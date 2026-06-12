@@ -49,6 +49,15 @@ bikepower-c/
 ├── test/test_domain          — host 单测（领域层）
 ├── docs/01-cidf-nimble-rewrite.md  — 基线重写方案
 ├── .trae/rules/            — AI 规则（C/ESP-IDF 版）
+│   ├── general-rules.md      — 项目结构 + 模块边界 + 提交/发版规则
+│   ├── coding-style.md       — C/ESP-IDF 代码风格 + FreeRTOS 约束
+│   ├── hardware-constraints.md — ESP32-C3 硬件约束
+│   ├── wifi-ble-mutex.md     — WiFi/BLE 射频互斥（硬约束）
+│   ├── ai-challenge.md       — AI 质疑规则
+│   ├── best-practices.md     — 项目优化审查规则（发版前）
+│   └── workflows/
+│       ├── pre-dev-checklist.md   — 开发前检查清单
+│       └── entropy-governance.md  — Entropy 治理（发版前扫描）
 └── .trae/memory/             — 项目记忆
 ```
 
