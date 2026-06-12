@@ -7,7 +7,8 @@ SRCS := test_domain.c \
         $(DOMAIN)/profile.c \
         $(DOMAIN)/domain_rng.c \
         $(DOMAIN)/hr_model.c \
-        $(DOMAIN)/power_engine.c
+        $(DOMAIN)/power_engine.c \
+        $(DOMAIN)/config_store.c
 
 test_domain: $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $(SRCS) -lm

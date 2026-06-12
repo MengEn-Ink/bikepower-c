@@ -3,5 +3,6 @@ idf_component_register(
          "domain_rng.c"
          "hr_model.c"
          "power_engine.c"
+         "config_store.c"
     INCLUDE_DIRS "include"
 )

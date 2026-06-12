@@ -11,6 +11,7 @@
 #include "profile.h"
 #include "hr_model.h"
 #include "power_engine.h"
+#include "config_store.h"
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -195,6 +196,57 @@ static void test_steady_snapshot(void)
     }
 }
 
+static void test_config_store(void)
+{
+    printf("[test] 配置 schema 默认/校验/迁移\n");
+    config_data_t c;
+    config_store_defaults(&c);
+    CHECK(c.schema_ver == CONFIG_VERSION, "默认schema版本");
+    CHECK(c.power == DEFAULT_POWER, "默认功率");
+    CHECK(c.cadence == DEFAULT_CADENCE, "默认踏频");
+    CHECK(c.mode == DEFAULT_RIDE_MODE, "默认模式");
+    CHECK(c.tune_road == MODE_TUNE_DEFAULT, "默认road调节");
+    CHECK(c.weight == PROFILE_WEIGHT_DEFAULT, "默认体重");
+    CHECK(c.ftp == PROFILE_FTP_DEFAULT, "默认FTP");
+    CHECK(c.thr_hr == PROFILE_THR_HR_DEFAULT, "默认阈值心率");
+    CHECK(c.ride_type == PROFILE_RIDE_TYPE_DEFAULT, "默认配速机器人");
+
+    // 合法数据不修正
+    CHECK(!config_store_validate(&c), "默认值无需校验修正");
+
+    // 越界字段夹紧
+    config_data_t b;
+    config_store_defaults(&b);
+    b.power = 99999;
+    b.cadence = -5;
+    b.mode = 7;
+    b.tune_road = 200;
+    b.weight = 10;
+    b.ftp = 9999;
+    b.thr_hr = 0;
+    b.ride_type = 99;
+    CHECK(config_store_validate(&b), "越界数据被修正");
+    CHECK(b.power == POWER_MAX, "功率夹到上限");
+    CHECK(b.cadence == CADENCE_MIN, "踏频夹到下限");
+    CHECK(b.mode == DEFAULT_RIDE_MODE, "非法模式回默认");
+    CHECK(b.tune_road == MODE_TUNE_MAX, "road调节夹上限");
+    CHECK(b.weight == PROFILE_WEIGHT_MIN, "体重夹下限");
+    CHECK(b.ftp == PROFILE_FTP_MAX, "FTP夹上限");
+    CHECK(b.thr_hr == PROFILE_THR_HR_MIN, "阈值心率夹下限");
+    CHECK(b.ride_type == PROFILE_RIDE_TYPE_DEFAULT, "非法配速机器人回默认");
+
+    // 版本不匹配触发迁移重置
+    config_data_t m;
+    config_store_defaults(&m);
+    m.schema_ver = 1;
+    m.power = 500;
+    CHECK(config_store_migrate(&m), "旧版本触发迁移");
+    CHECK(m.schema_ver == CONFIG_VERSION, "迁移后版本=当前");
+    CHECK(m.power == DEFAULT_POWER, "迁移后重置默认");
+    // 当前版本不迁移
+    CHECK(!config_store_migrate(&m), "当前版本不迁移");
+}
+
 int main(void)
 {
     test_profile();
@@ -205,6 +257,7 @@ int main(void)
     test_erg();
     test_road_pacer();
     test_steady_snapshot();
+    test_config_store();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }
