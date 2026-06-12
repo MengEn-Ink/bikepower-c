@@ -35,6 +35,7 @@ typedef struct {
     snapshot_t snapshot;
     long snapshot_count;
     bool dirty;
+    char device_name[DEVICE_NAME_MAX];
 } power_engine_t;
 
 void power_engine_init(power_engine_t *e);
@@ -51,6 +52,9 @@ bool power_engine_set_heartrate(power_engine_t *e, int value);
 bool power_engine_set_mode(power_engine_t *e, ride_mode_t mode);
 bool power_engine_set_mode_tuning(power_engine_t *e, ride_mode_t mode, int value);
 int power_engine_get_mode_tuning(power_engine_t *e, ride_mode_t mode);
+
+/** 设置 BLE 设备名（截断到 DEVICE_NAME_MAX-1），返回是否变化 */
+bool power_engine_set_device_name(power_engine_t *e, const char *name);
 
 /** FTMS 控制点下发 ERG 目标功率，自动切到 ERG 模式 */
 void power_engine_set_erg_target(power_engine_t *e, int target_power);

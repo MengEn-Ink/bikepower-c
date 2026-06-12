@@ -18,6 +18,7 @@ typedef struct {
     int ftp;            // profile.ftp
     int thr_hr;         // profile.thr_hr
     int ride_type;      // profile.ride_type 0-4
+    char device_name[DEVICE_NAME_MAX];  // BLE 广播名
 } config_data_t;
 
 /** 填充出厂默认值 */

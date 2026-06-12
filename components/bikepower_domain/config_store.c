@@ -2,6 +2,7 @@
  * 配置 schema 实现 — 见 config_store.h
  */
 #include "config_store.h"
+#include <string.h>
 
 static int clamp_int(int v, int lo, int hi)
 {
@@ -21,6 +22,8 @@ void config_store_defaults(config_data_t *c)
     c->ftp = PROFILE_FTP_DEFAULT;
     c->thr_hr = PROFILE_THR_HR_DEFAULT;
     c->ride_type = PROFILE_RIDE_TYPE_DEFAULT;
+    strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
+    c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
 
 bool config_store_validate(config_data_t *c)
@@ -36,6 +39,11 @@ bool config_store_validate(config_data_t *c)
     c->thr_hr = clamp_int(c->thr_hr, PROFILE_THR_HR_MIN, PROFILE_THR_HR_MAX);
     if (c->ride_type < 0 || c->ride_type >= PACER_COUNT) c->ride_type = PROFILE_RIDE_TYPE_DEFAULT;
 
+    c->device_name[DEVICE_NAME_MAX - 1] = '\0';
+    if (c->device_name[0] == '\0') {
+        strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
+    }
+
     return in.power != c->power
         || in.cadence != c->cadence
         || in.mode != c->mode
@@ -43,7 +51,8 @@ bool config_store_validate(config_data_t *c)
         || in.weight != c->weight
         || in.ftp != c->ftp
         || in.thr_hr != c->thr_hr
-        || in.ride_type != c->ride_type;
+        || in.ride_type != c->ride_type
+        || strncmp(in.device_name, c->device_name, DEVICE_NAME_MAX) != 0;
 }
 
 bool config_store_migrate(config_data_t *c)

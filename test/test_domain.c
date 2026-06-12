@@ -210,9 +210,24 @@ static void test_config_store(void)
     CHECK(c.ftp == PROFILE_FTP_DEFAULT, "默认FTP");
     CHECK(c.thr_hr == PROFILE_THR_HR_DEFAULT, "默认阈值心率");
     CHECK(c.ride_type == PROFILE_RIDE_TYPE_DEFAULT, "默认配速机器人");
+    CHECK(strcmp(c.device_name, DEVICE_NAME_DEFAULT) == 0, "默认设备名");
 
     // 合法数据不修正
     CHECK(!config_store_validate(&c), "默认值无需校验修正");
+
+    // 空设备名回退默认
+    config_data_t d;
+    config_store_defaults(&d);
+    d.device_name[0] = '\0';
+    CHECK(config_store_validate(&d), "空设备名被修正");
+    CHECK(strcmp(d.device_name, DEVICE_NAME_DEFAULT) == 0, "空设备名回退默认");
+
+    // 自定义设备名保留
+    config_data_t n;
+    config_store_defaults(&n);
+    strcpy(n.device_name, "MyBike");
+    CHECK(!config_store_validate(&n), "自定义设备名合法不修正");
+    CHECK(strcmp(n.device_name, "MyBike") == 0, "自定义设备名保留");
 
     // 越界字段夹紧
     config_data_t b;

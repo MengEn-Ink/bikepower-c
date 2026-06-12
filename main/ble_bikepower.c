@@ -67,6 +67,7 @@ static uint8_t g_ftms_status_buf[7]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0
 
 static ble_erg_cb_t g_erg_cb = NULL;
 static char g_device_name[24] = DEVICE_NAME;
+static esp_timer_handle_t g_notify_timer = NULL;
 
 static void start_advertising(void);
 
@@ -468,10 +469,31 @@ void ble_bikepower_start(void)
     if (rc != 0) { ESP_LOGW(TAG, "设置设备名失败 rc=%d", rc); }
 
     const esp_timer_create_args_t targs = { .callback = notify_tick, .name = "ble_notify" };
-    esp_timer_handle_t th;
-    ESP_ERROR_CHECK(esp_timer_create(&targs, &th));
-    ESP_ERROR_CHECK(esp_timer_start_periodic(th, (uint64_t)BLE_NOTIFY_INTERVAL_MS * 1000));
+    ESP_ERROR_CHECK(esp_timer_create(&targs, &g_notify_timer));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(g_notify_timer, (uint64_t)BLE_NOTIFY_INTERVAL_MS * 1000));
 
     nimble_port_freertos_init(ble_host_task);
     ESP_LOGI(TAG, "蓝牙功率计已启动 五服务 CPS+HRS+CSC+FTMS+DIS 设备名=%s", g_device_name);
+}
+
+void ble_bikepower_stop(void)
+{
+    if (g_notify_timer) {
+        esp_timer_stop(g_notify_timer);
+        esp_timer_delete(g_notify_timer);
+        g_notify_timer = NULL;
+    }
+    if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+        ble_gap_terminate(g_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+    }
+    ble_gap_adv_stop();
+
+    int rc = nimble_port_stop();
+    if (rc == 0) {
+        nimble_port_deinit();
+        ESP_LOGI(TAG, "蓝牙已停用 释放射频");
+    } else {
+        ESP_LOGE(TAG, "nimble_port_stop 失败 rc=%d", rc);
+    }
+    g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 }

@@ -5,6 +5,7 @@
 #include "config_store.h"
 #include "nvs.h"
 #include "esp_log.h"
+#include <string.h>
 
 static const char *TAG = "NVS";
 
@@ -18,6 +19,7 @@ static const char *TAG = "NVS";
 #define K_FTP         "ftp"
 #define K_THR_HR      "thr_hr"
 #define K_RIDE        "ride"
+#define K_DEVNAME     "devname"
 
 static void engine_to_config(power_engine_t *e, config_data_t *c)
 {
@@ -30,6 +32,8 @@ static void engine_to_config(power_engine_t *e, config_data_t *c)
     c->ftp = e->profile.ftp;
     c->thr_hr = e->profile.thr_hr;
     c->ride_type = e->profile.ride_type;
+    strncpy(c->device_name, e->device_name, DEVICE_NAME_MAX - 1);
+    c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
 
 static void config_to_engine(const config_data_t *c, power_engine_t *e)
@@ -42,6 +46,7 @@ static void config_to_engine(const config_data_t *c, power_engine_t *e)
     profile_set_ftp(&e->profile, c->ftp);
     profile_set_thr_hr(&e->profile, c->thr_hr);
     profile_set_ride_type(&e->profile, c->ride_type);
+    power_engine_set_device_name(e, c->device_name);
 }
 
 // 读单个 i32，缺失时保留默认值
@@ -81,6 +86,8 @@ void nvs_store_load(power_engine_t *e)
     get_i32(h, K_FTP, &c.ftp);
     get_i32(h, K_THR_HR, &c.thr_hr);
     get_i32(h, K_RIDE, &c.ride_type);
+    size_t dn_len = sizeof(c.device_name);
+    nvs_get_str(h, K_DEVNAME, c.device_name, &dn_len);
     nvs_close(h);
 
     bool migrated = config_store_migrate(&c);
@@ -117,6 +124,7 @@ bool nvs_store_save(power_engine_t *e)
     nvs_set_i32(h, K_FTP, c.ftp);
     nvs_set_i32(h, K_THR_HR, c.thr_hr);
     nvs_set_i32(h, K_RIDE, c.ride_type);
+    nvs_set_str(h, K_DEVNAME, c.device_name);
 
     err = nvs_commit(h);
     nvs_close(h);

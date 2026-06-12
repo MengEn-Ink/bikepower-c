@@ -21,7 +21,11 @@
 #define DEFAULT_HEARTRATE     150
 
 // ===== 配置格式版本 =====
-#define CONFIG_VERSION        3
+#define CONFIG_VERSION        4
+
+// ===== 设备名称（BLE 广播名，可配网修改并持久化） =====
+#define DEVICE_NAME_MAX       24
+#define DEVICE_NAME_DEFAULT   "BikePower"
 
 // ===== 骑行模式 ID =====
 typedef enum {

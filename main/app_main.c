@@ -23,6 +23,7 @@
 #include "app_state.h"
 #include "button.h"
 #include "led.h"
+#include "radio_ctrl.h"
 
 static const char *TAG = "APP";
 
@@ -33,6 +34,12 @@ static QueueHandle_t s_app_queue;
 static void on_erg_target(int target_power)
 {
     power_engine_set_erg_target(&s_engine, target_power);
+}
+
+// WiFi 配网触发（app_state 二次确认后回调）：进入射频独占配网模式
+static void on_wifi_trigger(void)
+{
+    radio_ctrl_enter_wifi(&s_engine);
 }
 
 void app_main(void)
@@ -58,9 +65,11 @@ void app_main(void)
 
     led_init();
     app_state_init(&s_engine);
+    app_state_set_wifi_trigger(on_wifi_trigger);
     button_init(s_app_queue);
 
     ble_bikepower_set_erg_callback(on_erg_target);
+    ble_bikepower_set_device_name(s_engine.device_name);
     ble_bikepower_start();
 
     // 看门狗：主循环每拍喂狗（idf 默认已为 IDLE 任务注册 TWDT，这里订阅当前任务）
@@ -74,6 +83,13 @@ void app_main(void)
         // 消费按钮/事件队列（非阻塞批量）
         while (xQueueReceive(s_app_queue, &e, 0) == pdTRUE) {
             app_state_handle_event(&e);
+        }
+
+        // WiFi 配网模式：BLE 已停用，主循环只喂狗等待重启恢复
+        if (app_state_get() == ST_WIFI_CONFIG) {
+            esp_task_wdt_reset();
+            vTaskDelay(pdMS_TO_TICKS(HR_LOOP_INTERVAL_MS));
+            continue;
         }
 
         // 轮询 BLE 连接变化并投递事件

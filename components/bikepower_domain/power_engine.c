@@ -4,6 +4,7 @@
 #include "domain_config.h"
 #include "domain_rng.h"
 #include "power_engine.h"
+#include <string.h>
 
 static int clampi(int v, int lo, int hi)
 {
@@ -43,6 +44,8 @@ void power_engine_init(power_engine_t *e)
     e->snapshot.mode = DEFAULT_RIDE_MODE;
     e->snapshot_count = 0;
     e->dirty = false;
+    strncpy(e->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
+    e->device_name[DEVICE_NAME_MAX - 1] = '\0';
     power_engine_reset_mode_state(e);
 }
 
@@ -214,6 +217,16 @@ int power_engine_get_mode_tuning(power_engine_t *e, ride_mode_t mode)
 {
     if (mode != RIDE_MODE_ROAD) return MODE_TUNE_DEFAULT;
     return clamp_tune(e->mode_tuning_road);
+}
+
+bool power_engine_set_device_name(power_engine_t *e, const char *name)
+{
+    if (name == NULL || name[0] == '\0') return false;
+    if (strncmp(e->device_name, name, DEVICE_NAME_MAX) == 0) return false;
+    strncpy(e->device_name, name, DEVICE_NAME_MAX - 1);
+    e->device_name[DEVICE_NAME_MAX - 1] = '\0';
+    e->dirty = true;
+    return true;
 }
 
 void power_engine_set_erg_target(power_engine_t *e, int target_power)
