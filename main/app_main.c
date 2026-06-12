@@ -8,6 +8,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "bikepower_config.h"
+#include "ble_bikepower.h"
 
 static const char *TAG = "APP";
 
@@ -23,10 +24,14 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "NVS 初始化完成");
 
-    ESP_LOGI(TAG, "app_main 启动日志：阶段0 骨架运行正常");
+    ble_bikepower_start();
+
+    // 阶段1：固定功率 200W 推送，验证 Zwift/nRF Connect 能连上看到功率
+    ble_bikepower_set_data(200, DEFAULT_HEARTRATE, DEFAULT_CADENCE);
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(10000));
-        ESP_LOGI(TAG, "心跳：可用堆 %lu 字节", (unsigned long)esp_get_free_heap_size());
+        ESP_LOGI(TAG, "心跳：可用堆 %lu 字节，连接数 %d",
+                 (unsigned long)esp_get_free_heap_size(), ble_bikepower_conn_count());
     }
 }
