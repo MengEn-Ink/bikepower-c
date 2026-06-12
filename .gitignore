@@ -1,0 +1,15 @@
+# ESP-IDF build artifacts
+build/
+sdkconfig
+sdkconfig.old
+*.bin
+*.elf
+*.map
+
+# macOS
+.DS_Store
+
+# Coredump / logs
+*.log
+dependencies.lock
+managed_components/
