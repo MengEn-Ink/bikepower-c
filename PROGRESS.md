@@ -15,7 +15,7 @@
 | 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测 545 断言 |
 | 3 | GPIO 中断按钮 + LED 任务 + 状态机 | ✅ 代码完成（物理按钮待人工确认） | 短/中/长按 + 二次确认 + LED 各态 |
 | 4 | 配置持久化（NVS load/save/migrate） | ✅ 完成 | 调功后断电重启功率由260W恢复为200W，host 单测 568 断言 |
-| 5 | WiFi 配网（radio_ctrl 软切换 + AP + HTTP） | ⬜ 未开始 | 长按确认→配网→保存→重启→BLE 恢复 |
+| 5 | WiFi 配网（radio_ctrl 软切换 + AP + HTTP） | ✅ 代码完成（配网真机流程待人工确认） | 长按确认→配网→保存→重启→BLE 恢复 |
 | 6 | 稳定性与发版（WDT/coredump/老化/tag） | ⬜ 未开始 | 72h 老化无 coredump，打 tag v3.0.0 |
 
 ---
@@ -69,7 +69,7 @@
 | NVS 桥接 | [main/nvs_store.c](main/nvs_store.c) | namespace=bikepower 短key，load（缺失/版本不匹配用默认并回写）+ save（脏标记落盘） |
 | 主循环接入 | [main/app_main.c](main/app_main.c) | 启动 load + clear_dirty，10s 心跳脏标记落盘 |
 
-- NVS namespace `bikepower`，短 key：`sv`/`power`/`cadence`/`mode`/`tune`/`weight`/`ftp`/`thr_hr`/`ride`
+- NVS namespace `bikepower`，短 key：`sv`/`power`/`cadence`/`mode`/`tune`/`weight`/`ftp`/`thr_hr`/`ride`/`devname`
 - 旧 MicroPython JSON 配置不迁移，首刷重置为默认
 
 ### 真机验证（已通过）
@@ -80,14 +80,29 @@
 
 ---
 
-## 待完成项（后续阶段）
+## 阶段5 完成情况
 
-### 阶段5：WiFi 配网
-- 新建 `main/radio_ctrl.c`（唯一 BLE/WiFi 开关，方案 C：软切换 + 兜底重启）
-- `main/wifi_portal.c`：esp_wifi AP + esp_http_server + EMBED_FILES HTML
-- 路由表对齐 MicroPython `09-web-api-reference.md`
-- app_state 注册 wifi_trigger 回调，ST_WIFI_CONFIG 期间暂停 BLE 通知
-- 180s 超时关闭 + 重启恢复 BLE
+### 已实现
+
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| 射频控制 | [main/radio_ctrl.c](main/radio_ctrl.c) | 唯一 BLE/WiFi 开关，方案 A：停 BLE → 延时释放射频 → 启 WiFi AP；配网结束/超时 `esp_restart()` 恢复 BLE |
+| 配网门户 | [main/wifi_portal.c](main/wifi_portal.c) | esp_wifi SoftAP + esp_http_server，内嵌 snprintf HTML 单页；路由 `/` `/config` `/time` `/renew` |
+| 状态机接入 | [main/app_state.c](main/app_state.c) | ST_WIFI_CONFIRM → ST_WIFI_CONFIG，经 `wifi_trigger` 回调触发 radio_ctrl |
+
+- 超时方案 A：180s（`WIFI_SHUTDOWN_MS`）无续期自动重启恢复 BLE，配网保存后 5s 延迟重启
+- 前端每秒轮询 `/time` 显示剩余时间，`/renew` 续期
+- 配网表单可改：功率/踏频/模式，保存后写入 power_engine + NVS
+
+### 待人工确认（需配网真机流程）
+
+- [ ] 长按 + 二次确认 → 进入配网，手机连 `BikePower` 热点
+- [ ] 浏览器访问 `192.168.4.1` → 修改参数 → 保存 → 设备重启 → BLE 恢复且参数生效
+- [ ] 180s 无操作 → 自动超时重启恢复 BLE
+
+---
+
+## 待完成项（后续阶段）
 
 ### 阶段6：稳定性与发版
 - 所有长任务订阅 Task WDT；coredump 分区；低内存监控
