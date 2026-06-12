@@ -14,7 +14,7 @@
 | 1 | NimBLE CPS 单服务最小闭环 | ✅ 完成 | 手机搜到 BikePower 看到功率 |
 | 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测 545 断言 |
 | 3 | GPIO 中断按钮 + LED 任务 + 状态机 | ✅ 代码完成（物理按钮待人工确认） | 短/中/长按 + 二次确认 + LED 各态 |
-| 4 | 配置持久化（NVS load/save/migrate） | ⬜ 未开始 | 调功断电重启恢复 |
+| 4 | 配置持久化（NVS load/save/migrate） | ✅ 完成 | 调功后断电重启功率由260W恢复为200W，host 单测 568 断言 |
 | 5 | WiFi 配网（radio_ctrl 软切换 + AP + HTTP） | ⬜ 未开始 | 长按确认→配网→保存→重启→BLE 恢复 |
 | 6 | 稳定性与发版（WDT/coredump/老化/tag） | ⬜ 未开始 | 72h 老化无 coredump，打 tag v3.0.0 |
 
@@ -59,13 +59,28 @@
 
 ---
 
-## 待完成项（后续阶段）
+## 阶段4 完成情况
 
-### 阶段4：配置持久化
-- 新建 `components/config_store`（纯 C schema + 校验/迁移）+ `main/nvs_store.c`（NVS 桥接）
-- NVS namespace `bikepower`，短 key：`schema_ver`/`power`/`cadence`/`hr`/`mode`/`ftp`/`thr_hr`/`weight`/`ride_type`
-- 调功后写脏标记，周期 flush；启动时 load 注入 power_engine
-- 旧 MicroPython JSON 配置不迁移，首刷重置为默认（发版说明标注）
+### 已实现
+
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| 配置 schema | [components/bikepower_domain/config_store.c](components/bikepower_domain/config_store.c) | 纯 C，defaults/validate（逐字段越界夹紧）/migrate（版本不匹配重置默认），可 host 单测 |
+| NVS 桥接 | [main/nvs_store.c](main/nvs_store.c) | namespace=bikepower 短key，load（缺失/版本不匹配用默认并回写）+ save（脏标记落盘） |
+| 主循环接入 | [main/app_main.c](main/app_main.c) | 启动 load + clear_dirty，10s 心跳脏标记落盘 |
+
+- NVS namespace `bikepower`，短 key：`sv`/`power`/`cadence`/`mode`/`tune`/`weight`/`ftp`/`thr_hr`/`ride`
+- 旧 MicroPython JSON 配置不迁移，首刷重置为默认
+
+### 真机验证（已通过）
+
+- 首刷启动用默认值并回写：`p=260W c=90RPM mode=0 tune=50 w=70 ftp=300 thr=190 ride=0`
+- 短按 3 次（每次 -20W）→ 等待落盘 → 断电重启 → 功率恢复为 `p=200W`，证明持久化生效
+- host 单测 568 断言全过（新增 config_store 23 断言）
+
+---
+
+## 待完成项（后续阶段）
 
 ### 阶段5：WiFi 配网
 - 新建 `main/radio_ctrl.c`（唯一 BLE/WiFi 开关，方案 C：软切换 + 兜底重启）
