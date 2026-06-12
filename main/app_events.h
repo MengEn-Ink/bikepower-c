@@ -11,6 +11,7 @@ typedef enum {
     APP_EVT_BTN_REPEAT,     // 长按自动重复（data=已按住毫秒）
     APP_EVT_BTN_UP,         // 按钮释放（data=按住毫秒）
     APP_EVT_CONN_CHANGED,   // BLE 连接状态变化（data=已连接 0/1）
+    APP_EVT_ERG_TARGET,     // FTMS ERG 目标功率（data=目标瓦特）
 } app_evt_type_t;
 
 typedef struct {

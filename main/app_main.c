@@ -31,9 +31,11 @@ static power_engine_t s_engine;
 static QueueHandle_t s_app_queue;
 
 // FTMS 控制点 ERG 回调（NimBLE host 任务上下文）
+// 不直接修改 s_engine，通过队列投递到主循环避免竞态
 static void on_erg_target(int target_power)
 {
-    power_engine_set_erg_target(&s_engine, target_power);
+    app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = target_power };
+    xQueueSend(s_app_queue, &e, 0);
 }
 
 // WiFi 配网触发（app_state 二次确认后回调）：进入射频独占配网模式

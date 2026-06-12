@@ -91,6 +91,11 @@ void app_state_handle_event(const app_evt_t *e)
         ESP_LOGI(TAG, "连接状态变化 connected=%d", s_connected);
         break;
 
+    case APP_EVT_ERG_TARGET:
+        power_engine_set_erg_target(s_engine, e->data);
+        ESP_LOGI(TAG, "ERG 目标功率 %dW", (int)e->data);
+        break;
+
     case APP_EVT_BTN_DOWN:
         if (s_state == ST_WIFI_CONFIRM) {
             trigger_wifi();
