@@ -107,10 +107,19 @@ void app_main(void)
 
         if (++tick >= 200) {  // 每 10s 一次心跳日志
             tick = 0;
+            uint32_t heap = esp_get_free_heap_size();
             ESP_LOGI(TAG, "心跳 堆=%lu p=%dW hr=%d c=%d mode=%d conn=%d state=%d",
-                     (unsigned long)esp_get_free_heap_size(),
+                     (unsigned long)heap,
                      s.power, s.heartrate, s.cadence, s.mode,
                      conn, app_state_get());
+
+            if (heap < HEAP_CRIT_BYTES) {
+                ESP_LOGE(TAG, "空闲堆严重不足 %lu < %d，存在崩溃风险",
+                         (unsigned long)heap, HEAP_CRIT_BYTES);
+            } else if (heap < HEAP_WARN_BYTES) {
+                ESP_LOGW(TAG, "空闲堆偏低 %lu < %d",
+                         (unsigned long)heap, HEAP_WARN_BYTES);
+            }
 
             // 配置脏标记则周期落盘（调功/改配置后断电可恢复）
             if (power_engine_is_dirty(&s_engine)) {
