@@ -99,6 +99,7 @@
 - [ ] 长按 + 二次确认 → 进入配网，手机连 `BikePower` 热点
 - [ ] 浏览器访问 `192.168.4.1` → 修改参数 → 保存 → 设备重启 → BLE 恢复且参数生效
 - [ ] 180s 无操作 → 自动超时重启恢复 BLE
+- [ ] 连上热点后跑 `python3 tests/stage5_portal_test.py` 校验 HTTP 路由（首页/more/碎片/time/mem_stats/favicon/success 守卫）
 
 ---
 
