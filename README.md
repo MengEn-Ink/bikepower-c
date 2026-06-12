@@ -27,7 +27,7 @@ ESP32-C3 蓝牙功率计模拟器（C 重写版）。由 MicroPython 实现完�
 bikepower-c/
 ├── main/                       — 应用层（入口/状态机/按钮/LED/BLE/配置常量）
 ├── components/bikepower_domain/ — 纯 C 领域层（功率引擎/心率模型/用户配置），可 host 单测
-├── tests/                      — BLE 自测与串口抓取脚本
+├── tests/                      — 真机自测脚本（BLE 五服务+ERG / 配网门户 / 连接事件 / 串口抓取）
 ├── test/test_domain            — 领域层 host 单测
 ├── docs/                       — 设计与重写方案
 ├── partitions.csv              — 分区表

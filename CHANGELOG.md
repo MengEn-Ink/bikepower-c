@@ -18,6 +18,9 @@
 - `/success` 直访守卫（未提交配置 302 回首页）、`/favicon.ico` 返回 204、`/mem_stats` 返回堆内存 JSON。
 - 测试脚本 `tests/stage5_portal_test.py`：HTTP 路由只读自测。
 
+### 改进（测试脚本）
+- `tests/ble_selftest.py`：补充 DIS 设备信息读取校验（厂商 `BikePower` / 型号 `ESP32-C3` / 固件 `3.0.0`），纳入总判定，与"五服务齐全"声明一致。
+
 ### 新增（阶段4 配置持久化）
 - 领域层 `config_store`：配置 schema（defaults/validate/migrate），`CONFIG_VERSION=4`。
 - `nvs_store`：NVS namespace `bikepower`，10 短 key 含 `devname`，脏标记周期落盘。
@@ -30,7 +33,7 @@
 
 ### 测试报告
 - host 单测（`test/test_domain`）：573 断言全过。
-- `idf.py build`：通过，`bikepower-c.bin` 约 0xfa620 bytes，应用分区 44% free。
+- `idf.py build`：通过，`bikepower-c.bin` 约 0xfd9a0 bytes，应用分区 43% free。
 - 分区表核验：`coredump` 64K @ 0x1d0000 已写入。
 - 真机老化、配网全链路、物理按钮/LED：待人工确认（见 [PROGRESS.md](PROGRESS.md)）。
 

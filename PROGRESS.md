@@ -12,7 +12,7 @@
 |------|------|------|------|
 | 0 | 工程骨架（CMake/分区/sdkconfig） | ✅ 完成 | 空工程启动日志 |
 | 1 | NimBLE CPS 单服务最小闭环 | ✅ 完成 | 手机搜到 BikePower 看到功率 |
-| 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测 545 断言 |
+| 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测 573 断言 |
 | 3 | GPIO 中断按钮 + LED 任务 + 状态机 | ✅ 代码完成（物理按钮待人工确认） | 短/中/长按 + 二次确认 + LED 各态 |
 | 4 | 配置持久化（NVS load/save/migrate） | ✅ 完成 | 调功后断电重启功率由260W恢复为200W，host 单测 568 断言 |
 | 5 | WiFi 配网（radio_ctrl 软切换 + AP + HTTP） | ✅ 代码完成（配网真机流程待人工确认） | 长按确认→配网→保存→重启→BLE 恢复 |
@@ -120,7 +120,7 @@
 
 - [ ] 72h 老化测试：长时间运行无 coredump、无堆持续下降（跑 `tests/stage5_portal_test.py` / `ble_selftest.py` 辅助）
 - [ ] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`
-- [ ] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认
+- [ ] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（`ble_selftest.py` 已自动校验厂商/型号/固件三字段）
 - [ ] 打 tag v3.0.0 + Gitee Release（老化通过后由人工执行）
 
 ---

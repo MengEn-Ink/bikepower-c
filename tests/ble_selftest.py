@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """BikePower C — BLE 自测脚本（Mac CoreBluetooth via bleak）
 
-扫描 BikePower → 连接 → 校验五服务 → 订阅 CPS/HR/CSC/FTMS 通知。
+扫描 BikePower → 连接 → 校验五服务 → 读取 DIS 设备信息（厂商/型号/固件版本）
+→ 订阅 CPS/HR/CSC/FTMS 通知。
 再通过 FTMS 控制点(0x2AD9)下发 RequestControl + SetTargetPower(ERG)，
 校验控制点 indication 响应，并确认 CPS 功率收敛到目标值附近。
 用法: python tests/ble_selftest.py [秒数] [目标功率]
@@ -18,6 +19,15 @@ HR_UUID = "00002a37-0000-1000-8000-00805f9b34fb"
 CSC_UUID = "00002a5b-0000-1000-8000-00805f9b34fb"
 FTMS_BIKE_UUID = "00002ad2-0000-1000-8000-00805f9b34fb"
 FTMS_CP_UUID = "00002ad9-0000-1000-8000-00805f9b34fb"
+DIS_MANUF_UUID = "00002a29-0000-1000-8000-00805f9b34fb"
+DIS_MODEL_UUID = "00002a24-0000-1000-8000-00805f9b34fb"
+DIS_FW_UUID = "00002a26-0000-1000-8000-00805f9b34fb"
+
+DIS_EXPECT = {
+    DIS_MANUF_UUID: ("厂商", "BikePower"),
+    DIS_MODEL_UUID: ("型号", "ESP32-C3"),
+    DIS_FW_UUID: ("固件", "3.0.0"),
+}
 
 DURATION = int(sys.argv[1]) if len(sys.argv) > 1 else 8
 TARGET_POWER = int(sys.argv[2]) if len(sys.argv) > 2 else 200
@@ -55,6 +65,22 @@ async def main():
             print(f"  特征 {label}: {'有' if present else '无'}")
             if not present:
                 missing.append(label)
+
+        dis_ok = True
+        print("读取 DIS 设备信息 ...")
+        for uuid, (label, expect) in DIS_EXPECT.items():
+            if uuid not in found:
+                print(f"  DIS {label}: 无特征")
+                dis_ok = False
+                continue
+            try:
+                val = (await client.read_gatt_char(uuid)).decode("utf-8", "replace")
+                match = val == expect
+                print(f"  DIS {label}: '{val}' (期望 '{expect}') {'通过' if match else '失败'}")
+                dis_ok = dis_ok and match
+            except Exception as e:
+                print(f"  DIS {label}: 读取失败 {type(e).__name__}")
+                dis_ok = False
 
         counts = {"cps": 0, "hr": 0, "csc": 0, "ftms": 0}
         last_power = [0]
@@ -121,10 +147,11 @@ async def main():
 
         print("--- 结果 ---")
         print(f"  五服务齐全: {'通过' if ok_services else '失败(' + ','.join(missing) + ')'}")
+        print(f"  DIS 设备信息: {'通过' if dis_ok else '失败'}")
         print(f"  CPS 通知:   {'通过' if ok_notify else '失败'}")
         print(f"  FTMS-CP 响应0x80: {'通过' if ok_cp_resp else '失败'}")
         print(f"  ERG 功率收敛: {'通过' if ok_erg else '失败'}")
-        ok = ok_notify and ok_services and ok_cp_resp and ok_erg
+        ok = ok_notify and ok_services and ok_cp_resp and ok_erg and dis_ok
         print("总判定:", "通过" if ok else "失败")
         return 0 if ok else 1
 
