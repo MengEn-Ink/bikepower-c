@@ -87,12 +87,12 @@
 | 模块 | 文件 | 说明 |
 |------|------|------|
 | 射频控制 | [main/radio_ctrl.c](main/radio_ctrl.c) | 唯一 BLE/WiFi 开关，方案 A：停 BLE → 延时释放射频 → 启 WiFi AP；配网结束/超时 `esp_restart()` 恢复 BLE |
-| 配网门户 | [main/wifi_portal.c](main/wifi_portal.c) | esp_wifi SoftAP + esp_http_server，内嵌 snprintf HTML 单页；路由 `/` `/config` `/time` `/renew` |
+| 配网门户 | [main/wifi_portal.c](main/wifi_portal.c) | esp_wifi SoftAP + esp_http_server，内嵌 snprintf HTML 分块发送；移植旧版完整 UI（iOS 三卡 + 训练区间染色 + 动态碎片页）；路由 `/` `/config` `/success` `/more` `/draft` `/ui/module` `/closing` `/time` `/renew` `/mem_stats` `/favicon.ico` |
 | 状态机接入 | [main/app_state.c](main/app_state.c) | ST_WIFI_CONFIRM → ST_WIFI_CONFIG，经 `wifi_trigger` 回调触发 radio_ctrl |
 
 - 超时方案 A：180s（`WIFI_SHUTDOWN_MS`）无续期自动重启恢复 BLE，配网保存后 5s 延迟重启
-- 前端每秒轮询 `/time` 显示剩余时间，`/renew` 续期
-- 配网表单可改：功率/踏频/模式，保存后写入 power_engine + NVS
+- 前端每秒轮询 `/time` 显示剩余时间，`/renew` 续期；`/mem_stats` 返回堆内存 JSON，`/favicon.ico` 返回 204
+- 配网表单可改：功率/踏频/心率/模式/体重/FTP/阈值心率/配速机器人/设备名，保存后写入 power_engine + NVS
 
 ### 待人工确认（需配网真机流程）
 

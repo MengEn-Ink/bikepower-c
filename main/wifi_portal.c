@@ -404,6 +404,12 @@ static void send_success(httpd_req_t *req)
 
 static esp_err_t h_success(httpd_req_t *req)
 {
+    if (!s_rebooting) {  // 未提交配置时直访，302 回首页（与旧版 PRG 守卫一致）
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", "/");
+        httpd_resp_send(req, NULL, 0);
+        return ESP_OK;
+    }
     send_success(req);
     return ESP_OK;
 }
@@ -739,6 +745,26 @@ static esp_err_t h_renew(httpd_req_t *req)
     return h_time(req);
 }
 
+// favicon：返回 204 空响应，避免浏览器配网时报 404
+static esp_err_t h_favicon(httpd_req_t *req)
+{
+    httpd_resp_set_status(req, "204 No Content");
+    httpd_resp_send(req, NULL, 0);
+    return ESP_OK;
+}
+
+// 内存统计 JSON（free + min_free），用于调试/压测
+static esp_err_t h_mem_stats(httpd_req_t *req)
+{
+    char buf[64];
+    snprintf(buf, sizeof(buf), "{\"free\":%u,\"min_free\":%u}",
+             (unsigned)esp_get_free_heap_size(),
+             (unsigned)esp_get_minimum_free_heap_size());
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, buf);
+    return ESP_OK;
+}
+
 // ============================ 启动 ============================
 
 static void start_softap(void)
@@ -786,6 +812,8 @@ static void start_httpd(void)
         { .uri = "/closing",   .method = HTTP_GET,  .handler = h_closing },
         { .uri = "/time",      .method = HTTP_GET,  .handler = h_time },
         { .uri = "/renew",     .method = HTTP_GET,  .handler = h_renew },
+        { .uri = "/mem_stats", .method = HTTP_GET,  .handler = h_mem_stats },
+        { .uri = "/favicon.ico", .method = HTTP_GET, .handler = h_favicon },
     };
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); i++) {
         httpd_register_uri_handler(s_httpd, &routes[i]);
