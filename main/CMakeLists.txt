@@ -4,6 +4,7 @@ idf_component_register(
          "app_state.c"
          "button.c"
          "led.c"
+         "nvs_store.c"
     INCLUDE_DIRS "."
     REQUIRES nvs_flash bt esp_timer esp_driver_gpio esp_system bikepower_domain
 )

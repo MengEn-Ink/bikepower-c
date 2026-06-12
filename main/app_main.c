@@ -18,6 +18,7 @@
 #include "bikepower_config.h"
 #include "ble_bikepower.h"
 #include "power_engine.h"
+#include "nvs_store.h"
 #include "app_events.h"
 #include "app_state.h"
 #include "button.h"
@@ -47,6 +48,8 @@ void app_main(void)
     ESP_LOGI(TAG, "NVS 初始化完成");
 
     power_engine_init(&s_engine);
+    nvs_store_load(&s_engine);
+    power_engine_clear_dirty(&s_engine);
     ESP_LOGI(TAG, "功率引擎初始化 p=%dW c=%dRPM hr=%d mode=%d",
              s_engine.base_power, s_engine.cadence_base,
              s_engine.last_heartrate, s_engine.mode);
@@ -92,6 +95,13 @@ void app_main(void)
                      (unsigned long)esp_get_free_heap_size(),
                      s.power, s.heartrate, s.cadence, s.mode,
                      conn, app_state_get());
+
+            // 配置脏标记则周期落盘（调功/改配置后断电可恢复）
+            if (power_engine_is_dirty(&s_engine)) {
+                if (nvs_store_save(&s_engine)) {
+                    power_engine_clear_dirty(&s_engine);
+                }
+            }
         }
 
         esp_task_wdt_reset();
