@@ -16,7 +16,7 @@
 | 3 | GPIO 中断按钮 + LED 任务 + 状态机 | ✅ 代码完成（物理按钮待人工确认） | 短/中/长按 + 二次确认 + LED 各态 |
 | 4 | 配置持久化（NVS load/save/migrate） | ✅ 完成 | 调功后断电重启功率由260W恢复为200W，host 单测 568 断言 |
 | 5 | WiFi 配网（radio_ctrl 软切换 + AP + HTTP） | ✅ 代码完成（配网真机流程待人工确认） | 长按确认→配网→保存→重启→BLE 恢复 |
-| 6 | 稳定性与发版（WDT/coredump/老化/tag） | ⬜ 未开始 | 72h 老化无 coredump，打 tag v3.0.0 |
+| 6 | 稳定性与发版（WDT/coredump/老化/tag） | 🚧 代码完成（72h 老化 + tag 待人工） | 72h 老化无 coredump，打 tag v3.0.0 |
 
 ---
 
@@ -103,12 +103,25 @@
 
 ---
 
-## 待完成项（后续阶段）
+## 阶段6 完成情况
 
-### 阶段6：稳定性与发版
-- 所有长任务订阅 Task WDT；coredump 分区；低内存监控
-- 72h 老化测试
-- release 编译 + CHANGELOG + 测试报告 + tag v3.0.0 + DIS 固件版本同步
+### 已实现
+
+| 项 | 文件 | 说明 |
+|------|------|------|
+| Task WDT 覆盖 | [main/app_main.c](main/app_main.c) / [main/led.c](main/led.c) | app_main 主循环与 led_task 均 `esp_task_wdt_add(NULL)` + 周期 `esp_task_wdt_reset()`；IDLE 任务由 `CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0` 监控 |
+| 低内存监控 | [main/app_main.c](main/app_main.c) | 心跳检查空闲堆：低于 `HEAP_WARN_BYTES`(40KB) 告警，低于 `HEAP_CRIT_BYTES`(20KB) 严重告警 |
+| Coredump | [partitions.csv](partitions.csv) / [sdkconfig.defaults](sdkconfig.defaults) | 新增 `coredump` 分区（64KB @ 0x1d0000），ELF 格式写 flash，CRC32 校验 |
+
+- button_task 为中断驱动、空闲时无限阻塞等唤醒，**刻意不订阅 WDT**（订阅会在无按键 5s 时误复位）
+- 阈值常量集中在 [main/bikepower_config.h](main/bikepower_config.h)：`HEAP_WARN_BYTES` / `HEAP_CRIT_BYTES`
+
+### 待人工确认（需真机 + 不可逆操作）
+
+- [ ] 72h 老化测试：长时间运行无 coredump、无堆持续下降（跑 `tests/stage5_portal_test.py` / `ble_selftest.py` 辅助）
+- [ ] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`
+- [ ] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认
+- [ ] 打 tag v3.0.0 + Gitee Release（老化通过后由人工执行）
 
 ---
 
