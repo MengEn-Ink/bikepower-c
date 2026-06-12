@@ -13,3 +13,10 @@ sdkconfig.old
 *.log
 dependencies.lock
 managed_components/
+
+# Editor / tooling cache
+.cache/
+compile_commands.json
+
+# Host unit test binary
+test/test_domain
