@@ -195,7 +195,8 @@ static bool query_get_str(httpd_req_t *req, const char *key, char *out, size_t o
 static int recv_body(httpd_req_t *req, char **out)
 {
     int total = req->content_len;
-    if (total <= 0 || total > 2048) total = total > 2048 ? 2048 : 0;
+    if (total <= 0) { *out = NULL; return -1; }
+    if (total > 4096) total = 4096;
     char *buf = malloc((size_t)total + 1);
     if (!buf) return -1;
     int recv = 0;
