@@ -7,6 +7,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 #include "bikepower_config.h"
 
 static const char *TAG = "LED";
@@ -31,6 +32,8 @@ static void led_task(void *arg)
     int elapsed = 0;
     int on = 0;
     led_pattern_t last = LED_SLOW;
+
+    esp_task_wdt_add(NULL);
 
     while (1) {
         led_pattern_t p = s_pattern;
@@ -57,6 +60,7 @@ static void led_task(void *arg)
 
         led_write(on);
         elapsed += LED_TICK_MS;
+        esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(LED_TICK_MS));
     }
 }
