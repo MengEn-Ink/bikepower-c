@@ -47,7 +47,7 @@ bikepower-c/
 │   ├── stage3_conn_test.py   — 连接事件驱动状态机验证
 │   └── serial_capture.py     — 串口日志抓取工具
 ├── test/test_domain          — host 单测（领域层）
-├── docs/01-cidf-nimble-rewrite.md  — 基线重写方案
+├── docs/05-cidf-nimble-rewrite.md  — 基线重写方案
 ├── .trae/rules/            — AI 规则（C/ESP-IDF 版）
 │   ├── general-rules.md      — 项目结构 + 模块边界 + 提交/发版规则
 │   ├── coding-style.md       — C/ESP-IDF 代码风格 + FreeRTOS 约束

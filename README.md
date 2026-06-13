@@ -19,7 +19,7 @@ BikePower C 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，�
 | `GND` | 地线 | 所有外设地必须共地 |
 | `UART0` | 调试串口 | 用于烧录、日志输出和故障排查；通常走开发板自带 USB 转串口 |
 
-更详细的硬件建议见 [docs/HARDWARE.md](docs/HARDWARE.md)。
+更详细的硬件建议见 [docs/03-hardware.md](docs/03-hardware.md)。
 
 ## 核心功能清单
 
@@ -113,9 +113,13 @@ bikepower-c/
 ├── components/
 │   └── bikepower_domain/
 ├── docs/
-│   ├── QUICKSTART.md
-│   ├── HARDWARE.md
-│   ├── 01-cidf-nimble-rewrite.md
+│   ├── 01-quickstart.md
+│   ├── 02-user-manual.md
+│   ├── 03-hardware.md
+│   ├── 04-technical-reference.md
+│   ├── 05-cidf-nimble-rewrite.md
+│   ├── 06-micropython-vs-c-comparison.md
+│   ├── INDEX.md
 │   └── images/
 ├── tests/
 ├── test/

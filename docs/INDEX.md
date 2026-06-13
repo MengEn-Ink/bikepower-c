@@ -8,16 +8,16 @@
 
 | 文档 | 说明 |
 |------|------|
-| [快速上手](QUICKSTART.md) | 第一次使用 BikePower C 的全流程指南 |
+| [快速上手](01-quickstart.md) | 第一次使用 BikePower C 的全流程指南 |
 | [README](../README.md) | 项目简介、功能清单、配图说明、引脚表、LED 灯效 |
 
 ## 🔧 开发者 / DIY 爱好者
 
 | 文档 | 说明 |
 |------|------|
-| [硬件指南](HARDWARE.md) | 推荐开发板、引脚定义、接线、供电、排障 |
-| [重写方案](01-cidf-nimble-rewrite.md) | 从 MicroPython 到 C 的分阶段重写路线图 |
-| [MicroPython vs C 对比](02-micropython-vs-c-comparison.md) | 两种技术栈的性能/内存/复杂度对比 |
+| [硬件指南](03-hardware.md) | 推荐开发板、引脚定义、接线、供电、排障 |
+| [重写方案](05-cidf-nimble-rewrite.md) | 从 MicroPython 到 C 的分阶段重写路线图 |
+| [MicroPython vs C 对比](06-micropython-vs-c-comparison.md) | 两种技术栈的性能/内存/复杂度对比 |
 
 ## 🤖 AI 助手
 

@@ -1,6 +1,6 @@
 # BikePower C — 项目进度
 
-> 基线方案：[docs/01-cidf-nimble-rewrite.md](docs/01-cidf-nimble-rewrite.md)
+> 基线方案：[docs/05-cidf-nimble-rewrite.md](docs/05-cidf-nimble-rewrite.md)
 > 目标固件版本：v3.0.0（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 参考仓库：git@gitee.com:mengen4jv/bikepower-c.git
 

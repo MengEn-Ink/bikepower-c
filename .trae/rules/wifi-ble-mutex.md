@@ -39,5 +39,5 @@ app_state ST_WIFI_CONFIG 触发 wifi_trigger 回调
 ## 相关规则
 
 - `.trae/rules/hardware-constraints.md` — ESP32-C3 硬件参数与异常 SOP
-- `docs/01-cidf-nimble-rewrite.md` — 阶段5 软切换方案细节
+- `docs/05-cidf-nimble-rewrite.md` — 阶段5 软切换方案细节
 - `AGENTS.md` — Hard Rules
