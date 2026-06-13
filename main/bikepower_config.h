@@ -4,9 +4,27 @@
  */
 #pragma once
 
-// ===== 硬件引脚 =====
-#define BTN_PIN              9      // BOOT 按钮，内置上拉，按下为低电平
-#define LED_PIN              12     // 板载 D4 LED，高电平有效
+// ===== 板型枚举 =====
+typedef enum {
+    BOARD_GENERIC_C3,       // 通用 ESP32-C3 开发板（GPIO12 LED, GPIO9 按钮）
+    BOARD_M5STAMP_C3,       // M5Stamp C3（GPIO2 SK6812 RGB LED, GPIO3 按钮）
+} board_type_t;
+
+// ===== 通用 ESP32-C3 开发板引脚 =====
+#define BTN_PIN_GENERIC       9      // BOOT 按钮，内置上拉，按下为低电平
+#define LED_PIN_GENERIC       12     // 板载 D4 LED，高电平有效
+
+// ===== M5Stamp C3 引脚 =====
+#define BTN_PIN_M5STAMP       3      // 用户按钮 SW，内置上拉，按下为低电平
+#define LED_PIN_M5STAMP       2      // SK6812 RGB LED 数据引脚
+
+// ===== SK6812 RGB LED 配置（M5Stamp C3） =====
+#define SK6812_NUM_LEDS       1      // 板载 1 颗 RGB LED
+#define SK6812_T0H_NS        300     // 0 码高电平时间 ns
+#define SK6812_T0L_NS        900     // 0 码低电平时间 ns
+#define SK6812_T1H_NS        600     // 1 码高电平时间 ns
+#define SK6812_T1L_NS        600     // 1 码低电平时间 ns
+#define SK6812_RESET_US      80      // 复位低电平时间 us
 
 // ===== BLE GATT 服务 UUID（16-bit） =====
 #define POWER_SERVICE_UUID         0x1818

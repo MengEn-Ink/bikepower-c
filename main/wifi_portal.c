@@ -467,7 +467,7 @@ static esp_err_t h_home(httpd_req_t *req)
         "var s=document.getElementsByClassName(\"seg\");for(var i=0;i<s.length;i++){var c=s[i].getElementsByTagName(\"input\")[0];s[i].className=c.checked?\"seg on\":\"seg\"}"
         "g(\"vs\").className=on?\"\":m===\"road\"?\"i road\":\"i erg\";"
         "[\"p\",\"c\",\"h\"].forEach(function(id){g(id).disabled=!on});"
-        "updNote()}}");
+        "updNote()}");
 
     snprintf(buf, sizeof(buf),
         "syncMode();updZone();"

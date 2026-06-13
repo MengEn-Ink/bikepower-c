@@ -24,6 +24,7 @@
 #include "button.h"
 #include "led.h"
 #include "radio_ctrl.h"
+#include "board_detect.h"
 
 static const char *TAG = "APP";
 
@@ -76,6 +77,7 @@ void app_main(void)
 
     s_app_queue = xQueueCreate(16, sizeof(app_evt_t));
 
+    board_detect();
     led_init();
     app_state_init(&s_engine);
     app_state_set_wifi_trigger(on_wifi_trigger);

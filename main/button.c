@@ -1,5 +1,7 @@
 /**
- * 中断驱动按钮（GPIO9，内部上拉，按下为低电平）
+ * 中断驱动按钮
+ * 通用板：GPIO9（BOOT 按钮），M5Stamp C3：GPIO3（用户按钮 SW）。
+ * 均为内部上拉，按下为低电平。
  *
  * ISR 仅释放信号量唤醒 button_task（中断上下文禁止调用 BLE/日志/队列阻塞 API）。
  * button_task 负责去抖、按住计时、长按自动重复，并向 app_queue 投递语义事件：
@@ -16,6 +18,7 @@
 #include "esp_log.h"
 #include "bikepower_config.h"
 #include "app_events.h"
+#include "board_detect.h"
 
 static const char *TAG = "BTN";
 
@@ -24,6 +27,7 @@ static const char *TAG = "BTN";
 
 static QueueHandle_t s_app_queue;
 static SemaphoreHandle_t s_wake;
+static int s_btn_pin;
 
 /**
  * 按钮 GPIO 中断服务函数。
@@ -49,7 +53,7 @@ static void IRAM_ATTR btn_isr(void *arg)
  */
 static int btn_pressed(void)
 {
-    return gpio_get_level(BTN_PIN) == 0;
+    return gpio_get_level(s_btn_pin) == 0;
 }
 
 /**
@@ -128,10 +132,11 @@ static void button_task(void *arg)
 void button_init(QueueHandle_t app_queue)
 {
     s_app_queue = app_queue;
+    s_btn_pin = board_btn_pin();
     s_wake = xSemaphoreCreateBinary();
 
     gpio_config_t io = {
-        .pin_bit_mask = 1ULL << BTN_PIN,
+        .pin_bit_mask = 1ULL << s_btn_pin,
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -140,8 +145,8 @@ void button_init(QueueHandle_t app_queue)
     gpio_config(&io);
 
     gpio_install_isr_service(0);
-    gpio_isr_handler_add(BTN_PIN, btn_isr, NULL);
+    gpio_isr_handler_add(s_btn_pin, btn_isr, NULL);
 
     xTaskCreate(button_task, "button_task", 2560, NULL, 5, NULL);
-    ESP_LOGI(TAG, "按钮任务启动 GPIO%d（中断驱动）", BTN_PIN);
+    ESP_LOGI(TAG, "按钮任务启动 GPIO%d（中断驱动）", s_btn_pin);
 }
