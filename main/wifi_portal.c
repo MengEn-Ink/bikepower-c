@@ -119,24 +119,6 @@ static const char *mode_name(int mode)
     return "固定功率";
 }
 
-// 配速机器人标签：如 "Coco · 2.4-2.8 W/kg"
-/**
- * 生成配速机器人显示标签。
- * 按 ride_type 取出机器人配置，格式化为用于前端展示的说明文本。
- * ride_type：机器人类型索引。
- * out：输出缓冲区。
- * out_sz：输出缓冲区大小。
- * 返回值：无。
- * 特殊行为：索引越界时自动回退到第一个机器人。
- */
-static void road_pacer_label(int ride_type, char *out, size_t out_sz)
-{
-    if (ride_type < 0 || ride_type >= PACER_COUNT) ride_type = 0;
-    const road_pacer_t *p = &ROAD_PACERS[ride_type];
-    snprintf(out, out_sz, "%s · %d.%d-%d.%d W/kg",
-             p->name, p->wkg_low / 10, p->wkg_low % 10, p->wkg_high / 10, p->wkg_high % 10);
-}
-
 // HTML 转义到 out（截断保护），用于设备名等用户输入
 /**
  * 对 HTML 文本做最小必要转义。
@@ -345,8 +327,6 @@ static esp_err_t h_home(httpd_req_t *req)
 
     char dn[64];
     html_escape(e->device_name, dn, sizeof(dn));
-    char pacer[48];
-    road_pacer_label(e->profile.ride_type, pacer, sizeof(pacer));
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
 
@@ -361,33 +341,41 @@ static esp_err_t h_home(httpd_req_t *req)
         ".seg,.btn{display:flex;align-items:center;justify-content:center}"
         ".bar,.status{justify-content:space-between;margin:0 0 10px}"
         ".brand{gap:8px;font-size:24px;font-weight:800}"
-        ".gear{min-height:36px;padding:0 12px;color:#007aff;background:#fff;border:1px solid #007aff29;border-radius:18px;font-size:13px;font-weight:800;text-decoration:none;display:flex;align-items:center}"
+        ".gear{position:relative;z-index:10;min-height:36px;padding:0 12px;color:#007aff;background:#fff;border:1px solid #007aff29;border-radius:18px;font-size:13px;font-weight:800;text-decoration:none;display:flex;align-items:center}"
         ".status{font-size:13px}"
         ".status .ble{color:#007aff;font-weight:800}"
         ".badge{background:#fff;border:1px solid #0001;color:#111;border-radius:18px;padding:6px 11px;font-weight:800;font-size:12px}"
         ".badge.ok{background:#e9f8ef;color:#15803d;border-color:#b7ebc8}"
         ".badge.warn{background:#fff3e0;color:#b45309;border-color:#ffd59a}"
         ".note.warn{background:#fff3e0;color:#92400e;border-color:#ffd59a}"
-        "#vs{position:relative}.card{background:#fff;border:1px solid #0001;border-radius:22px;padding:15px 16px;margin:0 0 10px}"
-        ".card .val{align-items:baseline;gap:6px}"
+        ".renew-btn{display:none;width:100%;padding:14px;border:0;border-radius:18px;background:#ff9500;color:#fff;font-size:16px;font-weight:800;margin:0 0 10px;animation:pulse 1s infinite}"
+        "@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}"
+        ".mode-info{display:none;background:#fff;border:1px solid #0001;border-radius:22px;padding:18px 16px;margin:0 0 10px}"
+        ".mode-info h3{font-size:17px;font-weight:800;margin:0 0 8px}"
+        ".mode-info p{font-size:13px;line-height:1.5;color:#666;margin:0 0 8px}"
+        ".mode-info .pacer-sel{width:100%;padding:12px;border:1px solid rgba(0,0,0,.08);border-radius:16px;font-size:15px;font-weight:700;background:#f5f5f7;color:#1d1d1f;margin:4px 0}"
+        ".mode-info .pacer-label{font-size:12px;font-weight:800;color:#007aff;margin:0 0 4px}"
+        "#vs{position:relative}#vs.i .card{visibility:hidden}#vs.i .mode-info{display:block}.mode-info{display:none;position:absolute;inset:0}#vs.road #mi-road,#vs.erg #mi-erg{display:block}.card{background:#fff;border:1px solid #0001;border-radius:22px;padding:15px 16px;margin:0 0 10px}"
+        ".card .val{display:flex;align-items:baseline;gap:6px}"
         ".card .val input{width:100%;border:0;background:transparent;color:#111;font-size:36px;font-weight:800;padding:0}"
+        ".card .val input.out-of-range{color:#ef4444}"
         ".card .unit{color:#86868b;font-size:14px}"
         ".card .lbl{display:flex;justify-content:space-between;align-items:center;color:#666;font-size:13px;margin-top:3px}"
         ".zone{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:#666}"
-        ".zone .dot{width:7px;height:7px;border-radius:50%;display:inline-block}"
+        ".zone .dot{width:12px;height:12px;border-radius:50%;display:inline-block}"
         ".seg-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;background:#e9e9ee;border:0;border-radius:18px;padding:4px;margin:4px 0 10px}"
         ".seg{gap:5px;padding:11px 0;border-radius:15px;color:#666;font-size:13px;font-weight:800}"
         ".seg input{display:none}.seg.on{background:#fff;color:#111}"
         ".note{font-size:12px;line-height:1.45;color:#3f3f46;background:#fff;border:1px solid #0001;border-radius:18px;padding:10px 12px;margin:0 0 10px}"
-        "#mi{display:none;position:absolute;inset:0;background:#fff;border:1px solid #0001;border-radius:22px;padding:18px;font-size:13px;line-height:1.55;color:#111}"
-        "#mi b{display:block;color:#111;font-size:18px;margin-bottom:8px}.mi-sub{font-size:13px;font-weight:800;margin-bottom:8px;color:#007aff}.mi-line{color:#666;margin-top:5px}#vs.i .card{visibility:hidden}#vs.i #mi{display:block}"
         ".btn{gap:8px;width:100%;padding:15px;border:0;border-radius:18px;background:#007aff;color:#fff;font-size:17px;font-weight:800}"
+        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.card,.note,.mode-info{background:#2c2c2e;border-color:#3a3a3c}.card .val input{color:#f5f5f7}.badge{background:#2c2c2e;border-color:#3a3a3c;color:#f5f5f7}.seg-row{background:#3a3a3c}.seg{color:#8e8e93}.seg.on{background:#2c2c2e;color:#f5f5f7}.mode-info .pacer-sel{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}.gear{background:#2c2c2e;border-color:#48484a;color:#0a84ff}.renew-btn{background:#ff9f0a}}"
         "</style></head><body><div class=\"box\">"
-        "<div class=\"bar\"><div class=\"brand\">BikePower</div>"
-        "<a class=\"gear\" href=\"/more\">&#9881; 更多配置</a></div>"
+        "<div class=\"bar\"><div class=\"brand\">BikePower <small style=\"font-size:10px;font-weight:600;color:#86868b\">v" FIRMWARE_VERSION "</small></div>"
+        "<a class=\"gear\" href=\"/more\" onclick=\"location.href='/more';return false\">&#9881; 更多配置</a></div>"
         "<div class=\"status\"><span class=\"ble\">&#9679; 配网中</span>"
         "<span class=\"badge\" id=\"cd\" onclick=\"doRenew()\">剩余 180 秒</span></div>"
-        "<form method=\"POST\" action=\"/config\">");
+        "<button type=\"button\" class=\"renew-btn\" id=\"rb\" onclick=\"doRenew()\">&#9202; 点击延长配网时间</button>"
+        "<form method=\"POST\" action=\"/config\" onsubmit=\"return validateForm()\">");
 
     char buf[1024];
     snprintf(buf, sizeof(buf),
@@ -405,11 +393,36 @@ static esp_err_t h_home(httpd_req_t *req)
     snprintf(buf, sizeof(buf),
         "<div class=\"card\">"
         "<div class=\"val\"><input id=\"h\" type=\"number\" name=\"heartrate\" value=\"%d\" min=\"60\" max=\"200\"%s oninput=\"updZone()\"><span class=\"unit\">BPM</span></div>"
-        "<div class=\"lbl\">心率<span class=\"zone\" id=\"hz\"><span class=\"dot\"></span><span></span></span></div></div>"
-        "<div id=\"mi\"></div></div>"
-        "<div class=\"seg-row\">",
-        hr, dis);
+        "<div class=\"lbl\">心率<span class=\"zone\" id=\"hz\"><span class=\"dot\"></span><span></span></span></div></div>", hr, dis);
     SEND(req, buf);
+
+    SEND(req,
+        "<div class=\"mode-info\" id=\"mi-road\">"
+        "<h3>机器人配速</h3>"
+        "<p>按体重和 W/kg 换算目标功率，心率接近对应强度。</p>"
+        "<div class=\"pacer-label\">选择配速机器人</div>"
+        "<select class=\"pacer-sel\" name=\"profile_ride_type\" id=\"road-pacer\" onchange=\"updNote()\">");
+    for (int i = 0; i < PACER_COUNT; i++) {
+        snprintf(buf, sizeof(buf),
+            "<option value=\"%s\"%s>%s · %d.%d-%d.%d W/kg</option>",
+            PROFILE_RIDE_TYPE_OPTIONS[i],
+            i == e->profile.ride_type ? " selected" : "",
+            ROAD_PACERS[i].name,
+            ROAD_PACERS[i].wkg_low / 10, ROAD_PACERS[i].wkg_low % 10,
+            ROAD_PACERS[i].wkg_high / 10, ROAD_PACERS[i].wkg_high % 10);
+        SEND(req, buf);
+    }
+
+    SEND(req,
+        "</select>"
+        "<p style=\"margin-top:12px;padding:10px 12px;background:#e8f4fd;border-radius:12px;font-size:12px;color:#007aff;line-height:1.5\">&#128161; 修改体重、FTP 等个人信息可获得更精准的功率计算，<a href=\"/more\" style=\"color:#007aff;font-weight:700\" onclick=\"location.href='/more';return false\">前往设置 →</a></p>"
+        "</div>"
+        "<div class=\"mode-info\" id=\"mi-erg\">"
+        "<h3>ERG 模式</h3>"
+        "<p>App 通过 BLE FTMS 下发目标功率，设备跟随训练课表。心率和踏频保持小幅波动。</p>"
+        "<p style=\"color:#007aff;font-weight:600\">功率由骑行 App 动态下发，无需手动设置。</p>"
+        "</div></div>"
+        "<div class=\"seg-row\">");
 
     // 三段模式按钮
     const struct { int m; const char *id; const char *label; } segs[] = {
@@ -429,7 +442,8 @@ static esp_err_t h_home(httpd_req_t *req)
     SEND(req,
         "</div>"
         "<div class=\"note\" id=\"mn\">固定功率：手动设置三项数据，保存后骑行 App 直接接收。</div>"
-        "<button class=\"btn\" type=\"submit\">&#8635; 保存并重启</button></form>"
+        "<button class=\"btn\" type=\"submit\">&#8635; 保存并重启</button>"
+        "<button type=\"button\" class=\"btn\" style=\"background:#8e8e93;margin-top:6px\" onclick=\"resetForm()\">恢复默认</button></form>"
         "</div><script>");
 
     snprintf(buf, sizeof(buf),
@@ -440,28 +454,33 @@ static esp_err_t h_home(httpd_req_t *req)
     SEND(req,
         "function g(i){return E[i]||(E[i]=document.getElementById(i))}var z;function updZone(){clearTimeout(z);z=setTimeout(uz,150)}"
         "function uz(){var w=parseInt(g(\"p\").value)||0,h=parseInt(g(\"h\").value)||0,c=parseInt(g(\"c\").value)||0,r=w/F,x=h/T,p=w&&F?(r<.55?0:r<.75?1:r<.9?2:r<1.05?3:r<1.2?4:r<1.5?5:6):0,hr=h&&T?(x<.68?0:x<.83?1:x<.94?2:x<1.05?3:4):0,a=g(\"pz\"),b=g(\"hz\"),d=g(\"cz\");"
+        "g(\"p\").className=w<0||w>2000?\"out-of-range\":\"\";g(\"c\").className=c<20||c>120?\"out-of-range\":\"\";g(\"h\").className=h<60||h>200?\"out-of-range\":\"\";"
         "a.children[0].style.background=C[p];a.children[1].textContent=w&&W?(w/W).toFixed(1)+\"W/kg Z\"+(p+1)+\" \"+P[p]:\"-\";"
         "b.children[0].style.background=C[hr];b.children[1].textContent=h?\"Z\"+(hr+1)+\" \"+H[hr]:\"-\";"
-        "d.children[0].style.background=c>=80&&c<=100?\"#16a34a\":c>=60&&c<=120?\"#f97316\":\"#ef4444\";d.children[1].textContent=c?(c>=80&&c<=100?\"稳定\":c>100?\"偏高\":\"偏低\"):\"-\";"
+        "d.children[0].style.background=c>=80&&c<=100?\"#16a34a\":c>=60&&c<=120?\"#f97316\":\"#ef4444\";d.children[1].textContent=c?(c>=80&&c<=100?\"稳定 80-100\":c>100?\"偏高\":\"偏低 \"+c+\" RPM\"):\"-\";"
         "updNote(w,h,c,p,hr)}"
         "function updNote(w,h,c,p,hr){var m=curMode();if(m===\"steady\"){var t=\"手动设置三项数据\";if(w&&F)t+=\"，当前 \"+(w/W).toFixed(1)+\" W/kg（\"+P[p]+\"区间）\";if(h&&T)t+=\"，心率 \"+H[hr]+\"区间\";g(\"mn\").textContent=\"固定功率：\"+t+\"。\"}}"
         "var R=0;function doRenew(){if(R)return;R=1;var b=g(\"cd\");b.className=\"badge ok\";b.textContent=\"已延长\";fetch(\"/renew\").then(function(r){return r.text()}).then(function(t){var s=parseInt(t);if(s>0){_sv=s;_lt=Date.now();updCd()}});setTimeout(function(){b.className=\"badge\";R=0},1200)}"
         "function curMode(){var r=document.getElementsByName(\"mode\");for(var i=0;i<r.length;i++){if(r[i].checked)return r[i].value}return \"steady\"}"
+        "function validateForm(){if(curMode()!==\"steady\")return true;var p=parseInt(g(\"p\").value),c=parseInt(g(\"c\").value),h=parseInt(g(\"h\").value;if(p<0||p>2000){alert(\"功率超出范围（0-2000W）\");return false}if(c<20||c>120){alert(\"踏频超出范围（20-120 RPM）\");return false}if(h<60||h>200){alert(\"心率超出范围（60-200 BPM）\");return false}return true}"
         "function syncMode(){var m=curMode();var on=m===\"steady\";"
         "var s=document.getElementsByClassName(\"seg\");for(var i=0;i<s.length;i++){var c=s[i].getElementsByTagName(\"input\")[0];s[i].className=c.checked?\"seg on\":\"seg\"}"
-        "g(\"vs\").className=on?\"\":\"i\";"
+        "g(\"vs\").className=on?\"\":m===\"road\"?\"i road\":\"i erg\";"
         "[\"p\",\"c\",\"h\"].forEach(function(id){g(id).disabled=!on});"
-        "g(\"mn\").textContent=on?\"固定功率：手动设置三项数据，保存后骑行 App 直接接收。\":m===\"erg\"?\"ERG：App 下发目标功率，设备跟随训练课表。\":\"机器人配速：按体重和 W/kg 换算功率，模拟跟骑。\";");
+        "if(!on){g(\"mn\").textContent=m===\"erg\"?\"ERG：App 下发目标功率，设备跟随训练课表。\":\"机器人配速：按体重和 W/kg 换算功率，模拟跟骑。\";g(\"mn\").style.background=\"#fff3e0\";setTimeout(function(){g(\"mn\").style.background=\"\"},2000)}"
+        "else{g(\"mn\").textContent=\"固定功率：手动设置三项数据，保存后骑行 App 直接接收。\";g(\"mn\").style.background=\"\"}");
 
     snprintf(buf, sizeof(buf),
-        "g(\"mi\").innerHTML=m===\"erg\"?\"<b>ERG 模式</b><div class=\\\"mi-line\\\">App 下发目标功率，设备跟随课表；心率和踏频小幅波动。</div>\":\"<b>机器人配速</b><div class=\\\"mi-sub\\\">%s</div><div class=\\\"mi-line\\\">按体重换算目标功率，心率接近对应强度。到更多配置调整个人信息和机器人。</div>\"}syncMode();updZone();",
-        pacer);
+        "}syncMode();updZone();"
+        "function resetForm(){g(\"p\").value=%d;g(\"c\").value=%d;g(\"h\").value=%d;"
+        "var r=document.getElementsByName(\"mode\");for(var i=0;i<r.length;i++){if(r[i].value===\"steady\")r[i].checked=true}syncMode();updZone()}",
+        DEFAULT_POWER, DEFAULT_CADENCE, DEFAULT_HEARTRATE);
     SEND(req, buf);
 
     SEND(req,
         "var _sv=180,_lt=Date.now(),_lw=0;"
         "function updCd(){var el=Math.floor((Date.now()-_lt)/1000),s=_sv-el;if(s<0)s=0;"
-        "var w=s>0&&s<=30?1:0;if(w!==_lw){_lw=w;g(\"cd\").className=w?\"badge warn\":\"badge\";g(\"mn\").className=w?\"note warn\":\"note\"}"
+        "var w=s>0&&s<=30?1:0;if(w!==_lw){_lw=w;g(\"cd\").className=w?\"badge warn\":\"badge\";g(\"mn\").className=w?\"note warn\":\"note\";g(\"rb\").style.display=w?\"block\":\"none\"}"
         "g(\"cd\").textContent=s>0?\"剩余 \"+s+\" 秒 · 点击延长\":\"WiFi 正在关闭\";"
         "if(w&&curMode()===\"steady\")g(\"mn\").textContent=\"剩余 \"+s+\" 秒，请保存或点击延长。\";"
         "if(s<=0)location.href=\"/closing\"}"
@@ -777,7 +796,7 @@ static void send_more_panel(httpd_req_t *req)
         ".menu-btn .text{flex:1}.menu-btn .desc{display:block;margin-top:3px;color:#6e6e73;font-size:12px;font-weight:600;line-height:1.35}.menu-btn .arrow{color:#c7c7cc;font-size:22px}"
         "</style>"
         "<div class=\"menu-grid\">"
-        "<button type=\"button\" class=\"menu-btn\" onclick=\"openMod('profile')\"><span class=\"icon\">&#128100;</span><span class=\"text\">个人信息<span class=\"desc\">体重、FTP、阈值心率和配速机器人</span></span><span class=\"arrow\">&rsaquo;</span></button>"
+        "<button type=\"button\" class=\"menu-btn\" onclick=\"openMod('profile')\"><span class=\"icon\">&#128100;</span><span class=\"text\">个人信息<span class=\"desc\">体重、FTP、阈值心率</span></span><span class=\"arrow\">&rsaquo;</span></button>"
         "<button type=\"button\" class=\"menu-btn\" onclick=\"openMod('device')\"><span class=\"icon\">&#128241;</span><span class=\"text\">设备名称<span class=\"desc\">修改骑行 App 中看到的蓝牙名称</span></span><span class=\"arrow\">&rsaquo;</span></button>"
         "</div>"
         "<script>panelCleanup=function(){};</script>");
@@ -829,22 +848,13 @@ static void send_profile_panel(httpd_req_t *req)
         "<input inputmode=\"numeric\" type=\"number\" id=\"profile-ftp\" min=\"50\" max=\"500\" value=\"\" placeholder=\"如 200\" oninput=\"syncProfileFtp()\"></div>"
         "<div class=\"field\" style=\"margin-top:14px\"><label>阈值心率 (BPM)</label>"
         "<input inputmode=\"numeric\" type=\"number\" id=\"profile-thr-hr\" min=\"100\" max=\"220\" value=\"\" placeholder=\"如 170\" oninput=\"syncProfileThrHr()\"></div>"
-        "<div class=\"field\" style=\"margin-top:14px\"><label>配速机器人</label>"
-        "<select id=\"profile-ride-type\" style=\"width:100%;padding:12px;border:1px solid rgba(0,0,0,.08);border-radius:16px;font-size:15px;font-weight:700;color:#1d1d1f;background:#f5f5f7\" oninput=\"syncProfileRideType()\">"
-        "<option value=\"coco\">Coco · 2.4-2.8 W/kg</option>"
-        "<option value=\"yumi\">Yumi · 2.7-3.1 W/kg</option>"
-        "<option value=\"jacques\">Jacques · 3.0-3.5 W/kg</option>"
-        "<option value=\"genie\">Genie · 3.5-3.9 W/kg</option>"
-        "<option value=\"constance\">Constance · 4.0-4.4 W/kg</option>"
-        "</select></div>"
         "</div>"
-        "<div class=\"module-note\">调整后请点\"应用并回首页\"，再在首页点\"保存并重启\"写入设备。</div>"
+        "<div class=\"module-note\">配速机器人请在首页「机器人配速」模式下选择。调整后请点\"应用并回首页\"，再在首页点\"保存并重启\"写入设备。</div>"
         "<script>"
         "window.syncProfileWeight=function(){document.getElementById(\"form-profile-weight\").value=document.getElementById(\"profile-weight\").value};"
         "window.syncProfileFtp=function(){document.getElementById(\"form-profile-ftp\").value=document.getElementById(\"profile-ftp\").value};"
         "window.syncProfileThrHr=function(){document.getElementById(\"form-profile-thr-hr\").value=document.getElementById(\"profile-thr-hr\").value};"
-        "window.syncProfileRideType=function(){document.getElementById(\"form-profile-ride-type\").value=document.getElementById(\"profile-ride-type\").value};"
-        "(function(){var fw=document.getElementById(\"form-profile-weight\");if(fw&&fw.value){document.getElementById(\"profile-weight\").value=fw.value}var ff=document.getElementById(\"form-profile-ftp\");if(ff&&ff.value){document.getElementById(\"profile-ftp\").value=ff.value}var ft=document.getElementById(\"form-profile-thr-hr\");if(ft&&ft.value){document.getElementById(\"profile-thr-hr\").value=ft.value}var fr=document.getElementById(\"form-profile-ride-type\");if(fr&&fr.value){document.getElementById(\"profile-ride-type\").value=fr.value}})();"
+        "(function(){var fw=document.getElementById(\"form-profile-weight\");if(fw&&fw.value){document.getElementById(\"profile-weight\").value=fw.value}var ff=document.getElementById(\"form-profile-ftp\");if(ff&&ff.value){document.getElementById(\"profile-ftp\").value=ff.value}var ft=document.getElementById(\"form-profile-thr-hr\");if(ft&&ft.value){document.getElementById(\"profile-thr-hr\").value=ft.value}})();"
         "panelCleanup=function(){};"
         "</script>");
 }
@@ -864,7 +874,7 @@ static void send_mode_panel(httpd_req_t *req)
         "<p>设备会根据机器人的 W/kg 区间和你的体重，自动换算目标功率。</p>"
         "<p style=\"margin-top:8px\">心率会逐步接近对应强度，适合模拟跟随稳定骑行团。</p>"
         "</div>"
-        "<div class=\"module-note\">此模式下首页的手动数值不生效。要改变输出，请调整个人信息和配速机器人。</div>"
+        "<div class=\"module-note\">请在首页切换到「机器人配速」模式后直接选择配速机器人。修改体重、FTP 等个人信息可获得更精准的功率计算。</div>"
         "<script>panelCleanup=function(){};</script>");
 }
 
@@ -933,9 +943,10 @@ static esp_err_t h_closing(httpd_req_t *req)
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<title>WiFi正在关闭</title></head>"
         "<body style=\"background:#f5f5f7;min-height:100vh;margin:0;padding:24px 16px;display:flex;justify-content:center;align-items:center;font-family:-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif;color:#1d1d1f\">"
-        "<div style=\"max-width:360px;width:100%;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:22px;padding:28px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.08)\">"
-        "<h1 style=\"color:#007aff;font-size:22px;margin:0 0 14px;font-weight:800\">WiFi 正在关闭</h1>"
-        "<p style=\"color:#6e6e73;font-size:14px;line-height:1.6;margin:0\">设备将重启并恢复蓝牙。请回到骑行 App 重新连接。</p>"
+        "<div style=\"max-width:360px;width:100%;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:26px;padding:28px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.08)\">"
+        "<div style=\"width:64px;height:64px;border-radius:50%;margin:0 auto 14px;background:#eef6ff;color:#007aff;font-size:38px;font-weight:800;display:flex;align-items:center;justify-content:center\">&#9202;</div>"
+        "<h1 style=\"font-size:22px;margin:0 0 8px;font-weight:800;letter-spacing:-.03em\">WiFi 正在关闭</h1>"
+        "<p style=\"color:#6e6e73;font-size:13px;line-height:1.5;margin:0\">设备将重启并恢复蓝牙，请回到骑行 App 重新连接。</p>"
         "</div></body></html>");
     return ESP_OK;
 }
