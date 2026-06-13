@@ -1,61 +1,130 @@
 # BikePower C
 
-ESP32-C3 蓝牙功率计模拟器（C 重写版）。由 MicroPython 实现完全重写为 **C + ESP-IDF + NimBLE**，对外提供标准 BLE 功率计/踏频/心率服务与 FTMS ERG，可被主流骑行 App 识别。
+BikePower C 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，面向智能骑行台、训练 App 和 DIY 骑行设备场景。它把原来的 MicroPython 版本完整重写为 C + ESP-IDF + NimBLE，让设备更稳定，也更适合长期使用和二次开发。
 
-## 项目信息
+## 项目简介
 
-| 项 | 值 |
-|------|------|
-| 硬件平台 | 合宙 ESP32-C3（RISC-V 单核 160MHz，400KB SRAM，WiFi + BLE5.0） |
-| 框架 | ESP-IDF v5.5.1 |
-| BLE 栈 | NimBLE（peripheral） |
-| RTOS | FreeRTOS（多任务 + Queue + 信号量） |
-| 语言 | C11 |
-| 目标版本 | v3.0.0 |
+如果你只想知道它能做什么，可以把它理解成一块“小型骑行训练控制盒”：开机后通过蓝牙广播，被骑行 App 配对后就能模拟功率、踏频、心率等数据；需要改配置时，再用按钮进入 WiFi 配网页面。
 
-## 核心功能
+## 硬件接线图说明
 
-- BLE 五服务：功率计（CPS）、踏频、心率、设备信息（DIS）、FTMS（含 ERG 模式）。
-- 物理按钮调功（GPIO9 中断驱动）+ LED 四态指示（GPIO12）。
-- WiFi 配网（长按 + 二次确认触发，与 BLE 射频互斥软切换）。
+下表列出当前固件默认使用的 ESP32-C3 主要引脚和接口用途：
 
-> 详细阶段进度、待办与已知限制见 [PROGRESS.md](PROGRESS.md)。
+| 引脚 / 接口 | 用途 | 说明 |
+|------|------|------|
+| `GPIO9` | 物理按钮 | 内部上拉，按下为低电平；短按调功，长按进入配网确认流程 |
+| `GPIO12` | 状态 LED | 高电平点亮；用于广播、连接、确认、配网等状态提示 |
+| `5V / USB` | 供电 | 可通过开发板 USB 口供电，也可由稳定 5V 电源输入 |
+| `3V3` | 板载逻辑电源 | 给外设供电时要注意总电流预算 |
+| `GND` | 地线 | 所有外设地必须共地 |
+| `UART0` | 调试串口 | 用于烧录、日志输出和故障排查；通常走开发板自带 USB 转串口 |
 
-## 目录结构
+更详细的硬件建议见 [docs/HARDWARE.md](docs/HARDWARE.md)。
 
+## 核心功能清单
+
+- 支持标准 BLE 骑行相关服务，可被主流骑行 App 识别
+- 模拟功率、踏频、心率、设备信息等训练数据
+- 支持 FTMS ERG 控制，适合训练模式联动
+- 提供实体按钮操作，不依赖屏幕也能快速调功
+- 提供 LED 状态提示，方便判断当前设备状态
+- 支持 WiFi 配网门户，可在手机浏览器里修改核心参数
+- 支持配置保存，重启后继续使用上一次设置
+
+## 软件架构
+
+项目采用三层结构，目的是把“设备怎么接”“训练逻辑怎么算”“用户怎么操作”分开处理，后续维护更清晰：
+
+- 应用层：位于 `main/`，负责按钮、LED、BLE、WiFi 配网、状态机和主循环
+- 领域层：位于 `components/bikepower_domain/`，负责功率引擎、心率模型、用户配置和训练逻辑
+- 硬件层：基于 ESP-IDF、FreeRTOS、NimBLE、GPIO、NVS、WiFi 等底层能力，为上层提供驱动和运行环境
+
+![架构图](docs/images/architecture.svg)
+
+按钮与灯效状态切换可参考：
+
+![状态机](docs/images/button-led-state.svg)
+
+主循环和数据更新流程可参考：
+
+![数据流](docs/images/main-loop-flow.svg)
+
+## 构建与烧录步骤
+
+先准备好 ESP-IDF 环境，再在项目根目录执行：
+
+```bash
+idf.py set-target esp32c3
+idf.py build
+idf.py -p <port> flash
+idf.py -p <port> monitor
 ```
+
+`<port>` 请替换为你的实际串口，例如 macOS 下常见 `/dev/cu.usbmodem*`，Linux 下常见 `/dev/ttyUSB0` 或 `/dev/ttyACM0`。
+
+## 使用说明
+
+设备的日常操作很简单，主要靠一个按钮：
+
+- 短按：功率减小 `20W`
+- 按住约 `0.5s` 以上：持续调功，每 `200ms` 增加 `20W`
+- 长按并保持到 `2s` 以上再松开：进入“配网确认”窗口
+- 在确认窗口内再按一次：正式进入 WiFi 配网模式
+- 如果确认窗口内没有再次按键：约 `3s` 后自动取消，回到蓝牙工作状态
+
+## 配网说明
+
+进入配网模式后，设备会临时关闭 BLE，打开自己的 WiFi 热点。普通用户按下面顺序操作即可：
+
+1. 长按按钮至少 `2s`，松开后看到 LED 进入确认提示
+2. 在确认时间内再按一次按钮
+3. 手机连接设备发出的 WiFi AP：`BikePower`
+4. 打开浏览器访问 `192.168.4.1`
+5. 修改需要的配置参数
+6. 点击保存，设备会自动重启
+7. 重启后恢复 BLE 广播，再回骑行 App 里继续使用
+
+## LED 灯效说明
+
+| LED 表现 | 设备状态 | 用户如何理解 |
+|------|------|------|
+| 慢闪 | BLE 广播中 | 设备已开机，正在等待手机或 App 连接 |
+| 常亮 | BLE 已连接 | 已配对成功，正在正常工作 |
+| 快闪 | 等待二次确认 | 你刚完成长按，设备在等你确认是否进入配网 |
+| 慢闪 | WiFi 配网中 | 设备已切到配网模式，可连热点改配置 |
+| 熄灭 | 非活动态或重启中 | 设备暂时不在正常广播状态 |
+
+## 项目目录结构
+
+```text
 bikepower-c/
-├── main/                       — 应用层（入口/状态机/按钮/LED/BLE/配置常量）
-├── components/bikepower_domain/ — 纯 C 领域层（功率引擎/心率模型/用户配置），可 host 单测
-├── tests/                      — 真机自测脚本（BLE 五服务+ERG / 配网门户 / 连接事件 / 串口抓取）
-├── test/test_domain            — 领域层 host 单测
-├── docs/                       — 设计与重写方案
-├── partitions.csv              — 分区表
-└── sdkconfig.defaults          — 默认配置
+├── README.md
+├── AGENTS.md
+├── PROGRESS.md
+├── main/
+│   ├── app_main.c
+│   ├── app_state.c
+│   ├── button.c
+│   ├── led.c
+│   ├── ble_bikepower.c
+│   ├── radio_ctrl.c
+│   ├── wifi_portal.c
+│   └── bikepower_config.h
+├── components/
+│   └── bikepower_domain/
+├── docs/
+│   ├── QUICKSTART.md
+│   ├── HARDWARE.md
+│   ├── 01-cidf-nimble-rewrite.md
+│   └── images/
+├── tests/
+├── test/
+│   └── test_domain
+├── partitions.csv
+└── sdkconfig.defaults
 ```
 
-## 构建与烧录
+## 引用
 
-需先安装并 source ESP-IDF v5.5.1 环境。
-
-```bash
-# 编译
-idf.py build
-
-# 烧录并打开串口监视（替换 <port> 为实际串口，如 /dev/ttyUSB0）
-idf.py -p <port> flash monitor
-```
-
-### 领域层 host 单测
-
-```bash
-cd test/test_domain
-idf.py build
-```
-
-## 硬件约束
-
-- **WiFi/BLE 射频互斥**：ESP32-C3 只有一路 RF，启动 WiFi 前必须先停止 BLE，二者无法共存。
-- **禁止开机自启 WiFi**：配网模式必须由用户长按 + 二次确认触发。
-
-详见 [.trae/rules/hardware-constraints.md](.trae/rules/hardware-constraints.md) 与 [.trae/rules/wifi-ble-mutex.md](.trae/rules/wifi-ble-mutex.md)。
+- [PROGRESS.md](PROGRESS.md)：查看当前开发进度、已完成阶段和已知限制
+- [AGENTS.md](AGENTS.md)：查看本项目的协作规范、验证要求和文档入口
