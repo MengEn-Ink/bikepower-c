@@ -2,9 +2,23 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
-## [Unreleased]
+## [3.1.0] - 2026-06-14
 
-> v3.0.0 候选：代码与文档完成，等待 72h 老化与真机配网/按钮人工确认后打 tag。
+### 新增
+- M5Stamp C3 开发板适配：运行时自动检测板型（GPIO12 电平判断），无需手动配置。
+- SK6812 RGB LED 驱动（RMT bytes encoder）：M5Stamp C3 使用 GPIO2 驱动板载 RGB LED，颜色映射为蓝色（广播）/ 绿色（连接）/ 黄色（确认）。
+- 板型检测模块 `board_detect.c/h`：启动时自动识别通用板或 M5Stamp C3，动态切换 LED/按钮引脚。
+
+### 修复
+- 配网页面模式切换失效：`syncMode()` 函数多余闭合花括号导致 JS 语法错误，整个 script 块无法执行。
+
+### 测试报告
+- `idf.py build`：0 error。
+- 真机串口确认：板型检测正确（M5Stamp C3），SK6812 LED 正常闪烁，BLE 广播/连接/FTMS ERG 正常。
+- 空闲堆：173KB（> 80KB 阈值）。
+- 配网页面模式切换：已修复，三段切换正常。
+
+## [3.0.0] - 2026-06-13
 
 ### 新增（阶段6 稳定性）
 - Task WDT 覆盖：`app_main` 主循环与 `led_task` 订阅看门狗并周期喂狗；启用 `CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0` 监控 IDLE 任务。

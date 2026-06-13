@@ -2,6 +2,9 @@
  * 心率动力学模型实现 — 见 hr_model.h
  */
 #include <math.h>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #include "domain_config.h"
 #include "domain_rng.h"
 #include "hr_model.h"
