@@ -46,6 +46,13 @@ async def main():
     print(f"扫描 {DEVICE_NAME} ...")
     dev = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
     if not dev:
+        # 模糊匹配：设备名可能带后缀（如 BikePower23）
+        devices = await BleakScanner.discover(timeout=5)
+        for d in devices:
+            if d.name and d.name.startswith(DEVICE_NAME):
+                dev = d
+                break
+    if not dev:
         print("未发现设备")
         return 1
     print(f"发现 {dev.name} {dev.address}，连接中...")
