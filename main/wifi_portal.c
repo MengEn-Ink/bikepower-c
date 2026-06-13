@@ -467,8 +467,7 @@ static esp_err_t h_home(httpd_req_t *req)
         "var s=document.getElementsByClassName(\"seg\");for(var i=0;i<s.length;i++){var c=s[i].getElementsByTagName(\"input\")[0];s[i].className=c.checked?\"seg on\":\"seg\"}"
         "g(\"vs\").className=on?\"\":m===\"road\"?\"i road\":\"i erg\";"
         "[\"p\",\"c\",\"h\"].forEach(function(id){g(id).disabled=!on});"
-        "if(!on){g(\"mn\").textContent=m===\"erg\"?\"ERG：App 下发目标功率，设备跟随训练课表。\":\"机器人配速：按体重和 W/kg 换算功率，模拟跟骑。\";g(\"mn\").style.background=\"#fff3e0\";setTimeout(function(){g(\"mn\").style.background=\"\"},2000)}"
-        "else{g(\"mn\").textContent=\"固定功率：手动设置三项数据，保存后骑行 App 直接接收。\";g(\"mn\").style.background=\"\"}");
+        "updNote()}");
 
     snprintf(buf, sizeof(buf),
         "}syncMode();updZone();"
