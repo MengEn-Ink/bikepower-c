@@ -7,12 +7,148 @@
 第一次使用前，建议先准备好这些东西：
 
 - 一块 ESP32-C3 开发板
-- 一根可正常传输数据的 USB 线
-- 一个稳定电源
+- 一根可正常传输数据的 USB 线（部分充电线无法传输数据，请确认你的线支持数据传输）
+- 一个稳定电源（电脑 USB 口或 5V 充电器均可）
 
 如果你只是体验基础功能，上面三样就够了。想进一步做固定安装、外壳封装或外接传感器，可以再参考 [HARDWARE.md](HARDWARE.md)。
 
-## 2. 第一次使用步骤
+## 2. 烧录固件
+
+> 如果你的开发板已经预装了 BikePower 固件，可以跳过此步骤，直接进入第 3 节。
+
+### 2.1 下载固件
+
+从项目的 [Release 页面](https://gitee.com/mengen4jv/bikepower-c/releases) 下载最新版本的 `bikepower-c-merged.bin` 文件。
+
+这是合并固件，包含了引导加载器、分区表和应用程序，一个文件即可完成烧录。
+
+下载后请校验文件完整性：
+
+| 文件 | SHA-256 |
+|------|---------|
+| `bikepower-c-merged.bin` (v3.0.0) | `3ba1b3f0f56140123b90da232a5659a7f700eb537141b97eb44d793002210e7b` |
+
+校验方法（在终端/命令行中运行）：
+
+- **Windows**（PowerShell）：
+  ```powershell
+  CertUtil -hashfile bikepower-c-merged.bin SHA256
+  ```
+- **macOS / Linux**：
+  ```bash
+  sha256sum bikepower-c-merged.bin
+  ```
+
+如果输出与上表一致，说明文件下载完整。
+
+### 2.2 安装 USB 驱动
+
+ESP32-C3 开发板通过 USB 转串口芯片与电脑通信，需要先安装对应驱动：
+
+| 开发板常见芯片 | 驱动下载 |
+|---------------|---------|
+| CH340 / CH343 | [沁恒官网](http://www.wch.cn/downloads/CH341SER_EXE.html) |
+| CP2102 / CP210x | [Silicon Labs 官网](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers) |
+| FT232 | [FTDI 官网](https://ftdichip.com/drivers/vcp-drivers/) |
+
+安装驱动后，将开发板通过 USB 线连接电脑：
+
+- **Windows**：打开"设备管理器" → "端口(COM 和 LPT)"，找到新增的 COM 口（如 `COM3`）
+- **macOS**：终端运行 `ls /dev/tty.usb*`，找到类似 `/dev/tty.usbserial-xxxx` 的设备
+- **Linux**：终端运行 `ls /dev/ttyUSB*`，找到类似 `/dev/ttyUSB0` 的设备
+
+如果找不到串口设备，通常是驱动未安装或 USB 线只支持充电。
+
+### 2.3 方法一：Windows 图形界面烧录（推荐新手）
+
+使用乐鑫官方的 **Flash Download Tool**，无需命令行操作。
+
+**第一步：下载工具**
+
+从乐鑫官网下载 [Flash Download Tool](https://www.espressif.com/zh-hans/support/download/other-tools)（选择最新版本），解压后运行 `flash_download_tool_x.x.x.exe`。
+
+**第二步：选择芯片类型**
+
+- ChipType 选择 `ESP32-C3`
+- WorkMode 选择 `Develop`
+- 点击 OK 进入主界面
+
+**第三步：配置烧录参数**
+
+在主界面中：
+
+1. 第一行勾选框打勾，点击右侧 `...` 选择下载的 `bikepower-c-merged.bin` 文件
+2. 地址栏填写 `0x0`（这是合并固件的起始地址，必须为 0x0）
+3. 下方参数设置：
+   - SPI SPEED：`40MHz`
+   - SPI MODE：`DIO`
+   - COM：选择你的串口号（如 COM3）
+   - BAUD：`460800`（如果烧录失败可降低为 `115200`）
+
+**第四步：开始烧录**
+
+1. 按住开发板上的 **BOOT** 键不要松开
+2. 点击软件右下角的 **START** 按钮
+3. 等待进度条出现并开始走，此时可以松开 BOOT 键
+4. 显示 **FINISH** 即表示烧录成功
+5. 按一下开发板上的 **RST**（复位）键，设备启动
+
+> 如果 START 后进度条不动或报错，检查：COM 口是否正确、BOOT 键是否按住、USB 线是否支持数据传输。
+
+### 2.4 方法二：命令行烧录（Windows / macOS / Linux）
+
+适合有命令行经验的用户，跨平台通用。
+
+**第一步：安装 esptool**
+
+```bash
+pip install esptool
+```
+
+> 如果没有 Python 环境，先从 [python.org](https://www.python.org/downloads/) 安装 Python 3。
+
+**第二步：烧录固件**
+
+将下面的串口号替换为你自己的（参见 2.2 节的查找方法）：
+
+- Windows：`COM3`
+- macOS：`/dev/tty.usbserial-xxxx`
+- Linux：`/dev/ttyUSB0`
+
+```bash
+esptool.py --chip esp32c3 -p COM3 -b 460800 write_flash --flash_mode dio --flash_size 2MB --flash_freq 80m 0x0 bikepower-c-merged.bin
+```
+
+烧录过程中会看到类似输出：
+
+```
+Writing at 0x00010000... (xx %)
+Wrote 1107328 bytes (698816 compressed) at 0x00000000 in 16.1 seconds
+Hash of data verified.
+Leaving...
+Hard resetting via RTS pin...
+```
+
+出现 `Hash of data verified` 表示烧录成功。如果设备没有自动重启，按一下 RST 键。
+
+> 如果报错 `A fatal error occurred: Failed to connect to ESP32-C3`，按住 BOOT 键再运行命令，连接成功后松开。
+
+### 2.5 方法三：ESP-IDF 烧录（适合开发者）
+
+如果你已经安装了 ESP-IDF 开发环境：
+
+```bash
+# 克隆项目
+git clone https://gitee.com/mengen4jv/bikepower-c.git
+cd bikepower-c
+
+# 编译并烧录
+idf.py -p /dev/ttyUSB0 flash monitor
+```
+
+此方法会从源码编译固件并烧录，适合需要修改代码的用户。
+
+## 3. 第一次使用步骤
 
 第一次上手可以按这个最短流程来：
 
@@ -24,7 +160,7 @@
 
 如果 LED 处于慢闪，通常表示设备已经开机并正在等待蓝牙连接；连接成功后一般会变成常亮。
 
-## 3. 配网指南
+## 4. 配网指南
 
 当你想改默认参数，例如功率、踏频、心率、设备名称等，可以进入设备自己的 WiFi 配网页面：
 
@@ -49,14 +185,14 @@
 
 如果你只是想顺利用起来，不需要先理解底层协议。
 
-## 5. 电源管理提示
+## 6. 电源管理提示
 
 - 建议使用稳定 USB 供电，避免劣质线材导致反复重启
 - 如果设备需要长时间骑行使用，建议选择输出稳定的移动电源或车载供电方案
 - 改配置时不要突然断电，避免保存过程中中断
 - 如果发现连接不稳定，先排查供电是否不足，再看蓝牙环境是否拥挤
 
-## 6. 常见问题 FAQ
+## 7. 常见问题 FAQ
 
 ### Q1：为什么我开机后搜不到设备？
 
