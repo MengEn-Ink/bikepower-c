@@ -467,10 +467,10 @@ static esp_err_t h_home(httpd_req_t *req)
         "var s=document.getElementsByClassName(\"seg\");for(var i=0;i<s.length;i++){var c=s[i].getElementsByTagName(\"input\")[0];s[i].className=c.checked?\"seg on\":\"seg\"}"
         "g(\"vs\").className=on?\"\":m===\"road\"?\"i road\":\"i erg\";"
         "[\"p\",\"c\",\"h\"].forEach(function(id){g(id).disabled=!on});"
-        "updNote()}");
+        "updNote()}}");
 
     snprintf(buf, sizeof(buf),
-        "}syncMode();updZone();"
+        "syncMode();updZone();"
         "function resetForm(){g(\"p\").value=%d;g(\"c\").value=%d;g(\"h\").value=%d;"
         "var r=document.getElementsByName(\"mode\");for(var i=0;i<r.length;i++){if(r[i].value===\"steady\")r[i].checked=true}syncMode();updZone()}",
         DEFAULT_POWER, DEFAULT_CADENCE, DEFAULT_HEARTRATE);
@@ -481,7 +481,7 @@ static esp_err_t h_home(httpd_req_t *req)
         "function updCd(){var el=Math.floor((Date.now()-_lt)/1000),s=_sv-el;if(s<0)s=0;"
         "var w=s>0&&s<=30?1:0;if(w!==_lw){_lw=w;g(\"cd\").className=w?\"badge warn\":\"badge\";g(\"mn\").className=w?\"note warn\":\"note\";g(\"rb\").style.display=w?\"block\":\"none\"}"
         "g(\"cd\").textContent=s>0?\"剩余 \"+s+\" 秒 · 点击延长\":\"WiFi 正在关闭\";"
-        "if(w&&curMode()===\"steady\")g(\"mn\").textContent=\"剩余 \"+s+\" 秒，请保存或点击延长。\";"
+        "if(w)g(\"mn\").textContent=\"剩余 \"+s+\" 秒，请保存或点击延长。\";"
         "if(s<=0)location.href=\"/closing\"}"
         "function tick(){if(document.hidden)return;fetch(\"/time\").then(function(r){return r.text()}).then(function(t){_sv=parseInt(t);_lt=Date.now();updCd()})}"
         "updCd();setInterval(updCd,1000);setInterval(tick,5000);"
