@@ -21,6 +21,14 @@ static const char *TAG = "NVS";
 #define K_RIDE        "ride"
 #define K_DEVNAME     "devname"
 
+/**
+ * 把运行时引擎状态拷贝成可持久化配置结构。
+ * 从 power_engine 与 profile 提取需要保存到 NVS 的字段。
+ * e：源功率引擎实例。
+ * c：目标配置结构。
+ * 返回值：无。
+ * 特殊行为：设备名会做长度截断并确保字符串结尾为 `\0`。
+ */
 static void engine_to_config(power_engine_t *e, config_data_t *c)
 {
     c->schema_ver = CONFIG_VERSION;
@@ -36,6 +44,14 @@ static void engine_to_config(power_engine_t *e, config_data_t *c)
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
 
+/**
+ * 把配置结构应用回运行时引擎。
+ * 将 config_data_t 中的持久化字段逐项写回 power_engine 和 profile。
+ * c：源配置结构。
+ * e：目标功率引擎实例。
+ * 返回值：无。
+ * 特殊行为：字段写入统一走领域层 setter，保持校验和副作用一致。
+ */
 static void config_to_engine(const config_data_t *c, power_engine_t *e)
 {
     power_engine_set_power(e, c->power);
@@ -50,6 +66,15 @@ static void config_to_engine(const config_data_t *c, power_engine_t *e)
 }
 
 // 读单个 i32，缺失时保留默认值
+/**
+ * 从 NVS 读取一个 32 位整数键。
+ * 若键存在则写入输出变量，否则保持调用方当前默认值不变。
+ * h：已打开的 NVS 句柄。
+ * key：键名。
+ * out：输出整数地址。
+ * 返回值：无。
+ * 特殊行为：键不存在不视为错误，方便以 defaults 结构为底逐项覆盖。
+ */
 static void get_i32(nvs_handle_t h, const char *key, int *out)
 {
     int32_t v;
@@ -58,6 +83,13 @@ static void get_i32(nvs_handle_t h, const char *key, int *out)
     }
 }
 
+/**
+ * 从 NVS 加载配置。
+ * 读取 namespace `bikepower` 下的键值，对版本迁移和越界修正后写回引擎。
+ * e：待接收配置的功率引擎实例。
+ * 返回值：无。
+ * 特殊行为：无配置时会回写默认值；发生迁移或夹紧时也会重新保存修正后的结果。
+ */
 void nvs_store_load(power_engine_t *e)
 {
     config_data_t c;
@@ -103,6 +135,13 @@ void nvs_store_load(power_engine_t *e)
     }
 }
 
+/**
+ * 把当前配置保存到 NVS。
+ * 将引擎状态转换为 config_data_t 后逐键写入 namespace `bikepower` 并提交。
+ * e：待保存的功率引擎实例。
+ * 返回值：`true` 表示保存成功，`false` 表示失败。
+ * 特殊行为：写入失败时只记录日志，不做回滚。
+ */
 bool nvs_store_save(power_engine_t *e)
 {
     config_data_t c;

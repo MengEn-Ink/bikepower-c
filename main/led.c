@@ -16,16 +16,37 @@ static const char *TAG = "LED";
 
 static volatile led_pattern_t s_pattern = LED_SLOW;
 
+/**
+ * 设置 LED 当前目标灯效。
+ * 更新后台任务读取的共享模式值。
+ * pattern：新的灯效模式。
+ * 返回值：无。
+ * 特殊行为：函数本身不直接操作 GPIO，真正输出由 led_task 周期刷新。
+ */
 void led_set_pattern(led_pattern_t pattern)
 {
     s_pattern = pattern;
 }
 
+/**
+ * 向 LED GPIO 输出指定电平。
+ * 把逻辑电平写到 LED 引脚。
+ * level：目标输出电平，1 为亮，0 为灭。
+ * 返回值：无。
+ * 特殊行为：GPIO12 为高电平有效。
+ */
 static void led_write(int level)
 {
     gpio_set_level(LED_PIN, level);
 }
 
+/**
+ * LED 后台任务。
+ * 依据当前模式维护闪烁节拍并持续刷新 GPIO 电平。
+ * arg：未使用的任务参数。
+ * 返回值：无，本任务不返回。
+ * 特殊行为：任务已订阅 TWDT，需要持续周期喂狗。
+ */
 static void led_task(void *arg)
 {
     (void)arg;
@@ -40,6 +61,7 @@ static void led_task(void *arg)
         if (p != last) {
             last = p;
             elapsed = 0;
+            // 切模式时重置节拍，避免从旧模式残留的半周期位置继续闪烁。
             on = (p == LED_SOLID) ? 1 : 0;
         }
 
@@ -65,6 +87,13 @@ static void led_task(void *arg)
     }
 }
 
+/**
+ * 初始化 LED 模块。
+ * 配置 GPIO12 为输出模式，默认灭灯，并启动 LED 后台任务。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：启动后灯效状态由 s_pattern 初始值和后续状态机调用共同决定。
+ */
 void led_init(void)
 {
     gpio_config_t io = {

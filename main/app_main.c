@@ -30,15 +30,26 @@ static const char *TAG = "APP";
 static power_engine_t s_engine;
 static QueueHandle_t s_app_queue;
 
-// FTMS 控制点 ERG 回调（NimBLE host 任务上下文）
-// 不直接修改 s_engine，通过队列投递到主循环避免竞态
+/**
+ * 处理 FTMS 控制点下发的 ERG 目标功率。
+ * 把骑行 App 通过 BLE 下发的目标功率写入领域引擎。
+ * target_power：目标功率，单位瓦特。
+ * 返回值：无。
+ * 特殊行为：运行在 NimBLE host 任务上下文，逻辑必须保持轻量且不可阻塞。
+ */
 static void on_erg_target(int target_power)
 {
     app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = target_power };
     xQueueSend(s_app_queue, &e, 0);
 }
 
-// WiFi 配网触发（app_state 二次确认后回调）：进入射频独占配网模式
+/**
+ * 处理进入 WiFi 配网模式的触发回调。
+ * 由状态机在用户完成二次确认后调用，切换到射频独占的 WiFi 配网流程。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：会停止 BLE 并进入 radio_ctrl 管理的 WiFi 配网模式。
+ */
 static void on_wifi_trigger(void)
 {
     radio_ctrl_enter_wifi(&s_engine);

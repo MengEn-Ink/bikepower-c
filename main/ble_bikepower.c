@@ -69,16 +69,42 @@ static ble_erg_cb_t g_erg_cb = NULL;
 static char g_device_name[24] = DEVICE_NAME;
 static esp_timer_handle_t g_notify_timer = NULL;
 
+/**
+ * 启动 BLE 广播。
+ * 组装 GAP 广播字段并以通用可连接模式开始对外广播。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：广播字段中只声明 CPS 和 HRS 服务 UUID，以兼容旧版发现行为。
+ */
 static void start_advertising(void);
 
 // ============================ GATT 访问回调 ============================
 
+/**
+ * 把平面缓冲区写入 GATT 读取响应。
+ * 将给定字节序列追加到 NimBLE 提供的输出 mbuf 中。
+ * ctxt：GATT 访问上下文。
+ * buf：待读取返回的数据缓冲区。
+ * len：数据长度。
+ * 返回值：0 表示成功，否则返回 ATT 错误码。
+ * 特殊行为：内存不足时转换为 `BLE_ATT_ERR_INSUFFICIENT_RES`。
+ */
 static int chr_read_buf(struct ble_gatt_access_ctxt *ctxt, const uint8_t *buf, size_t len)
 {
     int rc = os_mbuf_append(ctxt->om, buf, len);
     return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
+/**
+ * 处理 CPS Measurement 特征读访问。
+ * 向客户端返回当前打包好的 Cycling Power Measurement 数据。
+ * ch：连接句柄，未使用。
+ * ah：属性句柄，未使用。
+ * ctxt：GATT 访问上下文。
+ * arg：自定义参数，未使用。
+ * 返回值：0 表示成功，否则返回 ATT 错误码。
+ * 特殊行为：仅支持读操作，其他操作返回 `BLE_ATT_ERR_UNLIKELY`。
+ */
 static int cps_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
@@ -86,6 +112,16 @@ static int cps_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *
     return BLE_ATT_ERR_UNLIKELY;
 }
 
+/**
+ * 处理 HRS Measurement 特征读访问。
+ * 向客户端返回当前打包好的 Heart Rate Measurement 数据。
+ * ch：连接句柄，未使用。
+ * ah：属性句柄，未使用。
+ * ctxt：GATT 访问上下文。
+ * arg：自定义参数，未使用。
+ * 返回值：0 表示成功，否则返回 ATT 错误码。
+ * 特殊行为：仅支持读操作。
+ */
 static int hr_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
@@ -93,6 +129,16 @@ static int hr_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
     return BLE_ATT_ERR_UNLIKELY;
 }
 
+/**
+ * 处理 CSC Measurement 特征读访问。
+ * 向客户端返回当前打包好的 Cycling Speed and Cadence 数据。
+ * ch：连接句柄，未使用。
+ * ah：属性句柄，未使用。
+ * ctxt：GATT 访问上下文。
+ * arg：自定义参数，未使用。
+ * 返回值：0 表示成功，否则返回 ATT 错误码。
+ * 特殊行为：仅支持读操作。
+ */
 static int csc_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
@@ -100,6 +146,16 @@ static int csc_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *
     return BLE_ATT_ERR_UNLIKELY;
 }
 
+/**
+ * 处理 FTMS Feature 特征读访问。
+ * 返回预定义的 Fitness Machine 特性位图。
+ * ch：连接句柄，未使用。
+ * ah：属性句柄，未使用。
+ * ctxt：GATT 访问上下文。
+ * arg：自定义参数，未使用。
+ * 返回值：0 表示成功，否则返回 ATT 错误码。
+ * 特殊行为：特征值为静态常量，不随运行时变化。
+ */
 static int ftms_feat_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
@@ -107,6 +163,16 @@ static int ftms_feat_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
     return BLE_ATT_ERR_UNLIKELY;
 }
 
+/**
+ * 处理 FTMS Indoor Bike Data 特征读访问。
+ * 返回当前打包好的 FTMS 室内单车数据。
+ * ch：连接句柄，未使用。
+ * ah：属性句柄，未使用。
+ * ctxt：GATT 访问上下文。
+ * arg：自定义参数，未使用。
+ * 返回值：0 表示成功，否则返回 ATT 错误码。
+ * 特殊行为：仅支持读操作。
+ */
 static int ftms_bike_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
@@ -114,6 +180,16 @@ static int ftms_bike_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
     return BLE_ATT_ERR_UNLIKELY;
 }
 
+/**
+ * 处理 FTMS Status 特征读访问。
+ * 返回当前 FTMS 状态字节缓冲区。
+ * ch：连接句柄，未使用。
+ * ah：属性句柄，未使用。
+ * ctxt：GATT 访问上下文。
+ * arg：自定义参数，未使用。
+ * 返回值：0 表示成功，否则返回 ATT 错误码。
+ * 特殊行为：状态主要由控制点命令更新。
+ */
 static int ftms_status_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
@@ -121,6 +197,14 @@ static int ftms_status_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt 
     return BLE_ATT_ERR_UNLIKELY;
 }
 
+/**
+ * 发送 FTMS 控制点响应通知。
+ * 把请求操作码和处理结果编码成 FTMS Response Code 并通知给当前连接。
+ * request_op：原始请求操作码。
+ * result：FTMS 结果码。
+ * 返回值：无。
+ * 特殊行为：无连接时直接丢弃，不缓存待发送响应。
+ */
 static void ftms_send_response(uint8_t request_op, uint8_t result)
 {
     if (g_conn_handle == BLE_HS_CONN_HANDLE_NONE) return;
@@ -131,6 +215,16 @@ static void ftms_send_response(uint8_t request_op, uint8_t result)
     if (om) ble_gatts_notify_custom(g_conn_handle, g_ftms_cp_handle, om);
 }
 
+/**
+ * 处理 FTMS Control Point 写访问。
+ * 解析客户端下发的控制点指令，并驱动 ERG 回调、状态更新和响应通知。
+ * ch：连接句柄，未使用。
+ * ah：属性句柄，未使用。
+ * ctxt：GATT 访问上下文。
+ * arg：自定义参数，未使用。
+ * 返回值：0 表示已处理，否则返回 ATT 错误码。
+ * 特殊行为：仅支持写操作；未知操作码会返回 Not Supported。
+ */
 static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
@@ -149,6 +243,7 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
         break;
     case FTMS_OP_SET_TARGET_POWER:
         if (len >= 3) {
+            // Set Target Power 的负载为 16 位目标功率，解析后交给应用层 ERG 回调。
             int target = buf[1] | (buf[2] << 8);
             ESP_LOGI(TAG, "ERG目标功率 %dW", target);
             if (g_erg_cb) g_erg_cb(target);
@@ -178,6 +273,16 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
 
 // ============================ DIS 静态读取 ============================
 
+/**
+ * 处理 DIS 厂商名特征读访问。
+ * 返回设备厂商字符串。
+ * ch：连接句柄，未使用。
+ * ah：属性句柄，未使用。
+ * ctxt：GATT 访问上下文。
+ * arg：自定义参数，未使用。
+ * 返回值：0 表示成功，否则返回 ATT 错误码。
+ * 特殊行为：内容来自编译期常量。
+ */
 static int dis_manuf_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
@@ -186,6 +291,16 @@ static int dis_manuf_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
     return BLE_ATT_ERR_UNLIKELY;
 }
 
+/**
+ * 处理 DIS 型号特征读访问。
+ * 返回设备型号字符串。
+ * ch：连接句柄，未使用。
+ * ah：属性句柄，未使用。
+ * ctxt：GATT 访问上下文。
+ * arg：自定义参数，未使用。
+ * 返回值：0 表示成功，否则返回 ATT 错误码。
+ * 特殊行为：内容来自编译期常量。
+ */
 static int dis_model_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
@@ -194,6 +309,16 @@ static int dis_model_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
     return BLE_ATT_ERR_UNLIKELY;
 }
 
+/**
+ * 处理 DIS 固件版本特征读访问。
+ * 返回设备固件版本字符串。
+ * ch：连接句柄，未使用。
+ * ah：属性句柄，未使用。
+ * ctxt：GATT 访问上下文。
+ * arg：自定义参数，未使用。
+ * 返回值：0 表示成功，否则返回 ATT 错误码。
+ * 特殊行为：内容来自编译期常量。
+ */
 static int dis_fw_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
@@ -278,6 +403,13 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {
 
 // ============================ 数据打包 ============================
 
+/**
+ * 打包当前功率、心率和踏频到各服务通知缓冲区。
+ * 根据当前运行时快照生成 CPS、HRS、CSC 和 FTMS 的二进制负载。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：会推进曲柄累计圈数和时间戳，保持与旧版协议输出兼容。
+ */
 static void pack_all(void)
 {
     uint16_t power = g_power_w;
@@ -297,6 +429,7 @@ static void pack_all(void)
     uint16_t time_1024 = (uint16_t)(((uint64_t)adjusted_ms * 1024u / 1000u) & 0xFFFF);
     g_last_crank_ms = adjusted_ms;
 
+    // 基于踏频推演曲柄累计量，统一驱动 CPS 和 CSC 的 rev/time 字段。
     // CPS: flags=0x0020 + power + rev + time
     g_cps_buf[0] = 0x20; g_cps_buf[1] = 0x00;
     g_cps_buf[2] = power & 0xFF;       g_cps_buf[3] = (power >> 8) & 0xFF;
@@ -322,12 +455,28 @@ static void pack_all(void)
     g_ftms_bike_buf[6] = power & 0xFF;       g_ftms_bike_buf[7] = (power >> 8) & 0xFF;
 }
 
+/**
+ * 发送单个特征通知。
+ * 将平面缓冲区转换为 mbuf 后，通过 NimBLE 自定义通知发送。
+ * handle：特征值句柄。
+ * buf：待发送数据缓冲区。
+ * len：数据长度。
+ * 返回值：无。
+ * 特殊行为：若 mbuf 分配失败则静默跳过本次通知。
+ */
 static void notify_one(uint16_t handle, const uint8_t *buf, size_t len)
 {
     struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
     if (om) ble_gatts_notify_custom(g_conn_handle, handle, om);
 }
 
+/**
+ * BLE 周期通知定时器回调。
+ * 在有连接时打包当前数据并通知 CPS、HRS、CSC、FTMS 四个动态特征。
+ * arg：未使用的定时器参数。
+ * 返回值：无。
+ * 特殊行为：无连接时直接返回，不做任何打包和发送。
+ */
 static void notify_tick(void *arg)
 {
     (void)arg;
@@ -341,6 +490,14 @@ static void notify_tick(void *arg)
 
 // ============================ GAP / 广播 ============================
 
+/**
+ * 处理 GAP 连接与广播事件。
+ * 维护当前连接句柄，并在连接失败、断开或广播结束时重新启动广播。
+ * event：GAP 事件对象。
+ * arg：自定义参数，未使用。
+ * 返回值：0。
+ * 特殊行为：当前实现默认保持单连接模式，断开后自动回到可发现状态。
+ */
 static int gap_event_cb(struct ble_gap_event *event, void *arg)
 {
     (void)arg;
@@ -367,6 +524,13 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
     }
 }
 
+/**
+ * 启动 BLE 广播。
+ * 配置广播字段、设备名和服务 UUID，并开始无限时长广播。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：广播间隔从配置常量换算为 0.625ms 单位写入 NimBLE。
+ */
 static void start_advertising(void)
 {
     struct ble_gap_adv_params adv_params;
@@ -382,6 +546,7 @@ static void start_advertising(void)
         BLE_UUID16_INIT(POWER_SERVICE_UUID),
         BLE_UUID16_INIT(HR_SERVICE_UUID),
     };
+    // 广播包空间有限，只放最关键的两个 16 位服务 UUID，完整服务能力由连接后 GATT 发现获取。
     fields.uuids16 = adv_uuids;
     fields.num_uuids16 = 2;
     fields.uuids16_is_complete = 1;
@@ -401,6 +566,13 @@ static void start_advertising(void)
     ESP_LOGI(TAG, "开始广播 name=%s (间隔%dms)", g_device_name, BLE_ADVERTISING_INTERVAL_MS);
 }
 
+/**
+ * NimBLE 协议栈同步完成回调。
+ * 在地址准备好后推断地址类型并启动首次广播。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：若地址准备失败只记录错误，不会自动重试。
+ */
 static void on_sync(void)
 {
     int rc = ble_hs_util_ensure_addr(0);
@@ -410,11 +582,25 @@ static void on_sync(void)
     start_advertising();
 }
 
+/**
+ * NimBLE 协议栈复位回调。
+ * 在协议栈发生复位时记录原因，便于诊断 BLE 异常。
+ * reason：复位原因码。
+ * 返回值：无。
+ * 特殊行为：当前只记录日志，不主动执行恢复动作。
+ */
 static void on_reset(int reason)
 {
     ESP_LOGE(TAG, "BLE 协议栈复位 reason=%d", reason);
 }
 
+/**
+ * NimBLE host 线程入口。
+ * 运行 NimBLE 事件循环并在退出后执行 FreeRTOS 端清理。
+ * param：未使用的线程参数。
+ * 返回值：无。
+ * 特殊行为：`nimble_port_run()` 会阻塞直到 host 停止。
+ */
 static void ble_host_task(void *param)
 {
     (void)param;
@@ -425,6 +611,15 @@ static void ble_host_task(void *param)
 
 // ============================ 公共接口 ============================
 
+/**
+ * 更新 BLE 要广播和通知的数据快照。
+ * 写入当前功率、心率和踏频，供周期打包逻辑读取。
+ * power_w：功率，单位瓦特。
+ * heartrate_bpm：心率，单位 BPM。
+ * cadence_rpm：踏频，单位 RPM。
+ * 返回值：无。
+ * 特殊行为：只更新共享变量，不立即触发打包或发送。
+ */
 void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm)
 {
     g_power_w = power_w;
@@ -432,11 +627,25 @@ void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t ca
     g_cadence = cadence_rpm;
 }
 
+/**
+ * 注册 ERG 目标功率回调。
+ * 保存应用层提供的 FTMS ERG 回调。
+ * cb：回调函数指针，可为 NULL。
+ * 返回值：无。
+ * 特殊行为：新的回调会直接替换旧回调。
+ */
 void ble_bikepower_set_erg_callback(ble_erg_cb_t cb)
 {
     g_erg_cb = cb;
 }
 
+/**
+ * 设置 BLE 设备名。
+ * 更新内部设备名缓冲区，供广播和 GAP 设备名设置使用。
+ * name：新的设备名字符串。
+ * 返回值：无。
+ * 特殊行为：空指针或空串时保持现有设备名不变。
+ */
 void ble_bikepower_set_device_name(const char *name)
 {
     if (!name || !name[0]) return;
@@ -444,11 +653,25 @@ void ble_bikepower_set_device_name(const char *name)
     g_device_name[sizeof(g_device_name) - 1] = '\0';
 }
 
+/**
+ * 获取当前 BLE 连接数。
+ * 根据连接句柄是否有效返回单连接状态。
+ * 无参数。
+ * 返回值：0 表示未连接，1 表示已连接。
+ * 特殊行为：当前模块只支持单连接，因此不会返回更大的值。
+ */
 int ble_bikepower_conn_count(void)
 {
     return g_conn_handle == BLE_HS_CONN_HANDLE_NONE ? 0 : 1;
 }
 
+/**
+ * 启动 BLE 蓝牙功率计模块。
+ * 初始化 NimBLE、注册 GATT 服务、设置设备名、启动周期通知定时器并创建 host 线程。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：初始化失败时只记录日志并提前返回，不会自动重试或重启。
+ */
 void ble_bikepower_start(void)
 {
     esp_err_t err = nimble_port_init();
@@ -476,6 +699,13 @@ void ble_bikepower_start(void)
     ESP_LOGI(TAG, "蓝牙功率计已启动 五服务 CPS+HRS+CSC+FTMS+DIS 设备名=%s", g_device_name);
 }
 
+/**
+ * 停止 BLE 蓝牙功率计模块。
+ * 停止周期通知、终止连接、停止广播并关闭 NimBLE host。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：供 WiFi 配网前释放射频资源使用，结束后会清空当前连接句柄。
+ */
 void ble_bikepower_stop(void)
 {
     if (g_notify_timer) {
