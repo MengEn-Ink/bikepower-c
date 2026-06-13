@@ -81,7 +81,7 @@ bool profile_set_thr_hr(profile_t *p, int thr_hr)
  */
 bool profile_set_ride_type(profile_t *p, int ride_type)
 {
-    if (ride_type < 0 || ride_type >= PACER_COUNT) return false;
+    if (!PACER_INDEX_IS_VALID(ride_type)) return false;
     if (ride_type == p->ride_type) return false;
     p->ride_type = ride_type;
     return true;
@@ -95,11 +95,11 @@ bool profile_set_ride_type(profile_t *p, int ride_type)
  */
 int profile_ride_type_index(const char *id)
 {
-    if (!id) return 0;
+    if (!id) return PACER_INDEX_DEFAULT;
     for (int i = 0; i < PACER_COUNT; i++) {
         if (strcmp(PROFILE_RIDE_TYPE_OPTIONS[i], id) == 0) return i;
     }
-    return 0;
+    return PACER_INDEX_DEFAULT;
 }
 
 /*

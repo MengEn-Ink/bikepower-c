@@ -5,6 +5,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include "domain_config.h"
 
 /*
  * 用户档案数据。
@@ -17,17 +18,8 @@ typedef struct {
     int ride_type;  // 配速机器人索引 0-4
 } profile_t;
 
-/** 配速机器人：名称 + 功体比下限/上限（W/kg*10） */
-typedef struct {
-    const char *name;
-    int wkg_lo;
-    int wkg_hi;
-} road_pacer_t;
-
 /* 配速机器人 ID 字符串表，用于配置存储和 Web 参数映射。 */
 extern const char *const PROFILE_RIDE_TYPE_OPTIONS[];
-/* 配速机器人参数表，给 road 模式生成功体比范围。 */
-extern const road_pacer_t ROAD_PACERS[];
 
 /* 初始化用户档案到默认值。 */
 void profile_init(profile_t *p);

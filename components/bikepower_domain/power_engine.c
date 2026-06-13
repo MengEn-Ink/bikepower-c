@@ -66,7 +66,7 @@ static int target_heartrate(power_engine_t *e, int power)
 static const road_pacer_t *road_pacer(power_engine_t *e)
 {
     int idx = e->profile.ride_type;
-    if (idx < 0 || idx >= PACER_COUNT) idx = 0;
+    if (!PACER_INDEX_IS_VALID(idx)) idx = PACER_INDEX_DEFAULT;
     return &ROAD_PACERS[idx];
 }
 
@@ -80,7 +80,7 @@ void power_engine_reset_mode_state(power_engine_t *e)
 {
     if (e->mode == RIDE_MODE_ROAD) {
         const road_pacer_t *p = road_pacer(e);
-        e->last_power = e->profile.weight * p->wkg_lo / 10;
+        e->last_power = e->profile.weight * p->wkg_low / 10;
         e->last_cadence = e->cadence_base;
     } else if (e->mode == RIDE_MODE_ERG) {
         e->last_power = e->has_erg_target ? e->erg_active_target : e->base_power;
@@ -139,7 +139,7 @@ static void build_steady(power_engine_t *e, int *po, int *co, int *ho)
 static void build_road(power_engine_t *e, int *po, int *co, int *ho)
 {
     const road_pacer_t *p = road_pacer(e);
-    int wkg = domain_rng_range(p->wkg_lo, p->wkg_hi);
+    int wkg = domain_rng_range(p->wkg_low, p->wkg_high);
     int raw_power = e->profile.weight * wkg / 10;
     int power = clamp_power(raw_power);
     int cadence = clamp_cadence(e->cadence_base + domain_rng_range(STEADY_CADENCE_FLUCT_LO, STEADY_CADENCE_FLUCT_HI));
@@ -295,6 +295,26 @@ int power_engine_get_mode_tuning(power_engine_t *e, ride_mode_t mode)
 {
     if (mode != RIDE_MODE_ROAD) return MODE_TUNE_DEFAULT;
     return clamp_tune(e->mode_tuning_road);
+}
+
+int power_engine_get_pacer_index(power_engine_t *e)
+{
+    int idx = e->profile.ride_type;
+    if (!PACER_INDEX_IS_VALID(idx)) return PACER_INDEX_DEFAULT;
+    return idx;
+}
+
+bool power_engine_set_pacer_index(power_engine_t *e, int pacer_index)
+{
+    if (!profile_set_ride_type(&e->profile, pacer_index)) return false;
+    if (e->mode == RIDE_MODE_ROAD) power_engine_reset_mode_state(e);
+    e->dirty = true;
+    return true;
+}
+
+const char *power_engine_get_current_pacer(power_engine_t *e)
+{
+    return ROAD_PACERS[power_engine_get_pacer_index(e)].name;
 }
 
 /*

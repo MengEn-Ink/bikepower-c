@@ -90,4 +90,14 @@ typedef enum {
 // ===== 配速机器人 =====
 // 索引 0-4 对应 coco/yumi/jacques/genie/constance
 #define PACER_COUNT             5
-#define PROFILE_RIDE_TYPE_DEFAULT  0
+#define PACER_INDEX_DEFAULT     0
+#define PROFILE_RIDE_TYPE_DEFAULT  PACER_INDEX_DEFAULT
+#define PACER_INDEX_IS_VALID(idx)  ((idx) >= 0 && (idx) < PACER_COUNT)
+
+typedef struct {
+    const char *name;
+    int wkg_low;   // W/kg * 10
+    int wkg_high;  // W/kg * 10
+} road_pacer_t;
+
+extern const road_pacer_t ROAD_PACERS[PACER_COUNT];

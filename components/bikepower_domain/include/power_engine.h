@@ -72,6 +72,12 @@ bool power_engine_set_mode(power_engine_t *e, ride_mode_t mode);
 bool power_engine_set_mode_tuning(power_engine_t *e, ride_mode_t mode, int value);
 /* 读取指定模式的调节参数，目前仅 road 模式有意义。 */
 int power_engine_get_mode_tuning(power_engine_t *e, ride_mode_t mode);
+/* 读取当前 profile 选择的配速机器人索引。 */
+int power_engine_get_pacer_index(power_engine_t *e);
+/* 设置当前 profile 的配速机器人索引。 */
+bool power_engine_set_pacer_index(power_engine_t *e, int pacer_index);
+/* 返回当前 profile 选择的配速机器人名称。 */
+const char *power_engine_get_current_pacer(power_engine_t *e);
 
 /* 设置 BLE 设备名，超长时截断到 DEVICE_NAME_MAX-1。 */
 bool power_engine_set_device_name(power_engine_t *e, const char *name);

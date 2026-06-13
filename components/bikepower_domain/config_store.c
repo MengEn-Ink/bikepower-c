@@ -27,7 +27,7 @@ void config_store_defaults(config_data_t *c)
     c->weight = PROFILE_WEIGHT_DEFAULT;
     c->ftp = PROFILE_FTP_DEFAULT;
     c->thr_hr = PROFILE_THR_HR_DEFAULT;
-    c->ride_type = PROFILE_RIDE_TYPE_DEFAULT;
+    c->ride_type = PACER_INDEX_DEFAULT;
     strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
@@ -49,7 +49,7 @@ bool config_store_validate(config_data_t *c)
     c->weight = clamp_int(c->weight, PROFILE_WEIGHT_MIN, PROFILE_WEIGHT_MAX);
     c->ftp = clamp_int(c->ftp, PROFILE_FTP_MIN, PROFILE_FTP_MAX);
     c->thr_hr = clamp_int(c->thr_hr, PROFILE_THR_HR_MIN, PROFILE_THR_HR_MAX);
-    if (c->ride_type < 0 || c->ride_type >= PACER_COUNT) c->ride_type = PROFILE_RIDE_TYPE_DEFAULT;
+    if (!PACER_INDEX_IS_VALID(c->ride_type)) c->ride_type = PACER_INDEX_DEFAULT;
 
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
     if (c->device_name[0] == '\0') {

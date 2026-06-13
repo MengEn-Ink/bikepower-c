@@ -29,7 +29,7 @@ static void test_profile(void)
     CHECK(p.weight == PROFILE_WEIGHT_DEFAULT, "默认体重");
     CHECK(p.ftp == PROFILE_FTP_DEFAULT, "默认FTP");
     CHECK(p.thr_hr == PROFILE_THR_HR_DEFAULT, "默认阈值心率");
-    CHECK(p.ride_type == 0, "默认配速机器人 coco");
+    CHECK(p.ride_type == PACER_INDEX_DEFAULT, "默认配速机器人 coco");
 
     CHECK(!profile_set_weight(&p, 39), "体重下限拒绝");
     CHECK(!profile_set_weight(&p, 151), "体重上限拒绝");
@@ -168,8 +168,15 @@ static void test_road_pacer(void)
     printf("[test] road 配速功率范围\n");
     power_engine_t e;
     power_engine_init(&e);
+    CHECK(power_engine_get_pacer_index(&e) == PACER_INDEX_DEFAULT, "默认配速机器人索引");
+    CHECK(strcmp(power_engine_get_current_pacer(&e), "Coco") == 0, "默认配速机器人名称");
+    CHECK(power_engine_set_pacer_index(&e, 2), "可切换到 Jacques");
+    CHECK(power_engine_get_pacer_index(&e) == 2, "Jacques 索引=2");
+    CHECK(strcmp(power_engine_get_current_pacer(&e), "Jacques") == 0, "当前机器人名称已更新");
+    CHECK(!power_engine_set_pacer_index(&e, 2), "重复设置返回false");
+    CHECK(!power_engine_set_pacer_index(&e, PACER_COUNT), "非法机器人索引拒绝");
     profile_set_weight(&e.profile, 70);
-    profile_set_ride_type(&e.profile, 0); // coco 24-28
+    CHECK(power_engine_set_pacer_index(&e, PACER_INDEX_DEFAULT), "切回 Coco");
     power_engine_set_mode(&e, RIDE_MODE_ROAD);
     domain_rng_seed(7);
     int lo = 70 * 24 / 10; // 168
@@ -209,7 +216,7 @@ static void test_config_store(void)
     CHECK(c.weight == PROFILE_WEIGHT_DEFAULT, "默认体重");
     CHECK(c.ftp == PROFILE_FTP_DEFAULT, "默认FTP");
     CHECK(c.thr_hr == PROFILE_THR_HR_DEFAULT, "默认阈值心率");
-    CHECK(c.ride_type == PROFILE_RIDE_TYPE_DEFAULT, "默认配速机器人");
+    CHECK(c.ride_type == PACER_INDEX_DEFAULT, "默认配速机器人");
     CHECK(strcmp(c.device_name, DEVICE_NAME_DEFAULT) == 0, "默认设备名");
 
     // 合法数据不修正
@@ -248,7 +255,7 @@ static void test_config_store(void)
     CHECK(b.weight == PROFILE_WEIGHT_MIN, "体重夹下限");
     CHECK(b.ftp == PROFILE_FTP_MAX, "FTP夹上限");
     CHECK(b.thr_hr == PROFILE_THR_HR_MIN, "阈值心率夹下限");
-    CHECK(b.ride_type == PROFILE_RIDE_TYPE_DEFAULT, "非法配速机器人回默认");
+    CHECK(b.ride_type == PACER_INDEX_DEFAULT, "非法配速机器人回默认");
 
     // 版本不匹配触发迁移重置
     config_data_t m;
