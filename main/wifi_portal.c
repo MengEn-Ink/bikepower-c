@@ -350,12 +350,12 @@ static esp_err_t h_home(httpd_req_t *req)
         ".note.warn{background:#fff3e0;color:#92400e;border-color:#ffd59a}"
         ".renew-btn{display:none;width:100%;padding:14px;border:0;border-radius:18px;background:#ff9500;color:#fff;font-size:16px;font-weight:800;margin:0 0 10px;animation:pulse 1s infinite}"
         "@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}"
-        ".mode-info{display:none;background:#fff;border:1px solid #0001;border-radius:22px;padding:18px 16px;margin:0 0 10px}"
+        ".mode-info{display:none;position:absolute;top:0;right:0;bottom:0;left:0;overflow-y:auto;background:#fff;border:1px solid #0001;border-radius:22px;padding:18px 16px;margin:0 0 10px}"
         ".mode-info h3{font-size:17px;font-weight:800;margin:0 0 8px}"
         ".mode-info p{font-size:13px;line-height:1.5;color:#666;margin:0 0 8px}"
         ".mode-info .pacer-sel{width:100%;padding:12px;border:1px solid rgba(0,0,0,.08);border-radius:16px;font-size:15px;font-weight:700;background:#f5f5f7;color:#1d1d1f;margin:4px 0}"
         ".mode-info .pacer-label{font-size:12px;font-weight:800;color:#007aff;margin:0 0 4px}"
-        "#vs{position:relative}#vs.i .card{visibility:hidden}#vs.i .mode-info{display:block}.mode-info{display:none;position:absolute;inset:0}#vs.road #mi-road,#vs.erg #mi-erg{display:block}.card{background:#fff;border:1px solid #0001;border-radius:22px;padding:15px 16px;margin:0 0 10px}"
+        "#vs{position:relative}#vs.i .card{visibility:hidden}#vs.road #mi-road,#vs.erg #mi-erg{display:block}.card{background:#fff;border:1px solid #0001;border-radius:22px;padding:15px 16px;margin:0 0 10px}"
         ".card .val{display:flex;align-items:baseline;gap:6px}"
         ".card .val input{width:100%;border:0;background:transparent;color:#111;font-size:36px;font-weight:800;padding:0}"
         ".card .val input.out-of-range{color:#ef4444}"
@@ -433,7 +433,7 @@ static esp_err_t h_home(httpd_req_t *req)
     for (int i = 0; i < 3; i++) {
         // 这里把领域层整数模式重新映射成旧版网页使用的字符串值，保证前端兼容。
         snprintf(buf, sizeof(buf),
-            "<label class=\"%s\"><input type=\"radio\" name=\"mode\" value=\"%s\"%s onchange=\"syncMode()\">%s</label>",
+            "<label class=\"%s\" onclick=\"setTimeout(syncMode,0)\"><input type=\"radio\" name=\"mode\" value=\"%s\"%s>%s</label>",
             mode == segs[i].m ? "seg on" : "seg", segs[i].id,
             mode == segs[i].m ? " checked" : "", segs[i].label);
         SEND(req, buf);
@@ -459,10 +459,10 @@ static esp_err_t h_home(httpd_req_t *req)
         "b.children[0].style.background=C[hr];b.children[1].textContent=h?\"Z\"+(hr+1)+\" \"+H[hr]:\"-\";"
         "d.children[0].style.background=c>=80&&c<=100?\"#16a34a\":c>=60&&c<=120?\"#f97316\":\"#ef4444\";d.children[1].textContent=c?(c>=80&&c<=100?\"稳定 80-100\":c>100?\"偏高\":\"偏低 \"+c+\" RPM\"):\"-\";"
         "updNote(w,h,c,p,hr)}"
-        "function updNote(w,h,c,p,hr){var m=curMode();if(m===\"steady\"){var t=\"手动设置三项数据\";if(w&&F)t+=\"，当前 \"+(w/W).toFixed(1)+\" W/kg（\"+P[p]+\"区间）\";if(h&&T)t+=\"，心率 \"+H[hr]+\"区间\";g(\"mn\").textContent=\"固定功率：\"+t+\"。\"}}"
+        "function updNote(w,h,c,p,hr){var m=curMode();if(m===\"steady\"){var t=\"手动设置三项数据\";if(w&&F)t+=\"，当前 \"+(w/W).toFixed(1)+\" W/kg（\"+P[p]+\"区间）\";if(h&&T)t+=\"，心率 \"+H[hr]+\"区间\";g(\"mn\").textContent=\"固定功率：\"+t+\"。\"}else if(m===\"road\"){g(\"mn\").textContent=\"机器人配速：按体重和 W/kg 换算功率，模拟跟骑。\"}else if(m===\"erg\"){g(\"mn\").textContent=\"ERG：App 下发目标功率，设备跟随训练课表。\"}}"
         "var R=0;function doRenew(){if(R)return;R=1;var b=g(\"cd\");b.className=\"badge ok\";b.textContent=\"已延长\";fetch(\"/renew\").then(function(r){return r.text()}).then(function(t){var s=parseInt(t);if(s>0){_sv=s;_lt=Date.now();updCd()}});setTimeout(function(){b.className=\"badge\";R=0},1200)}"
         "function curMode(){var r=document.getElementsByName(\"mode\");for(var i=0;i<r.length;i++){if(r[i].checked)return r[i].value}return \"steady\"}"
-        "function validateForm(){if(curMode()!==\"steady\")return true;var p=parseInt(g(\"p\").value),c=parseInt(g(\"c\").value),h=parseInt(g(\"h\").value;if(p<0||p>2000){alert(\"功率超出范围（0-2000W）\");return false}if(c<20||c>120){alert(\"踏频超出范围（20-120 RPM）\");return false}if(h<60||h>200){alert(\"心率超出范围（60-200 BPM）\");return false}return true}"
+        "function validateForm(){if(curMode()!==\"steady\")return true;var p=parseInt(g(\"p\").value),c=parseInt(g(\"c\").value),h=parseInt(g(\"h\").value);if(p<0||p>2000){alert(\"功率超出范围（0-2000W）\");return false}if(c<20||c>120){alert(\"踏频超出范围（20-120 RPM）\");return false}if(h<60||h>200){alert(\"心率超出范围（60-200 BPM）\");return false}return true}"
         "function syncMode(){var m=curMode();var on=m===\"steady\";"
         "var s=document.getElementsByClassName(\"seg\");for(var i=0;i<s.length;i++){var c=s[i].getElementsByTagName(\"input\")[0];s[i].className=c.checked?\"seg on\":\"seg\"}"
         "g(\"vs\").className=on?\"\":m===\"road\"?\"i road\":\"i erg\";"
@@ -899,7 +899,8 @@ static void send_erg_panel(httpd_req_t *req)
         "<p>2. 设备接收后自动切换并跟随目标</p>"
         "<p>3. 心率和踏频继续模拟真实骑行变化</p>"
         "</div>"
-        "<div class=\"module-note\">此模式下首页的手动功率不生效；非 ERG 模式下 App 无法遥控功率。</div>");
+        "<div class=\"module-note\">此模式下首页的手动功率不生效；非 ERG 模式下 App 无法遥控功率。</div>"
+        "<script>panelCleanup=function(){};</script>");
 }
 
 /**
