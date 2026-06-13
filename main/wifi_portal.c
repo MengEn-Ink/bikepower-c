@@ -134,7 +134,7 @@ static void road_pacer_label(int ride_type, char *out, size_t out_sz)
     if (ride_type < 0 || ride_type >= PACER_COUNT) ride_type = 0;
     const road_pacer_t *p = &ROAD_PACERS[ride_type];
     snprintf(out, out_sz, "%s · %d.%d-%d.%d W/kg",
-             p->name, p->wkg_lo / 10, p->wkg_lo % 10, p->wkg_hi / 10, p->wkg_hi % 10);
+             p->name, p->wkg_low / 10, p->wkg_low % 10, p->wkg_high / 10, p->wkg_high % 10);
 }
 
 // HTML 转义到 out（截断保护），用于设备名等用户输入
