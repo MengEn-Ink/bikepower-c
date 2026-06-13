@@ -1,7 +1,7 @@
 # BikePower C — 项目进度
 
 > 基线方案：[docs/01-cidf-nimble-rewrite.md](docs/01-cidf-nimble-rewrite.md)
-> 目标固件版本：v3.0.0（C + ESP-IDF v5.5.1 + NimBLE，ESP32-C3）
+> 目标固件版本：v3.0.0（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 参考仓库：git@gitee.com:mengen4jv/bikepower-c.git
 
 ---
@@ -127,6 +127,6 @@
 
 ## 已知限制 / 注意事项
 
-- 当前 ESP-IDF 基线 v5.5.1-dirty（本地工具链）；方案推荐 v6.0.1 或 v5.5.4，量产前需升级并记录理由
+- ESP-IDF 已升级至 v5.5.4（修复了 NimBLE host 潜在断连问题；工具链 esp-14.2.0_20260121）。
 - WiFi/BLE 射频互斥：进入配网前必须先停 BLE（见 [.trae/rules/wifi-ble-mutex.md](.trae/rules/wifi-ble-mutex.md)）
 - 物理按钮/LED 灯效需人工确认，自动化测试只能覆盖 BLE 连接驱动的状态迁移

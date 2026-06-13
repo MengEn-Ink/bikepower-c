@@ -38,6 +38,6 @@
 - 真机老化、配网全链路、物理按钮/LED：待人工确认（见 [PROGRESS.md](PROGRESS.md)）。
 
 ### 已知限制
-- ESP-IDF 基线 v5.5.1-dirty，量产前评估升级。
+- ESP-IDF v5.5.4（已从 v5.5.1 升级，修复 NimBLE 断连问题）。
 - WiFi/BLE 射频互斥，配网前必停 BLE。
 - 发版前需将日志级别改为 `CONFIG_LOG_DEFAULT_LEVEL_WARN`。
