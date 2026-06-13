@@ -43,12 +43,26 @@ static volatile bool s_rebooting = false;
 
 // ============================ 超时管理 ============================
 
+/**
+ * 重置 WiFi 配网超时截止时间。
+ * 把截止时间延长到当前时刻之后的固定配网窗口。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：若已进入计划重启状态则不再续期，避免保存后被再次延长。
+ */
 static void arm_deadline(void)
 {
     if (s_rebooting) return;  // 计划重启中不再续期
     s_deadline_us = esp_timer_get_time() + (int64_t)WIFI_SHUTDOWN_MS * 1000;
 }
 
+/**
+ * 计算距离自动关闭还剩多少秒。
+ * 基于当前截止时间与当前单调时间计算剩余秒数。
+ * 无参数。
+ * 返回值：剩余秒数，最小为 0。
+ * 特殊行为：不会返回负数。
+ */
 static int remaining_seconds(void)
 {
     int64_t left = s_deadline_us - esp_timer_get_time();
@@ -56,6 +70,13 @@ static int remaining_seconds(void)
     return (int)(left / 1000000);
 }
 
+/**
+ * 配网超时检查定时器回调。
+ * 当到达截止时间时执行重启，以恢复 BLE 正常工作模式。
+ * arg：未使用的定时器参数。
+ * 返回值：无。
+ * 特殊行为：保存成功后也复用这一路径，通过 s_rebooting 区分日志文案。
+ */
 static void shutdown_check_cb(void *arg)
 {
     (void)arg;
@@ -68,6 +89,13 @@ static void shutdown_check_cb(void *arg)
 // ============================ 工具函数 ============================
 
 // 字符串 ID → mode 整数，未知返回 -1
+/**
+ * 把网页中的模式字符串转换为领域层模式枚举值。
+ * 解析 `steady`、`road`、`erg` 三种模式 ID。
+ * id：网页表单里的模式字符串。
+ * 返回值：对应的 ride_mode 整数值；未知字符串返回 -1。
+ * 特殊行为：仅用于网页到领域层的输入转换。
+ */
 static int mode_from_id(const char *id)
 {
     if (strcmp(id, "road") == 0) return RIDE_MODE_ROAD;
@@ -77,6 +105,13 @@ static int mode_from_id(const char *id)
 }
 
 // mode 中文名（成功页用）
+/**
+ * 获取模式的人类可读中文名称。
+ * 用于成功页等需要展示模式文案的场景。
+ * mode：领域层模式值。
+ * 返回值：静态中文字符串指针。
+ * 特殊行为：未知值默认回退为“固定功率”。
+ */
 static const char *mode_name(int mode)
 {
     if (mode == RIDE_MODE_ROAD) return "机器人配速";
@@ -85,6 +120,15 @@ static const char *mode_name(int mode)
 }
 
 // 配速机器人标签：如 "Coco · 2.4-2.8 W/kg"
+/**
+ * 生成配速机器人显示标签。
+ * 按 ride_type 取出机器人配置，格式化为用于前端展示的说明文本。
+ * ride_type：机器人类型索引。
+ * out：输出缓冲区。
+ * out_sz：输出缓冲区大小。
+ * 返回值：无。
+ * 特殊行为：索引越界时自动回退到第一个机器人。
+ */
 static void road_pacer_label(int ride_type, char *out, size_t out_sz)
 {
     if (ride_type < 0 || ride_type >= PACER_COUNT) ride_type = 0;
@@ -94,6 +138,15 @@ static void road_pacer_label(int ride_type, char *out, size_t out_sz)
 }
 
 // HTML 转义到 out（截断保护），用于设备名等用户输入
+/**
+ * 对 HTML 文本做最小必要转义。
+ * 将用户输入中的特殊字符转义后写入输出缓冲区，防止页面结构被破坏。
+ * in：原始输入字符串。
+ * out：输出缓冲区。
+ * out_sz：输出缓冲区大小。
+ * 返回值：无。
+ * 特殊行为：输出空间不足时会截断，但始终保证以 `\0` 结尾。
+ */
 static void html_escape(const char *in, char *out, size_t out_sz)
 {
     size_t o = 0;
@@ -116,6 +169,15 @@ static void html_escape(const char *in, char *out, size_t out_sz)
 }
 
 // URL 解码（含 %XX 和 +→空格），就地写 out
+/**
+ * 对 URL 编码字符串做解码。
+ * 支持 `%XX` 十六进制转义和 `+` 转空格。
+ * s：原始 URL 编码字符串。
+ * out：输出缓冲区。
+ * out_sz：输出缓冲区大小。
+ * 返回值：无。
+ * 特殊行为：遇到非法 `%XX` 序列时保留原字符。
+ */
 static void url_decode(const char *s, char *out, size_t out_sz)
 {
     size_t o = 0;
@@ -141,6 +203,16 @@ static void url_decode(const char *s, char *out, size_t out_sz)
 }
 
 // 从 form-urlencoded body 提取 key 的字符串值（已 URL 解码），未找到返回 false
+/**
+ * 从 `application/x-www-form-urlencoded` 请求体中提取字符串字段。
+ * 按键名查找并返回已 URL 解码的字段值。
+ * body：完整表单请求体。
+ * key：待提取字段名。
+ * out：输出缓冲区。
+ * out_sz：输出缓冲区大小。
+ * 返回值：`true` 表示找到并成功写入，`false` 表示未找到。
+ * 特殊行为：会校验匹配位置必须是字段起始，避免误命中其他字段的子串。
+ */
 static bool form_get_str(const char *body, const char *key, char *out, size_t out_sz)
 {
     char pat[40];
@@ -164,6 +236,15 @@ static bool form_get_str(const char *body, const char *key, char *out, size_t ou
 }
 
 // 从 form body 提取整数，未找到返回 def
+/**
+ * 从表单请求体中提取整数值。
+ * 基于 form_get_str 提取字段，再用 `atoi` 转换为整数。
+ * body：完整表单请求体。
+ * key：待提取字段名。
+ * def：字段缺失或为空时返回的默认值。
+ * 返回值：解析后的整数值或默认值。
+ * 特殊行为：空串会回退为默认值，不做更严格的数值合法性检查。
+ */
 static int form_get_int(const char *body, const char *key, int def)
 {
     char buf[32];
@@ -173,6 +254,16 @@ static int form_get_int(const char *body, const char *key, int def)
 }
 
 // 从查询字符串提取 name 参数（GET /ui/module?name=xxx）
+/**
+ * 从 URL 查询字符串中提取一个字段。
+ * 读取当前请求 URL 的 query 部分并返回指定键的解码结果。
+ * req：HTTP 请求对象。
+ * key：待提取字段名。
+ * out：输出缓冲区。
+ * out_sz：输出缓冲区大小。
+ * 返回值：`true` 表示找到字段，`false` 表示未找到或解析失败。
+ * 特殊行为：内部临时分配查询字符串缓冲区，使用后立即释放。
+ */
 static bool query_get_str(httpd_req_t *req, const char *key, char *out, size_t out_sz)
 {
     size_t qlen = httpd_req_get_url_query_len(req) + 1;
@@ -192,6 +283,14 @@ static bool query_get_str(httpd_req_t *req, const char *key, char *out, size_t o
 }
 
 // 收取请求 body 到动态缓冲（调用方 free），返回长度，失败返回 -1
+/**
+ * 读取完整 HTTP 请求体到动态缓冲区。
+ * 按 content_len 读取 body，并在末尾补 `\0` 便于后续按字符串解析。
+ * req：HTTP 请求对象。
+ * out：输出的动态缓冲区地址，由调用方负责 free。
+ * 返回值：成功时返回实际读取长度，失败返回 -1。
+ * 特殊行为：请求体长度被限制在 2048 字节以内，超出部分会被截到该上限。
+ */
 static int recv_body(httpd_req_t *req, char **out)
 {
     int total = req->content_len;
@@ -212,6 +311,13 @@ static int recv_body(httpd_req_t *req, char **out)
 
 // chunked 发送（大 HTML 分块，避免一次性大缓冲）
 #define SEND(req, s)  httpd_resp_sendstr_chunk((req), (s))
+/**
+ * 结束一次 chunked HTTP 响应。
+ * 向 esp_http_server 发送空 chunk，标记响应完成。
+ * req：HTTP 请求对象。
+ * 返回值：无。
+ * 特殊行为：配合 SEND 宏使用，适合大 HTML 分块输出。
+ */
 static void send_end(httpd_req_t *req)
 {
     httpd_resp_sendstr_chunk(req, NULL);
@@ -219,6 +325,13 @@ static void send_end(httpd_req_t *req)
 
 // ============================ 首页 ============================
 
+/**
+ * 处理首页路由。
+ * 输出主配置页面，展示当前数值、模式切换和倒计时状态。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：每次访问首页都会自动续期配网倒计时。
+ */
 static esp_err_t h_home(httpd_req_t *req)
 {
     arm_deadline();
@@ -305,6 +418,7 @@ static esp_err_t h_home(httpd_req_t *req)
         { RIDE_MODE_ERG, "erg", "ERG 模式" },
     };
     for (int i = 0; i < 3; i++) {
+        // 这里把领域层整数模式重新映射成旧版网页使用的字符串值，保证前端兼容。
         snprintf(buf, sizeof(buf),
             "<label class=\"%s\"><input type=\"radio\" name=\"mode\" value=\"%s\"%s onchange=\"syncMode()\">%s</label>",
             mode == segs[i].m ? "seg on" : "seg", segs[i].id,
@@ -361,6 +475,13 @@ static esp_err_t h_home(httpd_req_t *req)
 
 // ============================ 成功页 ============================
 
+/**
+ * 输出配置保存成功页面。
+ * 展示最终保存的关键配置，并给出即将重启恢复 BLE 的倒计时。
+ * req：HTTP 请求对象。
+ * 返回值：无。
+ * 特殊行为：只负责输出页面，不修改重启状态。
+ */
 static void send_success(httpd_req_t *req)
 {
     power_engine_t *e = s_engine;
@@ -408,6 +529,13 @@ static void send_success(httpd_req_t *req)
     send_end(req);
 }
 
+/**
+ * 处理成功页路由。
+ * 在已进入重启流程时输出成功页，否则将直接访问重定向回首页。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：充当 PRG 守卫，避免用户未提交配置却直接打开成功页。
+ */
 static esp_err_t h_success(httpd_req_t *req)
 {
     if (!s_rebooting) {  // 未提交配置时直访，302 回首页（与旧版 PRG 守卫一致）
@@ -423,6 +551,13 @@ static esp_err_t h_success(httpd_req_t *req)
 // ============================ 配置提交 ============================
 
 // 应用表单参数到引擎（与按钮路径一致，mode 字符串转整数）
+/**
+ * 把网页提交的表单数据应用到功率引擎。
+ * 解析模式、设备名和 profile 字段，并根据模式决定是否接受手动功率/踏频/心率输入。
+ * body：POST `/config` 的表单请求体。
+ * 返回值：无。
+ * 特殊行为：只有固定功率模式会应用首页手动三项数值，其他模式忽略这些字段。
+ */
 static void apply_config(const char *body)
 {
     power_engine_t *e = s_engine;
@@ -462,6 +597,13 @@ static void apply_config(const char *body)
         profile_set_ride_type_str(&e->profile, val);
 }
 
+/**
+ * 处理配置提交路由。
+ * 读取表单、应用配置、保存到 NVS、返回成功页并启动延迟重启倒计时。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示成功处理，ESP_FAIL 表示读取请求体失败。
+ * 特殊行为：重复提交时不会再次保存，而是直接返回当前成功页内容。
+ */
 static esp_err_t h_config(httpd_req_t *req)
 {
     if (s_rebooting) {  // 防重复提交
@@ -490,6 +632,7 @@ static esp_err_t h_config(httpd_req_t *req)
 
     send_success(req);
 
+    // 成功页展示约 5 秒后重启，给用户留出看到结果和切回骑行 App 的时间。
     s_rebooting = true;
     s_deadline_us = esp_timer_get_time() + 5000000;
     return ESP_OK;
@@ -497,6 +640,13 @@ static esp_err_t h_config(httpd_req_t *req)
 
 // ============================ 草稿保存 ============================
 
+/**
+ * 处理草稿保存路由。
+ * 仅把更多配置页里的字段暂存到内存，随后重定向回首页，不写 NVS 也不重启。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：该路由用于多页 UI 回写隐藏字段，不代表真正保存到设备。
+ */
 static esp_err_t h_draft(httpd_req_t *req)
 {
     arm_deadline();
@@ -529,6 +679,13 @@ static esp_err_t h_draft(httpd_req_t *req)
 
 // ============================ 更多配置页 ============================
 
+/**
+ * 处理更多配置页路由。
+ * 输出一个壳页面，内部通过 `/ui/module` 动态加载不同设置面板。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：访问时会自动续期配网倒计时。
+ */
 static esp_err_t h_more(httpd_req_t *req)
 {
     arm_deadline();
@@ -602,6 +759,13 @@ static esp_err_t h_more(httpd_req_t *req)
     ".spin{width:20px;height:20px;margin:0 auto 8px;border:3px solid #cfe5ff;border-top-color:#007aff;border-radius:50%;animation:r .8s linear infinite}@keyframes r{to{transform:rotate(360deg)}}.busy{opacity:.55;pointer-events:none}" \
     "</style>"
 
+/**
+ * 输出“更多配置”首页面板。
+ * 提供进入个人信息和设备名称两个子面板的入口按钮。
+ * req：HTTP 请求对象。
+ * 返回值：无。
+ * 特殊行为：该函数只输出 HTML 碎片，依赖外层页面的脚本环境。
+ */
 static void send_more_panel(httpd_req_t *req)
 {
     SEND(req, PANEL_STYLE
@@ -619,6 +783,13 @@ static void send_more_panel(httpd_req_t *req)
         "<script>panelCleanup=function(){};</script>");
 }
 
+/**
+ * 输出设备名称编辑面板。
+ * 显示当前设备名称输入框，并与隐藏表单字段保持同步。
+ * req：HTTP 请求对象。
+ * 返回值：无。
+ * 特殊行为：只是更新草稿字段，真正保存要回首页再提交 `/config`。
+ */
 static void send_device_panel(httpd_req_t *req)
 {
     char dn[64];
@@ -637,6 +808,13 @@ static void send_device_panel(httpd_req_t *req)
         "</script>");
 }
 
+/**
+ * 输出个人信息编辑面板。
+ * 展示体重、FTP、阈值心率和配速机器人等设置项。
+ * req：HTTP 请求对象。
+ * 返回值：无。
+ * 特殊行为：输入变化只同步到隐藏字段，不立即写入引擎持久化。
+ */
 static void send_profile_panel(httpd_req_t *req)
 {
     SEND(req, PANEL_STYLE
@@ -671,6 +849,13 @@ static void send_profile_panel(httpd_req_t *req)
         "</script>");
 }
 
+/**
+ * 输出机器人配速模式说明面板。
+ * 解释路配模式的功率换算逻辑和适用场景。
+ * req：HTTP 请求对象。
+ * 返回值：无。
+ * 特殊行为：当前版本该面板仅作为说明页，不含可编辑字段。
+ */
 static void send_mode_panel(httpd_req_t *req)
 {
     SEND(req, PANEL_STYLE
@@ -683,6 +868,13 @@ static void send_mode_panel(httpd_req_t *req)
         "<script>panelCleanup=function(){};</script>");
 }
 
+/**
+ * 输出 ERG 模式说明面板。
+ * 说明 FTMS 控制点如何驱动目标功率变化及其工作流程。
+ * req：HTTP 请求对象。
+ * 返回值：无。
+ * 特殊行为：当前版本该面板仅展示说明，不提供直接配置项。
+ */
 static void send_erg_panel(httpd_req_t *req)
 {
     SEND(req, PANEL_STYLE
@@ -700,6 +892,13 @@ static void send_erg_panel(httpd_req_t *req)
         "<div class=\"module-note\">此模式下首页的手动功率不生效；非 ERG 模式下 App 无法遥控功率。</div>");
 }
 
+/**
+ * 处理动态模块路由。
+ * 根据查询参数 `name` 输出对应 HTML 碎片，用于更多配置页内的局部刷新。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：未知模块名时返回提示文本而不是 404。
+ */
 static esp_err_t h_ui_module(httpd_req_t *req)
 {
     arm_deadline();
@@ -719,6 +918,13 @@ static esp_err_t h_ui_module(httpd_req_t *req)
 
 // ============================ 关闭提示页 ============================
 
+/**
+ * 处理 WiFi 关闭提示页路由。
+ * 在配网窗口结束后向浏览器展示一个静态提示页面。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：页面本身不触发重启，重启由后台定时器完成。
+ */
 static esp_err_t h_closing(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -736,6 +942,13 @@ static esp_err_t h_closing(httpd_req_t *req)
 
 // ============================ 计时器路由 ============================
 
+/**
+ * 处理剩余时间查询路由。
+ * 以纯文本形式返回当前 WiFi 配网剩余秒数。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：用于前端轮询倒计时显示，不会自动续期。
+ */
 static esp_err_t h_time(httpd_req_t *req)
 {
     char buf[8];
@@ -745,6 +958,13 @@ static esp_err_t h_time(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * 处理续期路由。
+ * 重置截止时间并复用 h_time 返回最新剩余秒数。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：这是前端“点击延长”按钮的后端入口。
+ */
 static esp_err_t h_renew(httpd_req_t *req)
 {
     arm_deadline();
@@ -752,6 +972,13 @@ static esp_err_t h_renew(httpd_req_t *req)
 }
 
 // favicon：返回 204 空响应，避免浏览器配网时报 404
+/**
+ * 处理 favicon 路由。
+ * 返回空响应，避免浏览器自动请求图标时产生无意义 404。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：HTTP 状态码固定为 204 No Content。
+ */
 static esp_err_t h_favicon(httpd_req_t *req)
 {
     httpd_resp_set_status(req, "204 No Content");
@@ -760,6 +987,13 @@ static esp_err_t h_favicon(httpd_req_t *req)
 }
 
 // 内存统计 JSON（free + min_free），用于调试/压测
+/**
+ * 处理内存统计路由。
+ * 返回当前空闲堆和历史最小空闲堆的 JSON 数据。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：仅用于调试和压测，不参与正式配网流程。
+ */
 static esp_err_t h_mem_stats(httpd_req_t *req)
 {
     char buf[64];
@@ -773,6 +1007,13 @@ static esp_err_t h_mem_stats(httpd_req_t *req)
 
 // ============================ 启动 ============================
 
+/**
+ * 启动 SoftAP。
+ * 初始化网络基础设施和 WiFi 驱动，并按固定配置开启 AP 模式。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：使用 `ESP_ERROR_CHECK`，任一步失败都会触发系统异常处理。
+ */
 static void start_softap(void)
 {
     ESP_ERROR_CHECK(esp_netif_init());
@@ -790,12 +1031,20 @@ static void start_softap(void)
     ap.ap.max_connection = 3;
     ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
 
+    // 该项目采用固定热点参数，避免在配网模式下引入额外配置复杂度。
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap));
     ESP_ERROR_CHECK(esp_wifi_start());
     ESP_LOGI(TAG, "SoftAP 启动 ssid=%s ip=192.168.4.1", WIFI_SSID);
 }
 
+/**
+ * 启动 HTTP 配网服务。
+ * 创建 esp_http_server 实例并注册所有页面与辅助接口路由。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：若启动失败只记录日志并返回，调用方不会自动重试。
+ */
 static void start_httpd(void)
 {
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
@@ -822,11 +1071,19 @@ static void start_httpd(void)
         { .uri = "/favicon.ico", .method = HTTP_GET, .handler = h_favicon },
     };
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); i++) {
+        // 所有路由集中在这里注册，保持门户能力边界清晰，便于后续扩展和排错。
         httpd_register_uri_handler(s_httpd, &routes[i]);
     }
     ESP_LOGI(TAG, "HTTP 配网服务就绪 端口=%d", WIFI_PORT);
 }
 
+/**
+ * 启动完整的 WiFi 配网门户。
+ * 绑定功率引擎、启动 SoftAP 和 HTTP 服务，并开启超时检查定时器。
+ * engine：供网页读取和写入配置的功率引擎实例。
+ * 返回值：无。
+ * 特殊行为：进入该模式后，设备最终会在保存成功或超时后通过重启恢复 BLE。
+ */
 void wifi_portal_start(power_engine_t *engine)
 {
     s_engine = engine;
