@@ -11,6 +11,12 @@ static int clamp_int(int v, int lo, int hi)
     return v;
 }
 
+/*
+ * 把配置对象填充为出厂默认值。
+ * 参数：c 为待写入默认值的配置对象。
+ * 返回值：无。
+ * 特殊行为：会统一设置 schema 版本、领域层默认参数和默认设备名，并保证名称以空字符结尾。
+ */
 void config_store_defaults(config_data_t *c)
 {
     c->schema_ver = CONFIG_VERSION;
@@ -26,6 +32,12 @@ void config_store_defaults(config_data_t *c)
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
 
+/*
+ * 校验并修正配置对象中的各字段范围。
+ * 参数：c 为待校验的配置对象。
+ * 返回值：若任一字段被修正则返回 true，否则返回 false。
+ * 特殊行为：非法模式和 ride_type 会回退到默认值；设备名为空时会恢复默认名称，并始终补齐末尾终止符。
+ */
 bool config_store_validate(config_data_t *c)
 {
     config_data_t in = *c;
@@ -55,6 +67,12 @@ bool config_store_validate(config_data_t *c)
         || strncmp(in.device_name, c->device_name, DEVICE_NAME_MAX) != 0;
 }
 
+/*
+ * 将旧版本配置迁移到当前 schema。
+ * 参数：c 为待迁移的配置对象。
+ * 返回值：若执行了迁移返回 true，否则返回 false。
+ * 特殊行为：当前没有细粒度历史迁移逻辑，schema 不匹配时会直接回退为整套默认配置。
+ */
 bool config_store_migrate(config_data_t *c)
 {
     if (c->schema_ver == CONFIG_VERSION) {

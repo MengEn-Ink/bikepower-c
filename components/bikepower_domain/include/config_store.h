@@ -8,6 +8,10 @@
 #include <stdbool.h>
 #include "domain_config.h"
 
+/*
+ * 配置持久化数据结构。
+ * 用途：承载 NVS 中保存的领域层参数，并作为校验与迁移的输入输出对象。
+ */
 typedef struct {
     int schema_ver;     // 配置格式版本
     int power;          // base_power
@@ -21,7 +25,7 @@ typedef struct {
     char device_name[DEVICE_NAME_MAX];  // BLE 广播名
 } config_data_t;
 
-/** 填充出厂默认值 */
+/* 填充配置对象的出厂默认值。 */
 void config_store_defaults(config_data_t *c);
 
 /**

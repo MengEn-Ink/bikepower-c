@@ -9,6 +9,10 @@
 
 #include <stdbool.h>
 
+/*
+ * 心率模型内部状态。
+ * 用途：保存心率平滑、HRV 变异、对外发射节流和固定用户心率模式所需的全部运行时数据。
+ */
 typedef struct {
     // 一阶平滑累加器
     float hr_float;
@@ -33,27 +37,32 @@ typedef struct {
     int   last_clamped_hr;
 } hr_state_t;
 
+/*
+ * 初始化心率模型状态。
+ * 用途：为平滑器、HRV 累加器、对外发射状态和固定心率模式缓存设置初始值。
+ */
 void hr_model_init(hr_state_t *st, int initial_hr);
 
-/** 模式切换时重置变异/漂移累加器 */
+/* 模式切换时重置 HRV 变异与漂移累加器。 */
 void hr_model_reset_variation(hr_state_t *st);
 
-/** 直接设置用户心率时重置内部累加器 */
+/* 直接设置固定用户心率，并同步重置相关内部累加器。 */
 void hr_model_set_user_hr(hr_state_t *st, int value);
 
-/** FTP 区间映射：功率 → 目标心率（已钳制） */
+/* 按 FTP 分区把当前功率映射为目标心率，并在返回前做边界钳制。 */
 int hr_model_ftp_zone(hr_state_t *st, int power, int ftp, int thr_hr);
 
-/** 一阶指数平滑逼近目标心率 */
+/* 用一阶指数模型把当前心率平滑逼近目标心率。 */
 int hr_model_smooth(hr_state_t *st, int target);
 
-/** 合成心率变异性（每秒缓存），返回叠加量 */
+/* 合成心率变异量，按秒更新缓存后返回当前叠加值。 */
 float hr_model_variation(hr_state_t *st);
 
-/** 对外台阶保持限速（死区 + 低概率跳变），返回限速后心率 */
+/* 对外输出心率时做台阶保持与限速，降低过快跳变。 */
 int hr_model_emit(hr_state_t *st, int raw);
 
-/** 固定用户心率模式下的小幅波动平滑值 */
+/* 在固定用户心率模式下生成带小幅波动的平滑心率值。 */
 int hr_model_steady_user(hr_state_t *st, int user_hr);
 
+/* 钳制心率到领域层允许范围内。 */
 int hr_clamp(int v);

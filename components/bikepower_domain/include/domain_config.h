@@ -4,6 +4,8 @@
  */
 #pragma once
 
+/* 功率、踏频、心率、模式和用户档案等领域常量定义集中在本头文件。 */
+
 // ===== 功率/踏频/心率范围 =====
 #define POWER_MIN             0
 #define POWER_MAX             2000
@@ -28,6 +30,7 @@
 #define DEVICE_NAME_DEFAULT   "BikePower"
 
 // ===== 骑行模式 ID =====
+/* 骑行模式枚举：决定功率、踏频和心率快照的生成策略。 */
 typedef enum {
     RIDE_MODE_STEADY = 0,
     RIDE_MODE_ROAD   = 1,
