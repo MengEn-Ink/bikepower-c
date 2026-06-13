@@ -9,7 +9,7 @@
 ## 运行环境
 | 约束 | 说明 |
 |------|------|
-| 框架 | ESP-IDF v5.5.1（本地基线，量产前评估升级 v5.5.4/v6.0.1） |
+| 框架 | ESP-IDF v5.5.4（本地工具链，已从 v5.5.1 升级，参考 v5.5.4 release notes） |
 | BLE 栈 | NimBLE host（peripheral） |
 | RTOS | FreeRTOS（多任务 + Queue + 信号量） |
 | 语言 | C11 |

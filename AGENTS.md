@@ -23,7 +23,6 @@
 - **常量集中**：引脚、UUID、阈值、超时、namespace key 必须定义在 `main/bikepower_config.h` 或领域层 `domain_config.h`，禁止散落硬编码。
 - **中断上下文安全**：ISR 内只允许 `xSemaphoreGiveFromISR` / `xQueueSendFromISR` 等 FromISR API，禁止调用 BLE/日志/阻塞 API。
 - **日志用 ESP_LOG**：禁止 `printf` 调试残留，统一 `ESP_LOGI/W/E`。
-- 不添加行内注释，除非用户明确要求；保留必要的接口注释并保持准确。
 
 ## Workflow
 
