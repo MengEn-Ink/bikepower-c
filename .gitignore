@@ -18,5 +18,8 @@ managed_components/
 .cache/
 compile_commands.json
 
+# Environment variables (contains tokens)
+.env
+
 # Host unit test binary
 test/test_domain

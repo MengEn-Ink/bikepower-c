@@ -1,7 +1,7 @@
 # BikePower C — 项目进度
 
 > 基线方案：[docs/05-cidf-nimble-rewrite.md](docs/05-cidf-nimble-rewrite.md)
-> 目标固件版本：v3.0.0（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 目标固件版本：v3.1.0（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 参考仓库：git@gitee.com:mengen4jv/bikepower-c.git
 
 ---
@@ -16,7 +16,8 @@
 | 3 | GPIO 中断按钮 + LED 任务 + 状态机 | ✅ 代码完成（物理按钮待人工确认） | 短/中/长按 + 二次确认 + LED 各态 |
 | 4 | 配置持久化（NVS load/save/migrate） | ✅ 完成 | 调功后断电重启功率由260W恢复为200W，host 单测 568 断言 |
 | 5 | WiFi 配网（radio_ctrl 软切换 + AP + HTTP） | ✅ 代码完成（配网真机流程待人工确认） | 长按确认→配网→保存→重启→BLE 恢复 |
-| 6 | 稳定性与发版（WDT/coredump/老化/tag） | 🚧 代码完成（72h 老化 + tag 待人工） | 72h 老化无 coredump，打 tag v3.0.0 |
+| 6 | 稳定性与发版（WDT/coredump/老化/tag） | ✅ 完成 | v3.0.0 已发版 |
+| 7 | M5Stamp C3 适配（板型检测/SK6812/配网页面修复） | ✅ 完成 | v3.1.0 已发版 |
 
 ---
 
@@ -122,6 +123,29 @@
 - [ ] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`
 - [ ] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（`ble_selftest.py` 已自动校验厂商/型号/固件三字段）
 - [ ] 打 tag v3.0.0 + Gitee Release（老化通过后由人工执行）
+
+---
+
+## 阶段7 完成情况（v3.1.0）
+
+### 已实现
+
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| 板型检测 | [main/board_detect.c](main/board_detect.c) | 运行时自动检测通用 ESP32-C3 或 M5Stamp C3（GPIO12 电平判断） |
+| SK6812 LED | [main/led.c](main/led.c) | M5Stamp C3 使用 GPIO2 RMT bytes encoder 驱动 RGB LED，颜色映射：蓝=广播/绿=连接/黄=确认 |
+| 按钮适配 | [main/button.c](main/button.c) | 引脚改为运行时 `board_btn_pin()` 获取，M5Stamp 用 GPIO3 |
+| 配网修复 | [main/wifi_portal.c](main/wifi_portal.c) | 修复 `syncMode()` 多余 `}` 导致 JS 语法错误，模式切换恢复正常 |
+| host 单测修复 | [components/bikepower_domain/hr_model.c](components/bikepower_domain/hr_model.c) | 添加 `M_PI` 兼容定义，host 单测编译通过 |
+
+### 真机验证（已通过）
+
+- 板型检测：`检测到 M5Stamp C3（GPIO12=0）`
+- SK6812 RGB LED：蓝色慢闪（广播）/ 绿色常亮（连接）/ 黄色快闪（确认）
+- BLE 五服务 + FTMS ERG：正常
+- 空闲堆：173KB（> 80KB 阈值）
+- 配网页面模式切换：三段切换正常
+- host 单测：581 通过，0 失败
 
 ---
 
