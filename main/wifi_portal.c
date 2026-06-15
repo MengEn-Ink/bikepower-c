@@ -371,11 +371,11 @@ static esp_err_t h_home(httpd_req_t *req)
         "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.card,.note,.mode-info{background:#2c2c2e;border-color:#3a3a3c}.card .val input{color:#f5f5f7}.badge{background:#2c2c2e;border-color:#3a3a3c;color:#f5f5f7}.seg-row{background:#3a3a3c}.seg{color:#8e8e93}.seg.on{background:#2c2c2e;color:#f5f5f7}.mode-info .pacer-sel{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}.gear{background:#2c2c2e;border-color:#48484a;color:#0a84ff}.renew-btn{background:#ff9f0a}}"
         "</style></head><body><div class=\"box\">"
         "<div class=\"bar\"><div class=\"brand\">BikePower <small style=\"font-size:10px;font-weight:600;color:#86868b\">v" FIRMWARE_VERSION "</small></div>"
-        "<a class=\"gear\" href=\"/more\" onclick=\"location.href='/more';return false\">&#9881; 更多配置</a></div>"
+        "<a class=\"gear\" href=\"/more\" onclick=\"return goMore()\">&#9881; 更多配置</a></div>"
         "<div class=\"status\"><span class=\"ble\">&#9679; 配网中</span>"
         "<span class=\"badge\" id=\"cd\" onclick=\"doRenew()\">剩余 180 秒</span></div>"
         "<button type=\"button\" class=\"renew-btn\" id=\"rb\" onclick=\"doRenew()\">&#9202; 点击延长配网时间</button>"
-        "<form method=\"POST\" action=\"/config\" onsubmit=\"return validateForm()\">");
+        "<form id=\"cfg\" method=\"POST\" action=\"/config\" onsubmit=\"return validateForm()\">");
 
     char buf[1024];
     snprintf(buf, sizeof(buf),
@@ -415,7 +415,7 @@ static esp_err_t h_home(httpd_req_t *req)
 
     SEND(req,
         "</select>"
-        "<p style=\"margin-top:12px;padding:10px 12px;background:#e8f4fd;border-radius:12px;font-size:12px;color:#007aff;line-height:1.5\">&#128161; 修改体重、FTP 等个人信息可获得更精准的功率计算，<a href=\"/more\" style=\"color:#007aff;font-weight:700\" onclick=\"location.href='/more';return false\">前往设置 →</a></p>"
+        "<p style=\"margin-top:12px;padding:10px 12px;background:#e8f4fd;border-radius:12px;font-size:12px;color:#007aff;line-height:1.5\">&#128161; 修改体重、FTP 等个人信息可获得更精准的功率计算，<a href=\"/more\" style=\"color:#007aff;font-weight:700\" onclick=\"return goMore()\">前往设置 →</a></p>"
         "</div>"
         "<div class=\"mode-info\" id=\"mi-erg\">"
         "<h3>ERG 模式</h3>"
@@ -462,6 +462,7 @@ static esp_err_t h_home(httpd_req_t *req)
         "function updNote(w,h,c,p,hr){var m=curMode();if(m===\"steady\"){var t=\"手动设置三项数据\";if(w&&F)t+=\"，当前 \"+(w/W).toFixed(1)+\" W/kg（\"+P[p]+\"区间）\";if(h&&T)t+=\"，心率 \"+H[hr]+\"区间\";g(\"mn\").textContent=\"固定功率：\"+t+\"。\"}else if(m===\"road\"){g(\"mn\").textContent=\"机器人配速：按体重和 W/kg 换算功率，模拟跟骑。\"}else if(m===\"erg\"){g(\"mn\").textContent=\"ERG：App 下发目标功率，设备跟随训练课表。\"}}"
         "var R=0;function doRenew(){if(R)return;R=1;var b=g(\"cd\");b.className=\"badge ok\";b.textContent=\"已延长\";fetch(\"/renew\").then(function(r){return r.text()}).then(function(t){var s=parseInt(t);if(s>0){_sv=s;_lt=Date.now();updCd()}});setTimeout(function(){b.className=\"badge\";R=0},1200)}"
         "function curMode(){var r=document.getElementsByName(\"mode\");for(var i=0;i<r.length;i++){if(r[i].checked)return r[i].value}return \"steady\"}"
+        "function goMore(){var fd=new URLSearchParams(new FormData(document.getElementById(\"cfg\")));fetch(\"/draft\",{method:\"POST\",body:fd}).then(function(){location.href=\"/more\"}).catch(function(){location.href=\"/more\"});return false}"
         "function validateForm(){if(curMode()!==\"steady\")return true;var p=parseInt(g(\"p\").value),c=parseInt(g(\"c\").value),h=parseInt(g(\"h\").value);if(p<0||p>2000){alert(\"功率超出范围（0-2000W）\");return false}if(c<20||c>120){alert(\"踏频超出范围（20-120 RPM）\");return false}if(h<60||h>200){alert(\"心率超出范围（60-200 BPM）\");return false}return true}"
         "function syncMode(){var m=curMode();var on=m===\"steady\";"
         "var s=document.getElementsByClassName(\"seg\");for(var i=0;i<s.length;i++){var c=s[i].getElementsByTagName(\"input\")[0];s[i].className=c.checked?\"seg on\":\"seg\"}"
@@ -673,6 +674,16 @@ static esp_err_t h_draft(httpd_req_t *req)
     if (len >= 0) {
         power_engine_t *e = s_engine;
         char val[64];
+        if (form_get_str(body, "mode", val, sizeof(val))) {
+            int m = mode_from_id(val);
+            if (m >= 0) power_engine_set_mode(e, (ride_mode_t)m);
+        }
+        if (form_get_str(body, "power", val, sizeof(val)) && val[0])
+            power_engine_set_power(e, atoi(val));
+        if (form_get_str(body, "cadence", val, sizeof(val)) && val[0])
+            power_engine_set_cadence(e, atoi(val));
+        if (form_get_str(body, "heartrate", val, sizeof(val)) && val[0])
+            power_engine_set_heartrate(e, atoi(val));
         if (form_get_str(body, "device_name", val, sizeof(val)))
             power_engine_set_device_name(e, val);
         if (form_get_str(body, "profile_weight", val, sizeof(val)) && val[0])
@@ -683,7 +694,8 @@ static esp_err_t h_draft(httpd_req_t *req)
             profile_set_thr_hr(&e->profile, atoi(val));
         if (form_get_str(body, "profile_ride_type", val, sizeof(val)) && val[0])
             profile_set_ride_type_str(&e->profile, val);
-        ESP_LOGI(TAG, "草稿保存 name=%s w=%d ftp=%d thr=%d ride=%d",
+        ESP_LOGI(TAG, "草稿保存 mode=%d p=%d c=%d hr=%d name=%s w=%d ftp=%d thr=%d ride=%d",
+                 (int)e->mode, e->base_power, e->cadence_base, e->last_heartrate,
                  e->device_name, e->profile.weight, e->profile.ftp,
                  e->profile.thr_hr, e->profile.ride_type);
         free(body);

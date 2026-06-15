@@ -6,6 +6,7 @@
 
 ### 修复
 - 配网提交表单报 "Header fields are too long"（HTTP 431）：手机浏览器请求头超过默认 1024 字节，`CONFIG_HTTPD_MAX_REQ_HDR_LEN` 由 1024 提升到 2048。
+- 配网首页表单跳转"更多配置"再返回后新填数值丢失：首页"更多配置"链接改为先把当前表单经 `/draft` 暂存到内存引擎再跳转；`/draft` 草稿保存扩展为也接受 `mode`/`power`/`cadence`/`heartrate`，返回首页时正确回显。
 
 ### 改进
 - SoftAP 并发连接数 `max_connection` 由 3 降为 2，降低配网期内存峰值。
