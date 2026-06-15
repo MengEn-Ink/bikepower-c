@@ -1,7 +1,21 @@
-# 项目优化与问题排查清单（待确认）
+# 项目优化与问题排查清单（已完成）
 
 > 日期：2026-06-15　固件：v3.1.0　范围：多板型支持、发行流程、配网网页、全链路复查
-> 状态：**等待用户确认后再执行修复与提交**
+> 状态：**已确认并全部执行完毕，5 批已 push**
+
+## 执行结果回执
+
+| 项 | 决策 | 结果 |
+|----|------|------|
+| A Header too long | 接受调大 | `CONFIG_HTTPD_MAX_REQ_HDR_LEN` 1024→2048，commit 6a1c0e5 |
+| B 多板型 | 方案1 描述表重构 | `s_board_desc[]` + `led_drv_t` 分发，commit c93da41 |
+| C 发行流程 | 实跑验证 | 双板编译成功，generic-c3/m5stamp-c3 各 1.0M |
+| D3 max_connection | 降为 2 | commit 6a1c0e5 |
+| 真机网页实测 | 用户自测 | 留待用户自测 |
+| 文档 drift | 修复 | v5.5.1→v5.5.4、注释 2048→4096、docs max_connection，commit 5bf62c5 |
+| 多板型工具 | 归档提交 | Kconfig + build_all.sh，commit 8ff3556 |
+
+> host 单测 581 通过；双板编译 app 44% free；飞书通知已发送。
 
 ---
 
