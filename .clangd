@@ -1,7 +1,13 @@
 CompileFlags:
+  CompilationDatabase: build
+  Add:
+    - --target=riscv32-esp-elf
   Remove:
+    - -march=*
+    - -mabi=*
     - -fstrict-volatile-bitfields
     - -fno-tree-switch-conversion
+    - -fno-shrink-wrap
     - -mlongcalls
 Diagnostics:
   Suppress:
