@@ -41,7 +41,8 @@ description: "BikePower C 发版流程。用于准备版本发布、检查测试
 9. **打 tag**
 - 使用非交互命令创建 `vMAJOR.MINOR.PATCH`
 - 推送 tag
-10. **生成合并固件**
+10. **生成合并固件（强制，不可拆开）**
+- **硬性要求**：发行版固件必须是合并后的单一 `.bin`，禁止分发分散的 bootloader / partition-table / app 三个文件。
 - 使用 `esptool.py merge_bin` 将 bootloader + partition-table + app 合并为单一 `.bin`
 - 合并命令：
   ```bash
@@ -83,5 +84,5 @@ description: "BikePower C 发版流程。用于准备版本发布、检查测试
 - 未跑测试就打 release tag
 - 未清理调试输出就发版
 - 未更新文档就发版
-- 上传分散的多个 bin 文件（必须合并为单文件）
+- 上传分散的多个 bin 文件（**强制合并为单文件，不可拆开分发**）
 - 在用户未确认时擅自 push tag 或发布 Release

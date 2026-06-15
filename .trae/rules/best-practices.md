@@ -262,7 +262,7 @@ app_state ST_WIFI_CONFIG → radio_ctrl: 停 BLE → 启 WiFi AP
 | Bug 修复批 | 明确缺陷和对应代码修复 | 单独提交，必须有相关测试 |
 | 测试工具批 | 测试脚本、host 单测 | 单独提交，必须跑测试 |
 | 文档规则批 | README、docs、MEMORY、rules、AGENTS.md | 单独提交，只记录文档验证结果 |
-| 发布产物批 | 固件 bin、版本号、tag | 单独提交，必须校验构建产物 |
+| 发布产物批 | 固件 bin、版本号、tag | 单独提交，必须校验构建产物；固件必须 `merge_bin` 合并为单文件，禁止分发分散 bin |
 
 分批防呆：
 

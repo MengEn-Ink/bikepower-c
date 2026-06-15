@@ -106,4 +106,5 @@ power_engine.snapshot → ble_bikepower_set_data → BLE 通知
 - 分支：GitHub Flow（main + feature/hotfix）。
 - 版本号：SemVer `vMAJOR.MINOR.PATCH`，commit/tag/Release 三者一致。
 - 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + tag v3.0.0 + DIS 固件版本同步。
+- **固件发行产物必须合并为单文件（强制）**：创建发行版时，必须用 `esptool.py merge_bin` 把 bootloader + partition-table + app 合并为单一 `.bin`，用户一次烧录即可，禁止分发分散的多个 bin 文件。
 - Commit message：`<type>(<scope>): <简体中文概述>` + 逐文件正文 + `Co-authored-by: AI <ai@trae>` + `Model:`。
