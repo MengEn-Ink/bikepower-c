@@ -19,7 +19,7 @@ static const char *TAG = "LED";
 #define LED_TICK_MS 20
 
 static volatile led_pattern_t s_pattern = LED_SLOW;
-static board_type_t s_board;
+static led_drv_t s_led_drv;
 
 // ===== SK6812 RGB LED 驱动（M5Stamp C3） =====
 
@@ -104,7 +104,7 @@ static void led_write_gpio(int level)
  */
 static void led_output(led_pattern_t pattern, int on)
 {
-    if (s_board == BOARD_M5STAMP_C3) {
+    if (s_led_drv == LED_DRV_SK6812) {
         if (on) {
             switch (pattern) {
             case LED_OFF:   sk6812_send(s_color_off);   break;
@@ -168,9 +168,9 @@ static void led_task(void *arg)
 
 void led_init(void)
 {
-    s_board = board_get_type();
+    s_led_drv = board_led_drv();
 
-    if (s_board == BOARD_M5STAMP_C3) {
+    if (s_led_drv == LED_DRV_SK6812) {
         sk6812_init();
     } else {
         gpio_config_t io = {

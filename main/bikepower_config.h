@@ -5,10 +5,23 @@
 #pragma once
 
 // ===== 板型枚举 =====
+// 新增板型：在此追加枚举值（保持 BOARD_TYPE_COUNT 末位），
+// 并在 board_detect.c 的 s_board_desc[] 表里补一行即可，无需改动 led/button 等模块。
 typedef enum {
     BOARD_GENERIC_C3,       // 通用 ESP32-C3 开发板（GPIO12 LED, GPIO9 按钮）
     BOARD_M5STAMP_C3,       // M5Stamp C3（GPIO2 SK6812 RGB LED, GPIO3 按钮）
+    BOARD_TYPE_COUNT,       // 板型总数（哨兵，必须置于末尾）
 } board_type_t;
+
+// ===== LED 驱动类型 =====
+typedef enum {
+    LED_DRV_GPIO,           // 普通 GPIO 高低电平 LED
+    LED_DRV_SK6812,         // SK6812 RGB LED（RMT 驱动）
+} led_drv_t;
+
+// ===== 板型名称宏（用于固件包命名） =====
+#define BOARD_NAME_GENERIC    "generic-c3"
+#define BOARD_NAME_M5STAMP    "m5stamp-c3"
 
 // ===== 通用 ESP32-C3 开发板引脚 =====
 #define BTN_PIN_GENERIC       9      // BOOT 按钮，内置上拉，按下为低电平
