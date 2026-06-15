@@ -1,6 +1,6 @@
 /**
  * WiFi 配网门户：esp_wifi SoftAP + esp_http_server 配置面板
- * 运行环境：ESP-IDF v5.5.1，目标芯片 ESP32-C3
+ * 运行环境：ESP-IDF v5.5.4，目标芯片 ESP32-C3
  *
  * 调用前必须已停用 BLE（由 radio_ctrl 保证）。
  * 路由：GET /（配置页）、POST /config（保存并重启）、GET /time（剩余秒数）。

@@ -606,7 +606,7 @@ SoftAP 关键配置来自 `bikepower_config.h`：
 
 `start_softap()` 中的运行时配置还包括：
 
-- `ap.ap.max_connection = 3`
+- `ap.ap.max_connection = 2`
 - `ap.ap.authmode = WIFI_AUTH_WPA2_PSK`
 
 ### 8.3 HTTP 服务与 11 路由

@@ -1,4 +1,4 @@
-# BikePower C — ESP-IDF v5.5.1 默认裁剪配置
+# BikePower C — ESP-IDF v5.5.4 默认裁剪配置
 # 目标芯片
 CONFIG_IDF_TARGET="esp32c3"
 

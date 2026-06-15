@@ -2,6 +2,26 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
+## [未发布]
+
+### 修复
+- 配网提交表单报 "Header fields are too long"（HTTP 431）：手机浏览器请求头超过默认 1024 字节，`CONFIG_HTTPD_MAX_REQ_HDR_LEN` 由 1024 提升到 2048。
+
+### 改进
+- SoftAP 并发连接数 `max_connection` 由 3 降为 2，降低配网期内存峰值。
+- 板型差异收敛为描述表：`board_detect.c` 用 `s_board_desc[]` 集中管理各板型的按钮/LED 引脚、LED 驱动类型与固件包名；新增 `led_drv_t` 驱动类型枚举，`led.c` 改为按驱动类型分发；新增板型只需追加枚举与一行描述，无需改动 led/button 等调用方。
+
+### 文档同步
+- 修正源码头注释与日志中残留的 ESP-IDF 版本号 v5.5.1 → v5.5.4（`app_main.c`/`button.h`/`wifi_portal.h`/`radio_ctrl.h`/`app_state.h`/`app_events.h`/`led.h`/`sdkconfig.defaults`）。
+- 修正 `wifi_portal.c` `recv_body` 注释请求体上限 2048 → 4096，与代码一致。
+- 同步 `docs/04-technical-reference.md` 中 `max_connection` 3 → 2。
+
+### 测试报告
+- host 单测：581 通过，0 失败。
+- 双板编译（`scripts/build_all.sh`）：generic-c3 / m5stamp-c3 均成功，app 分区 44% free。
+- 发行产物：`build/release/bikepower-c-3.1.0-generic-c3.bin`、`bikepower-c-3.1.0-m5stamp-c3.bin`（各 1.0M，合并单文件）。
+- 真机网页功能：待用户自测。
+
 ## [3.1.0] - 2026-06-14
 
 ### 新增

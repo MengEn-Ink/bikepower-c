@@ -2,7 +2,7 @@
  * 中断驱动按钮
  * 通用板：GPIO9（BOOT 按钮），M5Stamp C3：GPIO3（用户按钮 SW）。
  * 均为内部上拉，按下为低电平。
- * 运行环境：ESP-IDF v5.5.1
+ * 运行环境：ESP-IDF v5.5.4
  */
 #pragma once
 

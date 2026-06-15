@@ -271,7 +271,7 @@ static bool query_get_str(httpd_req_t *req, const char *key, char *out, size_t o
  * req：HTTP 请求对象。
  * out：输出的动态缓冲区地址，由调用方负责 free。
  * 返回值：成功时返回实际读取长度，失败返回 -1。
- * 特殊行为：请求体长度被限制在 2048 字节以内，超出部分会被截到该上限。
+ * 特殊行为：请求体长度被限制在 4096 字节以内，超出部分会被截到该上限。
  */
 static int recv_body(httpd_req_t *req, char **out)
 {

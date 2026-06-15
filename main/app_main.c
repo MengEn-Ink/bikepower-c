@@ -1,6 +1,6 @@
 /**
  * BikePower C — 应用入口
- * 运行环境：ESP-IDF v5.5.1 + NimBLE，目标芯片 ESP32-C3
+ * 运行环境：ESP-IDF v5.5.4 + NimBLE，目标芯片 ESP32-C3
  *
  * 任务结构：
  *   nimble_host   NimBLE 协议栈（ble_bikepower 内部启动）
@@ -58,7 +58,7 @@ static void on_wifi_trigger(void)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "BikePower C 启动 v%s (target=esp32c3, idf=v5.5.1)", FIRMWARE_VERSION);
+    ESP_LOGI(TAG, "BikePower C 启动 v%s (target=esp32c3, idf=v5.5.4)", FIRMWARE_VERSION);
 
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {

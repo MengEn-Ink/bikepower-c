@@ -1,6 +1,6 @@
 /**
  * 应用事件定义 — 按钮任务/主循环向状态机投递事件
- * 运行环境：ESP-IDF v5.5.1，FreeRTOS Queue 通信
+ * 运行环境：ESP-IDF v5.5.4，FreeRTOS Queue 通信
  */
 #pragma once
 

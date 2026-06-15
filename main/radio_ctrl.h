@@ -1,6 +1,6 @@
 /**
  * 射频控制器：BLE/WiFi 互斥的唯一开关（硬约束 WB-MUTEX-1/2）
- * 运行环境：ESP-IDF v5.5.1，目标芯片 ESP32-C3
+ * 运行环境：ESP-IDF v5.5.4，目标芯片 ESP32-C3
  *
  * ESP32-C3 单路射频，WiFi 与 BLE 不能同时占用。进入配网必须先停 BLE。
  * v3.0.0 采用方案 A：配网保存/超时后 esp_restart() 重启恢复 BLE，最可靠。
