@@ -1039,7 +1039,7 @@ static void start_softap(void)
     ap.ap.ssid_len = strlen(WIFI_SSID);
     strncpy((char *)ap.ap.password, WIFI_PASSWORD, sizeof(ap.ap.password));
     ap.ap.channel = WIFI_AP_CHANNEL;
-    ap.ap.max_connection = 3;
+    ap.ap.max_connection = 2;
     ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
 
     // 该项目采用固定热点参数，避免在配网模式下引入额外配置复杂度。
