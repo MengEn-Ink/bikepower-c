@@ -1,0 +1,20 @@
+menu "BikePower 板型配置"
+
+    choice BOARD_TYPE
+        prompt "目标板型"
+        default BOARD_AUTO_DETECT
+        help
+            选择目标硬件板型。自动检测通过 GPIO12 下拉电平判断：
+            通用板 GPIO12 接 LED 上拉 → 高电平；
+            M5Stamp C3 GPIO12 悬空 → 低电平。
+            若自动检测误判（如合宙简约版），可手动指定。
+
+        config BOARD_AUTO_DETECT
+            bool "自动检测"
+        config BOARD_GENERIC_C3
+            bool "通用 ESP32-C3（合宙简约版等，GPIO12 LED + GPIO9 按钮）"
+        config BOARD_M5STAMP_C3
+            bool "M5Stamp C3（GPIO2 SK6812 RGB LED + GPIO3 按钮）"
+    endchoice
+
+endmenu
