@@ -8,7 +8,7 @@ BikePower C 是一台运行在 ESP32-C3 上的蓝牙骑行功率计模拟器。
 
 默认蓝牙名称为 `BikePower`。
 默认 WiFi 热点名称也为 `BikePower`。
-当前固件版本为 `v3.0.0`。
+当前固件版本为 `v3.1.0`。
 
 ## 第一章：产品介绍
 
@@ -30,11 +30,20 @@ BikePower C 适合智能骑行台、训练 App、DIY 骑行附件和室内训练
 
 ## 第三章：快速安装
 
-当前固件默认接线如下：
+当前固件支持通用 ESP32-C3 开发板和 M5Stamp C3，启动时会自动检测板型。
+
+![硬件引脚对照](images/hardware-pinout.png)
+
+通用 ESP32-C3 开发板默认接线如下：
 
 - 按钮接 `GPIO9`
 - LED 接 `GPIO12`
 - 通过 USB 或稳定 `5V` 为开发板供电
+
+M5Stamp C3 使用板载按钮和 RGB LED：
+
+- 按钮为 `GPIO3`
+- SK6812 RGB LED 为 `GPIO2`
 
 最简接线步骤：
 
@@ -42,6 +51,8 @@ BikePower C 适合智能骑行台、训练 App、DIY 骑行附件和室内训练
 2. 按钮另一端接 `GND`
 3. LED 控制脚接 `GPIO12`
 4. 通过 USB 给开发板供电
+
+如果使用 M5Stamp C3，通常直接使用板载 `GPIO3` 按钮和 `GPIO2` RGB LED，不需要按上面的 GPIO9/GPIO12 外接方式重新接线。
 
 如果开发板自带按钮和 LED，可能不需要额外外接。
 第一次上电后，先观察 LED 状态，再打开骑行 App 搜索蓝牙设备。

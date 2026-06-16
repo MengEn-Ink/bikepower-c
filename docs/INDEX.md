@@ -34,9 +34,11 @@
 
 | 图片 | 说明 |
 |------|------|
-| ![架构图](images/architecture.svg) | 三层软件架构：应用层→领域层→硬件层 |
-| ![按钮&LED 状态机](images/button-led-state.svg) | 按钮操作、LED 四态、状态迁移 |
-| ![主循环数据流](images/main-loop-flow.svg) | 50ms 节拍的事件消费→BLE通知全流程 |
+| ![硬件引脚对照](images/hardware-pinout.png) | 通用 ESP32-C3 与 M5Stamp C3 的按钮、LED、板型检测差异 |
+| ![架构图](images/architecture.png) | 三层软件架构：应用层→领域层→硬件层（双板适配） |
+| ![按钮&LED 状态机](images/button-led-state.png) | 按钮操作、LED 四态、状态迁移 |
+| ![主循环数据流](images/main-loop-flow.png) | 50ms 节拍的事件消费→BLE通知全流程 |
+| ![WiFi/BLE 射频互斥流程](images/rf-wifi-flow.png) | 二次确认进入配网：停 BLE→启 WiFi→保存/超时→重启恢复 BLE |
 
 ## 📋 进度与变更
 

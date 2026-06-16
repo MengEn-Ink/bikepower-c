@@ -39,6 +39,8 @@ BikePower C 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，�
 | `GND` | 地线 | 所有外设地必须共地 |
 | `UART0` | 调试串口 | 用于烧录、日志输出和故障排查；通常走开发板自带 USB 转串口 |
 
+![硬件引脚对照](docs/images/hardware-pinout.png)
+
 更详细的硬件建议见 [docs/03-hardware.md](docs/03-hardware.md)。
 
 ## 核心功能清单
@@ -59,15 +61,19 @@ BikePower C 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，�
 - 领域层：位于 `components/bikepower_domain/`，负责功率引擎、心率模型、用户配置和训练逻辑
 - 硬件层：基于 ESP-IDF、FreeRTOS、NimBLE、GPIO、NVS、WiFi 等底层能力，为上层提供驱动和运行环境
 
-![架构图](docs/images/architecture.svg)
+![架构图](docs/images/architecture.png)
 
 按钮与灯效状态切换可参考：
 
-![状态机](docs/images/button-led-state.svg)
+![状态机](docs/images/button-led-state.png)
 
 主循环和数据更新流程可参考：
 
-![数据流](docs/images/main-loop-flow.svg)
+![数据流](docs/images/main-loop-flow.png)
+
+WiFi 配网的射频切换流程可参考：
+
+![WiFi/BLE 射频互斥流程](docs/images/rf-wifi-flow.png)
 
 ## 构建与烧录步骤
 

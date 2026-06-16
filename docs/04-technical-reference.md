@@ -2,10 +2,10 @@
 
 本文面向开发者、维护者和后续接手者。
 内容基于当前仓库实现撰写，重点对应 `main/`、`components/bikepower_domain/`、`tests/` 和 `docs/images/`。
-阅读顺序建议配合 [architecture.svg](images/architecture.svg)、[main-loop-flow.svg](images/main-loop-flow.svg) 和 [button-led-state.svg](images/button-led-state.svg) 一起看。
+阅读顺序建议配合 [architecture.png](images/architecture.png)、[main-loop-flow.png](images/main-loop-flow.png)、[button-led-state.png](images/button-led-state.png) 和 [rf-wifi-flow.png](images/rf-wifi-flow.png) 一起看。
 
-当前目标固件版本为 `v3.0.0`。
-运行环境为 `ESP-IDF v5.5.x + NimBLE + FreeRTOS`，目标芯片为 `ESP32-C3`。
+当前目标固件版本为 `v3.1.0`。
+运行环境为 `ESP-IDF v5.5.4 + NimBLE + FreeRTOS`，目标芯片为 `ESP32-C3`。
 
 ## 第一章：项目架构
 
@@ -19,8 +19,9 @@
 
 - `app_main.c`：启动入口、事件循环、50ms 节拍、WDT、NVS 装载
 - `app_state.c`：高层状态机，消费 `app_evt_t`
-- `button.c`：`GPIO9` 中断驱动按钮任务
-- `led.c`：`GPIO12` 独立灯效任务
+- `board_detect.c`：启动时检测通用 ESP32-C3 / M5Stamp C3
+- `button.c`：中断驱动按钮任务，通用板 `GPIO9`，M5Stamp C3 `GPIO3`
+- `led.c`：独立灯效任务，通用板 `GPIO12` 普通 LED，M5Stamp C3 `GPIO2` SK6812 RGB
 - `ble_bikepower.c`：NimBLE 五服务、通知打包、FTMS 控制点
 - `radio_ctrl.c`：BLE -> WiFi 射频切换唯一入口
 - `wifi_portal.c`：SoftAP + `esp_http_server` 配网页面
@@ -58,7 +59,7 @@
 - `esp_timer`：毫秒/微秒计时与定时回调
 - Task WDT：主循环和长任务保护
 
-对应关系可直接对照 [architecture.svg](images/architecture.svg)。
+对应关系可直接对照 [architecture.png](images/architecture.png)。
 如果后续要重构，建议维持“三层职责不交叉”的基本形状。
 
 ## 第二章：启动流程
@@ -580,6 +581,8 @@ DIS 读取内容来自编译期常量：
 WiFi 配网链路分布在 `app_state.c`、`radio_ctrl.c`、`wifi_portal.c`。
 最核心的硬约束是：ESP32-C3 只有一路 RF，BLE 和 WiFi 不共存。
 
+![WiFi/BLE 射频互斥流程](images/rf-wifi-flow.png)
+
 ### 8.1 射频互斥入口
 
 唯一入口是 `radio_ctrl_enter_wifi(power_engine_t *engine)`。
@@ -795,17 +798,25 @@ FTMS 控制点收到写请求后只做最少逻辑：
 - 阻塞调用
 - 重逻辑判断
 
-### 11.3 GPIO 固定
+### 11.3 GPIO 与板型适配
 
-应用层硬件常量在 `bikepower_config.h`：
+当前固件支持运行时板型检测，可对照 [hardware-pinout.png](images/hardware-pinout.png)。
+
+通用 ESP32-C3 开发板使用：
 
 - `BTN_PIN = 9`
 - `LED_PIN = 12`
 
+M5Stamp C3 使用：
+
+- 按钮：`GPIO3`
+- SK6812 RGB LED：`GPIO2`
+- 启动检测：`GPIO12` 悬空读低判定为 M5Stamp C3
+
 硬件规则里还明确：
 
 - `GPIO12~17` 不应使用 QSPI 模式
-- `GPIO12` 当前用于高电平有效 LED
+- 通用板 `GPIO12` 当前用于高电平有效 LED
 
 ### 11.4 任务栈大小
 
