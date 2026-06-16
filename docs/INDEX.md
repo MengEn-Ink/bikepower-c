@@ -18,6 +18,7 @@
 | [硬件指南](03-hardware.md) | 推荐开发板、引脚定义、接线、供电、排障 |
 | [重写方案](05-cidf-nimble-rewrite.md) | 从 MicroPython 到 C 的分阶段重写路线图 |
 | [MicroPython vs C 对比](06-micropython-vs-c-comparison.md) | 两种技术栈的性能/内存/复杂度对比 |
+| [固件防提取/防反编译](07-firmware-security.md) | 编译层加固（已实现）+ Flash 加密/Secure Boot 方案与选型 |
 
 ## 🤖 AI 助手
 
