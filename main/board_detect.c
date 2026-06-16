@@ -4,10 +4,10 @@
  * 各板型硬件差异集中在 s_board_desc[] 描述表（引脚 / LED 驱动 / 固件包名）。
  * 新增板型：bikepower_config.h 追加枚举值 → 此表补一行，调用方无需改动。
  *
- * 检测策略（仅在 Kconfig 未指定板型时启用）：配置 GPIO12 为输入下拉。
- * - 通用 ESP32-C3 开发板：GPIO12 接 LED 电路，有上拉电阻，读为高电平。
- * - M5Stamp C3：GPIO12 悬空，下拉后读为低电平。
- * 检测完成后恢复 GPIO12，避免影响后续 LED 初始化。
+ * 检测策略（仅在 Kconfig 未指定板型时启用）：配置 GPIO3 为输入下拉。
+ * - M5Stamp C3：GPIO3 接外部按钮（上拉电阻到 3.3V），内部下拉后分压仍为高电平。
+ * - 通用 ESP32-C3 开发板：GPIO3 悬空，下拉后读为低电平。
+ * 检测完成后恢复 GPIO3，避免影响后续按钮初始化。
  */
 #include "board_detect.h"
 #include "freertos/FreeRTOS.h"
@@ -35,8 +35,9 @@ board_type_t board_detect(void)
     s_board = BOARD_M5STAMP_C3;
     ESP_LOGI(TAG, "板型：%s（Kconfig 指定）", s_board_desc[s_board].name);
 #else
+    // 用 GPIO3 检测：M5Stamp 按钮上拉 → 高电平；通用板悬空 → 下拉后低电平
     gpio_config_t io = {
-        .pin_bit_mask = 1ULL << LED_PIN_GENERIC,
+        .pin_bit_mask = 1ULL << BTN_PIN_M5STAMP,
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_ENABLE,
@@ -46,12 +47,12 @@ board_type_t board_detect(void)
 
     vTaskDelay(pdMS_TO_TICKS(1));
 
-    int level = gpio_get_level(LED_PIN_GENERIC);
+    int level = gpio_get_level(BTN_PIN_M5STAMP);
 
-    gpio_reset_pin(LED_PIN_GENERIC);
+    gpio_reset_pin(BTN_PIN_M5STAMP);
 
-    s_board = (level == 1) ? BOARD_GENERIC_C3 : BOARD_M5STAMP_C3;
-    ESP_LOGI(TAG, "自动检测板型：%s（GPIO12=%d）", s_board_desc[s_board].name, level);
+    s_board = (level == 1) ? BOARD_M5STAMP_C3 : BOARD_GENERIC_C3;
+    ESP_LOGI(TAG, "自动检测板型：%s（GPIO3=%d）", s_board_desc[s_board].name, level);
 #endif
 
     return s_board;
