@@ -37,6 +37,14 @@ CONFIG_ESP_COREDUMP_STACK_SIZE=1024
 # 编译优化（减体积）
 CONFIG_COMPILER_OPTIMIZATION_SIZE=y
 
+# 固件加固（方案C：零硬件风险的编译层措施，不烧 eFuse、不影响串口排障）
+# Silent assert：去掉 assert 中的 __FILE__/行号明文字符串，
+# 抬高反编译门槛同时减小体积；触发时仅 abort 无信息。
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y
+# 关闭 bootloader 日志：不再打印分区/版本等启动信息。
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+CONFIG_BOOTLOADER_LOG_LEVEL=0
+
 # WiFi：仅 AP，缩小缓冲池省内存
 CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
 CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=4
