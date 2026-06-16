@@ -26,7 +26,7 @@ DIS_FW_UUID = "00002a26-0000-1000-8000-00805f9b34fb"
 DIS_EXPECT = {
     DIS_MANUF_UUID: ("厂商", "BikePower"),
     DIS_MODEL_UUID: ("型号", "ESP32-C3"),
-    DIS_FW_UUID: ("固件", "3.0.0"),
+    DIS_FW_UUID: ("固件", "3.1.1"),
 }
 
 DURATION = int(sys.argv[1]) if len(sys.argv) > 1 else 8

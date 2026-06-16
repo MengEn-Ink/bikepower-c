@@ -2,26 +2,28 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
-## [未发布]
+## [3.1.1] - 2026-06-16
 
 ### 修复
+- 板型自动检测误判：原用 GPIO12 电平判断，合宙通用板 GPIO12 接 LED 电路被内部下拉淹没，导致误判为 M5Stamp C3 走 SK6812 驱动致 LED 不亮。改用 GPIO3 检测（M5Stamp 按钮外部上拉读高，通用板悬空内部下拉读低），逻辑更可靠。
 - 配网提交表单报 "Header fields are too long"（HTTP 431）：手机浏览器请求头超过默认 1024 字节，`CONFIG_HTTPD_MAX_REQ_HDR_LEN` 由 1024 提升到 2048。
 - 配网首页表单跳转"更多配置"再返回后新填数值丢失：首页"更多配置"链接改为先把当前表单经 `/draft` 暂存到内存引擎再跳转；`/draft` 草稿保存扩展为也接受 `mode`/`power`/`cadence`/`heartrate`，返回首页时正确回显。
 
 ### 改进
 - SoftAP 并发连接数 `max_connection` 由 3 降为 2，降低配网期内存峰值。
 - 板型差异收敛为描述表：`board_detect.c` 用 `s_board_desc[]` 集中管理各板型的按钮/LED 引脚、LED 驱动类型与固件包名；新增 `led_drv_t` 驱动类型枚举，`led.c` 改为按驱动类型分发；新增板型只需追加枚举与一行描述，无需改动 led/button 等调用方。
+- 新增编译期板型选择与双板型构建脚本（`scripts/build_all.sh`）。
 
 ### 文档同步
 - 修正源码头注释与日志中残留的 ESP-IDF 版本号 v5.5.1 → v5.5.4（`app_main.c`/`button.h`/`wifi_portal.h`/`radio_ctrl.h`/`app_state.h`/`app_events.h`/`led.h`/`sdkconfig.defaults`）。
 - 修正 `wifi_portal.c` `recv_body` 注释请求体上限 2048 → 4096，与代码一致。
 - 同步 `docs/04-technical-reference.md` 中 `max_connection` 3 → 2。
+- 新增 `.clangd` 配置适配 RISC-V 工具链，消除 IDE 伪报错。
 
 ### 测试报告
 - host 单测：581 通过，0 失败。
 - 双板编译（`scripts/build_all.sh`）：generic-c3 / m5stamp-c3 均成功，app 分区 44% free。
-- 发行产物：`build/release/bikepower-c-3.1.0-generic-c3.bin`、`bikepower-c-3.1.0-m5stamp-c3.bin`（各 1.0M，合并单文件）。
-- 真机网页功能：待用户自测。
+- 真机测试：板型检测正确（generic-c3 GPIO3=0），BLE 五服务齐全，FTMS ERG 收敛正常，堆内存稳定 ~171KB 无泄漏。
 
 ## [3.1.0] - 2026-06-14
 

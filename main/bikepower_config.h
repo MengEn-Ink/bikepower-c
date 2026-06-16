@@ -101,7 +101,7 @@ typedef enum {
 #define DEVICE_NAME          "BikePower"
 #define DEVICE_MANUFACTURER  "BikePower"
 #define DEVICE_MODEL         "ESP32-C3"
-#define FIRMWARE_VERSION     "3.1.0"
+#define FIRMWARE_VERSION     "3.1.1"
 
 // ===== 看门狗 =====
 #define WDT_TIMEOUT_MS       5000
