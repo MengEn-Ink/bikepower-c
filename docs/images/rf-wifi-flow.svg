@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 420" font-family="'PingFang SC','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#666"/>
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#ff9800"/>
+    </marker>
+    <marker id="arrow-pink" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#e91e63"/>
+    </marker>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <text x="430" y="32" text-anchor="middle" font-size="17" font-weight="bold" fill="#333">BikePower C — WiFi/BLE 射频互斥配网流程</text>
+  <text x="430" y="54" text-anchor="middle" font-size="10" fill="#777">ESP32-C3 共用 2.4GHz RF；本固件采用“停 BLE → 开 WiFi AP → 重启恢复 BLE”的独占策略</text>
+
+  <rect x="35" y="92" width="150" height="58" rx="8" fill="#e8f5e9" stroke="#4caf50" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="110" y="116" text-anchor="middle" font-size="12" font-weight="bold" fill="#2e7d32">BLE 正常工作</text>
+  <text x="110" y="134" text-anchor="middle" font-size="9" fill="#666">广播 / 已连接 / GATT 通知</text>
+
+  <rect x="230" y="92" width="150" height="58" rx="8" fill="#fff3e0" stroke="#ff9800" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="305" y="116" text-anchor="middle" font-size="12" font-weight="bold" fill="#e65100">用户二次确认</text>
+  <text x="305" y="134" text-anchor="middle" font-size="9" fill="#666">长按 ≥2s 后 3s 内再按</text>
+
+  <rect x="425" y="92" width="150" height="58" rx="8" fill="#fce4ec" stroke="#e91e63" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="500" y="116" text-anchor="middle" font-size="12" font-weight="bold" fill="#c2185b">停止 BLE</text>
+  <text x="500" y="134" text-anchor="middle" font-size="9" fill="#666">停广播 / 断连接 / 释放 RF</text>
+
+  <rect x="620" y="92" width="180" height="58" rx="8" fill="#fff3e0" stroke="#ff9800" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="710" y="116" text-anchor="middle" font-size="12" font-weight="bold" fill="#e65100">启动 WiFi SoftAP</text>
+  <text x="710" y="134" text-anchor="middle" font-size="9" fill="#666">BikePower / 192.168.4.1</text>
+
+  <line x1="185" y1="121" x2="225" y2="121" stroke="#666" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="380" y1="121" x2="420" y2="121" stroke="#e91e63" stroke-width="1.4" marker-end="url(#arrow-pink)"/>
+  <line x1="575" y1="121" x2="615" y2="121" stroke="#ff9800" stroke-width="1.4" marker-end="url(#arrow-orange)"/>
+
+  <rect x="122" y="205" width="210" height="62" rx="8" fill="#fff8e1" stroke="#ff9800" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="227" y="229" text-anchor="middle" font-size="12" font-weight="bold" fill="#e65100">HTTP 配置门户</text>
+  <text x="227" y="247" text-anchor="middle" font-size="9" fill="#666">修改功率 / 模式 / FTP / 设备名</text>
+
+  <rect x="385" y="205" width="210" height="62" rx="8" fill="#e8f5e9" stroke="#4caf50" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="490" y="229" text-anchor="middle" font-size="12" font-weight="bold" fill="#2e7d32">保存到 NVS</text>
+  <text x="490" y="247" text-anchor="middle" font-size="9" fill="#666">config_store 校验 / nvs_store 写入</text>
+
+  <rect x="648" y="205" width="150" height="62" rx="8" fill="#ede7f6" stroke="#7e57c2" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="723" y="229" text-anchor="middle" font-size="12" font-weight="bold" fill="#5e35b1">重启设备</text>
+  <text x="723" y="247" text-anchor="middle" font-size="9" fill="#666">esp_restart()</text>
+
+  <line x1="710" y1="150" x2="710" y2="178" stroke="#ff9800" stroke-width="1.2"/>
+  <line x1="710" y1="178" x2="227" y2="178" stroke="#ff9800" stroke-width="1.2"/>
+  <line x1="227" y1="178" x2="227" y2="200" stroke="#ff9800" stroke-width="1.2" marker-end="url(#arrow-orange)"/>
+  <line x1="332" y1="236" x2="380" y2="236" stroke="#666" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="595" y1="236" x2="643" y2="236" stroke="#666" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+  <path d="M 723 267 Q 723 330 110 330 Q 110 220 110 155" fill="none" stroke="#7e57c2" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+  <text x="350" y="351" text-anchor="middle" font-size="10" fill="#7e57c2">保存成功 5s 后重启；180s 超时也重启；启动后回到 BLE 正常工作</text>
+
+  <rect x="218" y="300" width="424" height="28" rx="5" fill="#fff" stroke="#e91e63" stroke-width="1"/>
+  <text x="430" y="318" text-anchor="middle" font-size="10" font-weight="bold" fill="#c2185b">硬约束：WiFi 启动前必须停止 BLE；禁止开机自动进入 WiFi</text>
+</svg>
