@@ -85,13 +85,18 @@ void app_main(void)
 
     ble_bikepower_set_erg_callback(on_erg_target);
     ble_bikepower_set_device_name(s_engine.device_name);
-    ble_bikepower_start();
+    esp_err_t ble_ret = ble_bikepower_start();
+    if (ble_ret != ESP_OK) {
+        ESP_LOGE(TAG, "BLE 启动失败 ret=%d，进入错误恢复态", ble_ret);
+        app_state_set_error();
+    }
 
     // 看门狗：主循环每拍喂狗（idf 默认已为 IDLE 任务注册 TWDT，这里订阅当前任务）
     esp_task_wdt_add(NULL);
 
     int tick = 0;
     int last_conn = 0;
+    int ble_retry_tick = 0;
     app_evt_t e;
 
     while (1) {
@@ -102,6 +107,24 @@ void app_main(void)
 
         // WiFi 配网模式：BLE 已停用，主循环只喂狗等待重启恢复
         if (app_state_get() == ST_WIFI_CONFIG) {
+            esp_task_wdt_reset();
+            vTaskDelay(pdMS_TO_TICKS(HR_LOOP_INTERVAL_MS));
+            continue;
+        }
+
+        // BLE 未就绪：周期重试，跳过 BLE 调用，避免假运行
+        if (!ble_bikepower_is_ready()) {
+            if (++ble_retry_tick >= BLE_RETRY_TICKS) {
+                ble_retry_tick = 0;
+                ESP_LOGW(TAG, "重试 BLE 启动...");
+                esp_err_t r = ble_bikepower_start();
+                if (r == ESP_OK) {
+                    ESP_LOGI(TAG, "BLE 重试启动成功");
+                    app_state_clear_error();
+                } else {
+                    ESP_LOGE(TAG, "BLE 重试启动仍失败 ret=%d", r);
+                }
+            }
             esp_task_wdt_reset();
             vTaskDelay(pdMS_TO_TICKS(HR_LOOP_INTERVAL_MS));
             continue;

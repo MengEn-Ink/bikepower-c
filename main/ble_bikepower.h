@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "esp_err.h"
 
 /**
  * ERG 目标功率回调类型。
@@ -20,10 +21,18 @@ typedef void (*ble_erg_cb_t)(int target_power);
  * 启动 BLE 蓝牙功率计服务。
  * 初始化 NimBLE、注册五个 GATT 服务、配置设备名并开始广播和周期通知。
  * 无参数。
- * 返回值：无。
- * 特殊行为：内部会创建周期通知定时器和 NimBLE host 任务，重复启动前应确保已先停止。
+ * 返回值：`ESP_OK` 表示启动成功，否则表示初始化某一步失败。
+ * 特殊行为：内部会创建周期通知定时器和 NimBLE host 任务；启动失败时会自动清理已分配资源。
  */
-void ble_bikepower_start(void);
+esp_err_t ble_bikepower_start(void);
+
+/**
+ * 查询 BLE 模块是否已成功启动并就绪。
+ * 无参数。
+ * 返回值：`true` 表示 BLE 已启动且可正常使用，`false` 表示未启动或启动失败。
+ * 特殊行为：可用于在主循环中判断是否安全调用 BLE 数据更新和连接查询接口。
+ */
+bool ble_bikepower_is_ready(void);
 
 /**
  * 停止 BLE 蓝牙功率计服务。

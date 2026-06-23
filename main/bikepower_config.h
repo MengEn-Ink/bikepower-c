@@ -61,6 +61,7 @@ typedef enum {
 // ===== BLE 连接与广播 =====
 #define BLE_ADVERTISING_INTERVAL_MS  500    // 广播间隔
 #define BLE_NOTIFY_INTERVAL_MS       1000   // 通知间隔
+#define BLE_RETRY_TICKS              100    // BLE 启动失败重试节拍数（每拍50ms → 5s）
 
 // ===== 按钮时间阈值（毫秒） =====
 #define SHORT_PRESS_MS         500

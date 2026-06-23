@@ -68,6 +68,7 @@ static uint8_t g_ftms_status_buf[7]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0
 static ble_erg_cb_t g_erg_cb = NULL;
 static char g_device_name[24] = DEVICE_NAME;
 static esp_timer_handle_t g_notify_timer = NULL;
+static bool g_ready = false;
 
 /**
  * 启动 BLE 广播。
@@ -669,13 +670,16 @@ int ble_bikepower_conn_count(void)
  * 启动 BLE 蓝牙功率计模块。
  * 初始化 NimBLE、注册 GATT 服务、设置设备名、启动周期通知定时器并创建 host 线程。
  * 无参数。
- * 返回值：无。
- * 特殊行为：初始化失败时只记录日志并提前返回，不会自动重试或重启。
+ * 返回值：`ESP_OK` 表示启动成功，否则为对应错误码。
+ * 特殊行为：任一步失败都会回滚已分配资源，保持模块可再次尝试启动。
  */
-void ble_bikepower_start(void)
+esp_err_t ble_bikepower_start(void)
 {
     esp_err_t err = nimble_port_init();
-    if (err != ESP_OK) { ESP_LOGE(TAG, "nimble_port_init 失败 err=%d", err); return; }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nimble_port_init 失败 err=%d", err);
+        return err;
+    }
 
     ble_hs_cfg.sync_cb = on_sync;
     ble_hs_cfg.reset_cb = on_reset;
@@ -684,19 +688,55 @@ void ble_bikepower_start(void)
     ble_svc_gatt_init();
 
     int rc = ble_gatts_count_cfg(gatt_svcs);
-    if (rc != 0) { ESP_LOGE(TAG, "gatts_count_cfg 失败 rc=%d", rc); return; }
+    if (rc != 0) {
+        ESP_LOGE(TAG, "gatts_count_cfg 失败 rc=%d", rc);
+        nimble_port_deinit();
+        return ESP_FAIL;
+    }
     rc = ble_gatts_add_svcs(gatt_svcs);
-    if (rc != 0) { ESP_LOGE(TAG, "gatts_add_svcs 失败 rc=%d", rc); return; }
+    if (rc != 0) {
+        ESP_LOGE(TAG, "gatts_add_svcs 失败 rc=%d", rc);
+        nimble_port_deinit();
+        return ESP_FAIL;
+    }
 
     rc = ble_svc_gap_device_name_set(g_device_name);
-    if (rc != 0) { ESP_LOGW(TAG, "设置设备名失败 rc=%d", rc); }
+    if (rc != 0) {
+        ESP_LOGW(TAG, "设置设备名失败 rc=%d", rc);
+    }
 
     const esp_timer_create_args_t targs = { .callback = notify_tick, .name = "ble_notify" };
-    ESP_ERROR_CHECK(esp_timer_create(&targs, &g_notify_timer));
-    ESP_ERROR_CHECK(esp_timer_start_periodic(g_notify_timer, (uint64_t)BLE_NOTIFY_INTERVAL_MS * 1000));
+    err = esp_timer_create(&targs, &g_notify_timer);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "创建通知定时器失败 err=%d", err);
+        nimble_port_deinit();
+        return err;
+    }
+    err = esp_timer_start_periodic(g_notify_timer, (uint64_t)BLE_NOTIFY_INTERVAL_MS * 1000);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "启动通知定时器失败 err=%d", err);
+        esp_timer_delete(g_notify_timer);
+        g_notify_timer = NULL;
+        nimble_port_deinit();
+        return err;
+    }
 
     nimble_port_freertos_init(ble_host_task);
+
+    g_ready = true;
     ESP_LOGI(TAG, "蓝牙功率计已启动 五服务 CPS+HRS+CSC+FTMS+DIS 设备名=%s", g_device_name);
+    return ESP_OK;
+}
+
+/**
+ * 查询 BLE 模块是否已成功启动并就绪。
+ * 无参数。
+ * 返回值：`true` 表示已启动就绪，`false` 表示未启动或启动失败。
+ * 特殊行为：仅返回内部就绪标志快照。
+ */
+bool ble_bikepower_is_ready(void)
+{
+    return g_ready;
 }
 
 /**
@@ -726,4 +766,5 @@ void ble_bikepower_stop(void)
         ESP_LOGE(TAG, "nimble_port_stop 失败 rc=%d", rc);
     }
     g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+    g_ready = false;
 }

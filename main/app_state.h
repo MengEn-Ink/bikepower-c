@@ -67,3 +67,21 @@ void app_state_set_wifi_trigger(void (*cb)(void));
  * 特殊行为：仅返回快照，不做同步等待。
  */
 app_state_t app_state_get(void);
+
+/**
+ * 进入错误恢复态。
+ * BLE 启动失败或其他致命但可恢复错误时调用，LED 切到快闪提示。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：只改变状态和 LED，不复位或重启，留给主循环做周期重试。
+ */
+void app_state_set_error(void);
+
+/**
+ * 从错误恢复态回到 BLE 活动态。
+ * BLE 重试成功后调用，恢复正常运行的 LED 和状态。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：仅当当前处于 ST_ERROR_RECOVERY 时才会迁移。
+ */
+void app_state_clear_error(void);

@@ -92,6 +92,36 @@ app_state_t app_state_get(void)
 }
 
 /**
+ * 进入错误恢复态。
+ * BLE 启动失败或其他可恢复错误时调用，LED 切到快闪提示。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：只改变状态和 LED，不复位或重启。
+ */
+void app_state_set_error(void)
+{
+    s_state = ST_ERROR_RECOVERY;
+    s_connected = false;
+    led_set_pattern(LED_FAST);
+    ESP_LOGW(TAG, "进入错误恢复态 ST_ERROR_RECOVERY");
+}
+
+/**
+ * 从错误恢复态回到 BLE 活动态。
+ * BLE 重试成功后调用，恢复正常运行的 LED 和状态。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：仅当当前处于 ST_ERROR_RECOVERY 时才会迁移。
+ */
+void app_state_clear_error(void)
+{
+    if (s_state != ST_ERROR_RECOVERY) return;
+    s_state = ST_BLE_ACTIVE;
+    update_idle_led();
+    ESP_LOGI(TAG, "错误恢复 -> ST_BLE_ACTIVE");
+}
+
+/**
  * 进入 WiFi 二次确认窗口。
  * 长按达到阈值后回滚本次自动调功，并切换到等待二次确认的状态。
  * 无参数。
