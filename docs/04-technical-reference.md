@@ -24,7 +24,7 @@
 - `led.c`：独立灯效任务，通用板 `GPIO12` 普通 LED，M5Stamp C3 `GPIO2` SK6812 RGB
 - `ble_bikepower.c`：NimBLE 五服务、通知打包、FTMS 控制点
 - `radio_ctrl.c`：BLE -> WiFi 射频切换唯一入口
-- `wifi_portal.c`：SoftAP + `esp_http_server` 配网页面
+- `wifi_portal.c`：`esp_http_server` 配网页面（SoftAP 由 `radio_ctrl.c` 启动）
 - `nvs_store.c`：NVS 与领域层配置对象桥接
 - `bikepower_config.h`：应用层常量中心
 
