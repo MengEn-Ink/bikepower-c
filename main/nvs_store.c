@@ -3,23 +3,12 @@
  */
 #include "nvs_store.h"
 #include "config_store.h"
+#include "bikepower_config.h"
 #include "nvs.h"
 #include "esp_log.h"
 #include <string.h>
 
 static const char *TAG = "NVS";
-
-#define NVS_NS        "bikepower"
-#define K_SCHEMA_VER  "sv"
-#define K_POWER       "power"
-#define K_CADENCE     "cadence"
-#define K_MODE        "mode"
-#define K_TUNE        "tune"
-#define K_WEIGHT      "weight"
-#define K_FTP         "ftp"
-#define K_THR_HR      "thr_hr"
-#define K_RIDE        "ride"
-#define K_DEVNAME     "devname"
 
 /**
  * 把运行时引擎状态拷贝成可持久化配置结构。
@@ -96,7 +85,7 @@ void nvs_store_load(power_engine_t *e)
     config_store_defaults(&c);
 
     nvs_handle_t h;
-    esp_err_t err = nvs_open(NVS_NS, NVS_READONLY, &h);
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &h);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGI(TAG, "无配置，使用默认值并回写");
         config_to_engine(&c, e);
@@ -109,17 +98,17 @@ void nvs_store_load(power_engine_t *e)
         return;
     }
 
-    get_i32(h, K_SCHEMA_VER, &c.schema_ver);
-    get_i32(h, K_POWER, &c.power);
-    get_i32(h, K_CADENCE, &c.cadence);
-    get_i32(h, K_MODE, &c.mode);
-    get_i32(h, K_TUNE, &c.tune_road);
-    get_i32(h, K_WEIGHT, &c.weight);
-    get_i32(h, K_FTP, &c.ftp);
-    get_i32(h, K_THR_HR, &c.thr_hr);
-    get_i32(h, K_RIDE, &c.ride_type);
+    get_i32(h, NVS_KEY_SCHEMA_VER, &c.schema_ver);
+    get_i32(h, NVS_KEY_POWER, &c.power);
+    get_i32(h, NVS_KEY_CADENCE, &c.cadence);
+    get_i32(h, NVS_KEY_MODE, &c.mode);
+    get_i32(h, NVS_KEY_TUNE_ROAD, &c.tune_road);
+    get_i32(h, NVS_KEY_WEIGHT, &c.weight);
+    get_i32(h, NVS_KEY_FTP, &c.ftp);
+    get_i32(h, NVS_KEY_THR_HR, &c.thr_hr);
+    get_i32(h, NVS_KEY_RIDE_TYPE, &c.ride_type);
     size_t dn_len = sizeof(c.device_name);
-    nvs_get_str(h, K_DEVNAME, c.device_name, &dn_len);
+    nvs_get_str(h, NVS_KEY_DEVICE_NAME, c.device_name, &dn_len);
     nvs_close(h);
 
     bool migrated = config_store_migrate(&c);
@@ -137,10 +126,11 @@ void nvs_store_load(power_engine_t *e)
 
 /**
  * 把当前配置保存到 NVS。
- * 将引擎状态转换为 config_data_t 后逐键写入 namespace `bikepower` 并提交。
+ * 将引擎状态转换为 config_data_t 后逐键写入 namespace 并提交。
+ * 任一键写入失败或 commit 失败都返回 false，保留 dirty 由调用方重试。
  * e：待保存的功率引擎实例。
  * 返回值：`true` 表示保存成功，`false` 表示失败。
- * 特殊行为：写入失败时只记录日志，不做回滚。
+ * 特殊行为：失败时记录具体出错的键名，便于诊断。
  */
 bool nvs_store_save(power_engine_t *e)
 {
@@ -148,29 +138,49 @@ bool nvs_store_save(power_engine_t *e)
     engine_to_config(e, &c);
 
     nvs_handle_t h;
-    esp_err_t err = nvs_open(NVS_NS, NVS_READWRITE, &h);
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "保存打开 NVS 失败(%s)", esp_err_to_name(err));
         return false;
     }
 
-    nvs_set_i32(h, K_SCHEMA_VER, c.schema_ver);
-    nvs_set_i32(h, K_POWER, c.power);
-    nvs_set_i32(h, K_CADENCE, c.cadence);
-    nvs_set_i32(h, K_MODE, c.mode);
-    nvs_set_i32(h, K_TUNE, c.tune_road);
-    nvs_set_i32(h, K_WEIGHT, c.weight);
-    nvs_set_i32(h, K_FTP, c.ftp);
-    nvs_set_i32(h, K_THR_HR, c.thr_hr);
-    nvs_set_i32(h, K_RIDE, c.ride_type);
-    nvs_set_str(h, K_DEVNAME, c.device_name);
+    bool ok = true;
+#define SET_I32(k, v) do { \
+        esp_err_t _e = nvs_set_i32(h, (k), (v)); \
+        if (_e != ESP_OK) { \
+            ESP_LOGW(TAG, "nvs_set_i32 %s 失败(%s)", (k), esp_err_to_name(_e)); \
+            ok = false; \
+        } \
+    } while (0)
 
-    err = nvs_commit(h);
-    nvs_close(h);
+    SET_I32(NVS_KEY_SCHEMA_VER, c.schema_ver);
+    SET_I32(NVS_KEY_POWER, c.power);
+    SET_I32(NVS_KEY_CADENCE, c.cadence);
+    SET_I32(NVS_KEY_MODE, c.mode);
+    SET_I32(NVS_KEY_TUNE_ROAD, c.tune_road);
+    SET_I32(NVS_KEY_WEIGHT, c.weight);
+    SET_I32(NVS_KEY_FTP, c.ftp);
+    SET_I32(NVS_KEY_THR_HR, c.thr_hr);
+    SET_I32(NVS_KEY_RIDE_TYPE, c.ride_type);
+#undef SET_I32
+
+    err = nvs_set_str(h, NVS_KEY_DEVICE_NAME, c.device_name);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "NVS commit 失败(%s)", esp_err_to_name(err));
-        return false;
+        ESP_LOGW(TAG, "nvs_set_str %s 失败(%s)", NVS_KEY_DEVICE_NAME, esp_err_to_name(err));
+        ok = false;
     }
-    ESP_LOGI(TAG, "配置已保存 p=%dW mode=%d", c.power, c.mode);
-    return true;
+
+    if (ok) {
+        err = nvs_commit(h);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "NVS commit 失败(%s)", esp_err_to_name(err));
+            ok = false;
+        }
+    }
+    nvs_close(h);
+
+    if (ok) {
+        ESP_LOGI(TAG, "配置已保存 p=%dW mode=%d", c.power, c.mode);
+    }
+    return ok;
 }

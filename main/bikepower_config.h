@@ -58,6 +58,19 @@ typedef enum {
 #define DIS_MODEL_CHAR_UUID        0x2A24
 #define DIS_FIRMWARE_CHAR_UUID     0x2A26
 
+// ===== NVS 持久化 =====
+#define NVS_NAMESPACE          "bikepower"
+#define NVS_KEY_SCHEMA_VER     "sv"
+#define NVS_KEY_POWER          "power"
+#define NVS_KEY_CADENCE        "cadence"
+#define NVS_KEY_MODE           "mode"
+#define NVS_KEY_TUNE_ROAD      "tune"
+#define NVS_KEY_WEIGHT         "weight"
+#define NVS_KEY_FTP            "ftp"
+#define NVS_KEY_THR_HR         "thr_hr"
+#define NVS_KEY_RIDE_TYPE      "ride"
+#define NVS_KEY_DEVICE_NAME    "devname"
+
 // ===== BLE 连接与广播 =====
 #define BLE_ADVERTISING_INTERVAL_MS  500    // 广播间隔
 #define BLE_NOTIFY_INTERVAL_MS       1000   // 通知间隔
