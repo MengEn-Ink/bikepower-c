@@ -30,16 +30,12 @@ esp_err_t radio_ctrl_start_wifi_ap(void)
 {
     esp_err_t ret;
     esp_netif_t *ap_netif = NULL;
-    bool wifi_inited = false;
-    bool event_loop_created = false;
-    bool netif_inited = false;
 
     ret = esp_netif_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_netif_init 失败 ret=%d", ret);
         return ret;
     }
-    netif_inited = true;
 
     ret = esp_event_loop_create_default();
     if (ret != ESP_OK) {
@@ -47,7 +43,6 @@ esp_err_t radio_ctrl_start_wifi_ap(void)
         esp_netif_deinit();
         return ret;
     }
-    event_loop_created = true;
 
     ap_netif = esp_netif_create_default_wifi_ap();
     if (!ap_netif) {
@@ -66,7 +61,6 @@ esp_err_t radio_ctrl_start_wifi_ap(void)
         esp_netif_deinit();
         return ret;
     }
-    wifi_inited = true;
 
     wifi_config_t ap_cfg = { 0 };
     strncpy((char *)ap_cfg.ap.ssid, WIFI_SSID, sizeof(ap_cfg.ap.ssid));
@@ -113,10 +107,10 @@ esp_err_t radio_ctrl_start_wifi_ap(void)
 /**
  * 切换到 WiFi 配网模式。
  * 先按硬件约束停用 BLE，再启动 SoftAP，最后启动 HTTP 配网门户。
- * 若 AP 启动失败则重启设备恢复 BLE（方案 A 的安全兜底）。
+ * 若 AP 或 HTTP 启动失败则重启设备恢复 BLE（方案 A 的安全兜底）。
  * engine：供配网门户读写配置的功率引擎实例。
  * 返回值：无。
- * 特殊行为：AP 启动失败会立即重启，HTTP 启动失败继续运行在 AP 模式重启。
+ * 特殊行为：任何阶段失败都会立即 esp_restart() 恢复 BLE，避免设备卡在"有 AP 没页面"状态。
  */
 void radio_ctrl_enter_wifi(power_engine_t *engine)
 {
@@ -134,5 +128,11 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
         return;
     }
 
-    wifi_portal_start(engine);
+    ret = wifi_portal_start(engine);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "HTTP 配网门户启动失败 ret=%d，重启恢复 BLE", ret);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        esp_restart();
+        return;
+    }
 }

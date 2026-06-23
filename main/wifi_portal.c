@@ -1043,10 +1043,10 @@ static esp_err_t h_mem_stats(httpd_req_t *req)
  * 启动 HTTP 配网服务。
  * 创建 esp_http_server 实例并注册所有页面与辅助接口路由。
  * 无参数。
- * 返回值：无。
- * 特殊行为：若启动失败只记录日志并返回，调用方不会自动重试。
+ * 返回值：ESP_OK 表示 HTTP 服务已启动并注册所有路由，否则为错误码。
+ * 特殊行为：若启动失败只记录日志并返回错误码，调用方决定后续动作。
  */
-static void start_httpd(void)
+static esp_err_t start_httpd(void)
 {
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.server_port = WIFI_PORT;
@@ -1054,9 +1054,10 @@ static void start_httpd(void)
     cfg.max_uri_handlers = 12;
     cfg.stack_size = 8192;
 
-    if (httpd_start(&s_httpd, &cfg) != ESP_OK) {
-        ESP_LOGE(TAG, "httpd 启动失败");
-        return;
+    esp_err_t ret = httpd_start(&s_httpd, &cfg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "httpd 启动失败 ret=%d", ret);
+        return ret;
     }
     httpd_uri_t routes[] = {
         { .uri = "/",          .method = HTTP_GET,  .handler = h_home },
@@ -1076,6 +1077,7 @@ static void start_httpd(void)
         httpd_register_uri_handler(s_httpd, &routes[i]);
     }
     ESP_LOGI(TAG, "HTTP 配网服务就绪 端口=%d", WIFI_PORT);
+    return ESP_OK;
 }
 
 /**
@@ -1083,15 +1085,18 @@ static void start_httpd(void)
  * 绑定功率引擎、启动 HTTP 服务，并开启超时检查定时器。
  * 调用前必须已由 radio_ctrl 启动 SoftAP。
  * engine：供网页读取和写入配置的功率引擎实例。
- * 返回值：无。
- * 特殊行为：进入该模式后，设备最终会在保存成功或超时后通过重启恢复 BLE。
+ * 返回值：ESP_OK 表示门户已就绪，否则为错误码。
+ * 特殊行为：HTTP 启动失败时不会 arm 定时器，调用方应决定是否重启恢复 BLE。
  */
-void wifi_portal_start(power_engine_t *engine)
+esp_err_t wifi_portal_start(power_engine_t *engine)
 {
     s_engine = engine;
     s_rebooting = false;
 
-    start_httpd();
+    esp_err_t ret = start_httpd();
+    if (ret != ESP_OK) {
+        return ret;
+    }
     arm_deadline();
 
     const esp_timer_create_args_t targs = { .callback = shutdown_check_cb, .name = "portal_to" };
@@ -1099,4 +1104,5 @@ void wifi_portal_start(power_engine_t *engine)
     ESP_ERROR_CHECK(esp_timer_start_periodic(s_shutdown_timer, 1000000));  // 每秒检查超时
 
     ESP_LOGI(TAG, "WiFi 配网模式就绪，%ds 后自动超时", WIFI_SHUTDOWN_MS / 1000);
+    return ESP_OK;
 }
