@@ -264,20 +264,21 @@ static bool query_get_str(httpd_req_t *req, const char *key, char *out, size_t o
     return ok;
 }
 
-// 收取请求 body 到动态缓冲（调用方 free），返回长度，失败返回 -1
+// 收取请求 body 到动态缓冲（调用方 free），返回长度，失败返回 -1，超 4096 返回 -2
 /**
  * 读取完整 HTTP 请求体到动态缓冲区。
  * 按 content_len 读取 body，并在末尾补 `\0` 便于后续按字符串解析。
+ * 请求体超过 4096 字节时返回 -2，由调用方返回 413，避免截断后应用半截配置。
  * req：HTTP 请求对象。
- * out：输出的动态缓冲区地址，由调用方负责 free。
- * 返回值：成功时返回实际读取长度，失败返回 -1。
- * 特殊行为：请求体长度被限制在 4096 字节以内，超出部分会被截到该上限。
+ * out：输出的动态缓冲区地址，由调用方负责 free（返回 -2 时不分配）。
+ * 返回值：成功时返回实际读取长度；返回 -1 表示读取失败；返回 -2 表示超过 4096 字节上限。
+ * 特殊行为：超限时不读取任何数据，直接拒绝。
  */
 static int recv_body(httpd_req_t *req, char **out)
 {
     int total = req->content_len;
     if (total <= 0) { *out = NULL; return -1; }
-    if (total > 4096) total = 4096;
+    if (total > 4096) { *out = NULL; return -2; }
     char *buf = malloc((size_t)total + 1);
     if (!buf) return -1;
     int recv = 0;
@@ -632,6 +633,10 @@ static esp_err_t h_config(httpd_req_t *req)
 
     char *body = NULL;
     int len = recv_body(req, &body);
+    if (len == -2) {
+        httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE, "request body too large");
+        return ESP_FAIL;
+    }
     if (len < 0) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "read error");
         return ESP_FAIL;
@@ -671,6 +676,10 @@ static esp_err_t h_draft(httpd_req_t *req)
     arm_deadline();
     char *body = NULL;
     int len = recv_body(req, &body);
+    if (len == -2) {
+        httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE, "request body too large");
+        return ESP_FAIL;
+    }
     if (len >= 0) {
         power_engine_t *e = s_engine;
         char val[64];
