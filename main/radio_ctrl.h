@@ -8,13 +8,24 @@
  */
 #pragma once
 
+#include "esp_err.h"
 #include "power_engine.h"
 
 /**
  * 进入 WiFi 配网模式。
  * 按 WiFi/BLE 互斥约束执行停 BLE、等待射频释放，再启动 SoftAP 和 HTTP 配网门户。
+ * 启动失败会重启设备恢复 BLE（方案 A）。
  * engine：配网门户读写配置时使用的功率引擎实例。
  * 返回值：无。
  * 特殊行为：这是唯一允许切换 BLE/WiFi 射频占用的入口，调用后设备会脱离 BLE 模式。
  */
 void radio_ctrl_enter_wifi(power_engine_t *engine);
+
+/**
+ * 启动 WiFi SoftAP（由 radio_ctrl 独占管理）。
+ * 初始化 netif、事件循环、WiFi 驱动并启动 AP 模式，失败时逐步清理并返回错误码。
+ * 无参数。
+ * 返回值：`ESP_OK` 表示 AP 已成功启动，否则为对应错误码。
+ * 特殊行为：调用方需确保 BLE 已停用；本函数只负责 AP，不负责 HTTP 门户。
+ */
+esp_err_t radio_ctrl_start_wifi_ap(void);

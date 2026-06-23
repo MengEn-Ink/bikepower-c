@@ -1,8 +1,9 @@
 /**
- * WiFi 配网门户：esp_wifi SoftAP + esp_http_server 配置面板
+ * WiFi 配网门户：HTTP 配置面板（esp_http_server）
  * 运行环境：ESP-IDF v5.5.4，目标芯片 ESP32-C3
  *
- * 调用前必须已停用 BLE（由 radio_ctrl 保证）。
+ * SoftAP 启动由 radio_ctrl 统一管理；本模块只负责 HTTP 路由和页面。
+ * 调用前必须已停用 BLE 并已启动 SoftAP（由 radio_ctrl 保证）。
  * 路由：GET /（配置页）、POST /config（保存并重启）、GET /time（剩余秒数）。
  * 180s 无续期自动超时 -> esp_restart() 恢复 BLE。
  */

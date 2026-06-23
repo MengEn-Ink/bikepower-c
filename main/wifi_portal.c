@@ -1,5 +1,8 @@
 /**
- * WiFi 配网门户实现：SoftAP + esp_http_server
+ * WiFi 配网门户实现：HTTP 门户（esp_http_server）
+ *
+ * 注意：WiFi SoftAP 启动已收回 radio_ctrl.c 统一管理，本文件只负责 HTTP 路由和页面。
+ * 调用方（radio_ctrl）需在调用 wifi_portal_start 前确保 AP 已就绪。
  *
  * 网页 UI 照抄 MicroPython 旧版（web_home/web_common/web_more_pages）：
  *   GET  /            首页（iOS 三卡 + 模式分段 + 训练区间染色 + 续期 + 倒计时）
@@ -21,9 +24,6 @@
 #include "bikepower_config.h"
 #include "profile.h"
 #include "esp_log.h"
-#include "esp_wifi.h"
-#include "esp_event.h"
-#include "esp_netif.h"
 #include "esp_http_server.h"
 #include "esp_timer.h"
 #include "esp_system.h"
@@ -1031,37 +1031,6 @@ static esp_err_t h_mem_stats(httpd_req_t *req)
 // ============================ 启动 ============================
 
 /**
- * 启动 SoftAP。
- * 初始化网络基础设施和 WiFi 驱动，并按固定配置开启 AP 模式。
- * 无参数。
- * 返回值：无。
- * 特殊行为：使用 `ESP_ERROR_CHECK`，任一步失败都会触发系统异常处理。
- */
-static void start_softap(void)
-{
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_ap();
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    wifi_config_t ap = { 0 };
-    strncpy((char *)ap.ap.ssid, WIFI_SSID, sizeof(ap.ap.ssid));
-    ap.ap.ssid_len = strlen(WIFI_SSID);
-    strncpy((char *)ap.ap.password, WIFI_PASSWORD, sizeof(ap.ap.password));
-    ap.ap.channel = WIFI_AP_CHANNEL;
-    ap.ap.max_connection = 2;
-    ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
-
-    // 该项目采用固定热点参数，避免在配网模式下引入额外配置复杂度。
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap));
-    ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_LOGI(TAG, "SoftAP 启动 ssid=%s ip=192.168.4.1", WIFI_SSID);
-}
-
-/**
  * 启动 HTTP 配网服务。
  * 创建 esp_http_server 实例并注册所有页面与辅助接口路由。
  * 无参数。
@@ -1101,8 +1070,9 @@ static void start_httpd(void)
 }
 
 /**
- * 启动完整的 WiFi 配网门户。
- * 绑定功率引擎、启动 SoftAP 和 HTTP 服务，并开启超时检查定时器。
+ * 启动 WiFi 配网门户（HTTP 部分）。
+ * 绑定功率引擎、启动 HTTP 服务，并开启超时检查定时器。
+ * 调用前必须已由 radio_ctrl 启动 SoftAP。
  * engine：供网页读取和写入配置的功率引擎实例。
  * 返回值：无。
  * 特殊行为：进入该模式后，设备最终会在保存成功或超时后通过重启恢复 BLE。
@@ -1112,7 +1082,6 @@ void wifi_portal_start(power_engine_t *engine)
     s_engine = engine;
     s_rebooting = false;
 
-    start_softap();
     start_httpd();
     arm_deadline();
 
