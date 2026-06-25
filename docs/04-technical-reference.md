@@ -811,7 +811,7 @@ M5Stamp C3 使用：
 
 - 按钮：`GPIO3`
 - SK6812 RGB LED：`GPIO2`
-- 启动检测：`GPIO12` 悬空读低判定为 M5Stamp C3
+- 启动检测：`GPIO3` 输入下拉，按钮上拉读高判定为 M5Stamp C3
 
 硬件规则里还明确：
 
