@@ -33,14 +33,18 @@ static QueueHandle_t s_app_queue;
 
 /**
  * 处理 FTMS 控制点下发的 ERG 目标功率。
- * 直接调用领域引擎设置目标功率并同步返回结果。
+ * 先做范围校验，再投递到应用事件队列由主循环串行处理。
  * target_power：目标功率，单位瓦特（signed 16-bit）。
- * 返回值：true 表示设置成功，false 表示范围无效被拒绝。
- * 特殊行为：运行在 NimBLE host 任务上下文，逻辑必须保持轻量且不可阻塞。
+ * 返回值：true 表示参数合法且已入队，false 表示范围无效或队列满。
+ * 特殊行为：运行在 NimBLE host 任务上下文，只做轻量校验和入队，不直接改引擎状态。
  */
 static bool on_erg_target(int target_power)
 {
-    return power_engine_set_erg_target(&s_engine, target_power);
+    // 范围校验：与领域层 POWER_MIN/POWER_MAX 一致
+    if (target_power < POWER_MIN || target_power > POWER_MAX) return false;
+    app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = target_power };
+    if (!s_app_queue) return false;
+    return xQueueSend(s_app_queue, &e, 0) == pdTRUE;
 }
 
 /**

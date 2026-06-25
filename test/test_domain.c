@@ -146,13 +146,19 @@ static void test_erg(void)
     printf("[test] ERG 目标功率自动切模式\n");
     power_engine_t e;
     power_engine_init(&e);
-    power_engine_set_erg_target(&e, 250);
+    bool ok = power_engine_set_erg_target(&e, 250);
+    CHECK(ok == true, "ERG合法目标返回true");
     CHECK(e.mode == RIDE_MODE_ERG, "ERG下发自动切ERG");
     CHECK(e.has_erg_target && e.erg_active_target == 250, "ERG目标=250");
     CHECK(e.base_power == 250, "base同步=250");
-    // 超范围拒绝
-    power_engine_set_erg_target(&e, 9999);
-    CHECK(e.erg_active_target == 250, "超范围ERG拒绝");
+    // 超范围拒绝（高于上限）
+    ok = power_engine_set_erg_target(&e, 9999);
+    CHECK(ok == false, "超范围ERG返回false");
+    CHECK(e.erg_active_target == 250, "超范围ERG拒绝（值不变）");
+    // 超范围拒绝（低于下限，负值）
+    ok = power_engine_set_erg_target(&e, -1);
+    CHECK(ok == false, "负值ERG返回false");
+    CHECK(e.erg_active_target == 250, "负值ERG拒绝（值不变）");
     // ERG 快照功率围绕目标小幅波动
     domain_rng_seed(42);
     for (int i = 0; i < 50; i++) {
