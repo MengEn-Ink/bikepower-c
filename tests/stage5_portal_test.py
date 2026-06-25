@@ -2,7 +2,8 @@
 """阶段5 配网门户自测：连上 BikePower 热点后验证 HTTP 路由与行为。
 
 前置：长按 + 二次确认进入配网模式，手机/电脑连上 `BikePower` AP（密码 12345678），
-设备网关默认 192.168.4.1。本脚本只做只读 GET 校验，默认不提交 /config（提交会触发重启）。
+设备网关默认 192.168.4.1。默认不提交 /config（提交会触发重启），
+但会提交一次 /draft 草稿（仅内存生效，不持久化、不重启）用于验证 302 重定向。
 
 用法:
   python3 tests/stage5_portal_test.py                      # 默认 192.168.4.1，只读校验
@@ -19,11 +20,50 @@ TIMEOUT = 10
 
 
 def http_get(url, timeout=TIMEOUT):
+    """发 GET 请求并返回 (body, status, headers)。
+
+    不自动跟随重定向，3xx/4xx/5xx 等 HTTP 响应都正常返回，
+    由各用例自己断言预期状态码。只有网络层错误（超时、连接失败等）才抛异常。
+    """
     req = urllib.request.Request(url, headers={"Connection": "close"})
     # 不自动跟随重定向，便于校验 302
     opener = urllib.request.build_opener(_NoRedirect())
-    with opener.open(req, timeout=timeout) as resp:
-        return resp.read(), resp.status, dict(resp.headers)
+    try:
+        with opener.open(req, timeout=timeout) as resp:
+            return resp.read(), resp.status, dict(resp.headers)
+    except urllib.error.HTTPError as e:
+        # 302/404/500 等 HTTP 层响应也返回三元组，交给用例自己判断
+        try:
+            body = e.read()
+        except Exception:
+            body = b""
+        return body, e.code, dict(e.headers)
+
+
+def http_post(url, data=None, timeout=TIMEOUT):
+    """发 POST 请求并返回 (body, status, headers)。
+
+    data 为 bytes 或 None；Content-Type 默认 application/x-www-form-urlencoded。
+    HTTP 层错误（3xx/4xx/5xx）正常返回，由用例自己断言。
+    """
+    body_data = data if data is not None else b""
+    req = urllib.request.Request(
+        url, data=body_data, method="POST",
+        headers={
+            "Connection": "close",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+    )
+    opener = urllib.request.build_opener(_NoRedirect())
+    try:
+        with opener.open(req, timeout=timeout) as resp:
+            return resp.read(), resp.status, dict(resp.headers)
+    except urllib.error.HTTPError as e:
+        try:
+            body = e.read()
+        except Exception:
+            body = b""
+        return body, e.code, dict(e.headers)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -99,11 +139,19 @@ def main():
     results.append(_try("favicon /favicon.ico(204)", favicon))
 
     def success_guard():
-        # 未提交配置直访 /success 应 302 回首页
+        # 未提交配置直访 /success 应 302 回首页，且响应体为空
         body, status, headers = http_get(f"{base}/success")
-        ok = status == 302 and headers.get("Location") == "/"
-        return ok, f"status={status} loc={headers.get('Location')}"
+        ok = status == 302 and headers.get("Location") == "/" and len(body) == 0
+        return ok, f"status={status} loc={headers.get('Location')} len={len(body)}"
     results.append(_try("成功页直访守卫 /success(302)", success_guard))
+
+    def draft_redirect():
+        # POST /draft 保存草稿后应 302 回首页，且响应体为空
+        form = b"mode=steady&power=150&cadence=80&heartrate=120"
+        body, status, headers = http_post(f"{base}/draft", data=form)
+        ok = status == 302 and headers.get("Location") == "/" and len(body) == 0
+        return ok, f"status={status} loc={headers.get('Location')} len={len(body)}"
+    results.append(_try("草稿提交重定向 POST /draft(302)", draft_redirect))
 
     if args.renew:
         def renew():
