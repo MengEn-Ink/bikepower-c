@@ -2,6 +2,29 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
+## [未发布]
+
+### 修复（测试工具）
+- `scripts/tools/quality_gate.py` 过时项修正：
+  - 项目路径硬编码 `/Users/bytedance/...` 改为按脚本位置自动推导，跨机器可用。
+  - IDF 激活从硬编码 `~/esp/esp-idf-v5.5.4` 改为默认 `/home/mengen1014/work/esp32-power/esp-idf`，并增加 `idf.py --version` 探测，已激活则不重复 source。
+  - 子进程由 `/bin/sh` 改为显式 `bash -c`，修复 IDF `export.sh` bash 语法在 dash 下静默失败。
+  - 编译判定由文本匹配 `Project build complete` 改为 `rc==0 且输出含 build complete 或 write_flash`，避免 `tail` 截断误判。
+  - Host 单测判定增加 `None` 保护，原 `assertions.group(0)` 在输出异常时崩溃。
+  - 必备资产清单同步实际目录：`docs/USER-MANUAL.md` 等旧名修正为 `docs/02-user-manual.md` 等数字前缀名；新增 `main/radio_ctrl.c`、`main/wifi_portal.c`、`tests/*.py` 等关键测试脚本与板型适配源校验。
+
+### 测试报告（真机）
+- `quality_gate.py` 自检：28 ✅ / 1 ⚠️ / 0 ❌（warn 仅为本次未提交改动）。
+- `idf.py build`：0 error，`bikepower-c.bin` 0x102110 bytes，app 分区 42% free。
+- `idf.py -p /dev/ttyACM0 flash`：写入 1057040 bytes，hash 校验通过，hard reset 成功。
+- 串口启动日志（`tests/serial_capture.py`）：
+  - 板型检测 `generic-c3（GPIO3=0）`，三任务启动 LED/STATE/BTN，`state=ST_BLE_ACTIVE`。
+  - BLE 五服务启动 `CPS+HRS+CSC+FTMS+DIS`，设备名 `BikePower`，MAC `14:63:93:f6:71:56`。
+  - 空闲堆 `173676 bytes (~170KB)`，远高于 80KB 阈值。
+  - 心跳 `p=184W hr=147 c=89 mode=0 conn=1 state=1` 正常。
+- BLE 自测（`tests/ble_selftest.py`）：跳过（复位后 USB 串口掉线未恢复，需人工检查物理连接后补测）。
+- Host 单测：581 通过，0 失败。
+
 ## [3.1.1] - 2026-06-16
 
 ### 修复

@@ -2,11 +2,15 @@
 """BikePower C 项目质量扫描工具
 
 扫描范围：
-1. 编译检查 — 缺失的 #include、未使用的变量
-2. 常量一致性 — bikepower_config.h vs domain_config.h 重复定义
-3. 死代码 — 未引用的函数/变量
-4. Git 工作区 — 未提交/未推送
-5. 文档完整性 — REFERENCE.md 中的章节引用
+1. 编译检查 — idf.py build 是否通过
+2. Host 单测 — test/test_domain 断言是否全过
+3. 常量一致性 — bikepower_config.h vs domain_config.h 重复定义冲突
+4. 必备资产 — 关键文档/测试脚本是否存在
+5. Git 工作区 — 未提交/未推送统计
+
+环境要求：
+- 已 source esp-idf/export.sh；或脚本自动用默认路径激活。
+- 默认 IDF 路径：/home/mengen1014/work/esp32-power/esp-idf（v5.5）。
 """
 
 import os
@@ -14,41 +18,66 @@ import re
 import subprocess
 import sys
 
-PROJECT = "/Users/bytedance/work/bikepower-c"
+# 项目根目录：脚本位于 scripts/tools/，向上两级即项目根
+PROJECT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DEFAULT_IDF_PATH = "/home/mengen1014/work/esp32-power/esp-idf"
+
 SCORE = {"pass": 0, "warn": 0, "fail": 0}
+
 
 def ok(msg):
     SCORE["pass"] += 1
     print(f"  ✅ {msg}")
 
+
 def warn(msg):
     SCORE["warn"] += 1
     print(f"  ⚠️  {msg}")
+
 
 def fail(msg):
     SCORE["fail"] += 1
     print(f"  ❌ {msg}")
 
+
 def run(cmd):
-    r = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=PROJECT)
-    return r.stdout, r.returncode
+    r = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, cwd=PROJECT)
+    return r.stdout + r.stderr, r.returncode
+
+
+def idf_ready():
+    """检查 idf.py 是否已在 PATH 中可用。"""
+    r = subprocess.run(["bash", "-c", "idf.py --version >/dev/null 2>&1"])
+    return r.returncode == 0
+
+
+def ensure_idf():
+    """若 idf.py 不可用，则 source 默认路径的 export.sh 并返回激活命令前缀。"""
+    if idf_ready():
+        return ""
+    return f". {DEFAULT_IDF_PATH}/export.sh >/dev/null 2>&1 && "
+
 
 # 1. 编译检查
 print("\n=== 1. 编译检查 ===")
-out, rc = run("export IDF_PATH=~/esp/esp-idf-v5.5.4 && . $IDF_PATH/export.sh >/dev/null 2>&1 && idf.py build 2>&1 | tail -3")
-if "Project build complete" in out:
+out, rc = run(f"{ensure_idf()}idf.py build 2>&1 | tail -5")
+if rc == 0 and ("Project build complete" in out or "write_flash" in out):
     ok("idf.py build 通过")
 else:
-    fail(f"idf.py build 失败: {out[:200]}")
+    fail(f"idf.py build 失败 (rc={rc}): {out[:200]}")
 
 # 2. Host 单测
 print("\n=== 2. Host 单测 ===")
-out, rc = run("cd test && make -q && ./test_domain 2>&1 | tail -1")
-assertions = re.search(r'(\d+) 通过', out)
-if assertions:
-    ok(f"单测通过 ({assertions.group(0)})")
+out, rc = run("make -C test clean >/dev/null 2>&1 && make -C test 2>&1 >/dev/null && ./test/test_domain 2>&1 | tail -3")
+m = re.search(r'(\d+) 通过.*?(\d+) 失败', out)
+if m:
+    npass, nfail = int(m.group(1)), int(m.group(2))
+    if nfail == 0:
+        ok(f"单测通过 ({npass} 断言)")
+    else:
+        fail(f"单测有失败: {npass} 通过, {nfail} 失败")
 else:
-    fail(f"单测失败: {out[:200]}")
+    fail(f"单测未识别输出: {out[:200]}")
 
 # 3. Git 状态
 print("\n=== 3. Git 状态 ===")
@@ -60,21 +89,42 @@ if out_stripped:
 else:
     ok("工作区 clean")
 
-out, _ = run("git log --oneline origin/main..HEAD 2>/dev/null | wc -l")
-unpushed = int(out.strip())
-if unpushed > 0:
-    warn(f"有 {unpushed} 个未推送的 commit")
+out, _ = run("git rev-list --count @{u}..HEAD 2>/dev/null")
+out = out.strip()
+if out.isdigit() and int(out) > 0:
+    warn(f"有 {out} 个未推送的 commit")
 else:
-    ok("全部已推送")
+    ok("全部已推送（或无上游）")
 
-# 4. 文档完整性
-print("\n=== 4. 文档完整性 ===")
-required_docs = [
-    "README.md", "AGENTS.md", "CHANGELOG.md", "PROGRESS.md", "LICENSE",
-    "docs/INDEX.md", "docs/USER-MANUAL.md", "docs/TECHNICAL-REFERENCE.md",
-    "docs/QUICKSTART.md", "docs/HARDWARE.md",
+# 4. 必备资产
+print("\n=== 4. 必备资产 ===")
+required_assets = [
+    "README.md",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "PROGRESS.md",
+    "LICENSE",
+    "docs/INDEX.md",
+    "docs/01-quickstart.md",
+    "docs/02-user-manual.md",
+    "docs/03-hardware.md",
+    "docs/04-technical-reference.md",
+    "docs/05-cidf-nimble-rewrite.md",
+    "docs/06-micropython-vs-c-comparison.md",
+    "docs/07-firmware-security.md",
+    "main/app_main.c",
+    "main/ble_bikepower.c",
+    "main/wifi_portal.c",
+    "main/radio_ctrl.c",
+    "main/bikepower_config.h",
+    "components/bikepower_domain/include/domain_config.h",
+    "test/test_domain.c",
+    "tests/ble_selftest.py",
+    "tests/stage3_conn_test.py",
+    "tests/stage5_portal_test.py",
+    "tests/serial_capture.py",
 ]
-for d in required_docs:
+for d in required_assets:
     if os.path.exists(os.path.join(PROJECT, d)):
         ok(f"{d} 存在")
     else:
@@ -89,7 +139,8 @@ for path in ["main/bikepower_config.h", "components/bikepower_domain/include/dom
         continue
     with open(full) as f:
         for line in f:
-            m = re.match(r'#define\s+(\w+)\s+(\S+)', line)
+            # 仅匹配简单常量宏 #define NAME value（NAME 后非 '('，过滤函数宏）
+            m = re.match(r'#define\s+(\w+)(?!\S)\s+(\S+)', line)
             if m:
                 name, val = m.group(1), m.group(2)
                 if name in config_vars and config_vars[name] != val:
