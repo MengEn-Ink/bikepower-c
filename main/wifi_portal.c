@@ -550,6 +550,36 @@ static void send_success(httpd_req_t *req)
 }
 
 /**
+ * 发送配置保存失败错误页（HTTP 500）。
+ * 页面提示用户保存失败，提供返回重试按钮，不触发重启。
+ * req：HTTP 请求对象。
+ */
+static void send_save_error(httpd_req_t *req)
+{
+    httpd_resp_set_status(req, "500 Internal Server Error");
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    SEND(req,
+        "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>保存失败</title><style>"
+        "*{margin:0;padding:0;box-sizing:border-box}"
+        "body{min-height:100vh;background:#f5f5f7;padding:24px 16px;display:flex;justify-content:center;align-items:center;font-family:-apple-system,BlinkMacSystemFont,\"Helvetica Neue\",Arial,sans-serif;color:#1d1d1f}"
+        ".box{max-width:360px;width:100%;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:26px;padding:28px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.08)}"
+        ".icon{width:64px;height:64px;border-radius:50%;margin:0 auto 14px;background:#fff2f2;color:#ff3b30;font-size:38px;font-weight:800;display:flex;align-items:center;justify-content:center}"
+        "h1{font-size:22px;margin-bottom:8px;font-weight:800;letter-spacing:-.03em}"
+        ".sub{font-size:13px;color:#6e6e73;line-height:1.5;margin-bottom:16px}"
+        ".btn{display:inline-block;padding:12px 24px;background:#007aff;color:#fff;border-radius:12px;text-decoration:none;font-size:15px;font-weight:600}"
+        ".note{font-size:12px;color:#86868b;margin-top:12px;font-weight:600;line-height:1.5}"
+        "</style></head><body><div class=\"box\">"
+        "<div class=\"icon\">!</div>"
+        "<h1>保存失败</h1>"
+        "<p class=\"sub\">配置未能写入设备存储，请检查后重试。</p>"
+        "<a href=\"/\" class=\"btn\">返回重试</a>"
+        "<p class=\"note\">设备不会自动重启，仍可继续操作。</p>"
+        "</div></body></html>");
+    send_end(req);
+}
+
+/**
  * 处理成功页路由。
  * 在已进入重启流程时输出成功页，否则将直接访问重定向回首页。
  * req：HTTP 请求对象。
@@ -642,6 +672,10 @@ static esp_err_t h_config(httpd_req_t *req)
         return ESP_FAIL;
     }
 
+    // 先保存引擎快照，NVS 失败时回滚，避免内存配置与持久化不一致
+    power_engine_t saved;
+    memcpy(&saved, s_engine, sizeof(power_engine_t));
+
     apply_config(body);
     free(body);
 
@@ -651,7 +685,10 @@ static esp_err_t h_config(httpd_req_t *req)
                  s_engine->base_power, s_engine->cadence_base,
                  (int)s_engine->mode, s_engine->device_name);
     } else {
-        ESP_LOGE(TAG, "配置保存失败");
+        ESP_LOGE(TAG, "配置保存失败，回滚配置");
+        memcpy(s_engine, &saved, sizeof(power_engine_t));
+        send_save_error(req);
+        return ESP_FAIL;
     }
 
     send_success(req);
