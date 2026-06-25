@@ -1073,8 +1073,13 @@ static esp_err_t start_httpd(void)
         { .uri = "/favicon.ico", .method = HTTP_GET, .handler = h_favicon },
     };
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); i++) {
-        // 所有路由集中在这里注册，保持门户能力边界清晰，便于后续扩展和排错。
-        httpd_register_uri_handler(s_httpd, &routes[i]);
+        ret = httpd_register_uri_handler(s_httpd, &routes[i]);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "路由注册失败 uri=%s ret=%d", routes[i].uri, ret);
+            httpd_stop(s_httpd);
+            s_httpd = NULL;
+            return ret;
+        }
     }
     ESP_LOGI(TAG, "HTTP 配网服务就绪 端口=%d", WIFI_PORT);
     return ESP_OK;
@@ -1100,8 +1105,22 @@ esp_err_t wifi_portal_start(power_engine_t *engine)
     arm_deadline();
 
     const esp_timer_create_args_t targs = { .callback = shutdown_check_cb, .name = "portal_to" };
-    ESP_ERROR_CHECK(esp_timer_create(&targs, &s_shutdown_timer));
-    ESP_ERROR_CHECK(esp_timer_start_periodic(s_shutdown_timer, 1000000));  // 每秒检查超时
+    ret = esp_timer_create(&targs, &s_shutdown_timer);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_timer_create 失败 ret=%d", ret);
+        httpd_stop(s_httpd);
+        s_httpd = NULL;
+        return ret;
+    }
+    ret = esp_timer_start_periodic(s_shutdown_timer, 1000000);  // 每秒检查超时
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_timer_start_periodic 失败 ret=%d", ret);
+        esp_timer_delete(s_shutdown_timer);
+        s_shutdown_timer = NULL;
+        httpd_stop(s_httpd);
+        s_httpd = NULL;
+        return ret;
+    }
 
     ESP_LOGI(TAG, "WiFi 配网模式就绪，%ds 后自动超时", WIFI_SHUTDOWN_MS / 1000);
     return ESP_OK;
