@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include "esp_err.h"
+
 /**
  * LED 显示模式。
  * 表示状态机希望 LED 呈现的四种基础灯效。
@@ -23,10 +25,10 @@ typedef enum {
  * 初始化 LED 模块。
  * 配置输出 GPIO、拉低默认电平并启动独立 LED 任务。
  * 无参数。
- * 返回值：无。
+ * 返回值：ESP_OK 表示初始化成功，否则为错误码。
  * 特殊行为：LED 实际闪烁节拍由后台任务持续驱动，不在调用线程内阻塞执行。
  */
-void led_init(void);
+esp_err_t led_init(void);
 
 /**
  * 切换 LED 显示模式。

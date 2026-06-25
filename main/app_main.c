@@ -76,12 +76,27 @@ void app_main(void)
              s_engine.last_heartrate, s_engine.mode);
 
     s_app_queue = xQueueCreate(16, sizeof(app_evt_t));
+    if (!s_app_queue) {
+        ESP_LOGE(TAG, "xQueueCreate 失败，无法继续");
+        esp_restart();
+    }
 
     board_detect();
-    led_init();
+
+    ret = led_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "LED 初始化失败 ret=%d", ret);
+        esp_restart();
+    }
+
     app_state_init(&s_engine);
     app_state_set_wifi_trigger(on_wifi_trigger);
-    button_init(s_app_queue);
+
+    ret = button_init(s_app_queue);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "按钮初始化失败 ret=%d，进入错误恢复态", ret);
+        app_state_set_error();
+    }
 
     ble_bikepower_set_erg_callback(on_erg_target);
     ble_bikepower_set_device_name(s_engine.device_name);

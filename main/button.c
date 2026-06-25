@@ -124,16 +124,21 @@ static void button_task(void *arg)
 
 /**
  * 初始化按钮模块。
- * 配置 GPIO9 输入中断、安装 ISR 服务并创建按钮后台任务。
+ * 配置 GPIO 输入中断、安装 ISR 服务并创建按钮后台任务。
  * app_queue：按钮事件要投递到的应用队列。
- * 返回值：无。
- * 特殊行为：模块使用二值信号量作为 ISR 到任务的唤醒桥梁。
+ * 返回值：ESP_OK 表示初始化成功，否则为错误码。
+ * 特殊行为：模块使用二值信号量作为 ISR 到任务的唤醒桥梁；ISR 服务已安装时跳过安装。
  */
-void button_init(QueueHandle_t app_queue)
+esp_err_t button_init(QueueHandle_t app_queue)
 {
     s_app_queue = app_queue;
     s_btn_pin = board_btn_pin();
+
     s_wake = xSemaphoreCreateBinary();
+    if (!s_wake) {
+        ESP_LOGE(TAG, "xSemaphoreCreateBinary 失败");
+        return ESP_ERR_NO_MEM;
+    }
 
     gpio_config_t io = {
         .pin_bit_mask = 1ULL << s_btn_pin,
@@ -142,11 +147,37 @@ void button_init(QueueHandle_t app_queue)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_ANYEDGE,
     };
-    gpio_config(&io);
+    esp_err_t ret = gpio_config(&io);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "gpio_config 失败 ret=%d", ret);
+        vSemaphoreDelete(s_wake);
+        s_wake = NULL;
+        return ret;
+    }
 
-    gpio_install_isr_service(0);
-    gpio_isr_handler_add(s_btn_pin, btn_isr, NULL);
+    ret = gpio_install_isr_service(0);
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "gpio_install_isr_service 失败 ret=%d", ret);
+        vSemaphoreDelete(s_wake);
+        s_wake = NULL;
+        return ret;
+    }
+    ret = gpio_isr_handler_add(s_btn_pin, btn_isr, NULL);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "gpio_isr_handler_add 失败 ret=%d", ret);
+        vSemaphoreDelete(s_wake);
+        s_wake = NULL;
+        return ret;
+    }
 
-    xTaskCreate(button_task, "button_task", 2560, NULL, 5, NULL);
+    BaseType_t fr = xTaskCreate(button_task, "button_task", 2560, NULL, 5, NULL);
+    if (fr != pdPASS) {
+        ESP_LOGE(TAG, "xTaskCreate button_task 失败");
+        gpio_isr_handler_remove(s_btn_pin);
+        vSemaphoreDelete(s_wake);
+        s_wake = NULL;
+        return ESP_ERR_NO_MEM;
+    }
     ESP_LOGI(TAG, "按钮任务启动 GPIO%d（中断驱动）", s_btn_pin);
+    return ESP_OK;
 }

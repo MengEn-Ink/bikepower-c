@@ -49,7 +49,7 @@ static void sk6812_send(const uint8_t pixel[3])
 /**
  * 初始化 SK6812 RMT 发送通道和编码器。
  */
-static void sk6812_init(void)
+static esp_err_t sk6812_init(void)
 {
     rmt_tx_channel_config_t chan_cfg = {
         .gpio_num = board_led_pin(),
@@ -58,7 +58,11 @@ static void sk6812_init(void)
         .mem_block_symbols = 64,
         .trans_queue_depth = 1,
     };
-    ESP_ERROR_CHECK(rmt_new_tx_channel(&chan_cfg, &s_rmt_chan));
+    esp_err_t ret = rmt_new_tx_channel(&chan_cfg, &s_rmt_chan);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "rmt_new_tx_channel 失败 ret=%d", ret);
+        return ret;
+    }
 
     rmt_bytes_encoder_config_t enc_cfg = {
         .bit0 = {
@@ -75,13 +79,28 @@ static void sk6812_init(void)
         },
         .flags = { .msb_first = 1 },
     };
-    ESP_ERROR_CHECK(rmt_new_bytes_encoder(&enc_cfg, &s_rmt_enc));
+    ret = rmt_new_bytes_encoder(&enc_cfg, &s_rmt_enc);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "rmt_new_bytes_encoder 失败 ret=%d", ret);
+        rmt_del_channel(s_rmt_chan);
+        s_rmt_chan = NULL;
+        return ret;
+    }
 
-    rmt_enable(s_rmt_chan);
+    ret = rmt_enable(s_rmt_chan);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "rmt_enable 失败 ret=%d", ret);
+        rmt_del_encoder(s_rmt_enc);
+        s_rmt_enc = NULL;
+        rmt_del_channel(s_rmt_chan);
+        s_rmt_chan = NULL;
+        return ret;
+    }
 
     // 初始灭灯
     sk6812_send(s_color_off);
     ESP_LOGI(TAG, "SK6812 RGB LED 初始化完成 GPIO%d", board_led_pin());
+    return ESP_OK;
 }
 
 // ===== 通用 LED 驱动 =====
@@ -166,12 +185,15 @@ static void led_task(void *arg)
     }
 }
 
-void led_init(void)
+esp_err_t led_init(void)
 {
     s_led_drv = board_led_drv();
 
     if (s_led_drv == LED_DRV_SK6812) {
-        sk6812_init();
+        esp_err_t ret = sk6812_init();
+        if (ret != ESP_OK) {
+            return ret;
+        }
     } else {
         gpio_config_t io = {
             .pin_bit_mask = 1ULL << board_led_pin(),
@@ -180,10 +202,19 @@ void led_init(void)
             .pull_down_en = GPIO_PULLDOWN_DISABLE,
             .intr_type = GPIO_INTR_DISABLE,
         };
-        gpio_config(&io);
+        esp_err_t ret = gpio_config(&io);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "gpio_config LED 失败 ret=%d", ret);
+            return ret;
+        }
         gpio_set_level(board_led_pin(), 0);
-        ESP_LOGI(TAG, "LED 任务启动 GPIO%d", board_led_pin());
+        ESP_LOGI(TAG, "LED GPIO 初始化完成 GPIO%d", board_led_pin());
     }
 
-    xTaskCreate(led_task, "led_task", 2048, NULL, 3, NULL);
+    BaseType_t fr = xTaskCreate(led_task, "led_task", 2048, NULL, 3, NULL);
+    if (fr != pdPASS) {
+        ESP_LOGE(TAG, "xTaskCreate led_task 失败");
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
 }
