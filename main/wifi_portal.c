@@ -32,6 +32,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <limits.h>
 
 static const char *TAG = "PORTAL";
 
@@ -217,22 +218,26 @@ static bool form_get_str(const char *body, const char *key, char *out, size_t ou
     return true;
 }
 
-// 从 form body 提取整数，未找到返回 def
+// 从 form body 提取整数，未找到或非法输入返回 def
 /**
  * 从表单请求体中提取整数值。
- * 基于 form_get_str 提取字段，再用 `atoi` 转换为整数。
+ * 基于 form_get_str 提取字段，再用 strtol 严格解析。
  * body：完整表单请求体。
  * key：待提取字段名。
- * def：字段缺失或为空时返回的默认值。
+ * def：字段缺失、为空或解析失败时返回的默认值（保持旧值）。
  * 返回值：解析后的整数值或默认值。
- * 特殊行为：空串会回退为默认值，不做更严格的数值合法性检查。
+ * 特殊行为：必须完整消费字符串且为合法十进制整数，否则视为非法返回 def。
  */
 static int form_get_int(const char *body, const char *key, int def)
 {
     char buf[32];
     if (!form_get_str(body, key, buf, sizeof(buf))) return def;
     if (buf[0] == '\0') return def;
-    return atoi(buf);
+    char *endp = NULL;
+    long v = strtol(buf, &endp, 10);
+    if (endp == buf || *endp != '\0') return def;  // 未消费或残留字符 → 非法
+    if (v < INT_MIN || v > INT_MAX) return def;
+    return (int)v;
 }
 
 // 从查询字符串提取 name 参数（GET /ui/module?name=xxx）
@@ -637,12 +642,12 @@ static void apply_config(const char *body)
         power_engine_set_heartrate(e, h);
     }
 
-    if (form_get_str(body, "profile_weight", val, sizeof(val)) && val[0])
-        profile_set_weight(&e->profile, atoi(val));
-    if (form_get_str(body, "profile_ftp", val, sizeof(val)) && val[0])
-        profile_set_ftp(&e->profile, atoi(val));
-    if (form_get_str(body, "profile_thr_hr", val, sizeof(val)) && val[0])
-        profile_set_thr_hr(&e->profile, atoi(val));
+    int w = form_get_int(body, "profile_weight", e->profile.weight);
+    profile_set_weight(&e->profile, w);
+    int f = form_get_int(body, "profile_ftp", e->profile.ftp);
+    profile_set_ftp(&e->profile, f);
+    int thr = form_get_int(body, "profile_thr_hr", e->profile.thr_hr);
+    profile_set_thr_hr(&e->profile, thr);
     if (form_get_str(body, "profile_ride_type", val, sizeof(val)) && val[0])
         profile_set_ride_type_str(&e->profile, val);
 }
@@ -724,20 +729,20 @@ static esp_err_t h_draft(httpd_req_t *req)
             int m = mode_from_id(val);
             if (m >= 0) power_engine_set_mode(e, (ride_mode_t)m);
         }
-        if (form_get_str(body, "power", val, sizeof(val)) && val[0])
-            power_engine_set_power(e, atoi(val));
-        if (form_get_str(body, "cadence", val, sizeof(val)) && val[0])
-            power_engine_set_cadence(e, atoi(val));
-        if (form_get_str(body, "heartrate", val, sizeof(val)) && val[0])
-            power_engine_set_heartrate(e, atoi(val));
+        int p = form_get_int(body, "power", e->base_power);
+        power_engine_set_power(e, p);
+        int c = form_get_int(body, "cadence", e->cadence_base);
+        power_engine_set_cadence(e, c);
+        int hr = form_get_int(body, "heartrate", e->last_heartrate);
+        power_engine_set_heartrate(e, hr);
         if (form_get_str(body, "device_name", val, sizeof(val)))
             power_engine_set_device_name(e, val);
-        if (form_get_str(body, "profile_weight", val, sizeof(val)) && val[0])
-            profile_set_weight(&e->profile, atoi(val));
-        if (form_get_str(body, "profile_ftp", val, sizeof(val)) && val[0])
-            profile_set_ftp(&e->profile, atoi(val));
-        if (form_get_str(body, "profile_thr_hr", val, sizeof(val)) && val[0])
-            profile_set_thr_hr(&e->profile, atoi(val));
+        int w = form_get_int(body, "profile_weight", e->profile.weight);
+        profile_set_weight(&e->profile, w);
+        int f = form_get_int(body, "profile_ftp", e->profile.ftp);
+        profile_set_ftp(&e->profile, f);
+        int thr = form_get_int(body, "profile_thr_hr", e->profile.thr_hr);
+        profile_set_thr_hr(&e->profile, thr);
         if (form_get_str(body, "profile_ride_type", val, sizeof(val)) && val[0])
             profile_set_ride_type_str(&e->profile, val);
         ESP_LOGI(TAG, "草稿保存 mode=%d p=%d c=%d hr=%d name=%s w=%d ftp=%d thr=%d ride=%d",
