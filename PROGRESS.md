@@ -120,7 +120,7 @@
 ### 待人工确认（需真机 + 不可逆操作）
 
 - [ ] 72h 老化测试：长时间运行无 coredump、无堆持续下降（跑 `tests/stage5_portal_test.py` / `ble_selftest.py` 辅助）
-- [ ] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`
+- [x] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`（已设为 WARN）
 - [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（代码已对齐 v3.1.1，`ble_selftest.py` 已自动校验厂商/型号/固件三字段，真机待跑）
 - [ ] 打 tag v3.1.1 + Gitee Release（老化通过后由人工执行）
 
@@ -132,7 +132,7 @@
 
 | 模块 | 文件 | 说明 |
 |------|------|------|
-| 板型检测 | [main/board_detect.c](main/board_detect.c) | 运行时自动检测通用 ESP32-C3 或 M5Stamp C3（GPIO12 电平判断） |
+| 板型检测 | [main/board_detect.c](main/board_detect.c) | 运行时自动检测通用 ESP32-C3 或 M5Stamp C3（GPIO3 电平判断：M5Stamp 按钮上拉读高，通用板悬空下拉读低） |
 | SK6812 LED | [main/led.c](main/led.c) | M5Stamp C3 使用 GPIO2 RMT bytes encoder 驱动 RGB LED，颜色映射：蓝=广播/绿=连接/黄=确认 |
 | 按钮适配 | [main/button.c](main/button.c) | 引脚改为运行时 `board_btn_pin()` 获取，M5Stamp 用 GPIO3 |
 | 配网修复 | [main/wifi_portal.c](main/wifi_portal.c) | 修复 `syncMode()` 多余 `}` 导致 JS 语法错误，模式切换恢复正常 |
@@ -140,7 +140,7 @@
 
 ### 真机验证（已通过）
 
-- 板型检测：`检测到 M5Stamp C3（GPIO12=0）`
+- 板型检测：`自动检测板型：M5Stamp C3（GPIO3=1）`
 - SK6812 RGB LED：蓝色慢闪（广播）/ 绿色常亮（连接）/ 黄色快闪（确认）
 - BLE 五服务 + FTMS ERG：正常
 - 空闲堆：173KB（> 80KB 阈值）

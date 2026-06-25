@@ -36,7 +36,7 @@
 
   <rect x="575" y="145" width="130" height="92" rx="8" fill="#fff" stroke="#ab47bc" stroke-width="1.2"/>
   <text x="640" y="173" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">ESP32-C3</text>
-  <text x="640" y="194" text-anchor="middle" font-size="9" fill="#666">GPIO12 悬空读低</text>
+  <text x="640" y="194" text-anchor="middle" font-size="9" fill="#666">GPIO3 按钮上拉读高</text>
   <text x="640" y="211" text-anchor="middle" font-size="9" fill="#666">判定为 M5Stamp</text>
 
   <rect x="495" y="155" width="58" height="36" rx="6" fill="#e8f5e9" stroke="#4caf50" stroke-width="1.2"/>
