@@ -11,11 +11,11 @@
 /**
  * ERG 目标功率回调类型。
  * 当 FTMS 控制点收到 Set Target Power 指令时，用于把目标功率回传给应用层。
- * target_power：App 下发的目标功率，单位瓦特。
- * 返回值：无。
+ * target_power：App 下发的目标功率，单位瓦特（signed 16-bit）。
+ * 返回值：true 表示目标功率已被接受并生效，false 表示被拒绝（范围无效或资源不足）。
  * 特殊行为：回调运行在 NimBLE host 任务上下文，不应执行阻塞操作。
  */
-typedef void (*ble_erg_cb_t)(int target_power);
+typedef bool (*ble_erg_cb_t)(int target_power);
 
 /**
  * 启动 BLE 蓝牙功率计服务。

@@ -82,8 +82,9 @@ const char *power_engine_get_current_pacer(power_engine_t *e);
 /* 设置 BLE 设备名，超长时截断到 DEVICE_NAME_MAX-1。 */
 bool power_engine_set_device_name(power_engine_t *e, const char *name);
 
-/* 处理 FTMS 下发的 ERG 目标功率，并在需要时自动切到 ERG 模式。 */
-void power_engine_set_erg_target(power_engine_t *e, int target_power);
+/* 处理 FTMS 下发的 ERG 目标功率，并在需要时自动切到 ERG 模式。
+ * 返回 true 表示设置成功（范围有效并已应用），false 表示超出范围被拒绝。 */
+bool power_engine_set_erg_target(power_engine_t *e, int target_power);
 
 /* 按当前模式重置内部功率、踏频和心率相关状态。 */
 void power_engine_reset_mode_state(power_engine_t *e);

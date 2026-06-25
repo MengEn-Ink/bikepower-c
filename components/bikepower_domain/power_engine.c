@@ -339,9 +339,9 @@ bool power_engine_set_device_name(power_engine_t *e, const char *name)
  * 返回值：无。
  * 特殊行为：非法功率范围会直接忽略；成功设置后会同步更新 base_power，并在非 ERG 模式下自动切换到 ERG 模式。
  */
-void power_engine_set_erg_target(power_engine_t *e, int target_power)
+bool power_engine_set_erg_target(power_engine_t *e, int target_power)
 {
-    if (target_power < POWER_MIN || target_power > POWER_MAX) return;
+    if (target_power < POWER_MIN || target_power > POWER_MAX) return false;
     ride_mode_t old_mode = e->mode;
     e->erg_active_target = target_power;
     e->has_erg_target = true;
@@ -352,6 +352,7 @@ void power_engine_set_erg_target(power_engine_t *e, int target_power)
         power_engine_reset_mode_state(e);
     }
     e->dirty = true;
+    return true;
 }
 
 bool power_engine_is_dirty(power_engine_t *e)  { return e->dirty; }

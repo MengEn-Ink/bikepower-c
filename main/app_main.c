@@ -33,15 +33,14 @@ static QueueHandle_t s_app_queue;
 
 /**
  * 处理 FTMS 控制点下发的 ERG 目标功率。
- * 把骑行 App 通过 BLE 下发的目标功率写入领域引擎。
- * target_power：目标功率，单位瓦特。
- * 返回值：无。
+ * 直接调用领域引擎设置目标功率并同步返回结果。
+ * target_power：目标功率，单位瓦特（signed 16-bit）。
+ * 返回值：true 表示设置成功，false 表示范围无效被拒绝。
  * 特殊行为：运行在 NimBLE host 任务上下文，逻辑必须保持轻量且不可阻塞。
  */
-static void on_erg_target(int target_power)
+static bool on_erg_target(int target_power)
 {
-    app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = target_power };
-    xQueueSend(s_app_queue, &e, 0);
+    return power_engine_set_erg_target(&s_engine, target_power);
 }
 
 /**

@@ -34,6 +34,7 @@ static const char *TAG = "BLE";
 #define FTMS_OP_RESPONSE_CODE     0x80
 #define FTMS_RESULT_SUCCESS       0x01
 #define FTMS_RESULT_NOT_SUPPORTED 0x02
+#define FTMS_RESULT_INVALID_PARAM 0x03
 
 static uint8_t  g_own_addr_type;
 static uint16_t g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
@@ -69,6 +70,7 @@ static ble_erg_cb_t g_erg_cb = NULL;
 static char g_device_name[24] = DEVICE_NAME;
 static esp_timer_handle_t g_notify_timer = NULL;
 static bool g_ready = false;
+static volatile bool g_stopping = false;
 
 /**
  * 启动 BLE 广播。
@@ -244,11 +246,17 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
         break;
     case FTMS_OP_SET_TARGET_POWER:
         if (len >= 3) {
-            // Set Target Power 的负载为 16 位目标功率，解析后交给应用层 ERG 回调。
-            int target = buf[1] | (buf[2] << 8);
+            // Set Target Power 的负载为 signed 16-bit 目标功率（小端）
+            int16_t target_s16 = (int16_t)(buf[1] | ((uint16_t)buf[2] << 8));
+            int target = (int)target_s16;
             ESP_LOGI(TAG, "ERG目标功率 %dW", target);
-            if (g_erg_cb) g_erg_cb(target);
-            ftms_send_response(FTMS_OP_SET_TARGET_POWER, FTMS_RESULT_SUCCESS);
+            bool ok = false;
+            if (g_erg_cb) ok = g_erg_cb(target);
+            if (ok) {
+                ftms_send_response(FTMS_OP_SET_TARGET_POWER, FTMS_RESULT_SUCCESS);
+            } else {
+                ftms_send_response(FTMS_OP_SET_TARGET_POWER, FTMS_RESULT_INVALID_PARAM);
+            }
         } else {
             ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
         }
@@ -534,6 +542,10 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
  */
 static void start_advertising(void)
 {
+    if (g_stopping) {
+        ESP_LOGI(TAG, "停止过程中，跳过广播重启");
+        return;
+    }
     struct ble_gap_adv_params adv_params;
     struct ble_hs_adv_fields fields;
     int rc;
@@ -675,6 +687,7 @@ int ble_bikepower_conn_count(void)
  */
 esp_err_t ble_bikepower_start(void)
 {
+    g_stopping = false;
     esp_err_t err = nimble_port_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "nimble_port_init 失败 err=%d", err);
@@ -748,6 +761,7 @@ bool ble_bikepower_is_ready(void)
  */
 void ble_bikepower_stop(void)
 {
+    g_stopping = true;
     if (g_notify_timer) {
         esp_timer_stop(g_notify_timer);
         esp_timer_delete(g_notify_timer);
