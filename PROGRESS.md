@@ -88,7 +88,7 @@
 | 模块 | 文件 | 说明 |
 |------|------|------|
 | 射频控制 | [main/radio_ctrl.c](main/radio_ctrl.c) | 唯一 BLE/WiFi 开关，方案 A：停 BLE → 延时释放射频 → 启 WiFi AP；配网结束/超时 `esp_restart()` 恢复 BLE |
-| 配网门户 | [main/wifi_portal.c](main/wifi_portal.c) | esp_wifi SoftAP + esp_http_server，内嵌 snprintf HTML 分块发送；移植旧版完整 UI（iOS 三卡 + 训练区间染色 + 动态碎片页）；路由 `/` `/config` `/success` `/more` `/draft` `/ui/module` `/closing` `/time` `/renew` `/mem_stats` `/favicon.ico` |
+| 配网门户 | [main/wifi_portal.c](main/wifi_portal.c) | esp_http_server（SoftAP 由 radio_ctrl 启动），内嵌 snprintf HTML 分块发送；移植旧版完整 UI（iOS 三卡 + 训练区间染色 + 动态碎片页）；路由 `/` `/config` `/success` `/more` `/draft` `/ui/module` `/closing` `/time` `/renew` `/mem_stats` `/favicon.ico` |
 | 状态机接入 | [main/app_state.c](main/app_state.c) | ST_WIFI_CONFIRM → ST_WIFI_CONFIG，经 `wifi_trigger` 回调触发 radio_ctrl |
 
 - 超时方案 A：180s（`WIFI_SHUTDOWN_MS`）无续期自动重启恢复 BLE，配网保存后 5s 延迟重启
@@ -121,8 +121,8 @@
 
 - [ ] 72h 老化测试：长时间运行无 coredump、无堆持续下降（跑 `tests/stage5_portal_test.py` / `ble_selftest.py` 辅助）
 - [ ] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`
-- [ ] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（`ble_selftest.py` 已自动校验厂商/型号/固件三字段）
-- [ ] 打 tag v3.0.0 + Gitee Release（老化通过后由人工执行）
+- [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（代码已对齐 v3.1.1，`ble_selftest.py` 已自动校验厂商/型号/固件三字段，真机待跑）
+- [ ] 打 tag v3.1.1 + Gitee Release（老化通过后由人工执行）
 
 ---
 
