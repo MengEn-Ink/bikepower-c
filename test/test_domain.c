@@ -178,6 +178,76 @@ static void test_erg(void)
     CHECK(e.base_power == 260, "新值base同步=260");
 }
 
+static void test_setters_edge(void)
+{
+    printf("[test] setter 边界与拒绝路径\n");
+    power_engine_t e;
+    power_engine_init(&e);
+
+    // set_mode 非法值拒绝
+    CHECK(power_engine_set_mode(&e, (ride_mode_t)(-1)) == false, "set_mode 负值拒绝");
+    CHECK(power_engine_set_mode(&e, (ride_mode_t)RIDE_MODE_COUNT) == false, "set_mode 越界拒绝");
+    CHECK(power_engine_set_mode(&e, RIDE_MODE_STEADY) == false, "set_mode 同值拒绝");
+
+    // mode_tuning 仅 ROAD 生效 + 钳制 + 同值拒绝
+    CHECK(power_engine_set_mode_tuning(&e, RIDE_MODE_STEADY, 30) == false, "mode_tuning 非ROAD拒绝");
+    CHECK(power_engine_get_mode_tuning(&e, RIDE_MODE_STEADY) == MODE_TUNE_DEFAULT, "非ROAD取默认tune");
+    CHECK(power_engine_set_mode_tuning(&e, RIDE_MODE_ROAD, 999) == true, "ROAD tune 设置成功");
+    CHECK(power_engine_get_mode_tuning(&e, RIDE_MODE_ROAD) == MODE_TUNE_MAX, "tune 钳制到上限");
+    CHECK(power_engine_set_mode_tuning(&e, RIDE_MODE_ROAD, MODE_TUNE_MAX) == false, "tune 同值拒绝");
+
+    // set_device_name 空指针/空串拒绝、同名拒绝、超长截断
+    CHECK(power_engine_set_device_name(&e, NULL) == false, "设备名NULL拒绝");
+    CHECK(power_engine_set_device_name(&e, "") == false, "设备名空串拒绝");
+    CHECK(power_engine_set_device_name(&e, "MyBike") == true, "设备名设置成功");
+    CHECK(power_engine_set_device_name(&e, "MyBike") == false, "设备名同名拒绝");
+    char longname[64];
+    memset(longname, 'A', sizeof(longname));
+    longname[63] = '\0';
+    CHECK(power_engine_set_device_name(&e, longname) == true, "超长设备名接受");
+    CHECK((int)strlen(e.device_name) == DEVICE_NAME_MAX - 1, "超长设备名截断到MAX-1");
+
+    // set_cadence / adjust_cadence 仅 steady + 范围 + 同值
+    power_engine_init(&e);
+    CHECK(power_engine_set_cadence(&e, CADENCE_MAX + 50) == false, "踏频超上限拒绝");
+    CHECK(power_engine_set_cadence(&e, CADENCE_MIN - 5) == false, "踏频低于下限拒绝");
+    CHECK(power_engine_set_cadence(&e, e.cadence_base) == false, "踏频同值拒绝");
+    CHECK(power_engine_set_cadence(&e, 100) == true, "踏频合法设置成功");
+    power_engine_set_mode(&e, RIDE_MODE_ROAD);
+    int cad_before = e.cadence_base;
+    CHECK(power_engine_adjust_cadence(&e, 10) == cad_before, "非steady调踏频不变");
+
+    // set_heartrate 仅 steady + 范围
+    power_engine_init(&e);
+    CHECK(power_engine_set_heartrate(&e, HR_MAX + 10) == false, "心率超上限拒绝");
+    CHECK(power_engine_set_heartrate(&e, HR_MIN - 10) == false, "心率低于下限拒绝");
+    CHECK(power_engine_set_heartrate(&e, 160) == true, "心率合法设置成功");
+    CHECK(e.has_user_hr && e.user_heartrate == 160, "has_user_hr置位且值=160");
+    power_engine_set_mode(&e, RIDE_MODE_ROAD);
+    CHECK(power_engine_set_heartrate(&e, 150) == false, "非steady心率拒绝");
+}
+
+static void test_hr_variation_steady(void)
+{
+    printf("[test] HRV 漂移上限 + steady_user 区间钳制\n");
+    hr_state_t st;
+    hr_model_init(&st, 120);
+    domain_rng_seed(7);
+    // HRV 长时间累加后 drift 被 cap，整体波动幅度有界
+    float last = 0.0f;
+    for (int i = 0; i < 5000; i++) last = hr_model_variation(&st);
+    CHECK(last <= HRV_RSA_AMPLITUDE + HRV_MAYER_AMPLITUDE + HRV_DRIFT_CAP_BPM + 0.01f,
+          "HRV 总波动受 drift cap 限制");
+
+    // steady_user：输出始终在 base ± 波动区间内
+    hr_model_init(&st, 150);
+    for (int i = 0; i < 300; i++) {
+        int hr = hr_model_steady_user(&st, 150);
+        CHECK(hr >= 150 + STEADY_USER_HR_FLUCT_LO && hr <= 150 + STEADY_USER_HR_FLUCT_HI,
+              "steady_user 在区间内");
+    }
+}
+
 static void test_road_pacer(void)
 {
     printf("[test] road 配速功率范围\n");
@@ -292,6 +362,8 @@ int main(void)
     test_emit_deadband();
     test_adjust_power();
     test_erg();
+    test_setters_edge();
+    test_hr_variation_steady();
     test_road_pacer();
     test_steady_snapshot();
     test_config_store();
