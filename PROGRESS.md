@@ -70,12 +70,12 @@
 | NVS 桥接 | [main/nvs_store.c](main/nvs_store.c) | namespace=bikepower 短key，load（缺失/版本不匹配用默认并回写）+ save（脏标记落盘） |
 | 主循环接入 | [main/app_main.c](main/app_main.c) | 启动 load + clear_dirty，10s 心跳脏标记落盘 |
 
-- NVS namespace `bikepower`，短 key：`sv`/`power`/`cadence`/`mode`/`tune`/`weight`/`ftp`/`thr_hr`/`ride`/`devname`
+- NVS namespace `bikepower`，短 key：`sv`/`power`/`cadence`/`mode`/`hr`/`hashr`/`weight`/`ftp`/`thr_hr`/`ride`/`devname`（schema v5：心率持久化替代已移除的 tune_road）
 - 旧 MicroPython JSON 配置不迁移，首刷重置为默认
 
 ### 真机验证（已通过）
 
-- 首刷启动用默认值并回写：`p=260W c=90RPM mode=0 tune=50 w=70 ftp=300 thr=190 ride=0`
+- 首刷启动用默认值并回写：`p=260W c=90RPM mode=0 hr=150 w=70 ftp=300 thr=190 ride=0`
 - 短按 3 次（每次 -20W）→ 等待落盘 → 断电重启 → 功率恢复为 `p=200W`，证明持久化生效
 - host 单测 568 断言全过（新增 config_store 23 断言）
 

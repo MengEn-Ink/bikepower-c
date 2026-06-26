@@ -106,7 +106,7 @@
 
 如果存在旧值，则：
 
-1. 从键 `sv`、`power`、`cadence`、`mode`、`tune`、`weight`、`ftp`、`thr_hr`、`ride`、`devname` 读取
+1. 从键 `sv`、`power`、`cadence`、`mode`、`hr`、`hashr`、`weight`、`ftp`、`thr_hr`、`ride`、`devname` 读取
 2. `config_store_migrate(&c)`
 3. `config_store_validate(&c)`
 4. `config_to_engine(&c, e)`
@@ -385,7 +385,6 @@ DIS 读取内容来自编译期常量：
 - `user_heartrate`
 - `has_user_hr`
 - `mode`
-- `mode_tuning_road`
 - `erg_active_target`
 - `has_erg_target`
 - `profile`
@@ -403,7 +402,6 @@ DIS 读取内容来自编译期常量：
 - `DEFAULT_CADENCE = 90`
 - `DEFAULT_HEARTRATE = 150`
 - `DEFAULT_RIDE_MODE = RIDE_MODE_STEADY`
-- `MODE_TUNE_DEFAULT = 50`
 - `DEVICE_NAME_DEFAULT = "BikePower"`
 
 然后调用：
@@ -679,7 +677,8 @@ namespace 固定为：
 - `K_POWER = "power"`
 - `K_CADENCE = "cadence"`
 - `K_MODE = "mode"`
-- `K_TUNE = "tune"`
+- `K_HEARTRATE = "hr"`
+- `K_HAS_USER_HR = "hashr"`
 - `K_WEIGHT = "weight"`
 - `K_FTP = "ftp"`
 - `K_THR_HR = "thr_hr"`
@@ -707,7 +706,7 @@ namespace 固定为：
 - 功率 `POWER_MIN` 到 `POWER_MAX`
 - 踏频 `CADENCE_MIN` 到 `CADENCE_MAX`
 - 模式合法性
-- `tune_road`
+- 固定心率 `HR_MIN` 到 `HR_MAX`，`has_user_hr` 规范化为 0/1
 - 体重 `PROFILE_WEIGHT_MIN` 到 `PROFILE_WEIGHT_MAX`
 - FTP `PROFILE_FTP_MIN` 到 `PROFILE_FTP_MAX`
 - 阈值心率 `PROFILE_THR_HR_MIN` 到 `PROFILE_THR_HR_MAX`
