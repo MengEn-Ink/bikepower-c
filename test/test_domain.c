@@ -167,6 +167,15 @@ static void test_erg(void)
               "ERG功率在目标±5内");
         CHECK(s.mode == RIDE_MODE_ERG, "快照模式=ERG");
     }
+    // 同值幂等：已在 ERG 且目标未变时不置 dirty，避免高频同值反复落盘
+    power_engine_clear_dirty(&e);
+    ok = power_engine_set_erg_target(&e, 250);
+    CHECK(ok == true, "同值ERG返回true");
+    CHECK(!power_engine_is_dirty(&e), "同值ERG不置dirty");
+    ok = power_engine_set_erg_target(&e, 260);
+    CHECK(ok == true, "新值ERG返回true");
+    CHECK(power_engine_is_dirty(&e), "新值ERG置dirty");
+    CHECK(e.base_power == 260, "新值base同步=260");
 }
 
 static void test_road_pacer(void)

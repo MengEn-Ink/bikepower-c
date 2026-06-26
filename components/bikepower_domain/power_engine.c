@@ -336,12 +336,19 @@ bool power_engine_set_device_name(power_engine_t *e, const char *name)
 /*
  * 设置 FTMS 下发的 ERG 目标功率。
  * 参数：e 为功率引擎对象；target_power 为目标功率。
- * 返回值：无。
- * 特殊行为：非法功率范围会直接忽略；成功设置后会同步更新 base_power，并在非 ERG 模式下自动切换到 ERG 模式。
+ * 返回值：成功设置或同值幂等返回 true，功率越界返回 false。
+ * 特殊行为：非法功率范围会直接忽略；成功设置后会同步更新 base_power，并在非 ERG 模式下自动切换到 ERG 模式；
+ *           已处于 ERG 且目标未变时幂等返回不置 dirty，避免高频同值下发反复落盘。
  */
 bool power_engine_set_erg_target(power_engine_t *e, int target_power)
 {
     if (target_power < POWER_MIN || target_power > POWER_MAX) return false;
+    // 同值幂等：训练 App 在 ERG 中会高频(1~2Hz)反复下发相同/缓变目标，
+    // 若每次都置 dirty 会让心跳每 10s 把无意义的 ERG 目标反复写入 NVS，损耗 flash。
+    // 已处于 ERG 且目标未变时直接返回，不置 dirty。
+    if (e->mode == RIDE_MODE_ERG && e->has_erg_target && e->base_power == target_power) {
+        return true;
+    }
     ride_mode_t old_mode = e->mode;
     e->erg_active_target = target_power;
     e->has_erg_target = true;
