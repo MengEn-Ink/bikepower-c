@@ -79,7 +79,11 @@ static uint32_t now_ms(void)
 static void post(app_evt_type_t type, int32_t data)
 {
     app_evt_t e = { .type = type, .data = data };
-    xQueueSend(s_app_queue, &e, 0);
+    // 队列满时丢弃事件（保持按钮任务无阻塞），但记录告警留痕：
+    // 丢失 BTN_DOWN 会导致 UP/REPEAT 与 DOWN 不配对，状态机回滚目标错乱，需可追查。
+    if (xQueueSend(s_app_queue, &e, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "事件队列满，丢弃按钮事件 type=%d data=%ld", (int)type, (long)data);
+    }
 }
 
 /**
@@ -113,6 +117,12 @@ static void button_task(void *arg)
                 post(APP_EVT_BTN_REPEAT, (int32_t)held);
             }
             vTaskDelay(pdMS_TO_TICKS(BTN_POLL_MS));
+            // 释放沿去抖：读到松开后再延时复读，机械抖动期间的瞬时高电平不会被误判为释放，
+            // 否则长按过程中的抖动会被切成一次短按 UP，错触发调功或打断二次确认流程。
+            if (!btn_pressed()) {
+                vTaskDelay(pdMS_TO_TICKS(BTN_DEBOUNCE_MS));
+                if (!btn_pressed()) break;
+            }
         }
 
         uint32_t held = now_ms() - press_start;
