@@ -89,7 +89,7 @@ void nvs_store_load(power_engine_t *e)
     if (err == ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGI(TAG, "无配置，使用默认值并回写");
         config_to_engine(&c, e);
-        nvs_store_save(e);
+        if (!nvs_store_save(e)) ESP_LOGW(TAG, "默认值回写 NVS 失败，下次启动将重试");
         return;
     }
     if (err != ESP_OK) {
@@ -124,7 +124,7 @@ void nvs_store_load(power_engine_t *e)
              migrated ? " [migrated]" : "", fixed ? " [clamped]" : "");
 
     if (migrated || fixed) {
-        nvs_store_save(e);
+        if (!nvs_store_save(e)) ESP_LOGW(TAG, "迁移/夹紧后回写 NVS 失败，下次启动将重试");
     }
 }
 
