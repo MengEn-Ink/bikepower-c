@@ -97,8 +97,10 @@ void app_main(void)
 
     ret = button_init(s_app_queue);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "按钮初始化失败 ret=%d，进入错误恢复态", ret);
-        app_state_set_error();
+        // 按钮失败属局部降级：设备仍可作为纯 BLE 功率计正常服务，不进入 ERROR_RECOVERY。
+        // ERROR_RECOVERY 专用于 BLE 核心故障（仅 BLE 重试成功才 clear_error），
+        // 按钮失败无法靠 BLE 重试恢复，若置该态会让状态机永卡、LED 永久误报快闪。
+        ESP_LOGE(TAG, "按钮初始化失败 ret=%d，按钮功能不可用，设备降级为纯 BLE 功率计", ret);
     }
 
     ble_bikepower_set_erg_callback(on_erg_target);
