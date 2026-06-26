@@ -131,9 +131,14 @@ void app_state_clear_error(void)
 static void enter_confirm_window(void)
 {
     if (s_auto_adjusted) {
-        // 长按过程中做过自动调功时，进入确认窗口前必须先恢复到按下前的基准值。
-        power_engine_set_power(s_engine, s_power_before_press);
-        ESP_LOGI(TAG, "长按结束，回滚功率到 %dW", s_power_before_press);
+        // 长按过程中做过自动调功时，进入确认窗口前尝试恢复到按下前的基准值。
+        // set_power 仅 STEADY 模式生效：若长按期间被 ERG 目标切到非 STEADY 模式，
+        // 回滚会被拒绝，此处据返回值如实记录，避免谎报"已回滚"掩盖状态。
+        if (power_engine_set_power(s_engine, s_power_before_press)) {
+            ESP_LOGI(TAG, "长按结束，回滚功率到 %dW", s_power_before_press);
+        } else {
+            ESP_LOGW(TAG, "长按结束，因模式变更或值无效跳过回滚（目标 %dW）", s_power_before_press);
+        }
     }
     s_state = ST_WIFI_CONFIRM;
     s_confirm_start = now_ms();
