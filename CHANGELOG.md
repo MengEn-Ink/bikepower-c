@@ -14,15 +14,22 @@
   - 必备资产清单同步实际目录：`docs/USER-MANUAL.md` 等旧名修正为 `docs/02-user-manual.md` 等数字前缀名；新增 `main/radio_ctrl.c`、`main/wifi_portal.c`、`tests/*.py` 等关键测试脚本与板型适配源校验。
 
 ### 测试报告（真机）
-- `quality_gate.py` 自检：28 ✅ / 1 ⚠️ / 0 ❌（warn 仅为本次未提交改动）。
+- `quality_gate.py` 自检：29 ✅ / 0 ⚠️ / 0 ❌（工作区 clean）。
 - `idf.py build`：0 error，`bikepower-c.bin` 0x102110 bytes，app 分区 42% free。
 - `idf.py -p /dev/ttyACM0 flash`：写入 1057040 bytes，hash 校验通过，hard reset 成功。
 - 串口启动日志（`tests/serial_capture.py`）：
   - 板型检测 `generic-c3（GPIO3=0）`，三任务启动 LED/STATE/BTN，`state=ST_BLE_ACTIVE`。
-  - BLE 五服务启动 `CPS+HRS+CSC+FTMS+DIS`，设备名 `BikePower`，MAC `14:63:93:f6:71:56`。
+  - BLE 五服务启动 `CPS+HRS+CSC+FTMS+DIS`，设备名 `BikePower`，MAC `14:63:93:f7:48:36`。
+  - NVS 配置加载 `p=260W c=90RPM mode=0 tune=50 w=70 ftp=300 thr=190 ride=0`。
   - 空闲堆 `173676 bytes (~170KB)`，远高于 80KB 阈值。
   - 心跳 `p=184W hr=147 c=89 mode=0 conn=1 state=1` 正常。
-- BLE 自测（`tests/ble_selftest.py`）：跳过（复位后 USB 串口掉线未恢复，需人工检查物理连接后补测）。
+- BLE 自测（`tests/ble_selftest.py`）：通过。
+  - 五服务齐全：CPS/HRS/CSC/FTMS-Bike/FTMS-CP 全部发现。
+  - DIS 设备信息：厂商 `BikePower` / 型号 `ESP32-C3` / 固件 `3.1.1` 三字段匹配。
+  - 通知计数（10s 窗口）：CPS 13 / HR 12 / CSC 12 / FTMS 12。
+  - FTMS 控制点响应：RequestControl `800001` / StartResume `800701` / SetTargetPower `800501`，均为成功响应。
+  - ERG 功率收敛：基线 ~255W，下发 SetTargetPower(200W) 后 8s 收敛到 ~204W（目标 200W，误差 4W，容差内）。
+  - 总判定：通过。
 - Host 单测：581 通过，0 失败。
 
 ## [3.1.1] - 2026-06-16
