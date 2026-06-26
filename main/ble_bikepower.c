@@ -552,9 +552,6 @@ static void start_advertising(void)
 
     memset(&fields, 0, sizeof(fields));
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
-    fields.name = (uint8_t *)g_device_name;
-    fields.name_len = strlen(g_device_name);
-    fields.name_is_complete = 1;
     static ble_uuid16_t adv_uuids[] = {
         BLE_UUID16_INIT(POWER_SERVICE_UUID),
         BLE_UUID16_INIT(HR_SERVICE_UUID),
@@ -563,9 +560,32 @@ static void start_advertising(void)
     fields.uuids16 = adv_uuids;
     fields.num_uuids16 = 2;
     fields.uuids16_is_complete = 1;
+    // 31 字节广播包预算：flags(3) + 完整 16 位 UUID 列表(2+2×2=6) 占 9 字节，
+    // 留给名字 AD 22 字节即最多 BLE_ADV_NAME_MAX_LEN 个字符。超出部分（完整名）放 scan response，
+    // 避免 ble_gap_adv_set_fields 因 EMSGSIZE 静默失败导致设备搜不到。
+    size_t name_len = strlen(g_device_name);
+    fields.name = (uint8_t *)g_device_name;
+    if (name_len > BLE_ADV_NAME_MAX_LEN) {
+        fields.name_len = BLE_ADV_NAME_MAX_LEN;
+        fields.name_is_complete = 0;
+    } else {
+        fields.name_len = name_len;
+        fields.name_is_complete = 1;
+    }
 
     rc = ble_gap_adv_set_fields(&fields);
     if (rc != 0) { ESP_LOGE(TAG, "设置广播字段失败 rc=%d", rc); return; }
+
+    // 名字被截断时，完整设备名放进 scan response，扫描设备仍可显示完整名称。
+    if (!fields.name_is_complete) {
+        struct ble_hs_adv_fields rsp_fields;
+        memset(&rsp_fields, 0, sizeof(rsp_fields));
+        rsp_fields.name = (uint8_t *)g_device_name;
+        rsp_fields.name_len = name_len;
+        rsp_fields.name_is_complete = 1;
+        rc = ble_gap_adv_rsp_set_fields(&rsp_fields);
+        if (rc != 0) { ESP_LOGE(TAG, "设置 scan response 失败 rc=%d", rc); return; }
+    }
 
     memset(&adv_params, 0, sizeof(adv_params));
     adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;

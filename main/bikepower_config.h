@@ -75,6 +75,9 @@ typedef enum {
 #define BLE_ADVERTISING_INTERVAL_MS  500    // 广播间隔
 #define BLE_NOTIFY_INTERVAL_MS       1000   // 通知间隔
 #define BLE_RETRY_TICKS              100    // BLE 启动失败重试节拍数（每拍50ms → 5s）
+// 广播包名字 AD 字段最大字符数。31 字节预算 - flags(3) - 完整16位UUID列表(6) = 22 字节给名字 AD，
+// 减去 AD 头(2) 得 20 个字符；超出部分完整名走 scan response。
+#define BLE_ADV_NAME_MAX_LEN         20
 
 // ===== 按钮时间阈值（毫秒） =====
 #define SHORT_PRESS_MS         500
