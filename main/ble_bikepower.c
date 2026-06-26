@@ -23,6 +23,7 @@
 #include "services/gatt/ble_svc_gatt.h"
 
 #include "bikepower_config.h"
+#include "domain_config.h"
 #include "ble_bikepower.h"
 
 static const char *TAG = "BLE";
@@ -71,7 +72,7 @@ static uint8_t g_ftms_feature_buf[8] = { 0x02, 0x40, 0x00, 0x00, 0x08, 0x00, 0x0
 static uint8_t g_ftms_status_buf[7]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 static ble_erg_cb_t g_erg_cb = NULL;
-static char g_device_name[24] = DEVICE_NAME;
+static char g_device_name[DEVICE_NAME_MAX] = DEVICE_NAME;
 static esp_timer_handle_t g_notify_timer = NULL;
 // 跨任务访问：app_main 写(start/stop)，esp_timer(notify_tick) 读，加 volatile 防缓存。
 static volatile bool g_ready = false;
