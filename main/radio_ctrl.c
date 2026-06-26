@@ -115,7 +115,14 @@ esp_err_t radio_ctrl_start_wifi_ap(void)
 void radio_ctrl_enter_wifi(power_engine_t *engine)
 {
     ESP_LOGI(TAG, "进入 WiFi 配网：停用 BLE 释放射频");
-    ble_bikepower_stop();
+    if (!ble_bikepower_stop()) {
+        // BLE 未能释放射频，继续启 WiFi 会违反单路 RF 互斥约束。
+        // 直接重启由开机流程干净地恢复 BLE，避免 WiFi/BLE 同时占用射频。
+        ESP_LOGE(TAG, "BLE 停用失败 射频未释放，重启恢复 BLE");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        esp_restart();
+        return;
+    }
 
     // 给控制器留出释放射频的时间，避免 WiFi init 与 BLE deinit 竞争
     vTaskDelay(pdMS_TO_TICKS(200));

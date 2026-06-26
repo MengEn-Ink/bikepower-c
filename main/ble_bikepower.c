@@ -489,6 +489,9 @@ static void notify_one(uint16_t handle, const uint8_t *buf, size_t len)
 static void notify_tick(void *arg)
 {
     (void)arg;
+    // 停止过程中或未就绪时立即退出：teardown 路径会 deinit NimBLE，
+    // 此处早退避免回调在协议栈释放后访问已失效资源（use-after-free）。
+    if (g_stopping || !g_ready) return;
     if (g_conn_handle == BLE_HS_CONN_HANDLE_NONE) return;
     pack_all();
     notify_one(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
@@ -776,10 +779,10 @@ bool ble_bikepower_is_ready(void)
  * 停止 BLE 蓝牙功率计模块。
  * 停止周期通知、终止连接、停止广播并关闭 NimBLE host。
  * 无参数。
- * 返回值：无。
+ * 返回值：`true` 表示射频已成功释放，`false` 表示 nimble_port_stop 失败、射频可能仍被占用。
  * 特殊行为：供 WiFi 配网前释放射频资源使用，结束后会清空当前连接句柄。
  */
-void ble_bikepower_stop(void)
+bool ble_bikepower_stop(void)
 {
     g_stopping = true;
     if (g_notify_timer) {
@@ -793,12 +796,14 @@ void ble_bikepower_stop(void)
     ble_gap_adv_stop();
 
     int rc = nimble_port_stop();
-    if (rc == 0) {
+    bool released = (rc == 0);
+    if (released) {
         nimble_port_deinit();
         ESP_LOGI(TAG, "蓝牙已停用 释放射频");
     } else {
-        ESP_LOGE(TAG, "nimble_port_stop 失败 rc=%d", rc);
+        ESP_LOGE(TAG, "nimble_port_stop 失败 rc=%d 射频可能仍被占用", rc);
     }
     g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
     g_ready = false;
+    return released;
 }

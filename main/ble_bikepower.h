@@ -38,10 +38,10 @@ bool ble_bikepower_is_ready(void);
  * 停止 BLE 蓝牙功率计服务。
  * 停止通知定时器、终止连接、停止广播并释放 NimBLE 控制器资源。
  * 无参数。
- * 返回值：无。
+ * 返回值：`true` 表示射频已成功释放，`false` 表示停用失败、射频可能仍被占用。
  * 特殊行为：进入 WiFi 配网前必须先调用，满足 WB-MUTEX-1 射频互斥约束。
  */
-void ble_bikepower_stop(void);
+bool ble_bikepower_stop(void);
 
 /**
  * 更新下一轮 BLE 通知要发送的数据。
