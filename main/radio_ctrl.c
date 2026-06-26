@@ -68,7 +68,7 @@ esp_err_t radio_ctrl_start_wifi_ap(void)
     ap_cfg.ap.ssid_len = strlen(WIFI_SSID);
     strncpy((char *)ap_cfg.ap.password, WIFI_PASSWORD, sizeof(ap_cfg.ap.password));
     ap_cfg.ap.channel = WIFI_AP_CHANNEL;
-    ap_cfg.ap.max_connection = 2;
+    ap_cfg.ap.max_connection = WIFI_MAX_STA_CONN;
     ap_cfg.ap.authmode = WIFI_AUTH_WPA2_PSK;
 
     ret = esp_wifi_set_mode(WIFI_MODE_AP);

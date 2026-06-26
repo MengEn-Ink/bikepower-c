@@ -26,9 +26,9 @@ static rmt_encoder_handle_t s_rmt_enc;
 
 // 各状态对应的 RGB 颜色（G, R, B 顺序，SK6812 协议）
 static const uint8_t s_color_off[]   = {0, 0, 0};        // 灭
-static const uint8_t s_color_slow[]  = {0, 0, 0x30};     // 蓝色（BLE 广播中）
-static const uint8_t s_color_solid[] = {0x30, 0, 0};     // 绿色（BLE 已连接）
-static const uint8_t s_color_fast[]  = {0x30, 0x30, 0};  // 黄色（等待确认）
+static const uint8_t s_color_slow[]  = {0, 0, SK6812_BRIGHTNESS};     // 蓝色（BLE 广播中）
+static const uint8_t s_color_solid[] = {SK6812_BRIGHTNESS, 0, 0};     // 绿色（BLE 已连接）
+static const uint8_t s_color_fast[]  = {SK6812_BRIGHTNESS, SK6812_BRIGHTNESS, 0};  // 黄色（等待确认）
 
 /**
  * 通过 RMT 发送 SK6812 一帧数据。
@@ -68,9 +68,9 @@ static esp_err_t sk6812_init(void)
     rmt_tx_channel_config_t chan_cfg = {
         .gpio_num = board_led_pin(),
         .clk_src = RMT_CLK_SRC_DEFAULT,
-        .resolution_hz = 10 * 1000 * 1000,  // 10 MHz → 100ns 分辨率
-        .mem_block_symbols = 64,
-        .trans_queue_depth = 1,
+        .resolution_hz = RMT_CLK_HZ,  // 10 MHz → 100ns 分辨率
+        .mem_block_symbols = RMT_MEM_BLOCK_SYMBOLS,
+        .trans_queue_depth = RMT_TX_QUEUE_DEPTH,
     };
     esp_err_t ret = rmt_new_tx_channel(&chan_cfg, &s_rmt_chan);
     if (ret != ESP_OK) {
@@ -228,7 +228,7 @@ esp_err_t led_init(void)
         ESP_LOGI(TAG, "LED GPIO 初始化完成 GPIO%d", board_led_pin());
     }
 
-    BaseType_t fr = xTaskCreate(led_task, "led_task", 2048, NULL, 3, NULL);
+    BaseType_t fr = xTaskCreate(led_task, "led_task", TASK_STACK_LED, NULL, TASK_PRIO_LED, NULL);
     if (fr != pdPASS) {
         ESP_LOGE(TAG, "xTaskCreate led_task 失败");
         // 创建任务失败时释放已初始化的硬件资源

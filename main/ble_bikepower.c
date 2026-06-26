@@ -232,7 +232,7 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
     (void)ch; (void)ah; (void)arg;
     if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
 
-    uint8_t buf[20];
+    uint8_t buf[FTMS_CP_BUF_SIZE];
     uint16_t len = 0;
     int rc = ble_hs_mbuf_to_flat(ctxt->om, buf, sizeof(buf), &len);
     if (rc != 0 || len < 1) return 0;

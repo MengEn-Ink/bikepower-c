@@ -281,14 +281,14 @@ static bool query_get_str(httpd_req_t *req, const char *key, char *out, size_t o
     return ok;
 }
 
-// 收取请求 body 到动态缓冲（调用方 free），返回长度，失败返回 -1，超 4096 返回 -2
+// 收取请求 body 到动态缓冲（调用方 free），返回长度，失败返回 -1，超 HTTP_MAX_BODY_LEN 返回 -2
 /**
  * 读取完整 HTTP 请求体到动态缓冲区。
  * 按 content_len 读取 body，并在末尾补 `\0` 便于后续按字符串解析。
- * 请求体超过 4096 字节时返回 -2，由调用方返回 413，避免截断后应用半截配置。
+ * 请求体超过 HTTP_MAX_BODY_LEN 字节时返回 -2，由调用方返回 413，避免截断后应用半截配置。
  * req：HTTP 请求对象。
  * out：输出的动态缓冲区地址，由调用方负责 free（返回 -2 时不分配）。
- * 返回值：成功时返回实际读取长度；返回 -1 表示读取失败；返回 -2 表示超过 4096 字节上限。
+ * 返回值：成功时返回实际读取长度；返回 -1 表示读取失败；返回 -2 表示超过 HTTP_MAX_BODY_LEN 字节上限。
  * 特殊行为：超限时不读取任何数据，直接拒绝。
  */
 static int recv_body(httpd_req_t *req, char **out)
@@ -296,7 +296,7 @@ static int recv_body(httpd_req_t *req, char **out)
     // content_len 是 size_t，先按无符号比较上限，避免赋给 int 时 >INT_MAX 回绕成负数/异常值。
     size_t total = req->content_len;
     if (total == 0) { *out = NULL; return -1; }
-    if (total > 4096) { *out = NULL; return -2; }
+    if (total > HTTP_MAX_BODY_LEN) { *out = NULL; return -2; }
     char *buf = malloc(total + 1);
     if (!buf) return -1;
     size_t recv = 0;
@@ -453,7 +453,7 @@ static esp_err_t h_home(httpd_req_t *req)
         { RIDE_MODE_ROAD, "road", "机器人配速" },
         { RIDE_MODE_ERG, "erg", "ERG 模式" },
     };
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < RIDE_MODE_COUNT; i++) {
         // 这里把领域层整数模式重新映射成旧版网页使用的字符串值，保证前端兼容。
         snprintf(buf, sizeof(buf),
             "<label class=\"%s\" onclick=\"setTimeout(syncMode,0)\"><input type=\"radio\" name=\"mode\" value=\"%s\"%s>%s</label>",
@@ -697,7 +697,7 @@ static esp_err_t h_config(httpd_req_t *req)
                  (int)s_engine->mode, s_engine->device_name);
         // 保存成功后先设置 5s 重启窗口，再发成功页，避免响应发送期间被超时打断
         s_rebooting = true;
-        s_deadline_sec = now_sec() + 5;
+        s_deadline_sec = now_sec() + WIFI_PORTAL_REBOOT_DELAY_SEC;
         send_success(req);
     } else {
         ESP_LOGE(TAG, "配置保存失败，回滚配置");
@@ -1088,8 +1088,8 @@ static esp_err_t start_httpd(void)
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.server_port = WIFI_PORT;
     cfg.lru_purge_enable = true;
-    cfg.max_uri_handlers = 12;
-    cfg.stack_size = 8192;
+    cfg.max_uri_handlers = HTTP_MAX_URI_HANDLERS;
+    cfg.stack_size = TASK_STACK_HTTPD;
 
     esp_err_t ret = httpd_start(&s_httpd, &cfg);
     if (ret != ESP_OK) {

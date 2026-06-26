@@ -38,6 +38,11 @@ typedef enum {
 #define SK6812_T1H_NS        600     // 1 码高电平时间 ns
 #define SK6812_T1L_NS        600     // 1 码低电平时间 ns
 #define SK6812_RESET_US      80      // 复位低电平时间 us
+#define SK6812_BRIGHTNESS    0x30    // LED全局亮度（0-0xFF）
+// RMT 驱动配置
+#define RMT_CLK_HZ           (10 * 1000 * 1000)  // RMT时钟频率：10MHz → 100ns分辨率
+#define RMT_MEM_BLOCK_SYMBOLS 64    // RMT通道内存块大小
+#define RMT_TX_QUEUE_DEPTH   1       // RMT发送队列深度
 
 // ===== BLE GATT 服务 UUID（16-bit） =====
 #define POWER_SERVICE_UUID         0x1818
@@ -92,9 +97,18 @@ typedef enum {
 #define FTMS_RESULT_SUCCESS       0x01
 #define FTMS_RESULT_NOT_SUPPORTED 0x02
 #define FTMS_RESULT_INVALID_PARAM 0x03
+#define FTMS_CP_BUF_SIZE          20     // FTMS控制点接收缓冲区大小（字节）
 
 // ===== 应用事件队列 =====
 #define APP_EVENT_QUEUE_LEN          16     // app_main 事件队列深度
+#define MAIN_HEARTBEAT_INTERVAL_TICKS 200   // 主循环心跳日志间隔：200*50ms=10s
+
+// ===== FreeRTOS 任务配置（栈大小/优先级） =====
+#define TASK_STACK_BTN          2560   // 按钮任务栈大小（字节）
+#define TASK_PRIO_BTN           5      // 按钮任务调度优先级
+#define TASK_STACK_LED          2048   // LED任务栈大小（字节）
+#define TASK_PRIO_LED           3      // LED任务调度优先级
+#define TASK_STACK_HTTPD        8192   // HTTP服务器任务栈大小（字节）
 
 // ===== 按钮时间阈值（毫秒） =====
 #define SHORT_PRESS_MS         500
@@ -118,6 +132,10 @@ typedef enum {
 #define WIFI_SHUTDOWN_MS       180000
 #define WIFI_RENEW_MS          180000
 #define WIFI_PORTAL_CHECK_INTERVAL_US  1000000  // 配网门户超时检查周期（每秒）
+#define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 配置保存成功后重启等待时间（秒）
+#define WIFI_MAX_STA_CONN      2        // SoftAP最大连接客户端数
+#define HTTP_MAX_BODY_LEN      4096     // HTTP请求体最大长度（字节）
+#define HTTP_MAX_URI_HANDLERS  12       // HTTP服务器最大URI路由数
 
 // ===== 射频软切换（radio_ctrl，毫秒） =====
 #define RADIO_BLE_RELEASE_WAIT_MS  200   // 停 BLE 后留给控制器释放射频的时间

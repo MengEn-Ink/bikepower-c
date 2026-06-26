@@ -177,7 +177,7 @@ esp_err_t button_init(QueueHandle_t app_queue)
         return ret;
     }
 
-    BaseType_t fr = xTaskCreate(button_task, "button_task", 2560, NULL, 5, NULL);
+    BaseType_t fr = xTaskCreate(button_task, "button_task", TASK_STACK_BTN, NULL, TASK_PRIO_BTN, NULL);
     if (fr != pdPASS) {
         ESP_LOGE(TAG, "xTaskCreate button_task 失败");
         gpio_isr_handler_remove(s_btn_pin);

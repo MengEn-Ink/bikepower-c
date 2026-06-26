@@ -191,7 +191,7 @@ void app_main(void)
         snapshot_t s = power_engine_snapshot(&s_engine);
         ble_bikepower_set_data((uint16_t)s.power, (uint8_t)s.heartrate, (uint16_t)s.cadence);
 
-        if (++tick >= 200) {  // 每 10s 一次心跳日志
+        if (++tick >= MAIN_HEARTBEAT_INTERVAL_TICKS) {  // 每 10s 一次心跳日志
             tick = 0;
             uint32_t heap = esp_get_free_heap_size();
             ESP_LOGI(TAG, "心跳 堆=%lu p=%dW hr=%d c=%d mode=%d conn=%d state=%d",
