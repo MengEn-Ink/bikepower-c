@@ -281,20 +281,21 @@ static bool query_get_str(httpd_req_t *req, const char *key, char *out, size_t o
  */
 static int recv_body(httpd_req_t *req, char **out)
 {
-    int total = req->content_len;
-    if (total <= 0) { *out = NULL; return -1; }
+    // content_len 是 size_t，先按无符号比较上限，避免赋给 int 时 >INT_MAX 回绕成负数/异常值。
+    size_t total = req->content_len;
+    if (total == 0) { *out = NULL; return -1; }
     if (total > 4096) { *out = NULL; return -2; }
-    char *buf = malloc((size_t)total + 1);
+    char *buf = malloc(total + 1);
     if (!buf) return -1;
-    int recv = 0;
+    size_t recv = 0;
     while (recv < total) {
         int r = httpd_req_recv(req, buf + recv, total - recv);
         if (r <= 0) { free(buf); return -1; }
-        recv += r;
+        recv += (size_t)r;
     }
     buf[recv] = '\0';
     *out = buf;
-    return recv;
+    return (int)recv;
 }
 
 // chunked 发送（大 HTML 分块，避免一次性大缓冲）
