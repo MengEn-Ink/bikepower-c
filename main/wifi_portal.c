@@ -303,6 +303,10 @@ static int recv_body(httpd_req_t *req, char **out)
 
 // chunked 发送（大 HTML 分块，避免一次性大缓冲）
 #define SEND(req, s)  httpd_resp_sendstr_chunk((req), (s))
+
+// 设备名 HTML 转义后的最大字节数：每字符最坏转义为 6 字节（&quot;），按 DEVICE_NAME_MAX 预留。
+#define DEVICE_NAME_HTML_MAX  (DEVICE_NAME_MAX * 6)
+
 /**
  * 结束一次 chunked HTTP 响应。
  * 向 esp_http_server 发送空 chunk，标记响应完成。
@@ -335,7 +339,7 @@ static esp_err_t h_home(httpd_req_t *req)
     bool on = (mode == RIDE_MODE_STEADY);
     const char *dis = on ? "" : " disabled";
 
-    char dn[64];
+    char dn[DEVICE_NAME_HTML_MAX];
     html_escape(e->device_name, dn, sizeof(dn));
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -514,7 +518,7 @@ static esp_err_t h_home(httpd_req_t *req)
 static void send_success(httpd_req_t *req)
 {
     power_engine_t *e = s_engine;
-    char dn[64];
+    char dn[DEVICE_NAME_HTML_MAX];
     html_escape(e->device_name, dn, sizeof(dn));
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -540,7 +544,7 @@ static void send_success(httpd_req_t *req)
         "<p class=\"sub\">设备将重启并恢复蓝牙连接。</p>"
         "<div class=\"values\">");
 
-    char buf[512];
+    char buf[768];
     snprintf(buf, sizeof(buf),
         "<p>%dW / %dRPM / %dBPM</p>"
         "<p class=\"muted\">%s模式 · 蓝牙名称：%s</p></div>"
@@ -783,7 +787,7 @@ static esp_err_t h_more(httpd_req_t *req)
 {
     arm_deadline();
     power_engine_t *e = s_engine;
-    char dn[64];
+    char dn[DEVICE_NAME_HTML_MAX];
     html_escape(e->device_name, dn, sizeof(dn));
     const char *ride = PROFILE_RIDE_TYPE_OPTIONS[
         (e->profile.ride_type >= 0 && e->profile.ride_type < PACER_COUNT) ? e->profile.ride_type : 0];
@@ -885,7 +889,7 @@ static void send_more_panel(httpd_req_t *req)
  */
 static void send_device_panel(httpd_req_t *req)
 {
-    char dn[64];
+    char dn[DEVICE_NAME_HTML_MAX];
     html_escape(s_engine->device_name, dn, sizeof(dn));
     SEND(req, PANEL_STYLE
         "<div class=\"panel-card\">"
