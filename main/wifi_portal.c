@@ -114,6 +114,13 @@ static int mode_from_id(const char *id)
     return -1;
 }
 
+static const char *mode_to_id(int mode)
+{
+    if (mode == RIDE_MODE_ROAD) return "road";
+    if (mode == RIDE_MODE_ERG) return "erg";
+    return "steady";
+}
+
 // mode 中文名（成功页用）
 /**
  * 获取模式的人类可读中文名称。
@@ -352,6 +359,7 @@ static esp_err_t h_home(httpd_req_t *req)
     html_escape(e->device_name, dn, sizeof(dn));
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
 
     SEND(req,
         "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
@@ -797,8 +805,12 @@ static esp_err_t h_more(httpd_req_t *req)
         "<div class=\"hero\"><a class=\"back\" href=\"/\">&larr; 返回首页</a><h1>更多配置</h1><p class=\"sub\">先调整个人信息或设备名称，再应用回首页统一保存。</p></div>"
         "<form method=\"POST\" action=\"/draft\" id=\"core-form\">");
 
-    char buf[768];
+    char buf[1024];
     snprintf(buf, sizeof(buf),
+        "<input type=\"hidden\" id=\"form-mode\" name=\"mode\" value=\"%s\">"
+        "<input type=\"hidden\" id=\"form-power\" name=\"power\" value=\"%d\">"
+        "<input type=\"hidden\" id=\"form-cadence\" name=\"cadence\" value=\"%d\">"
+        "<input type=\"hidden\" id=\"form-heartrate\" name=\"heartrate\" value=\"%d\">"
         "<input type=\"hidden\" id=\"form-device-name\" name=\"device_name\" value=\"%s\">"
         "<input type=\"hidden\" id=\"form-profile-weight\" name=\"profile_weight\" value=\"%d\">"
         "<input type=\"hidden\" id=\"form-profile-ftp\" name=\"profile_ftp\" value=\"%d\">"
@@ -806,6 +818,7 @@ static esp_err_t h_more(httpd_req_t *req)
         "<input type=\"hidden\" id=\"form-profile-ride-type\" name=\"profile_ride_type\" value=\"%s\">"
         "<div id=\"panel\"></div>"
         "<button class=\"btn\" type=\"submit\">应用并回首页</button></form>",
+        mode_to_id(e->mode), e->base_power, e->cadence_base, e->last_heartrate,
         dn, e->profile.weight, e->profile.ftp, e->profile.thr_hr, ride);
     SEND(req, buf);
 
