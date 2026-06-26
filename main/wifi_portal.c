@@ -624,47 +624,33 @@ static esp_err_t h_success(httpd_req_t *req)
 
 // 应用表单参数到引擎（与按钮路径一致，mode 字符串转整数）
 /**
- * 把网页提交的表单数据应用到功率引擎。
- * 解析模式、设备名和 profile 字段，并根据模式决定是否接受手动功率/踏频/心率输入。
- * body：POST `/config` 的表单请求体。
+ * 把网页提交的表单字段统一应用到功率引擎。
+ * 解析 mode/设备名/手动三项/profile 五项并写入引擎，供 /config 与 /draft 共用。
+ * body：表单请求体。
  * 返回值：无。
- * 特殊行为：只有固定功率模式会应用首页手动三项数值，其他模式忽略这些字段。
+ * 特殊行为：手动功率/踏频/心率三项依赖 power_engine setter 内部的"仅 STEADY 生效"守卫，
+ *           非 STEADY 模式下 setter 自行拒绝，无需调用方再判断。
  */
-static void apply_config(const char *body)
+static void apply_form_fields(const char *body)
 {
     power_engine_t *e = s_engine;
     char val[64];
 
-    int cur_mode = (int)e->mode;
-    int mode_target = cur_mode;
     if (form_get_str(body, "mode", val, sizeof(val))) {
         int m = mode_from_id(val);
-        if (m >= 0) {
-            power_engine_set_mode(e, (ride_mode_t)m);
-            mode_target = m;
-        }
+        if (m >= 0) power_engine_set_mode(e, (ride_mode_t)m);
     }
-
     if (form_get_str(body, "device_name", val, sizeof(val))) {
         power_engine_set_device_name(e, val);
     }
+    // 手动三项：setter 内部仅 STEADY 生效，非 STEADY 自动拒绝
+    power_engine_set_power(e, form_get_int(body, "power", e->base_power));
+    power_engine_set_cadence(e, form_get_int(body, "cadence", e->cadence_base));
+    power_engine_set_heartrate(e, form_get_int(body, "heartrate", e->last_heartrate));
 
-    // 仅固定功率模式应用手动数值
-    if (mode_target == RIDE_MODE_STEADY) {
-        int p = form_get_int(body, "power", e->base_power);
-        power_engine_set_power(e, p);
-        int c = form_get_int(body, "cadence", e->cadence_base);
-        power_engine_set_cadence(e, c);
-        int h = form_get_int(body, "heartrate", e->last_heartrate);
-        power_engine_set_heartrate(e, h);
-    }
-
-    int w = form_get_int(body, "profile_weight", e->profile.weight);
-    profile_set_weight(&e->profile, w);
-    int f = form_get_int(body, "profile_ftp", e->profile.ftp);
-    profile_set_ftp(&e->profile, f);
-    int thr = form_get_int(body, "profile_thr_hr", e->profile.thr_hr);
-    profile_set_thr_hr(&e->profile, thr);
+    profile_set_weight(&e->profile, form_get_int(body, "profile_weight", e->profile.weight));
+    profile_set_ftp(&e->profile, form_get_int(body, "profile_ftp", e->profile.ftp));
+    profile_set_thr_hr(&e->profile, form_get_int(body, "profile_thr_hr", e->profile.thr_hr));
     if (form_get_str(body, "profile_ride_type", val, sizeof(val)) && val[0])
         profile_set_ride_type_str(&e->profile, val);
 }
@@ -698,7 +684,7 @@ static esp_err_t h_config(httpd_req_t *req)
     power_engine_t saved;
     memcpy(&saved, s_engine, sizeof(power_engine_t));
 
-    apply_config(body);
+    apply_form_fields(body);
     free(body);
 
     if (nvs_store_save(s_engine)) {
@@ -749,27 +735,7 @@ static esp_err_t h_draft(httpd_req_t *req)
     }
     if (len >= 0) {
         power_engine_t *e = s_engine;
-        char val[64];
-        if (form_get_str(body, "mode", val, sizeof(val))) {
-            int m = mode_from_id(val);
-            if (m >= 0) power_engine_set_mode(e, (ride_mode_t)m);
-        }
-        int p = form_get_int(body, "power", e->base_power);
-        power_engine_set_power(e, p);
-        int c = form_get_int(body, "cadence", e->cadence_base);
-        power_engine_set_cadence(e, c);
-        int hr = form_get_int(body, "heartrate", e->last_heartrate);
-        power_engine_set_heartrate(e, hr);
-        if (form_get_str(body, "device_name", val, sizeof(val)))
-            power_engine_set_device_name(e, val);
-        int w = form_get_int(body, "profile_weight", e->profile.weight);
-        profile_set_weight(&e->profile, w);
-        int f = form_get_int(body, "profile_ftp", e->profile.ftp);
-        profile_set_ftp(&e->profile, f);
-        int thr = form_get_int(body, "profile_thr_hr", e->profile.thr_hr);
-        profile_set_thr_hr(&e->profile, thr);
-        if (form_get_str(body, "profile_ride_type", val, sizeof(val)) && val[0])
-            profile_set_ride_type_str(&e->profile, val);
+        apply_form_fields(body);
         ESP_LOGI(TAG, "草稿保存 mode=%d p=%d c=%d hr=%d name=%s w=%d ftp=%d thr=%d ride=%d",
                  (int)e->mode, e->base_power, e->cadence_base, e->last_heartrate,
                  e->device_name, e->profile.weight, e->profile.ftp,
