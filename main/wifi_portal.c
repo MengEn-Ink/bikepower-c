@@ -39,8 +39,17 @@ static const char *TAG = "PORTAL";
 static power_engine_t *s_engine = NULL;
 static httpd_handle_t s_httpd = NULL;
 static esp_timer_handle_t s_shutdown_timer = NULL;
-static volatile int64_t s_deadline_us = 0;
+// 截止时间存为 32 位秒级单调时间：ESP32-C3 是 32 位核，单字读写原子，
+// 避免 64 位变量在 httpd 任务续期与 esp_timer 回调读取之间发生撕裂导致误判提前重启。
+// 秒级精度对配网窗口（分钟级）与每秒倒计时已足够。
+static volatile uint32_t s_deadline_sec = 0;
 static volatile bool s_rebooting = false;
+
+// 当前单调时间（秒）。
+static uint32_t now_sec(void)
+{
+    return (uint32_t)(esp_timer_get_time() / 1000000);
+}
 
 // ============================ 超时管理 ============================
 
@@ -54,7 +63,7 @@ static volatile bool s_rebooting = false;
 static void arm_deadline(void)
 {
     if (s_rebooting) return;  // 计划重启中不再续期
-    s_deadline_us = esp_timer_get_time() + (int64_t)WIFI_SHUTDOWN_MS * 1000;
+    s_deadline_sec = now_sec() + (WIFI_SHUTDOWN_MS / 1000);
 }
 
 /**
@@ -66,9 +75,9 @@ static void arm_deadline(void)
  */
 static int remaining_seconds(void)
 {
-    int64_t left = s_deadline_us - esp_timer_get_time();
-    if (left < 0) left = 0;
-    return (int)(left / 1000000);
+    uint32_t now = now_sec();
+    if (now >= s_deadline_sec) return 0;
+    return (int)(s_deadline_sec - now);
 }
 
 /**
@@ -81,7 +90,7 @@ static int remaining_seconds(void)
 static void shutdown_check_cb(void *arg)
 {
     (void)arg;
-    if (esp_timer_get_time() >= s_deadline_us) {
+    if (now_sec() >= s_deadline_sec) {
         ESP_LOGI(TAG, "%s，重启恢复 BLE", s_rebooting ? "配置已保存" : "WiFi 配网超时");
         esp_restart();
     }
@@ -708,7 +717,7 @@ static esp_err_t h_config(httpd_req_t *req)
 
     // 成功页展示约 5 秒后重启，给用户留出看到结果和切回骑行 App 的时间。
     s_rebooting = true;
-    s_deadline_us = esp_timer_get_time() + 5000000;
+    s_deadline_sec = now_sec() + 5;
     return ESP_OK;
 }
 
