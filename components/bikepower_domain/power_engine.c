@@ -16,13 +16,6 @@ static int clampi(int v, int lo, int hi)
 static int clamp_power(int v)   { return clampi(v, POWER_MIN, POWER_MAX); }
 static int clamp_cadence(int v) { return clampi(v, CADENCE_MIN, CADENCE_MAX); }
 
-static int clamp_tune(int v)
-{
-    if (v < MODE_TUNE_MIN) return MODE_TUNE_MIN;
-    if (v > MODE_TUNE_MAX) return MODE_TUNE_MAX;
-    return v;
-}
-
 /*
  * 初始化功率引擎的全部运行时状态和默认配置。
  * 参数：e 为待初始化的功率引擎对象。
@@ -37,7 +30,6 @@ void power_engine_init(power_engine_t *e)
     e->user_heartrate = 0;
     e->has_user_hr = false;
     e->mode = DEFAULT_RIDE_MODE;
-    e->mode_tuning_road = MODE_TUNE_DEFAULT;
     e->erg_active_target = 0;
     e->has_erg_target = false;
     e->last_power = DEFAULT_POWER;
@@ -272,29 +264,6 @@ bool power_engine_set_mode(power_engine_t *e, ride_mode_t mode)
     power_engine_reset_mode_state(e);
     e->dirty = true;
     return true;
-}
-
-/*
- * 设置模式调节参数。
- * 参数：e 为功率引擎对象；mode 为目标模式；value 为调节值。
- * 返回值：参数实际发生变化时返回 true，否则返回 false。
- * 特殊行为：当前仅 road 模式支持调节；输入值会先钳制到合法区间，且若当前正处于该模式会立即重置模式状态。
- */
-bool power_engine_set_mode_tuning(power_engine_t *e, ride_mode_t mode, int value)
-{
-    if (mode != RIDE_MODE_ROAD) return false;
-    value = clamp_tune(value);
-    if (e->mode_tuning_road == value) return false;
-    e->mode_tuning_road = value;
-    if (e->mode == mode) power_engine_reset_mode_state(e);
-    e->dirty = true;
-    return true;
-}
-
-int power_engine_get_mode_tuning(power_engine_t *e, ride_mode_t mode)
-{
-    if (mode != RIDE_MODE_ROAD) return MODE_TUNE_DEFAULT;
-    return clamp_tune(e->mode_tuning_road);
 }
 
 int power_engine_get_pacer_index(power_engine_t *e)

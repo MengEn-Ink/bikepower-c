@@ -37,7 +37,6 @@ typedef struct {
     int user_heartrate;       // 有效仅当 has_user_hr
     bool has_user_hr;
     ride_mode_t mode;
-    int mode_tuning_road;     // road 模式范围调节 0-100
     int erg_active_target;    // 有效仅当 has_erg_target
     bool has_erg_target;
     int last_power;
@@ -68,10 +67,6 @@ bool power_engine_set_cadence(power_engine_t *e, int value);
 bool power_engine_set_heartrate(power_engine_t *e, int value);
 /* 切换骑行模式，并在模式变化后重置内部状态。 */
 bool power_engine_set_mode(power_engine_t *e, ride_mode_t mode);
-/* 设置指定模式的调节参数，目前仅 road 模式支持。 */
-bool power_engine_set_mode_tuning(power_engine_t *e, ride_mode_t mode, int value);
-/* 读取指定模式的调节参数，目前仅 road 模式有意义。 */
-int power_engine_get_mode_tuning(power_engine_t *e, ride_mode_t mode);
 /* 读取当前 profile 选择的配速机器人索引。 */
 int power_engine_get_pacer_index(power_engine_t *e);
 /* 设置当前 profile 的配速机器人索引。 */

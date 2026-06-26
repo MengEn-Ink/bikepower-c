@@ -189,13 +189,6 @@ static void test_setters_edge(void)
     CHECK(power_engine_set_mode(&e, (ride_mode_t)RIDE_MODE_COUNT) == false, "set_mode 越界拒绝");
     CHECK(power_engine_set_mode(&e, RIDE_MODE_STEADY) == false, "set_mode 同值拒绝");
 
-    // mode_tuning 仅 ROAD 生效 + 钳制 + 同值拒绝
-    CHECK(power_engine_set_mode_tuning(&e, RIDE_MODE_STEADY, 30) == false, "mode_tuning 非ROAD拒绝");
-    CHECK(power_engine_get_mode_tuning(&e, RIDE_MODE_STEADY) == MODE_TUNE_DEFAULT, "非ROAD取默认tune");
-    CHECK(power_engine_set_mode_tuning(&e, RIDE_MODE_ROAD, 999) == true, "ROAD tune 设置成功");
-    CHECK(power_engine_get_mode_tuning(&e, RIDE_MODE_ROAD) == MODE_TUNE_MAX, "tune 钳制到上限");
-    CHECK(power_engine_set_mode_tuning(&e, RIDE_MODE_ROAD, MODE_TUNE_MAX) == false, "tune 同值拒绝");
-
     // set_device_name 空指针/空串拒绝、同名拒绝、超长截断
     CHECK(power_engine_set_device_name(&e, NULL) == false, "设备名NULL拒绝");
     CHECK(power_engine_set_device_name(&e, "") == false, "设备名空串拒绝");
@@ -297,7 +290,8 @@ static void test_config_store(void)
     CHECK(c.power == DEFAULT_POWER, "默认功率");
     CHECK(c.cadence == DEFAULT_CADENCE, "默认踏频");
     CHECK(c.mode == DEFAULT_RIDE_MODE, "默认模式");
-    CHECK(c.tune_road == MODE_TUNE_DEFAULT, "默认road调节");
+    CHECK(c.heartrate == DEFAULT_HEARTRATE, "默认心率");
+    CHECK(c.has_user_hr == 0, "默认不启用固定心率");
     CHECK(c.weight == PROFILE_WEIGHT_DEFAULT, "默认体重");
     CHECK(c.ftp == PROFILE_FTP_DEFAULT, "默认FTP");
     CHECK(c.thr_hr == PROFILE_THR_HR_DEFAULT, "默认阈值心率");
@@ -327,7 +321,7 @@ static void test_config_store(void)
     b.power = 99999;
     b.cadence = -5;
     b.mode = 7;
-    b.tune_road = 200;
+    b.heartrate = 9999;
     b.weight = 10;
     b.ftp = 9999;
     b.thr_hr = 0;
@@ -336,7 +330,7 @@ static void test_config_store(void)
     CHECK(b.power == POWER_MAX, "功率夹到上限");
     CHECK(b.cadence == CADENCE_MIN, "踏频夹到下限");
     CHECK(b.mode == DEFAULT_RIDE_MODE, "非法模式回默认");
-    CHECK(b.tune_road == MODE_TUNE_MAX, "road调节夹上限");
+    CHECK(b.heartrate == HR_MAX, "心率夹到上限");
     CHECK(b.weight == PROFILE_WEIGHT_MIN, "体重夹下限");
     CHECK(b.ftp == PROFILE_FTP_MAX, "FTP夹上限");
     CHECK(b.thr_hr == PROFILE_THR_HR_MIN, "阈值心率夹下限");
@@ -352,6 +346,20 @@ static void test_config_store(void)
     CHECK(m.power == DEFAULT_POWER, "迁移后重置默认");
     // 当前版本不迁移
     CHECK(!config_store_migrate(&m), "当前版本不迁移");
+
+    // 固定心率：启用并设合法值，validate 不修正、值保留（持久化往返关键）
+    config_data_t hr;
+    config_store_defaults(&hr);
+    hr.has_user_hr = 1;
+    hr.heartrate = 165;
+    CHECK(!config_store_validate(&hr), "启用固定心率合法不修正");
+    CHECK(hr.has_user_hr == 1 && hr.heartrate == 165, "固定心率字段保留");
+    // has_user_hr 非 0/1 被规范化为 1
+    config_data_t hr2;
+    config_store_defaults(&hr2);
+    hr2.has_user_hr = 5;
+    CHECK(config_store_validate(&hr2), "has_user_hr 非规范值被修正");
+    CHECK(hr2.has_user_hr == 1, "has_user_hr 规范化为1");
 }
 
 int main(void)

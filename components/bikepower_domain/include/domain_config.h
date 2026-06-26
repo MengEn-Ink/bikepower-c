@@ -23,7 +23,8 @@
 #define DEFAULT_HEARTRATE     150
 
 // ===== 配置格式版本 =====
-#define CONFIG_VERSION        4
+// v5：移除 road 模式无效的 tune_road 字段，新增固定心率持久化（heartrate + has_user_hr）。
+#define CONFIG_VERSION        5
 
 // ===== 设备名称（BLE 广播名，可配网修改并持久化） =====
 #define DEVICE_NAME_MAX       24
@@ -39,11 +40,6 @@ typedef enum {
 
 #define RIDE_MODE_COUNT       3
 #define DEFAULT_RIDE_MODE     RIDE_MODE_STEADY
-
-// ===== 模式范围调节 =====
-#define MODE_TUNE_MIN         0
-#define MODE_TUNE_MAX         100
-#define MODE_TUNE_DEFAULT     50
 
 // ===== 固定功率模式波动 =====
 #define STEADY_POWER_FLUCT_LO    (-5)

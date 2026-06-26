@@ -24,7 +24,8 @@ static void engine_to_config(power_engine_t *e, config_data_t *c)
     c->power = e->base_power;
     c->cadence = e->cadence_base;
     c->mode = (int)e->mode;
-    c->tune_road = e->mode_tuning_road;
+    c->heartrate = e->has_user_hr ? e->user_heartrate : DEFAULT_HEARTRATE;
+    c->has_user_hr = e->has_user_hr ? 1 : 0;
     c->weight = e->profile.weight;
     c->ftp = e->profile.ftp;
     c->thr_hr = e->profile.thr_hr;
@@ -46,7 +47,8 @@ static void config_to_engine(const config_data_t *c, power_engine_t *e)
     power_engine_set_power(e, c->power);
     power_engine_set_cadence(e, c->cadence);
     power_engine_set_mode(e, (ride_mode_t)c->mode);
-    power_engine_set_mode_tuning(e, RIDE_MODE_ROAD, c->tune_road);
+    // 固定用户心率：仅在曾启用过(has_user_hr)时恢复；set_heartrate 内部仅 STEADY 生效。
+    if (c->has_user_hr) power_engine_set_heartrate(e, c->heartrate);
     profile_set_weight(&e->profile, c->weight);
     profile_set_ftp(&e->profile, c->ftp);
     profile_set_thr_hr(&e->profile, c->thr_hr);
@@ -102,7 +104,8 @@ void nvs_store_load(power_engine_t *e)
     get_i32(h, NVS_KEY_POWER, &c.power);
     get_i32(h, NVS_KEY_CADENCE, &c.cadence);
     get_i32(h, NVS_KEY_MODE, &c.mode);
-    get_i32(h, NVS_KEY_TUNE_ROAD, &c.tune_road);
+    get_i32(h, NVS_KEY_HEARTRATE, &c.heartrate);
+    get_i32(h, NVS_KEY_HAS_USER_HR, &c.has_user_hr);
     get_i32(h, NVS_KEY_WEIGHT, &c.weight);
     get_i32(h, NVS_KEY_FTP, &c.ftp);
     get_i32(h, NVS_KEY_THR_HR, &c.thr_hr);
@@ -119,8 +122,9 @@ void nvs_store_load(power_engine_t *e)
     bool fixed = config_store_validate(&c);
     config_to_engine(&c, e);
 
-    ESP_LOGI(TAG, "配置加载完成 p=%dW c=%dRPM mode=%d tune=%d w=%d ftp=%d thr=%d ride=%d%s%s",
-             c.power, c.cadence, c.mode, c.tune_road, c.weight, c.ftp, c.thr_hr, c.ride_type,
+    ESP_LOGI(TAG, "配置加载完成 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d ftp=%d thr=%d ride=%d%s%s",
+             c.power, c.cadence, c.mode, c.heartrate, c.has_user_hr,
+             c.weight, c.ftp, c.thr_hr, c.ride_type,
              migrated ? " [migrated]" : "", fixed ? " [clamped]" : "");
 
     if (migrated || fixed) {
@@ -161,7 +165,8 @@ bool nvs_store_save(power_engine_t *e)
     SET_I32(NVS_KEY_POWER, c.power);
     SET_I32(NVS_KEY_CADENCE, c.cadence);
     SET_I32(NVS_KEY_MODE, c.mode);
-    SET_I32(NVS_KEY_TUNE_ROAD, c.tune_road);
+    SET_I32(NVS_KEY_HEARTRATE, c.heartrate);
+    SET_I32(NVS_KEY_HAS_USER_HR, c.has_user_hr);
     SET_I32(NVS_KEY_WEIGHT, c.weight);
     SET_I32(NVS_KEY_FTP, c.ftp);
     SET_I32(NVS_KEY_THR_HR, c.thr_hr);

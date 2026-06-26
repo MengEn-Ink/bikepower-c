@@ -23,7 +23,8 @@ void config_store_defaults(config_data_t *c)
     c->power = DEFAULT_POWER;
     c->cadence = DEFAULT_CADENCE;
     c->mode = DEFAULT_RIDE_MODE;
-    c->tune_road = MODE_TUNE_DEFAULT;
+    c->heartrate = DEFAULT_HEARTRATE;
+    c->has_user_hr = 0;
     c->weight = PROFILE_WEIGHT_DEFAULT;
     c->ftp = PROFILE_FTP_DEFAULT;
     c->thr_hr = PROFILE_THR_HR_DEFAULT;
@@ -45,7 +46,8 @@ bool config_store_validate(config_data_t *c)
     c->power = clamp_int(c->power, POWER_MIN, POWER_MAX);
     c->cadence = clamp_int(c->cadence, CADENCE_MIN, CADENCE_MAX);
     if (c->mode < 0 || c->mode >= RIDE_MODE_COUNT) c->mode = DEFAULT_RIDE_MODE;
-    c->tune_road = clamp_int(c->tune_road, MODE_TUNE_MIN, MODE_TUNE_MAX);
+    c->heartrate = clamp_int(c->heartrate, HR_MIN, HR_MAX);
+    c->has_user_hr = c->has_user_hr ? 1 : 0;
     c->weight = clamp_int(c->weight, PROFILE_WEIGHT_MIN, PROFILE_WEIGHT_MAX);
     c->ftp = clamp_int(c->ftp, PROFILE_FTP_MIN, PROFILE_FTP_MAX);
     c->thr_hr = clamp_int(c->thr_hr, PROFILE_THR_HR_MIN, PROFILE_THR_HR_MAX);
@@ -59,7 +61,8 @@ bool config_store_validate(config_data_t *c)
     return in.power != c->power
         || in.cadence != c->cadence
         || in.mode != c->mode
-        || in.tune_road != c->tune_road
+        || in.heartrate != c->heartrate
+        || in.has_user_hr != c->has_user_hr
         || in.weight != c->weight
         || in.ftp != c->ftp
         || in.thr_hr != c->thr_hr

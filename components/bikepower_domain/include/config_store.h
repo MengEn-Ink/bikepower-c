@@ -17,7 +17,8 @@ typedef struct {
     int power;          // base_power
     int cadence;        // cadence_base
     int mode;           // ride_mode_t
-    int tune_road;      // road 模式范围调节 0-100
+    int heartrate;      // 固定用户心率（仅 has_user_hr 时有效）
+    int has_user_hr;    // 是否启用固定用户心率（0/1）
     int weight;         // profile.weight
     int ftp;            // profile.ftp
     int thr_hr;         // profile.thr_hr
