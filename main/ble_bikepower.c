@@ -13,6 +13,8 @@
 #include <string.h>
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
@@ -37,7 +39,9 @@ static const char *TAG = "BLE";
 #define FTMS_RESULT_INVALID_PARAM 0x03
 
 static uint8_t  g_own_addr_type;
-static uint16_t g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+// 跨任务访问：host 任务(gap_event_cb/on_reset)写，app_main(conn_count) 与 esp_timer(notify_tick) 读，
+// 加 volatile 防止编译器缓存（C3 上 16 位单次访问原子）。
+static volatile uint16_t g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 
 static uint16_t g_cps_val_handle;
 static uint16_t g_hr_val_handle;
@@ -69,8 +73,12 @@ static uint8_t g_ftms_status_buf[7]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0
 static ble_erg_cb_t g_erg_cb = NULL;
 static char g_device_name[24] = DEVICE_NAME;
 static esp_timer_handle_t g_notify_timer = NULL;
-static bool g_ready = false;
+// 跨任务访问：app_main 写(start/stop)，esp_timer(notify_tick) 读，加 volatile 防缓存。
+static volatile bool g_ready = false;
 static volatile bool g_stopping = false;
+// 通知互斥锁：保证 notify_tick 回调与 ble_bikepower_stop 的 deinit 互斥，
+// stop 在释放 NimBLE 前必须先拿到锁，确保没有 notify 回调正在访问协议栈（消除 UAF 窗口）。
+static SemaphoreHandle_t g_notify_lock = NULL;
 
 /**
  * 启动 BLE 广播。
@@ -489,15 +497,19 @@ static void notify_one(uint16_t handle, const uint8_t *buf, size_t len)
 static void notify_tick(void *arg)
 {
     (void)arg;
-    // 停止过程中或未就绪时立即退出：teardown 路径会 deinit NimBLE，
-    // 此处早退避免回调在协议栈释放后访问已失效资源（use-after-free）。
-    if (g_stopping || !g_ready) return;
-    if (g_conn_handle == BLE_HS_CONN_HANDLE_NONE) return;
+    // 持锁后再检查标志并访问协议栈：stop 会先拿同一把锁才 deinit NimBLE，
+    // 保证本回调要么完整在 deinit 前执行、要么 stop 等待本回调结束，消除 UAF 窗口。
+    if (!g_notify_lock || xSemaphoreTake(g_notify_lock, 0) != pdTRUE) return;
+    if (g_stopping || !g_ready || g_conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+        xSemaphoreGive(g_notify_lock);
+        return;
+    }
     pack_all();
     notify_one(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
     notify_one(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
     notify_one(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
     notify_one(g_ftms_bike_handle, g_ftms_bike_buf, sizeof(g_ftms_bike_buf));
+    xSemaphoreGive(g_notify_lock);
 }
 
 // ============================ GAP / 广播 ============================
@@ -620,14 +632,18 @@ static void on_sync(void)
 
 /**
  * NimBLE 协议栈复位回调。
- * 在协议栈发生复位时记录原因，便于诊断 BLE 异常。
+ * 在协议栈发生复位时记录原因并清理连接状态，便于诊断并恢复 BLE。
  * reason：复位原因码。
  * 返回值：无。
- * 特殊行为：当前只记录日志，不主动执行恢复动作。
+ * 特殊行为：复位不会产生 DISCONNECT 事件，需在此手动清连接句柄；
+ *           复位后 NimBLE 会重新回调 sync_cb 触发重新广播。
  */
 static void on_reset(int reason)
 {
     ESP_LOGE(TAG, "BLE 协议栈复位 reason=%d", reason);
+    // 复位后旧连接句柄已失效且不会有断开事件，清理以免 conn_count 误报已连接、
+    // notify_tick 持续向失效句柄发通知。
+    g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 }
 
 /**
@@ -711,6 +727,13 @@ int ble_bikepower_conn_count(void)
 esp_err_t ble_bikepower_start(void)
 {
     g_stopping = false;
+    if (!g_notify_lock) {
+        g_notify_lock = xSemaphoreCreateMutex();
+        if (!g_notify_lock) {
+            ESP_LOGE(TAG, "创建通知互斥锁失败");
+            return ESP_ERR_NO_MEM;
+        }
+    }
     esp_err_t err = nimble_port_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "nimble_port_init 失败 err=%d", err);
@@ -790,6 +813,10 @@ bool ble_bikepower_stop(void)
         esp_timer_delete(g_notify_timer);
         g_notify_timer = NULL;
     }
+    // 拿锁等待可能正在执行的 notify_tick 回调结束（esp_timer_delete 不保证等待飞行中的回调），
+    // 之后再释放协议栈，确保回调不会访问已 deinit 的 NimBLE 资源。
+    if (g_notify_lock) xSemaphoreTake(g_notify_lock, portMAX_DELAY);
+
     if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
         ble_gap_terminate(g_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
     }
@@ -805,5 +832,7 @@ bool ble_bikepower_stop(void)
     }
     g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
     g_ready = false;
+
+    if (g_notify_lock) xSemaphoreGive(g_notify_lock);
     return released;
 }
