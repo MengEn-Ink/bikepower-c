@@ -35,6 +35,14 @@ esp_err_t ble_bikepower_start(void);
 bool ble_bikepower_is_ready(void);
 
 /**
+ * 查询 BLE 启动是否失败。
+ * 无参数。
+ * 返回值：`true` 表示启动过程中发生错误需要清理重试，`false` 表示正常。
+ * 特殊行为：启动失败时需要由主任务调用 ble_bikepower_stop() 清理资源后再重试。
+ */
+bool ble_bikepower_start_failed(void);
+
+/**
  * 停止 BLE 蓝牙功率计服务。
  * 停止通知定时器、终止连接、停止广播并释放 NimBLE 控制器资源。
  * 无参数。

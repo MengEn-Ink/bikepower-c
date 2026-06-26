@@ -47,6 +47,22 @@ static void sk6812_send(const uint8_t pixel[3])
 }
 
 /**
+ * 释放 SK6812 RMT 通道和编码器资源。
+ */
+static void sk6812_deinit(void)
+{
+    if (s_rmt_enc) {
+        rmt_del_encoder(s_rmt_enc);
+        s_rmt_enc = NULL;
+    }
+    if (s_rmt_chan) {
+        rmt_disable(s_rmt_chan);
+        rmt_del_channel(s_rmt_chan);
+        s_rmt_chan = NULL;
+    }
+}
+
+/**
  * 初始化 SK6812 RMT 发送通道和编码器。
  */
 static esp_err_t sk6812_init(void)
@@ -217,6 +233,10 @@ esp_err_t led_init(void)
     BaseType_t fr = xTaskCreate(led_task, "led_task", 2048, NULL, 3, NULL);
     if (fr != pdPASS) {
         ESP_LOGE(TAG, "xTaskCreate led_task 失败");
+        // 创建任务失败时释放已初始化的硬件资源
+        if (s_led_drv == LED_DRV_SK6812) {
+            sk6812_deinit();
+        }
         return ESP_ERR_NO_MEM;
     }
     return ESP_OK;

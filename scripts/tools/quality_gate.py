@@ -9,8 +9,9 @@
 5. Git 工作区 — 未提交/未推送统计
 
 环境要求：
-- 已 source esp-idf/export.sh；或脚本自动用默认路径激活。
-- 默认 IDF 路径：/home/mengen1014/work/esp32-power/esp-idf（v5.5）。
+- 已 source esp-idf/export.sh；或脚本自动按优先级探测路径激活。
+- IDF 探测优先级：$IDF_PATH 环境变量 → $HOME/esp/esp-idf-v5.5.4（macOS 默认）→ ../esp32-power/esp-idf（相邻项目布局）→ /home/mengen1014/work/esp32-power/esp-idf（Linux 默认）。
+- 仅支持 ESP-IDF v5.5.x 版本。
 """
 
 import os
@@ -20,7 +21,18 @@ import sys
 
 # 项目根目录：脚本位于 scripts/tools/，向上两级即项目根
 PROJECT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DEFAULT_IDF_PATH = "/home/mengen1014/work/esp32-power/esp-idf"
+
+# IDF 路径探测优先级列表
+IDF_CANDIDATE_PATHS = [
+    # 优先使用环境变量
+    os.environ.get("IDF_PATH"),
+    # macOS 默认安装路径
+    os.path.expanduser("~/esp/esp-idf-v5.5.4"),
+    # 相邻项目布局（bikepower-c 和 esp32-power 在同一父目录）
+    os.path.abspath(os.path.join(PROJECT, "..", "esp32-power", "esp-idf")),
+    # 原 Linux 开发机默认路径
+    "/home/mengen1014/work/esp32-power/esp-idf",
+]
 
 SCORE = {"pass": 0, "warn": 0, "fail": 0}
 
@@ -52,19 +64,36 @@ def idf_ready():
 
 
 def ensure_idf():
-    """若 idf.py 不可用，则 source 默认路径的 export.sh 并返回激活命令前缀。"""
+    """若 idf.py 不可用，则按优先级探测 IDF 路径并返回激活命令前缀。
+    返回 None 表示未找到可用的 ESP-IDF 环境。
+    """
     if idf_ready():
         return ""
-    return f". {DEFAULT_IDF_PATH}/export.sh >/dev/null 2>&1 && "
+    # 过滤掉 None/空路径，按顺序探测
+    for path in filter(None, IDF_CANDIDATE_PATHS):
+        export_sh = os.path.join(path, "export.sh")
+        if not os.path.exists(export_sh):
+            continue
+        # 验证 source 后 idf.py 确实可用
+        test_cmd = f". {export_sh} >/dev/null 2>&1 && idf.py --version >/dev/null 2>&1"
+        r = subprocess.run(["bash", "-c", test_cmd], cwd=PROJECT)
+        if r.returncode == 0:
+            return f". {export_sh} >/dev/null 2>&1 && "
+    # 所有候选路径均无效
+    return None
 
 
 # 1. 编译检查
 print("\n=== 1. 编译检查 ===")
-out, rc = run(f"{ensure_idf()}idf.py build 2>&1 | tail -5")
-if rc == 0 and ("Project build complete" in out or "write_flash" in out):
-    ok("idf.py build 通过")
+idf_prefix = ensure_idf()
+if idf_prefix is None:
+    fail("未找到可用的 ESP-IDF v5.5.x 环境，请设置 IDF_PATH 环境变量，或安装到默认路径 ~/esp/esp-idf-v5.5.4")
 else:
-    fail(f"idf.py build 失败 (rc={rc}): {out[:200]}")
+    out, rc = run(f"{idf_prefix}idf.py build 2>&1 | tail -5")
+    if rc == 0 and ("Project build complete" in out or "write_flash" in out):
+        ok("idf.py build 通过")
+    else:
+        fail(f"idf.py build 失败 (rc={rc}): {out[:200]}")
 
 # 2. Host 单测
 print("\n=== 2. Host 单测 ===")

@@ -15,7 +15,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 RELEASE_DIR="$PROJECT_DIR/build/release"
-IDF_PATH="$HOME/esp/esp-idf-v5.5.4"
+# 对齐build_firmware.sh逻辑：优先使用环境变量IDF_PATH，默认macOS路径
+IDF_PATH="${IDF_PATH:-$HOME/esp/esp-idf-v5.5.4}"
+
+# 脚本退出时自动清理临时配置文件（无论成功失败）
+cleanup() {
+    rm -f "$PROJECT_DIR/sdkconfig.board" "$PROJECT_DIR/sdkconfig.board.tmp"
+}
+trap cleanup EXIT
 
 # 确定要编译的板型列表
 if [ $# -gt 0 ]; then
@@ -25,7 +32,13 @@ else
 fi
 
 # 激活 ESP-IDF 环境
-source "$IDF_PATH/export.sh" 2>/dev/null
+if [ ! -f "$IDF_PATH/export.sh" ]; then
+    echo "错误：找不到ESP-IDF环境，$IDF_PATH/export.sh 不存在"
+    echo "请设置IDF_PATH环境变量指向ESP-IDF v5.5.x安装目录，或安装到默认路径 $HOME/esp/esp-idf-v5.5.4"
+    exit 1
+fi
+echo "激活ESP-IDF环境: $IDF_PATH"
+source "$IDF_PATH/export.sh" > /dev/null
 
 cd "$PROJECT_DIR"
 

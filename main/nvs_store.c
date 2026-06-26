@@ -46,9 +46,10 @@ static void config_to_engine(const config_data_t *c, power_engine_t *e)
 {
     power_engine_set_power(e, c->power);
     power_engine_set_cadence(e, c->cadence);
-    power_engine_set_mode(e, (ride_mode_t)c->mode);
-    // 固定用户心率：仅在曾启用过(has_user_hr)时恢复；set_heartrate 内部仅 STEADY 生效。
+    // 先恢复固定心率：初始化时engine默认mode为STEADY，set_heartrate可正常生效；
+    // 后续set_mode切换到ROAD/ERG不会清除has_user_hr/user_heartrate字段，切回STEADY时可自动恢复使用
     if (c->has_user_hr) power_engine_set_heartrate(e, c->heartrate);
+    power_engine_set_mode(e, (ride_mode_t)c->mode);
     profile_set_weight(&e->profile, c->weight);
     profile_set_ftp(&e->profile, c->ftp);
     profile_set_thr_hr(&e->profile, c->thr_hr);

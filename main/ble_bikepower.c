@@ -77,6 +77,7 @@ static esp_timer_handle_t g_notify_timer = NULL;
 // 跨任务访问：app_main 写(start/stop)，esp_timer(notify_tick) 读，加 volatile 防缓存。
 static volatile bool g_ready = false;
 static volatile bool g_stopping = false;
+static volatile bool g_start_failed = false;
 // 通知互斥锁：保证 notify_tick 回调与 ble_bikepower_stop 的 deinit 互斥，
 // stop 在释放 NimBLE 前必须先拿到锁，确保没有 notify 回调正在访问协议栈（消除 UAF 窗口）。
 static SemaphoreHandle_t g_notify_lock = NULL;
@@ -85,10 +86,10 @@ static SemaphoreHandle_t g_notify_lock = NULL;
  * 启动 BLE 广播。
  * 组装 GAP 广播字段并以通用可连接模式开始对外广播。
  * 无参数。
- * 返回值：无。
+ * 返回值：0表示启动成功，非0为NimBLE错误码。
  * 特殊行为：广播字段中只声明 CPS 和 HRS 服务 UUID，以兼容旧版发现行为。
  */
-static void start_advertising(void);
+static int start_advertising(void);
 // 发送单个特征通知（定义在通知模块），FTMS 控制点回调需提前用于推送 Training Status。
 static void notify_one(uint16_t handle, const uint8_t *buf, size_t len);
 
@@ -221,12 +222,10 @@ static int ftms_status_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt 
  */
 static void ftms_send_response(uint8_t request_op, uint8_t result)
 {
-    if (g_conn_handle == BLE_HS_CONN_HANDLE_NONE) return;
     g_ftms_resp_buf[0] = FTMS_OP_RESPONSE_CODE;
     g_ftms_resp_buf[1] = request_op;
     g_ftms_resp_buf[2] = result;
-    struct os_mbuf *om = ble_hs_mbuf_from_flat(g_ftms_resp_buf, sizeof(g_ftms_resp_buf));
-    if (om) ble_gatts_notify_custom(g_conn_handle, g_ftms_cp_handle, om);
+    notify_one(g_ftms_cp_handle, g_ftms_resp_buf, sizeof(g_ftms_resp_buf));
 }
 
 /**
@@ -479,18 +478,36 @@ static void pack_all(void)
 }
 
 /**
- * 发送单个特征通知。
- * 将平面缓冲区转换为 mbuf 后，通过 NimBLE 自定义通知发送。
+ * 发送单个特征通知（已持锁版本）。
+ * 调用者必须已持有g_notify_lock，直接将平面缓冲区转换为 mbuf 后发送通知。
  * handle：特征值句柄。
  * buf：待发送数据缓冲区。
  * len：数据长度。
  * 返回值：无。
- * 特殊行为：若 mbuf 分配失败则静默跳过本次通知。
+ * 特殊行为：状态异常或mbuf分配失败则静默跳过。
+ */
+static void notify_one_nolock(uint16_t handle, const uint8_t *buf, size_t len)
+{
+    if (g_stopping || !g_ready || g_conn_handle == BLE_HS_CONN_HANDLE_NONE) return;
+    struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
+    if (om) ble_gatts_notify_custom(g_conn_handle, handle, om);
+}
+
+/**
+ * 发送单个特征通知（线程安全版本）。
+ * 自动拿互斥锁、检查BLE状态，将平面缓冲区转换为 mbuf 后通过 NimBLE 自定义通知发送。
+ * handle：特征值句柄。
+ * buf：待发送数据缓冲区。
+ * len：数据长度。
+ * 返回值：无。
+ * 特殊行为：锁获取失败、状态异常或mbuf分配失败则静默跳过本次通知。
  */
 static void notify_one(uint16_t handle, const uint8_t *buf, size_t len)
 {
-    struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
-    if (om) ble_gatts_notify_custom(g_conn_handle, handle, om);
+    // 短等待10ms拿锁：锁持有时间极短（微秒级），不会阻塞NimBLE任务太久，同时保证FTMS关键响应不丢
+    if (!g_notify_lock || xSemaphoreTake(g_notify_lock, pdMS_TO_TICKS(10)) != pdTRUE) return;
+    notify_one_nolock(handle, buf, len);
+    xSemaphoreGive(g_notify_lock);
 }
 
 /**
@@ -511,14 +528,29 @@ static void notify_tick(void *arg)
         return;
     }
     pack_all();
-    notify_one(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
-    notify_one(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
-    notify_one(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
-    notify_one(g_ftms_bike_handle, g_ftms_bike_buf, sizeof(g_ftms_bike_buf));
+    notify_one_nolock(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
+    notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
+    notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
+    notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, sizeof(g_ftms_bike_buf));
     xSemaphoreGive(g_notify_lock);
 }
 
 // ============================ GAP / 广播 ============================
+
+/**
+ * 标记 BLE 启动/重广播失败，统一日志与状态更新。
+ * reason：失败场景描述，用于日志定位。
+ * rc：NimBLE 错误码。
+ * 返回值：无。
+ * 特殊行为：仅清 g_ready、置 g_start_failed，交由 app_main 主任务上下文清理重试；
+ *   绝不在 NimBLE 回调上下文里直接调用 stop/deinit，避免在协议栈回调中重入释放。
+ */
+static void mark_start_failed(const char *reason, int rc)
+{
+    ESP_LOGE(TAG, "%s rc=%d", reason, rc);
+    g_ready = false;
+    g_start_failed = true;
+}
 
 /**
  * 处理 GAP 连接与广播事件。
@@ -531,6 +563,7 @@ static void notify_tick(void *arg)
 static int gap_event_cb(struct ble_gap_event *event, void *arg)
 {
     (void)arg;
+    int rc;
     switch (event->type) {
     case BLE_GAP_EVENT_CONNECT:
         if (event->connect.status == 0) {
@@ -538,16 +571,19 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
             ESP_LOGI(TAG, "设备已连接 handle=%d", g_conn_handle);
         } else {
             ESP_LOGW(TAG, "连接失败 status=%d，重新广播", event->connect.status);
-            start_advertising();
+            rc = start_advertising();
+            if (rc != 0 && !g_stopping) mark_start_failed("连接失败后重广播失败", rc);
         }
         return 0;
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "设备已断开 reason=%d", event->disconnect.reason);
         g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
-        start_advertising();
+        rc = start_advertising();
+        if (rc != 0 && !g_stopping) mark_start_failed("断开后重广播失败", rc);
         return 0;
     case BLE_GAP_EVENT_ADV_COMPLETE:
-        start_advertising();
+        rc = start_advertising();
+        if (rc != 0 && !g_stopping) mark_start_failed("广播完成后重广播失败", rc);
         return 0;
     default:
         return 0;
@@ -558,14 +594,14 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
  * 启动 BLE 广播。
  * 配置广播字段、设备名和服务 UUID，并开始无限时长广播。
  * 无参数。
- * 返回值：无。
+ * 返回值：0表示启动成功，非0为NimBLE错误码。
  * 特殊行为：广播间隔从配置常量换算为 0.625ms 单位写入 NimBLE。
  */
-static void start_advertising(void)
+static int start_advertising(void)
 {
     if (g_stopping) {
         ESP_LOGI(TAG, "停止过程中，跳过广播重启");
-        return;
+        return 0;
     }
     struct ble_gap_adv_params adv_params;
     struct ble_hs_adv_fields fields;
@@ -595,7 +631,7 @@ static void start_advertising(void)
     }
 
     rc = ble_gap_adv_set_fields(&fields);
-    if (rc != 0) { ESP_LOGE(TAG, "设置广播字段失败 rc=%d", rc); return; }
+    if (rc != 0) { ESP_LOGE(TAG, "设置广播字段失败 rc=%d", rc); return rc; }
 
     // 名字被截断时，完整设备名放进 scan response，扫描设备仍可显示完整名称。
     if (!fields.name_is_complete) {
@@ -605,7 +641,7 @@ static void start_advertising(void)
         rsp_fields.name_len = name_len;
         rsp_fields.name_is_complete = 1;
         rc = ble_gap_adv_rsp_set_fields(&rsp_fields);
-        if (rc != 0) { ESP_LOGE(TAG, "设置 scan response 失败 rc=%d", rc); return; }
+        if (rc != 0) { ESP_LOGE(TAG, "设置 scan response 失败 rc=%d", rc); return rc; }
     }
 
     memset(&adv_params, 0, sizeof(adv_params));
@@ -616,8 +652,9 @@ static void start_advertising(void)
 
     rc = ble_gap_adv_start(g_own_addr_type, NULL, BLE_HS_FOREVER,
                            &adv_params, gap_event_cb, NULL);
-    if (rc != 0) { ESP_LOGE(TAG, "广播启动失败 rc=%d", rc); return; }
+    if (rc != 0) { ESP_LOGE(TAG, "广播启动失败 rc=%d", rc); return rc; }
     ESP_LOGI(TAG, "开始广播 name=%s (间隔%dms)", g_device_name, BLE_ADVERTISING_INTERVAL_MS);
+    return 0;
 }
 
 /**
@@ -625,15 +662,29 @@ static void start_advertising(void)
  * 在地址准备好后推断地址类型并启动首次广播。
  * 无参数。
  * 返回值：无。
- * 特殊行为：若地址准备失败只记录错误，不会自动重试。
+ * 特殊行为：若地址准备或广播启动失败则自动停止BLE，触发主逻辑重试。
  */
 static void on_sync(void)
 {
     int rc = ble_hs_util_ensure_addr(0);
-    if (rc != 0) { ESP_LOGE(TAG, "ensure_addr 失败 rc=%d", rc); return; }
+    if (rc != 0) {
+        mark_start_failed("ensure_addr 失败", rc);
+        return;
+    }
     rc = ble_hs_id_infer_auto(0, &g_own_addr_type);
-    if (rc != 0) { ESP_LOGE(TAG, "infer addr type 失败 rc=%d", rc); return; }
-    start_advertising();
+    if (rc != 0) {
+        mark_start_failed("infer addr type 失败", rc);
+        return;
+    }
+    rc = start_advertising();
+    if (rc != 0) {
+        mark_start_failed("启动广播失败", rc);
+        return;
+    }
+    // 广播成功启动后才标记为就绪状态
+    g_ready = true;
+    g_start_failed = false;
+    ESP_LOGI(TAG, "BLE 就绪，五服务 CPS+HRS+CSC+FTMS+DIS 设备名=%s", g_device_name);
 }
 
 /**
@@ -733,6 +784,7 @@ int ble_bikepower_conn_count(void)
 esp_err_t ble_bikepower_start(void)
 {
     g_stopping = false;
+    g_start_failed = false;
     if (!g_notify_lock) {
         g_notify_lock = xSemaphoreCreateMutex();
         if (!g_notify_lock) {
@@ -788,8 +840,7 @@ esp_err_t ble_bikepower_start(void)
 
     nimble_port_freertos_init(ble_host_task);
 
-    g_ready = true;
-    ESP_LOGI(TAG, "蓝牙功率计已启动 五服务 CPS+HRS+CSC+FTMS+DIS 设备名=%s", g_device_name);
+    ESP_LOGI(TAG, "BLE host 已启动，等待协议栈同步...");
     return ESP_OK;
 }
 
@@ -802,6 +853,11 @@ esp_err_t ble_bikepower_start(void)
 bool ble_bikepower_is_ready(void)
 {
     return g_ready;
+}
+
+bool ble_bikepower_start_failed(void)
+{
+    return g_start_failed;
 }
 
 /**
@@ -838,6 +894,7 @@ bool ble_bikepower_stop(void)
     }
     g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
     g_ready = false;
+    g_start_failed = false;
 
     if (g_notify_lock) xSemaphoreGive(g_notify_lock);
     return released;

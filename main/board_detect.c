@@ -43,13 +43,22 @@ board_type_t board_detect(void)
         .pull_down_en = GPIO_PULLDOWN_ENABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
-    gpio_config(&io);
+    esp_err_t ret = gpio_config(&io);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "板型检测GPIO配置失败 ret=%d，默认使用通用板", ret);
+        s_board = BOARD_GENERIC_C3;
+        ESP_LOGI(TAG, "自动检测板型：%s（GPIO配置失败fallback）", s_board_desc[s_board].name);
+        return s_board;
+    }
 
     vTaskDelay(pdMS_TO_TICKS(1));
 
     int level = gpio_get_level(BTN_PIN_M5STAMP);
 
-    gpio_reset_pin(BTN_PIN_M5STAMP);
+    ret = gpio_reset_pin(BTN_PIN_M5STAMP);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "板型检测GPIO复位失败 ret=%d", ret);
+    }
 
     s_board = (level == 1) ? BOARD_M5STAMP_C3 : BOARD_GENERIC_C3;
     ESP_LOGI(TAG, "自动检测板型：%s（GPIO3=%d）", s_board_desc[s_board].name, level);

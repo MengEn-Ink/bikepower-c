@@ -30,21 +30,27 @@ static const char *TAG = "APP";
 
 static power_engine_t s_engine;
 static QueueHandle_t s_app_queue;
+// ERG目标单独缓存：最新目标优先，不占用事件队列，避免队列满误报Invalid Param
+static volatile int s_pending_erg_target = 0;
+static volatile bool s_has_pending_erg = false;
 
 /**
  * 处理 FTMS 控制点下发的 ERG 目标功率。
- * 先做范围校验，再投递到应用事件队列由主循环串行处理。
+ * 先做范围校验，缓存最新目标由主循环串行处理，不进事件队列。
  * target_power：目标功率，单位瓦特（signed 16-bit）。
- * 返回值：true 表示参数合法且已入队，false 表示范围无效或队列满。
- * 特殊行为：运行在 NimBLE host 任务上下文，只做轻量校验和入队，不直接改引擎状态。
+ * 返回值：true 表示参数合法已接收，false 表示范围无效。
+ * 特殊行为：运行在 NimBLE host 任务上下文，只做轻量校验和缓存，不直接改引擎状态；永远使用最新目标，旧目标自动覆盖。
  */
 static bool on_erg_target(int target_power)
 {
     // 范围校验：与领域层 POWER_MIN/POWER_MAX 一致
     if (target_power < POWER_MIN || target_power > POWER_MAX) return false;
-    app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = target_power };
-    if (!s_app_queue) return false;
-    return xQueueSend(s_app_queue, &e, 0) == pdTRUE;
+    // 关中断保护写入，与主循环读取+清标志互斥，避免新目标被覆盖丢失（单核C3关中断足够）
+    portDISABLE_INTERRUPTS();
+    s_pending_erg_target = target_power;
+    s_has_pending_erg = true;
+    portENABLE_INTERRUPTS();
+    return true;
 }
 
 /**
@@ -127,6 +133,20 @@ void app_main(void)
         while (xQueueReceive(s_app_queue, &e, 0) == pdTRUE) {
             app_state_handle_event(&e);
         }
+        // 处理待处理的ERG目标：关中断原子复制目标+清标志，避免竞态丢新目标（单核C3足够）
+        int erg_target = 0;
+        bool has_erg = false;
+        portDISABLE_INTERRUPTS();
+        if (s_has_pending_erg) {
+            erg_target = s_pending_erg_target;
+            has_erg = true;
+            s_has_pending_erg = false;
+        }
+        portENABLE_INTERRUPTS();
+        if (has_erg) {
+            app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = erg_target };
+            app_state_handle_event(&e);
+        }
 
         // WiFi 配网模式：BLE 已停用，主循环只喂狗等待重启恢复
         if (app_state_get() == ST_WIFI_CONFIG) {
@@ -139,6 +159,11 @@ void app_main(void)
         if (!ble_bikepower_is_ready()) {
             if (++ble_retry_tick >= BLE_RETRY_TICKS) {
                 ble_retry_tick = 0;
+                // 如果是启动过程中异步失败，先清理资源再重试
+                if (ble_bikepower_start_failed()) {
+                    ESP_LOGW(TAG, "BLE 启动失败，清理资源后重试");
+                    ble_bikepower_stop();
+                }
                 ESP_LOGW(TAG, "重试 BLE 启动...");
                 esp_err_t r = ble_bikepower_start();
                 if (r == ESP_OK) {

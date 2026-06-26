@@ -5,9 +5,12 @@
 → 订阅 CPS/HR/CSC/FTMS 通知。
 再通过 FTMS 控制点(0x2AD9)下发 RequestControl + SetTargetPower(ERG)，
 校验控制点 indication 响应，并确认 CPS 功率收敛到目标值附近。
-用法: python tests/ble_selftest.py [秒数] [目标功率]
+用法: python tests/ble_selftest.py [秒数] [目标功率] [期望固件版本]
+  期望固件版本省略时自动从 main/bikepower_config.h 的 FIRMWARE_VERSION 解析。
 """
 import asyncio
+import os
+import re
 import struct
 import sys
 
@@ -23,14 +26,28 @@ DIS_MANUF_UUID = "00002a29-0000-1000-8000-00805f9b34fb"
 DIS_MODEL_UUID = "00002a24-0000-1000-8000-00805f9b34fb"
 DIS_FW_UUID = "00002a26-0000-1000-8000-00805f9b34fb"
 
-DIS_EXPECT = {
-    DIS_MANUF_UUID: ("厂商", "BikePower"),
-    DIS_MODEL_UUID: ("型号", "ESP32-C3"),
-    DIS_FW_UUID: ("固件", "3.1.1"),
-}
+def get_expected_fw_version():
+    """从bikepower_config.h自动解析固件版本，保持单一事实源"""
+    config_path = os.path.join(os.path.dirname(__file__), "..", "main", "bikepower_config.h")
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        match = re.search(r'#define\s+FIRMWARE_VERSION\s+"([^"]+)"', content)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return "3.1.1"  # fallback默认值
 
 DURATION = int(sys.argv[1]) if len(sys.argv) > 1 else 8
 TARGET_POWER = int(sys.argv[2]) if len(sys.argv) > 2 else 200
+EXPECTED_FW_VERSION = sys.argv[3] if len(sys.argv) > 3 else get_expected_fw_version()
+
+DIS_EXPECT = {
+    DIS_MANUF_UUID: ("厂商", "BikePower"),
+    DIS_MODEL_UUID: ("型号", "ESP32-C3"),
+    DIS_FW_UUID: ("固件", EXPECTED_FW_VERSION),
+}
 
 OP_REQUEST_CONTROL = 0x00
 OP_SET_TARGET_POWER = 0x05

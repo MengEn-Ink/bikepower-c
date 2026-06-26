@@ -669,6 +669,9 @@ static esp_err_t h_config(httpd_req_t *req)
         return ESP_OK;
     }
 
+    // 开始处理配置提交前先续期超时窗口，避免处理过程中（读请求体/写NVS/发响应）被超时重启
+    arm_deadline();
+
     char *body = NULL;
     int len = recv_body(req, &body);
     if (len == -2) {
@@ -692,18 +695,19 @@ static esp_err_t h_config(httpd_req_t *req)
         ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d name=%s",
                  s_engine->base_power, s_engine->cadence_base,
                  (int)s_engine->mode, s_engine->device_name);
+        // 保存成功后先设置 5s 重启窗口，再发成功页，避免响应发送期间被超时打断
+        s_rebooting = true;
+        s_deadline_sec = now_sec() + 5;
+        send_success(req);
     } else {
         ESP_LOGE(TAG, "配置保存失败，回滚配置");
         memcpy(s_engine, &saved, sizeof(power_engine_t));
+        // 保存失败后续期完整超时窗口，允许用户重试
+        arm_deadline();
         send_save_error(req);
         return ESP_FAIL;
     }
 
-    send_success(req);
-
-    // 成功页展示约 5 秒后重启，给用户留出看到结果和切回骑行 App 的时间。
-    s_rebooting = true;
-    s_deadline_sec = now_sec() + 5;
     return ESP_OK;
 }
 

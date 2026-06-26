@@ -218,6 +218,12 @@ static void test_setters_edge(void)
     CHECK(e.has_user_hr && e.user_heartrate == 160, "has_user_hr置位且值=160");
     power_engine_set_mode(&e, RIDE_MODE_ROAD);
     CHECK(power_engine_set_heartrate(&e, 150) == false, "非steady心率拒绝");
+    // 持久化恢复场景：先设置心率再切非STEADY模式，字段保留不丢失，切回STEADY可直接使用
+    CHECK(e.has_user_hr && e.user_heartrate == 160, "切到ROAD后固定心率字段保留");
+    power_engine_set_mode(&e, RIDE_MODE_ERG);
+    CHECK(e.has_user_hr && e.user_heartrate == 160, "切到ERG后固定心率字段保留");
+    power_engine_set_mode(&e, RIDE_MODE_STEADY);
+    CHECK(e.has_user_hr && e.user_heartrate == 160, "切回STEADY后固定心率字段保留，可直接使用");
 }
 
 static void test_hr_variation_steady(void)
