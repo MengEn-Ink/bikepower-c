@@ -8,6 +8,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 /*
  * 心率模型内部状态。
@@ -18,7 +19,7 @@ typedef struct {
     float hr_float;
     bool  hr_float_init;
     // HRV 状态
-    int   hrv_tick;
+    uint32_t hrv_tick;   // 50ms 步进计数；无符号回绕数学上等价 2^32 个 tick 后相位整周回到 0
     int   hrv_sec_counter;
     float drift_bpm;
     float hrv_cached;
