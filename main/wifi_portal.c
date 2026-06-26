@@ -210,11 +210,14 @@ static bool form_get_str(const char *body, const char *key, char *out, size_t ou
     p += strlen(pat);
     const char *end = strchr(p, '&');
     size_t len = end ? (size_t)(end - p) : strlen(p);
-    char raw[128];
-    if (len >= sizeof(raw)) len = sizeof(raw) - 1;
+    // 按字段实际长度动态分配中转缓冲，避免固定栈缓冲把长字段（如多字节 UTF-8 设备名）
+    // 在 url_decode 之前就静默截断。解码后写入 out 仍受调用方 out_sz 约束。
+    char *raw = malloc(len + 1);
+    if (!raw) return false;
     memcpy(raw, p, len);
     raw[len] = '\0';
     url_decode(raw, out, out_sz);
+    free(raw);
     return true;
 }
 
@@ -716,6 +719,14 @@ static esp_err_t h_config(httpd_req_t *req)
  */
 static esp_err_t h_draft(httpd_req_t *req)
 {
+    // 配置已提交并计划重启时，拒绝再修改内存配置：否则会覆盖刚写入 NVS 的快照，
+    // 导致重启后 BLE 生效值与成功页展示的"已保存"值不一致。直接引导到成功页。
+    if (s_rebooting) {
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", "/success");
+        httpd_resp_send(req, NULL, 0);
+        return ESP_OK;
+    }
     arm_deadline();
     char *body = NULL;
     int len = recv_body(req, &body);
