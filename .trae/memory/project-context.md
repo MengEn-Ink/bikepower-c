@@ -33,7 +33,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 2. **详细变更记录在 CHANGELOG.md**。
 3. **版本号**：SemVer 三位，commit/tag/Release 三者一致。
 4. **分批提交**：按功能分批，不混提。
-5. **每批 commit 后立即 push**（最高优先级）。
+5. **测试无误后自动提交并 push（用户已授权，无需逐次询问）**：相关测试（host 单测 / 编译 / 适用时真机）通过即 commit 并立即 `git push`，无需等待确认。
 6. **提交前 diff 自检**：链路完整、无残留调试、文档已同步。
 7. commit message 末尾附 `Co-authored-by: AI <ai@trae>` + `Model:`。
 
