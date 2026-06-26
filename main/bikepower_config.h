@@ -98,21 +98,11 @@ typedef enum {
 #define WIFI_SHUTDOWN_MS       180000
 #define WIFI_RENEW_MS          180000
 
-// ===== 功率/踏频/心率范围 =====
-#define POWER_MIN             0
-#define POWER_MAX             2000
-#define CADENCE_MIN          20
-#define CADENCE_MAX         120
-#define HR_MIN               60
-#define HR_MAX              200
-
-// ===== 调功步进 =====
-#define POWER_STEP_W         20     // 短按 -20W / 长按连续 +20W
-
-// ===== 默认值 =====
-#define DEFAULT_POWER       260
-#define DEFAULT_CADENCE      90
-#define DEFAULT_HEARTRATE   150
+// ===== 功率/踏频/心率范围、调功步进、默认值 =====
+// 单一事实源：以下领域常量统一在 domain_config.h 定义，本头直接引入避免两处 drift。
+// POWER_MIN/MAX、CADENCE_MIN/MAX、HR_MIN/MAX、POWER_STEP_W、
+// DEFAULT_POWER/CADENCE/HEARTRATE 均来自 domain_config.h。
+#include "domain_config.h"
 
 // ===== 设备信息 =====
 #define DEVICE_NAME          "BikePower"
