@@ -7,7 +7,7 @@
 - **名称**：BikePower C — ESP32-C3 蓝牙功率计模拟器（C 重写版）
 - **运行环境**：ESP-IDF v5.5.4 + NimBLE + FreeRTOS（非 MicroPython）
 - **硬件平台**：合宙 ESP32-C3（RISC-V 单核 160MHz, 400KB SRAM, WiFi+BLE5.0）
-- **目标版本**：v3.1.1
+- **目标版本**：v3.1.2
 - **参考仓库**：git@gitee.com:mengen4jv/bikepower-c.git
 - **构建/烧录**：`idf.py build` / `idf.py -p <port> flash monitor`
 
@@ -111,6 +111,6 @@ power_engine.snapshot → ble_bikepower_set_data → BLE 通知
 ## 发布流程
 - 分支：GitHub Flow（main + feature/hotfix）。
 - 版本号：SemVer `vMAJOR.MINOR.PATCH`，commit/tag/Release 三者一致。
-- 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + 打 tag（当前 v3.1.1）+ DIS 固件版本同步。
+- 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + 打 tag（当前 v3.1.2）+ DIS 固件版本同步。
 - **固件发行产物必须合并为单文件（强制）**：创建发行版时，必须用 `esptool.py merge_bin` 把 bootloader + partition-table + app 合并为单一 `.bin`，用户一次烧录即可，禁止分发分散的多个 bin 文件。
 - Commit message：`<type>(<scope>): <简体中文概述>` + 逐文件正文 + `Co-authored-by: AI <ai@trae>` + `Model:`。

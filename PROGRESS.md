@@ -1,7 +1,7 @@
 # BikePower C — 项目进度
 
 > 基线方案：[docs/05-cidf-nimble-rewrite.md](docs/05-cidf-nimble-rewrite.md)
-> 目标固件版本：v3.1.1（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 目标固件版本：v3.1.2（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 参考仓库：git@gitee.com:mengen4jv/bikepower-c.git
 
 ---
@@ -121,8 +121,8 @@
 
 - [ ] 72h 老化测试：长时间运行无 coredump、无堆持续下降（跑 `tests/stage5_portal_test.py` / `ble_selftest.py` 辅助）
 - [x] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`（已设为 WARN）
-- [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（代码已对齐 v3.1.1，`ble_selftest.py` 已自动校验厂商/型号/固件三字段，真机待跑）
-- [ ] 打 tag v3.1.1 + Gitee Release（老化通过后由人工执行）
+- [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（代码已对齐 v3.1.2，`ble_selftest.py` 已自动校验厂商/型号/固件三字段，真机待跑）
+- [ ] 打 tag v3.1.2 + Gitee Release（老化通过后由人工执行）
 
 ---
 

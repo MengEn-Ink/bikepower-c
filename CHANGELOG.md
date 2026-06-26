@@ -4,32 +4,30 @@
 
 ## [未发布]
 
-### 修复（测试工具）
+## [3.1.2] - 2026-06-26
+
+### 修复
+- 配网页面表单值丢失：用户从首页切换到"更多配置"再返回后，首页显示的功率/踏频/心率/模式恢复为旧值，最终保存到 NVS 的也是错误默认值。根因有二：
+  1. 浏览器缓存了配网首页 HTML，返回时显示缓存版本而非服务端最新状态。修复：首页响应添加 `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`。
+  2. "更多配置"页隐藏表单只包含 `device_name`/`profile_*` 字段，缺少 `mode`/`power`/`cadence`/`heartrate`。用户点"应用并回首页"提交到 `/draft` 时这四项未回传，`apply_form_fields` 无法恢复之前选择的值。修复：补全隐藏字段并新增 `mode_to_id()` 将整数模式映射为表单字符串。
+
+### 改进（规则/记忆）
+- 新增 `WIFI-28`/`WIFI-29` 规则：动态 HTML 必须禁缓存；多页表单每页隐藏字段必须覆盖全部可变字段。
+- 踩坑记忆补充两条 WARNING：浏览器缓存与多页表单隐藏字段完整性。
+
+### 测试报告
+- `idf.py build`：0 error。
+- 真机烧录 + 串口确认：固件 `v3.1.2`，BLE 五服务启动正常。
+- Host 单测：581 通过，0 失败。
+
+### 测试工具（沿用上版）
 - `scripts/tools/quality_gate.py` 过时项修正：
   - 项目路径硬编码 `/Users/bytedance/...` 改为按脚本位置自动推导，跨机器可用。
   - IDF 激活从硬编码 `~/esp/esp-idf-v5.5.4` 改为默认 `/home/mengen1014/work/esp32-power/esp-idf`，并增加 `idf.py --version` 探测，已激活则不重复 source。
   - 子进程由 `/bin/sh` 改为显式 `bash -c`，修复 IDF `export.sh` bash 语法在 dash 下静默失败。
   - 编译判定由文本匹配 `Project build complete` 改为 `rc==0 且输出含 build complete 或 write_flash`，避免 `tail` 截断误判。
   - Host 单测判定增加 `None` 保护，原 `assertions.group(0)` 在输出异常时崩溃。
-  - 必备资产清单同步实际目录：`docs/USER-MANUAL.md` 等旧名修正为 `docs/02-user-manual.md` 等数字前缀名；新增 `main/radio_ctrl.c`、`main/wifi_portal.c`、`tests/*.py` 等关键测试脚本与板型适配源校验。
-
-### 测试报告（真机，HEAD=v3.1.1-52-g4ec6a6c）
-- `quality_gate.py` 自检：29 ✅ / 0 ⚠️ / 0 ❌（工作区 clean）。
-- `idf.py build`：0 error，`bikepower-c.bin` 0x104240 bytes（较 v3.1.1 增 ~5KB，因 schema v5 + BLE 健壮性修复），app 分区 42% free。
-- `idf.py -p /dev/ttyACM0 flash`：写入 1057040 bytes，hash 校验通过，hard reset 成功。
-- 串口启动日志（`tests/serial_capture.py`）：
-  - App 版本 `v3.1.1-52-g4ec6a6c`，板型 `generic-c3（GPIO3=0）`，三任务启动 LED/STATE/BTN，`state=ST_BLE_ACTIVE`。
-  - NVS 配置加载（schema v5 格式）`p=260W c=90RPM mode=0 hr=150(user=0) w=70 ftp=300 thr=190 ride=0`。
-  - BLE 五服务启动 `CPS+HRS+CSC+FTMS+DIS`，设备名 `BikePower`，MAC `14:63:93:f7:48:36`。
-  - BLE host 已启动，等待协议栈同步（新增的健壮性日志）。
-- BLE 自测（`tests/ble_selftest.py`）：通过。
-  - 五服务齐全：CPS/HRS/CSC/FTMS-Bike/FTMS-CP 全部发现。
-  - DIS 设备信息：厂商 `BikePower` / 型号 `ESP32-C3` / 固件 `3.1.1` 三字段匹配。
-  - 通知计数（10s 窗口）：CPS 13 / HR 13 / CSC 13 / FTMS 13。
-  - FTMS 控制点响应：RequestControl `800001` / StartResume `800701` / SetTargetPower(-1) 被拒绝 `800503`（新增参数校验）/ SetTargetPower(200) 成功 `800501`。
-  - ERG 功率收敛：基线 ~262W，下发 SetTargetPower(200W) 后 8s 收敛到 ~203W（目标 200W，误差 3W，容差内）。
-  - 总判定：通过。
-- Host 单测：581 通过，0 失败。
+  - 必备资产清单同步实际目录。
 
 ## [3.1.1] - 2026-06-16
 

@@ -12,7 +12,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 
 - BikePower 从 MicroPython（仓库 esp32-power）**完全重写**为 C + ESP-IDF + NimBLE。
 - 用户授权"全程你来设计开发"，分阶段（0-6）推进，每阶段编译 → 烧录 → 真机验证后提交推送。
-- 项目位置 `/Users/bytedance/work/bikepower-c`，ESP-IDF v5.5.4 本地工具链，目标 v3.1.1。
+- 项目位置 `/home/mengen1014/work/bikepower-c`，ESP-IDF v5.5.4 本地工具链，目标 v3.1.2。
 - MicroPython 专有约束（mpremote/gc/_thread/const/.mpy/部署 .py）**不适用**本项目。
 
 ---
@@ -93,6 +93,8 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 ### WiFi / RF
 - [CRITICAL] [2026-06-12] WiFi 与 BLE 共用射频，必须先停 BLE 再启 WiFi（见 wifi-ble-mutex.md）。
 - [CRITICAL] [2026-06-12] 禁止开机自动启 WiFi，否则无限重启风险。
+- [WARNING] [2026-06-26] 配网页面必须设置 `Cache-Control: no-store`，否则浏览器缓存导致用户从"更多配置"返回首页时显示旧数据，表单值丢失。
+- [WARNING] [2026-06-26] 多页表单的每个页面隐藏表单必须包含全部可变字段（mode/power/cadence/heartrate/profile_*），否则提交到 `/draft` 时丢失未包含的字段值，最终 `/config` 保存到 NVS 的是错误默认值。
 
 ### 中断 / FreeRTOS
 - [CRITICAL] [2026-06-12] ISR 内只用 `*FromISR` API，禁止日志/BLE/阻塞调用。
@@ -101,6 +103,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 ### 工具环境
 - [WARNING] [2026-06-12] macOS 无 `timeout` 命令，串口抓取改用纯 Python 脚本。
 - [CRITICAL] [2026-06-12] heredoc（`python - <<'PY'`）在工具执行环境被注入污染导致 SyntaxError，必须写成脚本文件再运行。
+- [INFO] [2026-06-26] ESP-IDF 本地路径 `/home/mengen1014/work/esp32-power/esp-idf`（非 `~/esp/esp-idf`），source 其 `export.sh` 后才可用 `idf.py`。
 
 ### 编译
 - [WARNING] [2026-06-12] main/CMakeLists.txt 的 REQUIRES 必须包含 `bikepower_domain`，否则领域层链接失败。

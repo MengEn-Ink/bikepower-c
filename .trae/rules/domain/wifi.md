@@ -65,6 +65,8 @@
 - `profile_ride_type`
 - `WIFI-20`：其中 `power`、`cadence`、`heartrate` 仅在 `steady` 模式下应用；其他模式提交时忽略这三项的手动值。
 - `WIFI-21`：新增配置项时，必须同步修改 `bikepower_config.h` 或领域层常量、`wifi_portal.c` 表单解析、自测脚本和技术文档。
+- `WIFI-28`：所有动态 HTML 响应（首页、更多配置页、成功页）必须设置 `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`，防止浏览器缓存导致页面回退时显示旧数据。
+- `WIFI-29`：多页表单中每个提交到 `/draft` 或 `/config` 的页面隐藏表单必须包含 `WIFI-19` 列出的全部可变字段，否则提交时会丢失未包含的字段值。
 
 ## 页面与资源边界
 
