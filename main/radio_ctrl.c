@@ -12,6 +12,7 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_system.h"
+#include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
@@ -124,10 +125,15 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
         return;
     }
 
+    // 本函数在已订阅 TWDT 的 app_main 任务上同步执行，nimble_port_stop 与
+    // WiFi/netif 初始化均为长阻塞步骤，逐段喂狗避免累计耗时超过 WDT_TIMEOUT_MS 触发误复位。
+    esp_task_wdt_reset();
+
     // 给控制器留出释放射频的时间，避免 WiFi init 与 BLE deinit 竞争
     vTaskDelay(pdMS_TO_TICKS(200));
 
     esp_err_t ret = radio_ctrl_start_wifi_ap();
+    esp_task_wdt_reset();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "SoftAP 启动失败 ret=%d，重启恢复 BLE", ret);
         vTaskDelay(pdMS_TO_TICKS(1000));
@@ -136,6 +142,7 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
     }
 
     ret = wifi_portal_start(engine);
+    esp_task_wdt_reset();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "HTTP 配网门户启动失败 ret=%d，重启恢复 BLE", ret);
         vTaskDelay(pdMS_TO_TICKS(1000));
