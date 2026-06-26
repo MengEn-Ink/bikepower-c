@@ -108,7 +108,11 @@ void nvs_store_load(power_engine_t *e)
     get_i32(h, NVS_KEY_THR_HR, &c.thr_hr);
     get_i32(h, NVS_KEY_RIDE_TYPE, &c.ride_type);
     size_t dn_len = sizeof(c.device_name);
-    nvs_get_str(h, NVS_KEY_DEVICE_NAME, c.device_name, &dn_len);
+    esp_err_t dn_err = nvs_get_str(h, NVS_KEY_DEVICE_NAME, c.device_name, &dn_len);
+    if (dn_err != ESP_OK && dn_err != ESP_ERR_NVS_NOT_FOUND) {
+        // 读取失败（如存储项损坏/超长）时保留 defaults 的设备名，并记录原因便于排查。
+        ESP_LOGW(TAG, "读取设备名失败(%s)，保留默认设备名", esp_err_to_name(dn_err));
+    }
     nvs_close(h);
 
     bool migrated = config_store_migrate(&c);

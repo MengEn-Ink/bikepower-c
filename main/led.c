@@ -153,7 +153,10 @@ static void led_task(void *arg)
     int on = 0;
     led_pattern_t last = LED_SLOW;
 
-    esp_task_wdt_add(NULL);
+    esp_err_t wdt_err = esp_task_wdt_add(NULL);
+    if (wdt_err != ESP_OK) {
+        ESP_LOGW(TAG, "TWDT 订阅失败(%s)，LED 任务看门狗保护未生效", esp_err_to_name(wdt_err));
+    }
 
     while (1) {
         led_pattern_t p = s_pattern;

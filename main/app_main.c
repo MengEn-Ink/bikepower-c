@@ -110,7 +110,10 @@ void app_main(void)
     }
 
     // 看门狗：主循环每拍喂狗（idf 默认已为 IDLE 任务注册 TWDT，这里订阅当前任务）
-    esp_task_wdt_add(NULL);
+    esp_err_t wdt_err = esp_task_wdt_add(NULL);
+    if (wdt_err != ESP_OK) {
+        ESP_LOGW(TAG, "TWDT 订阅失败(%s)，主循环看门狗保护未生效", esp_err_to_name(wdt_err));
+    }
 
     int tick = 0;
     int last_conn = 0;
