@@ -89,6 +89,8 @@ static SemaphoreHandle_t g_notify_lock = NULL;
  * 特殊行为：广播字段中只声明 CPS 和 HRS 服务 UUID，以兼容旧版发现行为。
  */
 static void start_advertising(void);
+// 发送单个特征通知（定义在通知模块），FTMS 控制点回调需提前用于推送 Training Status。
+static void notify_one(uint16_t handle, const uint8_t *buf, size_t len);
 
 // ============================ GATT 访问回调 ============================
 
@@ -272,14 +274,17 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
         break;
     case FTMS_OP_START_RESUME:
         g_ftms_status_buf[0] = 0x01;
+        notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
         ftms_send_response(FTMS_OP_START_RESUME, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_STOP_PAUSE:
         g_ftms_status_buf[0] = 0x02;
+        notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
         ftms_send_response(FTMS_OP_STOP_PAUSE, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_RESET:
         g_ftms_status_buf[0] = 0x00;
+        notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
         ftms_send_response(FTMS_OP_RESET, FTMS_RESULT_SUCCESS);
         break;
     default:
