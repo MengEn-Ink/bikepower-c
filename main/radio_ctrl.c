@@ -120,7 +120,7 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
         // BLE 未能释放射频，继续启 WiFi 会违反单路 RF 互斥约束。
         // 直接重启由开机流程干净地恢复 BLE，避免 WiFi/BLE 同时占用射频。
         ESP_LOGE(TAG, "BLE 停用失败 射频未释放，重启恢复 BLE");
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(RADIO_RESTART_DELAY_MS));
         esp_restart();
         return;
     }
@@ -130,13 +130,13 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
     esp_task_wdt_reset();
 
     // 给控制器留出释放射频的时间，避免 WiFi init 与 BLE deinit 竞争
-    vTaskDelay(pdMS_TO_TICKS(200));
+    vTaskDelay(pdMS_TO_TICKS(RADIO_BLE_RELEASE_WAIT_MS));
 
     esp_err_t ret = radio_ctrl_start_wifi_ap();
     esp_task_wdt_reset();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "SoftAP 启动失败 ret=%d，重启恢复 BLE", ret);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(RADIO_RESTART_DELAY_MS));
         esp_restart();
         return;
     }
@@ -145,7 +145,7 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
     esp_task_wdt_reset();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "HTTP 配网门户启动失败 ret=%d，重启恢复 BLE", ret);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(RADIO_RESTART_DELAY_MS));
         esp_restart();
         return;
     }

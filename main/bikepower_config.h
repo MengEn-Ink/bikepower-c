@@ -76,20 +76,39 @@ typedef enum {
 #define BLE_ADVERTISING_INTERVAL_MS  500    // 广播间隔
 #define BLE_NOTIFY_INTERVAL_MS       1000   // 通知间隔
 #define BLE_RETRY_TICKS              100    // BLE 启动失败重试节拍数（每拍50ms → 5s）
+#define BLE_NOTIFY_LOCK_WAIT_MS      10     // 通知互斥锁短等待上限：锁持有为微秒级，避免阻塞 NimBLE 任务
 // 广播包名字 AD 字段最大字符数。31 字节预算 - flags(3) - 完整16位UUID列表(6) = 22 字节给名字 AD，
 // 减去 AD 头(2) 得 20 个字符；超出部分完整名走 scan response。
 #define BLE_ADV_NAME_MAX_LEN         20
+
+// ===== FTMS 控制点 OpCode（协议码，0x2AD9 写入/响应） =====
+#define FTMS_OP_REQUEST_CONTROL   0x00
+#define FTMS_OP_RESET             0x01
+#define FTMS_OP_SET_TARGET_POWER  0x05
+#define FTMS_OP_START_RESUME      0x07
+#define FTMS_OP_STOP_PAUSE        0x08
+#define FTMS_OP_RESPONSE_CODE     0x80
+// ===== FTMS 控制点 Result Code（响应结果） =====
+#define FTMS_RESULT_SUCCESS       0x01
+#define FTMS_RESULT_NOT_SUPPORTED 0x02
+#define FTMS_RESULT_INVALID_PARAM 0x03
+
+// ===== 应用事件队列 =====
+#define APP_EVENT_QUEUE_LEN          16     // app_main 事件队列深度
 
 // ===== 按钮时间阈值（毫秒） =====
 #define SHORT_PRESS_MS         500
 #define WIFI_BTN_HOLD_MS       2000
 #define CONFIRM_WINDOW_MS      3000
 #define BTN_AUTO_REPEAT_MS     200
+#define BTN_POLL_MS            20     // 按下保持期间的轮询间隔
+#define BTN_DEBOUNCE_MS        30     // 边沿去抖时间
 
 // ===== LED 闪烁间隔（毫秒） =====
 #define LED_BLINK_SLOW_MS      1000
 #define LED_BLINK_FAST_MS      200
 #define LED_BLINK_WIFI_MS      3000
+#define LED_TICK_MS            20     // LED 任务节拍，累加判断闪烁相位
 
 // ===== WiFi AP 热点 =====
 #define WIFI_SSID              "BikePower"
@@ -98,6 +117,11 @@ typedef enum {
 #define WIFI_PORT              80
 #define WIFI_SHUTDOWN_MS       180000
 #define WIFI_RENEW_MS          180000
+#define WIFI_PORTAL_CHECK_INTERVAL_US  1000000  // 配网门户超时检查周期（每秒）
+
+// ===== 射频软切换（radio_ctrl，毫秒） =====
+#define RADIO_BLE_RELEASE_WAIT_MS  200   // 停 BLE 后留给控制器释放射频的时间
+#define RADIO_RESTART_DELAY_MS     1000  // 失败兜底 esp_restart 前的等待
 
 // ===== 功率/踏频/心率范围、调功步进、默认值 =====
 // 单一事实源：以下领域常量统一在 domain_config.h 定义，本头直接引入避免两处 drift。

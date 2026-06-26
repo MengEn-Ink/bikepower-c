@@ -16,8 +16,6 @@
 
 static const char *TAG = "LED";
 
-#define LED_TICK_MS 20
-
 static volatile led_pattern_t s_pattern = LED_SLOW;
 static led_drv_t s_led_drv;
 

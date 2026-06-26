@@ -22,9 +22,6 @@
 
 static const char *TAG = "BTN";
 
-#define BTN_POLL_MS     20
-#define BTN_DEBOUNCE_MS 30
-
 static QueueHandle_t s_app_queue;
 static SemaphoreHandle_t s_wake;
 static int s_btn_pin;

@@ -28,17 +28,6 @@
 
 static const char *TAG = "BLE";
 
-// ---- FTMS 控制点 OpCode ----
-#define FTMS_OP_REQUEST_CONTROL   0x00
-#define FTMS_OP_RESET             0x01
-#define FTMS_OP_SET_TARGET_POWER  0x05
-#define FTMS_OP_START_RESUME      0x07
-#define FTMS_OP_STOP_PAUSE        0x08
-#define FTMS_OP_RESPONSE_CODE     0x80
-#define FTMS_RESULT_SUCCESS       0x01
-#define FTMS_RESULT_NOT_SUPPORTED 0x02
-#define FTMS_RESULT_INVALID_PARAM 0x03
-
 static uint8_t  g_own_addr_type;
 // 跨任务访问：host 任务(gap_event_cb/on_reset)写，app_main(conn_count) 与 esp_timer(notify_tick) 读，
 // 加 volatile 防止编译器缓存（C3 上 16 位单次访问原子）。
@@ -504,8 +493,8 @@ static void notify_one_nolock(uint16_t handle, const uint8_t *buf, size_t len)
  */
 static void notify_one(uint16_t handle, const uint8_t *buf, size_t len)
 {
-    // 短等待10ms拿锁：锁持有时间极短（微秒级），不会阻塞NimBLE任务太久，同时保证FTMS关键响应不丢
-    if (!g_notify_lock || xSemaphoreTake(g_notify_lock, pdMS_TO_TICKS(10)) != pdTRUE) return;
+    // 短等待拿锁：锁持有时间极短（微秒级），不会阻塞NimBLE任务太久，同时保证FTMS关键响应不丢
+    if (!g_notify_lock || xSemaphoreTake(g_notify_lock, pdMS_TO_TICKS(BLE_NOTIFY_LOCK_WAIT_MS)) != pdTRUE) return;
     notify_one_nolock(handle, buf, len);
     xSemaphoreGive(g_notify_lock);
 }

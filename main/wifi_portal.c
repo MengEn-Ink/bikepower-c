@@ -1149,7 +1149,7 @@ esp_err_t wifi_portal_start(power_engine_t *engine)
         s_httpd = NULL;
         return ret;
     }
-    ret = esp_timer_start_periodic(s_shutdown_timer, 1000000);  // 每秒检查超时
+    ret = esp_timer_start_periodic(s_shutdown_timer, WIFI_PORTAL_CHECK_INTERVAL_US);  // 每秒检查超时
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_timer_start_periodic 失败 ret=%d", ret);
         esp_timer_delete(s_shutdown_timer);

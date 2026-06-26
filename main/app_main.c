@@ -84,7 +84,7 @@ void app_main(void)
              s_engine.base_power, s_engine.cadence_base,
              s_engine.last_heartrate, s_engine.mode);
 
-    s_app_queue = xQueueCreate(16, sizeof(app_evt_t));
+    s_app_queue = xQueueCreate(APP_EVENT_QUEUE_LEN, sizeof(app_evt_t));
     if (!s_app_queue) {
         ESP_LOGE(TAG, "xQueueCreate 失败，无法继续");
         esp_restart();
