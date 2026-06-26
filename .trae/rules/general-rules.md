@@ -29,22 +29,28 @@ bikepower-c/
 ├── partitions.csv            — 分区表
 ├── sdkconfig.defaults        — 默认配置
 ├── main/
-│   ├── app_main.c            — 入口：任务创建 + 事件循环 + 连接轮询 + WDT
+│   ├── app_main.c            — 入口：任务创建 + 事件循环 + 连接轮询 + WDT + 堆监控
 │   ├── app_state.c/.h        — 7 态状态机（按钮/连接事件 → 调功/确认/配网）
-│   ├── app_events.h          — 事件类型定义（BTN_DOWN/REPEAT/UP/CONN_CHANGED）
-│   ├── button.c/.h           — GPIO9 中断驱动按钮任务
-│   ├── led.c/.h              — GPIO12 LED 任务（四态）
+│   ├── app_events.h          — 事件类型定义（BTN_DOWN/REPEAT/UP/CONN_CHANGED/ERG_TARGET）
+│   ├── button.c/.h           — GPIO 中断驱动按钮任务（引脚由 board_detect 运行时决定）
+│   ├── led.c/.h              — LED 任务（通用板 GPIO12 四态 / M5Stamp SK6812 RGB）
+│   ├── board_detect.c/.h     — 运行时板型检测（通用 ESP32-C3 / M5Stamp C3）
 │   ├── ble_bikepower.c/.h    — NimBLE 五服务 + FTMS ERG
+│   ├── nvs_store.c/.h        — NVS 配置持久化桥接
+│   ├── radio_ctrl.c/.h       — BLE/WiFi 射频软切换（唯一 RF 开关）
+│   ├── wifi_portal.c/.h      — HTTP 配网门户（SoftAP 由 radio_ctrl 启动）
 │   └── bikepower_config.h    — 全局常量（引脚/阈值/UUID/版本）
 ├── components/bikepower_domain/   — 纯 C 领域层（可 host 单测）
 │   ├── power_engine.c        — 功率/踏频数据引擎
 │   ├── hr_model.c            — 心率模型
 │   ├── profile.c            — 用户配置 + 范围校验
+│   ├── config_store.c       — 配置 schema（defaults/validate/migrate）
 │   ├── domain_rng.c         — 随机数
 │   └── include/             — 头文件 + domain_config.h
 ├── tests/
 │   ├── ble_selftest.py       — bleak 五服务 + FTMS ERG 自测
 │   ├── stage3_conn_test.py   — 连接事件驱动状态机验证
+│   ├── stage5_portal_test.py — 配网门户 HTTP 路由自测
 │   └── serial_capture.py     — 串口日志抓取工具
 ├── test/test_domain          — host 单测（领域层）
 ├── docs/05-cidf-nimble-rewrite.md  — 基线重写方案
@@ -55,23 +61,22 @@ bikepower-c/
 │   ├── wifi-ble-mutex.md     — WiFi/BLE 射频互斥（硬约束）
 │   ├── ai-challenge.md       — AI 质疑规则
 │   ├── best-practices.md     — 项目优化审查规则（发版前）
-│   └── workflows/
-│       ├── pre-dev-checklist.md   — 开发前检查清单
-│       └── entropy-governance.md  — Entropy 治理（发版前扫描）
+│   ├── domain/              — BLE / WiFi 领域规则
+│   └── workflows/           — 开发前检查/迭代/治理/测试/设备测试等流程规则
 └── .trae/memory/             — 项目记忆
 ```
 
 ## 模块依赖图
 ```
-        app_main.c (入口/事件循环/WDT)
+        app_main.c (入口/事件循环/WDT/堆监控)
             │
-   ┌────────┼────────┬─────────┬──────────┐
-   │        │        │         │          │
-button.c  led.c  app_state.c  ble_bikepower.c  (阶段4/5: nvs_store/radio_ctrl/wifi_portal)
-   │        │        │         │
+   ┌────────┼────────┬─────────┬──────────┬───────────┐
+   │        │        │         │          │           │
+button.c  led.c  app_state.c  ble_bikepower.c  nvs_store.c  radio_ctrl.c→wifi_portal.c
+   │        │        │         │          (board_detect.c 供 button/led 取引脚)
    └────────┴───→ app_queue (Queue)
                     │
-            components/bikepower_domain (power_engine/hr_model/profile)
+            components/bikepower_domain (power_engine/hr_model/profile/config_store)
 ```
 
 ## 运行时数据流
@@ -86,9 +91,9 @@ power_engine.snapshot → ble_bikepower_set_data → BLE 通知
 ## 模块互斥约束
 | 约束 | 执行者 |
 |------|--------|
-| WiFi/BLE 射频互斥 | radio_ctrl（阶段5）先停 BLE 再启 WiFi |
+| WiFi/BLE 射频互斥 | radio_ctrl 先停 BLE 再启 WiFi |
 | 蓝牙优先 | app_state 长按 → 确认 → wifi_trigger |
-| 配网后重启恢复 BLE | radio_ctrl `esp_restart()`（阶段5） |
+| 配网后重启恢复 BLE | radio_ctrl `esp_restart()` |
 | 无循环依赖 | import/include 链为 DAG |
 
 ## 阶段路线（详见 PROGRESS.md）
@@ -98,13 +103,14 @@ power_engine.snapshot → ble_bikepower_set_data → BLE 通知
 | 1 | BLE CPS 最小闭环 | ✅ |
 | 2 | 领域层 + 五服务 + FTMS ERG | ✅ |
 | 3 | 按钮 + LED + 状态机 | ✅ 代码完成（物理按钮待人工确认） |
-| 4 | 配置持久化 NVS | ⬜ |
-| 5 | WiFi 配网（radio_ctrl + AP + HTTP） | ⬜ |
-| 6 | 稳定性与发版 | ⬜ |
+| 4 | 配置持久化 NVS | ✅ |
+| 5 | WiFi 配网（radio_ctrl + AP + HTTP） | ✅ 代码完成（配网真机流程待人工确认） |
+| 6 | 稳定性与发版（WDT/coredump/老化/tag） | ✅ v3.0.0 已发版 |
+| 7 | M5Stamp C3 适配（板型检测/SK6812/配网页修复） | ✅ v3.1.0 已发版 |
 
 ## 发布流程
 - 分支：GitHub Flow（main + feature/hotfix）。
 - 版本号：SemVer `vMAJOR.MINOR.PATCH`，commit/tag/Release 三者一致。
-- 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + tag v3.0.0 + DIS 固件版本同步。
+- 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + 打 tag（当前 v3.1.1）+ DIS 固件版本同步。
 - **固件发行产物必须合并为单文件（强制）**：创建发行版时，必须用 `esptool.py merge_bin` 把 bootloader + partition-table + app 合并为单一 `.bin`，用户一次烧录即可，禁止分发分散的多个 bin 文件。
 - Commit message：`<type>(<scope>): <简体中文概述>` + 逐文件正文 + `Co-authored-by: AI <ai@trae>` + `Model:`。

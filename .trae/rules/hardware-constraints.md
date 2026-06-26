@@ -16,7 +16,7 @@
 | 区域 | 大小 | 说明 |
 |------|------|------|
 | 片上 SRAM | 400 KB | 无 PSRAM |
-| NimBLE host 启动后空闲堆 | ~200-220 KB（实测基线） | 低于 80KB 需告警 |
+| NimBLE host 启动后空闲堆 | ~200-220 KB（实测基线） | 低于 40KB 告警 / 低于 20KB 严重告警（HEAP_WARN_BYTES / HEAP_CRIT_BYTES） |
 | WiFi AP 启动 | 额外 ~30-40 KB | 配网期间峰值 |
 
 ### Socket / HTTP 限制

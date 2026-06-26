@@ -589,10 +589,12 @@ WiFi 配网链路分布在 `app_state.c`、`radio_ctrl.c`、`wifi_portal.c`。
 执行顺序固定：
 
 1. 打日志 `"进入 WiFi 配网：停用 BLE 释放射频"`
-2. `ble_bikepower_stop()`
+2. `ble_bikepower_stop()`（返回 `bool`）—— 若返回 `false`（射频未释放）立即 `esp_restart()` 兜底恢复 BLE，不继续启 WiFi，杜绝违反单路 RF 互斥
 3. `vTaskDelay(200ms)`
-4. `wifi_portal_start(engine)`
+4. `radio_ctrl_start_wifi_ap()` —— 失败则 `esp_restart()` 恢复 BLE
+5. `wifi_portal_start(engine)` —— 失败则 `esp_restart()` 恢复 BLE
 
+本函数运行在已订阅 TWDT 的 app_main 任务上，在停用 BLE 后、SoftAP 启动后、门户启动后各插入 `esp_task_wdt_reset()` 喂狗，避免长阻塞累计超时触发看门狗误复位。
 这个 200ms 的释放窗口是为了给控制器留出 RF 资源切换时间。
 
 ### 8.2 SoftAP 启动
@@ -650,7 +652,7 @@ SoftAP 关键配置来自 `bikepower_config.h`：
 关键变量：
 
 - `s_shutdown_timer`
-- `s_deadline_us`
+- `s_deadline_sec`（32 位秒级单调时间，避免 64 位变量在 httpd 任务与定时器回调间撕裂误重启）
 - `s_rebooting`
 
 流程为：

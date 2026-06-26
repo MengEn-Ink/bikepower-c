@@ -12,7 +12,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 
 - BikePower 从 MicroPython（仓库 esp32-power）**完全重写**为 C + ESP-IDF + NimBLE。
 - 用户授权"全程你来设计开发"，分阶段（0-6）推进，每阶段编译 → 烧录 → 真机验证后提交推送。
-- 项目位置 `/Users/bytedance/work/bikepower-c`，ESP-IDF v5.5.4 本地工具链，目标 v3.0.0。
+- 项目位置 `/Users/bytedance/work/bikepower-c`，ESP-IDF v5.5.4 本地工具链，目标 v3.1.1。
 - MicroPython 专有约束（mpremote/gc/_thread/const/.mpy/部署 .py）**不适用**本项目。
 
 ---
@@ -63,7 +63,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 | 决策 | 结论 | 日期 |
 |------|------|------|
 | 重写技术栈 | C + ESP-IDF v5.5.4 + NimBLE peripheral | 2026-06-13 |
-| 领域层独立组件 | components/bikepower_domain 可 host 单测（545 断言） | 2026-06-12 |
+| 领域层独立组件 | components/bikepower_domain 可 host 单测（test/test_domain，断言数随用例增长） | 2026-06-12 |
 | BLE 五服务 | CPS+HRS+CSC+FTMS+DIS，FTMS 控制点 ERG（RequestControl/StartResume/SetTargetPower） | 2026-06-12 |
 | 按钮中断驱动 | ISR 仅 `xSemaphoreGiveFromISR`，去抖/计时在 button_task | 2026-06-12 |
 | 事件总线 | app_queue（Queue）+ button wake（二值信号量） | 2026-06-12 |
