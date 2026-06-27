@@ -4,6 +4,13 @@
 
 ## [未发布]
 
+### 改进（ESP-IDF 升级）
+- ESP-IDF v5.5.1 → v5.5.4：phy_version 1201→1232，BT controller 2edb0b0→b7de11e，工具链 esp-14.2.0_20241119→esp-14.2.0_20260121。固件体积 +2.8KB（0xf7350→0xf7e60），编译/真机验证通过。
+- 配网启动/停止路径加堆内存诊断日志（`wifi_portal.c`/`radio_ctrl.c`），便于内存监控。
+
+### 改进（文档）
+- 新增 `docs/memory-and-feature-assessment.md`：各场景内存实测、满负载分析、OTA/Captive Portal/FTMS 扩展可行性评估与规划建议。
+
 ## [3.1.3] - 2026-06-27
 
 ### 改进（WiFi/BLE 共存配网，设备不重启）
