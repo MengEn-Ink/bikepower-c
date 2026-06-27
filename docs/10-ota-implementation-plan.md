@@ -2,7 +2,7 @@
 
 > 固件版本：v3.1.4（规划）
 > 硬件：ESP32-C3，4MB Flash
-> 关联文档：[内存与新功能评估](memory-and-feature-assessment.md)、[04-技术参考](04-technical-reference.md)
+> 关联文档：[内存与新功能评估](09-memory-and-feature-assessment.md)、[04-技术参考](04-technical-reference.md)
 
 ---
 

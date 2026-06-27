@@ -162,7 +162,7 @@
 | 探测端点路由 | [main/wifi_portal.c](main/wifi_portal.c) | 注册 10 个 OS 探测端点（/generate_204、/hotspot-detect.html、/ncsi.txt 等），统一 302 重定向到首页 |
 | 4MB OTA 分区表 | [partitions.csv](partitions.csv) | ota_0/ota_1 互切（各 1.75MB）+ otadata，无 factory；固件 1017KB，每分区 45% 空闲 |
 | OTA 回滚支持 | [sdkconfig.defaults](sdkconfig.defaults) | CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y，新固件 PENDING_VERIFY 自检通过才确认 |
-| OTA 落地方案 | [docs/ota-implementation-plan.md](docs/ota-implementation-plan.md) | 详细方案：配网页 multipart 上传 + 流式 esp_ota_write + 10s 自检回滚 + 防降级 |
+| OTA 落地方案 | [docs/10-ota-implementation-plan.md](docs/10-ota-implementation-plan.md) | 详细方案：配网页 multipart 上传 + 流式 esp_ota_write + 10s 自检回滚 + 防降级 |
 
 ### 覆盖的 OS 探测端点
 
@@ -185,7 +185,7 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 
 ### OTA 后续实施（v3.2.0 规划）
 
-详见 [docs/ota-implementation-plan.md](docs/ota-implementation-plan.md)，核心步骤：
+详见 [docs/10-ota-implementation-plan.md](docs/10-ota-implementation-plan.md)，核心步骤：
 1. 新建 ota_update 模块（multipart 流式接收 + esp_ota_begin/write/end）
 2. 配网页"更多配置"加固件升级入口
 3. app_main 集成 PENDING_VERIFY 自检（BLE 起来 + 10s 无 abort → mark_valid）

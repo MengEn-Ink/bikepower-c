@@ -19,8 +19,10 @@
 | [重写方案](05-cidf-nimble-rewrite.md) | 从 MicroPython 到 C 的分阶段重写路线图 |
 | [MicroPython vs C 对比](06-micropython-vs-c-comparison.md) | 两种技术栈的性能/内存/复杂度对比 |
 | [固件防提取/防反编译](07-firmware-security.md) | 编译层加固（已实现）+ Flash 加密/Secure Boot 方案与选型 |
-| [内存与新功能评估](memory-and-feature-assessment.md) | v3.1.3/v5.5.4 各场景内存实测、满负载分析、OTA/Captive Portal/FTMS 扩展可行性 |
-| [OTA 与 Captive Portal 落地方案](ota-implementation-plan.md) | Captive Portal 实施总结 + OTA 详细方案（分区表/上传协议/回滚自检/防降级/实施清单） |
+| [内存与新功能评估](09-memory-and-feature-assessment.md) | v3.1.3/v5.5.4 各场景内存实测、满负载分析、OTA/Captive Portal/FTMS 扩展可行性 |
+| [OTA 与 Captive Portal 落地方案](10-ota-implementation-plan.md) | Captive Portal 实施总结 + OTA 详细方案（分区表/上传协议/回滚自检/防降级/实施清单） |
+| [OTA 固件升级操作手册](11-ota-user-guide.md) | 面向测试/客户的 OTA 升级操作指南（配网/上传/升级步骤/常见问题排查） |
+| [v3.1.6 迭代规划](12-roadmap-v316.md) | FTMS 扩展（坡度/阻力/范围特征）+ 内存优化（WiFi 残留释放/HTTP 缓冲复用）可行性 |
 
 ## 🤖 AI 助手
 

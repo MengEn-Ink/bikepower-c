@@ -30,8 +30,8 @@
 - `OTA_TEST_AUTO_CONFIG` 改为 CMake option（默认 OFF）：正式发版编译不带，测试编译传 `-DOTA_TEST_AUTO_CONFIG=ON` 启用启动自动配网，支持 OTA 全流程自动化测试（升级+降级保护+版本确认），正式固件行为不受影响。
 
 ### 改进（文档）
-- 新增 `docs/memory-and-feature-assessment.md`：各场景内存实测、满负载分析、OTA/Captive Portal/FTMS 扩展可行性评估与规划建议。
-- 新增 `docs/ota-implementation-plan.md`：OTA 升级与 Captive Portal 落地方案，含分区表设计、multipart 上传协议、状态机扩展、回滚自检、防降级、实施步骤清单。
+- 新增 `docs/09-memory-and-feature-assessment.md`：各场景内存实测、满负载分析、OTA/Captive Portal/FTMS 扩展可行性评估与规划建议。
+- 新增 `docs/10-ota-implementation-plan.md`：OTA 升级与 Captive Portal 落地方案，含分区表设计、multipart 上传协议、状态机扩展、回滚自检、防降级、实施步骤清单。
 
 ## [3.1.3] - 2026-06-27
 

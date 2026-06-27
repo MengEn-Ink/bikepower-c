@@ -20,6 +20,22 @@
 6. **按功能分批提交**：不相关变更不混进同一 commit。
 7. **commit 后立即 push**（最高优先级）。
 
+## 文档命名规范（强制）
+
+`docs/` 目录下所有 Markdown 文档必须使用 `NN-kebab-case.md` 格式排序命名：
+
+| 规则 | 说明 |
+|------|------|
+| 格式 `NN-名称.md` | NN 为两位数字前缀（01-99），决定文档排列顺序 |
+| kebab-case | 名称用小写+连字符（如 `ota-user-guide`） |
+| 编号连续递增 | 新增文档取当前最大编号 +1，不跳号、不复用已删除编号 |
+| 例外：`INDEX.md` | 索引文件不加编号，始终排在文件列表最后 |
+| 例外：`images/` 子目录 | 图片资源不编号 |
+| 重命名同步 | 重命名文档时必须同步更新 INDEX.md 及所有交叉引用 |
+| 禁止无编号文档 | 禁止在 docs/ 放无编号的 .md（INDEX.md 除外） |
+
+当前编号分配见 [docs/INDEX.md](../../docs/INDEX.md)。
+
 ## 文件结构
 ```
 bikepower-c/
@@ -53,9 +69,25 @@ bikepower-c/
 │   ├── ble_selftest.py       — bleak 五服务 + FTMS ERG 自测
 │   ├── stage3_conn_test.py   — 连接事件驱动状态机验证
 │   ├── stage5_portal_test.py — 配网门户 HTTP 路由自测
-│   └── serial_capture.py     — 串口日志抓取工具
+│   ├── ota_upload_test.py    — OTA 固件上传单步测试
+│   ├── ota_full_test.sh      — OTA 全流程自动测试（升级+降级+版本确认）
+│   ├── serial_capture.py     — 串口日志抓取工具
+│   └── README.md             — 测试脚本使用说明
 ├── test/test_domain          — host 单测（领域层）
-├── docs/05-cidf-nimble-rewrite.md  — 基线重写方案
+├── docs/                     — 文档（NN-kebab-case.md 编号排序，见文档命名规范）
+│   ├── 01-quickstart.md      — 快速上手
+│   ├── 02-user-manual.md     — 用户手册
+│   ├── 03-hardware.md        — 硬件指南
+│   ├── 04-technical-reference.md — 技术参考
+│   ├── 05-cidf-nimble-rewrite.md — 基线重写方案
+│   ├── 06-micropython-vs-c-comparison.md — 技术栈对比
+│   ├── 07-firmware-security.md — 固件安全
+│   ├── 08-review-checklist.md — 审查清单
+│   ├── 09-memory-and-feature-assessment.md — 内存与新功能评估
+│   ├── 10-ota-implementation-plan.md — OTA 落地方案
+│   ├── 11-ota-user-guide.md  — OTA 操作手册
+│   ├── 12-roadmap-v316.md    — v3.1.6 迭代规划
+│   └── INDEX.md              — 文档索引
 ├── .trae/rules/            — AI 规则（C/ESP-IDF 版）
 │   ├── general-rules.md      — 项目结构 + 模块边界 + 提交/发版规则
 │   ├── coding-style.md       — C/ESP-IDF 代码风格 + FreeRTOS 约束
