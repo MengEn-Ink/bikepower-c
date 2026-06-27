@@ -380,6 +380,7 @@ static void send_end(httpd_req_t *req)
  */
 static esp_err_t h_home(httpd_req_t *req)
 {
+    ESP_LOGI(TAG, "首页请求到达 堆=%lu", (unsigned long)esp_get_free_heap_size());
     // 已进入关 WiFi 收尾流程：此时刷新首页会续期 deadline 破坏收尾，引导到成功页
     if (s_closing) {
         httpd_resp_set_status(req, "302 Found");
@@ -1262,6 +1263,7 @@ esp_err_t wifi_portal_start(power_engine_t *engine)
     s_engine = engine;
     s_closing = false;
     s_done_called = false;
+    ESP_LOGI(TAG, "配网启动前 堆=%lu", (unsigned long)esp_get_free_heap_size());
 
     esp_err_t ret = start_httpd();
     if (ret != ESP_OK) {
@@ -1319,7 +1321,7 @@ void wifi_portal_stop(void)
     }
     s_closing = false;
     s_done_called = false;
-    ESP_LOGI(TAG, "HTTP 配网门户已停止");
+    ESP_LOGI(TAG, "HTTP 配网门户已停止 堆=%lu", (unsigned long)esp_get_free_heap_size());
 }
 
 /**

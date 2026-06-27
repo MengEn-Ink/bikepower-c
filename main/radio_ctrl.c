@@ -113,7 +113,7 @@ esp_err_t radio_ctrl_start_wifi_ap(void)
         goto fail;
     }
 
-    ESP_LOGI(TAG, "SoftAP 启动 ssid=%s ip=192.168.4.1（BLE 共存）", WIFI_SSID);
+    ESP_LOGI(TAG, "SoftAP 启动 ssid=%s ip=192.168.4.1（BLE 共存）堆=%lu", WIFI_SSID, (unsigned long)esp_get_free_heap_size());
     return ESP_OK;
 
 fail:
