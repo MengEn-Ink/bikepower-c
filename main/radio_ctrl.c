@@ -7,6 +7,7 @@
  */
 #include "radio_ctrl.h"
 #include "wifi_portal.h"
+#include "captive_portal.h"
 #include "ble_bikepower.h"
 #include "bikepower_config.h"
 #include "esp_log.h"
@@ -186,10 +187,17 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
         }
     }
 
+    // AP 就绪后启动 DNS 劫持，使手机连上 SoftAP 后自动弹出配网页（Captive Portal）
+    esp_err_t dns_ret = captive_portal_start_dns();
+    if (dns_ret != ESP_OK) {
+        ESP_LOGW(TAG, "DNS 劫持启动失败，降级为手动输入 IP 配网");
+    }
+
     ret = wifi_portal_start(engine);
     esp_task_wdt_reset();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "HTTP 配网门户启动失败 ret=%d，关闭 WiFi 回到 BLE", ret);
+        captive_portal_stop_dns();
         radio_ctrl_stop_wifi_ap();
         // wifi_portal_start 失败时已通过 portal_done 投递 APP_EVT_WIFI_DONE，
         // 状态机会调 radio_ctrl_exit_wifi 做幂等清理并回到 ST_BLE_ACTIVE。
@@ -205,7 +213,8 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
  */
 void radio_ctrl_exit_wifi(void)
 {
-    ESP_LOGI(TAG, "退出 WiFi 配网：关闭 HTTP + SoftAP，射频归还 BLE");
+    ESP_LOGI(TAG, "退出 WiFi 配网：关闭 HTTP + DNS + SoftAP，射频归还 BLE");
     wifi_portal_stop();
+    captive_portal_stop_dns();
     radio_ctrl_stop_wifi_ap();
 }

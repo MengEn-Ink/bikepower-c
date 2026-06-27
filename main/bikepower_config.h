@@ -135,7 +135,10 @@ typedef enum {
 #define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 配置保存成功后重启等待时间（秒）
 #define WIFI_MAX_STA_CONN      2        // SoftAP最大连接客户端数
 #define HTTP_MAX_BODY_LEN      4096     // HTTP请求体最大长度（字节）
-#define HTTP_MAX_URI_HANDLERS  14       // HTTP服务器最大URI路由数
+#define HTTP_MAX_URI_HANDLERS  28       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点）
+
+// ===== Captive Portal =====
+#define CAPTIVE_PORTAL_HOST    "192.168.4.1"  // SoftAP 网关 IP，DNS 劫持目标 + 重定向 Location 主机
 
 // ===== 射频软切换（radio_ctrl，毫秒） =====
 #define RADIO_BLE_RELEASE_WAIT_MS  200   // 停 BLE 后留给控制器释放射频的时间
@@ -151,7 +154,7 @@ typedef enum {
 #define DEVICE_NAME          "BikePower"
 #define DEVICE_MANUFACTURER  "BikePower"
 #define DEVICE_MODEL         "ESP32-C3"
-#define FIRMWARE_VERSION     "3.1.3"
+#define FIRMWARE_VERSION     "3.1.5"
 
 // ===== 看门狗 =====
 #define WDT_TIMEOUT_MS       5000

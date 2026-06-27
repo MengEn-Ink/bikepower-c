@@ -21,6 +21,8 @@
  * mode 映射：旧版网页用字符串 steady/road/erg，C 版用整数 0/1/2。
  */
 #include "wifi_portal.h"
+#include "captive_portal.h"
+#include "ota_update.h"
 #include "nvs_store.h"
 #include "ble_bikepower.h"
 #include "bikepower_config.h"
@@ -974,7 +976,7 @@ static void send_more_panel(httpd_req_t *req)
     SEND(req, PANEL_STYLE
         "<style>"
         ".menu-grid{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}"
-        ".menu-btn{display:flex;align-items:center;justify-content:space-between;text-align:left;padding:15px;border:0;border-radius:20px;background:#fff;color:#1d1d1f;font-size:15px;font-weight:800;text-decoration:none;min-height:72px;cursor:pointer;border:1px solid rgba(0,0,0,.06);box-shadow:0 6px 18px rgba(0,0,0,.045)}"
+        ".menu-btn{display:flex;align-items:center;justify-content:space-between;text-align:left;padding:15px;border:0;border-radius:20px;background:#fff;color:#1d1d1f;font-size:15px;font-weight:800;text-decoration:none;min-height:72px;cursor:pointer;border:1px solid rgba(0,0,0,.06);box-shadow:0 6px 18px rgba(0,0,0,.045);box-sizing:border-box;width:100%}"
         ".menu-btn:active{opacity:0.85}"
         ".menu-btn .icon{width:34px;height:34px;border-radius:12px;background:#eef6ff;color:#007aff;display:flex;align-items:center;justify-content:center;font-size:19px;margin-right:10px}"
         ".menu-btn .text{flex:1}.menu-btn .desc{display:block;margin-top:3px;color:#6e6e73;font-size:12px;font-weight:600;line-height:1.35}.menu-btn .arrow{color:#c7c7cc;font-size:22px}"
@@ -982,6 +984,7 @@ static void send_more_panel(httpd_req_t *req)
         "<div class=\"menu-grid\">"
         "<button type=\"button\" class=\"menu-btn\" onclick=\"openMod('profile')\"><span class=\"icon\">&#128100;</span><span class=\"text\">个人信息<span class=\"desc\">体重、FTP、阈值心率</span></span><span class=\"arrow\">&rsaquo;</span></button>"
         "<button type=\"button\" class=\"menu-btn\" onclick=\"openMod('device')\"><span class=\"icon\">&#128241;</span><span class=\"text\">设备名称<span class=\"desc\">修改骑行 App 中看到的蓝牙名称</span></span><span class=\"arrow\">&rsaquo;</span></button>"
+        "<a class=\"menu-btn\" href=\"/ota\"><span class=\"icon\">&#128230;</span><span class=\"text\">固件升级<span class=\"desc\">上传新固件 bin 文件</span></span><span class=\"arrow\">&rsaquo;</span></a>"
         "</div>"
         "<script>panelCleanup=function(){};</script>");
 }
@@ -1111,6 +1114,74 @@ static esp_err_t h_ui_module(httpd_req_t *req)
     return ESP_OK;
 }
 
+// ============================ OTA 升级页 ============================
+
+/**
+ * 处理 OTA 升级页路由。
+ * 显示当前版本、固件选择和上传表单，提交到 /ota/upload。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：续期配网超时；表单 enctype=multipart/form-data。
+ */
+static esp_err_t h_ota(httpd_req_t *req)
+{
+    arm_deadline();
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    SEND(req,
+        "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>固件升级 - BikePower</title><style>"
+        "*{margin:0;padding:0;box-sizing:border-box}"
+        "body{background:#f5f5f7;padding:12px;font-family:-apple-system,sans-serif;color:#1d1d1f}"
+        ".box{max-width:420px;margin:0 auto}"
+        ".hero{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:24px;padding:14px;margin-bottom:12px;box-shadow:0 10px 28px rgba(0,0,0,.06)}"
+        "a.back{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;margin:0 0 12px;color:#fff;background:#007aff;border-radius:18px;text-decoration:none;font-size:15px;font-weight:800}"
+        "h1{font-size:24px;margin:0 0 4px;letter-spacing:-.04em}.sub{font-size:12px;color:#6e6e73;line-height:1.5;margin-bottom:12px}"
+        ".card{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:20px;padding:16px;margin-bottom:12px;box-shadow:0 6px 18px rgba(0,0,0,.045)}"
+        ".card h2{font-size:15px;margin-bottom:8px}.card p{font-size:12px;line-height:1.55;color:#6e6e73;margin-bottom:10px}"
+        ".ver{font-size:13px;color:#007aff;font-weight:800;margin-bottom:12px}"
+        ".file-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}"
+        "input[type=file]{flex:1;padding:10px;border:1px solid rgba(0,0,0,.08);border-radius:14px;background:#f5f5f7;font-size:14px}"
+        ".btn{display:block;width:100%;padding:14px;border:0;border-radius:18px;background:#1d1d1f;color:#fff;font-size:15px;font-weight:800}"
+        ".btn:active{opacity:.7}.btn:disabled{opacity:.4}"
+        ".warn{margin-top:10px;font-size:12px;color:#856404;background:#fff3cd;border:1px solid #ffeaa7;border-radius:14px;padding:10px;line-height:1.5}"
+        "#prog{display:none;margin-top:12px}.bar{height:8px;background:#e8e8ed;border-radius:4px;overflow:hidden}.bar>i{display:block;height:100%;width:0;background:#007aff;transition:width .2s}"
+        "#msg{margin-top:8px;font-size:12px;color:#6e6e73}"
+        "</style></head><body><div class=\"box\">"
+        "<div class=\"hero\"><a class=\"back\" href=\"/more\">&larr; 返回更多配置</a><h1>固件升级</h1>"
+        "<p class=\"sub\">上传 BikePower C 固件 bin 文件，升级后设备自动重启。</p></div>"
+        "<div class=\"card\">");
+    char vbuf[64];
+    snprintf(vbuf, sizeof(vbuf), "<div class=\"ver\">当前版本：v%s</div>", FIRMWARE_VERSION);
+    SEND(req, vbuf);
+    SEND(req,
+        "<form id=\"ota-form\" action=\"/ota/upload\" method=\"POST\" enctype=\"multipart/form-data\">"
+        "<div class=\"file-row\"><input type=\"file\" name=\"firmware\" accept=\".bin\" id=\"fw-file\"></div>"
+        "<button class=\"btn\" type=\"submit\" id=\"fw-btn\" disabled>开始升级</button>"
+        "<div class=\"warn\">升级期间请勿断开电源和 WiFi，否则可能变砖需重新烧录。</div>"
+        "</form>"
+        "<div id=\"prog\"><p style=\"font-size:12px;margin-bottom:6px\">上传中...</p>"
+        "<div class=\"bar\"><i id=\"bar-i\"></i></div><div id=\"msg\"></div></div>"
+        "</div></div>"
+        "<script>"
+        "var f=document.getElementById('fw-file'),b=document.getElementById('fw-btn');"
+        "f.onchange=function(){b.disabled=!f.files.length};"
+        "document.getElementById('ota-form').onsubmit=function(e){"
+        "if(b.disabled)return false;"
+        "b.disabled=true;f.disabled=true;"
+        "document.getElementById('prog').style.display='block';"
+        "document.getElementById('msg').textContent='正在上传...';"
+        "var fd=new FormData(this),xhr=new XMLHttpRequest();"
+        "xhr.upload.onprogress=function(ev){if(ev.lengthComputable){var p=Math.floor(ev.loaded*100/ev.total);document.getElementById('bar-i').style.width=p+'%';document.getElementById('msg').textContent='上传 '+p+'%'}};"
+        "xhr.onload=function(){if(xhr.status===200){document.open();document.write(xhr.responseText);document.close()}"
+        "else{document.getElementById('msg').textContent='上传失败 HTTP '+xhr.status;b.disabled=false;f.disabled=false}};"
+        "xhr.onerror=function(){document.getElementById('msg').textContent='网络错误';b.disabled=false;f.disabled=false};"
+        "xhr.open('POST','/ota/upload');xhr.send(fd);return false};"
+        "</script></body></html>");
+    send_end(req);
+    return ESP_OK;
+}
+
 // ============================ 关闭提示页 ============================
 
 /**
@@ -1229,6 +1300,8 @@ static esp_err_t start_httpd(void)
         { .uri = "/close-wifi", .method = HTTP_POST, .handler = h_close_wifi },
         { .uri = "/success",   .method = HTTP_GET,  .handler = h_success },
         { .uri = "/more",      .method = HTTP_GET,  .handler = h_more },
+        { .uri = "/ota",       .method = HTTP_GET,  .handler = h_ota },
+        { .uri = "/ota/upload", .method = HTTP_POST, .handler = ota_update_handle_upload, .user_ctx = NULL },
         { .uri = "/draft",     .method = HTTP_POST, .handler = h_draft },
         { .uri = "/ui/module", .method = HTTP_GET,  .handler = h_ui_module },
         { .uri = "/closing",   .method = HTTP_GET,  .handler = h_closing },
@@ -1236,6 +1309,17 @@ static esp_err_t start_httpd(void)
         { .uri = "/renew",     .method = HTTP_GET,  .handler = h_renew },
         { .uri = "/mem_stats", .method = HTTP_GET,  .handler = h_mem_stats },
         { .uri = "/favicon.ico", .method = HTTP_GET, .handler = h_favicon },
+        // Captive Portal 探测端点：各 OS 连通性检测，统一 302 重定向到配网首页触发自动弹窗
+        { .uri = "/generate_204",               .method = HTTP_GET, .handler = captive_portal_detect_handler },  // Android/Chrome
+        { .uri = "/gen_204",                    .method = HTTP_GET, .handler = captive_portal_detect_handler },  // Android variant
+        { .uri = "/hotspot-detect.html",        .method = HTTP_GET, .handler = captive_portal_detect_handler },  // iOS/macOS
+        { .uri = "/library/test/success.html",  .method = HTTP_GET, .handler = captive_portal_detect_handler },  // iOS variant
+        { .uri = "/ncsi.txt",                   .method = HTTP_GET, .handler = captive_portal_detect_handler },  // Windows
+        { .uri = "/connecttest.txt",            .method = HTTP_GET, .handler = captive_portal_detect_handler },  // Windows 10+
+        { .uri = "/canonical.html",             .method = HTTP_GET, .handler = captive_portal_detect_handler },  // Firefox
+        { .uri = "/success.txt",                .method = HTTP_GET, .handler = captive_portal_detect_handler },  // Firefox variant
+        { .uri = "/redirect",                   .method = HTTP_GET, .handler = captive_portal_detect_handler },  // 通用
+        { .uri = "/kindle-wifi/wifistub.html",  .method = HTTP_GET, .handler = captive_portal_detect_handler },  // Kindle
     };
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); i++) {
         ret = httpd_register_uri_handler(s_httpd, &routes[i]);

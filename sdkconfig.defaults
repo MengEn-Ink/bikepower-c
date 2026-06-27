@@ -2,9 +2,16 @@
 # 目标芯片
 CONFIG_IDF_TARGET="esp32c3"
 
-# 分区表
+# 分区表（4MB Flash OTA 布局：ota_0/ota_1 互切 + otadata）
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# OTA 应用回滚：新固件首次启动处于 PENDING_VERIFY，
+# 应用自检通过后调 esp_ota_mark_app_valid_cancel_rollback() 确认；
+# 未确认即重启则 bootloader 自动回滚到上一可用分区。
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 
 # BLE：使用 NimBLE，关闭 Bluedroid
 CONFIG_BT_ENABLED=y

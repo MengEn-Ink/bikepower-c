@@ -8,8 +8,10 @@ idf_component_register(
          "nvs_store.c"
          "radio_ctrl.c"
          "wifi_portal.c"
+         "captive_portal.c"
+         "ota_update.c"
     INCLUDE_DIRS "."
     REQUIRES nvs_flash bt esp_timer esp_driver_gpio esp_system
              esp_wifi esp_event esp_netif esp_http_server bikepower_domain
-             esp_driver_rmt
+             esp_driver_rmt app_update
 )
