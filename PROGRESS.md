@@ -19,6 +19,7 @@
 | 6 | 稳定性与发版（WDT/coredump/老化/tag） | ✅ 完成 | v3.0.0 已发版 |
 | 7 | M5Stamp C3 适配（板型检测/SK6812/配网页面修复） | ✅ 完成 | v3.1.0 已发版 |
 | 8 | WiFi/BLE 共存配网（v3.1.3） | ✅ 代码完成（真机待确认） | BLE 全程在线 + 配置实时生效 + 不重启 |
+| 9 | Captive Portal + OTA 实现（v3.1.5） | ✅ 完成 | DNS 劫持自动弹配网页 + 4MB OTA 分区表 + OTA 上传/防降级/自检回滚，真机升级降级测试通过 |
 
 ---
 
@@ -150,8 +151,51 @@
 
 ---
 
+## 阶段9 完成情况（v3.1.4 Captive Portal + OTA 规划）
+
+### 已实现
+
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| Captive Portal | [main/captive_portal.c](main/captive_portal.c) / [main/captive_portal.h](main/captive_portal.h) | 自研轻量 DNS 服务器（UDP 53 劫持所有 A 查询返回 192.168.4.1）+ OS 探测端点 302 重定向 handler |
+| DNS 生命周期 | [main/radio_ctrl.c](main/radio_ctrl.c) | AP 启动后启动 DNS，退出配网时停止（captive_portal_start_dns / captive_portal_stop_dns） |
+| 探测端点路由 | [main/wifi_portal.c](main/wifi_portal.c) | 注册 10 个 OS 探测端点（/generate_204、/hotspot-detect.html、/ncsi.txt 等），统一 302 重定向到首页 |
+| 4MB OTA 分区表 | [partitions.csv](partitions.csv) | ota_0/ota_1 互切（各 1.75MB）+ otadata，无 factory；固件 1017KB，每分区 45% 空闲 |
+| OTA 回滚支持 | [sdkconfig.defaults](sdkconfig.defaults) | CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y，新固件 PENDING_VERIFY 自检通过才确认 |
+| OTA 落地方案 | [docs/ota-implementation-plan.md](docs/ota-implementation-plan.md) | 详细方案：配网页 multipart 上传 + 流式 esp_ota_write + 10s 自检回滚 + 防降级 |
+
+### 覆盖的 OS 探测端点
+
+Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统一 302 重定向触发系统自动弹出 Captive Portal 窗口。
+
+### 资源占用
+
+- DNS 任务栈 3072 字节 + UDP 缓冲 512 字节（栈上）
+- 固件增量 ~2KB
+- 配网态空闲堆仍 >80KB 告警线
+
+### 待人工确认（需真机验证）
+
+- [ ] iOS 连上 BikePower 热点后自动弹出配网页
+- [ ] Android 连上后自动弹出配网页
+- [ ] Windows 连上后浏览器提示需登录
+- [ ] 不弹窗时手动访问 192.168.4.1 仍可配网（降级兼容）
+- [ ] 退出配网后 DNS 任务已停止（串口日志）
+- [ ] 首次烧录需 `esptool.py erase_flash`（2MB→4MB 分区表变更）
+
+### OTA 后续实施（v3.2.0 规划）
+
+详见 [docs/ota-implementation-plan.md](docs/ota-implementation-plan.md)，核心步骤：
+1. 新建 ota_update 模块（multipart 流式接收 + esp_ota_begin/write/end）
+2. 配网页"更多配置"加固件升级入口
+3. app_main 集成 PENDING_VERIFY 自检（BLE 起来 + 10s 无 abort → mark_valid）
+4. 版本号防降级
+5. 编译 + 真机测试（正常升级/损坏固件拒绝/回滚验证）
+
+---
+
 ## 已知限制 / 注意事项
 
 - ESP-IDF 已升级至 v5.5.4（修复了 NimBLE host 潜在断连问题；工具链 esp-14.2.0_20260121）。
-- WiFi/BLE 射频互斥：进入配网前必须先停 BLE（见 [.trae/rules/wifi-ble-mutex.md](.trae/rules/wifi-ble-mutex.md)）
+- WiFi/BLE 共存：配网期间 BLE 保持在线（`CONFIG_ESP_COEX_SW_COEXIST_ENABLE`），仅资源初始化失败时降级为停 BLE + 重启（见 [.trae/rules/wifi-ble-mutex.md](.trae/rules/wifi-ble-mutex.md)）
 - 物理按钮/LED 灯效需人工确认，自动化测试只能覆盖 BLE 连接驱动的状态迁移

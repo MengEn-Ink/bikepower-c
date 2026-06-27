@@ -20,6 +20,7 @@
 | [MicroPython vs C 对比](06-micropython-vs-c-comparison.md) | 两种技术栈的性能/内存/复杂度对比 |
 | [固件防提取/防反编译](07-firmware-security.md) | 编译层加固（已实现）+ Flash 加密/Secure Boot 方案与选型 |
 | [内存与新功能评估](memory-and-feature-assessment.md) | v3.1.3/v5.5.4 各场景内存实测、满负载分析、OTA/Captive Portal/FTMS 扩展可行性 |
+| [OTA 与 Captive Portal 落地方案](ota-implementation-plan.md) | Captive Portal 实施总结 + OTA 详细方案（分区表/上传协议/回滚自检/防降级/实施清单） |
 
 ## 🤖 AI 助手
 
@@ -46,6 +47,6 @@
 
 | 文档 | 说明 |
 |------|------|
-| [项目进度](../PROGRESS.md) | 阶段 0-6 完成情况、待确认项、已知限制 |
+| [项目进度](../PROGRESS.md) | 阶段 0-9 完成情况、待确认项、已知限制 |
 | [更新日志](../CHANGELOG.md) | 版本历史与变更记录 |
 | [优化审查清单](08-review-checklist.md) | v3.1.0 多板型/发行流程/配网网页全链路复查记录（已完成） |

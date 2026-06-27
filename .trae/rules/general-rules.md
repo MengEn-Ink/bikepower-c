@@ -39,6 +39,8 @@ bikepower-c/
 │   ├── nvs_store.c/.h        — NVS 配置持久化桥接
 │   ├── radio_ctrl.c/.h       — BLE/WiFi 射频软切换（唯一 RF 开关）
 │   ├── wifi_portal.c/.h      — HTTP 配网门户（SoftAP 由 radio_ctrl 启动）
+│   ├── captive_portal.c/.h   — 轻量 DNS 劫持（UDP 53 → 192.168.4.1，自动弹配网页）
+│   ├── ota_update.c/.h       — OTA 固件升级（multipart 上传 + 防降级 + 自检回滚）
 │   └── bikepower_config.h    — 全局常量（引脚/阈值/UUID/版本）
 ├── components/bikepower_domain/   — 纯 C 领域层（可 host 单测）
 │   ├── power_engine.c        — 功率/踏频数据引擎

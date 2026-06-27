@@ -4,12 +4,33 @@
 
 ## [未发布]
 
+### 新增（Captive Portal 自动弹配网页）
+- 自研轻量 DNS 服务器（`main/captive_portal.c`）：UDP 53 监听，所有 A 记录查询应答 192.168.4.1，手机连上 SoftAP 后任意域名都指向配网入口。零第三方依赖，DNS 任务栈 3072 字节，固件增量 ~2KB。
+- OS 探测端点覆盖：注册 10 个主流系统连通性探测端点（`/generate_204` Android、`/hotspot-detect.html` iOS、`/ncsi.txt` Windows、`/canonical.html` Firefox 等），统一 302 重定向到配网首页，触发系统自动弹出 Captive Portal 窗口。
+- DNS 生命周期集成到 `radio_ctrl`：AP 启动后启动 DNS 劫持，退出配网时停止，与配网会话同生命周期。DNS 启动失败降级为手动输入 IP 配网。
+
+### 改进（4MB Flash OTA 分区表）
+- `partitions.csv` 从 2MB factory 布局改为 4MB OTA 布局：`ota_0`/`ota_1` 互切（各 1.75MB）+ `otadata`，无 factory 分区。固件 1017KB，每分区 45% 空闲。首次烧录需 `esptool.py erase_flash`。
+- `sdkconfig.defaults` 启用 `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`：新固件首次启动处于 `ESP_OTA_IMG_PENDING_VERIFY`，应用自检通过调 `esp_ota_mark_app_valid_cancel_rollback` 确认；未确认即重启则 bootloader 自动回滚。
+- `sdkconfig.defaults` 启用 `CONFIG_ESPTOOLPY_FLASHSIZE_4MB`。
+
 ### 改进（ESP-IDF 升级）
 - ESP-IDF v5.5.1 → v5.5.4：phy_version 1201→1232，BT controller 2edb0b0→b7de11e，工具链 esp-14.2.0_20241119→esp-14.2.0_20260121。固件体积 +2.8KB（0xf7350→0xf7e60），编译/真机验证通过。
 - 配网启动/停止路径加堆内存诊断日志（`wifi_portal.c`/`radio_ctrl.c`），便于内存监控。
 
+### 新增（OTA 升级实现）
+- `main/ota_update.c`：multipart/form-data 固件上传，流式写入 ota_1（不整包驻留内存，峰值 ~4KB）；解析 `esp_app_desc_t.version` 与 `FIRMWARE_VERSION` 比较，拒绝降级（<当前版本），同版本允许重刷。
+- 自检回滚：新固件首次启动处于 `ESP_OTA_IMG_PENDING_VERIFY`，BLE 启动失败立即 `esp_ota_mark_app_invalid_rollback`；启动 10s 自检窗口到期未 abort 则 `esp_ota_mark_app_valid_cancel_rollback` 确认。
+- 配网门户集成 `/ota` 路由：Web 上传固件页面，保存即升级，设备重启进新固件。WiFi 退出路径不变（done 回调 → ST_BLE_ACTIVE）。
+- 真机验证：v3.1.4→v3.1.5 升级成功，v3.1.5→v3.1.4 降级被拒，自检确认有效。
+
+### 修复（OTA 版本同步）
+- `CMakeLists.txt` 强制 `PROJECT_VER` 从 `bikepower_config.h` 提取 `FIRMWARE_VERSION` 宏：原 `git describe` 含后缀导致 `esp_app_desc.version` 与宏不一致，防降级比较基准错乱。修复后 `app_desc.version=3.1.5` 与宏严格一致。
+- 移除 OTA 测试辅助代码：`OTA_TEST_AUTO_CONFIG` option（启动自动配网）、`OTA_DEBUG` message、`app_main.c` 测试块，出正式固件 v3.1.5（无自动配网，靠按钮触发）。
+
 ### 改进（文档）
 - 新增 `docs/memory-and-feature-assessment.md`：各场景内存实测、满负载分析、OTA/Captive Portal/FTMS 扩展可行性评估与规划建议。
+- 新增 `docs/ota-implementation-plan.md`：OTA 升级与 Captive Portal 落地方案，含分区表设计、multipart 上传协议、状态机扩展、回滚自检、防降级、实施步骤清单。
 
 ## [3.1.3] - 2026-06-27
 
