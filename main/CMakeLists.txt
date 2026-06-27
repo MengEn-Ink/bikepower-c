@@ -15,3 +15,9 @@ idf_component_register(
              esp_wifi esp_event esp_netif esp_http_server bikepower_domain
              esp_driver_rmt app_update
 )
+
+option(OTA_TEST_AUTO_CONFIG "测试用：启动自动触发配网（正式发版保持 OFF）" OFF)
+if(OTA_TEST_AUTO_CONFIG)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE OTA_TEST_AUTO_CONFIG)
+    message(STATUS "OTA_TEST_AUTO_CONFIG=ON（测试固件，启动自动配网）")
+endif()

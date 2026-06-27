@@ -219,6 +219,18 @@ void app_main(void)
             continue;
         }
 
+#ifdef OTA_TEST_AUTO_CONFIG
+        // 测试固件：BLE 首次就绪后延迟 3s（60×50ms）自动触发配网，便于 OTA 全流程自动化测试
+        {
+            static int s_auto_cfg_tick = 0;
+            if (s_auto_cfg_tick >= 0 && ++s_auto_cfg_tick == 60) {
+                s_auto_cfg_tick = -1;
+                ESP_LOGW(TAG, "[OTA测试] BLE 就绪 3s，自动触发配网");
+                app_state_enter_wifi_config_for_test();
+            }
+        }
+#endif
+
         // 轮询 BLE 连接变化并投递事件
         int conn = ble_bikepower_conn_count();
         if (conn != last_conn) {
