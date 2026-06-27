@@ -26,7 +26,8 @@
 
 ### 修复（OTA 版本同步）
 - `CMakeLists.txt` 强制 `PROJECT_VER` 从 `bikepower_config.h` 提取 `FIRMWARE_VERSION` 宏：原 `git describe` 含后缀导致 `esp_app_desc.version` 与宏不一致，防降级比较基准错乱。修复后 `app_desc.version=3.1.5` 与宏严格一致。
-- 移除 OTA 测试辅助代码：`OTA_TEST_AUTO_CONFIG` option（启动自动配网）、`OTA_DEBUG` message、`app_main.c` 测试块，出正式固件 v3.1.5（无自动配网，靠按钮触发）。
+- 移除 `OTA_DEBUG` 调试 message，出正式固件 v3.1.5（无自动配网，靠按钮触发）。
+- `OTA_TEST_AUTO_CONFIG` 改为 CMake option（默认 OFF）：正式发版编译不带，测试编译传 `-DOTA_TEST_AUTO_CONFIG=ON` 启用启动自动配网，支持 OTA 全流程自动化测试（升级+降级保护+版本确认），正式固件行为不受影响。
 
 ### 改进（文档）
 - 新增 `docs/memory-and-feature-assessment.md`：各场景内存实测、满负载分析、OTA/Captive Portal/FTMS 扩展可行性评估与规划建议。
