@@ -4,6 +4,48 @@
 
 ## [未发布]
 
+## [3.1.3] - 2026-06-27
+
+### 改进（WiFi/BLE 共存配网，设备不重启）
+- 配网期间 BLE 保持在线继续通知，骑行 App 全程不断连。原方案进入配网会停 BLE + 配网结束 `esp_restart()`，现改为共存模式（`CONFIG_ESP_COEX_SW_COEXIST_ENABLE`），coex 模块按时间片仲裁 WiFi/BLE 射频。
+- 配网结束（保存成功或 180s 超时）不再重启设备：`wifi_portal` 通过 done 回调投递 `APP_EVT_WIFI_DONE`，状态机收到后调用 `radio_ctrl_exit_wifi` 关闭 HTTP + SoftAP，回到 `ST_BLE_ACTIVE`。
+- 配置变更实时生效：网页表单提交后通过 `power_engine_set_*` 系列 setter 同步内存与 NVS，主循环 50ms 周期通过 BLE 通知新值，无需重启。
+- 失败兜底：仅当共存模式下 `radio_ctrl_start_wifi_ap()` 返回错误（资源耗尽/初始化失败）时，降级为旧独占方案（停 BLE + 重试 + 必要时 `esp_restart`）。
+
+### 改进（配网页面交互）
+- 首页底部按钮拆分为"保存设置"（仅保存+实时生效，不关 WiFi，可继续修改）和"保存并关闭 WiFi"（保存+实时生效+5s 后关 WiFi 回到 BLE）两个按钮，通过 `formaction` 区分目标路由。
+- 去掉"恢复默认"按钮及对应 `resetForm` 函数，简化界面操作。
+- 保存成功后首页 URL 带 `saved=1` 参数触发 toast 提示"已保存并实时生效"，2s 自动消失。
+
+### 修复（代码逻辑漏洞）
+- `wifi_portal.c` `h_home` 缺 `s_closing` 守卫：关 WiFi 收尾阶段浏览器刷新首页会续期 deadline 破坏收尾流程。修复：开头加守卫，收尾期间刷新跳转成功页。
+- `wifi_portal.c` `h_draft` 草稿污染引擎：`apply_form_fields` 置 dirty 后主循环 10s 心跳会自动落盘 NVS，违反草稿语义。修复：草稿后立即 `power_engine_clear_dirty`。
+- `wifi_portal.c` NVS 失败回滚 BLE 跳变：`apply_form_fields` 已改 `s_engine` 并触发 BLE 通知，回滚后下次通知旧值造成跳变。修复：改写临时副本，NVS 成功后才 swap 回主引擎。
+- `wifi_portal.c` `send_save_error` 返回 `ESP_FAIL` 导致 httpd 重复发错误响应。修复：改返回 `ESP_OK`（500 响应已通过 SEND 完整发送）。
+- `ble_bikepower` 设备名网页修改后不实时生效：BLE 广播名只在启动时调一次。新增 `ble_bikepower_refresh_device_name()`，保存路径检测设备名变化时刷新 GAP 服务+重启广播。
+- `nvs_store.c` NVS 并发竞争：app_main 主循环（按钮调功 dirty 落盘）与 httpd 任务（网页保存）并发 `nvs_store_save` 无锁。修复：`StaticSemaphore` 互斥保护，100ms 超时跳过保留 dirty。
+- `radio_ctrl.c` `esp_netif_deinit` 无条件调用：可能释放别人 init 的 netif。修复：加 `s_netif_inited` 标志，仅自建时 deinit。
+
+### 修复（超时卡死 bug）
+- `app_main.c` `on_wifi_done` 的 `xQueueSend(..., 0)` 零等待投递，队列瞬满时事件丢失；`portal_done` 的 `s_closing` 守卫又阻止重试，导致永久卡在 `ST_WIFI_CONFIG`，定时器继续跑每秒打印噪音。修复：改为 5 次重试投递（每次 10ms）+ 诊断日志。
+- `wifi_portal.c` `shutdown_check_cb` 日志在 `portal_done` 幂等检查之前打印，导致每秒重复打印"到期"噪音。修复：加 `s_closing` 守卫，收尾后不再重复打印。
+- `wifi_portal.c` `portal_done` 加链路诊断日志，确认 `done_cb` 调用与 `s_done_cb` 有效性。
+
+### 改进（按钮诊断）
+- `button.c` `post` 函数加按钮事件诊断日志，确认 ISR→button_task→app_queue 链路通畅。
+
+### 改进（规则同步）
+- `wifi-ble-mutex.md` 改名为"WiFi/BLE 射频共用规则"，更新 WB-MUTEX-1~8 条款，新增失败兜底降级路径。
+- `ai-challenge.md` 硬件约束冲突条款更新为支持共存；操作权限 Deny 项由"BLE+WiFi 共存"改为"绕过 radio_ctrl 直接调 esp_wifi_*"。
+- `coding-style.md` 禁止事项更新为"禁止绕过 radio_ctrl 直接调用 esp_wifi_*"。
+- `best-practices.md` WiFi 健壮性、架构一致性、配网链路图同步更新。
+- `README.md` 配网说明、LED 灯效表更新为共存方案。
+
+### 测试报告
+- `idf.py build`：0 error，固件大小 0xf70a0 字节（约 1MB），分区剩余 45%。
+- host 单测：918 通过 0 失败。
+- 真机测试：BLE 连接稳定（堆 180KB），网页保存实时生效，device_name 刷新验证通过。
+
 ## [3.1.2] - 2026-06-26
 
 ### 修复

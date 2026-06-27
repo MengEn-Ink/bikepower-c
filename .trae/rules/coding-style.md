@@ -48,7 +48,7 @@
 | Task WDT | 主循环及长任务喂狗 |
 
 ## 禁止事项
-- ❌ 禁止 WiFi 启动前不停 BLE（RF 互斥）。
+- ❌ 禁止绕过 radio_ctrl 直接调用 esp_wifi_*（必须走 radio_ctrl_enter_wifi / radio_ctrl_exit_wifi）。
 - ❌ 禁止开机自动启动 WiFi。
 - ❌ 禁止 ISR 内调用阻塞/日志/BLE API。
 - ❌ 禁止 `printf` 调试残留（用 ESP_LOG）。

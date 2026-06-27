@@ -118,9 +118,11 @@
 
 | 检查方法 | 通过标准 |
 |---------|---------|
-| WiFi 启动前是否确认 BLE 已完全停止 | 是（radio_ctrl 统一入口） |
+| WiFi 启停是否走 radio_ctrl 统一入口 | 是（radio_ctrl_enter_wifi / radio_ctrl_exit_wifi） |
+| 共存模式下 BLE 是否保持在线 | 是，配网期间 BLE 继续通知 |
 | socket / HTTP 连接是否在出错路径释放 | 是 |
-| WiFi 超时关闭后是否重启恢复 BLE | 是，`esp_restart()` |
+| WiFi 超时/保存后是否不重启回到 BLE | 是，done 回调 + APP_EVT_WIFI_DONE 关 HTTP + SoftAP |
+| 共存启动失败是否降级为独占方案 | 是，停 BLE + 重试 + 必要时 esp_restart |
 | 配网任务异常是否被捕获 | 是，不传播 |
 
 ### 异常兜底原则
@@ -213,7 +215,7 @@
 |--------|---------|---------|
 | 模块依赖图 | 对比 include 与依赖图 | 链为 DAG，无循环依赖 |
 | 启动流程 | app_main 任务创建 → 事件循环 | 初始化顺序正确，WDT 覆盖长任务 |
-| 模块互斥约束 | WiFi 启动前 BLE 必停 | radio_ctrl 先停 BLE 再启 WiFi |
+| 模块互斥约束 | WiFi 启停走 radio_ctrl 统一入口 | radio_ctrl_enter_wifi / radio_ctrl_exit_wifi |
 | RF 开关单一入口 | 全局搜索 `esp_wifi_*` / NimBLE 启停 | 仅 radio_ctrl 操作 |
 | 公有接口一致性 | 对照头文件公开声明 | 无遗漏、无多余导出 |
 | 领域层纯净性 | 检查 components 是否 include ESP-IDF | 无 |
@@ -233,18 +235,20 @@ power_engine.snapshot → ble_bikepower_set_data → BLE 通知
 连接轮询(app_main) → APP_EVT_CONN_CHANGED → app_state
 ```
 
-**配网链路**：
+**配网链路（共存模式）**：
 ```
-app_state ST_WIFI_CONFIG → radio_ctrl: 停 BLE → 启 WiFi AP
-    → wifi_portal: esp_http_server 配网 → 保存/超时 → esp_restart() 恢复 BLE
+app_state ST_WIFI_CONFIG → radio_ctrl_enter_wifi（BLE 不停）
+    → radio_ctrl_start_wifi_ap（coex 仲裁）→ wifi_portal_start（HTTP 配网，配置实时生效到 BLE 通知）
+    → 保存/超时 → wifi_portal done 回调 → APP_EVT_WIFI_DONE
+    → app_state → radio_ctrl_exit_wifi（关 HTTP + SoftAP）→ ST_BLE_ACTIVE
 ```
 
 **关键交互点**（模块间仅通过这些接口通信）：
 - `app_state` → `ble_bikepower`: `ble_bikepower_set_data()` 通知
 - `app_state` → `led`: `led_set_pattern()`
-- `app_state` → `radio_ctrl`: wifi_trigger 触发配网
-- `radio_ctrl` → `ble_bikepower`: 停广播 / 断连 / 停 host
+- `app_state` → `radio_ctrl`: `wifi_trigger` 触发配网 / `wifi_exit` 退出配网
 - `radio_ctrl` → `wifi_portal`: 启动 HTTP 配网服务
+- `wifi_portal` → `app_main`: done 回调投递 `APP_EVT_WIFI_DONE`
 - `app_state` / `power_engine` → `nvs_store`: 配置保存 / 恢复
 - 上层 → `components/bikepower_domain`: power_engine / hr_model / profile 数据接口
 
