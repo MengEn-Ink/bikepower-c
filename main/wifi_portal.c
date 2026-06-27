@@ -47,6 +47,10 @@ static esp_timer_handle_t s_shutdown_timer = NULL;
 static volatile uint32_t s_deadline_sec = 0;
 // 配网结束标志：true 表示已进入收尾流程（保存成功或超时），不再续期、不再接受新请求
 static volatile bool s_closing = false;
+// done_cb 幂等标志：true 表示 portal_done 已调用过 done_cb，防止定时器重复触发投递多个事件。
+// 与 s_closing 分离：s_closing 在 h_close_wifi 设 5s 收尾窗口时就置 true（阻止改配置），
+// 但此时 done_cb 尚未调用；s_done_called 只在 portal_done 真正调用 done_cb 时置 true。
+static volatile bool s_done_called = false;
 // 配网结束回调：保存/超时后由 portal 调用，通知 app_main 投递 APP_EVT_WIFI_DONE 切换状态
 static void (*s_done_cb)(void) = NULL;
 
@@ -97,12 +101,14 @@ static void portal_done(void);  // 前向声明：shutdown_check_cb 复用此入
 static void shutdown_check_cb(void *arg)
 {
     (void)arg;
-    // s_closing 已置位说明 portal_done 已触发过 done_cb，定时器理应被 wifi_portal_stop 停止。
+    // s_done_called 已置位说明 portal_done 已触发过 done_cb：定时器理应被 wifi_portal_stop 停止。
     // 若因事件投递失败导致主循环未消费 APP_EVT_WIFI_DONE、wifi_portal_stop 未被调用，
-    // 定时器仍在跑——此处守卫避免每秒重复打印"到期"噪音日志。
-    if (s_closing) return;
+    // 定时器仍在跑——此处守卫避免每秒重复调用 portal_done 投递多个事件。
+    // 注意：不能用 s_closing 守卫，因为 h_close_wifi 设 5s 收尾窗口时也会置 s_closing=true，
+    // 那样会阻止定时器在 5s 后触发 portal_done 关闭 WiFi。
+    if (s_done_called) return;
     if (now_sec() >= s_deadline_sec) {
-        ESP_LOGI(TAG, "WiFi 配网窗口到期，关闭 WiFi 回到 BLE");
+        ESP_LOGI(TAG, "WiFi 配网窗口到期/收尾窗口到期，关闭 WiFi 回到 BLE");
         portal_done();
     }
 }
@@ -116,8 +122,9 @@ static void shutdown_check_cb(void *arg)
  */
 static void portal_done(void)
 {
-    if (s_closing) return;
-    s_closing = true;
+    if (s_done_called) return;  // 幂等：done_cb 只调用一次
+    s_done_called = true;
+    s_closing = true;  // 收尾流程彻底启动，阻止后续表单操作
     ESP_LOGI(TAG, "portal_done 触发，调用 done_cb 投递 APP_EVT_WIFI_DONE");
     if (s_done_cb) s_done_cb();
     else ESP_LOGE(TAG, "s_done_cb 为 NULL，APP_EVT_WIFI_DONE 无法投递");
@@ -1254,9 +1261,15 @@ esp_err_t wifi_portal_start(power_engine_t *engine)
 {
     s_engine = engine;
     s_closing = false;
+    s_done_called = false;
 
     esp_err_t ret = start_httpd();
     if (ret != ESP_OK) {
+        // httpd 启动失败：portal 没跑起来，done_cb 不会被定时器触发。
+        // 主动调用 portal_done 投递 APP_EVT_WIFI_DONE，让状态机走 radio_ctrl_exit_wifi
+        // 清理已启动的 SoftAP 并回到 ST_BLE_ACTIVE，避免永久卡在配网态。
+        ESP_LOGE(TAG, "HTTP 启动失败，主动触发 done_cb 让状态机回 BLE");
+        portal_done();
         return ret;
     }
     arm_deadline();
@@ -1267,6 +1280,7 @@ esp_err_t wifi_portal_start(power_engine_t *engine)
         ESP_LOGE(TAG, "esp_timer_create 失败 ret=%d", ret);
         httpd_stop(s_httpd);
         s_httpd = NULL;
+        portal_done();  // 触发 done_cb 让状态机清理 SoftAP 回 BLE
         return ret;
     }
     ret = esp_timer_start_periodic(s_shutdown_timer, WIFI_PORTAL_CHECK_INTERVAL_US);  // 每秒检查超时
@@ -1276,6 +1290,7 @@ esp_err_t wifi_portal_start(power_engine_t *engine)
         s_shutdown_timer = NULL;
         httpd_stop(s_httpd);
         s_httpd = NULL;
+        portal_done();  // 触发 done_cb 让状态机清理 SoftAP 回 BLE
         return ret;
     }
 
@@ -1303,6 +1318,7 @@ void wifi_portal_stop(void)
         s_httpd = NULL;
     }
     s_closing = false;
+    s_done_called = false;
     ESP_LOGI(TAG, "HTTP 配网门户已停止");
 }
 

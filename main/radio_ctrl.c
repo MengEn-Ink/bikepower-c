@@ -191,7 +191,8 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "HTTP 配网门户启动失败 ret=%d，关闭 WiFi 回到 BLE", ret);
         radio_ctrl_stop_wifi_ap();
-        // 不重启，由状态机收到 APP_EVT_WIFI_DONE 后回到 ST_BLE_ACTIVE
+        // wifi_portal_start 失败时已通过 portal_done 投递 APP_EVT_WIFI_DONE，
+        // 状态机会调 radio_ctrl_exit_wifi 做幂等清理并回到 ST_BLE_ACTIVE。
     }
 }
 

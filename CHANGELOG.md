@@ -31,6 +31,12 @@
 - `wifi_portal.c` `shutdown_check_cb` 日志在 `portal_done` 幂等检查之前打印，导致每秒重复打印"到期"噪音。修复：加 `s_closing` 守卫，收尾后不再重复打印。
 - `wifi_portal.c` `portal_done` 加链路诊断日志，确认 `done_cb` 调用与 `s_done_cb` 有效性。
 
+### 修复（收尾流程逻辑漏洞，真机验证发现）
+- `wifi_portal.c` `s_closing` 语义冲突导致"保存并关闭 WiFi"后 WiFi 永不关闭：`h_close_wifi` 设 `s_closing=true` 表示"5s 收尾窗口"，但 `portal_done` 和 `shutdown_check_cb` 都用 `s_closing` 做幂等守卫，语义冲突导致 `portal_done` 永不执行。修复：引入独立 `s_done_called` 标志做 `portal_done` 幂等，`s_closing` 仅表示"收尾窗口已启动/已结束"，两者解耦。
+- `wifi_portal.c` `shutdown_check_cb` 守卫误用 `s_closing`：上一轮止噪修复用 `s_closing` 守卫，但也误杀了收尾窗口到期触发 `portal_done` 的能力。修复：改用 `s_done_called` 守卫，`s_closing` 状态下仍检查 deadline。
+- `wifi_portal.c` `wifi_portal_start` 失败路径卡死状态机：`start_httpd`/`esp_timer_create`/`esp_timer_start_periodic` 任一失败直接 return，`APP_EVT_WIFI_DONE` 永不投递，状态机卡 `ST_WIFI_CONFIG`。修复：三处失败路径都调 `portal_done()` 触发 done_cb，状态机走 `radio_ctrl_exit_wifi` 幂等清理。
+- `radio_ctrl.c` `wifi_portal_start` 失败注释过时：原注释说"等 APP_EVT_WIFI_DONE"，但该事件原实现不会来。修复：注释更新为"portal_done 已投递事件"。
+
 ### 改进（按钮诊断）
 - `button.c` `post` 函数加按钮事件诊断日志，确认 ISR→button_task→app_queue 链路通畅。
 
