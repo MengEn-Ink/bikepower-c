@@ -24,6 +24,7 @@
 #include "button.h"
 #include "led.h"
 #include "radio_ctrl.h"
+#include "wifi_portal.h"
 #include "board_detect.h"
 
 static const char *TAG = "APP";
@@ -55,14 +56,48 @@ static bool on_erg_target(int target_power)
 
 /**
  * 处理进入 WiFi 配网模式的触发回调。
- * 由状态机在用户完成二次确认后调用，切换到射频独占的 WiFi 配网流程。
+ * 由状态机在用户完成二次确认后调用，切换到 WiFi/BLE 共存的 WiFi 配网流程。
  * 无参数。
  * 返回值：无。
- * 特殊行为：会停止 BLE 并进入 radio_ctrl 管理的 WiFi 配网模式。
+ * 特殊行为：BLE 保持在线继续通知，WiFi 由 coex 时间片仲裁；极端失败时降级为停 BLE + 重启。
  */
 static void on_wifi_trigger(void)
 {
     radio_ctrl_enter_wifi(&s_engine);
+}
+
+/**
+ * 处理退出 WiFi 配网模式的回调。
+ * 由状态机在配网结束（保存成功或超时）后调用，关闭 HTTP 门户 + SoftAP，射频归还 BLE。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：BLE 全程未停，无需重激活；不重启设备。
+ */
+static void on_wifi_exit(void)
+{
+    radio_ctrl_exit_wifi();
+}
+
+/**
+ * WiFi 配网结束回调（保存成功或超时）。
+ * 由 wifi_portal 在 esp_timer 任务上下文调用，仅做轻量操作：投递事件给主循环，
+ * 实际的 wifi_portal_stop / radio_ctrl_exit_wifi / 状态切换在 app_main 任务上下文串行执行。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：BLE 全程未停，事件投递后由主循环统一关闭 WiFi 资源。
+ */
+static void on_wifi_done(void)
+{
+    app_evt_t e = { .type = APP_EVT_WIFI_DONE, .data = 0 };
+    // esp_timer 任务上下文投递事件给主循环。队列满时短暂重试，避免事件丢失导致
+    // 永久卡在 ST_WIFI_CONFIG（portal_done 的 s_closing 守卫会阻止后续重试）。
+    for (int i = 0; i < 5; i++) {
+        if (xQueueSend(s_app_queue, &e, pdMS_TO_TICKS(10)) == pdTRUE) {
+            ESP_LOGI(TAG, "APP_EVT_WIFI_DONE 已投递（尝试 %d）", i + 1);
+            return;
+        }
+    }
+    ESP_LOGE(TAG, "APP_EVT_WIFI_DONE 投递失败，设备将卡在 ST_WIFI_CONFIG，需手动重启");
 }
 
 void app_main(void)
@@ -100,6 +135,8 @@ void app_main(void)
 
     app_state_init(&s_engine);
     app_state_set_wifi_trigger(on_wifi_trigger);
+    app_state_set_wifi_exit(on_wifi_exit);
+    wifi_portal_set_done_callback(on_wifi_done);  // 注册配网结束回调，由 wifi_portal 在保存/超时后调用
 
     ret = button_init(s_app_queue);
     if (ret != ESP_OK) {
@@ -148,12 +185,9 @@ void app_main(void)
             app_state_handle_event(&e);
         }
 
-        // WiFi 配网模式：BLE 已停用，主循环只喂狗等待重启恢复
-        if (app_state_get() == ST_WIFI_CONFIG) {
-            esp_task_wdt_reset();
-            vTaskDelay(pdMS_TO_TICKS(HR_LOOP_INTERVAL_MS));
-            continue;
-        }
+        // WiFi 配网模式（共存）：BLE 保持在线继续通知，主循环继续生成快照推 BLE；
+        // APP_EVT_WIFI_DONE 已在上方队列消费中处理（调用 radio_ctrl_exit_wifi + 切回 ST_BLE_ACTIVE）。
+        // 不再 continue 跳过 BLE 通知，确保配网期间骑行 App 仍能收到实时数据。
 
         // BLE 未就绪：周期重试，跳过 BLE 调用，避免假运行
         if (!ble_bikepower_is_ready()) {

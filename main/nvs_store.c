@@ -6,9 +6,16 @@
 #include "bikepower_config.h"
 #include "nvs.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include <string.h>
 
 static const char *TAG = "NVS";
+
+// NVS 写入互斥锁：app_main 主循环（按钮调功 dirty 落盘）与 httpd 任务（网页保存）
+// 可能并发调用 nvs_store_save，加锁避免两个 nvs_open 同 namespace 并发写造成数据竞争。
+static SemaphoreHandle_t s_save_mutex = NULL;
+static StaticSemaphore_t s_save_mutex_buf;
 
 /**
  * 把运行时引擎状态拷贝成可持久化配置结构。
@@ -84,6 +91,11 @@ static void get_i32(nvs_handle_t h, const char *key, int *out)
  */
 void nvs_store_load(power_engine_t *e)
 {
+    // 启动时单线程初始化互斥锁（load 先于任何 save 调用，保证 mutex 在 save 之前就绪）
+    if (s_save_mutex == NULL) {
+        s_save_mutex = xSemaphoreCreateMutexStatic(&s_save_mutex_buf);
+    }
+
     config_data_t c;
     config_store_defaults(&c);
 
@@ -143,6 +155,17 @@ void nvs_store_load(power_engine_t *e)
  */
 bool nvs_store_save(power_engine_t *e)
 {
+    // 防御性 lazy init：load 异常时 mutex 仍可能在 save 首次调用时为 NULL
+    if (s_save_mutex == NULL) {
+        s_save_mutex = xSemaphoreCreateMutexStatic(&s_save_mutex_buf);
+    }
+    // 互斥保护整段 nvs_open→set→commit 流程，避免并发写造成 commit 丢失或脏写。
+    // 等待 100ms 让另一侧先写完；超时则放弃本次保存（dirty 保留，下次心跳重试）。
+    if (xSemaphoreTake(s_save_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGW(TAG, "NVS 保存互斥锁等待超时，跳过本次保存");
+        return false;
+    }
+
     config_data_t c;
     engine_to_config(e, &c);
 
@@ -150,6 +173,7 @@ bool nvs_store_save(power_engine_t *e)
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "保存打开 NVS 失败(%s)", esp_err_to_name(err));
+        xSemaphoreGive(s_save_mutex);
         return false;
     }
 
@@ -188,6 +212,8 @@ bool nvs_store_save(power_engine_t *e)
         }
     }
     nvs_close(h);
+
+    xSemaphoreGive(s_save_mutex);
 
     if (ok) {
         ESP_LOGI(TAG, "配置已保存 p=%dW mode=%d", c.power, c.mode);

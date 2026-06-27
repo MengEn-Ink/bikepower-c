@@ -751,6 +751,29 @@ void ble_bikepower_set_device_name(const char *name)
     g_device_name[sizeof(g_device_name) - 1] = '\0';
 }
 
+void ble_bikepower_refresh_device_name(void)
+{
+    // 未启动时无法访问 GAP 服务，跳过（启动流程会自动用 g_device_name 注册）
+    if (!ble_bikepower_is_ready()) {
+        ESP_LOGW(TAG, "BLE 未启动，跳过设备名刷新");
+        return;
+    }
+    int rc = ble_svc_gap_device_name_set(g_device_name);
+    if (rc != 0) {
+        ESP_LOGW(TAG, "GAP 设备名设置失败 rc=%d", rc);
+    }
+    // 已连接时不重启广播：避免 ble_gap_adv_stop 影响现有连接；
+    // 连接内通过 GAP Device Name 服务读取即可拿到新名，断连回调会用新名重广播。
+    if (g_conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+        ble_gap_adv_stop();
+        rc = start_advertising();
+        if (rc != 0 && !g_stopping) {
+            ESP_LOGW(TAG, "刷新设备名后重广播失败 rc=%d", rc);
+        }
+    }
+    ESP_LOGI(TAG, "BLE 设备名已刷新: %s", g_device_name);
+}
+
 /**
  * 获取当前 BLE 连接数。
  * 根据连接句柄是否有效返回单连接状态。

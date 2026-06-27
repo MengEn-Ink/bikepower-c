@@ -81,6 +81,16 @@ void ble_bikepower_set_erg_callback(ble_erg_cb_t cb);
 void ble_bikepower_set_device_name(const char *name);
 
 /**
+ * 把当前缓存的设备名同步到 GAP 服务并重启广播。
+ * 调用后扫描端可见新设备名，已建立的连接通过 GAP Device Name 服务读取也能拿到新名。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：仅 BLE 已启动时有效；已连接时只更新 GAP 服务不重启广播（避免影响连接），
+ *           断连后会自动用新名重新广播。
+ */
+void ble_bikepower_refresh_device_name(void);
+
+/**
  * 查询当前 BLE 连接数。
  * 返回当前是否存在活动连接。
  * 无参数。

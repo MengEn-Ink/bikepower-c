@@ -26,6 +26,7 @@ static bool s_auto_adjusted = false;   // 本次按住是否发生自动调功
 static uint32_t s_confirm_start = 0;   // 确认窗口开始时间
 
 static void (*s_wifi_trigger)(void) = NULL;
+static void (*s_wifi_exit)(void) = NULL;
 
 /**
  * 获取当前单调时间的毫秒值。
@@ -61,6 +62,18 @@ static void update_idle_led(void)
 void app_state_set_wifi_trigger(void (*cb)(void))
 {
     s_wifi_trigger = cb;
+}
+
+/**
+ * 注册 WiFi 配网结束回调。
+ * 保存状态机退出配网态时要调用的外部清理函数（关 HTTP + 关 WiFi）。
+ * cb：配网结束回调，可为 NULL。
+ * 返回值：无。
+ * 特殊行为：后续注册会直接覆盖之前的回调；回调在主任务上下文执行。
+ */
+void app_state_set_wifi_exit(void (*cb)(void))
+{
+    s_wifi_exit = cb;
 }
 
 /**
@@ -186,6 +199,17 @@ void app_state_handle_event(const app_evt_t *e)
     case APP_EVT_ERG_TARGET:
         power_engine_set_erg_target(s_engine, e->data);
         ESP_LOGI(TAG, "ERG 目标功率 %dW", (int)e->data);
+        break;
+
+    case APP_EVT_WIFI_DONE:
+        // 配网结束（保存成功或超时）：先关闭 WiFi 资源（HTTP + SoftAP），再回到 BLE 活动态。
+        // BLE 全程未停，无需重激活；LED 直接根据当前连接状态刷新。
+        if (s_state == ST_WIFI_CONFIG) {
+            if (s_wifi_exit) s_wifi_exit();   // 在主任务上下文串行释放 WiFi 资源
+            s_state = ST_BLE_ACTIVE;
+            update_idle_led();
+            ESP_LOGI(TAG, "WiFi 配网结束 -> ST_BLE_ACTIVE");
+        }
         break;
 
     case APP_EVT_BTN_DOWN:

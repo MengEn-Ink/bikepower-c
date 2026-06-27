@@ -60,6 +60,15 @@ void app_state_tick(void);
 void app_state_set_wifi_trigger(void (*cb)(void));
 
 /**
+ * 注册退出 WiFi 配网的回调。
+ * 在配网结束（保存成功或超时）后由状态机调用该回调，交给射频控制模块关闭 WiFi 资源。
+ * cb：配网结束回调，可为 NULL。
+ * 返回值：无。
+ * 特殊行为：回调在主任务上下文执行；未注册时仅切换状态，不释放 WiFi 资源（需调用方自行清理）。
+ */
+void app_state_set_wifi_exit(void (*cb)(void));
+
+/**
  * 获取当前应用状态。
  * 返回状态机当前所处的高层状态。
  * 无参数。

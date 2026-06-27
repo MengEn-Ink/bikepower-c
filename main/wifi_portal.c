@@ -5,9 +5,10 @@
  * 调用方（radio_ctrl）需在调用 wifi_portal_start 前确保 AP 已就绪。
  *
  * 网页 UI 照抄 MicroPython 旧版（web_home/web_common/web_more_pages）：
- *   GET  /            首页（iOS 三卡 + 模式分段 + 训练区间染色 + 续期 + 倒计时）
- *   POST /config      解析表单，应用配置 + 持久化 NVS，返回成功页，5s 后重启
- *   GET  /success     成功页（兼容旧版路由）
+ *   GET  /            首页（iOS 三卡 + 模式分段 + 训练区间染色 + 续期 + 倒计时 + saved=1 toast）
+ *   POST /config      保存配置（实时生效到 BLE）+ 持久化 NVS，302 回首页（不关 WiFi，可继续修改）
+ *   POST /close-wifi  保存配置 + 5s 后关闭 WiFi 回到 BLE（用户主动结束配网）
+ *   GET  /success     成功页（兼容旧版路由，h_close_wifi 触发后展示）
  *   GET  /more        更多配置页（个人信息 + 设备名碎片入口）
  *   POST /draft       草稿保存（仅应用内存，不持久化不重启，302 回首页）
  *   GET  /ui/module   动态碎片（more/profile/device/mode/erg）
@@ -15,12 +16,13 @@
  *   GET  /time        剩余秒数（纯文本，前端每秒轮询）
  *   GET  /renew       续期（重置超时），返回剩余秒数
  *
- * 超时：180s 无续期自动 esp_restart() 恢复 BLE（方案 A）。
+ * 超时：180s 无续期自动关闭 WiFi 回到 BLE（不重启）；配置通过 power_engine setter 实时生效。
  *
  * mode 映射：旧版网页用字符串 steady/road/erg，C 版用整数 0/1/2。
  */
 #include "wifi_portal.h"
 #include "nvs_store.h"
+#include "ble_bikepower.h"
 #include "bikepower_config.h"
 #include "profile.h"
 #include "esp_log.h"
@@ -43,7 +45,10 @@ static esp_timer_handle_t s_shutdown_timer = NULL;
 // 避免 64 位变量在 httpd 任务续期与 esp_timer 回调读取之间发生撕裂导致误判提前重启。
 // 秒级精度对配网窗口（分钟级）与每秒倒计时已足够。
 static volatile uint32_t s_deadline_sec = 0;
-static volatile bool s_rebooting = false;
+// 配网结束标志：true 表示已进入收尾流程（保存成功或超时），不再续期、不再接受新请求
+static volatile bool s_closing = false;
+// 配网结束回调：保存/超时后由 portal 调用，通知 app_main 投递 APP_EVT_WIFI_DONE 切换状态
+static void (*s_done_cb)(void) = NULL;
 
 // 当前单调时间（秒）。
 static uint32_t now_sec(void)
@@ -62,7 +67,7 @@ static uint32_t now_sec(void)
  */
 static void arm_deadline(void)
 {
-    if (s_rebooting) return;  // 计划重启中不再续期
+    if (s_closing) return;  // 计划重启中不再续期
     s_deadline_sec = now_sec() + (WIFI_SHUTDOWN_MS / 1000);
 }
 
@@ -82,18 +87,40 @@ static int remaining_seconds(void)
 
 /**
  * 配网超时检查定时器回调。
- * 当到达截止时间时执行重启，以恢复 BLE 正常工作模式。
+ * 当到达截止时间时调用 done 回调关闭 WiFi 回到 BLE，不重启设备。
  * arg：未使用的定时器参数。
  * 返回值：无。
- * 特殊行为：保存成功后也复用这一路径，通过 s_rebooting 区分日志文案。
+ * 特殊行为：超时和保存成功均通过本回调统一触发——保存成功时 h_config 会把 deadline 缩短为 5s，
+ *           本回调在 5s 后捕获并调用 portal_done；portal_done 内部用 s_closing 做幂等保护。
  */
+static void portal_done(void);  // 前向声明：shutdown_check_cb 复用此入口
 static void shutdown_check_cb(void *arg)
 {
     (void)arg;
+    // s_closing 已置位说明 portal_done 已触发过 done_cb，定时器理应被 wifi_portal_stop 停止。
+    // 若因事件投递失败导致主循环未消费 APP_EVT_WIFI_DONE、wifi_portal_stop 未被调用，
+    // 定时器仍在跑——此处守卫避免每秒重复打印"到期"噪音日志。
+    if (s_closing) return;
     if (now_sec() >= s_deadline_sec) {
-        ESP_LOGI(TAG, "%s，重启恢复 BLE", s_rebooting ? "配置已保存" : "WiFi 配网超时");
-        esp_restart();
+        ESP_LOGI(TAG, "WiFi 配网窗口到期，关闭 WiFi 回到 BLE");
+        portal_done();
     }
+}
+
+/**
+ * 触发配网结束流程（保存成功或超时统一入口）。
+ * 设置收尾标志并调用 done 回调，由 app_main 投递 APP_EVT_WIFI_DONE 切换状态。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：幂等，重复调用不会重复触发回调。
+ */
+static void portal_done(void)
+{
+    if (s_closing) return;
+    s_closing = true;
+    ESP_LOGI(TAG, "portal_done 触发，调用 done_cb 投递 APP_EVT_WIFI_DONE");
+    if (s_done_cb) s_done_cb();
+    else ESP_LOGE(TAG, "s_done_cb 为 NULL，APP_EVT_WIFI_DONE 无法投递");
 }
 
 // ============================ 工具函数 ============================
@@ -346,6 +373,13 @@ static void send_end(httpd_req_t *req)
  */
 static esp_err_t h_home(httpd_req_t *req)
 {
+    // 已进入关 WiFi 收尾流程：此时刷新首页会续期 deadline 破坏收尾，引导到成功页
+    if (s_closing) {
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", "/success");
+        httpd_resp_send(req, NULL, 0);
+        return ESP_OK;
+    }
     arm_deadline();
     power_engine_t *e = s_engine;
     int power = e->base_power;
@@ -473,8 +507,13 @@ static esp_err_t h_home(httpd_req_t *req)
     SEND(req,
         "</div>"
         "<div class=\"note\" id=\"mn\">固定功率：手动设置三项数据，保存后骑行 App 直接接收。</div>"
-        "<button class=\"btn\" type=\"submit\">&#8635; 保存并重启</button>"
-        "<button type=\"button\" class=\"btn\" style=\"background:#8e8e93;margin-top:6px\" onclick=\"resetForm()\">恢复默认</button></form>"
+        // 两个提交按钮：通过 formaction 区分目标路由。
+        // 主按钮"保存设置" → /config（仅保存+实时生效，不关 WiFi，可继续修改）
+        // 次按钮"保存并关闭 WiFi" → /close-wifi（保存+实时生效+5s 后关 WiFi 回到 BLE）
+        "<button class=\"btn\" type=\"submit\" formaction=\"/config\">&#10003; 保存设置</button>"
+        "<button class=\"btn\" type=\"submit\" formaction=\"/close-wifi\" style=\"background:#34c759;margin-top:8px\">&#8634; 保存并关闭 WiFi</button></form>"
+        // 保存成功 toast：由首页 URL 携带 saved=1 触发，2s 后自动消失
+        "<div id=\"toast\" style=\"display:none;position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1d1d1f;color:#fff;padding:12px 22px;border-radius:18px;font-size:14px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:50\">&#10003; 已保存并实时生效</div>"
         "</div><script>");
 
     snprintf(buf, sizeof(buf),
@@ -483,6 +522,10 @@ static esp_err_t h_home(httpd_req_t *req)
     SEND(req, buf);
 
     SEND(req,
+        // saved=1 toast：h_config 保存成功 302 回首页时携带，2s 后自动消失。
+        "if(location.search.indexOf(\"saved=1\")>=0){"
+        "var t=g(\"toast\");t.style.display=\"block\";"
+        "setTimeout(function(){t.style.display=\"none\";history.replaceState(null,\"\",\"\")},2000)}"
         "function g(i){return E[i]||(E[i]=document.getElementById(i))}var z;function updZone(){clearTimeout(z);z=setTimeout(uz,150)}"
         "function uz(){var w=parseInt(g(\"p\").value)||0,h=parseInt(g(\"h\").value)||0,c=parseInt(g(\"c\").value)||0,r=w/F,x=h/T,p=w&&F?(r<.55?0:r<.75?1:r<.9?2:r<1.05?3:r<1.2?4:r<1.5?5:6):0,hr=h&&T?(x<.68?0:x<.83?1:x<.94?2:x<1.05?3:4):0,a=g(\"pz\"),b=g(\"hz\"),d=g(\"cz\");"
         "g(\"p\").className=w<0||w>2000?\"out-of-range\":\"\";g(\"c\").className=c<20||c>120?\"out-of-range\":\"\";g(\"h\").className=h<60||h>200?\"out-of-range\":\"\";"
@@ -502,10 +545,7 @@ static esp_err_t h_home(httpd_req_t *req)
         "updNote()}");
 
     snprintf(buf, sizeof(buf),
-        "syncMode();updZone();"
-        "function resetForm(){g(\"p\").value=%d;g(\"c\").value=%d;g(\"h\").value=%d;"
-        "var r=document.getElementsByName(\"mode\");for(var i=0;i<r.length;i++){if(r[i].value===\"steady\")r[i].checked=true}syncMode();updZone()}",
-        DEFAULT_POWER, DEFAULT_CADENCE, DEFAULT_HEARTRATE);
+        "syncMode();updZone();");
     SEND(req, buf);
 
     SEND(req,
@@ -527,10 +567,10 @@ static esp_err_t h_home(httpd_req_t *req)
 
 /**
  * 输出配置保存成功页面。
- * 展示最终保存的关键配置，并给出即将重启恢复 BLE 的倒计时。
+ * 展示最终保存的关键配置，并给出即将关闭 WiFi 回到 BLE 的倒计时。
  * req：HTTP 请求对象。
  * 返回值：无。
- * 特殊行为：只负责输出页面，不修改重启状态。
+ * 特殊行为：只负责输出页面，不修改收尾状态；配置已通过 power_engine setter 实时生效，BLE 通知中已是新值。
  */
 static void send_success(httpd_req_t *req)
 {
@@ -558,7 +598,7 @@ static void send_success(httpd_req_t *req)
         "</style></head><body><div class=\"box\">"
         "<div class=\"icon\">&#10003;</div>"
         "<h1>已保存</h1>"
-        "<p class=\"sub\">设备将重启并恢复蓝牙连接。</p>"
+        "<p class=\"sub\">配置已实时生效，蓝牙连接未中断。</p>"
         "<div class=\"values\">");
 
     char buf[768];
@@ -566,7 +606,7 @@ static void send_success(httpd_req_t *req)
         "<p>%dW / %dRPM / %dBPM</p>"
         "<p class=\"muted\">%s模式 · 蓝牙名称：%s</p></div>"
         "<div class=\"reboot-box\"><div class=\"title\">下一步</div>"
-        "<div class=\"desc\">倒计时结束后回到骑行 App，重新连接 %s。</div></div>",
+        "<div class=\"desc\">倒计时结束后 WiFi 自动关闭，%s 全程在线，回到骑行 App 即可继续骑行。</div></div>",
         e->base_power, e->cadence_base, e->last_heartrate,
         mode_name((int)e->mode), dn, dn);
     SEND(req, buf);
@@ -575,7 +615,7 @@ static void send_success(httpd_req_t *req)
         "<div class=\"countdown\" id=\"t\">5</div>"
         "<p class=\"note\">请保持设备供电，WiFi 会自动关闭。</p>"
         "</div>"
-        "<script>var t=5;function c(){if(t>0){document.getElementById(\"t\").innerHTML=t;t--;setTimeout(c,1000)}else{document.body.innerHTML='<div style=\"text-align:center;padding:40px;color:#6e6e73;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif\"><p style=\"font-size:22px;font-weight:800;color:#1d1d1f\">设备正在重启</p><p style=\"margin-top:12px;font-size:15px\">蓝牙恢复后，请回到骑行 App 重新连接</p></div>'}}c()</script></body></html>");
+        "<script>var t=5;function c(){if(t>0){document.getElementById(\"t\").innerHTML=t;t--;setTimeout(c,1000)}else{document.body.innerHTML='<div style=\"text-align:center;padding:40px;color:#6e6e73;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif\"><p style=\"font-size:22px;font-weight:800;color:#1d1d1f\">WiFi 已关闭</p><p style=\"margin-top:12px;font-size:15px\">蓝牙全程未断开，回到骑行 App 继续骑行即可</p></div>'}}c()</script></body></html>");
     send_end(req);
 }
 
@@ -618,7 +658,7 @@ static void send_save_error(httpd_req_t *req)
  */
 static esp_err_t h_success(httpd_req_t *req)
 {
-    if (!s_rebooting) {  // 未提交配置时直访，302 回首页（与旧版 PRG 守卫一致）
+    if (!s_closing) {  // 未提交配置时直访，302 回首页（与旧版 PRG 守卫一致）
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/");
         httpd_resp_send(req, NULL, 0);
@@ -639,9 +679,8 @@ static esp_err_t h_success(httpd_req_t *req)
  * 特殊行为：手动功率/踏频/心率三项依赖 power_engine setter 内部的"仅 STEADY 生效"守卫，
  *           非 STEADY 模式下 setter 自行拒绝，无需调用方再判断。
  */
-static void apply_form_fields(const char *body)
+static void apply_form_fields(power_engine_t *e, const char *body)
 {
-    power_engine_t *e = s_engine;
     char val[64];
 
     if (form_get_str(body, "mode", val, sizeof(val))) {
@@ -664,20 +703,22 @@ static void apply_form_fields(const char *body)
 }
 
 /**
- * 处理配置提交路由。
- * 读取表单、应用配置、保存到 NVS、返回成功页并启动延迟重启倒计时。
+ * 处理配置提交路由（仅保存，不关闭 WiFi）。
+ * 读取表单、应用配置（实时生效到 BLE 通知）、保存到 NVS，302 回首页并带 saved=1 提示。
  * req：HTTP 请求对象。
  * 返回值：ESP_OK 表示成功处理，ESP_FAIL 表示读取请求体失败。
- * 特殊行为：重复提交时不会再次保存，而是直接返回当前成功页内容。
+ * 特殊行为：本路由不触发 WiFi 关闭，用户可反复保存继续修改；如需关闭 WiFi 走 /close-wifi。
  */
 static esp_err_t h_config(httpd_req_t *req)
 {
-    if (s_rebooting) {  // 防重复提交
-        send_success(req);
+    if (s_closing) {  // 已进入收尾流程，拒绝再保存
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", "/success");
+        httpd_resp_send(req, NULL, 0);
         return ESP_OK;
     }
 
-    // 开始处理配置提交前先续期超时窗口，避免处理过程中（读请求体/写NVS/发响应）被超时重启
+    // 开始处理配置提交前先续期超时窗口，避免处理过程中（读请求体/写NVS/发响应）被超时触发收尾
     arm_deadline();
 
     char *body = NULL;
@@ -691,29 +732,90 @@ static esp_err_t h_config(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    // 先保存引擎快照，NVS 失败时回滚，避免内存配置与持久化不一致
-    power_engine_t saved;
-    memcpy(&saved, s_engine, sizeof(power_engine_t));
-
-    apply_form_fields(body);
+    // 写入临时副本：NVS 失败时直接丢弃，s_engine 完全不变，BLE 主循环不会读到中间值造成跳变
+    power_engine_t next;
+    memcpy(&next, s_engine, sizeof(power_engine_t));
+    apply_form_fields(&next, body);
     free(body);
 
-    if (nvs_store_save(s_engine)) {
+    if (nvs_store_save(&next)) {
+        // NVS 成功后再 swap 回主引擎：BLE 主循环下次取快照即推新值
+        // 设备名变化时同步刷新 GAP 服务+广播，让扫描端立即看到新名
+        bool name_changed = strcmp(s_engine->device_name, next.device_name) != 0;
+        memcpy(s_engine, &next, sizeof(power_engine_t));
         power_engine_clear_dirty(s_engine);
-        ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d name=%s",
+        if (name_changed) {
+            ble_bikepower_refresh_device_name();
+        }
+        ESP_LOGI(TAG, "配置已保存（仅保存，不关WiFi）p=%dW c=%dRPM mode=%d name=%s",
                  s_engine->base_power, s_engine->cadence_base,
                  (int)s_engine->mode, s_engine->device_name);
-        // 保存成功后先设置 5s 重启窗口，再发成功页，避免响应发送期间被超时打断
-        s_rebooting = true;
-        s_deadline_sec = now_sec() + WIFI_PORTAL_REBOOT_DELAY_SEC;
-        send_success(req);
+        // PRG 模式：302 回首页，URL 带 saved=1 触发"已保存"toast。
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", "/?saved=1");
+        httpd_resp_send(req, NULL, 0);
     } else {
-        ESP_LOGE(TAG, "配置保存失败，回滚配置");
-        memcpy(s_engine, &saved, sizeof(power_engine_t));
+        ESP_LOGE(TAG, "配置保存失败，s_engine 保持原值");
         // 保存失败后续期完整超时窗口，允许用户重试
         arm_deadline();
         send_save_error(req);
+        return ESP_OK;  // 500 响应已通过 SEND 完整发送，避免 httpd 重复发错误
+    }
+
+    return ESP_OK;
+}
+
+/**
+ * 处理"保存并关闭 WiFi"路由。
+ * 与 h_config 同样保存配置+实时生效，额外触发 portal_done 关闭 WiFi 回到 BLE。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示成功处理，ESP_FAIL 表示读取请求体失败。
+ * 特殊行为：成功后设置 5s 收尾窗口，由 shutdown_check_cb 触发 portal_done 关 WiFi。
+ */
+static esp_err_t h_close_wifi(httpd_req_t *req)
+{
+    if (s_closing) {  // 防重复提交
+        send_success(req);
+        return ESP_OK;
+    }
+
+    arm_deadline();
+
+    char *body = NULL;
+    int len = recv_body(req, &body);
+    if (len == -2) {
+        httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE, "request body too large");
         return ESP_FAIL;
+    }
+    if (len < 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "read error");
+        return ESP_FAIL;
+    }
+
+    power_engine_t next;
+    memcpy(&next, s_engine, sizeof(power_engine_t));
+    apply_form_fields(&next, body);
+    free(body);
+
+    if (nvs_store_save(&next)) {
+        bool name_changed = strcmp(s_engine->device_name, next.device_name) != 0;
+        memcpy(s_engine, &next, sizeof(power_engine_t));
+        power_engine_clear_dirty(s_engine);
+        if (name_changed) {
+            ble_bikepower_refresh_device_name();
+        }
+        ESP_LOGI(TAG, "配置已保存并准备关闭 WiFi p=%dW c=%dRPM mode=%d name=%s",
+                 s_engine->base_power, s_engine->cadence_base,
+                 (int)s_engine->mode, s_engine->device_name);
+        // 配置已实时生效到 BLE 通知，设置 5s 收尾窗口让成功页发送后关闭 WiFi。
+        s_closing = true;
+        s_deadline_sec = now_sec() + WIFI_PORTAL_REBOOT_DELAY_SEC;
+        send_success(req);
+    } else {
+        ESP_LOGE(TAG, "配置保存失败，s_engine 保持原值");
+        arm_deadline();
+        send_save_error(req);
+        return ESP_OK;
     }
 
     return ESP_OK;
@@ -732,7 +834,7 @@ static esp_err_t h_draft(httpd_req_t *req)
 {
     // 配置已提交并计划重启时，拒绝再修改内存配置：否则会覆盖刚写入 NVS 的快照，
     // 导致重启后 BLE 生效值与成功页展示的"已保存"值不一致。直接引导到成功页。
-    if (s_rebooting) {
+    if (s_closing) {
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/success");
         httpd_resp_send(req, NULL, 0);
@@ -746,9 +848,13 @@ static esp_err_t h_draft(httpd_req_t *req)
         return ESP_FAIL;
     }
     if (len >= 0) {
+        // 草稿语义：仅写内存不落盘。apply_form_fields 会置 dirty，
+        // 立即清除避免主循环 10s 心跳自动 nvs_store_save 把草稿误存进 NVS。
+        // 用户点"保存设置"或"保存并关闭 WiFi"才会真正持久化。
+        apply_form_fields(s_engine, body);
+        power_engine_clear_dirty(s_engine);
         power_engine_t *e = s_engine;
-        apply_form_fields(body);
-        ESP_LOGI(TAG, "草稿保存 mode=%d p=%d c=%d hr=%d name=%s w=%d ftp=%d thr=%d ride=%d",
+        ESP_LOGI(TAG, "草稿保存（仅内存，未落盘）mode=%d p=%d c=%d hr=%d name=%s w=%d ftp=%d thr=%d ride=%d",
                  (int)e->mode, e->base_power, e->cadence_base, e->last_heartrate,
                  e->device_name, e->profile.weight, e->profile.ftp,
                  e->profile.thr_hr, e->profile.ride_type);
@@ -886,7 +992,7 @@ static void send_device_panel(httpd_req_t *req)
     SEND(req, PANEL_STYLE
         "<div class=\"panel-card\">"
         "<h2>设备名称</h2>"
-        "<p>这是骑行 App 搜索蓝牙设备时看到的名称。应用回首页后，再点击保存并重启生效。</p>"
+        "<p>这是骑行 App 搜索蓝牙设备时看到的名称。应用回首页后，再点击保存并应用生效。</p>"
         "<div class=\"field\"><input inputmode=\"text\" type=\"text\" id=\"more-device-name\" value=\"");
     SEND(req, dn);
     SEND(req, "\" maxlength=\"22\" oninput=\"syncDeviceName()\"></div></div>"
@@ -919,7 +1025,7 @@ static void send_profile_panel(httpd_req_t *req)
         "<div class=\"field\" style=\"margin-top:14px\"><label>阈值心率 (BPM)</label>"
         "<input inputmode=\"numeric\" type=\"number\" id=\"profile-thr-hr\" min=\"100\" max=\"220\" value=\"\" placeholder=\"如 170\" oninput=\"syncProfileThrHr()\"></div>"
         "</div>"
-        "<div class=\"module-note\">配速机器人请在首页「机器人配速」模式下选择。调整后请点\"应用并回首页\"，再在首页点\"保存并重启\"写入设备。</div>"
+        "<div class=\"module-note\">配速机器人请在首页「机器人配速」模式下选择。调整后请点\"应用并回首页\"，再在首页点\"保存并应用\"写入设备。</div>"
         "<script>"
         "window.syncProfileWeight=function(){document.getElementById(\"form-profile-weight\").value=document.getElementById(\"profile-weight\").value};"
         "window.syncProfileFtp=function(){document.getElementById(\"form-profile-ftp\").value=document.getElementById(\"profile-ftp\").value};"
@@ -1004,7 +1110,7 @@ static esp_err_t h_ui_module(httpd_req_t *req)
  * 在配网窗口结束后向浏览器展示一个静态提示页面。
  * req：HTTP 请求对象。
  * 返回值：ESP_OK 表示处理成功。
- * 特殊行为：页面本身不触发重启，重启由后台定时器完成。
+ * 特殊行为：页面本身不触发任何动作，WiFi 关闭由后台定时器 + done 回调完成。
  */
 static esp_err_t h_closing(httpd_req_t *req)
 {
@@ -1017,7 +1123,7 @@ static esp_err_t h_closing(httpd_req_t *req)
         "<div style=\"max-width:360px;width:100%;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:26px;padding:28px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.08)\">"
         "<div style=\"width:64px;height:64px;border-radius:50%;margin:0 auto 14px;background:#eef6ff;color:#007aff;font-size:38px;font-weight:800;display:flex;align-items:center;justify-content:center\">&#9202;</div>"
         "<h1 style=\"font-size:22px;margin:0 0 8px;font-weight:800;letter-spacing:-.03em\">WiFi 正在关闭</h1>"
-        "<p style=\"color:#6e6e73;font-size:13px;line-height:1.5;margin:0\">设备将重启并恢复蓝牙，请回到骑行 App 重新连接。</p>"
+        "<p style=\"color:#6e6e73;font-size:13px;line-height:1.5;margin:0\">蓝牙全程未断开，回到骑行 App 继续骑行即可。</p>"
         "</div></body></html>");
     return ESP_OK;
 }
@@ -1112,6 +1218,7 @@ static esp_err_t start_httpd(void)
     httpd_uri_t routes[] = {
         { .uri = "/",          .method = HTTP_GET,  .handler = h_home },
         { .uri = "/config",    .method = HTTP_POST, .handler = h_config },
+        { .uri = "/close-wifi", .method = HTTP_POST, .handler = h_close_wifi },
         { .uri = "/success",   .method = HTTP_GET,  .handler = h_success },
         { .uri = "/more",      .method = HTTP_GET,  .handler = h_more },
         { .uri = "/draft",     .method = HTTP_POST, .handler = h_draft },
@@ -1138,15 +1245,15 @@ static esp_err_t start_httpd(void)
 /**
  * 启动 WiFi 配网门户（HTTP 部分）。
  * 绑定功率引擎、启动 HTTP 服务，并开启超时检查定时器。
- * 调用前必须已由 radio_ctrl 启动 SoftAP。
+ * 调用前必须已由 radio_ctrl 启动 SoftAP（共存模式下 BLE 仍在线）。
  * engine：供网页读取和写入配置的功率引擎实例。
  * 返回值：ESP_OK 表示门户已就绪，否则为错误码。
- * 特殊行为：HTTP 启动失败时不会 arm 定时器，调用方应决定是否重启恢复 BLE。
+ * 特殊行为：HTTP 启动失败时不会 arm 定时器，调用方应关闭 SoftAP 回到 BLE。
  */
 esp_err_t wifi_portal_start(power_engine_t *engine)
 {
     s_engine = engine;
-    s_rebooting = false;
+    s_closing = false;
 
     esp_err_t ret = start_httpd();
     if (ret != ESP_OK) {
@@ -1172,6 +1279,41 @@ esp_err_t wifi_portal_start(power_engine_t *engine)
         return ret;
     }
 
-    ESP_LOGI(TAG, "WiFi 配网模式就绪，%ds 后自动超时", WIFI_SHUTDOWN_MS / 1000);
+    ESP_LOGI(TAG, "WiFi 配网模式就绪（BLE 共存），%ds 后自动超时", WIFI_SHUTDOWN_MS / 1000);
     return ESP_OK;
+}
+
+/**
+ * 停止 WiFi 配网门户。
+ * 停止超时检查定时器并关闭 HTTP 服务，释放 esp_http_server 资源。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：通常由 done 回调间接触发（在 app_main 任务上下文里调用，避免 httpd 任务自杀）；
+ *           SoftAP 由 radio_ctrl_exit_wifi 单独关闭；可重复调用（幂等）。
+ */
+void wifi_portal_stop(void)
+{
+    if (s_shutdown_timer) {
+        esp_timer_stop(s_shutdown_timer);
+        esp_timer_delete(s_shutdown_timer);
+        s_shutdown_timer = NULL;
+    }
+    if (s_httpd) {
+        httpd_stop(s_httpd);
+        s_httpd = NULL;
+    }
+    s_closing = false;
+    ESP_LOGI(TAG, "HTTP 配网门户已停止");
+}
+
+/**
+ * 注册配网结束回调。
+ * 保存成功或超时后会调用 cb，由调用方在 app_main 任务上下文里关闭 WiFi 并切换状态。
+ * cb：配网结束回调，可为 NULL。
+ * 返回值：无。
+ * 特殊行为：回调在 esp_timer 任务上下文执行，应仅做轻量操作（如投递事件队列），避免阻塞。
+ */
+void wifi_portal_set_done_callback(void (*cb)(void))
+{
+    s_done_cb = cb;
 }

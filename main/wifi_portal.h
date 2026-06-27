@@ -3,9 +3,9 @@
  * 运行环境：ESP-IDF v5.5.4，目标芯片 ESP32-C3
  *
  * SoftAP 启动由 radio_ctrl 统一管理；本模块只负责 HTTP 路由和页面。
- * 调用前必须已停用 BLE 并已启动 SoftAP（由 radio_ctrl 保证）。
- * 路由：GET /（配置页）、POST /config（保存并重启）、GET /time（剩余秒数）。
- * 180s 无续期自动超时 -> esp_restart() 恢复 BLE。
+ * 调用前必须已由 radio_ctrl 启动 SoftAP（v3.1.3 起为共存模式，BLE 仍在线）。
+ * 路由：GET /（配置页）、POST /config（保存并实时生效）、GET /time（剩余秒数）。
+ * 180s 无续期自动关闭 WiFi 回到 BLE（不重启）；配置通过 power_engine setter 实时生效到 BLE 通知。
  */
 #pragma once
 
@@ -17,6 +17,24 @@
  * 启动 HTTP 服务和超时定时器，提供浏览器配置页面。
  * engine：当前功率引擎实例，供网页读取与写入配置。
  * 返回值：ESP_OK 表示门户已就绪，否则为错误码。
- * 特殊行为：调用前必须已由 radio_ctrl 停止 BLE 并启动 SoftAP；HTTP 启动失败时返回错误码，由调用方决定是否重启恢复 BLE。
+ * 特殊行为：调用前必须已由 radio_ctrl 启动 SoftAP；HTTP 启动失败时返回错误码，由调用方关闭 SoftAP 回到 BLE。
  */
 esp_err_t wifi_portal_start(power_engine_t *engine);
+
+/**
+ * 停止 WiFi 配网门户。
+ * 停止超时检查定时器并关闭 HTTP 服务，释放 esp_http_server 资源。
+ * 无参数。
+ * 返回值：无。
+ * 特殊行为：通常由 done 回调间接触发；SoftAP 由 radio_ctrl_exit_wifi 单独关闭；可重复调用（幂等）。
+ */
+void wifi_portal_stop(void);
+
+/**
+ * 注册配网结束回调。
+ * 保存成功或超时后会调用 cb，由调用方在 app_main 任务上下文里关闭 WiFi 并切换状态。
+ * cb：配网结束回调，可为 NULL。
+ * 返回值：无。
+ * 特殊行为：回调在 esp_timer 任务上下文执行，应仅做轻量操作（如投递事件队列），避免阻塞。
+ */
+void wifi_portal_set_done_callback(void (*cb)(void));
