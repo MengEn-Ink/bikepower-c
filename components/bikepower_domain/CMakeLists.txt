@@ -8,5 +8,11 @@ idf_component_register(
          "json_miniparse.c"
          "button_logic.c"
          "led_pattern.c"
+         "app_state_machine.c"
+         "button_debounce.c"
+         "dns_packet.c"
+         "ftms_codec.c"
+         "radio_state.c"
+         "ota_selftest.c"
     INCLUDE_DIRS "include"
 )

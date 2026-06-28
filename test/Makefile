@@ -12,7 +12,13 @@ SRCS := test_domain.c \
         $(DOMAIN)/ota_version.c \
         $(DOMAIN)/json_miniparse.c \
         $(DOMAIN)/button_logic.c \
-        $(DOMAIN)/led_pattern.c
+        $(DOMAIN)/led_pattern.c \
+        $(DOMAIN)/app_state_machine.c \
+        $(DOMAIN)/button_debounce.c \
+        $(DOMAIN)/dns_packet.c \
+        $(DOMAIN)/ftms_codec.c \
+        $(DOMAIN)/radio_state.c \
+        $(DOMAIN)/ota_selftest.c
 
 test_domain: $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $(SRCS) -lm

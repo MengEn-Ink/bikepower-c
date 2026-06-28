@@ -16,6 +16,12 @@
 #include "json_miniparse.h"
 #include "button_logic.h"
 #include "led_pattern.h"
+#include "app_state_machine.h"
+#include "button_debounce.h"
+#include "dns_packet.h"
+#include "ftms_codec.h"
+#include "radio_state.h"
+#include "ota_selftest.h"
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -506,6 +512,302 @@ static void test_led_pattern(void)
     CHECK(led_pattern_initial_on(LED_PATTERN_FAST) == 0, "FAST 初始灭");
 }
 
+static void test_app_state_machine(void)
+{
+    printf("[test] 应用状态机决策表\n");
+
+    // BTN_DOWN 在不同状态下的动作
+    CHECK(app_state_machine_dispatch(ASM_ST_WIFI_CONFIRM, ASM_EVT_BTN_DOWN) == ASM_ACT_BTN_TRIGGER_WIFI,
+          "WIFI_CONFIRM + BTN_DOWN -> 触发配网");
+    CHECK(app_state_machine_dispatch(ASM_ST_BLE_ACTIVE, ASM_EVT_BTN_DOWN) == ASM_ACT_BTN_DOWN_RECORD,
+          "BLE_ACTIVE + BTN_DOWN -> 记录基准功率");
+    CHECK(app_state_machine_dispatch(ASM_ST_BOOTING, ASM_EVT_BTN_DOWN) == ASM_ACT_IGNORE,
+          "BOOTING + BTN_DOWN -> 忽略");
+    CHECK(app_state_machine_dispatch(ASM_ST_WIFI_CONFIG, ASM_EVT_BTN_DOWN) == ASM_ACT_IGNORE,
+          "WIFI_CONFIG + BTN_DOWN -> 忽略");
+    CHECK(app_state_machine_dispatch(ASM_ST_ERROR_RECOVERY, ASM_EVT_BTN_DOWN) == ASM_ACT_IGNORE,
+          "ERROR_RECOVERY + BTN_DOWN -> 忽略");
+
+    // BTN_REPEAT 仅在 BLE_ACTIVE 处理
+    CHECK(app_state_machine_dispatch(ASM_ST_BLE_ACTIVE, ASM_EVT_BTN_REPEAT) == ASM_ACT_BTN_REPEAT_ADJUST,
+          "BLE_ACTIVE + BTN_REPEAT -> 调功");
+    CHECK(app_state_machine_dispatch(ASM_ST_WIFI_CONFIRM, ASM_EVT_BTN_REPEAT) == ASM_ACT_IGNORE,
+          "WIFI_CONFIRM + BTN_REPEAT -> 忽略");
+    CHECK(app_state_machine_dispatch(ASM_ST_WIFI_CONFIG, ASM_EVT_BTN_REPEAT) == ASM_ACT_IGNORE,
+          "WIFI_CONFIG + BTN_REPEAT -> 忽略");
+
+    // BTN_UP：BLE_ACTIVE 之外的状态都应忽略
+    CHECK(app_state_machine_dispatch(ASM_ST_BLE_ACTIVE, ASM_EVT_BTN_UP) == ASM_ACT_BTN_UP_SHORT,
+          "BLE_ACTIVE + BTN_UP -> 占位（调用方再判 held_ms）");
+    CHECK(app_state_machine_dispatch(ASM_ST_WIFI_CONFIRM, ASM_EVT_BTN_UP) == ASM_ACT_IGNORE,
+          "WIFI_CONFIRM + BTN_UP -> 忽略");
+    CHECK(app_state_machine_dispatch(ASM_ST_WIFI_CONFIG, ASM_EVT_BTN_UP) == ASM_ACT_IGNORE,
+          "WIFI_CONFIG + BTN_UP -> 忽略");
+
+    // WIFI_DONE 仅在 WIFI_CONFIG 状态触发退出
+    CHECK(app_state_machine_dispatch(ASM_ST_WIFI_CONFIG, ASM_EVT_WIFI_DONE) == ASM_ACT_WIFI_DONE_EXIT,
+          "WIFI_CONFIG + WIFI_DONE -> 退出配网");
+    CHECK(app_state_machine_dispatch(ASM_ST_BLE_ACTIVE, ASM_EVT_WIFI_DONE) == ASM_ACT_IGNORE,
+          "BLE_ACTIVE + WIFI_DONE -> 忽略");
+
+    // CONN_CHANGED/ERG_TARGET 不依赖状态分支
+    CHECK(app_state_machine_dispatch(ASM_ST_BLE_ACTIVE, ASM_EVT_CONN_CHANGED) == ASM_ACT_IGNORE,
+          "CONN_CHANGED 由调用方直接处理");
+    CHECK(app_state_machine_dispatch(ASM_ST_BLE_ACTIVE, ASM_EVT_ERG_TARGET) == ASM_ACT_IGNORE,
+          "ERG_TARGET 由调用方直接处理");
+
+    // 辅助判定函数
+    CHECK(app_state_machine_can_adjust_power(ASM_ST_BLE_ACTIVE) == true, "BLE_ACTIVE 可调功");
+    CHECK(app_state_machine_can_adjust_power(ASM_ST_WIFI_CONFIG) == false, "WIFI_CONFIG 不可调功");
+    CHECK(app_state_machine_can_adjust_power(ASM_ST_WIFI_CONFIRM) == false, "WIFI_CONFIRM 不可调功");
+
+    CHECK(app_state_machine_should_ignore_btn_up(ASM_ST_WIFI_CONFIG) == true, "WIFI_CONFIG 忽略 BTN_UP");
+    CHECK(app_state_machine_should_ignore_btn_up(ASM_ST_WIFI_CONFIRM) == true, "WIFI_CONFIRM 忽略 BTN_UP");
+    CHECK(app_state_machine_should_ignore_btn_up(ASM_ST_BLE_ACTIVE) == false, "BLE_ACTIVE 不忽略 BTN_UP");
+}
+
+static void test_button_debounce(void)
+{
+    printf("[test] 按钮去抖逻辑\n");
+    const uint32_t SHORT = 500;
+    const uint32_t REPEAT = 200;
+
+    // button_debounce_is_valid_press
+    CHECK(button_debounce_is_valid_press(true) == true, "去抖后仍按下 -> 有效");
+    CHECK(button_debounce_is_valid_press(false) == false, "去抖后已松开 -> 误触");
+
+    // button_repeat_should_fire 边界
+    CHECK(button_repeat_should_fire(0, 0, SHORT, REPEAT) == false, "0ms < SHORT 不触发");
+    CHECK(button_repeat_should_fire(499, 0, SHORT, REPEAT) == false, "499ms < SHORT 不触发");
+    CHECK(button_repeat_should_fire(500, 0, SHORT, REPEAT) == true, "500ms 边界首次触发");
+    CHECK(button_repeat_should_fire(600, 500, SHORT, REPEAT) == false, "距上次 100ms < REPEAT 不触发");
+    CHECK(button_repeat_should_fire(700, 500, SHORT, REPEAT) == true, "距上次 200ms 边界触发");
+    CHECK(button_repeat_should_fire(1000, 800, SHORT, REPEAT) == true, "距上次 200ms 触发");
+
+    // button_release_is_real
+    CHECK(button_release_is_real(false) == true, "去抖后已松开 -> 真释放");
+    CHECK(button_release_is_real(true) == false, "去抖后仍按下 -> 抖动");
+}
+
+static void test_dns_packet(void)
+{
+    printf("[test] DNS 报文构造\n");
+    // 构造一个标准 DNS A 记录查询：查询 "example.com"
+    uint8_t query[32];
+    size_t qlen = 0;
+    // Header: ID=0x1234, FLAGS=0x0100 (RD=1), QDCOUNT=1, ANCOUNT=NSCOUNT=ARCOUNT=0
+    query[0] = 0x12; query[1] = 0x34;
+    query[2] = 0x01; query[3] = 0x00;
+    query[4] = 0x00; query[5] = 0x01;
+    query[6] = 0x00; query[7] = 0x00;
+    query[8] = 0x00; query[9] = 0x00;
+    query[10] = 0x00; query[11] = 0x00;
+    qlen = 12;
+    // QNAME: "example.com" -> 7example3com0
+    query[qlen++] = 7;  memcpy(&query[qlen], "example", 7); qlen += 7;
+    query[qlen++] = 3;  memcpy(&query[qlen], "com", 3); qlen += 3;
+    query[qlen++] = 0;
+    // QTYPE=A(1), QCLASS=IN(1)
+    query[qlen++] = 0x00; query[qlen++] = 0x01;
+    query[qlen++] = 0x00; query[qlen++] = 0x01;
+
+    uint8_t tx[DNS_PACKET_MAX_LEN];
+    size_t txlen = 0;
+    CHECK(dns_packet_build_a_response(query, qlen, 192, 168, 4, 1, 60, tx, &txlen) == true,
+          "标准 A 查询 -> 构造成功");
+
+    // 验证响应字段
+    CHECK(txlen == qlen + 16, "响应长度 = 查询 + 16字节Answer");
+    CHECK(tx[0] == 0x12 && tx[1] == 0x34, "响应 ID 复用查询 ID");
+    CHECK(tx[2] == 0x81 && tx[3] == 0x80, "响应 FLAGS=0x8180");
+    CHECK(tx[6] == 0x00 && tx[7] == 0x01, "ANCOUNT=1");
+    // Answer 段起始
+    size_t ans = qlen;
+    CHECK(tx[ans + 0] == 0xC0 && tx[ans + 1] == 0x0C, "Answer NAME 指针指向偏移12");
+    CHECK(tx[ans + 2] == 0x00 && tx[ans + 3] == 0x01, "Answer TYPE=A");
+    CHECK(tx[ans + 4] == 0x00 && tx[ans + 5] == 0x01, "Answer CLASS=IN");
+    CHECK(tx[ans + 6] == 0x00 && tx[ans + 7] == 0x00, "Answer TTL 高字节");
+    CHECK(tx[ans + 8] == 0x00 && tx[ans + 9] == 60, "Answer TTL 低字节=60");
+    CHECK(tx[ans + 10] == 0x00 && tx[ans + 11] == 0x04, "Answer RDLENGTH=4");
+    CHECK(tx[ans + 12] == 192 && tx[ans + 13] == 168 && tx[ans + 14] == 4 && tx[ans + 15] == 1,
+          "Answer RDATA=192.168.4.1");
+
+    // 异常输入
+    CHECK(dns_packet_build_a_response(query, 5, 192, 168, 4, 1, 60, tx, &txlen) == false,
+          "查询长度<12 拒绝");
+    CHECK(dns_packet_build_a_response(NULL, qlen, 192, 168, 4, 1, 60, tx, &txlen) == false,
+          "query=NULL 拒绝");
+    // QR=1 的响应报文不应被当作查询
+    query[2] = 0x81;
+    CHECK(dns_packet_build_a_response(query, qlen, 192, 168, 4, 1, 60, tx, &txlen) == false,
+          "QR=1 非 Query 拒绝");
+    query[2] = 0x01;  // 恢复
+    // QDCOUNT=0
+    query[5] = 0x00;
+    CHECK(dns_packet_build_a_response(query, qlen, 192, 168, 4, 1, 60, tx, &txlen) == false,
+          "QDCOUNT=0 拒绝");
+    query[5] = 0x01;  // 恢复
+
+    // dns_packet_get_qtype
+    CHECK(dns_packet_get_qtype(query, qlen) == 1, "QTYPE=A=1");
+    query[qlen - 4] = 0x00; query[qlen - 3] = 0x1C;  // 改为 AAAA
+    CHECK(dns_packet_get_qtype(query, qlen) == 28, "QTYPE=AAAA=28");
+}
+
+static void test_ftms_codec(void)
+{
+    printf("[test] FTMS 协议编解码\n");
+    const int PMIN = 0, PMAX = 800;
+    int target = -999;
+
+    // ftms_codec_decode_cp 各 OpCode
+    uint8_t req_ctrl[1] = { FTMS_CODEC_OP_REQUEST_CONTROL };
+    CHECK(ftms_codec_decode_cp(req_ctrl, 1, PMIN, PMAX, &target) == FTMS_CODEC_RSP_SUCCESS,
+          "REQUEST_CONTROL -> SUCCESS");
+
+    uint8_t req_power_ok[3] = { FTMS_CODEC_OP_SET_TARGET_POWER, 0xFA, 0x00 };  // 250W
+    CHECK(ftms_codec_decode_cp(req_power_ok, 3, PMIN, PMAX, &target) == FTMS_CODEC_RSP_SUCCESS,
+          "SET_TARGET_POWER 250W -> SUCCESS");
+    CHECK(target == 250, "目标功率=250W");
+
+    uint8_t req_power_neg[3] = { FTMS_CODEC_OP_SET_TARGET_POWER, 0xFF, 0xFF };  // -1W
+    CHECK(ftms_codec_decode_cp(req_power_neg, 3, PMIN, PMAX, &target) == FTMS_CODEC_RSP_INVALID_PARAM,
+          "SET_TARGET_POWER -1W -> INVALID_PARAM");
+
+    uint8_t req_power_over[3] = { FTMS_CODEC_OP_SET_TARGET_POWER, 0x21, 0x03 };  // 801W
+    CHECK(ftms_codec_decode_cp(req_power_over, 3, PMIN, PMAX, &target) == FTMS_CODEC_RSP_INVALID_PARAM,
+          "SET_TARGET_POWER 801W -> INVALID_PARAM");
+
+    uint8_t req_power_short[2] = { FTMS_CODEC_OP_SET_TARGET_POWER, 0xFA };
+    CHECK(ftms_codec_decode_cp(req_power_short, 2, PMIN, PMAX, &target) == FTMS_CODEC_RSP_INVALID_PARAM,
+          "SET_TARGET_POWER len<3 -> INVALID_PARAM");
+
+    uint8_t req_start[1] = { FTMS_CODEC_OP_START_RESUME };
+    CHECK(ftms_codec_decode_cp(req_start, 1, PMIN, PMAX, &target) == FTMS_CODEC_RSP_SUCCESS_START,
+          "START_RESUME -> SUCCESS_START");
+
+    uint8_t req_stop[1] = { FTMS_CODEC_OP_STOP_PAUSE };
+    CHECK(ftms_codec_decode_cp(req_stop, 1, PMIN, PMAX, &target) == FTMS_CODEC_RSP_SUCCESS_STOP,
+          "STOP_PAUSE -> SUCCESS_STOP");
+
+    uint8_t req_reset[1] = { FTMS_CODEC_OP_RESET };
+    CHECK(ftms_codec_decode_cp(req_reset, 1, PMIN, PMAX, &target) == FTMS_CODEC_RSP_SUCCESS_RESET,
+          "RESET -> SUCCESS_RESET");
+
+    uint8_t req_unknown[1] = { 0xFF };
+    CHECK(ftms_codec_decode_cp(req_unknown, 1, PMIN, PMAX, &target) == FTMS_CODEC_RSP_UNSUPPORTED,
+          "未知 OpCode -> UNSUPPORTED");
+
+    // ftms_codec_encode_response
+    uint8_t resp[3];
+    CHECK(ftms_codec_encode_response(FTMS_CODEC_OP_REQUEST_CONTROL, FTMS_CODEC_RESULT_SUCCESS, resp) == 3,
+          "Response 编码长度=3");
+    CHECK(resp[0] == FTMS_CODEC_OP_RESPONSE_CODE && resp[1] == FTMS_CODEC_OP_REQUEST_CONTROL && resp[2] == FTMS_CODEC_RESULT_SUCCESS,
+          "Response 字节正确");
+
+    // ftms_codec_encode_cps
+    uint8_t cps[8];
+    CHECK(ftms_codec_encode_cps(200, 100, 5120, cps) == 8, "CPS 编码长度=8");
+    CHECK(cps[0] == 0x20 && cps[1] == 0x00, "CPS flags=0x0020");
+    CHECK(cps[2] == 200 && cps[3] == 0, "CPS power=200W 小端");
+    CHECK(cps[4] == 100 && cps[5] == 0, "CPS crank_rev=100");
+    CHECK(cps[6] == 0x00 && cps[7] == 0x14, "CPS crank_time=5120(0x1400) 小端");
+
+    // ftms_codec_encode_hr
+    uint8_t hr[2];
+    CHECK(ftms_codec_encode_hr(150, hr) == 2, "HR 编码长度=2");
+    CHECK(hr[0] == 0x00 && hr[1] == 150, "HR flags=0 + bpm=150");
+
+    // ftms_codec_encode_csc
+    uint8_t csc[5];
+    CHECK(ftms_codec_encode_csc(100, 5120, csc) == 5, "CSC 编码长度=5");
+    CHECK(csc[0] == 0x02, "CSC flags=0x02");
+    CHECK(csc[1] == 100 && csc[2] == 0, "CSC crank_rev=100");
+    CHECK(csc[3] == 0x00 && csc[4] == 0x14, "CSC crank_time=5120");
+
+    // ftms_codec_encode_ftms_bike
+    uint8_t bike[8];
+    CHECK(ftms_codec_encode_ftms_bike(90, 200, bike) == 8, "FTMS Bike 编码长度=8");
+    CHECK(bike[0] == 0x44 && bike[1] == 0x00, "FTMS flags=0x0044");
+    uint16_t exp_speed = 90 * 30;
+    CHECK(bike[2] == (exp_speed & 0xFF) && bike[3] == ((exp_speed >> 8) & 0xFF), "FTMS speed=cad*30=2700 小端");
+    uint16_t exp_cad = 90 * 2;
+    CHECK(bike[4] == (exp_cad & 0xFF) && bike[5] == ((exp_cad >> 8) & 0xFF), "FTMS cadence=cad*2=180 小端");
+    CHECK(bike[6] == 200 && bike[7] == 0, "FTMS power=200W");
+
+    // ftms_codec_encode_training_status
+    uint8_t status[7];
+    CHECK(ftms_codec_encode_training_status(0x01, status) == 7, "Training Status 编码长度=7");
+    CHECK(status[0] == 0x01, "Training Status=0x01 Started");
+}
+
+static void test_radio_state(void)
+{
+    printf("[test] 射频状态机决策\n");
+
+    // radio_state_sta_connected
+    CHECK(radio_state_sta_connected(RADIO_STA_GOT_IP_BIT) == true, "GOT_IP -> 已连接");
+    CHECK(radio_state_sta_connected(RADIO_STA_DISCONNECTED_BIT) == false, "DISCONNECTED -> 未连接");
+    CHECK(radio_state_sta_connected(0) == false, "无位 -> 未连接");
+    CHECK(radio_state_sta_connected(RADIO_STA_GOT_IP_BIT | RADIO_STA_DISCONNECTED_BIT) == true,
+          "两位置位优先 GOT_IP（实际场景不会同时）");
+
+    // radio_state_sta_timeout
+    CHECK(radio_state_sta_timeout(0) == true, "无事件位 -> 超时");
+    CHECK(radio_state_sta_timeout(RADIO_STA_GOT_IP_BIT) == false, "GOT_IP -> 非超时");
+    CHECK(radio_state_sta_timeout(RADIO_STA_DISCONNECTED_BIT) == false, "DISCONNECTED -> 非超时");
+
+    // radio_state_can_switch_to_apsta
+    CHECK(radio_state_can_switch_to_apsta(RADIO_MODE_AP) == true, "AP -> 可切 APSTA");
+    CHECK(radio_state_can_switch_to_apsta(RADIO_MODE_STA) == false, "STA -> 不可切 APSTA");
+    CHECK(radio_state_can_switch_to_apsta(RADIO_MODE_APSTA) == false, "已 APSTA -> 不可再切");
+    CHECK(radio_state_can_switch_to_apsta(RADIO_MODE_NONE) == false, "NONE -> 不可切");
+
+    // radio_state_can_switch_to_ap
+    CHECK(radio_state_can_switch_to_ap(RADIO_MODE_APSTA, true) == true, "APSTA + 已断开 -> 可切 AP");
+    CHECK(radio_state_can_switch_to_ap(RADIO_MODE_APSTA, false) == false, "APSTA + 未断开 -> 不可切");
+    CHECK(radio_state_can_switch_to_ap(RADIO_MODE_AP, true) == false, "已 AP -> 不可切");
+    CHECK(radio_state_can_switch_to_ap(RADIO_MODE_STA, true) == false, "STA -> 不可切");
+}
+
+static void test_ota_selftest(void)
+{
+    printf("[test] OTA 自检状态机\n");
+
+    // IDLE 状态
+    CHECK(ota_selftest_advance(OTA_SELFTEST_IDLE, OTA_SELFTEST_EVT_START) == OTA_SELFTEST_PENDING,
+          "IDLE + START -> PENDING");
+    CHECK(ota_selftest_advance(OTA_SELFTEST_IDLE, OTA_SELFTEST_EVT_TIMEOUT) == OTA_SELFTEST_IDLE,
+          "IDLE + TIMEOUT -> 保持 IDLE");
+    CHECK(ota_selftest_advance(OTA_SELFTEST_IDLE, OTA_SELFTEST_EVT_MARK_INVALID) == OTA_SELFTEST_IDLE,
+          "IDLE + MARK_INVALID -> 保持 IDLE");
+
+    // PENDING 状态
+    CHECK(ota_selftest_advance(OTA_SELFTEST_PENDING, OTA_SELFTEST_EVT_TIMEOUT) == OTA_SELFTEST_CONFIRMED,
+          "PENDING + TIMEOUT -> CONFIRMED");
+    CHECK(ota_selftest_advance(OTA_SELFTEST_PENDING, OTA_SELFTEST_EVT_MARK_VALID) == OTA_SELFTEST_CONFIRMED,
+          "PENDING + MARK_VALID -> CONFIRMED");
+    CHECK(ota_selftest_advance(OTA_SELFTEST_PENDING, OTA_SELFTEST_EVT_MARK_INVALID) == OTA_SELFTEST_ROLLED_BACK,
+          "PENDING + MARK_INVALID -> ROLLED_BACK");
+    CHECK(ota_selftest_advance(OTA_SELFTEST_PENDING, OTA_SELFTEST_EVT_START) == OTA_SELFTEST_PENDING,
+          "PENDING + START -> 保持 PENDING（幂等）");
+
+    // 终态
+    CHECK(ota_selftest_advance(OTA_SELFTEST_CONFIRMED, OTA_SELFTEST_EVT_MARK_INVALID) == OTA_SELFTEST_CONFIRMED,
+          "CONFIRMED 是终态");
+    CHECK(ota_selftest_advance(OTA_SELFTEST_ROLLED_BACK, OTA_SELFTEST_EVT_MARK_VALID) == OTA_SELFTEST_ROLLED_BACK,
+          "ROLLED_BACK 是终态");
+
+    // 辅助判定
+    CHECK(ota_selftest_can_rollback(OTA_SELFTEST_PENDING) == true, "PENDING 可回滚");
+    CHECK(ota_selftest_can_rollback(OTA_SELFTEST_CONFIRMED) == false, "CONFIRMED 不可回滚");
+    CHECK(ota_selftest_can_rollback(OTA_SELFTEST_IDLE) == false, "IDLE 不可回滚");
+    CHECK(ota_selftest_can_rollback(OTA_SELFTEST_ROLLED_BACK) == false, "ROLLED_BACK 不可回滚");
+
+    CHECK(ota_selftest_should_start(1) == true, "PENDING_VERIFY 状态需启动自检");
+    CHECK(ota_selftest_should_start(0) == false, "非 PENDING_VERIFY 不启动自检");
+}
+
 int main(void)
 {
     test_profile();
@@ -523,6 +825,12 @@ int main(void)
     test_json_miniparse();
     test_button_logic();
     test_led_pattern();
+    test_app_state_machine();
+    test_button_debounce();
+    test_dns_packet();
+    test_ftms_codec();
+    test_radio_state();
+    test_ota_selftest();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }
