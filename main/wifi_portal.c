@@ -1410,7 +1410,7 @@ static esp_err_t h_ota(httpd_req_t *req)
         "if(d.has_update){h+='<p style=\"color:#34c759;font-size:13px;font-weight:800\">发现新版本！</p>';document.getElementById('upgrade-btn').disabled=false}"
         "else{h+='<p style=\"color:#86868b;font-size:13px\">已是最新版本</p>'}"
         "r.innerHTML=h}}"
-        "catch(e){}}};"
+        "catch(e){}};"
         "x.open('GET','/ota/status');x.send()},2000)};"
         "function startUpgrade(){"
         "if(!confirm('确认下载并升级？设备将断开蓝牙和配网热点，约2分钟后重启。'))return;"

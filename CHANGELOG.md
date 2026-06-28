@@ -2,12 +2,29 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
-## [未发布]
+## [3.1.8] - 2026-06-28
+
+### 修复（OTA 版本检查失败：HTTP 302 重定向）
+- `main/ota_downloader.c` 修复 Gitee `latest.json` 返回 302 时被当错误处理导致「无法获取版本信息」：ESP-IDF `esp_http_client` 的 `disable_auto_redirect=false` 不足，需显式设 `max_redirection_count`（默认 0 不重定向）。
+- `check_version` 和 `download_and_upgrade` 两处 HTTP 客户端配置均添加 `.max_redirection_count = 10`，跟随 Gitee raw URL 的 302 跳转到实际文件位置。
+- 真机日志确认：修复前 `latest.json HTTP 302 content_length=444`（读到重定向页 HTML）→ 修复后跟随重定向拿到真实 JSON。
+
+### 修复（配网页面 JS 语法错误：检查更新按钮无反应）
+- `main/wifi_portal.c` `/ota` 页 `pollStatus` 函数结尾多余的 `}` 导致 `setInterval(function(){...},2000)` 的 `)` 失配，整个 `<script>` 块报 `missing ) after argument list`，「检查更新」按钮点击完全无反应。
+- 历史教训已记入 TC-3a 规则：任何 `main/wifi_portal.c` 改动必须先跑 `tests/check_portal_js.py` 静态检查。
+
+### 新增（测试体系：覆盖率目标 90% + Loop 模式流程）
+- 抽取 OTA 纯逻辑到领域层（host 可测）：
+  - `components/bikepower_domain/ota_version.c/.h`：语义版本比较（从 `main/ota_update.c` 抽取），覆盖防降级核心逻辑。
+  - `components/bikepower_domain/json_miniparse.c/.h`：latest.json 解析（从 `main/ota_downloader.c` 抽取 static 函数），覆盖版本检查字段提取。
+- `test/test_domain.c` 新增 `test_ota_version_compare`（13 断言）+ `test_json_miniparse`（13 断言），host 单测断言数 581 → 946。
+- 新增 `tests/check_config_consistency.py`（TC-3c 常量一致性静态检查）：56 项校验 `bikepower_config.h` / `domain_config.h` / `README.md` / `docs/` 之间常量值一致，防止文档与代码漂移。
+- 新增 `docs/test-coverage-analysis.md` 测试覆盖率分析文档：模块清单、覆盖率矩阵、当前 28% → 目标 90% 路径、Loop 模式测试建立流程。
+- 更新 `.trae/rules/workflows/test-coverage.md`：TC-1 覆盖对象新增 ota_version/json_miniparse，新增 TC-3c 常量一致性规则，新增「覆盖率目标与现状」+「Loop 模式测试建立流程」章节。
 
 ### 改进（OTA 升级方式精简：仅保留在线下载）
 - 移除 `/ota/upload` 路由及上传固件 bin 文件方式，统一为 HTTPS 在线下载升级，消除「上传 vs 在线」两种入口的认知冲突。
-- `main/ota_update.c` 大幅精简：删除 multipart 流式上传、`ota_update_handle_upload`、`OTA_RECV_CHUNK`/`OTA_HEADER_BUF_LEN`/`OTA_FIRMWARE_MAX` 等上传相关实现与常量；仅保留自检确认/回滚逻辑。
-- `main/ota_update.h` 公开 `ota_version_compare` 接口（语义版本 major.minor.patch 比较，非该格式回退 strcmp），供在线 OTA 防降级统一使用。
+- `main/ota_update.c` 大幅精简：删除 multipart 流式上传、`ota_update_handle_upload`、`OTA_RECV_CHUNK`/`OTA_HEADER_BUF_LEN`/`OTA_FIRMWARE_MAX` 等上传相关实现与常量；仅保留自检确认/回滚逻辑，版本比较已抽到领域层。
 - `main/wifi_portal.c` 修复防降级漏洞：`ota_check_task` 由 `strcmp != 0`（仅判断不同，含降级）改为 `ota_version_compare > 0`（仅远端更新才提示），避免误判降级为「有更新」。
 - `main/wifi_portal.c` `h_ota_check`/`h_ota_upgrade` 不再接收表单 `ssid`/`psk` 参数，统一从 NVS 读取已配置的家庭 WiFi 凭证；未配置时返回错误引导去 `/more` 配置。
 - `main/wifi_portal.c` `/ota` 页面重构：移除上传卡片与上传 JS，凭证改为只读展示已配置 SSID；未配置时显示「去配置家庭网络」入口；前端 `checkUpdate`/`startUpgrade` 不再发送凭证。

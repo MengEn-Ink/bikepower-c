@@ -8,6 +8,7 @@
  */
 #include "ota_downloader.h"
 #include "bikepower_config.h"
+#include "json_miniparse.h"   // 领域层 JSON 解析（host 可测）
 #include "esp_log.h"
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
@@ -55,51 +56,6 @@ static bool ota_sync_time(void)
     return false;
 }
 
-// ============================ JSON 最小解析 ============================
-
-/**
- * 从 JSON 字符串中提取指定键的字符串值。
- * 查找 "key":"value" 模式，返回 value 部分（不解析转义）。
- * json：完整 JSON 字符串。
- * key：待提取的键名（不带引号）。
- * out：输出缓冲区。
- * out_sz：输出缓冲区大小。
- * 返回值：true 表示找到并写入，false 表示未找到。
- * 特殊行为：遇到第一个闭合引号即结束，不处理转义（latest.json 由工具生成，无转义）。
- */
-static bool json_get_str(const char *json, const char *key, char *out, size_t out_sz)
-{
-    char pat[40];
-    snprintf(pat, sizeof(pat), "\"%s\":\"", key);
-    const char *p = strstr(json, pat);
-    if (!p) return false;
-    p += strlen(pat);
-    const char *end = strchr(p, '"');
-    if (!end) return false;
-    size_t len = (size_t)(end - p);
-    if (len >= out_sz) len = out_sz - 1;
-    memcpy(out, p, len);
-    out[len] = '\0';
-    return true;
-}
-
-/**
- * 从 JSON 字符串中提取指定键的整数值。
- * 查找 "key":数字 模式，解析为 int。
- * json：完整 JSON 字符串。
- * key：待提取的键名。
- * 返回值：解析后的整数值，未找到返回 0。
- */
-static int json_get_int(const char *json, const char *key)
-{
-    char pat[40];
-    snprintf(pat, sizeof(pat), "\"%s\":", key);
-    const char *p = strstr(json, pat);
-    if (!p) return 0;
-    p += strlen(pat);
-    return (int)strtol(p, NULL, 10);
-}
-
 // ============================ 版本检查 ============================
 
 esp_err_t ota_downloader_check_version(const char *json_url, ota_version_info_t *info)
@@ -117,6 +73,7 @@ esp_err_t ota_downloader_check_version(const char *json_url, ota_version_info_t 
         .cert_pem = NULL,
         .crt_bundle_attach = esp_crt_bundle_attach,   // 启用证书包验证
         .disable_auto_redirect = false,
+        .max_redirection_count = 10,   // Gitee latest.json 返回 302，必须跟随重定向
     };
     esp_http_client_handle_t client = esp_http_client_init(&cfg);
     if (client == NULL) {
@@ -206,6 +163,8 @@ esp_err_t ota_downloader_download_and_upgrade(const char *url)
         .keep_alive_enable = true,
         .buffer_size = OTA_BUF_SIZE,
         .buffer_size_tx = 1024,
+        .disable_auto_redirect = false,
+        .max_redirection_count = 10,   // Gitee 固件 URL 同样会 302，必须跟随
     };
     esp_https_ota_config_t ota_cfg = {
         .http_config = &http_cfg,
