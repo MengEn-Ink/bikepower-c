@@ -77,6 +77,15 @@ static void configure_captive_portal_dhcp(void)
     } else {
         ESP_LOGI(TAG, "DHCP 已下发 Captive Portal DNS/URI: %s", portal_uri);
     }
+
+    // 显式启动 DHCP server，防止 WiFi 反复启停后 lwip 不自动启动
+    // 已启动时返回 ESP_ERR_INVALID_STATE，幂等安全
+    ret = esp_netif_dhcps_start(s_ap_netif);
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "DHCP server 显式启动失败 ret=%d", ret);
+    } else {
+        ESP_LOGI(TAG, "DHCP server 已启动（显式确保）");
+    }
 }
 
 /**
