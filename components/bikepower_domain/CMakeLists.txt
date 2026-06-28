@@ -6,5 +6,7 @@ idf_component_register(
          "config_store.c"
          "ota_version.c"
          "json_miniparse.c"
+         "button_logic.c"
+         "led_pattern.c"
     INCLUDE_DIRS "include"
 )

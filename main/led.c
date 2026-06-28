@@ -13,6 +13,7 @@
 #include "esp_task_wdt.h"
 #include "bikepower_config.h"
 #include "board_detect.h"
+#include "led_pattern.h"
 
 static const char *TAG = "LED";
 
@@ -24,11 +25,8 @@ static led_drv_t s_led_drv;
 static rmt_channel_handle_t s_rmt_chan;
 static rmt_encoder_handle_t s_rmt_enc;
 
-// 各状态对应的 RGB 颜色（G, R, B 顺序，SK6812 协议）
+// SK6812 灭灯帧（颜色映射已抽到领域层 led_pattern.c）
 static const uint8_t s_color_off[]   = {0, 0, 0};        // 灭
-static const uint8_t s_color_slow[]  = {0, 0, SK6812_BRIGHTNESS};     // 蓝色（BLE 广播中）
-static const uint8_t s_color_solid[] = {SK6812_BRIGHTNESS, 0, 0};     // 绿色（BLE 已连接）
-static const uint8_t s_color_fast[]  = {SK6812_BRIGHTNESS, SK6812_BRIGHTNESS, 0};  // 黄色（等待确认）
 
 /**
  * 通过 RMT 发送 SK6812 一帧数据。
@@ -139,12 +137,9 @@ static void led_output(led_pattern_t pattern, int on)
 {
     if (s_led_drv == LED_DRV_SK6812) {
         if (on) {
-            switch (pattern) {
-            case LED_OFF:   sk6812_send(s_color_off);   break;
-            case LED_SLOW:  sk6812_send(s_color_slow);  break;
-            case LED_SOLID: sk6812_send(s_color_solid); break;
-            case LED_FAST:  sk6812_send(s_color_fast);  break;
-            }
+            uint8_t rgb[3];
+            led_pattern_to_rgb((led_pattern_logic_t)pattern, SK6812_BRIGHTNESS, rgb);
+            sk6812_send(rgb);
         } else {
             sk6812_send(s_color_off);
         }
@@ -177,22 +172,12 @@ static void led_task(void *arg)
         if (p != last) {
             last = p;
             elapsed = 0;
-            on = (p == LED_SOLID) ? 1 : 0;
+            on = led_pattern_initial_on((led_pattern_logic_t)p);
         }
 
-        switch (p) {
-        case LED_OFF:
-            on = 0;
-            break;
-        case LED_SOLID:
-            on = 1;
-            break;
-        case LED_SLOW:
-            if (elapsed >= LED_BLINK_SLOW_MS) { on = !on; elapsed = 0; }
-            break;
-        case LED_FAST:
-            if (elapsed >= LED_BLINK_FAST_MS) { on = !on; elapsed = 0; }
-            break;
+        if (led_blink_should_toggle((led_pattern_logic_t)p, (uint32_t)elapsed, LED_BLINK_SLOW_MS, LED_BLINK_FAST_MS)) {
+            on = !on;
+            elapsed = 0;
         }
 
         led_output(p, on);

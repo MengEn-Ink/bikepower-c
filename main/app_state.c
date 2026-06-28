@@ -14,6 +14,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "bikepower_config.h"
+#include "button_logic.h"
 
 static const char *TAG = "STATE";
 
@@ -231,7 +232,7 @@ void app_state_handle_event(const app_evt_t *e)
 
     case APP_EVT_BTN_REPEAT:
         if (s_state != ST_BLE_ACTIVE) break;
-        if (e->data < WIFI_BTN_HOLD_MS) {
+        if (button_repeat_should_adjust((uint32_t)e->data, WIFI_BTN_HOLD_MS)) {
             // 只有在进入 WiFi 长按阈值之前，长按重复事件才用于持续加功率。
             power_engine_adjust_power(s_engine, POWER_STEP_W);
             s_auto_adjusted = true;
@@ -242,13 +243,16 @@ void app_state_handle_event(const app_evt_t *e)
         if (s_state == ST_WIFI_CONFIG) break;        // 二次确认后的释放，忽略
         if (s_state == ST_WIFI_CONFIRM) break;       // 已在 DOWN 处理
         if (s_state != ST_BLE_ACTIVE) break;
-        if (e->data < SHORT_PRESS_MS) {
-            int p = power_engine_adjust_power(s_engine, -POWER_STEP_W);
-            ESP_LOGI(TAG, "短按 功率-%dW -> %dW", POWER_STEP_W, p);
-        } else if (e->data >= WIFI_BTN_HOLD_MS) {
-            enter_confirm_window();
+        {
+            btn_release_action_t act = button_classify_release((uint32_t)e->data, SHORT_PRESS_MS, WIFI_BTN_HOLD_MS);
+            if (act == BTN_RELEASE_SHORT) {
+                int p = power_engine_adjust_power(s_engine, -POWER_STEP_W);
+                ESP_LOGI(TAG, "短按 功率-%dW -> %dW", POWER_STEP_W, p);
+            } else if (act == BTN_RELEASE_LONG) {
+                enter_confirm_window();
+            }
+            // BTN_RELEASE_MID：500ms~2000ms 长按调功已在 REPEAT 应用，释放不额外动作
         }
-        // 500ms~2000ms：长按调功已在 REPEAT 应用，释放不额外动作
         break;
     }
 }
@@ -263,7 +267,7 @@ void app_state_handle_event(const app_evt_t *e)
 void app_state_tick(void)
 {
     if (s_state == ST_WIFI_CONFIRM &&
-        (now_ms() - s_confirm_start) >= CONFIRM_WINDOW_MS) {
+        button_confirm_window_expired(now_ms() - s_confirm_start, CONFIRM_WINDOW_MS)) {
         s_state = ST_BLE_ACTIVE;
         update_idle_led();
         ESP_LOGI(TAG, "确认窗口超时，取消进入配网模式");

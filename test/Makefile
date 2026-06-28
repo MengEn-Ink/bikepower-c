@@ -10,7 +10,9 @@ SRCS := test_domain.c \
         $(DOMAIN)/power_engine.c \
         $(DOMAIN)/config_store.c \
         $(DOMAIN)/ota_version.c \
-        $(DOMAIN)/json_miniparse.c
+        $(DOMAIN)/json_miniparse.c \
+        $(DOMAIN)/button_logic.c \
+        $(DOMAIN)/led_pattern.c
 
 test_domain: $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $(SRCS) -lm

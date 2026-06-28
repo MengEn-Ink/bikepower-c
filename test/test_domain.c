@@ -14,6 +14,8 @@
 #include "config_store.h"
 #include "ota_version.h"
 #include "json_miniparse.h"
+#include "button_logic.h"
+#include "led_pattern.h"
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -432,6 +434,78 @@ static void test_json_miniparse(void)
     CHECK(json_get_int(neg, "x") == -42, "负数解析");
 }
 
+static void test_button_logic(void)
+{
+    printf("[test] 按钮按压时长分类\n");
+    const uint32_t SHORT = 500;
+    const uint32_t HOLD = 2000;
+    const uint32_t WINDOW = 3000;
+
+    // button_classify_release 边界
+    CHECK(button_classify_release(0, SHORT, HOLD) == BTN_RELEASE_SHORT, "0ms 短按");
+    CHECK(button_classify_release(499, SHORT, HOLD) == BTN_RELEASE_SHORT, "499ms 短按");
+    CHECK(button_classify_release(500, SHORT, HOLD) == BTN_RELEASE_MID, "500ms 边界归 MID（不减功）");
+    CHECK(button_classify_release(1999, SHORT, HOLD) == BTN_RELEASE_MID, "1999ms 中间区间");
+    CHECK(button_classify_release(2000, SHORT, HOLD) == BTN_RELEASE_LONG, "2000ms 边界归 LONG（触发确认）");
+    CHECK(button_classify_release(5000, SHORT, HOLD) == BTN_RELEASE_LONG, "5000ms 长按");
+
+    // button_repeat_should_adjust 边界
+    CHECK(button_repeat_should_adjust(0, HOLD) == true, "0ms REPEAT 调功");
+    CHECK(button_repeat_should_adjust(1999, HOLD) == true, "1999ms REPEAT 调功");
+    CHECK(button_repeat_should_adjust(2000, HOLD) == false, "2000ms REPEAT 停止调功（进入确认区间）");
+    CHECK(button_repeat_should_adjust(3000, HOLD) == false, "3000ms REPEAT 停止调功");
+
+    // button_confirm_window_expired 边界
+    CHECK(button_confirm_window_expired(0, WINDOW) == false, "0ms 未超时");
+    CHECK(button_confirm_window_expired(2999, WINDOW) == false, "2999ms 未超时");
+    CHECK(button_confirm_window_expired(3000, WINDOW) == true, "3000ms 边界超时");
+    CHECK(button_confirm_window_expired(5000, WINDOW) == true, "5000ms 已超时");
+
+    // 自定义阈值（验证不硬编码）
+    CHECK(button_classify_release(100, 100, 300) == BTN_RELEASE_MID, "自定义阈值 100ms 边界归 MID");
+    CHECK(button_classify_release(300, 100, 300) == BTN_RELEASE_LONG, "自定义阈值 300ms 边界归 LONG");
+    CHECK(button_repeat_should_adjust(300, 300) == false, "自定义阈值 300ms REPEAT 停止");
+    CHECK(button_confirm_window_expired(100, 100) == true, "自定义阈值 100ms 超时");
+}
+
+static void test_led_pattern(void)
+{
+    printf("[test] LED 模式映射\n");
+    const uint8_t B = 0x30;
+    uint8_t rgb[3];
+
+    // led_pattern_to_rgb 颜色映射
+    led_pattern_to_rgb(LED_PATTERN_OFF, B, rgb);
+    CHECK(rgb[0] == 0 && rgb[1] == 0 && rgb[2] == 0, "OFF 全灭");
+
+    led_pattern_to_rgb(LED_PATTERN_SLOW, B, rgb);
+    CHECK(rgb[0] == 0 && rgb[1] == 0 && rgb[2] == B, "SLOW 蓝色 [0,0,B]");
+
+    led_pattern_to_rgb(LED_PATTERN_SOLID, B, rgb);
+    CHECK(rgb[0] == B && rgb[1] == 0 && rgb[2] == 0, "SOLID 绿色 [B,0,0]");
+
+    led_pattern_to_rgb(LED_PATTERN_FAST, B, rgb);
+    CHECK(rgb[0] == B && rgb[1] == B && rgb[2] == 0, "FAST 黄色 [B,B,0]");
+
+    // 亮度参数生效
+    led_pattern_to_rgb(LED_PATTERN_SLOW, 0x10, rgb);
+    CHECK(rgb[2] == 0x10, "SLOW 自定义亮度");
+
+    // led_blink_should_toggle 节拍
+    CHECK(led_blink_should_toggle(LED_PATTERN_OFF, 5000, 1000, 200) == false, "OFF 不闪烁");
+    CHECK(led_blink_should_toggle(LED_PATTERN_SOLID, 5000, 1000, 200) == false, "SOLID 不闪烁");
+    CHECK(led_blink_should_toggle(LED_PATTERN_SLOW, 999, 1000, 200) == false, "SLOW 999ms 未到周期");
+    CHECK(led_blink_should_toggle(LED_PATTERN_SLOW, 1000, 1000, 200) == true, "SLOW 1000ms 边界翻转");
+    CHECK(led_blink_should_toggle(LED_PATTERN_FAST, 199, 1000, 200) == false, "FAST 199ms 未到周期");
+    CHECK(led_blink_should_toggle(LED_PATTERN_FAST, 200, 1000, 200) == true, "FAST 200ms 边界翻转");
+
+    // led_pattern_initial_on 初始状态
+    CHECK(led_pattern_initial_on(LED_PATTERN_OFF) == 0, "OFF 初始灭");
+    CHECK(led_pattern_initial_on(LED_PATTERN_SLOW) == 0, "SLOW 初始灭");
+    CHECK(led_pattern_initial_on(LED_PATTERN_SOLID) == 1, "SOLID 初始亮");
+    CHECK(led_pattern_initial_on(LED_PATTERN_FAST) == 0, "FAST 初始灭");
+}
+
 int main(void)
 {
     test_profile();
@@ -447,6 +521,8 @@ int main(void)
     test_config_store();
     test_ota_version_compare();
     test_json_miniparse();
+    test_button_logic();
+    test_led_pattern();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

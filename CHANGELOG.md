@@ -21,6 +21,15 @@
 - 新增 `tests/check_config_consistency.py`（TC-3c 常量一致性静态检查）：56 项校验 `bikepower_config.h` / `domain_config.h` / `README.md` / `docs/` 之间常量值一致，防止文档与代码漂移。
 - 新增 `docs/test-coverage-analysis.md` 测试覆盖率分析文档：模块清单、覆盖率矩阵、当前 28% → 目标 90% 路径、Loop 模式测试建立流程。
 - 更新 `.trae/rules/workflows/test-coverage.md`：TC-1 覆盖对象新增 ota_version/json_miniparse，新增 TC-3c 常量一致性规则，新增「覆盖率目标与现状」+「Loop 模式测试建立流程」章节。
+- 抽取按钮按压时长分类到领域层（host 可测）：
+  - `components/bikepower_domain/button_logic.c/.h`：短按/中区间/长按分类、REPEAT 调功判定、确认窗口超时（从 `main/app_state.c` 抽取）。
+  - `main/app_state.c` `BTN_UP`/`BTN_REPEAT`/`app_state_tick` 改为调用领域层函数，消除硬编码阈值比较。
+  - `test/test_domain.c` 新增 `test_button_logic`（18 断言），覆盖 500/2000ms 边界与自定义阈值。
+- 抽取 LED 模式映射到领域层（host 可测）：
+  - `components/bikepower_domain/led_pattern.c/.h`：pattern→GRB 颜色映射、闪烁节拍判定、初始 on 状态（从 `main/led.c` 抽取）。
+  - `main/led.c` `led_output`/`led_task` 改为调用领域层函数，删除 `s_color_slow`/`s_color_solid`/`s_color_fast` 静态数组（颜色映射统一由领域层提供）。
+  - `test/test_domain.c` 新增 `test_led_pattern`（15 断言），覆盖 4 种灯效颜色 + 闪烁周期边界 + 初始状态。
+- `docs/test-coverage-analysis.md` 更新覆盖率矩阵：领域层 864→944 行（+button_logic 38 + led_pattern 42），自动化覆盖率 27.7%→30.0%，host 单测断言 946→979。
 
 ### 改进（OTA 升级方式精简：仅保留在线下载）
 - 移除 `/ota/upload` 路由及上传固件 bin 文件方式，统一为 HTTPS 在线下载升级，消除「上传 vs 在线」两种入口的认知冲突。
