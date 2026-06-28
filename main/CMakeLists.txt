@@ -10,10 +10,11 @@ idf_component_register(
          "wifi_portal.c"
          "captive_portal.c"
          "ota_update.c"
+         "ota_downloader.c"
     INCLUDE_DIRS "."
     REQUIRES nvs_flash bt esp_timer esp_driver_gpio esp_system
              esp_wifi esp_event esp_netif esp_http_server bikepower_domain
-             esp_driver_rmt app_update
+             esp_driver_rmt app_update esp_https_ota esp_http_client mbedtls
 )
 
 option(OTA_TEST_AUTO_CONFIG "测试用：启动自动触发配网（正式发版保持 OFF）" OFF)

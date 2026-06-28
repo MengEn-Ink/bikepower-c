@@ -1,18 +1,20 @@
-# v3.1.6 迭代规划：FTMS 扩展与内存优化
+# v3.1.6 迭代规划：在线 OTA 下载升级 + FTMS 扩展与内存优化
 
 > 规划日期：2026-06-27
-> 当前版本：v3.1.5（OTA + Captive Portal 已完成）
+> 最近更新：2026-06-28（在线 OTA 下载升级已实现，编译通过待真机测试）
+> 当前版本：v3.1.5（OTA 上传 + Captive Portal 已完成）
 > 目标版本：v3.1.6
-> 状态：规划中
+> 状态：在线 OTA 下载升级已编码完成，待真机测试
 
 ---
 
 ## 一、迭代背景
 
-v3.1.5 已完成 OTA 升级和 Captive Portal 自动弹配网页，核心功能稳定。v3.1.6 聚焦两个方向：
+v3.1.5 已完成 OTA 上传升级和 Captive Portal 自动弹配网页，但升级需用户手动下载 bin 文件再通过配网页上传，体验不佳。v3.1.6 聚焦三个方向：
 
-1. **FTMS 扩展**：提升骑行 App 兼容性，补全 FTMS 规范特征
-2. **内存优化**：降低配网态内存占用，为后续功能腾出空间
+1. **在线 OTA 下载升级（核心）**：设备连接家庭 WiFi 后自动检测最新版本并下载升级，无需手动下载 bin 文件
+2. **FTMS 扩展**：提升骑行 App 兼容性，补全 FTMS 规范特征
+3. **内存优化**：降低配网态内存占用，为后续功能腾出空间
 
 ### 当前基线
 
@@ -27,7 +29,122 @@ v3.1.5 已完成 OTA 升级和 Captive Portal 自动弹配网页，核心功能�
 
 ---
 
-## 二、FTMS 扩展方案
+## 二、在线 OTA 下载升级方案（v3.1.6 核心，已实现）
+
+### 2.1 方案概述
+
+设备在配网态（SoftAP 已启动）下，用户在配网页面输入家庭 WiFi 凭证，设备切换 APSTA 模式连接家庭路由器，通过 HTTPS 从 Gitee 仓库拉取 `latest.json` 检查最新版本，对比版本号后提示用户升级。升级时设备停 BLE + 停 SoftAP 独占 STA，HTTPS 下载固件 bin 写入 OTA 分区，完成后重启进入新固件。
+
+### 2.2 固件分发源
+
+| 方案 | 说明 | 选择 |
+|------|------|------|
+| Gitee Release 附件 | 仓库改公开，Release 上传 bin+json | ✅ 已选 |
+| Gitee 私有 + Token | 需配置 token，URL 带认证 | ❌ 复杂 |
+| 自建 HTTP 服务器 | 完全自主但需运维 | ❌ 成本高 |
+| 混合方案 | Gitee 为主 + 自建镜像 | ❌ 过度设计 |
+
+**实现**：固件 bin 和 `latest.json` 放仓库 `ota/` 目录，通过 Gitee raw URL 访问（仓库需公开）。
+
+### 2.3 射频资源管理
+
+| 场景 | 模式 | BLE | SoftAP | STA | 说明 |
+|------|------|-----|--------|-----|------|
+| 检查版本 | APSTA 共存 | 在线 | 在线 | 临时连接 | 配网页可继续访问 |
+| 下载升级 | STA 独占 | 停止 | 停止 | 独占 | 释放射频确保稳定性 |
+
+**检查版本**：APSTA 共存，BLE 和配网页保持在线，STA 临时连路由器获 IP 后拉 JSON，完成切回 AP-only。
+**下载升级**：停 SoftAP + 停 BLE 释放射频，STA 独占连路由器，HTTPS 下载固件，完成后重启。
+
+### 2.4 升级交互流程
+
+```
+用户进入配网页 /ota
+  → 看到现有"上传升级"卡片 + 新增"在线检查更新"卡片
+  → 输入家庭 WiFi SSID/PSK（自动回填已保存值）
+  → 点击"检查更新"
+    → POST /ota/check（APSTA 连路由器 + 拉 latest.json + 返回 JSON）
+    → 显示最新版本号/更新说明/是否有更新
+  → 若有更新，点击"下载并升级"
+    → POST /ota/upgrade（保存凭证 + 返回升级提示页 + 异步任务启动）
+    → 异步任务：延迟 3s → 停 AP+BLE → 启 STA → 检查版本 → HTTPS 下载 → 重启
+  → 用户看到"正在下载升级"提示页，约 2 分钟后设备重启
+  → 重新连接蓝牙，进入新固件
+```
+
+### 2.5 模块实现
+
+#### 新增模块
+
+| 文件 | 职责 |
+|------|------|
+| `main/ota_downloader.h/.c` | HTTPS 检查版本 + 下载升级（esp_http_client + esp_https_ota） |
+| `ota/latest.json` | 版本信息文件（放仓库，raw 访问） |
+
+#### 修改模块
+
+| 文件 | 变更 |
+|------|------|
+| `main/radio_ctrl.h/.c` | 新增 `radio_ctrl_sta_connect`/`sta_disconnect`/`enter_sta_exclusive` |
+| `main/nvs_store.h/.c` | 新增 `nvs_store_save_wifi_cred`/`load_wifi_cred`（独立 namespace "wifica"） |
+| `main/wifi_portal.c` | 新增 `/ota/check` 和 `/ota/upgrade` 路由 + 前端 UI 卡片 |
+| `main/bikepower_config.h` | 新增 OTA 下载/家庭 WiFi 常量 + `FIRMWARE_VERSION` 改 3.1.6 |
+| `main/CMakeLists.txt` | 加 `ota_downloader.c` + `esp_https_ota`/`esp_http_client` 依赖 |
+
+### 2.6 关键常量
+
+```c
+#define OTA_VERSION_URL        "https://gitee.com/mengen4jv/bikepower-c/raw/main/ota/latest.json"
+#define OTA_DOWNLOAD_TIMEOUT_MS  30000   // HTTPS 单次请求超时
+#define OTA_STA_CONNECT_MS       15000   // STA 连路由器超时
+#define OTA_BUF_SIZE             4096    // HTTPS 下载缓冲
+#define NVS_NAMESPACE_WIFI     "wifica"  // 家庭 WiFi 凭证独立 namespace
+```
+
+### 2.7 latest.json 格式
+
+```json
+{"version":"3.1.6","url":"https://gitee.com/.../bikepower-c.bin","size":1175760,"changelog":"更新说明"}
+```
+
+字段说明：
+- `version`：最新版本号（字符串比较，与 `FIRMWARE_VERSION` 不同即为有更新）
+- `url`：固件 bin 的 HTTPS 下载 URL
+- `size`：固件大小（字节，仅展示用）
+- `changelog`：更新说明（展示给用户）
+
+### 2.8 内存预算
+
+| 场景 | v3.1.5 | v3.1.6 | 说明 |
+|------|--------|--------|------|
+| 配网态（APSTA 共存检查版本） | - | ~100 KB | AP+STA+BLE 三栈共存 |
+| 下载升级态（STA 独占） | - | ~150 KB+ | BLE 已停，释放射频 |
+
+**结论**：检查版本时 APSTA+BLE 共存约 100KB（高于 80KB 告警线）；下载升级时 BLE 已停，内存充足。
+
+### 2.9 风险与已知限制
+
+| 风险 | 级别 | 缓解 |
+|------|------|------|
+| Gitee raw URL 访问限流 | 低 | 公开仓库无频率限制 |
+| 家庭 WiFi 信号弱导致下载失败 | 中 | 超时回退重启回 BLE |
+| 配网页 SSID/PSK 未做 XSS 转义 | 中 | 已知限制，阶段5统一处理 |
+| 下载中断电变砖 | 中 | OTA 分区双备份，可回滚 |
+| 版本号比较用字符串不等 | 低 | 仅判断有无更新，不做降级保护 |
+
+### 2.10 验证计划
+
+| 验证项 | 方法 | 通过标准 |
+|--------|------|---------|
+| 检查版本 | 配网页输入家庭WiFi，点检查更新 | 返回最新版本号和更新说明 |
+| STA 独占下载 | 点下载并升级，观察串口日志 | 下载完成+重启进入新固件 |
+| 凭证持久化 | 重启后再次进入配网页 | SSID 自动回填 |
+| 失败回退 | 输入错误 WiFi 密码 | 检查失败返回错误 JSON，配网页可用 |
+| 下载中断电 | 下载过程中断电 | 重启后回旧固件，可重新升级 |
+
+---
+
+## 三、FTMS 扩展方案
 
 ### 2.1 现状分析
 
@@ -120,7 +237,7 @@ Control Point 已支持指令：
 
 ---
 
-## 三、内存优化方案
+## 四、内存优化方案
 
 ### 3.1 优化目标
 
@@ -183,7 +300,7 @@ Control Point 已支持指令：
 
 ---
 
-## 四、迭代功能清单汇总
+## 五、迭代功能清单汇总
 
 ### 4.1 P0（必须）
 
@@ -211,7 +328,7 @@ Control Point 已支持指令：
 
 ---
 
-## 五、内存安全边界预测
+## 六、内存安全边界预测
 
 ```
 v3.1.5 满负载：                    117 KB
@@ -224,7 +341,7 @@ v3.1.5 满负载：                    117 KB
 
 ---
 
-## 六、验证计划
+## 七、验证计划
 
 ### 6.1 FTMS 扩展验证
 
@@ -246,7 +363,7 @@ v3.1.5 满负载：                    117 KB
 
 ---
 
-## 七、发版节奏
+## 八、发版节奏
 
 | 阶段 | 内容 | 产出 |
 |------|------|------|
@@ -259,7 +376,7 @@ v3.1.5 满负载：                    117 KB
 
 ---
 
-## 八、相关文档
+## 九、相关文档
 
 | 文档 | 说明 |
 |------|------|

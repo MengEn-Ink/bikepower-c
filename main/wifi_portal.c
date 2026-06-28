@@ -23,14 +23,18 @@
 #include "wifi_portal.h"
 #include "captive_portal.h"
 #include "ota_update.h"
+#include "ota_downloader.h"
+#include "radio_ctrl.h"
 #include "nvs_store.h"
 #include "ble_bikepower.h"
 #include "bikepower_config.h"
 #include "profile.h"
 #include "esp_log.h"
 #include "esp_http_server.h"
+#include "esp_wifi.h"   // v3.1.6: wifi_ap_record_t（家庭网络扫描）
 #include "esp_timer.h"
 #include "esp_system.h"
+#include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
@@ -371,6 +375,13 @@ static void send_end(httpd_req_t *req)
     httpd_resp_sendstr_chunk(req, NULL);
 }
 
+static void set_no_store_headers(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    httpd_resp_set_hdr(req, "Expires", "0");
+}
+
 // ============================ 首页 ============================
 
 /**
@@ -383,6 +394,7 @@ static void send_end(httpd_req_t *req)
 static esp_err_t h_home(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "首页请求到达 堆=%lu", (unsigned long)esp_get_free_heap_size());
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：强制关闭，避免 fd 耗尽
     // 已进入关 WiFi 收尾流程：此时刷新首页会续期 deadline 破坏收尾，引导到成功页
     if (s_closing) {
         httpd_resp_set_status(req, "302 Found");
@@ -403,7 +415,7 @@ static esp_err_t h_home(httpd_req_t *req)
     html_escape(e->device_name, dn, sizeof(dn));
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
-    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    set_no_store_headers(req);
 
     SEND(req,
         "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
@@ -668,6 +680,7 @@ static void send_save_error(httpd_req_t *req)
  */
 static esp_err_t h_success(httpd_req_t *req)
 {
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：避免 fd 耗尽
     if (!s_closing) {  // 未提交配置时直访，302 回首页（与旧版 PRG 守卫一致）
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/");
@@ -721,6 +734,7 @@ static void apply_form_fields(power_engine_t *e, const char *body)
  */
 static esp_err_t h_config(httpd_req_t *req)
 {
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：避免 fd 耗尽
     if (s_closing) {  // 已进入收尾流程，拒绝再保存
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/success");
@@ -784,6 +798,7 @@ static esp_err_t h_config(httpd_req_t *req)
  */
 static esp_err_t h_close_wifi(httpd_req_t *req)
 {
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：避免 fd 耗尽
     if (s_closing) {  // 防重复提交
         send_success(req);
         return ESP_OK;
@@ -842,6 +857,7 @@ static esp_err_t h_close_wifi(httpd_req_t *req)
  */
 static esp_err_t h_draft(httpd_req_t *req)
 {
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：避免 fd 耗尽
     // 配置已提交并计划重启时，拒绝再修改内存配置：否则会覆盖刚写入 NVS 的快照，
     // 导致重启后 BLE 生效值与成功页展示的"已保存"值不一致。直接引导到成功页。
     if (s_closing) {
@@ -888,6 +904,8 @@ static esp_err_t h_draft(httpd_req_t *req)
  */
 static esp_err_t h_more(httpd_req_t *req)
 {
+    ESP_LOGI(TAG, "GET /more 页面请求");
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：大页面强制关闭，避免 fd 耗尽
     arm_deadline();
     power_engine_t *e = s_engine;
     char dn[DEVICE_NAME_HTML_MAX];
@@ -896,6 +914,7 @@ static esp_err_t h_more(httpd_req_t *req)
         (e->profile.ride_type >= 0 && e->profile.ride_type < PACER_COUNT) ? e->profile.ride_type : 0];
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
+    set_no_store_headers(req);
     SEND(req,
         "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<title>更多配置 - BikePower</title><style>"
@@ -940,7 +959,7 @@ static esp_err_t h_more(httpd_req_t *req)
 
     SEND(req,
         "</div><script>"
-        "var panelCleanup=null,modBusy=false;function runScripts(r){var s=r.getElementsByTagName(\"script\");for(var i=0;i<s.length;i++){try{eval(s[i].textContent)}catch(e){}}}"
+        "var panelCleanup=null,modBusy=false;function runScripts(r){var s=r.getElementsByTagName(\"script\");for(var i=0;i<s.length;i++){try{eval(s[i].textContent)}catch(e){console.error(\"[runScripts] eval 失败:\",e)}}}"
         "function busyCard(t){return '<div class=\"panel-card\" style=\"text-align:center;padding:18px\"><div class=\"spin\"></div><p>'+t+'</p></div>'}"
         "function setBusy(b){modBusy=b;var bs=document.getElementsByTagName(\"button\");for(var i=0;i<bs.length;i++){bs[i].disabled=b;if(b)bs[i].classList.add(\"busy\");else bs[i].classList.remove(\"busy\")}}"
         "function openMod(n){if(modBusy)return;if(panelCleanup){try{panelCleanup()}catch(e){}panelCleanup=null}var p=document.getElementById(\"panel\");setBusy(true);p.innerHTML=busyCard(\"正在加载...\");fetch(\"/ui/module?name=\"+encodeURIComponent(n)).then(function(r){return r.text()}).then(function(h){p.innerHTML=h;setBusy(false);runScripts(p)}).catch(function(){setBusy(false);p.innerHTML='<div class=\"module-note\">加载失败，请重试</div>'})}"
@@ -984,6 +1003,7 @@ static void send_more_panel(httpd_req_t *req)
         "<div class=\"menu-grid\">"
         "<button type=\"button\" class=\"menu-btn\" onclick=\"openMod('profile')\"><span class=\"icon\">&#128100;</span><span class=\"text\">个人信息<span class=\"desc\">体重、FTP、阈值心率</span></span><span class=\"arrow\">&rsaquo;</span></button>"
         "<button type=\"button\" class=\"menu-btn\" onclick=\"openMod('device')\"><span class=\"icon\">&#128241;</span><span class=\"text\">设备名称<span class=\"desc\">修改骑行 App 中看到的蓝牙名称</span></span><span class=\"arrow\">&rsaquo;</span></button>"
+        "<button type=\"button\" class=\"menu-btn\" onclick=\"openMod('wifi')\"><span class=\"icon\">&#128246;</span><span class=\"text\">家庭网络<span class=\"desc\">配置家庭 WiFi 用于在线检查更新</span></span><span class=\"arrow\">&rsaquo;</span></button>"
         "<a class=\"menu-btn\" href=\"/ota\"><span class=\"icon\">&#128230;</span><span class=\"text\">固件升级<span class=\"desc\">上传新固件 bin 文件</span></span><span class=\"arrow\">&rsaquo;</span></a>"
         "</div>"
         "<script>panelCleanup=function(){};</script>");
@@ -1097,18 +1117,23 @@ static void send_erg_panel(httpd_req_t *req)
  * 返回值：ESP_OK 表示处理成功。
  * 特殊行为：未知模块名时返回提示文本而不是 404。
  */
+static void send_wifi_panel(httpd_req_t *req);   // v3.1.6 前向声明
 static esp_err_t h_ui_module(httpd_req_t *req)
 {
     arm_deadline();
     char name[24] = "";
     query_get_str(req, "name", name, sizeof(name));
+    ESP_LOGI(TAG, "GET /ui/module?name=%s 请求到达", name);
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
+    set_no_store_headers(req);
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：避免 fd 耗尽
     if (strcmp(name, "more") == 0)        send_more_panel(req);
     else if (strcmp(name, "device") == 0) send_device_panel(req);
     else if (strcmp(name, "profile") == 0) send_profile_panel(req);
     else if (strcmp(name, "mode") == 0)   send_mode_panel(req);
     else if (strcmp(name, "erg") == 0)    send_erg_panel(req);
+    else if (strcmp(name, "wifi") == 0)   send_wifi_panel(req);   // v3.1.6 家庭网络配置
     else SEND(req, "<div class=\"module-note\">请选择模块。</div>");
     send_end(req);
     return ESP_OK;
@@ -1126,7 +1151,10 @@ static esp_err_t h_ui_module(httpd_req_t *req)
 static esp_err_t h_ota(httpd_req_t *req)
 {
     arm_deadline();
+    ESP_LOGI(TAG, "GET /ota 页面请求");
     httpd_resp_set_type(req, "text/html; charset=utf-8");
+    set_no_store_headers(req);
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：大页面强制关闭连接，避免 fd 耗尽
     SEND(req,
         "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
@@ -1162,7 +1190,27 @@ static esp_err_t h_ota(httpd_req_t *req)
         "</form>"
         "<div id=\"prog\"><p style=\"font-size:12px;margin-bottom:6px\">上传中...</p>"
         "<div class=\"bar\"><i id=\"bar-i\"></i></div><div id=\"msg\"></div></div>"
-        "</div></div>"
+        "</div>");  // 关闭上传卡片，box 待续
+
+    // ===== 在线检查更新卡片（v3.1.6 新增） =====
+    char home_ssid[HOME_WIFI_SSID_MAX] = {0};
+    char home_ssid_html[HOME_WIFI_SSID_MAX * 6] = {0};
+    nvs_store_load_wifi_cred(home_ssid, sizeof(home_ssid), NULL, 0);
+    html_escape(home_ssid, home_ssid_html, sizeof(home_ssid_html));
+    SEND(req,
+        "<div class=\"card\"><h2>在线检查更新</h2>"
+        "<p>连接家庭 WiFi 后从服务器检查最新版本并下载升级。升级时设备会断开蓝牙和配网热点，约 2 分钟后自动重启。</p>"
+        "<div class=\"file-row\"><input type=\"text\" id=\"home-ssid\" placeholder=\"家庭 WiFi 名称\" value=\"");
+    SEND(req, home_ssid_html);
+    SEND(req,
+        "\" style=\"flex:1;padding:10px;border:1px solid rgba(0,0,0,.08);border-radius:14px;background:#f5f5f7;font-size:14px\"></div>"
+        "<div class=\"file-row\"><input type=\"password\" id=\"home-psk\" placeholder=\"家庭 WiFi 密码（留空使用已保存密码）\" style=\"flex:1;padding:10px;border:1px solid rgba(0,0,0,.08);border-radius:14px;background:#f5f5f7;font-size:14px\"></div>"
+        "<button class=\"btn\" type=\"button\" id=\"check-btn\" onclick=\"checkUpdate()\">检查更新</button>"
+        "<div id=\"check-result\" style=\"margin-top:12px\"></div>"
+        "<button class=\"btn\" type=\"button\" id=\"upgrade-btn\" onclick=\"startUpgrade()\" disabled style=\"margin-top:12px\">下载并升级</button>"
+        "</div></div>");  // 关闭在线卡片 + box
+
+    SEND(req,
         "<script>"
         "var f=document.getElementById('fw-file'),b=document.getElementById('fw-btn');"
         "f.onchange=function(){b.disabled=!f.files.length};"
@@ -1177,12 +1225,727 @@ static esp_err_t h_ota(httpd_req_t *req)
         "else{document.getElementById('msg').textContent='上传失败 HTTP '+xhr.status;b.disabled=false;f.disabled=false}};"
         "xhr.onerror=function(){document.getElementById('msg').textContent='网络错误';b.disabled=false;f.disabled=false};"
         "xhr.open('POST','/ota/upload');xhr.send(fd);return false};"
+        "function checkUpdate(){"
+        "var ssid=document.getElementById('home-ssid').value,psk=document.getElementById('home-psk').value;"
+        "if(!ssid){alert('请输入家庭WiFi名称');return}"
+        "var btn=document.getElementById('check-btn');btn.disabled=true;btn.textContent='检查中...';"
+        "var r=document.getElementById('check-result');"
+        "r.innerHTML='<p style=\"font-size:12px;color:#6e6e73\">正在连接WiFi并检查，请稍候（约10-30秒）...</p>';"
+        "var x=new XMLHttpRequest();"
+        "x.onload=function(){"
+        "if(x.status!==200){btn.disabled=false;btn.textContent='检查更新';r.innerHTML='<p style=\"color:#ff3b30\">检查失败 HTTP '+x.status+'</p>';return}"
+        "try{var d=JSON.parse(x.responseText);"
+        "if(d.status==='error'){btn.disabled=false;btn.textContent='检查更新';r.innerHTML='<p style=\"color:#ff3b30;font-size:13px\">'+(d.error||'检查失败')+'</p>';return}"
+        "if(d.status==='started'||d.status==='running'){pollStatus(btn,r);return}"
+        "btn.disabled=false;btn.textContent='检查更新';r.innerHTML='<p style=\"color:#ff3b30\">未知响应</p>'}"
+        "catch(e){btn.disabled=false;btn.textContent='检查更新';r.innerHTML='<p style=\"color:#ff3b30\">解析失败</p>'}};"
+        "x.onerror=function(){btn.disabled=false;btn.textContent='检查更新';r.innerHTML='<p style=\"color:#ff3b30\">网络错误</p>'};"
+        "x.open('POST','/ota/check');x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');"
+        "x.send('ssid='+encodeURIComponent(ssid)+'&psk='+encodeURIComponent(psk))};"
+        "function pollStatus(btn,r){"
+        "var t=setInterval(function(){"
+        "var x=new XMLHttpRequest();"
+        "x.onload=function(){if(x.status!==200)return;try{var d=JSON.parse(x.responseText);"
+        "if(d.status==='running'){r.innerHTML='<p style=\"font-size:12px;color:#6e6e73\">正在连接WiFi并检查，请稍候...</p>';return}"
+        "clearInterval(t);btn.disabled=false;btn.textContent='检查更新';"
+        "if(d.status==='error'){r.innerHTML='<p style=\"color:#ff3b30;font-size:13px\">'+(d.error||'检查失败')+'</p>';return}"
+        "if(d.status==='done'){"
+        "var h='<div class=\"ver\">服务器最新版本：v'+d.version+'</div>';"
+        "h+='<p style=\"font-size:12px;color:#6e6e73;margin-bottom:8px\">当前版本：v'+d.current+'</p>';"
+        "if(d.changelog)h+='<p style=\"font-size:12px;color:#6e6e73;margin-bottom:8px\">'+d.changelog+'</p>';"
+        "if(d.has_update){h+='<p style=\"color:#34c759;font-size:13px;font-weight:800\">发现新版本！</p>';document.getElementById('upgrade-btn').disabled=false}"
+        "else{h+='<p style=\"color:#86868b;font-size:13px\">已是最新版本</p>'}"
+        "r.innerHTML=h}}"
+        "catch(e){}}};"
+        "x.open('GET','/ota/status');x.send()},2000,btn,r)};"
+        "function startUpgrade(){"
+        "if(!confirm('确认下载并升级？设备将断开蓝牙和配网热点，约2分钟后重启。'))return;"
+        "var ssid=document.getElementById('home-ssid').value,psk=document.getElementById('home-psk').value;"
+        "var btn=document.getElementById('upgrade-btn');btn.disabled=true;btn.textContent='升级指令已发送...';"
+        "var x=new XMLHttpRequest();"
+        "x.onload=function(){if(x.status===200){document.open();document.write(x.responseText);document.close()}"
+        "else{btn.disabled=false;btn.textContent='下载并升级';alert('升级请求失败 HTTP '+x.status)}};"
+        "x.onerror=function(){btn.disabled=false;btn.textContent='下载并升级';alert('网络错误')};"
+        "x.open('POST','/ota/upgrade');x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');"
+        "x.send('ssid='+encodeURIComponent(ssid)+'&psk='+encodeURIComponent(psk))};"
         "</script></body></html>");
     send_end(req);
     return ESP_OK;
 }
 
+// ============================ 在线 OTA 检查/升级（v3.1.6） ============================
+
+// ----- 异步版本检查状态机 -----
+typedef enum {
+    OTA_CHECK_IDLE = 0,
+    OTA_CHECK_RUNNING,
+    OTA_CHECK_DONE,
+    OTA_CHECK_ERROR,
+} ota_check_state_t;
+
+static ota_check_state_t s_ota_check_state = OTA_CHECK_IDLE;
+static char s_ota_check_version[32] = {0};      // 服务器版本号
+static char s_ota_check_changelog[128] = {0};   // 更新说明
+static char s_ota_check_error[64] = {0};        // 错误信息
+static bool s_ota_check_has_update = false;
+static int s_ota_check_size = 0;
+
+/**
+ * 异步版本检查任务：连 STA+SNTP+拉 latest.json，结果写入全局变量。
+ * 由 h_ota_check 触发，独立任务避免阻塞 HTTP 线程。
+ * arg：未使用（凭证从 NVS 读取，h_ota_check 已保存）。
+ */
+static void ota_check_task(void *arg)
+{
+    (void)arg;
+    char ssid[HOME_WIFI_SSID_MAX] = {0};
+    char psk[HOME_WIFI_PSK_MAX] = {0};
+
+    // 凭证已在 h_ota_check 中保存到 NVS，这里读回
+    if (!nvs_store_load_wifi_cred(ssid, sizeof(ssid), psk, sizeof(psk))) {
+        snprintf(s_ota_check_error, sizeof(s_ota_check_error), "无 WiFi 凭证");
+        s_ota_check_state = OTA_CHECK_ERROR;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    ESP_LOGI(TAG, "异步检查：STA 连接 %.32s", ssid);
+    esp_err_t ret = radio_ctrl_sta_connect(ssid, psk, OTA_STA_CONNECT_MS);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "异步检查：STA 连接失败 ret=%d", ret);
+        snprintf(s_ota_check_error, sizeof(s_ota_check_error), "WiFi连接失败");
+        s_ota_check_state = OTA_CHECK_ERROR;
+        vTaskDelete(NULL);
+        return;
+    }
+    esp_task_wdt_reset();
+
+    ESP_LOGI(TAG, "异步检查：STA 连接成功，拉 latest.json");
+    ota_version_info_t info;
+    ret = ota_downloader_check_version(OTA_VERSION_URL, &info);
+    radio_ctrl_sta_disconnect();
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "异步检查：版本拉取失败 ret=%d", ret);
+        snprintf(s_ota_check_error, sizeof(s_ota_check_error), "无法获取版本信息");
+        s_ota_check_state = OTA_CHECK_ERROR;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    s_ota_check_has_update = strcmp(info.version, FIRMWARE_VERSION) != 0;
+    s_ota_check_size = info.size;
+    strncpy(s_ota_check_version, info.version, sizeof(s_ota_check_version) - 1);
+    strncpy(s_ota_check_changelog, info.changelog, sizeof(s_ota_check_changelog) - 1);
+    s_ota_check_state = OTA_CHECK_DONE;
+    ESP_LOGI(TAG, "异步检查完成：当前=%s 最新=%s 有更新=%d",
+             FIRMWARE_VERSION, info.version, s_ota_check_has_update);
+    vTaskDelete(NULL);
+}
+
+/**
+ * 异步 OTA 升级任务：停 AP+停 BLE+启 STA+下载+重启。
+ * 由 h_ota_upgrade 触发，独立任务执行避免阻塞 HTTP 响应。
+ * arg：未使用（凭证从 NVS 读取）。
+ * 返回值：无（任务结束前必 esp_restart）。
+ * 特殊行为：延迟 3s 等 HTTP 响应发出；任何失败均 esp_restart 回到 BLE 模式。
+ */
+static void ota_upgrade_task(void *arg)
+{
+    (void)arg;
+    char ssid[HOME_WIFI_SSID_MAX] = {0};
+    char psk[HOME_WIFI_PSK_MAX] = {0};
+    if (!nvs_store_load_wifi_cred(ssid, sizeof(ssid), psk, sizeof(psk))) {
+        ESP_LOGE(TAG, "OTA 升级：无家庭 WiFi 凭证，放弃");
+        vTaskDelay(pdMS_TO_TICKS(OTA_REBOOT_AFTER_UPGRADE_MS));
+        esp_restart();
+    }
+
+    ESP_LOGI(TAG, "OTA 升级任务启动，延迟 3s 等 HTTP 响应发出");
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    esp_task_wdt_reset();
+
+    // 1. 进入 STA 独占模式（停 AP+停 BLE+启 STA+连路由器）
+    esp_err_t ret = radio_ctrl_enter_sta_exclusive(ssid, psk);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "STA 独占失败 ret=%d，重启回 BLE", ret);
+        vTaskDelay(pdMS_TO_TICKS(OTA_REBOOT_AFTER_UPGRADE_MS));
+        esp_restart();
+    }
+    esp_task_wdt_reset();
+
+    // 2. 检查版本（获取最新下载 URL）
+    ota_version_info_t info;
+    ret = ota_downloader_check_version(OTA_VERSION_URL, &info);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "版本检查失败 ret=%d，重启回 BLE", ret);
+        vTaskDelay(pdMS_TO_TICKS(OTA_REBOOT_AFTER_UPGRADE_MS));
+        esp_restart();
+    }
+    esp_task_wdt_reset();
+
+    // 3. 下载固件并写入 OTA 分区
+    ret = ota_downloader_download_and_upgrade(info.url);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "下载升级失败 ret=%d，重启回 BLE", ret);
+        vTaskDelay(pdMS_TO_TICKS(OTA_REBOOT_AFTER_UPGRADE_MS));
+        esp_restart();
+    }
+
+    // 4. 延迟后重启进入新固件
+    ESP_LOGI(TAG, "升级完成，%dms 后重启", OTA_REBOOT_AFTER_UPGRADE_MS);
+    vTaskDelay(pdMS_TO_TICKS(OTA_REBOOT_AFTER_UPGRADE_MS));
+    esp_restart();
+    // esp_restart 不返回，函数到此结束
+}
+
+/**
+ * 处理在线版本检查路由。
+ * 解析家庭 WiFi 凭证，切 APSTA 连路由器，拉 latest.json，返回版本信息 JSON。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理完成（不代表检查成功，错误通过 JSON 字段返回）。
+ * 特殊行为：阻塞 10-30s（连 WiFi+HTTPS）；失败时切回 AP-only 不影响配网。
+ */
+static esp_err_t h_ota_check(httpd_req_t *req)
+{
+    if (s_closing) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "配网收尾中");
+        return ESP_OK;
+    }
+    arm_deadline();
+    ESP_LOGI(TAG, "POST /ota/check 异步触发版本检查");
+    set_no_store_headers(req);
+    httpd_resp_set_hdr(req, "Connection", "close");
+
+    char *body = NULL;
+    int len = recv_body(req, &body);
+    if (len < 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "body 读取失败");
+        return ESP_FAIL;
+    }
+
+    char ssid[HOME_WIFI_SSID_MAX] = {0};
+    char psk[HOME_WIFI_PSK_MAX] = {0};
+    form_get_str(body, "ssid", ssid, sizeof(ssid));
+    form_get_str(body, "psk", psk, sizeof(psk));
+    free(body);
+
+    if (ssid[0] == '\0') {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"请输入家庭WiFi名称\",\"current\":\"" FIRMWARE_VERSION "\"}");
+        return ESP_OK;
+    }
+
+    // 密码留空时从 NVS 加载已保存密码（配合前端"留空使用已保存密码"提示）
+    if (psk[0] == '\0') {
+        char saved_ssid[HOME_WIFI_SSID_MAX] = {0};
+        char saved_psk[HOME_WIFI_PSK_MAX] = {0};
+        if (!nvs_store_load_wifi_cred(saved_ssid, sizeof(saved_ssid), saved_psk, sizeof(saved_psk)) || saved_psk[0] == '\0') {
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"请输入WiFi密码\",\"current\":\"" FIRMWARE_VERSION "\"}");
+            return ESP_OK;
+        }
+        strncpy(psk, saved_psk, sizeof(psk) - 1);
+    }
+
+    // 若上次检查已完成/出错，先重置状态
+    if (s_ota_check_state != OTA_CHECK_RUNNING) {
+        s_ota_check_state = OTA_CHECK_IDLE;
+        s_ota_check_version[0] = '\0';
+        s_ota_check_changelog[0] = '\0';
+        s_ota_check_error[0] = '\0';
+        s_ota_check_has_update = false;
+        s_ota_check_size = 0;
+    } else {
+        // 已有检查任务在跑，拒绝重复触发
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"running\",\"current\":\"" FIRMWARE_VERSION "\"}");
+        return ESP_OK;
+    }
+
+    // 持久化凭证（异步任务从 NVS 读回）
+    nvs_store_save_wifi_cred(ssid, psk);
+
+    // 启动异步检查任务（不阻塞 HTTP 线程）
+    s_ota_check_state = OTA_CHECK_RUNNING;
+    BaseType_t ok = xTaskCreate(ota_check_task, "ota_chk", TASK_STACK_OTA_CHECK, NULL, 5, NULL);
+    if (ok != pdPASS) {
+        ESP_LOGE(TAG, "异步检查任务创建失败");
+        s_ota_check_state = OTA_CHECK_ERROR;
+        snprintf(s_ota_check_error, sizeof(s_ota_check_error), "任务创建失败");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"任务创建失败\",\"current\":\"" FIRMWARE_VERSION "\"}");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "异步检查任务已启动");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"status\":\"started\",\"current\":\"" FIRMWARE_VERSION "\"}");
+    return ESP_OK;
+}
+
+/**
+ * 处理版本检查状态查询路由（前端轮询）。
+ * 返回当前检查状态和结果（若完成）。
+ * req：HTTP 请求对象。
+ */
+static esp_err_t h_ota_status(httpd_req_t *req)
+{
+    arm_deadline();
+    httpd_resp_set_type(req, "application/json");
+    set_no_store_headers(req);
+    httpd_resp_set_hdr(req, "Connection", "close");
+
+    const char *status_str;
+    switch (s_ota_check_state) {
+        case OTA_CHECK_RUNNING: status_str = "running"; break;
+        case OTA_CHECK_DONE:    status_str = "done";    break;
+        case OTA_CHECK_ERROR:   status_str = "error";   break;
+        default:                status_str = "idle";    break;
+    }
+
+    char resp[512];
+    if (s_ota_check_state == OTA_CHECK_DONE) {
+        snprintf(resp, sizeof(resp),
+                 "{\"status\":\"done\",\"has_update\":%s,\"version\":\"%s\",\"size\":%d,\"changelog\":\"%s\",\"current\":\"%s\"}",
+                 s_ota_check_has_update ? "true" : "false",
+                 s_ota_check_version, s_ota_check_size, s_ota_check_changelog, FIRMWARE_VERSION);
+    } else if (s_ota_check_state == OTA_CHECK_ERROR) {
+        snprintf(resp, sizeof(resp),
+                 "{\"status\":\"error\",\"error\":\"%s\",\"current\":\"%s\"}",
+                 s_ota_check_error, FIRMWARE_VERSION);
+    } else {
+        snprintf(resp, sizeof(resp),
+                 "{\"status\":\"%s\",\"current\":\"%s\"}", status_str, FIRMWARE_VERSION);
+    }
+    httpd_resp_sendstr(req, resp);
+    return ESP_OK;
+}
+
+/**
+ * 处理在线升级触发路由。
+ * 保存凭证后返回"升级中"提示页，异步任务执行实际下载升级。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示已触发升级任务。
+ * 特殊行为：返回响应后设备会断开所有连接（AP+BLE），约 2 分钟后重启。
+ */
+static esp_err_t h_ota_upgrade(httpd_req_t *req)
+{
+    if (s_closing) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "配网收尾中");
+        return ESP_OK;
+    }
+    arm_deadline();
+    ESP_LOGI(TAG, "POST /ota/upgrade 在线升级请求");
+    set_no_store_headers(req);
+    httpd_resp_set_hdr(req, "Connection", "close");
+
+    char *body = NULL;
+    int len = recv_body(req, &body);
+    if (len >= 0) {
+        char ssid[HOME_WIFI_SSID_MAX] = {0};
+        char psk[HOME_WIFI_PSK_MAX] = {0};
+        form_get_str(body, "ssid", ssid, sizeof(ssid));
+        form_get_str(body, "psk", psk, sizeof(psk));
+        if (ssid[0] != '\0') {
+            // 密码留空时从 NVS 加载已保存密码
+            if (psk[0] == '\0') {
+                char saved_ssid[HOME_WIFI_SSID_MAX] = {0};
+                char saved_psk[HOME_WIFI_PSK_MAX] = {0};
+                if (nvs_store_load_wifi_cred(saved_ssid, sizeof(saved_ssid), saved_psk, sizeof(saved_psk)) && saved_psk[0] != '\0') {
+                    strncpy(psk, saved_psk, sizeof(psk) - 1);
+                }
+            }
+            nvs_store_save_wifi_cred(ssid, psk);
+        }
+        free(body);
+    }
+
+    // 标记配网收尾，阻止后续配置修改
+    s_closing = true;
+    ESP_LOGI(TAG, "OTA 升级已触发，启动异步任务");
+
+    // 返回升级提示页
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_sendstr(req,
+        "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>升级中 - BikePower</title></head>"
+        "<body style=\"background:#f5f5f7;min-height:100vh;margin:0;padding:24px 16px;display:flex;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;color:#1d1d1f\">"
+        "<div style=\"max-width:360px;width:100%;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:26px;padding:28px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.08)\">"
+        "<div style=\"width:64px;height:64px;border-radius:50%;margin:0 auto 14px;background:#eef6ff;color:#007aff;font-size:38px;font-weight:800;display:flex;align-items:center;justify-content:center\">&#8593;</div>"
+        "<h1 style=\"font-size:22px;margin:0 0 8px;font-weight:800;letter-spacing:-.03em\">正在下载升级</h1>"
+        "<p style=\"color:#6e6e73;font-size:13px;line-height:1.5;margin:0 0 16px\">设备已断开蓝牙和配网热点，正在通过家庭 WiFi 下载最新固件。</p>"
+        "<p style=\"color:#86868b;font-size:12px;line-height:1.5;margin:0\">约 2 分钟后设备自动重启，请重新连接蓝牙继续使用。期间请保持通电，勿断电。</p>"
+        "</div></body></html>");
+
+    // 异步触发升级（延迟 3s 确保响应发出）
+    xTaskCreate(ota_upgrade_task, "ota_up", TASK_STACK_OTA_UPGRADE, NULL, 5, NULL);
+    return ESP_OK;
+}
+
 // ============================ 关闭提示页 ============================
+
+// ============================ 家庭网络配置（v3.1.6：扫描+保存+测试连接） ============================
+
+#define WIFI_SCAN_MAX_APS   10      // 最多返回前 10 个信号最强的热点
+#define WIFI_CONNECT_TIMEOUT_MS 15000   // 测试连接超时
+
+// ----- 异步扫描状态机 -----
+typedef enum {
+    WIFI_SCAN_IDLE = 0,
+    WIFI_SCAN_RUNNING,
+    WIFI_SCAN_DONE,
+    WIFI_SCAN_ERROR,
+} wifi_scan_state_t;
+
+static wifi_scan_state_t s_wifi_scan_state = WIFI_SCAN_IDLE;
+static wifi_ap_record_t s_scan_aps[WIFI_SCAN_MAX_APS];  // 静态预分配，避免任务内 malloc
+static int s_scan_count = 0;
+static char s_scan_error[64] = {0};
+
+// ----- 异步连接测试状态机 -----
+typedef enum {
+    WIFI_CONN_IDLE = 0,
+    WIFI_CONN_RUNNING,
+    WIFI_CONN_DONE,
+    WIFI_CONN_ERROR,
+} wifi_conn_state_t;
+
+static wifi_conn_state_t s_wifi_conn_state = WIFI_CONN_IDLE;
+static char s_wifi_conn_error[64] = {0};
+
+/**
+ * 异步 WiFi 扫描任务。
+ * 调用 radio_ctrl_wifi_scan 扫描周边热点，结果写入全局 s_scan_aps。
+ */
+static void wifi_scan_task(void *arg)
+{
+    (void)arg;
+    int count = 0;
+    esp_err_t ret = radio_ctrl_wifi_scan(s_scan_aps, WIFI_SCAN_MAX_APS, &count);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "WiFi 扫描失败 ret=%d", ret);
+        snprintf(s_scan_error, sizeof(s_scan_error), "扫描失败");
+        s_wifi_scan_state = WIFI_SCAN_ERROR;
+        vTaskDelete(NULL);
+        return;
+    }
+    s_scan_count = count;
+    s_wifi_scan_state = WIFI_SCAN_DONE;
+    ESP_LOGI(TAG, "异步扫描完成，发现 %d 个热点", count);
+    vTaskDelete(NULL);
+}
+
+/**
+ * 异步 WiFi 连接测试任务。
+ * 凭证从 NVS 读回，连 STA 验证后断开。
+ */
+static void wifi_connect_task(void *arg)
+{
+    (void)arg;
+    char ssid[HOME_WIFI_SSID_MAX] = {0};
+    char psk[HOME_WIFI_PSK_MAX] = {0};
+    if (!nvs_store_load_wifi_cred(ssid, sizeof(ssid), psk, sizeof(psk))) {
+        snprintf(s_wifi_conn_error, sizeof(s_wifi_conn_error), "无凭证");
+        s_wifi_conn_state = WIFI_CONN_ERROR;
+        vTaskDelete(NULL);
+        return;
+    }
+    ESP_LOGI(TAG, "异步测试连接：%.32s", ssid);
+    esp_err_t ret = radio_ctrl_sta_connect(ssid, psk, WIFI_CONNECT_TIMEOUT_MS);
+    if (ret == ESP_OK) {
+        radio_ctrl_sta_disconnect();
+        s_wifi_conn_state = WIFI_CONN_DONE;
+        ESP_LOGI(TAG, "异步测试连接成功");
+    } else {
+        snprintf(s_wifi_conn_error, sizeof(s_wifi_conn_error), "连接失败");
+        s_wifi_conn_state = WIFI_CONN_ERROR;
+        ESP_LOGE(TAG, "异步测试连接失败 ret=%d", ret);
+    }
+    vTaskDelete(NULL);
+}
+
+/**
+ * 触发 WiFi 扫描路由（异步）。
+ * 立即启动扫描任务返回 started，前端轮询 /wifi/scan/status 获取结果。
+ */
+static esp_err_t h_wifi_scan(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "POST /wifi/scan 请求到达 state=%d closing=%d", s_wifi_scan_state, s_closing ? 1 : 0);
+    if (s_closing) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "配网收尾中");
+        return ESP_OK;
+    }
+    arm_deadline();
+    set_no_store_headers(req);
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_type(req, "application/json");
+
+    if (s_wifi_scan_state == WIFI_SCAN_RUNNING) {
+        ESP_LOGI(TAG, "POST /wifi/scan 扫描已在进行，返回 running");
+        httpd_resp_sendstr(req, "{\"status\":\"running\"}");
+        return ESP_OK;
+    }
+    // 重置状态
+    s_wifi_scan_state = WIFI_SCAN_IDLE;
+    s_scan_count = 0;
+    s_scan_error[0] = '\0';
+
+    s_wifi_scan_state = WIFI_SCAN_RUNNING;
+    BaseType_t ok = xTaskCreate(wifi_scan_task, "wifi_scan", TASK_STACK_OTA_CHECK, NULL, 5, NULL);
+    if (ok != pdPASS) {
+        ESP_LOGE(TAG, "扫描任务创建失败");
+        s_wifi_scan_state = WIFI_SCAN_ERROR;
+        snprintf(s_scan_error, sizeof(s_scan_error), "任务创建失败");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"任务创建失败\"}");
+        return ESP_OK;
+    }
+    ESP_LOGI(TAG, "POST /wifi/scan 异步扫描已启动");
+    httpd_resp_sendstr(req, "{\"status\":\"started\"}");
+    return ESP_OK;
+}
+
+/**
+ * 查询扫描状态路由（前端轮询）。
+ * 返回扫描结果 JSON（SSID + RSSI + 加密类型）。
+ */
+static esp_err_t h_wifi_scan_status(httpd_req_t *req)
+{
+    arm_deadline();
+    set_no_store_headers(req);
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_type(req, "application/json");
+
+    if (s_wifi_scan_state == WIFI_SCAN_RUNNING) {
+        httpd_resp_sendstr(req, "{\"status\":\"running\"}");
+        return ESP_OK;
+    }
+    if (s_wifi_scan_state == WIFI_SCAN_ERROR) {
+        ESP_LOGW(TAG, "GET /wifi/scan/status 返回 error: %s", s_scan_error);
+        char resp[128];
+        snprintf(resp, sizeof(resp), "{\"status\":\"error\",\"error\":\"%s\"}", s_scan_error);
+        httpd_resp_sendstr(req, resp);
+        return ESP_OK;
+    }
+    if (s_wifi_scan_state != WIFI_SCAN_DONE) {
+        httpd_resp_sendstr(req, "{\"status\":\"idle\"}");
+        return ESP_OK;
+    }
+    // 拼接扫描结果（按 RSSI 降序，radio_ctrl 已保证）
+    char resp[2048];
+    int off = 0;
+    off += snprintf(resp + off, sizeof(resp) - off, "{\"status\":\"done\",\"count\":%d,\"list\":[", s_scan_count);
+    for (int i = 0; i < s_scan_count && off < (int)sizeof(resp) - 80; i++) {
+        char ssid_escaped[HOME_WIFI_SSID_MAX * 2] = {0};
+        const char *src = (const char *)s_scan_aps[i].ssid;
+        for (int j = 0; src[j] && j < (int)sizeof(ssid_escaped) - 8; j++) {
+            char ch = src[j];
+            if (ch == '"' || ch == '\\') {
+                ssid_escaped[strlen(ssid_escaped)] = '\\';
+            }
+            ssid_escaped[strlen(ssid_escaped)] = ch;
+        }
+        off += snprintf(resp + off, sizeof(resp) - off,
+            "%s{\"ssid\":\"%s\",\"rssi\":%d,\"auth\":%d}",
+            (i == 0 ? "" : ","), ssid_escaped,
+            s_scan_aps[i].rssi, s_scan_aps[i].authmode);
+    }
+    off += snprintf(resp + off, sizeof(resp) - off, "]}");
+    ESP_LOGI(TAG, "GET /wifi/scan/status 返回 done count=%d", s_scan_count);
+    httpd_resp_sendstr(req, resp);
+    return ESP_OK;
+}
+
+/**
+ * 保存家庭 WiFi 凭证并触发异步连接测试路由。
+ * 解析表单 ssid/psk，存 NVS，启动连接测试任务。
+ */
+static esp_err_t h_wifi_save(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "POST /wifi/save 请求到达 closing=%d", s_closing ? 1 : 0);
+    if (s_closing) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "配网收尾中");
+        return ESP_OK;
+    }
+    arm_deadline();
+    set_no_store_headers(req);
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_type(req, "application/json");
+
+    char *body = NULL;
+    int len = recv_body(req, &body);
+    if (len < 0) {
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"body读取失败\"}");
+        return ESP_FAIL;
+    }
+    char ssid[HOME_WIFI_SSID_MAX] = {0};
+    char psk[HOME_WIFI_PSK_MAX] = {0};
+    form_get_str(body, "ssid", ssid, sizeof(ssid));
+    form_get_str(body, "psk", psk, sizeof(psk));
+    free(body);
+
+    if (ssid[0] == '\0') {
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"请输入WiFi名称\"}");
+        return ESP_OK;
+    }
+    nvs_store_save_wifi_cred(ssid, psk);
+    ESP_LOGI(TAG, "POST /wifi/save 凭证已保存 ssid=%.32s，启动测试连接", ssid);
+
+    if (s_wifi_conn_state == WIFI_CONN_RUNNING) {
+        httpd_resp_sendstr(req, "{\"status\":\"running\"}");
+        return ESP_OK;
+    }
+    s_wifi_conn_state = WIFI_CONN_IDLE;
+    s_wifi_conn_error[0] = '\0';
+    s_wifi_conn_state = WIFI_CONN_RUNNING;
+    BaseType_t ok = xTaskCreate(wifi_connect_task, "wifi_conn", TASK_STACK_OTA_CHECK, NULL, 5, NULL);
+    if (ok != pdPASS) {
+        s_wifi_conn_state = WIFI_CONN_ERROR;
+        snprintf(s_wifi_conn_error, sizeof(s_wifi_conn_error), "任务创建失败");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"任务创建失败\"}");
+        return ESP_OK;
+    }
+    httpd_resp_sendstr(req, "{\"status\":\"started\"}");
+    return ESP_OK;
+}
+
+/**
+ * 查询连接测试状态路由（前端轮询）。
+ */
+static esp_err_t h_wifi_connect_status(httpd_req_t *req)
+{
+    arm_deadline();
+    set_no_store_headers(req);
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_type(req, "application/json");
+
+    if (s_wifi_conn_state == WIFI_CONN_RUNNING) {
+        httpd_resp_sendstr(req, "{\"status\":\"running\"}");
+        return ESP_OK;
+    }
+    if (s_wifi_conn_state == WIFI_CONN_DONE) {
+        httpd_resp_sendstr(req, "{\"status\":\"done\"}");
+        return ESP_OK;
+    }
+    if (s_wifi_conn_state == WIFI_CONN_ERROR) {
+        char resp[128];
+        snprintf(resp, sizeof(resp), "{\"status\":\"error\",\"error\":\"%s\"}", s_wifi_conn_error);
+        httpd_resp_sendstr(req, resp);
+        return ESP_OK;
+    }
+    httpd_resp_sendstr(req, "{\"status\":\"idle\"}");
+    return ESP_OK;
+}
+
+/**
+ * 输出"家庭网络"配置面板碎片（由 /ui/module?name=wifi 调用）。
+ * 进入面板自动扫描周边 WiFi（取信号最强前 10 个），用户选择热点输入密码后提交验证。
+ */
+static void send_wifi_panel(httpd_req_t *req)
+{
+    SEND(req, PANEL_STYLE
+        "<div class=\"panel-card\">"
+        "<h2>家庭网络</h2>"
+        "<p>配置家庭 WiFi 后，设备可用于在线检查固件更新和下载升级。下方自动扫描周边热点，选择你的家庭 WiFi 并输入密码。</p>"
+        "</div>"
+        "<div class=\"panel-card\">"
+        "<div id=\"scan-status\" style=\"font-size:13px;color:#6e6e73;margin-bottom:8px\">正在扫描周边 WiFi...</div>"
+        "<div id=\"scan-list\"></div>"
+        "<div id=\"psk-row\" style=\"display:none;margin-top:12px\">"
+        "<div class=\"field\"><label>WiFi 密码</label>"
+        "<input type=\"password\" id=\"home-psk\" placeholder=\"家庭 WiFi 密码\" maxlength=\"63\"></div>"
+        "</div>"
+        "<button class=\"module-btn\" type=\"button\" id=\"save-btn\" style=\"margin-top:10px\" disabled onclick=\"saveWifi()\">保存并测试连接</button>"
+        "<div id=\"wifi-result\" style=\"margin-top:10px\"></div>"
+        "</div>");
+
+    SEND(req,
+        "<script>"
+        "var pickedSsid='';"
+        // 触发扫描（POST 立即返回 started，前端轮询结果）
+        "function startScan(){"
+        "var st=document.getElementById('scan-status'),lst=document.getElementById('scan-list');"
+        "st.textContent='正在扫描周边 WiFi...';st.style.color='#6e6e73';lst.innerHTML='';"
+        "var x=new XMLHttpRequest();"
+        "x.onload=function(){if(x.status!==200){st.textContent='扫描请求失败';st.style.color='#ff3b30';return}"
+        "try{var d=JSON.parse(x.responseText);"
+        "if(d.status==='started'||d.status==='running'){pollScan();return}"
+        "st.textContent=d.error||'扫描失败';st.style.color='#ff3b30'}"
+        "catch(e){st.textContent='解析失败';st.style.color='#ff3b30'}};"
+        "x.onerror=function(){st.textContent='网络错误';st.style.color='#ff3b30'};"
+        "x.open('POST','/wifi/scan');x.send()}"
+        // 轮询扫描状态
+        "function pollScan(){"
+        "var st=document.getElementById('scan-status'),lst=document.getElementById('scan-list');"
+        "var t=setInterval(function(){"
+        "var x=new XMLHttpRequest();"
+        "x.onload=function(){if(x.status!==200)return;"
+        "try{var d=JSON.parse(x.responseText);"
+        "if(d.status==='running')return;"
+        "clearInterval(t);"
+        "if(d.status==='error'){st.textContent=d.error||'扫描失败';st.style.color='#ff3b30';return}"
+        "if(d.status==='done'&&d.list&&d.list.length>0){"
+        "st.textContent='发现 '+d.count+' 个热点，请选择你的家庭 WiFi：';st.style.color='#1d1d1f';"
+        "var h='';"
+        "for(var i=0;i<d.list.length;i++){"
+        "var a=d.list[i];"
+        "var lock=a.auth>0?'<span style=\"color:#86868b\">&#128274;</span>':'<span style=\"color:#34c759\">&#9888;</span>';"
+        "var sig=a.rssi>=-55?'<span style=\"color:#34c759\">&#9679;&#9679;&#9679;</span>':(a.rssi>=-70?'<span style=\"color:#ff9500\">&#9679;&#9679;&#9679;</span>':'<span style=\"color:#ff3b30\">&#9679;&#9679;&#9679;</span>');"
+        "h+='<div class=\"wifi-item\" data-ssid=\"'+escapeAttr(a.ssid)+'\" data-auth=\"'+a.auth+'\" onclick=\"pickSsid(this)\" style=\"padding:12px;margin:6px 0;background:#f5f5f7;border:2px solid transparent;border-radius:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center\">'"
+        "+'<span style=\"font-size:15px;font-weight:700;color:#1d1d1f\">'+escapeHtml(a.ssid)+'</span>'"
+        "+'<span style=\"display:flex;align-items:center;gap:8px\">'+lock+' '+sig+' <span style=\"color:#86868b;font-size:11px\">'+a.rssi+'dBm</span></span></div>'}"
+        "lst.innerHTML=h}"
+        "else{st.textContent='未发现周边 WiFi 热点';st.style.color='#86868b'}}"
+        "catch(e){st.textContent='解析失败';st.style.color='#ff3b30'}}};"
+        "x.open('GET','/wifi/scan/status');x.send()},1000)}"
+        // 选择热点
+        "function pickSsid(el){"
+        "var items=document.querySelectorAll('.wifi-item');"
+        "for(var i=0;i<items.length;i++){items[i].style.borderColor='transparent';items[i].style.background='#f5f5f7'}"
+        "el.style.borderColor='#007aff';el.style.background='#eef6ff';"
+        "pickedSsid=el.getAttribute('data-ssid');"
+        "var auth=parseInt(el.getAttribute('data-auth'));"
+        "var pr=document.getElementById('psk-row'),pk=document.getElementById('home-psk'),btn=document.getElementById('save-btn');"
+        "pr.style.display='block';btn.disabled=false;"
+        "if(auth===0){pk.value='';pk.placeholder='开放网络，无需密码';pk.disabled=true}"
+        "else{pk.placeholder='家庭 WiFi 密码';pk.disabled=false;pk.focus()}}"
+        // 提交保存并测试连接
+        "function saveWifi(){"
+        "if(!pickedSsid){alert('请先选择一个 WiFi 热点');return}"
+        "var psk=document.getElementById('home-psk').value;"
+        "var btn=document.getElementById('save-btn');btn.disabled=true;btn.textContent='测试中...';"
+        "var r=document.getElementById('wifi-result');"
+        "r.innerHTML='<p style=\"font-size:12px;color:#6e6e73\">正在保存并测试连接，约 10-15 秒...</p>';"
+        "var x=new XMLHttpRequest();"
+        "x.onload=function(){if(x.status!==200){btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">请求失败</p>';return}"
+        "try{var d=JSON.parse(x.responseText);"
+        "if(d.status==='started'||d.status==='running'){pollConn(btn,r);return}"
+        "btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">'+(d.error||'失败')+'</p>'}"
+        "catch(e){btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">解析失败</p>'}};"
+        "x.onerror=function(){btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">网络错误</p>'};"
+        "x.open('POST','/wifi/save');x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');"
+        "x.send('ssid='+encodeURIComponent(pickedSsid)+'&psk='+encodeURIComponent(psk))}"
+        // 轮询连接测试状态
+        "function pollConn(btn,r){"
+        "var t=setInterval(function(){"
+        "var x=new XMLHttpRequest();"
+        "x.onload=function(){if(x.status!==200)return;"
+        "try{var d=JSON.parse(x.responseText);"
+        "if(d.status==='running')return;"
+        "clearInterval(t);btn.disabled=false;btn.textContent='保存并测试连接';"
+        "if(d.status==='done'){r.innerHTML='<p style=\"color:#34c759;font-size:13px;font-weight:800\">&#10004; 连接成功！凭证已保存，可用于在线检查更新</p>'}"
+        "else if(d.status==='error'){r.innerHTML='<p style=\"color:#ff3b30;font-size:13px\">'+(d.error||'连接失败，请检查密码')+'</p>'}}"
+        "catch(e){clearInterval(t);btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">解析失败</p>'}}};"
+        "x.open('GET','/wifi/connect/status');x.send()},1500)}"
+        // HTML 转义工具
+        "function escapeHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;')}"
+        "function escapeAttr(s){return s.replace(/&/g,'&amp;').replace(/\"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}"
+        "panelCleanup=function(){};"
+        // 进入面板自动扫描
+        "startScan();"
+        "</script>");
+}
 
 /**
  * 处理 WiFi 关闭提示页路由。
@@ -1193,6 +1956,7 @@ static esp_err_t h_ota(httpd_req_t *req)
  */
 static esp_err_t h_closing(httpd_req_t *req)
 {
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：避免 fd 耗尽
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_sendstr(req,
         "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
@@ -1218,6 +1982,7 @@ static esp_err_t h_closing(httpd_req_t *req)
  */
 static esp_err_t h_time(httpd_req_t *req)
 {
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：高频轮询，强制关闭避免 fd 耗尽
     char buf[8];
     snprintf(buf, sizeof(buf), "%d", remaining_seconds());
     httpd_resp_set_type(req, "text/plain");
@@ -1248,6 +2013,7 @@ static esp_err_t h_renew(httpd_req_t *req)
  */
 static esp_err_t h_favicon(httpd_req_t *req)
 {
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：避免 fd 耗尽
     httpd_resp_set_status(req, "204 No Content");
     httpd_resp_send(req, NULL, 0);
     return ESP_OK;
@@ -1263,6 +2029,7 @@ static esp_err_t h_favicon(httpd_req_t *req)
  */
 static esp_err_t h_mem_stats(httpd_req_t *req)
 {
+    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：避免 fd 耗尽
     char buf[64];
     snprintf(buf, sizeof(buf), "{\"free\":%u,\"min_free\":%u}",
              (unsigned)esp_get_free_heap_size(),
@@ -1288,6 +2055,8 @@ static esp_err_t start_httpd(void)
     cfg.lru_purge_enable = true;
     cfg.max_uri_handlers = HTTP_MAX_URI_HANDLERS;
     cfg.stack_size = TASK_STACK_HTTPD;
+    cfg.max_open_sockets = 7;   // v3.1.6：ESP-IDF 限制 max 7（内部保留 3 个），保持默认值避免 httpd 启动失败
+    cfg.keep_alive_enable = false;  // v3.1.6：关闭 keep-alive，避免浏览器连接累积导致 fd 耗尽（配网页面无需复用连接）
 
     esp_err_t ret = httpd_start(&s_httpd, &cfg);
     if (ret != ESP_OK) {
@@ -1302,6 +2071,13 @@ static esp_err_t start_httpd(void)
         { .uri = "/more",      .method = HTTP_GET,  .handler = h_more },
         { .uri = "/ota",       .method = HTTP_GET,  .handler = h_ota },
         { .uri = "/ota/upload", .method = HTTP_POST, .handler = ota_update_handle_upload, .user_ctx = NULL },
+        { .uri = "/ota/check",   .method = HTTP_POST, .handler = h_ota_check },    // v3.1.6 异步触发版本检查
+        { .uri = "/ota/status",  .method = HTTP_GET,  .handler = h_ota_status },   // v3.1.6 查询版本检查状态（前端轮询）
+        { .uri = "/ota/upgrade", .method = HTTP_POST, .handler = h_ota_upgrade },   // v3.1.6 在线下载升级
+        { .uri = "/wifi/scan",          .method = HTTP_POST, .handler = h_wifi_scan },          // v3.1.6 异步扫描周边 WiFi
+        { .uri = "/wifi/scan/status",   .method = HTTP_GET,  .handler = h_wifi_scan_status },   // v3.1.6 查询扫描结果（前端轮询）
+        { .uri = "/wifi/save",          .method = HTTP_POST, .handler = h_wifi_save },          // v3.1.6 保存家庭 WiFi 凭证+测试连接
+        { .uri = "/wifi/connect/status", .method = HTTP_GET,  .handler = h_wifi_connect_status }, // v3.1.6 查询连接测试状态（前端轮询）
         { .uri = "/draft",     .method = HTTP_POST, .handler = h_draft },
         { .uri = "/ui/module", .method = HTTP_GET,  .handler = h_ui_module },
         { .uri = "/closing",   .method = HTTP_GET,  .handler = h_closing },

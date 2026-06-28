@@ -220,3 +220,103 @@ bool nvs_store_save(power_engine_t *e)
     }
     return ok;
 }
+
+// ============================ 家庭 WiFi 凭证（v3.1.6 在线 OTA） ============================
+
+bool nvs_store_save_wifi_cred(const char *ssid, const char *psk)
+{
+    if (ssid == NULL || psk == NULL) {
+        return false;
+    }
+    if (s_save_mutex == NULL) {
+        s_save_mutex = xSemaphoreCreateMutexStatic(&s_save_mutex_buf);
+    }
+    if (xSemaphoreTake(s_save_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "wifi_cred 保存等待锁超时");
+        return false;
+    }
+
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NVS_NAMESPACE_WIFI, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi namespace 打开失败(%s)", esp_err_to_name(err));
+        xSemaphoreGive(s_save_mutex);
+        return false;
+    }
+
+    err = nvs_set_blob(h, NVS_KEY_HOME_SSID, ssid, strlen(ssid) + 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi ssid 写入失败(%s)", esp_err_to_name(err));
+        nvs_close(h);
+        xSemaphoreGive(s_save_mutex);
+        return false;
+    }
+    err = nvs_set_blob(h, NVS_KEY_HOME_PSK, psk, strlen(psk) + 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi psk 写入失败(%s)", esp_err_to_name(err));
+        nvs_close(h);
+        xSemaphoreGive(s_save_mutex);
+        return false;
+    }
+    err = nvs_commit(h);
+    nvs_close(h);
+    xSemaphoreGive(s_save_mutex);
+
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "wifi_cred commit 失败(%s)", esp_err_to_name(err));
+        return false;
+    }
+    ESP_LOGI(TAG, "家庭 WiFi 凭证已保存 ssid=%s", ssid);
+    return true;
+}
+
+bool nvs_store_load_wifi_cred(char *ssid, size_t ssid_sz, char *psk, size_t psk_sz)
+{
+    if (ssid == NULL || ssid_sz == 0) {
+        return false;
+    }
+    ssid[0] = '\0';
+    if (psk != NULL && psk_sz > 0) {
+        psk[0] = '\0';
+    }
+
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NVS_NAMESPACE_WIFI, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        return false;  // 无记录属正常情况
+    }
+
+    size_t required = 0;
+    err = nvs_get_blob(h, NVS_KEY_HOME_SSID, NULL, &required);
+    if (err != ESP_OK || required == 0 || required > ssid_sz) {
+        nvs_close(h);
+        return false;
+    }
+    err = nvs_get_blob(h, NVS_KEY_HOME_SSID, ssid, &required);
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return false;
+    }
+    ssid[ssid_sz - 1] = '\0';
+
+    // psk 可选：为 NULL 时只加载 ssid（用于页面回显 SSID 不暴露密码）
+    if (psk == NULL || psk_sz == 0) {
+        nvs_close(h);
+        return ssid[0] != '\0';
+    }
+
+    required = 0;
+    err = nvs_get_blob(h, NVS_KEY_HOME_PSK, NULL, &required);
+    if (err != ESP_OK || required > psk_sz) {
+        nvs_close(h);
+        return false;
+    }
+    err = nvs_get_blob(h, NVS_KEY_HOME_PSK, psk, &required);
+    nvs_close(h);
+    if (err != ESP_OK) {
+        return false;
+    }
+    psk[psk_sz - 1] = '\0';
+
+    return ssid[0] != '\0';
+}
