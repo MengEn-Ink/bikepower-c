@@ -385,7 +385,6 @@ static void set_no_store_headers(httpd_req_t *req)
 // ============================ 首页 ============================
 
 /**
- * 处理首页路由。
  * 输出主配置页面，展示当前数值、模式切换和倒计时状态。
  * req：HTTP 请求对象。
  * 返回值：ESP_OK 表示处理成功。
@@ -428,7 +427,6 @@ static esp_err_t h_home(httpd_req_t *req)
         ".seg,.btn{display:flex;align-items:center;justify-content:center}"
         ".bar,.status{justify-content:space-between;margin:0 0 10px}"
         ".brand{gap:8px;font-size:24px;font-weight:800}"
-        ".gear{position:relative;z-index:10;min-height:36px;padding:0 12px;color:#007aff;background:#fff;border:1px solid #007aff29;border-radius:18px;font-size:13px;font-weight:800;text-decoration:none;display:flex;align-items:center}"
         ".status{font-size:13px}"
         ".status .ble{color:#007aff;font-weight:800}"
         ".badge{background:#fff;border:1px solid #0001;color:#111;border-radius:18px;padding:6px 11px;font-weight:800;font-size:12px}"
@@ -454,11 +452,16 @@ static esp_err_t h_home(httpd_req_t *req)
         ".seg{gap:5px;padding:11px 0;border-radius:15px;color:#666;font-size:13px;font-weight:800}"
         ".seg input{display:none}.seg.on{background:#fff;color:#111}"
         ".note{font-size:12px;line-height:1.45;color:#3f3f46;background:#fff;border:1px solid #0001;border-radius:18px;padding:10px 12px;margin:0 0 10px}"
-        ".btn{gap:8px;width:100%;padding:15px;border:0;border-radius:18px;background:#007aff;color:#fff;font-size:17px;font-weight:800}"
-        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.card,.note,.mode-info{background:#2c2c2e;border-color:#3a3a3c}.card .val input{color:#f5f5f7}.badge{background:#2c2c2e;border-color:#3a3a3c;color:#f5f5f7}.seg-row{background:#3a3a3c}.seg{color:#8e8e93}.seg.on{background:#2c2c2e;color:#f5f5f7}.mode-info .pacer-sel{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}.gear{background:#2c2c2e;border-color:#48484a;color:#0a84ff}.renew-btn{background:#ff9f0a}}"
+        ".btn{gap:8px;width:100%;padding:13px;border:0;border-radius:14px;background:#007aff;color:#fff;font-size:15px;font-weight:700;letter-spacing:.02em}"
+        ".btn:active{opacity:.85;transform:scale(.99)}"
+        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.card,.note,.mode-info{background:#2c2c2e;border-color:#3a3a3c}.card .val input{color:#f5f5f7}.badge{background:#2c2c2e;border-color:#3a3a3c;color:#f5f5f7}.seg-row{background:#3a3a3c}.seg{color:#8e8e93}.seg.on{background:#2c2c2e;color:#f5f5f7}.mode-info .pacer-sel{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}.renew-btn{background:#ff9f0a}.btn{background:#0a84ff}}"
+        ".navbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.06);padding:6px 0 env(safe-area-inset-bottom,6px);z-index:100;max-width:420px;margin:0 auto}"
+        ".nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#86868b;font-size:11px;font-weight:700;padding:4px 0;min-height:50px;gap:2px}"
+        ".nav-item.on{color:#007aff}.nav-ico{font-size:20px}.nav-tx{font-size:11px}"
+        "@media(prefers-color-scheme:dark){.navbar{background:#1c1c1e;border-color:#3a3a3c}.nav-item{color:#8e8e93}.nav-item.on{color:#0a84ff}}"
+        "body{padding-bottom:70px!important}"
         "</style></head><body><div class=\"box\">"
-        "<div class=\"bar\"><div class=\"brand\">BikePower <small style=\"font-size:10px;font-weight:600;color:#86868b\">v" FIRMWARE_VERSION "</small></div>"
-        "<a class=\"gear\" href=\"/more\" onclick=\"return goMore()\">&#9881; 更多配置</a></div>"
+        "<div class=\"bar\"><div class=\"brand\">BikePower <small style=\"font-size:10px;font-weight:600;color:#86868b\">v" FIRMWARE_VERSION "</small></div></div>"
         "<div class=\"status\"><span class=\"ble\">&#9679; 配网中</span>"
         "<span class=\"badge\" id=\"cd\" onclick=\"doRenew()\">剩余 180 秒</span></div>"
         "<button type=\"button\" class=\"renew-btn\" id=\"rb\" onclick=\"doRenew()\">&#9202; 点击延长配网时间</button>"
@@ -502,7 +505,7 @@ static esp_err_t h_home(httpd_req_t *req)
 
     SEND(req,
         "</select>"
-        "<p style=\"margin-top:12px;padding:10px 12px;background:#e8f4fd;border-radius:12px;font-size:12px;color:#007aff;line-height:1.5\">&#128161; 修改体重、FTP 等个人信息可获得更精准的功率计算，<a href=\"/more\" style=\"color:#007aff;font-weight:700\" onclick=\"return goMore()\">前往设置 →</a></p>"
+        "<p style=\"margin-top:12px;padding:10px 12px;background:#e8f4fd;border-radius:12px;font-size:12px;color:#007aff;line-height:1.5\">&#128161; 修改体重、FTP 等个人信息可获得更精准的功率计算，<a href=\"/more\" style=\"color:#007aff;font-weight:700\">前往设置 →</a></p>"
         "</div>"
         "<div class=\"mode-info\" id=\"mi-erg\">"
         "<h3>ERG 模式</h3>"
@@ -533,7 +536,7 @@ static esp_err_t h_home(httpd_req_t *req)
         // 主按钮"保存设置" → /config（仅保存+实时生效，不关 WiFi，可继续修改）
         // 次按钮"保存并关闭 WiFi" → /close-wifi（保存+实时生效+5s 后关 WiFi 回到 BLE）
         "<button class=\"btn\" type=\"submit\" formaction=\"/config\">&#10003; 保存设置</button>"
-        "<button class=\"btn\" type=\"submit\" formaction=\"/close-wifi\" style=\"background:#34c759;margin-top:8px\">&#8634; 保存并关闭 WiFi</button></form>"
+        "<button class=\"btn\" type=\"submit\" formaction=\"/close-wifi\" style=\"background:#34c759;margin-top:8px\">&#8634; 保存并退出配网</button></form>"
         // 保存成功 toast：由首页 URL 携带 saved=1 触发，2s 后自动消失
         "<div id=\"toast\" style=\"display:none;position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1d1d1f;color:#fff;padding:12px 22px;border-radius:18px;font-size:14px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:50\">&#10003; 已保存并实时生效</div>"
         "</div><script>");
@@ -558,7 +561,6 @@ static esp_err_t h_home(httpd_req_t *req)
         "function updNote(w,h,c,p,hr){var m=curMode();if(m===\"steady\"){var t=\"手动设置三项数据\";if(w&&F)t+=\"，当前 \"+(w/W).toFixed(1)+\" W/kg（\"+P[p]+\"区间）\";if(h&&T)t+=\"，心率 \"+H[hr]+\"区间\";g(\"mn\").textContent=\"固定功率：\"+t+\"。\"}else if(m===\"road\"){g(\"mn\").textContent=\"机器人配速：按体重和 W/kg 换算功率，模拟跟骑。\"}else if(m===\"erg\"){g(\"mn\").textContent=\"ERG：App 下发目标功率，设备跟随训练课表。\"}}"
         "var R=0;function doRenew(){if(R)return;R=1;var b=g(\"cd\");b.className=\"badge ok\";b.textContent=\"已延长\";fetch(\"/renew\").then(function(r){return r.text()}).then(function(t){var s=parseInt(t);if(s>0){_sv=s;_lt=Date.now();updCd()}});setTimeout(function(){b.className=\"badge\";R=0},1200)}"
         "function curMode(){var r=document.getElementsByName(\"mode\");for(var i=0;i<r.length;i++){if(r[i].checked)return r[i].value}return \"steady\"}"
-        "function goMore(){var fd=new URLSearchParams(new FormData(document.getElementById(\"cfg\")));fetch(\"/draft\",{method:\"POST\",body:fd}).then(function(){location.href=\"/more\"}).catch(function(){location.href=\"/more\"});return false}"
         "function validateForm(){if(curMode()!==\"steady\")return true;var p=parseInt(g(\"p\").value),c=parseInt(g(\"c\").value),h=parseInt(g(\"h\").value);if(p<0||p>2000){alert(\"功率超出范围（0-2000W）\");return false}if(c<20||c>120){alert(\"踏频超出范围（20-120 RPM）\");return false}if(h<60||h>200){alert(\"心率超出范围（60-200 BPM）\");return false}return true}"
         "function syncMode(){var m=curMode();var on=m===\"steady\";"
         "var s=document.getElementsByClassName(\"seg\");for(var i=0;i<s.length;i++){var c=s[i].getElementsByTagName(\"input\")[0];s[i].className=c.checked?\"seg on\":\"seg\"}"
@@ -579,7 +581,9 @@ static esp_err_t h_home(httpd_req_t *req)
         "if(s<=0)location.href=\"/closing\"}"
         "function tick(){if(document.hidden)return;fetch(\"/time\").then(function(r){return r.text()}).then(function(t){_sv=parseInt(t);_lt=Date.now();updCd()})}"
         "updCd();setInterval(updCd,1000);setInterval(tick,5000);"
-        "</script></body></html>");
+        "</script>"
+        "<nav class=\"navbar\"><a class=\"nav-item on\" href=\"/\"><span class=\"nav-ico\">&#9881;</span><span class=\"nav-tx\">配置</span></a><a class=\"nav-item\" href=\"/more\"><span class=\"nav-ico\">&#128218;</span><span class=\"nav-tx\">更多</span></a><a class=\"nav-item\" href=\"/about\"><span class=\"nav-ico\">&#8505;</span><span class=\"nav-tx\">关于</span></a></nav>"
+        "</body></html>");
 
     send_end(req);
     return ESP_OK;
@@ -919,25 +923,31 @@ static esp_err_t h_more(httpd_req_t *req)
         "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<title>更多配置 - BikePower</title><style>"
         "*{margin:0;padding:0;box-sizing:border-box}"
-        "body{background:#f5f5f7;padding:12px;font-family:-apple-system,BlinkMacSystemFont,\"Helvetica Neue\",Arial,sans-serif;color:#1d1d1f}"
+        "body{background:#f2f2f7;padding:12px;font-family:-apple-system,BlinkMacSystemFont,\"Helvetica Neue\",Arial,sans-serif;color:#1d1d1f}"
         ".box{max-width:420px;margin:0 auto}"
-        ".hero{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:24px;padding:14px 14px 16px;margin-bottom:12px;box-shadow:0 10px 28px rgba(0,0,0,.06)}"
-        "h1{font-size:24px;margin:0 0 4px;letter-spacing:-.04em}.sub{font-size:12px;color:#6e6e73;line-height:1.5;margin-bottom:12px}"
-        "a.back{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;margin:0 0 12px;color:#fff;background:#007aff;border-radius:18px;text-decoration:none;font-size:15px;font-weight:800;box-shadow:0 10px 20px rgba(0,122,255,.22)}"
-        ".panel-card{border:1px solid rgba(0,0,0,.06);border-radius:20px;padding:14px;margin-bottom:10px;background:#fff;box-shadow:0 6px 18px rgba(0,0,0,.045)}"
-        ".panel-card h2{font-size:15px;margin-bottom:6px;letter-spacing:-.02em}.panel-card p{font-size:12px;line-height:1.55;color:#6e6e73}"
-        ".module-btn{display:block;width:100%;margin-top:8px;padding:12px;border:none;border-radius:16px;background:#007aff;color:#fff;font-weight:800}"
+        ".hero{background:#fff;border-radius:18px;padding:16px 16px 14px;margin-bottom:10px;box-shadow:0 2px 12px rgba(0,0,0,.04)}"
+        "h1{font-size:22px;margin:0 0 4px;letter-spacing:-.03em;font-weight:700}.sub{font-size:12px;color:#86868b;line-height:1.5;margin-bottom:8px}"
+        ".panel-card{border:0;border-radius:16px;padding:14px;margin-bottom:8px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.04)}"
+        ".panel-card h2{font-size:15px;margin-bottom:6px;letter-spacing:-.02em;color:#1d1d1f}.panel-card p{font-size:12px;line-height:1.55;color:#86868b}"
+        ".module-btn{display:block;width:100%;margin-top:8px;padding:11px;border:0;border-radius:12px;background:#007aff;color:#fff;font-weight:600;font-size:14px}"
+        ".module-btn:active{opacity:.85}"
         ".module-btn.secondary{background:#fff;color:#007aff;border:1px solid rgba(0,122,255,.18)}"
-        ".module-note{margin-top:8px;font-size:12px;line-height:1.5;color:#0f4c81;background:#eef6ff;border:1px solid #cfe5ff;border-radius:16px;padding:10px}"
-        ".range-row{margin-top:8px}.range-row label{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#6e6e73;margin-bottom:6px}"
-        ".range-row .range-value{font-size:11px;color:#007aff;font-weight:800}"
-        ".spin{width:20px;height:20px;margin:0 auto 8px;border:3px solid #cfe5ff;border-top-color:#007aff;border-radius:50%;animation:r .8s linear infinite}@keyframes r{to{transform:rotate(360deg)}}.busy{opacity:.55;pointer-events:none}"
-        ".btn{display:block;width:100%;margin:10px 0 0;padding:14px;border:0;border-radius:18px;background:#1d1d1f;color:#fff;font-size:15px;font-weight:800;text-align:center;text-decoration:none}"
+        ".module-note{margin-top:8px;font-size:12px;line-height:1.5;color:#0f4c81;background:#eef6ff;border:1px solid #cfe5ff;border-radius:12px;padding:10px}"
+        ".range-row{margin-top:8px}.range-row label{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#6e6e73;margin-bottom:6px}"
+        ".range-row .range-value{font-size:11px;color:#007aff;font-weight:700}"
+        ".spin{width:18px;height:18px;margin:0 auto 6px;border:2px solid #cfe5ff;border-top-color:#007aff;border-radius:50%;animation:r .8s linear infinite}@keyframes r{to{transform:rotate(360deg)}}.busy{opacity:.55;pointer-events:none}"
+        ".btn{display:block;width:100%;margin:10px 0 0;padding:12px;border:0;border-radius:12px;background:#007aff;color:#fff;font-size:14px;font-weight:600;text-align:center;text-decoration:none}"
+        ".btn:active{opacity:.85}"
         ".btn.alt{background:#fff;color:#007aff;border:1px solid rgba(0,122,255,.18)}"
-        "input,select{width:100%;padding:12px;border:1px solid rgba(0,0,0,.08);border-radius:16px;font-size:15px;background:#f5f5f7;color:#1d1d1f;font-weight:700}"
-        ".field{margin:9px 0}.field label{display:block;font-size:12px;font-weight:800;color:#6e6e73;margin:0 0 5px}"
+        "input,select{width:100%;padding:11px;border:1px solid rgba(0,0,0,.06);border-radius:12px;font-size:14px;background:#f5f5f7;color:#1d1d1f;font-weight:600}"
+        ".field{margin:9px 0}.field label{display:block;font-size:12px;font-weight:600;color:#6e6e73;margin:0 0 5px}"
+        ".navbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.06);padding:6px 0 env(safe-area-inset-bottom,6px);z-index:100;max-width:420px;margin:0 auto}"
+        ".nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#86868b;font-size:11px;font-weight:700;padding:4px 0;min-height:50px;gap:2px}"
+        ".nav-item.on{color:#007aff}.nav-ico{font-size:20px}.nav-tx{font-size:11px}"
+        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.hero,.panel-card{background:#2c2c2e}.module-btn{background:#0a84ff}.btn{background:#0a84ff}input,select{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}.navbar{background:#1c1c1e;border-color:#3a3a3c}.nav-item{color:#8e8e93}.nav-item.on{color:#0a84ff}}"
+        "body{padding-bottom:70px!important}"
         "</style></head><body><div class=\"box\">"
-        "<div class=\"hero\"><a class=\"back\" href=\"/\">&larr; 返回首页</a><h1>更多配置</h1><p class=\"sub\">先调整个人信息或设备名称，再应用回首页统一保存。</p></div>"
+        "<div class=\"hero\"><h1>更多配置</h1><p class=\"sub\">选择功能模块进行配置，修改后回首页保存生效。</p></div>"
         "<form method=\"POST\" action=\"/draft\" id=\"core-form\">");
 
     char buf[1024];
@@ -959,12 +969,90 @@ static esp_err_t h_more(httpd_req_t *req)
 
     SEND(req,
         "</div><script>"
-        "var panelCleanup=null,modBusy=false;function runScripts(r){var s=r.getElementsByTagName(\"script\");for(var i=0;i<s.length;i++){try{eval(s[i].textContent)}catch(e){console.error(\"[runScripts] eval 失败:\",e)}}}"
+        "var panelCleanup=null,modBusy=false,pickedSsid='',savedSsid='';"
+        // runScripts：碎片里的 script 标签不会自动执行，用 textContent 重新创建注入
+        "function runScripts(r){var s=r.getElementsByTagName(\"script\");for(var i=0;i<s.length;i++){var ns=document.createElement(\"script\");ns.textContent=s[i].textContent;document.body.appendChild(ns);ns.parentNode.removeChild(ns)}}"
         "function busyCard(t){return '<div class=\"panel-card\" style=\"text-align:center;padding:18px\"><div class=\"spin\"></div><p>'+t+'</p></div>'}"
         "function setBusy(b){modBusy=b;var bs=document.getElementsByTagName(\"button\");for(var i=0;i<bs.length;i++){bs[i].disabled=b;if(b)bs[i].classList.add(\"busy\");else bs[i].classList.remove(\"busy\")}}"
         "function openMod(n){if(modBusy)return;if(panelCleanup){try{panelCleanup()}catch(e){}panelCleanup=null}var p=document.getElementById(\"panel\");setBusy(true);p.innerHTML=busyCard(\"正在加载...\");fetch(\"/ui/module?name=\"+encodeURIComponent(n)).then(function(r){return r.text()}).then(function(h){p.innerHTML=h;setBusy(false);runScripts(p)}).catch(function(){setBusy(false);p.innerHTML='<div class=\"module-note\">加载失败，请重试</div>'})}"
+        // WiFi 扫描函数（预定义在主脚本，wifi 面板通过 onclick 调用）
+        "function wifiStartScan(){"
+        "var st=document.getElementById('scan-status'),lst=document.getElementById('scan-list');"
+        "st.textContent='正在扫描周边 WiFi...';st.style.color='#6e6e73';lst.innerHTML='';"
+        "var x=new XMLHttpRequest();"
+        "x.onload=function(){if(x.status!==200){st.textContent='扫描请求失败';st.style.color='#ff3b30';return}"
+        "try{var d=JSON.parse(x.responseText);"
+        "if(d.status==='started'||d.status==='running'){wifiPollScan();return}"
+        "st.textContent=d.error||'扫描失败';st.style.color='#ff3b30'}"
+        "catch(e){st.textContent='解析失败';st.style.color='#ff3b30'}};"
+        "x.onerror=function(){st.textContent='网络错误';st.style.color='#ff3b30'};"
+        "x.open('POST','/wifi/scan');x.send()}"
+        "function wifiPollScan(){"
+        "var st=document.getElementById('scan-status'),lst=document.getElementById('scan-list');"
+        "var t=setInterval(function(){"
+        "var x=new XMLHttpRequest();"
+        "x.onload=function(){if(x.status!==200)return;"
+        "try{var d=JSON.parse(x.responseText);"
+        "if(d.status==='running')return;"
+        "clearInterval(t);"
+        "if(d.status==='error'){st.textContent=d.error||'扫描失败';st.style.color='#ff3b30';return}"
+        "if(d.status==='done'&&d.list&&d.list.length>0){"
+        "st.textContent='发现 '+d.count+' 个热点，请选择你的家庭 WiFi：';st.style.color='#1d1d1f';"
+        "var h='';"
+        "for(var i=0;i<d.list.length;i++){"
+        "var a=d.list[i];"
+        "var lock=a.auth>0?'<span style=\"color:#86868b\">&#128274;</span>':'<span style=\"color:#34c759\">&#9888;</span>';"
+        "var sig=a.rssi>=-55?'<span style=\"color:#34c759\">\u25cf\u25cf\u25cf</span>':(a.rssi>=-70?'<span style=\"color:#ff9500\">\u25cf\u25cf\u25cf</span>':'<span style=\"color:#ff3b30\">\u25cf\u25cf\u25cf</span>');"
+        "h+='<div class=\"wifi-item\" data-ssid=\"'+wifiEscAttr(a.ssid)+'\" data-auth=\"'+a.auth+'\" onclick=\"wifiPick(this)\" style=\"padding:12px;margin:6px 0;background:#f5f5f7;border:2px solid transparent;border-radius:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center\">'+"
+        "'<span style=\"font-size:15px;font-weight:700;color:#1d1d1f\">'+wifiEscHtml(a.ssid)+'</span>'+"
+        "'<span style=\"display:flex;align-items:center;gap:8px\">'+lock+' '+sig+' <span style=\"color:#86868b;font-size:11px\">'+a.rssi+'dBm</span></span></div>'}"
+        "lst.innerHTML=h;"
+        "if(savedSsid){var m=document.querySelectorAll('.wifi-item');for(var i=0;i<m.length;i++){if(m[i].getAttribute('data-ssid')===savedSsid){wifiPick(m[i]);break}}}}"
+        "else{st.textContent='未发现周边 WiFi 热点';st.style.color='#86868b'}}"
+        "catch(e){st.textContent='解析失败';st.style.color='#ff3b30'}};"
+        "x.open('GET','/wifi/scan/status');x.send()},1000)}"
+        "function wifiPick(el){"
+        "var items=document.querySelectorAll('.wifi-item');"
+        "for(var i=0;i<items.length;i++){items[i].style.borderColor='transparent';items[i].style.background='#f5f5f7'}"
+        "el.style.borderColor='#007aff';el.style.background='#eef6ff';"
+        "pickedSsid=el.getAttribute('data-ssid');"
+        "var auth=parseInt(el.getAttribute('data-auth'));"
+        "var pr=document.getElementById('psk-row'),pk=document.getElementById('home-psk'),btn=document.getElementById('save-btn');"
+        "pr.style.display='block';btn.disabled=false;"
+        "if(auth===0){pk.value='';pk.placeholder='开放网络，无需密码';pk.disabled=true}"
+        "else{pk.placeholder='家庭 WiFi 密码';pk.disabled=false;pk.focus()}}"
+        "function wifiSave(){"
+        "if(!pickedSsid){alert('请先选择一个 WiFi 热点');return}"
+        "var psk=document.getElementById('home-psk').value;"
+        "var btn=document.getElementById('save-btn');btn.disabled=true;btn.textContent='测试中...';"
+        "var r=document.getElementById('wifi-result');"
+        "r.innerHTML='<p style=\"font-size:12px;color:#6e6e73\">正在保存并测试连接，约 10-15 秒...</p>';"
+        "var x=new XMLHttpRequest();"
+        "x.onload=function(){if(x.status!==200){btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">请求失败</p>';return}"
+        "try{var d=JSON.parse(x.responseText);"
+        "if(d.status==='started'||d.status==='running'){wifiPollConn(btn,r);return}"
+        "btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">'+(d.error||'失败')+'</p>'}"
+        "catch(e){btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">解析失败</p>'}};"
+        "x.onerror=function(){btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">网络错误</p>'};"
+        "x.open('POST','/wifi/save');x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');"
+        "x.send('ssid='+encodeURIComponent(pickedSsid)+'&psk='+encodeURIComponent(psk))}"
+        "function wifiPollConn(btn,r){"
+        "var t=setInterval(function(){"
+        "var x=new XMLHttpRequest();"
+        "x.onload=function(){if(x.status!==200)return;"
+        "try{var d=JSON.parse(x.responseText);"
+        "if(d.status==='running')return;"
+        "clearInterval(t);btn.disabled=false;btn.textContent='保存并测试连接';"
+        "if(d.status==='done'){r.innerHTML='<p style=\"color:#34c759;font-size:13px;font-weight:800\">\u2714 连接成功！凭证已保存，可用于在线检查更新</p>'}"
+        "else if(d.status==='error'){r.innerHTML='<p style=\"color:#ff3b30;font-size:13px\">'+(d.error||'连接失败，请检查密码')+'</p>'}}"
+        "catch(e){clearInterval(t);btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">解析失败</p>'}};"
+        "x.open('GET','/wifi/connect/status');x.send()},1500)}"
+        "function wifiEscHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;')}"
+        "function wifiEscAttr(s){return s.replace(/&/g,'&amp;').replace(/\"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}"
         "openMod(\"more\");"
-        "</script></body></html>");
+        "</script>"
+        "<nav class=\"navbar\"><a class=\"nav-item\" href=\"/\"><span class=\"nav-ico\">&#9881;</span><span class=\"nav-tx\">配置</span></a><a class=\"nav-item on\" href=\"/more\"><span class=\"nav-ico\">&#128218;</span><span class=\"nav-tx\">更多</span></a><a class=\"nav-item\" href=\"/about\"><span class=\"nav-ico\">&#8505;</span><span class=\"nav-tx\">关于</span></a></nav>"
+        "</body></html>");
     send_end(req);
     return ESP_OK;
 }
@@ -982,6 +1070,75 @@ static esp_err_t h_more(httpd_req_t *req)
     ".range-row .range-value{font-size:11px;color:#007aff;font-weight:800}" \
     ".spin{width:20px;height:20px;margin:0 auto 8px;border:3px solid #cfe5ff;border-top-color:#007aff;border-radius:50%;animation:r .8s linear infinite}@keyframes r{to{transform:rotate(360deg)}}.busy{opacity:.55;pointer-events:none}" \
     "</style>"
+
+/**
+ * 处理 /about 路由。
+ * 输出设备关于页面：固件版本、设备名、内存状态、项目说明。
+ * req：HTTP 请求对象。
+ * 返回值：ESP_OK 表示处理成功。
+ * 特殊行为：每次访问自动续期配网倒计时。
+ */
+static esp_err_t h_about(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "GET /about 页面请求");
+    httpd_resp_set_hdr(req, "Connection", "close");
+    arm_deadline();
+    power_engine_t *e = s_engine;
+    char dn[DEVICE_NAME_HTML_MAX];
+    html_escape(e->device_name, dn, sizeof(dn));
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    set_no_store_headers(req);
+    SEND(req,
+        "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>关于 - BikePower</title><style>"
+        "*{margin:0;padding:0;box-sizing:border-box}"
+        "body{background:#f2f2f7;padding:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#1d1d1f}"
+        ".box{max-width:420px;margin:0 auto}"
+        ".hero{background:#fff;border-radius:18px;padding:16px;margin-bottom:10px;box-shadow:0 2px 12px rgba(0,0,0,.04)}"
+        "h1{font-size:22px;margin:0 0 4px;letter-spacing:-.03em;font-weight:700}.sub{font-size:12px;color:#86868b;line-height:1.5}"
+        ".card{background:#fff;border:0;border-radius:16px;padding:14px 16px;margin-bottom:8px;box-shadow:0 1px 8px rgba(0,0,0,.04)}"
+        ".card h2{font-size:15px;margin-bottom:8px;letter-spacing:-.02em;color:#1d1d1f}"
+        ".info-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:13px}"
+        ".info-row:last-child{border-bottom:0}.info-row .k{color:#86868b;font-weight:600}.info-row .v{color:#1d1d1f;font-weight:700}"
+        ".navbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.06);padding:6px 0 env(safe-area-inset-bottom,6px);z-index:100;max-width:420px;margin:0 auto}"
+        ".nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#86868b;font-size:11px;font-weight:700;padding:4px 0;min-height:50px;gap:2px}"
+        ".nav-item.on{color:#007aff}.nav-ico{font-size:20px}.nav-tx{font-size:11px}"
+        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.hero,.card{background:#2c2c2e}.info-row{border-color:#3a3a3c}.info-row .v{color:#f5f5f7}.navbar{background:#1c1c1e;border-color:#3a3a3c}.nav-item{color:#8e8e93}.nav-item.on{color:#0a84ff}}"
+        "body{padding-bottom:70px!important}"
+        "</style></head><body><div class=\"box\">"
+        "<div class=\"hero\"><h1>关于</h1><p class=\"sub\">BikePower C 骑行训练控制盒</p></div>");
+
+    SEND(req, "<div class=\"card\"><h2>设备信息</h2>");
+    char vbuf[128];
+    snprintf(vbuf, sizeof(vbuf), "<div class=\"info-row\"><span class=\"k\">固件版本</span><span class=\"v\">v%s</span></div>", FIRMWARE_VERSION);
+    SEND(req, vbuf);
+    char dnbuf[DEVICE_NAME_HTML_MAX + 128];
+    snprintf(dnbuf, sizeof(dnbuf), "<div class=\"info-row\"><span class=\"k\">设备名称</span><span class=\"v\">%s</span></div>", dn);
+    SEND(req, dnbuf);
+    char hbuf1[128];
+    snprintf(hbuf1, sizeof(hbuf1), "<div class=\"info-row\"><span class=\"k\">当前堆内存</span><span class=\"v\">%lu KB</span></div>", (unsigned long)esp_get_free_heap_size() / 1024);
+    SEND(req, hbuf1);
+    char hbuf2[128];
+    snprintf(hbuf2, sizeof(hbuf2), "<div class=\"info-row\"><span class=\"k\">最低堆内存</span><span class=\"v\">%lu KB</span></div>", (unsigned long)esp_get_minimum_free_heap_size() / 1024);
+    SEND(req, hbuf2);
+    SEND(req, "</div>");
+
+    SEND(req,
+        "<div class=\"card\"><h2>项目说明</h2>"
+        "<p style=\"font-size:13px;line-height:1.6;color:#6e6e73\">BikePower C 是基于 ESP32-C3 + NimBLE 的骑行训练控制盒，模拟功率/踏频/心率/FTMS 服务，支持 WiFi 配网和 OTA 升级。</p>"
+        "</div>"
+        "<div class=\"card\"><h2>技术栈</h2>"
+        "<div class=\"info-row\"><span class=\"k\">芯片</span><span class=\"v\">ESP32-C3</span></div>"
+        "<div class=\"info-row\"><span class=\"k\">框架</span><span class=\"v\">ESP-IDF v5.5.4</span></div>"
+        "<div class=\"info-row\"><span class=\"k\">BLE 协议栈</span><span class=\"v\">NimBLE</span></div>"
+        "<div class=\"info-row\"><span class=\"k\">RTOS</span><span class=\"v\">FreeRTOS</span></div>"
+        "</div>"
+        "<nav class=\"navbar\"><a class=\"nav-item\" href=\"/\"><span class=\"nav-ico\">&#9881;</span><span class=\"nav-tx\">配置</span></a><a class=\"nav-item\" href=\"/more\"><span class=\"nav-ico\">&#128218;</span><span class=\"nav-tx\">更多</span></a><a class=\"nav-item on\" href=\"/about\"><span class=\"nav-ico\">&#8505;</span><span class=\"nav-tx\">关于</span></a></nav>"
+        "</div></body></html>");
+    send_end(req);
+    return ESP_OK;
+}
 
 /**
  * 输出“更多配置”首页面板。
@@ -1004,7 +1161,7 @@ static void send_more_panel(httpd_req_t *req)
         "<button type=\"button\" class=\"menu-btn\" onclick=\"openMod('profile')\"><span class=\"icon\">&#128100;</span><span class=\"text\">个人信息<span class=\"desc\">体重、FTP、阈值心率</span></span><span class=\"arrow\">&rsaquo;</span></button>"
         "<button type=\"button\" class=\"menu-btn\" onclick=\"openMod('device')\"><span class=\"icon\">&#128241;</span><span class=\"text\">设备名称<span class=\"desc\">修改骑行 App 中看到的蓝牙名称</span></span><span class=\"arrow\">&rsaquo;</span></button>"
         "<button type=\"button\" class=\"menu-btn\" onclick=\"openMod('wifi')\"><span class=\"icon\">&#128246;</span><span class=\"text\">家庭网络<span class=\"desc\">配置家庭 WiFi 用于在线检查更新</span></span><span class=\"arrow\">&rsaquo;</span></button>"
-        "<a class=\"menu-btn\" href=\"/ota\"><span class=\"icon\">&#128230;</span><span class=\"text\">固件升级<span class=\"desc\">上传新固件 bin 文件</span></span><span class=\"arrow\">&rsaquo;</span></a>"
+        "<a class=\"menu-btn\" href=\"/ota\"><span class=\"icon\">&#128230;</span><span class=\"text\">固件升级<span class=\"desc\">在线检查并下载最新固件</span></span><span class=\"arrow\">&rsaquo;</span></a>"
         "</div>"
         "<script>panelCleanup=function(){};</script>");
 }
@@ -1143,10 +1300,11 @@ static esp_err_t h_ui_module(httpd_req_t *req)
 
 /**
  * 处理 OTA 升级页路由。
- * 显示当前版本、固件选择和上传表单，提交到 /ota/upload。
+ * 显示当前版本、已配置家庭 WiFi（只读）、在线检查更新按钮。
+ * 凭证统一在 /more 家庭网络配置，本页只读展示。
  * req：HTTP 请求对象。
  * 返回值：ESP_OK 表示处理成功。
- * 特殊行为：续期配网超时；表单 enctype=multipart/form-data。
+ * 特殊行为：续期配网超时；未配置家庭 WiFi 时提示去 /more 配置。
  */
 static esp_err_t h_ota(httpd_req_t *req)
 {
@@ -1154,83 +1312,71 @@ static esp_err_t h_ota(httpd_req_t *req)
     ESP_LOGI(TAG, "GET /ota 页面请求");
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     set_no_store_headers(req);
-    httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：大页面强制关闭连接，避免 fd 耗尽
+    httpd_resp_set_hdr(req, "Connection", "close");
     SEND(req,
         "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<title>固件升级 - BikePower</title><style>"
         "*{margin:0;padding:0;box-sizing:border-box}"
-        "body{background:#f5f5f7;padding:12px;font-family:-apple-system,sans-serif;color:#1d1d1f}"
+        "body{background:#f2f2f7;padding:12px;font-family:-apple-system,sans-serif;color:#1d1d1f}"
         ".box{max-width:420px;margin:0 auto}"
-        ".hero{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:24px;padding:14px;margin-bottom:12px;box-shadow:0 10px 28px rgba(0,0,0,.06)}"
-        "a.back{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;margin:0 0 12px;color:#fff;background:#007aff;border-radius:18px;text-decoration:none;font-size:15px;font-weight:800}"
-        "h1{font-size:24px;margin:0 0 4px;letter-spacing:-.04em}.sub{font-size:12px;color:#6e6e73;line-height:1.5;margin-bottom:12px}"
-        ".card{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:20px;padding:16px;margin-bottom:12px;box-shadow:0 6px 18px rgba(0,0,0,.045)}"
-        ".card h2{font-size:15px;margin-bottom:8px}.card p{font-size:12px;line-height:1.55;color:#6e6e73;margin-bottom:10px}"
-        ".ver{font-size:13px;color:#007aff;font-weight:800;margin-bottom:12px}"
-        ".file-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}"
-        "input[type=file]{flex:1;padding:10px;border:1px solid rgba(0,0,0,.08);border-radius:14px;background:#f5f5f7;font-size:14px}"
-        ".btn{display:block;width:100%;padding:14px;border:0;border-radius:18px;background:#1d1d1f;color:#fff;font-size:15px;font-weight:800}"
-        ".btn:active{opacity:.7}.btn:disabled{opacity:.4}"
-        ".warn{margin-top:10px;font-size:12px;color:#856404;background:#fff3cd;border:1px solid #ffeaa7;border-radius:14px;padding:10px;line-height:1.5}"
-        "#prog{display:none;margin-top:12px}.bar{height:8px;background:#e8e8ed;border-radius:4px;overflow:hidden}.bar>i{display:block;height:100%;width:0;background:#007aff;transition:width .2s}"
-        "#msg{margin-top:8px;font-size:12px;color:#6e6e73}"
+        ".hero{background:#fff;border-radius:18px;padding:16px;margin-bottom:10px;box-shadow:0 2px 12px rgba(0,0,0,.04)}"
+        "h1{font-size:22px;margin:0 0 4px;letter-spacing:-.03em;font-weight:700}.sub{font-size:12px;color:#86868b;line-height:1.5;margin-bottom:8px}"
+        ".card{background:#fff;border:0;border-radius:16px;padding:14px;margin-bottom:8px;box-shadow:0 1px 8px rgba(0,0,0,.04)}"
+        ".card h2{font-size:15px;margin-bottom:6px;color:#1d1d1f}.card p{font-size:12px;line-height:1.55;color:#86868b;margin-bottom:8px}"
+        ".ver{font-size:13px;color:#007aff;font-weight:700;margin-bottom:10px}"
+        ".cred-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#f5f5f7;border-radius:12px;margin-bottom:8px}"
+        ".cred-label{font-size:12px;color:#86868b}.cred-val{font-size:14px;font-weight:700;color:#1d1d1f;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
+        ".btn{display:block;width:100%;padding:11px;border:0;border-radius:12px;background:#007aff;color:#fff;font-size:14px;font-weight:600}"
+        ".btn:active{opacity:.85}.btn:disabled{opacity:.4}"
+        ".warn{margin-top:8px;font-size:12px;color:#856404;background:#fff3cd;border:1px solid #ffeaa7;border-radius:10px;padding:10px;line-height:1.5}"
+        ".navbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.06);padding:6px 0 env(safe-area-inset-bottom,6px);z-index:100;max-width:420px;margin:0 auto}"
+        ".nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#86868b;font-size:11px;font-weight:700;padding:4px 0;min-height:50px;gap:2px}"
+        ".nav-item.on{color:#007aff}.nav-ico{font-size:20px}.nav-tx{font-size:11px}"
+        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.hero,.card{background:#2c2c2e}.btn{background:#0a84ff}.navbar{background:#1c1c1e;border-color:#3a3a3c}.nav-item{color:#8e8e93}.nav-item.on{color:#0a84ff}.cred-row{background:#3a3a3c}.cred-val{color:#f5f5f7}}"
+        "body{padding-bottom:70px!important}"
         "</style></head><body><div class=\"box\">"
-        "<div class=\"hero\"><a class=\"back\" href=\"/more\">&larr; 返回更多配置</a><h1>固件升级</h1>"
-        "<p class=\"sub\">上传 BikePower C 固件 bin 文件，升级后设备自动重启。</p></div>"
+        "<div class=\"hero\"><h1>固件升级</h1>"
+        "<p class=\"sub\">通过家庭 WiFi 在线检查并下载最新固件，升级后设备自动重启。</p></div>"
         "<div class=\"card\">");
     char vbuf[64];
     snprintf(vbuf, sizeof(vbuf), "<div class=\"ver\">当前版本：v%s</div>", FIRMWARE_VERSION);
     SEND(req, vbuf);
-    SEND(req,
-        "<form id=\"ota-form\" action=\"/ota/upload\" method=\"POST\" enctype=\"multipart/form-data\">"
-        "<div class=\"file-row\"><input type=\"file\" name=\"firmware\" accept=\".bin\" id=\"fw-file\"></div>"
-        "<button class=\"btn\" type=\"submit\" id=\"fw-btn\" disabled>开始升级</button>"
-        "<div class=\"warn\">升级期间请勿断开电源和 WiFi，否则可能变砖需重新烧录。</div>"
-        "</form>"
-        "<div id=\"prog\"><p style=\"font-size:12px;margin-bottom:6px\">上传中...</p>"
-        "<div class=\"bar\"><i id=\"bar-i\"></i></div><div id=\"msg\"></div></div>"
-        "</div>");  // 关闭上传卡片，box 待续
 
-    // ===== 在线检查更新卡片（v3.1.6 新增） =====
+    // 只读展示已配置的家庭 WiFi
     char home_ssid[HOME_WIFI_SSID_MAX] = {0};
     char home_ssid_html[HOME_WIFI_SSID_MAX * 6] = {0};
     nvs_store_load_wifi_cred(home_ssid, sizeof(home_ssid), NULL, 0);
     html_escape(home_ssid, home_ssid_html, sizeof(home_ssid_html));
-    SEND(req,
-        "<div class=\"card\"><h2>在线检查更新</h2>"
-        "<p>连接家庭 WiFi 后从服务器检查最新版本并下载升级。升级时设备会断开蓝牙和配网热点，约 2 分钟后自动重启。</p>"
-        "<div class=\"file-row\"><input type=\"text\" id=\"home-ssid\" placeholder=\"家庭 WiFi 名称\" value=\"");
-    SEND(req, home_ssid_html);
-    SEND(req,
-        "\" style=\"flex:1;padding:10px;border:1px solid rgba(0,0,0,.08);border-radius:14px;background:#f5f5f7;font-size:14px\"></div>"
-        "<div class=\"file-row\"><input type=\"password\" id=\"home-psk\" placeholder=\"家庭 WiFi 密码（留空使用已保存密码）\" style=\"flex:1;padding:10px;border:1px solid rgba(0,0,0,.08);border-radius:14px;background:#f5f5f7;font-size:14px\"></div>"
-        "<button class=\"btn\" type=\"button\" id=\"check-btn\" onclick=\"checkUpdate()\">检查更新</button>"
-        "<div id=\"check-result\" style=\"margin-top:12px\"></div>"
-        "<button class=\"btn\" type=\"button\" id=\"upgrade-btn\" onclick=\"startUpgrade()\" disabled style=\"margin-top:12px\">下载并升级</button>"
-        "</div></div>");  // 关闭在线卡片 + box
+    if (home_ssid[0] == '\0') {
+        SEND(req,
+            "<div class=\"cred-row\"><span class=\"cred-label\">家庭网络</span>"
+            "<span class=\"cred-val\" style=\"color:#ff3b30\">未配置</span></div>"
+            "<a class=\"btn\" href=\"/more\" style=\"text-decoration:none;text-align:center;display:block\">去配置家庭网络</a>"
+            "<div class=\"warn\">需先在「更多 → 家庭网络」配置家庭 WiFi，才能在线检查更新。</div>"
+            "</div>");  // 关闭卡片，box 待续
+    } else {
+        SEND(req, home_ssid_html);
+        SEND(req,
+            "<div class=\"cred-row\"><span class=\"cred-label\">家庭网络</span>"
+            "<span class=\"cred-val\">");
+        SEND(req, home_ssid_html);
+        SEND(req,
+            "</span></div>"
+            "<button class=\"btn\" type=\"button\" id=\"check-btn\" onclick=\"checkUpdate()\">检查更新</button>"
+            "<div id=\"check-result\" style=\"margin-top:12px\"></div>"
+            "<button class=\"btn\" type=\"button\" id=\"upgrade-btn\" onclick=\"startUpgrade()\" disabled style=\"margin-top:12px\">下载并升级</button>"
+            "<div class=\"warn\">升级期间设备会断开蓝牙和配网热点，约 2 分钟后自动重启，请勿断电。</div>"
+            "</div>");  // 关闭卡片，box 待续
+    }
 
     SEND(req,
         "<script>"
-        "var f=document.getElementById('fw-file'),b=document.getElementById('fw-btn');"
-        "f.onchange=function(){b.disabled=!f.files.length};"
-        "document.getElementById('ota-form').onsubmit=function(e){"
-        "if(b.disabled)return false;"
-        "b.disabled=true;f.disabled=true;"
-        "document.getElementById('prog').style.display='block';"
-        "document.getElementById('msg').textContent='正在上传...';"
-        "var fd=new FormData(this),xhr=new XMLHttpRequest();"
-        "xhr.upload.onprogress=function(ev){if(ev.lengthComputable){var p=Math.floor(ev.loaded*100/ev.total);document.getElementById('bar-i').style.width=p+'%';document.getElementById('msg').textContent='上传 '+p+'%'}};"
-        "xhr.onload=function(){if(xhr.status===200){document.open();document.write(xhr.responseText);document.close()}"
-        "else{document.getElementById('msg').textContent='上传失败 HTTP '+xhr.status;b.disabled=false;f.disabled=false}};"
-        "xhr.onerror=function(){document.getElementById('msg').textContent='网络错误';b.disabled=false;f.disabled=false};"
-        "xhr.open('POST','/ota/upload');xhr.send(fd);return false};"
         "function checkUpdate(){"
-        "var ssid=document.getElementById('home-ssid').value,psk=document.getElementById('home-psk').value;"
-        "if(!ssid){alert('请输入家庭WiFi名称');return}"
-        "var btn=document.getElementById('check-btn');btn.disabled=true;btn.textContent='检查中...';"
+        "var btn=document.getElementById('check-btn');if(!btn)return;"
+        "btn.disabled=true;btn.textContent='检查中...';"
         "var r=document.getElementById('check-result');"
-        "r.innerHTML='<p style=\"font-size:12px;color:#6e6e73\">正在连接WiFi并检查，请稍候（约10-30秒）...</p>';"
+        "r.innerHTML='<p style=\"font-size:12px;color:#6e6e73\">正在连接家庭WiFi并检查，请稍候（约10-30秒）...</p>';"
         "var x=new XMLHttpRequest();"
         "x.onload=function(){"
         "if(x.status!==200){btn.disabled=false;btn.textContent='检查更新';r.innerHTML='<p style=\"color:#ff3b30\">检查失败 HTTP '+x.status+'</p>';return}"
@@ -1240,13 +1386,12 @@ static esp_err_t h_ota(httpd_req_t *req)
         "btn.disabled=false;btn.textContent='检查更新';r.innerHTML='<p style=\"color:#ff3b30\">未知响应</p>'}"
         "catch(e){btn.disabled=false;btn.textContent='检查更新';r.innerHTML='<p style=\"color:#ff3b30\">解析失败</p>'}};"
         "x.onerror=function(){btn.disabled=false;btn.textContent='检查更新';r.innerHTML='<p style=\"color:#ff3b30\">网络错误</p>'};"
-        "x.open('POST','/ota/check');x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');"
-        "x.send('ssid='+encodeURIComponent(ssid)+'&psk='+encodeURIComponent(psk))};"
+        "x.open('POST','/ota/check');x.send()};"
         "function pollStatus(btn,r){"
         "var t=setInterval(function(){"
         "var x=new XMLHttpRequest();"
         "x.onload=function(){if(x.status!==200)return;try{var d=JSON.parse(x.responseText);"
-        "if(d.status==='running'){r.innerHTML='<p style=\"font-size:12px;color:#6e6e73\">正在连接WiFi并检查，请稍候...</p>';return}"
+        "if(d.status==='running'){r.innerHTML='<p style=\"font-size:12px;color:#6e6e73\">正在连接家庭WiFi并检查，请稍候...</p>';return}"
         "clearInterval(t);btn.disabled=false;btn.textContent='检查更新';"
         "if(d.status==='error'){r.innerHTML='<p style=\"color:#ff3b30;font-size:13px\">'+(d.error||'检查失败')+'</p>';return}"
         "if(d.status==='done'){"
@@ -1257,18 +1402,18 @@ static esp_err_t h_ota(httpd_req_t *req)
         "else{h+='<p style=\"color:#86868b;font-size:13px\">已是最新版本</p>'}"
         "r.innerHTML=h}}"
         "catch(e){}}};"
-        "x.open('GET','/ota/status');x.send()},2000,btn,r)};"
+        "x.open('GET','/ota/status');x.send()},2000)};"
         "function startUpgrade(){"
         "if(!confirm('确认下载并升级？设备将断开蓝牙和配网热点，约2分钟后重启。'))return;"
-        "var ssid=document.getElementById('home-ssid').value,psk=document.getElementById('home-psk').value;"
         "var btn=document.getElementById('upgrade-btn');btn.disabled=true;btn.textContent='升级指令已发送...';"
         "var x=new XMLHttpRequest();"
         "x.onload=function(){if(x.status===200){document.open();document.write(x.responseText);document.close()}"
         "else{btn.disabled=false;btn.textContent='下载并升级';alert('升级请求失败 HTTP '+x.status)}};"
         "x.onerror=function(){btn.disabled=false;btn.textContent='下载并升级';alert('网络错误')};"
-        "x.open('POST','/ota/upgrade');x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');"
-        "x.send('ssid='+encodeURIComponent(ssid)+'&psk='+encodeURIComponent(psk))};"
-        "</script></body></html>");
+        "x.open('POST','/ota/upgrade');x.send()};"
+        "</script>"
+        "<nav class=\"navbar\"><a class=\"nav-item\" href=\"/\"><span class=\"nav-ico\">&#9881;</span><span class=\"nav-tx\">配置</span></a><a class=\"nav-item on\" href=\"/more\"><span class=\"nav-ico\">&#128218;</span><span class=\"nav-tx\">更多</span></a><a class=\"nav-item\" href=\"/about\"><span class=\"nav-ico\">&#8505;</span><span class=\"nav-tx\">关于</span></a></nav>"
+        "</body></html>");
     send_end(req);
     return ESP_OK;
 }
@@ -1333,7 +1478,7 @@ static void ota_check_task(void *arg)
         return;
     }
 
-    s_ota_check_has_update = strcmp(info.version, FIRMWARE_VERSION) != 0;
+    s_ota_check_has_update = ota_version_compare(info.version, FIRMWARE_VERSION) > 0;
     s_ota_check_size = info.size;
     strncpy(s_ota_check_version, info.version, sizeof(s_ota_check_version) - 1);
     strncpy(s_ota_check_changelog, info.changelog, sizeof(s_ota_check_changelog) - 1);
@@ -1417,35 +1562,13 @@ static esp_err_t h_ota_check(httpd_req_t *req)
     set_no_store_headers(req);
     httpd_resp_set_hdr(req, "Connection", "close");
 
-    char *body = NULL;
-    int len = recv_body(req, &body);
-    if (len < 0) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "body 读取失败");
-        return ESP_FAIL;
-    }
-
+    // 凭证从 NVS 读取（统一在 /more 家庭网络配置，/ota 页不再输入）
     char ssid[HOME_WIFI_SSID_MAX] = {0};
     char psk[HOME_WIFI_PSK_MAX] = {0};
-    form_get_str(body, "ssid", ssid, sizeof(ssid));
-    form_get_str(body, "psk", psk, sizeof(psk));
-    free(body);
-
-    if (ssid[0] == '\0') {
+    if (!nvs_store_load_wifi_cred(ssid, sizeof(ssid), psk, sizeof(psk)) || ssid[0] == '\0') {
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"请输入家庭WiFi名称\",\"current\":\"" FIRMWARE_VERSION "\"}");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"请先在更多页面配置家庭网络\",\"current\":\"" FIRMWARE_VERSION "\"}");
         return ESP_OK;
-    }
-
-    // 密码留空时从 NVS 加载已保存密码（配合前端"留空使用已保存密码"提示）
-    if (psk[0] == '\0') {
-        char saved_ssid[HOME_WIFI_SSID_MAX] = {0};
-        char saved_psk[HOME_WIFI_PSK_MAX] = {0};
-        if (!nvs_store_load_wifi_cred(saved_ssid, sizeof(saved_ssid), saved_psk, sizeof(saved_psk)) || saved_psk[0] == '\0') {
-            httpd_resp_set_type(req, "application/json");
-            httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"请输入WiFi密码\",\"current\":\"" FIRMWARE_VERSION "\"}");
-            return ESP_OK;
-        }
-        strncpy(psk, saved_psk, sizeof(psk) - 1);
     }
 
     // 若上次检查已完成/出错，先重置状态
@@ -1463,10 +1586,7 @@ static esp_err_t h_ota_check(httpd_req_t *req)
         return ESP_OK;
     }
 
-    // 持久化凭证（异步任务从 NVS 读回）
-    nvs_store_save_wifi_cred(ssid, psk);
-
-    // 启动异步检查任务（不阻塞 HTTP 线程）
+    // 启动异步检查任务（凭证从 NVS 读回）
     s_ota_check_state = OTA_CHECK_RUNNING;
     BaseType_t ok = xTaskCreate(ota_check_task, "ota_chk", TASK_STACK_OTA_CHECK, NULL, 5, NULL);
     if (ok != pdPASS) {
@@ -1540,25 +1660,22 @@ static esp_err_t h_ota_upgrade(httpd_req_t *req)
     set_no_store_headers(req);
     httpd_resp_set_hdr(req, "Connection", "close");
 
-    char *body = NULL;
-    int len = recv_body(req, &body);
-    if (len >= 0) {
-        char ssid[HOME_WIFI_SSID_MAX] = {0};
-        char psk[HOME_WIFI_PSK_MAX] = {0};
-        form_get_str(body, "ssid", ssid, sizeof(ssid));
-        form_get_str(body, "psk", psk, sizeof(psk));
-        if (ssid[0] != '\0') {
-            // 密码留空时从 NVS 加载已保存密码
-            if (psk[0] == '\0') {
-                char saved_ssid[HOME_WIFI_SSID_MAX] = {0};
-                char saved_psk[HOME_WIFI_PSK_MAX] = {0};
-                if (nvs_store_load_wifi_cred(saved_ssid, sizeof(saved_ssid), saved_psk, sizeof(saved_psk)) && saved_psk[0] != '\0') {
-                    strncpy(psk, saved_psk, sizeof(psk) - 1);
-                }
-            }
-            nvs_store_save_wifi_cred(ssid, psk);
-        }
-        free(body);
+    // 凭证从 NVS 读取（统一在 /more 家庭网络配置）
+    char ssid[HOME_WIFI_SSID_MAX] = {0};
+    char psk[HOME_WIFI_PSK_MAX] = {0};
+    if (!nvs_store_load_wifi_cred(ssid, sizeof(ssid), psk, sizeof(psk)) || ssid[0] == '\0') {
+        httpd_resp_set_type(req, "text/html; charset=utf-8");
+        httpd_resp_sendstr(req,
+            "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            "<title>无法升级 - BikePower</title></head>"
+            "<body style=\"background:#f5f5f7;min-height:100vh;margin:0;padding:24px;display:flex;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;color:#1d1d1f\">"
+            "<div style=\"max-width:360px;background:#fff;border-radius:26px;padding:28px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.08)\">"
+            "<h1 style=\"font-size:22px;margin:0 0 8px\">无法升级</h1>"
+            "<p style=\"color:#6e6e73;font-size:13px;margin:0 0 16px\">尚未配置家庭 WiFi，无法在线下载固件。</p>"
+            "<a href=\"/more\" style=\"display:inline-block;padding:12px 24px;background:#007aff;color:#fff;border-radius:16px;text-decoration:none;font-weight:800\">去配置家庭网络</a>"
+            "</div></body></html>");
+        return ESP_OK;
     }
 
     // 标记配网收尾，阻止后续配置修改
@@ -1844,11 +1961,25 @@ static esp_err_t h_wifi_connect_status(httpd_req_t *req)
  */
 static void send_wifi_panel(httpd_req_t *req)
 {
+    // 读取已保存的家庭 WiFi SSID，用于在面板上显示当前状态
+    char saved_ssid[HOME_WIFI_SSID_MAX] = {0};
+    bool has_saved = nvs_store_load_wifi_cred(saved_ssid, sizeof(saved_ssid), NULL, 0);
+    char saved_html[HOME_WIFI_SSID_MAX * 2] = {0};
+    if (has_saved) {
+        html_escape(saved_ssid, saved_html, sizeof(saved_html));
+    }
+
     SEND(req, PANEL_STYLE
         "<div class=\"panel-card\">"
-        "<h2>家庭网络</h2>"
-        "<p>配置家庭 WiFi 后，设备可用于在线检查固件更新和下载升级。下方自动扫描周边热点，选择你的家庭 WiFi 并输入密码。</p>"
-        "</div>"
+        "<h2>家庭网络</h2>");
+    if (has_saved) {
+        SEND(req, "<p>当前已配置家庭 WiFi：<strong style=\"color:#007aff\">");
+        SEND(req, saved_html);
+        SEND(req, "</strong>。可在下方重新选择或修改密码。</p>");
+    } else {
+        SEND(req, "<p>配置家庭 WiFi 后，设备可用于在线检查固件更新和下载升级。下方自动扫描周边热点，选择你的家庭 WiFi 并输入密码。</p>");
+    }
+    SEND(req, "</div>"
         "<div class=\"panel-card\">"
         "<div id=\"scan-status\" style=\"font-size:13px;color:#6e6e73;margin-bottom:8px\">正在扫描周边 WiFi...</div>"
         "<div id=\"scan-list\"></div>"
@@ -1856,95 +1987,19 @@ static void send_wifi_panel(httpd_req_t *req)
         "<div class=\"field\"><label>WiFi 密码</label>"
         "<input type=\"password\" id=\"home-psk\" placeholder=\"家庭 WiFi 密码\" maxlength=\"63\"></div>"
         "</div>"
-        "<button class=\"module-btn\" type=\"button\" id=\"save-btn\" style=\"margin-top:10px\" disabled onclick=\"saveWifi()\">保存并测试连接</button>"
+        "<button class=\"module-btn\" type=\"button\" id=\"save-btn\" style=\"margin-top:10px\" disabled onclick=\"wifiSave()\">保存并测试连接</button>"
         "<div id=\"wifi-result\" style=\"margin-top:10px\"></div>"
         "</div>");
 
-    SEND(req,
-        "<script>"
-        "var pickedSsid='';"
-        // 触发扫描（POST 立即返回 started，前端轮询结果）
-        "function startScan(){"
-        "var st=document.getElementById('scan-status'),lst=document.getElementById('scan-list');"
-        "st.textContent='正在扫描周边 WiFi...';st.style.color='#6e6e73';lst.innerHTML='';"
-        "var x=new XMLHttpRequest();"
-        "x.onload=function(){if(x.status!==200){st.textContent='扫描请求失败';st.style.color='#ff3b30';return}"
-        "try{var d=JSON.parse(x.responseText);"
-        "if(d.status==='started'||d.status==='running'){pollScan();return}"
-        "st.textContent=d.error||'扫描失败';st.style.color='#ff3b30'}"
-        "catch(e){st.textContent='解析失败';st.style.color='#ff3b30'}};"
-        "x.onerror=function(){st.textContent='网络错误';st.style.color='#ff3b30'};"
-        "x.open('POST','/wifi/scan');x.send()}"
-        // 轮询扫描状态
-        "function pollScan(){"
-        "var st=document.getElementById('scan-status'),lst=document.getElementById('scan-list');"
-        "var t=setInterval(function(){"
-        "var x=new XMLHttpRequest();"
-        "x.onload=function(){if(x.status!==200)return;"
-        "try{var d=JSON.parse(x.responseText);"
-        "if(d.status==='running')return;"
-        "clearInterval(t);"
-        "if(d.status==='error'){st.textContent=d.error||'扫描失败';st.style.color='#ff3b30';return}"
-        "if(d.status==='done'&&d.list&&d.list.length>0){"
-        "st.textContent='发现 '+d.count+' 个热点，请选择你的家庭 WiFi：';st.style.color='#1d1d1f';"
-        "var h='';"
-        "for(var i=0;i<d.list.length;i++){"
-        "var a=d.list[i];"
-        "var lock=a.auth>0?'<span style=\"color:#86868b\">&#128274;</span>':'<span style=\"color:#34c759\">&#9888;</span>';"
-        "var sig=a.rssi>=-55?'<span style=\"color:#34c759\">&#9679;&#9679;&#9679;</span>':(a.rssi>=-70?'<span style=\"color:#ff9500\">&#9679;&#9679;&#9679;</span>':'<span style=\"color:#ff3b30\">&#9679;&#9679;&#9679;</span>');"
-        "h+='<div class=\"wifi-item\" data-ssid=\"'+escapeAttr(a.ssid)+'\" data-auth=\"'+a.auth+'\" onclick=\"pickSsid(this)\" style=\"padding:12px;margin:6px 0;background:#f5f5f7;border:2px solid transparent;border-radius:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center\">'"
-        "+'<span style=\"font-size:15px;font-weight:700;color:#1d1d1f\">'+escapeHtml(a.ssid)+'</span>'"
-        "+'<span style=\"display:flex;align-items:center;gap:8px\">'+lock+' '+sig+' <span style=\"color:#86868b;font-size:11px\">'+a.rssi+'dBm</span></span></div>'}"
-        "lst.innerHTML=h}"
-        "else{st.textContent='未发现周边 WiFi 热点';st.style.color='#86868b'}}"
-        "catch(e){st.textContent='解析失败';st.style.color='#ff3b30'}}};"
-        "x.open('GET','/wifi/scan/status');x.send()},1000)}"
-        // 选择热点
-        "function pickSsid(el){"
-        "var items=document.querySelectorAll('.wifi-item');"
-        "for(var i=0;i<items.length;i++){items[i].style.borderColor='transparent';items[i].style.background='#f5f5f7'}"
-        "el.style.borderColor='#007aff';el.style.background='#eef6ff';"
-        "pickedSsid=el.getAttribute('data-ssid');"
-        "var auth=parseInt(el.getAttribute('data-auth'));"
-        "var pr=document.getElementById('psk-row'),pk=document.getElementById('home-psk'),btn=document.getElementById('save-btn');"
-        "pr.style.display='block';btn.disabled=false;"
-        "if(auth===0){pk.value='';pk.placeholder='开放网络，无需密码';pk.disabled=true}"
-        "else{pk.placeholder='家庭 WiFi 密码';pk.disabled=false;pk.focus()}}"
-        // 提交保存并测试连接
-        "function saveWifi(){"
-        "if(!pickedSsid){alert('请先选择一个 WiFi 热点');return}"
-        "var psk=document.getElementById('home-psk').value;"
-        "var btn=document.getElementById('save-btn');btn.disabled=true;btn.textContent='测试中...';"
-        "var r=document.getElementById('wifi-result');"
-        "r.innerHTML='<p style=\"font-size:12px;color:#6e6e73\">正在保存并测试连接，约 10-15 秒...</p>';"
-        "var x=new XMLHttpRequest();"
-        "x.onload=function(){if(x.status!==200){btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">请求失败</p>';return}"
-        "try{var d=JSON.parse(x.responseText);"
-        "if(d.status==='started'||d.status==='running'){pollConn(btn,r);return}"
-        "btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">'+(d.error||'失败')+'</p>'}"
-        "catch(e){btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">解析失败</p>'}};"
-        "x.onerror=function(){btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">网络错误</p>'};"
-        "x.open('POST','/wifi/save');x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');"
-        "x.send('ssid='+encodeURIComponent(pickedSsid)+'&psk='+encodeURIComponent(psk))}"
-        // 轮询连接测试状态
-        "function pollConn(btn,r){"
-        "var t=setInterval(function(){"
-        "var x=new XMLHttpRequest();"
-        "x.onload=function(){if(x.status!==200)return;"
-        "try{var d=JSON.parse(x.responseText);"
-        "if(d.status==='running')return;"
-        "clearInterval(t);btn.disabled=false;btn.textContent='保存并测试连接';"
-        "if(d.status==='done'){r.innerHTML='<p style=\"color:#34c759;font-size:13px;font-weight:800\">&#10004; 连接成功！凭证已保存，可用于在线检查更新</p>'}"
-        "else if(d.status==='error'){r.innerHTML='<p style=\"color:#ff3b30;font-size:13px\">'+(d.error||'连接失败，请检查密码')+'</p>'}}"
-        "catch(e){clearInterval(t);btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">解析失败</p>'}}};"
-        "x.open('GET','/wifi/connect/status');x.send()},1500)}"
-        // HTML 转义工具
-        "function escapeHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;')}"
-        "function escapeAttr(s){return s.replace(/&/g,'&amp;').replace(/\"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}"
-        "panelCleanup=function(){};"
-        // 进入面板自动扫描
-        "startScan();"
-        "</script>");
+    // 注入 savedSsid 变量（通过 script 设置全局变量，runScripts 会执行）
+    // 并用 1x1 透明 img 的 onload 触发首次扫描（img onload 是 HTML 属性，浏览器一定会执行）
+    char jsvar[160];
+    snprintf(jsvar, sizeof(jsvar),
+        "<script>savedSsid=\"%s\";</script>", has_saved ? saved_html : "");
+    SEND(req, jsvar);
+    // 用 data URI 的 1x1 透明 PNG 触发 onload（不依赖网络请求，浏览器一定会 onload）
+    // 这样 wifiStartScan() 必然被调用，不依赖 script 标签执行
+    SEND(req, "<img src=\"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\" style=\"display:none\" onload=\"wifiStartScan()\">");
 }
 
 /**
@@ -2069,11 +2124,11 @@ static esp_err_t start_httpd(void)
         { .uri = "/close-wifi", .method = HTTP_POST, .handler = h_close_wifi },
         { .uri = "/success",   .method = HTTP_GET,  .handler = h_success },
         { .uri = "/more",      .method = HTTP_GET,  .handler = h_more },
+        { .uri = "/about",     .method = HTTP_GET,  .handler = h_about },   // v3.1.7 关于页面（版本/内存/技术栈）
         { .uri = "/ota",       .method = HTTP_GET,  .handler = h_ota },
-        { .uri = "/ota/upload", .method = HTTP_POST, .handler = ota_update_handle_upload, .user_ctx = NULL },
-        { .uri = "/ota/check",   .method = HTTP_POST, .handler = h_ota_check },    // v3.1.6 异步触发版本检查
+        { .uri = "/ota/check",   .method = HTTP_POST, .handler = h_ota_check },    // v3.1.6 异步触发版本检查（凭证从 NVS 读）
         { .uri = "/ota/status",  .method = HTTP_GET,  .handler = h_ota_status },   // v3.1.6 查询版本检查状态（前端轮询）
-        { .uri = "/ota/upgrade", .method = HTTP_POST, .handler = h_ota_upgrade },   // v3.1.6 在线下载升级
+        { .uri = "/ota/upgrade", .method = HTTP_POST, .handler = h_ota_upgrade },   // v3.1.6 在线下载升级（凭证从 NVS 读）
         { .uri = "/wifi/scan",          .method = HTTP_POST, .handler = h_wifi_scan },          // v3.1.6 异步扫描周边 WiFi
         { .uri = "/wifi/scan/status",   .method = HTTP_GET,  .handler = h_wifi_scan_status },   // v3.1.6 查询扫描结果（前端轮询）
         { .uri = "/wifi/save",          .method = HTTP_POST, .handler = h_wifi_save },          // v3.1.6 保存家庭 WiFi 凭证+测试连接
