@@ -4,6 +4,19 @@
 
 ## [未发布]
 
+### 修复（安全）
+- `wifi_portal.c` h_ota 路由不再明文回显家庭 WiFi 密码到 HTML input value，避免 SoftAP 开放网络下密码泄露；密码框留空时从 NVS 加载已保存密码。
+- `nvs_store.c` `nvs_store_load_wifi_cred` 支持 psk=NULL 可选参数，用于只加载 SSID 不暴露密码的场景。
+
+### 新增（家庭网络配置 + WiFi 扫描优化）
+- `/ui/module?name=wifi` 家庭网络面板：自动扫描周边 WiFi（信号最强前 10），用户选择后输入密码测试连接，凭证保存到独立 namespace `wifica`。
+- `radio_ctrl.c` 新增 `radio_ctrl_wifi_scan`：APSTA 模式扫描，首次扫描时创建 STA netif，完成后切回 AP-only。
+- `radio_ctrl.c` 新增 `radio_ctrl_sta_connect`：STA 连接家庭路由器获取 IP，用于 OTA 在线检查。
+- WiFi 扫描/连接改为异步任务，避免阻塞 HTTP 线程导致 fd 耗尽。
+
+### 改进（fd 耗尽修复）
+- `wifi_portal.c` 所有 HTTP 路由（20 个）统一添加 `Connection: close` 头，强制关闭连接释放文件描述符，解决 `httpd_accept_conn: error in accept (23)`。
+
 ### 新增（Captive Portal 自动弹配网页）
 - 自研轻量 DNS 服务器（`main/captive_portal.c`）：UDP 53 监听，所有 A 记录查询应答 192.168.4.1，手机连上 SoftAP 后任意域名都指向配网入口。零第三方依赖，DNS 任务栈 3072 字节，固件增量 ~2KB。
 - OS 探测端点覆盖：注册 10 个主流系统连通性探测端点（`/generate_204` Android、`/hotspot-detect.html` iOS、`/ncsi.txt` Windows、`/canonical.html` Firefox 等），统一 302 重定向到配网首页，触发系统自动弹出 Captive Portal 窗口。
