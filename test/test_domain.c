@@ -12,6 +12,8 @@
 #include "hr_model.h"
 #include "power_engine.h"
 #include "config_store.h"
+#include "ota_version.h"
+#include "json_miniparse.h"
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -368,6 +370,68 @@ static void test_config_store(void)
     CHECK(hr2.has_user_hr == 1, "has_user_hr 规范化为1");
 }
 
+static void test_ota_version_compare(void)
+{
+    printf("[test] OTA 语义版本比较\n");
+    CHECK(ota_version_compare("3.1.8", "3.1.7") > 0, "升级 3.1.8 > 3.1.7");
+    CHECK(ota_version_compare("3.1.7", "3.1.7") == 0, "相同版本 3.1.7 == 3.1.7");
+    CHECK(ota_version_compare("3.1.6", "3.1.7") < 0, "降级 3.1.6 < 3.1.7 被拒");
+    CHECK(ota_version_compare("3.2.0", "3.1.7") > 0, "minor 升 3.2.0 > 3.1.7");
+    CHECK(ota_version_compare("4.0.0", "3.1.7") > 0, "major 升 4.0.0 > 3.1.7");
+    CHECK(ota_version_compare("3.1.10", "3.1.9") > 0, "patch 双位 3.1.10 > 3.1.9");
+    CHECK(ota_version_compare("3.1.7", "3.1.10") < 0, "patch 双位 3.1.7 < 3.1.10");
+    CHECK(ota_version_compare("10.0.0", "9.9.9") > 0, "双位 major 10 > 9");
+    CHECK(ota_version_compare("v3.1.8", "3.1.7") != 0, "非 x.y.z 格式回退 strcmp");
+    // 注意：sscanf("3.1.7-rc1") 仍能解析出 3.1.7，故与 3.1.7 相等
+    CHECK(ota_version_compare("3.1.7-rc1", "3.1.7") == 0, "带后缀 sscanf 仍解析前缀相等");
+    CHECK(ota_version_compare("", "") == 0, "空字符串相等");
+    CHECK(ota_version_compare("3.1.8", "") > 0, "空当前版本");
+}
+
+static void test_json_miniparse(void)
+{
+    printf("[test] JSON 最小解析\n");
+    const char *json = "{\"version\":\"3.1.8\",\"url\":\"https://gitee.com/x/f.bin\",\"size\":102400,\"changelog\":\"修复 OTA\"}";
+    char out[128];
+    int n;
+
+    CHECK(json_get_str(json, "version", out, sizeof(out)), "提取 version");
+    CHECK(strcmp(out, "3.1.8") == 0, "version 值正确");
+
+    CHECK(json_get_str(json, "url", out, sizeof(out)), "提取 url");
+    CHECK(strcmp(out, "https://gitee.com/x/f.bin") == 0, "url 值正确");
+
+    CHECK(json_get_str(json, "changelog", out, sizeof(out)), "提取 changelog");
+    CHECK(strcmp(out, "修复 OTA") == 0, "changelog 值正确（中文）");
+
+    n = json_get_int(json, "size");
+    CHECK(n == 102400, "size 整数值正确");
+
+    n = json_get_int(json, "nonexistent");
+    CHECK(n == 0, "不存在键返回 0");
+
+    CHECK(!json_get_str(json, "nonexistent", out, sizeof(out)), "不存在键返回 false");
+
+    // 缓冲区不足截断
+    char small[5];
+    CHECK(json_get_str(json, "version", small, sizeof(small)), "小缓冲提取");
+    CHECK(strcmp(small, "3.1.") == 0, "小缓冲截断为 3.1.");
+
+    // 嵌套 JSON（key 出现在 value 中）
+    const char *nested = "{\"a\":\"1\",\"key\":\"val\"}";
+    CHECK(json_get_str(nested, "key", out, sizeof(out)), "嵌套场景提取");
+    CHECK(strcmp(out, "val") == 0, "嵌套值正确");
+
+    // 空字符串值
+    const char *empty = "{\"v\":\"\"}";
+    CHECK(json_get_str(empty, "v", out, sizeof(out)), "空字符串值提取");
+    CHECK(out[0] == '\0', "空字符串值正确");
+
+    // 负数
+    const char *neg = "{\"x\":-42}";
+    CHECK(json_get_int(neg, "x") == -42, "负数解析");
+}
+
 int main(void)
 {
     test_profile();
@@ -381,6 +445,8 @@ int main(void)
     test_road_pacer();
     test_steady_snapshot();
     test_config_store();
+    test_ota_version_compare();
+    test_json_miniparse();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

@@ -15,15 +15,7 @@
 #pragma once
 
 #include "esp_err.h"
-
-/**
- * 语义版本比较（major.minor.patch）。
- * remote：远端版本字符串。
- * current：当前版本字符串。
- * 返回值：>0 表示 remote 更新，==0 相同，<0 表示 remote 更旧（降级）。
- * 特殊行为：非 x.y.z 格式回退到 strcmp。
- */
-int ota_version_compare(const char *remote, const char *current);
+#include "ota_version.h"   // 领域层语义版本比较（host 可测）
 
 /**
  * OTA 启动自检：检测当前固件是否处于 PENDING_VERIFY。

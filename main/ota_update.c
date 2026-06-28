@@ -7,6 +7,7 @@
  *      期间若调 ota_update_mark_invalid_and_rollback 则回滚到上一可用固件。
  */
 #include "ota_update.h"
+#include "ota_version.h"   // 领域层语义版本比较（host 可测）
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
@@ -20,24 +21,6 @@ static const char *TAG = "OTA";
 
 static esp_timer_handle_t s_selftest_timer = NULL;
 static volatile bool s_selftest_done = false;
-
-// ============================ 版本比较 ============================
-
-int ota_version_compare(const char *remote, const char *current)
-{
-    int r_major = 0, r_minor = 0, r_patch = 0;
-    int c_major = 0, c_minor = 0, c_patch = 0;
-    if (sscanf(remote, "%d.%d.%d", &r_major, &r_minor, &r_patch) != 3) {
-        return strcmp(remote, current);
-    }
-    if (sscanf(current, "%d.%d.%d", &c_major, &c_minor, &c_patch) != 3) {
-        return strcmp(remote, current);
-    }
-    if (r_major != c_major) return r_major > c_major ? 1 : -1;
-    if (r_minor != c_minor) return r_minor > c_minor ? 1 : -1;
-    if (r_patch != c_patch) return r_patch > c_patch ? 1 : -1;
-    return 0;
-}
 
 // ============================ 自检回滚 ============================
 

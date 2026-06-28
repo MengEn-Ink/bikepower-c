@@ -4,5 +4,7 @@ idf_component_register(
          "hr_model.c"
          "power_engine.c"
          "config_store.c"
+         "ota_version.c"
+         "json_miniparse.c"
     INCLUDE_DIRS "include"
 )

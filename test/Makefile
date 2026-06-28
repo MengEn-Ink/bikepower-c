@@ -8,7 +8,9 @@ SRCS := test_domain.c \
         $(DOMAIN)/domain_rng.c \
         $(DOMAIN)/hr_model.c \
         $(DOMAIN)/power_engine.c \
-        $(DOMAIN)/config_store.c
+        $(DOMAIN)/config_store.c \
+        $(DOMAIN)/ota_version.c \
+        $(DOMAIN)/json_miniparse.c
 
 test_domain: $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $(SRCS) -lm

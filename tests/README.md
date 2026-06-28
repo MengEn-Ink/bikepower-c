@@ -43,11 +43,51 @@ source $IDF_PATH/export.sh
 | 脚本 | 用途 | 依赖 |
 |------|------|------|
 | `stage5_portal_test.py` | 配网门户 HTTP 路由自测（8 条用例） | Python3 |
+| `check_portal_js.py` | **门户 JS 语法静态检查（TC-3a，前置门）** | Python3 + Node.js |
+| `ota_flow_test.py` | **OTA 全流程自测（TC-3b，静态+动态）** | Python3 + Node.js |
 | `ble_selftest.py` | BLE 五服务 + FTMS ERG 自测 | bleak |
 | `stage3_conn_test.py` | BLE 连接事件驱动状态机验证 | bleak |
 | `serial_capture.py` | 串口日志抓取工具 | pyserial |
+| `serial_daemon.py` | 串口日志守护进程（后台常驻，自动让出烧录） | pyserial |
 
-> v3.1.6 起 OTA 升级统一为 HTTPS 在线下载方式，已移除基于 `/ota/upload` 上传的 `ota_full_test.sh` 与 `ota_upload_test.py`。在线 OTA 全流程需配合家庭 WiFi 与 OTA 版本服务器，建议人工按 [docs/11-ota-user-guide.md](../docs/11-ota-user-guide.md) 验证。
+### check_portal_js.py（TC-3a，最高优先级前置门）
+
+```bash
+# 任何修改 main/wifi_portal.c 后必跑，JS 语法全绿才能编译/烧录
+python3 tests/check_portal_js.py
+# 详细模式（打印每个 script 块预览）
+python3 tests/check_portal_js.py --verbose
+```
+
+从 `main/wifi_portal.c` 提取所有 C 字符串字面量拼接的 HTML，定位所有 `<script>` 块，用 `node --check` 验证 JS 语法。自动替换 C printf 占位符（`%d`/`%s` 等）避免误报。
+
+历史教训：v3.1.6 `/ota` 页 `pollStatus` 结尾 `}}}` 多一个 `}`，导致整个 script 块报 `missing ) after argument list`，"检查更新"按钮点击完全无反应。本脚本在编译前拦截此类 bug。
+
+### ota_flow_test.py（TC-3b，OTA 全流程）
+
+```bash
+# 静态部分（无需设备，默认）
+python3 tests/ota_flow_test.py --static
+# 动态部分（需设备进入配网态）
+python3 tests/ota_flow_test.py --dynamic --ip 192.168.4.1
+# 动态部分 + 完整家庭 WiFi 流程
+python3 tests/ota_flow_test.py --dynamic --ip 192.168.4.1 --ssid MyHome --psk secret
+```
+
+静态部分验证：OTA 路由注册、按钮元素、onclick 绑定、JS 函数定义、x.open 调用与路由一致、JS 语法。
+动态部分验证：GET /ota、POST /ota/check、GET /ota/status 状态机轮询、配 WiFi 后完整检查流程。
+
+### serial_daemon.py（串口日志守护进程）
+
+```bash
+# 后台启动（自动让出烧录串口）
+nohup python3 tests/serial_daemon.py -p /dev/ttyACM0 > /tmp/serial_daemon.out 2>&1 &
+# 停止
+pkill -f serial_daemon.py
+# 日志按日滚动：tests/logs/serial_<YYYYMMDD>.log
+```
+
+> v3.1.6 起 OTA 升级统一为 HTTPS 在线下载方式，已移除基于 `/ota/upload` 上传的 `ota_full_test.sh` 与 `ota_upload_test.py`。在线 OTA 全流程由 `ota_flow_test.py` 覆盖，人工验证参考 [docs/11-ota-user-guide.md](../docs/11-ota-user-guide.md)。
 
 ---
 
