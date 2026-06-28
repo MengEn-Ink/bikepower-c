@@ -12,6 +12,7 @@
 ### 改进（规则、文档与测试自动化）
 - `AGENTS.md`、`.trae/rules/*`、`PROGRESS.md`、`docs/04-technical-reference.md` 同步当前 v3.1.8 事实：普通配网走 coex 共存且 BLE 不停，OTA 独占 STA 才停 BLE；修正旧版“必须先停 BLE/配网后重启恢复”的过时描述。
 - `tests/stage3_conn_test.py` 支持 `--port/-p` 并自动扫描 Espressif USB JTAG/serial 串口，修复 Linux 下默认写死 `/dev/cu.usbmodem101` 导致连接事件验证误失败。
+- 新增 `tests/ota_local_mock.py`：从 `main/wifi_portal.c` 提取真实 `/ota` 页面 JS，在 localhost mock `/ota/check`、`/ota/status`、`/ota/upgrade`，无需连接 BikePower 热点即可验证 OTA 页面流程。
 - 真机流程记录：测试固件 `OTA_TEST_AUTO_CONFIG=ON` 可自动进配网，串口确认 v3.1.8、BLE 广播、SoftAP/DNS/HTTP 启动，配网态堆约 116KB；本机 NetworkManager 连接 BikePower 后会因无互联网/路由切换不稳定，后续 OTA 页面流程改用本地模拟验证。
 
 ### 测试报告（本轮审计）
@@ -19,6 +20,7 @@
 - 静态门禁：`check_portal_js.py`、`ota_flow_test.py --static`、`check_portal_structure.py`、`check_nvs_schema.py`、`check_board_desc.py`、`check_tasks_wdt.py`、`check_config_consistency.py` 全部通过。
 - 编译：正式固件 `idf.py build` 通过，app 大小 `0x136a80`，OTA 分区剩余 31%；测试固件 `idf.py build -DOTA_TEST_AUTO_CONFIG=ON` 通过，app 大小 `0x136b90`。
 - 真机：`idf.py -p /dev/ttyACM0 flash` 成功；`ble_selftest.py` 五服务/DIS/FTMS ERG 全通过；`stage3_conn_test.py -p /dev/ttyACM0` 连接事件通过。
+- 本地 OTA 模拟：`python3 tests/ota_local_mock.py --self-test` 通过，命中 `/ota`、`/ota/check`、`/ota/status` 轮询和 `/ota/upgrade`。
 
 ### 修复（OTA 版本检查失败：HTTP 302 重定向）
 - `main/ota_downloader.c` 修复 Gitee `latest.json` 返回 302 时被当错误处理导致「无法获取版本信息」：ESP-IDF `esp_http_client` 的 `disable_auto_redirect=false` 不足，需显式设 `max_redirection_count`（默认 0 不重定向）。

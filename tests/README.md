@@ -50,6 +50,7 @@ source $IDF_PATH/export.sh
 | `check_tasks_wdt.py` | **任务/队列/WDT 静态完整性检查（TC-3g）** | Python3 |
 | `check_config_consistency.py` | **常量一致性静态检查（TC-3c）** | Python3 |
 | `ota_flow_test.py` | **OTA 全流程自测（TC-3b，静态+动态）** | Python3 + Node.js |
+| `ota_local_mock.py` | **OTA 页面本地模拟器（无需连接 BikePower 热点）** | Python3 + Node.js |
 | `ble_selftest.py` | BLE 五服务 + FTMS ERG 自测 | bleak |
 | `stage3_conn_test.py` | BLE 连接事件驱动状态机验证 | bleak |
 | `serial_capture.py` | 串口日志抓取工具 | pyserial |
@@ -130,6 +131,19 @@ python3 tests/ota_flow_test.py --dynamic --ip 192.168.4.1 --ssid MyHome --psk se
 
 静态部分验证：OTA 路由注册、按钮元素、onclick 绑定、JS 函数定义、x.open 调用与路由一致、JS 语法。
 动态部分验证：GET /ota、POST /ota/check、GET /ota/status 状态机轮询、配 WiFi 后完整检查流程。
+
+### ota_local_mock.py（OTA 页面本地模拟）
+
+```bash
+# 自动启动 localhost mock server，并用 Node 执行固件 /ota 页面的真实 JS 流程
+python3 tests/ota_local_mock.py --self-test
+
+# 手动打开网页测试
+python3 tests/ota_local_mock.py --serve --port 8080
+# 浏览器访问 http://127.0.0.1:8080/ota
+```
+
+适用于本机连接 `BikePower` 热点后没有互联网、NetworkManager 自动回连家庭 WiFi、或不方便切换无线网络的场景。它只模拟 `/ota/check`、`/ota/status`、`/ota/upgrade` 的 HTTP 合约和 OTA 页面前端状态机，不覆盖 ESP32 真机 STA 切换、HTTPS 下载写入 flash 和 bootloader 回滚。
 
 ### serial_daemon.py（串口日志守护进程）
 
