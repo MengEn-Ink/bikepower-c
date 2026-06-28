@@ -115,7 +115,7 @@ python3 tests/check_tasks_wdt.py
 3. `app_main.c` 必须调用 `esp_task_wdt_add` 注册看门狗 + `esp_task_wdt_reset` 喂狗
 4. 优先级硬编码数字降级为 WARN（不阻断）
 
-已知发现：`wifi_portal.c:1709` ota_upgrade_task 缺少错误检查（待修）。
+历史发现：`wifi_portal.c` 的 `ota_upgrade_task` 创建后曾缺少错误检查；现已修复，TC-3g 会阻断同类回归。
 
 ### ota_flow_test.py（TC-3b，OTA 全流程）
 

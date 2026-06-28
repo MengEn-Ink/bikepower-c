@@ -4,6 +4,22 @@
 
 ## [3.1.8] - 2026-06-28
 
+### 修复（OTA 触发与射频独占保护）
+- `main/wifi_portal.c` 修复 `/ota/upgrade` 创建 `ota_upgrade_task` 后未检查返回值的问题：内存不足或任务创建失败时不再向用户展示“正在升级”的假成功页，而是返回错误页并恢复 `s_closing=false`。
+- `main/radio_ctrl.c/.h` 新增 `radio_ctrl_ble_suspended()`：OTA 独占 STA 或共存失败兜底主动停 BLE 后，`app_main` 不再误判为 BLE 故障并自动重启 NimBLE，避免 OTA 下载期间 BLE 与 STA 抢射频。
+- 网络/OTA 辅助任务统一使用 `TASK_PRIO_NET`，TC-3g 对 `xTaskCreate` 栈大小、优先级和错误检查全绿。
+
+### 改进（规则、文档与测试自动化）
+- `AGENTS.md`、`.trae/rules/*`、`PROGRESS.md`、`docs/04-technical-reference.md` 同步当前 v3.1.8 事实：普通配网走 coex 共存且 BLE 不停，OTA 独占 STA 才停 BLE；修正旧版“必须先停 BLE/配网后重启恢复”的过时描述。
+- `tests/stage3_conn_test.py` 支持 `--port/-p` 并自动扫描 Espressif USB JTAG/serial 串口，修复 Linux 下默认写死 `/dev/cu.usbmodem101` 导致连接事件验证误失败。
+- 真机流程记录：测试固件 `OTA_TEST_AUTO_CONFIG=ON` 可自动进配网，串口确认 v3.1.8、BLE 广播、SoftAP/DNS/HTTP 启动，配网态堆约 116KB；本机 NetworkManager 连接 BikePower 后会因无互联网/路由切换不稳定，后续 OTA 页面流程改用本地模拟验证。
+
+### 测试报告（本轮审计）
+- Host 单测：`tests/test_runner.sh -d`，1088 通过、0 失败。
+- 静态门禁：`check_portal_js.py`、`ota_flow_test.py --static`、`check_portal_structure.py`、`check_nvs_schema.py`、`check_board_desc.py`、`check_tasks_wdt.py`、`check_config_consistency.py` 全部通过。
+- 编译：正式固件 `idf.py build` 通过，app 大小 `0x136a80`，OTA 分区剩余 31%；测试固件 `idf.py build -DOTA_TEST_AUTO_CONFIG=ON` 通过，app 大小 `0x136b90`。
+- 真机：`idf.py -p /dev/ttyACM0 flash` 成功；`ble_selftest.py` 五服务/DIS/FTMS ERG 全通过；`stage3_conn_test.py -p /dev/ttyACM0` 连接事件通过。
+
 ### 修复（OTA 版本检查失败：HTTP 302 重定向）
 - `main/ota_downloader.c` 修复 Gitee `latest.json` 返回 302 时被当错误处理导致「无法获取版本信息」：ESP-IDF `esp_http_client` 的 `disable_auto_redirect=false` 不足，需显式设 `max_redirection_count`（默认 0 不重定向）。
 - `check_version` 和 `download_and_upgrade` 两处 HTTP 客户端配置均添加 `.max_redirection_count = 10`，跟随 Gitee raw URL 的 302 跳转到实际文件位置。

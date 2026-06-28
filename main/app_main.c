@@ -198,6 +198,11 @@ void app_main(void)
 
         // BLE 未就绪：周期重试，跳过 BLE 调用，避免假运行
         if (!ble_bikepower_is_ready()) {
+            if (radio_ctrl_ble_suspended()) {
+                esp_task_wdt_reset();
+                vTaskDelay(pdMS_TO_TICKS(HR_LOOP_INTERVAL_MS));
+                continue;
+            }
             if (++ble_retry_tick >= BLE_RETRY_TICKS) {
                 ble_retry_tick = 0;
                 // 如果是启动过程中异步失败，先清理资源再重试

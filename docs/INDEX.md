@@ -33,7 +33,7 @@
 | [general-rules.md](../.trae/rules/general-rules.md) | 项目结构、模块边界、提交流程 |
 | [coding-style.md](../.trae/rules/coding-style.md) | C/ESP-IDF 代码风格 |
 | [hardware-constraints.md](../.trae/rules/hardware-constraints.md) | ESP32-C3 硬件约束 |
-| [wifi-ble-mutex.md](../.trae/rules/wifi-ble-mutex.md) | WiFi/BLE 射频互斥规则 |
+| [wifi-ble-mutex.md](../.trae/rules/wifi-ble-mutex.md) | WiFi/BLE 射频共用规则 |
 
 ## 📊 配图
 
@@ -43,7 +43,7 @@
 | ![架构图](images/architecture.png) | 三层软件架构：应用层→领域层→硬件层（双板适配） |
 | ![按钮&LED 状态机](images/button-led-state.png) | 按钮操作、LED 四态、状态迁移 |
 | ![主循环数据流](images/main-loop-flow.png) | 50ms 节拍的事件消费→BLE通知全流程 |
-| ![WiFi/BLE 射频互斥流程](images/rf-wifi-flow.png) | 二次确认进入配网：停 BLE→启 WiFi→保存/超时→重启恢复 BLE |
+| ![WiFi/BLE 射频共用流程](images/rf-wifi-flow.png) | 二次确认进入配网：BLE 保持在线→启 WiFi→保存/超时→关闭 WiFi 回 BLE |
 
 ## 📋 进度与变更
 

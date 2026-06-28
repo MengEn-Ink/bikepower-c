@@ -48,7 +48,7 @@ static power_engine_t *s_engine = NULL;
 static httpd_handle_t s_httpd = NULL;
 static esp_timer_handle_t s_shutdown_timer = NULL;
 // 截止时间存为 32 位秒级单调时间：ESP32-C3 是 32 位核，单字读写原子，
-// 避免 64 位变量在 httpd 任务续期与 esp_timer 回调读取之间发生撕裂导致误判提前重启。
+    // 避免 64 位变量在 httpd 任务续期与 esp_timer 回调读取之间发生撕裂导致误判提前关闭。
 // 秒级精度对配网窗口（分钟级）与每秒倒计时已足够。
 static volatile uint32_t s_deadline_sec = 0;
 // 配网结束标志：true 表示已进入收尾流程（保存成功或超时），不再续期、不再接受新请求
@@ -73,11 +73,11 @@ static uint32_t now_sec(void)
  * 把截止时间延长到当前时刻之后的固定配网窗口。
  * 无参数。
  * 返回值：无。
- * 特殊行为：若已进入计划重启状态则不再续期，避免保存后被再次延长。
+ * 特殊行为：若已进入收尾状态则不再续期，避免保存并关闭后被再次延长。
  */
 static void arm_deadline(void)
 {
-    if (s_closing) return;  // 计划重启中不再续期
+    if (s_closing) return;  // 收尾中不再续期
     s_deadline_sec = now_sec() + (WIFI_SHUTDOWN_MS / 1000);
 }
 
@@ -100,7 +100,7 @@ static int remaining_seconds(void)
  * 当到达截止时间时调用 done 回调关闭 WiFi 回到 BLE，不重启设备。
  * arg：未使用的定时器参数。
  * 返回值：无。
- * 特殊行为：超时和保存成功均通过本回调统一触发——保存成功时 h_config 会把 deadline 缩短为 5s，
+ * 特殊行为：超时和保存并关闭均通过本回调统一触发——关闭 WiFi 时会把 deadline 缩短为 5s，
  *           本回调在 5s 后捕获并调用 portal_done；portal_done 内部用 s_closing 做幂等保护。
  */
 static void portal_done(void);  // 前向声明：shutdown_check_cb 复用此入口
@@ -854,7 +854,7 @@ static esp_err_t h_close_wifi(httpd_req_t *req)
 
 /**
  * 处理草稿保存路由。
- * 仅把更多配置页里的字段暂存到内存，随后重定向回首页，不写 NVS 也不重启。
+ * 仅把更多配置页里的字段暂存到内存，随后重定向回首页，不写 NVS 也不关闭 WiFi。
  * req：HTTP 请求对象。
  * 返回值：ESP_OK 表示处理成功。
  * 特殊行为：该路由用于多页 UI 回写隐藏字段，不代表真正保存到设备。
@@ -862,8 +862,8 @@ static esp_err_t h_close_wifi(httpd_req_t *req)
 static esp_err_t h_draft(httpd_req_t *req)
 {
     httpd_resp_set_hdr(req, "Connection", "close");   // v3.1.6：避免 fd 耗尽
-    // 配置已提交并计划重启时，拒绝再修改内存配置：否则会覆盖刚写入 NVS 的快照，
-    // 导致重启后 BLE 生效值与成功页展示的"已保存"值不一致。直接引导到成功页。
+    // 配置已提交并进入收尾时，拒绝再修改内存配置：否则会覆盖刚写入 NVS 的快照，
+    // 导致 BLE 生效值与成功页展示的"已保存"值不一致。直接引导到成功页。
     if (s_closing) {
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/success");
@@ -1555,10 +1555,10 @@ static void ota_upgrade_task(void *arg)
 
 /**
  * 处理在线版本检查路由。
- * 解析家庭 WiFi 凭证，切 APSTA 连路由器，拉 latest.json，返回版本信息 JSON。
+ * 从 NVS 读取家庭 WiFi 凭证，异步切 APSTA 连路由器并拉取 latest.json。
  * req：HTTP 请求对象。
  * 返回值：ESP_OK 表示处理完成（不代表检查成功，错误通过 JSON 字段返回）。
- * 特殊行为：阻塞 10-30s（连 WiFi+HTTPS）；失败时切回 AP-only 不影响配网。
+ * 特殊行为：HTTP 线程只创建任务并立即返回，联网检查结果由 /ota/status 轮询。
  */
 static esp_err_t h_ota_check(httpd_req_t *req)
 {
@@ -1597,7 +1597,7 @@ static esp_err_t h_ota_check(httpd_req_t *req)
 
     // 启动异步检查任务（凭证从 NVS 读回）
     s_ota_check_state = OTA_CHECK_RUNNING;
-    BaseType_t ok = xTaskCreate(ota_check_task, "ota_chk", TASK_STACK_OTA_CHECK, NULL, 5, NULL);
+    BaseType_t ok = xTaskCreate(ota_check_task, "ota_chk", TASK_STACK_OTA_CHECK, NULL, TASK_PRIO_NET, NULL);
     if (ok != pdPASS) {
         ESP_LOGE(TAG, "异步检查任务创建失败");
         s_ota_check_state = OTA_CHECK_ERROR;
@@ -1653,9 +1653,9 @@ static esp_err_t h_ota_status(httpd_req_t *req)
 
 /**
  * 处理在线升级触发路由。
- * 保存凭证后返回"升级中"提示页，异步任务执行实际下载升级。
+ * 从 NVS 读取家庭 WiFi 凭证，创建异步任务执行实际下载升级。
  * req：HTTP 请求对象。
- * 返回值：ESP_OK 表示已触发升级任务。
+ * 返回值：ESP_OK 表示 HTTP 请求已处理；是否触发成功由响应页面体现。
  * 特殊行为：返回响应后设备会断开所有连接（AP+BLE），约 2 分钟后重启。
  */
 static esp_err_t h_ota_upgrade(httpd_req_t *req)
@@ -1691,6 +1691,24 @@ static esp_err_t h_ota_upgrade(httpd_req_t *req)
     s_closing = true;
     ESP_LOGI(TAG, "OTA 升级已触发，启动异步任务");
 
+    BaseType_t ok = xTaskCreate(ota_upgrade_task, "ota_up", TASK_STACK_OTA_UPGRADE, NULL, TASK_PRIO_NET, NULL);
+    if (ok != pdPASS) {
+        ESP_LOGE(TAG, "OTA 升级任务创建失败");
+        s_closing = false;
+        httpd_resp_set_type(req, "text/html; charset=utf-8");
+        httpd_resp_sendstr(req,
+            "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            "<title>无法升级 - BikePower</title></head>"
+            "<body style=\"background:#f5f5f7;min-height:100vh;margin:0;padding:24px;display:flex;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;color:#1d1d1f\">"
+            "<div style=\"max-width:360px;background:#fff;border-radius:26px;padding:28px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.08)\">"
+            "<h1 style=\"font-size:22px;margin:0 0 8px\">无法升级</h1>"
+            "<p style=\"color:#6e6e73;font-size:13px;margin:0 0 16px\">设备内存不足，升级任务未能启动。</p>"
+            "<a href=\"/ota\" style=\"display:inline-block;padding:12px 24px;background:#007aff;color:#fff;border-radius:16px;text-decoration:none;font-weight:800\">返回固件升级</a>"
+            "</div></body></html>");
+        return ESP_OK;
+    }
+
     // 返回升级提示页
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_sendstr(req,
@@ -1705,8 +1723,6 @@ static esp_err_t h_ota_upgrade(httpd_req_t *req)
         "<p style=\"color:#86868b;font-size:12px;line-height:1.5;margin:0\">约 2 分钟后设备自动重启，请重新连接蓝牙继续使用。期间请保持通电，勿断电。</p>"
         "</div></body></html>");
 
-    // 异步触发升级（延迟 3s 确保响应发出）
-    xTaskCreate(ota_upgrade_task, "ota_up", TASK_STACK_OTA_UPGRADE, NULL, 5, NULL);
     return ESP_OK;
 }
 
@@ -1819,7 +1835,7 @@ static esp_err_t h_wifi_scan(httpd_req_t *req)
     s_scan_error[0] = '\0';
 
     s_wifi_scan_state = WIFI_SCAN_RUNNING;
-    BaseType_t ok = xTaskCreate(wifi_scan_task, "wifi_scan", TASK_STACK_OTA_CHECK, NULL, 5, NULL);
+    BaseType_t ok = xTaskCreate(wifi_scan_task, "wifi_scan", TASK_STACK_OTA_CHECK, NULL, TASK_PRIO_NET, NULL);
     if (ok != pdPASS) {
         ESP_LOGE(TAG, "扫描任务创建失败");
         s_wifi_scan_state = WIFI_SCAN_ERROR;
@@ -1925,7 +1941,7 @@ static esp_err_t h_wifi_save(httpd_req_t *req)
     s_wifi_conn_state = WIFI_CONN_IDLE;
     s_wifi_conn_error[0] = '\0';
     s_wifi_conn_state = WIFI_CONN_RUNNING;
-    BaseType_t ok = xTaskCreate(wifi_connect_task, "wifi_conn", TASK_STACK_OTA_CHECK, NULL, 5, NULL);
+    BaseType_t ok = xTaskCreate(wifi_connect_task, "wifi_conn", TASK_STACK_OTA_CHECK, NULL, TASK_PRIO_NET, NULL);
     if (ok != pdPASS) {
         s_wifi_conn_state = WIFI_CONN_ERROR;
         snprintf(s_wifi_conn_error, sizeof(s_wifi_conn_error), "任务创建失败");

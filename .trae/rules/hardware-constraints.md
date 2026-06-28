@@ -6,10 +6,10 @@
 
 ## ESP32-C3 硬件限制
 
-### WiFi/BLE 互斥
-- ESP32-C3 只有一路 RF，WiFi 和 BLE 无法同时运行。
-- **禁止**：WiFi 启动前未停止 BLE。
-- **必须**：`esp_wifi_start()` 前先停 NimBLE（停广播、断连接、`nimble_port_stop` / 关闭 host）。
+### WiFi/BLE 射频共用
+- ESP32-C3 只有一路 RF，但当前 sdkconfig 启用 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE`，配网默认由 coex 模块仲裁 WiFi/BLE 时间片。
+- **禁止**：绕过 `radio_ctrl` 直接调用 `esp_wifi_*` 启停 WiFi。
+- **必须**：普通配网保持 BLE 在线；OTA 下载进入独占 STA、或共存初始化失败兜底时，才由 `radio_ctrl` 先停 NimBLE（停广播、断连接、`nimble_port_stop` / 关闭 host）。
 - 详见 `.trae/rules/wifi-ble-mutex.md`。
 
 ### 内存约束
@@ -54,6 +54,6 @@
 | 异常 | 标准操作 | 预防 |
 |------|---------|------|
 | NimBLE 初始化失败 | 记录 + `esp_restart()` | 启动序列校验返回码 |
-| WiFi/BLE 共存冲突 | 先停 BLE 再启 WiFi | 启动前检查 RF 状态 |
+| WiFi/BLE 共存冲突 | 统一走 radio_ctrl；配网 coex，共存失败才停 BLE 兜底 | 启动前检查 RF 状态 |
 | Task WDT 超时 | 检查阻塞点，喂狗覆盖全部长任务 | 主循环周期喂狗 |
 | 串口被占用 | 释放占用进程 | 部署脚本检测 |

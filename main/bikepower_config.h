@@ -124,6 +124,7 @@ typedef enum {
 #define TASK_STACK_LED          2048   // LED任务栈大小（字节）
 #define TASK_PRIO_LED           3      // LED任务调度优先级
 #define TASK_STACK_HTTPD        8192   // HTTP服务器任务栈大小（字节）
+#define TASK_PRIO_NET           5      // 网络/OTA 辅助任务调度优先级
 
 #define TASK_STACK_OTA_UPGRADE  8192   // OTA 升级任务栈大小（v3.1.6：HTTPS 下载+写入）
 #define TASK_STACK_OTA_CHECK    8192   // OTA 版本检查任务栈大小（v3.1.6：STA+SNTP+HTTPS 客户端）
@@ -150,7 +151,7 @@ typedef enum {
 #define WIFI_SHUTDOWN_MS       180000
 #define WIFI_RENEW_MS          180000
 #define WIFI_PORTAL_CHECK_INTERVAL_US  1000000  // 配网门户超时检查周期（每秒）
-#define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 配置保存成功后重启等待时间（秒）
+#define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 保存并关闭 WiFi 前的收尾等待时间（历史命名保留）
 #define WIFI_MAX_STA_CONN      2        // SoftAP最大连接客户端数
 #define HTTP_MAX_BODY_LEN      4096     // HTTP请求体最大长度（字节）
 #define HTTP_MAX_URI_HANDLERS  32       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + v3.1.6 WiFi 配置路由）

@@ -208,20 +208,15 @@
 | `board_detect.c` GPIO 检测 | 46 | GPIO 读取强依赖硬件电平 | 真机 DT 系列 |
 | **排除合计** | **3204** | | |
 
-### 已知待修缺陷（TC-3g 发现，不阻断覆盖率达成）
+### 已修复缺陷（TC-3g 回归保护）
 
 | 缺陷 | 位置 | 严重度 | 处理 |
 |------|------|-------|------|
-| `xTaskCreate(ota_upgrade_task, ...)` 后缺少错误检查 | `wifi_portal.c:1709` | 中 | 待修复（单独提交，不混入本轮测试覆盖批次） |
+| `xTaskCreate(ota_upgrade_task, ...)` 后缺少错误检查 | `wifi_portal.c` | 中 | 已修复；创建失败返回错误页并恢复 `s_closing=false` |
 
-### 优先级硬编码 WARN（TC-3g 发现，不阻断）
+### 任务优先级检查（TC-3g）
 
-以下 5 处 `xTaskCreate` 优先级硬编码数字 5，建议提取为宏但不阻断编译：
-- `captive_portal.c:131` dns_server
-- `wifi_portal.c:1600` ota_chk
-- `wifi_portal.c:1709` ota_up
-- `wifi_portal.c:1822` wifi_scan
-- `wifi_portal.c:1928` wifi_conn
+网络/OTA 辅助任务统一使用 `TASK_PRIO_NET`，TC-3g 当前无硬编码优先级告警。
 
 ## 七、维护规则
 

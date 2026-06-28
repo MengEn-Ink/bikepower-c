@@ -9,6 +9,7 @@
  */
 #pragma once
 
+#include <stdbool.h>
 #include "esp_err.h"
 #include "power_engine.h"
 #include "esp_wifi.h"   // wifi_ap_record_t
@@ -51,6 +52,14 @@ esp_err_t radio_ctrl_start_wifi_ap(void);
  * 特殊行为：仅释放本模块自建的资源；不重启设备，不触碰 BLE；可重复调用（幂等）。
  */
 void radio_ctrl_stop_wifi_ap(void);
+
+/**
+ * 查询 BLE 是否被射频控制器有意挂起。
+ * 无参数。
+ * 返回值：true 表示当前处于独占 WiFi/OTA 兜底路径，主循环不应自动重启 BLE。
+ * 特殊行为：用于区分 BLE 真故障和 OTA/独占 WiFi 期间的主动停用。
+ */
+bool radio_ctrl_ble_suspended(void);
 
 // ===== STA 模式（v3.1.6：在线 OTA 下载） =====
 

@@ -4,7 +4,7 @@
 内容基于当前仓库实现撰写，重点对应 `main/`、`components/bikepower_domain/`、`tests/` 和 `docs/images/`。
 阅读顺序建议配合 [architecture.png](images/architecture.png)、[main-loop-flow.png](images/main-loop-flow.png)、[button-led-state.png](images/button-led-state.png) 和 [rf-wifi-flow.png](images/rf-wifi-flow.png) 一起看。
 
-当前目标固件版本为 `v3.1.2`。
+当前固件版本为 `v3.1.8`。
 运行环境为 `ESP-IDF v5.5.4 + NimBLE + FreeRTOS`，目标芯片为 `ESP32-C3`。
 
 ## 第一章：项目架构
@@ -23,7 +23,7 @@
 - `button.c`：中断驱动按钮任务，通用板 `GPIO9`，M5Stamp C3 `GPIO3`
 - `led.c`：独立灯效任务，通用板 `GPIO12` 普通 LED，M5Stamp C3 `GPIO2` SK6812 RGB
 - `ble_bikepower.c`：NimBLE 五服务、通知打包、FTMS 控制点
-- `radio_ctrl.c`：BLE -> WiFi 射频切换唯一入口
+- `radio_ctrl.c`：WiFi/BLE 射频共用唯一入口
 - `wifi_portal.c`：`esp_http_server` 配网页面（SoftAP 由 `radio_ctrl.c` 启动）
 - `nvs_store.c`：NVS 与领域层配置对象桥接
 - `bikepower_config.h`：应用层常量中心
@@ -262,7 +262,7 @@ DIS 读取内容来自编译期常量：
 
 - `DEVICE_MANUFACTURER = "BikePower"`
 - `DEVICE_MODEL = "ESP32-C3"`
-- `FIRMWARE_VERSION = "3.1.2"`
+- `FIRMWARE_VERSION = "3.1.8"`
 
 测试脚本 `tests/ble_selftest.py` 也会校验这三项。
 
@@ -577,28 +577,28 @@ DIS 读取内容来自编译期常量：
 ## 第八章：WiFi 配网
 
 WiFi 配网链路分布在 `app_state.c`、`radio_ctrl.c`、`wifi_portal.c`。
-最核心的硬约束是：ESP32-C3 只有一路 RF，BLE 和 WiFi 不共存。
+当前配网默认使用 ESP-IDF coex 共存模式：BLE 保持在线继续通知，WiFi SoftAP 负责本地门户；仅 OTA 下载升级进入独占 STA，或共存初始化失败兜底时才主动停 BLE。
 
-![WiFi/BLE 射频互斥流程](images/rf-wifi-flow.png)
+![WiFi/BLE 射频共用流程](images/rf-wifi-flow.png)
 
-### 8.1 射频互斥入口
+### 8.1 射频共用入口
 
 唯一入口是 `radio_ctrl_enter_wifi(power_engine_t *engine)`。
-执行顺序固定：
+普通配网执行顺序如下：
 
-1. 打日志 `"进入 WiFi 配网：停用 BLE 释放射频"`
-2. `ble_bikepower_stop()`（返回 `bool`）—— 若返回 `false`（射频未释放）立即 `esp_restart()` 兜底恢复 BLE，不继续启 WiFi，杜绝违反单路 RF 互斥
-3. `vTaskDelay(200ms)`
-4. `radio_ctrl_start_wifi_ap()` —— 失败则 `esp_restart()` 恢复 BLE
-5. `wifi_portal_start(engine)` —— 失败则 `esp_restart()` 恢复 BLE
+1. 打日志 `"进入 WiFi 配网（共存模式）：BLE 保持在线"`
+2. `radio_ctrl_start_wifi_ap()` 启动 SoftAP，不触碰 NimBLE
+3. `captive_portal_start_dns()` 启动 DNS 劫持
+4. `wifi_portal_start(engine)` 启动 HTTP 门户
+5. 保存并关闭或 180s 超时后，`wifi_portal` 投递 `APP_EVT_WIFI_DONE`
+6. 状态机调用 `radio_ctrl_exit_wifi()`，关闭 HTTP/DNS/SoftAP，原地回到 BLE 工作态
 
-本函数运行在已订阅 TWDT 的 app_main 任务上，在停用 BLE 后、SoftAP 启动后、门户启动后各插入 `esp_task_wdt_reset()` 喂狗，避免长阻塞累计超时触发看门狗误复位。
-这个 200ms 的释放窗口是为了给控制器留出 RF 资源切换时间。
+失败兜底也集中在 `radio_ctrl`：只有共存 SoftAP 初始化失败时，才调用 `ble_bikepower_stop()` 释放 BLE 并重试；主循环通过 `radio_ctrl_ble_suspended()` 区分主动停 BLE 与 BLE 故障，避免在独占 WiFi/OTA 期间自动重启 BLE。
 
 ### 8.2 SoftAP 启动
 
-`wifi_portal_start()` 内部调用 `start_softap()`。
-SoftAP 关键配置来自 `bikepower_config.h`：
+SoftAP 由 `radio_ctrl_start_wifi_ap()` 启动，HTTP 门户由 `wifi_portal_start()` 绑定到已经启动的 AP。
+关键配置来自 `bikepower_config.h`：
 
 - `WIFI_SSID = "BikePower"`
 - `WIFI_PASSWORD = "12345678"`
@@ -612,21 +612,32 @@ SoftAP 关键配置来自 `bikepower_config.h`：
 - `ap.ap.max_connection = 2`
 - `ap.ap.authmode = WIFI_AUTH_WPA2_PSK`
 
-### 8.3 HTTP 服务与 11 路由
+### 8.3 HTTP 服务与路由
 
 `start_httpd()` 使用 `HTTPD_DEFAULT_CONFIG()`，并设置：
 
 - `cfg.server_port = WIFI_PORT`
 - `cfg.lru_purge_enable = true`
-- `cfg.max_uri_handlers = 12`
+- `cfg.max_uri_handlers = HTTP_MAX_URI_HANDLERS`（当前 32）
 - `cfg.stack_size = 8192`
+- `cfg.keep_alive_enable = false`
 
-已注册路由共 11 个：
+已注册业务路由 21 个，另有 10 个 Captive Portal 探测路由：
 
 - `GET /`
 - `POST /config`
+- `POST /close-wifi`
 - `GET /success`
 - `GET /more`
+- `GET /about`
+- `GET /ota`
+- `POST /ota/check`
+- `GET /ota/status`
+- `POST /ota/upgrade`
+- `POST /wifi/scan`
+- `GET /wifi/scan/status`
+- `POST /wifi/save`
+- `GET /wifi/connect/status`
 - `POST /draft`
 - `GET /ui/module`
 - `GET /closing`
@@ -637,8 +648,11 @@ SoftAP 关键配置来自 `bikepower_config.h`：
 
 其中：
 
-- `/config`：真正保存配置并进入 5 秒后重启
+- `/config`：保存配置并实时生效
+- `/close-wifi`：保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE
 - `/draft`：只把更多配置页字段回写到内存，不保存不重启
+- `/ota/check`：异步连接家庭 WiFi，拉取 `latest.json`
+- `/ota/upgrade`：进入独占 STA，下载固件并写入 OTA 分区，完成后重启
 - `/time`：返回剩余秒数
 - `/renew`：续期
 - `/mem_stats`：返回 `free` 和 `min_free`
@@ -651,16 +665,19 @@ SoftAP 关键配置来自 `bikepower_config.h`：
 
 - `s_shutdown_timer`
 - `s_deadline_sec`（32 位秒级单调时间，避免 64 位变量在 httpd 任务与定时器回调间撕裂误重启）
-- `s_rebooting`
+- `s_closing`（收尾窗口中不再续期、不再接受配置修改）
+- `s_done_called`（done 回调幂等标志）
 
 流程为：
 
 1. `arm_deadline()` 设定截止时间
 2. `esp_timer_start_periodic(..., 1000000)` 每秒检查一次
 3. `shutdown_check_cb()` 判断是否超时
-4. 超时或保存完成后统一 `esp_restart()`
+4. 超时或保存并关闭 WiFi 后调用 `portal_done()`
+5. `portal_done()` 通过 done 回调投递 `APP_EVT_WIFI_DONE`
+6. 状态机在 app_main 上下文调用 `radio_ctrl_exit_wifi()`
 
-所以当前版本不实现“配网结束后无重启恢复 BLE”，而是走更稳妥的重启回 BLE 路线。
+所以当前版本的配网退出不重启设备；BLE 在普通配网期间保持在线。OTA 升级是例外：升级任务会关闭 AP 和 BLE，切到 STA 独占模式下载固件，最终通过 `esp_restart()` 进入新固件或回到 BLE。
 
 ## 第九章：配置持久化
 
@@ -669,27 +686,33 @@ SoftAP 关键配置来自 `bikepower_config.h`：
 NVS 实现位于 `main/nvs_store.c`。
 namespace 固定为：
 
-`NVS_NS = "bikepower"`
+`NVS_NAMESPACE = "bikepower"`
 
 键定义如下：
 
-- `K_SCHEMA_VER = "sv"`
-- `K_POWER = "power"`
-- `K_CADENCE = "cadence"`
-- `K_MODE = "mode"`
-- `K_HEARTRATE = "hr"`
-- `K_HAS_USER_HR = "hashr"`
-- `K_WEIGHT = "weight"`
-- `K_FTP = "ftp"`
-- `K_THR_HR = "thr_hr"`
-- `K_RIDE = "ride"`
-- `K_DEVNAME = "devname"`
+- `NVS_KEY_SCHEMA_VER = "sv"`
+- `NVS_KEY_POWER = "power"`
+- `NVS_KEY_CADENCE = "cadence"`
+- `NVS_KEY_MODE = "mode"`
+- `NVS_KEY_HEARTRATE = "hr"`
+- `NVS_KEY_HAS_USER_HR = "hashr"`
+- `NVS_KEY_WEIGHT = "weight"`
+- `NVS_KEY_FTP = "ftp"`
+- `NVS_KEY_THR_HR = "thr_hr"`
+- `NVS_KEY_RIDE_TYPE = "ride"`
+- `NVS_KEY_DEVICE_NAME = "devname"`
+
+家庭 WiFi 凭证使用独立 namespace，避免和骑行配置混在一起：
+
+- `NVS_NAMESPACE_WIFI = "wifica"`
+- `NVS_KEY_HOME_SSID = "ssid"`
+- `NVS_KEY_HOME_PSK = "psk"`
 
 ### 9.2 schema 版本
 
 领域层配置版本在 `domain_config.h` 中：
 
-`CONFIG_VERSION = 4`
+`CONFIG_VERSION = 5`
 
 `config_store_migrate()` 当前没有细粒度迁移逻辑。
 只要 `schema_ver != CONFIG_VERSION`，就直接 `config_store_defaults()`。
@@ -775,15 +798,16 @@ FTMS 控制点收到写请求后只做最少逻辑：
 
 ## 第十一章：硬件约束
 
-### 11.1 WiFi/BLE 互斥
+### 11.1 WiFi/BLE 射频共用
 
 这是最关键的硬约束。
-进入配网前必须先执行 `ble_bikepower_stop()`，再启 WiFi。
+配网默认通过 coex 让 BLE 与 WiFi SoftAP 共用射频，进入配网不停止 BLE。
 项目规则已明确要求：
 
 - 禁止开机自启 WiFi
-- 禁止 BLE 活着时启 WiFi
-- 配网结束后通过 `esp_restart()` 恢复 BLE
+- 禁止绕过 `radio_ctrl` 直接调用 `esp_wifi_*`
+- OTA 独占 STA 或共存失败兜底时，必须由 `radio_ctrl` 负责停 BLE 并设置 `radio_ctrl_ble_suspended()`
+- 普通配网结束后关闭 WiFi 原地回 BLE，不通过重启恢复
 
 ### 11.2 中断上下文安全
 
@@ -906,12 +930,12 @@ LED 物理变化仍需人工肉眼确认。
 
 ## 结语
 
-这个项目的复杂度不在“代码量很大”，而在“应用层协调、领域层模型、BLE/WiFi 射频互斥”三者要同时成立。
+这个项目的复杂度不在“代码量很大”，而在“应用层协调、领域层模型、BLE/WiFi 射频共用”三者要同时成立。
 维护时最容易出问题的地方通常不是算法本身，而是：
 
 - 破坏了主循环节拍
 - 绕过了 `radio_ctrl`
 - 在错误线程里直接改引擎或发 BLE
-- 忽略了 NVS 脏标记和重启恢复路径
+- 忽略了 NVS 脏标记、配网收尾和 OTA 重启路径
 
 只要守住这几个边界，后续继续迭代会比较稳。

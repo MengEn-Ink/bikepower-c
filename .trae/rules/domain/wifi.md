@@ -8,7 +8,7 @@
 
 ## 角色与触发
 
-- `WIFI-1`：WiFi 仅用于短时本地配网，不承担常驻联网、扫描周边热点或后台同步职责。
+- `WIFI-1`：WiFi 仅用于短时本地配网、家庭网络配置和在线 OTA，不承担常驻后台联网职责。
 - `WIFI-2`：配网模式只能由按钮长按进入确认窗口后，再次确认触发。
 - `WIFI-3`：禁止在开机流程、异常恢复路径或普通 BLE 工作流中自动启动 WiFi。
 
@@ -20,21 +20,31 @@
 - `WIFI-7`：HTTP 服务器端口固定为 `80`。
 - `WIFI-8`：热点参数统一从 `main/bikepower_config.h` 读取，禁止在 `wifi_portal.c` 内散落硬编码副本。
 
-## BLE/WiFi 射频互斥
+## BLE/WiFi 射频共用
 
-- `WIFI-9`：启动 WiFi 前必须先停止 BLE。
-- `WIFI-10`：唯一允许执行 BLE -> WiFi 射频切换的入口是 `radio_ctrl.c`。
-- `WIFI-11`：`wifi_portal.c` 不得自行决定 BLE 停止顺序，只能假定调用前 RF 已经切换完成。
+- `WIFI-9`：配网 SoftAP 默认使用 coex 共存模式，BLE 保持在线继续通知。
+- `WIFI-10`：唯一允许启停 WiFi、切 AP/APSTA/STA 或停 BLE 兜底的入口是 `radio_ctrl.c`。
+- `WIFI-11`：`wifi_portal.c` 不得直接调用 `esp_wifi_*` 或自行决定 BLE 停止顺序；OTA 独占 STA 也必须通过 `radio_ctrl_enter_sta_exclusive()`。
 
 ## HTTP 服务与路由
 
 - `WIFI-12`：配网门户使用 `esp_http_server`。
-- `WIFI-13`：当前 HTTP 服务固定注册 11 个路由，新增或删除路由都必须同步更新规则、自测脚本和技术文档。
+- `WIFI-13`：当前 HTTP 服务注册 21 个业务路由 + 10 个 Captive Portal 探测路由，新增或删除路由都必须同步更新规则、自测脚本和技术文档。
 - 路由列表：
 - `GET /`
 - `POST /config`
+- `POST /close-wifi`
 - `GET /success`
 - `GET /more`
+- `GET /about`
+- `GET /ota`
+- `POST /ota/check`
+- `GET /ota/status`
+- `POST /ota/upgrade`
+- `POST /wifi/scan`
+- `GET /wifi/scan/status`
+- `POST /wifi/save`
+- `GET /wifi/connect/status`
 - `POST /draft`
 - `GET /ui/module`
 - `GET /closing`
@@ -42,13 +52,14 @@
 - `GET /renew`
 - `GET /mem_stats`
 - `GET /favicon.ico`
+- Captive Portal 探测端点：`/generate_204`、`/gen_204`、`/hotspot-detect.html`、`/library/test/success.html`、`/ncsi.txt`、`/connecttest.txt`、`/canonical.html`、`/success.txt`、`/redirect`、`/kindle-wifi/wifistub.html`
 - `WIFI-14`：路由注册必须集中维护，避免分散在多个函数里造成行为漂移。
 
 ## 超时与恢复
 
-- `WIFI-15`：配网模式 `180s` 无配置提交或有效续期后必须自动关闭并重启设备。
-- `WIFI-16`：自动关闭后的恢复方式是 `esp_restart()`，通过重启回到 BLE 主工作模式。
-- `WIFI-17`：保存成功后也走短延时重启，不做 WiFi -> BLE 的原地热切换。
+- `WIFI-15`：配网模式 `180s` 无配置提交或有效续期后必须自动关闭 WiFi。
+- `WIFI-16`：配网结束通过 `APP_EVT_WIFI_DONE` 原地关闭 HTTP/DNS/SoftAP 并回到 BLE 主工作模式，不重启设备。
+- `WIFI-17`：OTA 升级进入独占 STA 后会停 BLE 与 SoftAP，下载写入完成或失败后通过重启恢复。
 
 ## 配网表单字段
 

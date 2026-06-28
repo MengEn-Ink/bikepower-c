@@ -5,22 +5,44 @@
 LED 物理表现（慢闪->常亮->慢闪）需肉眼确认，本脚本只验证连接计数与状态机日志。
 """
 import asyncio
+import argparse
 import sys
 import threading
 import time
 
 import serial
+from serial.tools import list_ports
 from bleak import BleakScanner, BleakClient
 
-PORT = "/dev/cu.usbmodem101"
 DEVICE_NAME = "BikePower"
 
 lines = []
 stop = threading.Event()
+port = None
+
+
+def detect_port():
+    ports = list(list_ports.comports())
+    for p in ports:
+        if p.vid == 0x303A and p.pid == 0x1001:
+            return p.device
+    for p in ports:
+        if "ttyACM" in p.device or "ttyUSB" in p.device or "usbmodem" in p.device:
+            return p.device
+    return None
 
 
 def reader():
-    s = serial.Serial(PORT, 115200, timeout=1)
+    if not port:
+        print("未找到串口，无法验证状态机串口日志")
+        stop.set()
+        return
+    try:
+        s = serial.Serial(port, 115200, timeout=1)
+    except serial.SerialException as e:
+        print(f"打开串口失败 {port}: {e}")
+        stop.set()
+        return
     while not stop.is_set():
         ln = s.readline().decode("utf-8", "replace").rstrip()
         if ln and ("STATE" in ln or "心跳" in ln or "conn=" in ln):
@@ -30,6 +52,13 @@ def reader():
 
 
 async def main():
+    global port
+    parser = argparse.ArgumentParser(description="BikePower BLE 连接事件串口验证")
+    parser.add_argument("-p", "--port", default=None, help="串口端口，不传则自动扫描")
+    args = parser.parse_args()
+    port = args.port or detect_port()
+    print(f"串口: {port or '未找到'}")
+
     t = threading.Thread(target=reader, daemon=True)
     t.start()
     time.sleep(1)

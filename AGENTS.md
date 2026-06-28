@@ -3,7 +3,7 @@
 本文件是 AI 编码助手的跨工具入口。保持简短，链接到权威资产而非重复内容。
 
 > 项目性质：BikePower 从 MicroPython 完全重写为 **C + ESP-IDF + NimBLE**（ESP32-C3）。
-> 目标固件版本 v3.1.2。所有 MicroPython 专有约束（mpremote/gc/_thread/const/.mpy）**不适用**于本项目。
+> 当前固件版本 v3.1.8。所有 MicroPython 专有约束（mpremote/gc/_thread/const/.mpy）**不适用**于本项目。
 
 ## 必读优先级
 
@@ -12,13 +12,13 @@
 - [.trae/rules/general-rules.md](.trae/rules/general-rules.md) — 项目结构、模块边界、提交/发版规则。
 - [.trae/rules/coding-style.md](.trae/rules/coding-style.md) — C/ESP-IDF 代码风格与 FreeRTOS 约束。
 - [.trae/rules/hardware-constraints.md](.trae/rules/hardware-constraints.md) — ESP32-C3 硬件约束。
-- [.trae/rules/wifi-ble-mutex.md](.trae/rules/wifi-ble-mutex.md) — WiFi/BLE 射频互斥（硬约束）。
+- [.trae/rules/wifi-ble-mutex.md](.trae/rules/wifi-ble-mutex.md) — WiFi/BLE 射频共用（硬约束）。
 - [docs/05-cidf-nimble-rewrite.md](docs/05-cidf-nimble-rewrite.md) — 基线重写方案（分阶段路线图）。
 
 ## Hard Rules
 
 - 与用户用简体中文沟通，除非明确要求其他语言。
-- **WiFi/BLE 互斥**：启动 WiFi 前必须先停止 BLE；ESP32-C3 只有一路 RF，二者无法共存。
+- **WiFi/BLE 射频共用**：配网默认走 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE` 共存模式，BLE 不停；WiFi 启停必须经 `radio_ctrl`，仅 OTA 独占 STA 或共存初始化失败兜底时由 `radio_ctrl` 先停 BLE。
 - **禁止开机自启 WiFi**：配网模式必须由用户长按 + 二次确认触发。
 - **常量集中**：引脚、UUID、阈值、超时、namespace key 必须定义在 `main/bikepower_config.h` 或领域层 `domain_config.h`，禁止散落硬编码。
 - **中断上下文安全**：ISR 内只允许 `xSemaphoreGiveFromISR` / `xQueueSendFromISR` 等 FromISR API，禁止调用 BLE/日志/阻塞 API。

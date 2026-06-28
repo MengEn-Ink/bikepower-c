@@ -128,7 +128,7 @@ esp_err_t captive_portal_start_dns(void)
     }
 
     s_dns_sock = sock;
-    if (xTaskCreate(dns_task, "dns_server", DNS_TASK_STACK, NULL, 5, &s_dns_task) != pdPASS) {
+    if (xTaskCreate(dns_task, "dns_server", DNS_TASK_STACK, NULL, TASK_PRIO_NET, &s_dns_task) != pdPASS) {
         ESP_LOGE(TAG, "DNS 任务创建失败 堆=%lu", (unsigned long)esp_get_free_heap_size());
         close(s_dns_sock);
         s_dns_sock = -1;

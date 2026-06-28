@@ -31,6 +31,7 @@ static esp_netif_t *s_ap_netif = NULL;
 static bool s_wifi_inited = false;     // esp_wifi_init 已调用且未 deinit
 static bool s_event_loop_created = false;  // 自建默认事件循环（与 BLE 共用时不重复创建）
 static bool s_netif_inited = false;    // 本模块调 esp_netif_init 成功（INVALID_STATE 表示别人已 init，不能 deinit）
+static volatile bool s_ble_suspended = false;  // OTA/独占 WiFi 主动停 BLE，主循环需暂停 BLE 自动重试
 
 // STA 模式（v3.1.6 在线 OTA）：APSTA 共存时用
 static esp_netif_t *s_sta_netif = NULL;
@@ -222,6 +223,11 @@ void radio_ctrl_stop_wifi_ap(void)
     ESP_LOGI(TAG, "SoftAP 已关闭 射频归还 BLE");
 }
 
+bool radio_ctrl_ble_suspended(void)
+{
+    return s_ble_suspended;
+}
+
 /**
  * 进入 WiFi 配网模式（共存版：不停 BLE 不重启）。
  * BLE 保持在线继续通知，直接启动 SoftAP + HTTP 配网门户。
@@ -240,6 +246,7 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
     if (ret != ESP_OK) {
         // 共存启动失败：保留旧独占方案作为最后兜底，确保设备不会卡死在"无配网无 BLE"状态。
         ESP_LOGE(TAG, "共存 SoftAP 启动失败 ret=%d，降级为独占方案（停 BLE + 重启）", ret);
+        s_ble_suspended = true;
         if (!ble_bikepower_stop()) {
             ESP_LOGE(TAG, "BLE 停用失败 射频未释放，强制重启");
             vTaskDelay(pdMS_TO_TICKS(RADIO_RESTART_DELAY_MS));
@@ -288,6 +295,7 @@ void radio_ctrl_exit_wifi(void)
     wifi_portal_stop();
     captive_portal_stop_dns();
     radio_ctrl_stop_wifi_ap();
+    s_ble_suspended = false;
 }
 
 // ============================ STA 模式（v3.1.6 在线 OTA） ============================
@@ -478,6 +486,7 @@ esp_err_t radio_ctrl_enter_sta_exclusive(const char *ssid, const char *psk)
     esp_task_wdt_reset();
 
     // 2. 停 BLE 释放射频
+    s_ble_suspended = true;
     if (!ble_bikepower_stop()) {
         ESP_LOGE(TAG, "BLE 停用失败，仍尝试继续 STA");
     }

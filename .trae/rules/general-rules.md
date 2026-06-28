@@ -7,13 +7,13 @@
 - **名称**：BikePower C — ESP32-C3 蓝牙功率计模拟器（C 重写版）
 - **运行环境**：ESP-IDF v5.5.4 + NimBLE + FreeRTOS（非 MicroPython）
 - **硬件平台**：合宙 ESP32-C3（RISC-V 单核 160MHz, 400KB SRAM, WiFi+BLE5.0）
-- **目标版本**：v3.1.2
+- **当前版本**：v3.1.8
 - **参考仓库**：git@gitee.com:mengen4jv/bikepower-c.git
 - **构建/烧录**：`idf.py build` / `idf.py -p <port> flash monitor`
 
 ## 强制规则
-1. **蓝牙优先**：BLE 是核心功能，仅在用户二次确认进入配网模式时关闭。
-2. **WiFi/BLE 互斥**：进入配网必须先停 BLE 再启 WiFi AP（见 wifi-ble-mutex.md）。
+1. **蓝牙优先**：BLE 是核心功能，配网默认保持在线；仅 OTA 独占 STA 或共存初始化失败兜底时由 `radio_ctrl` 主动停 BLE。
+2. **WiFi/BLE 射频共用**：WiFi 启停必须经 `radio_ctrl`，配网走 coex 共存模式（见 wifi-ble-mutex.md）。
 3. **异常恢复**：BLE 初始化失败走可控恢复（记录 + 必要时 `esp_restart()`）。
 4. **分阶段验证**：每阶段编译 → 烧录 → 真机验证 → 分批提交推送，禁止只写不验证。
 5. **代码改动同步文档**：改代码必须同步 PROGRESS.md / 规则 / CHANGELOG。
@@ -92,7 +92,7 @@ bikepower-c/
 │   ├── general-rules.md      — 项目结构 + 模块边界 + 提交/发版规则
 │   ├── coding-style.md       — C/ESP-IDF 代码风格 + FreeRTOS 约束
 │   ├── hardware-constraints.md — ESP32-C3 硬件约束
-│   ├── wifi-ble-mutex.md     — WiFi/BLE 射频互斥（硬约束）
+│   ├── wifi-ble-mutex.md     — WiFi/BLE 射频共用（硬约束）
 │   ├── ai-challenge.md       — AI 质疑规则
 │   ├── best-practices.md     — 项目优化审查规则（发版前）
 │   ├── domain/              — BLE / WiFi 领域规则
@@ -125,9 +125,10 @@ power_engine.snapshot → ble_bikepower_set_data → BLE 通知
 ## 模块互斥约束
 | 约束 | 执行者 |
 |------|--------|
-| WiFi/BLE 射频互斥 | radio_ctrl 先停 BLE 再启 WiFi |
+| WiFi/BLE 射频共用 | radio_ctrl 统一管理 AP/APSTA/STA，配网 coex 共存 |
 | 蓝牙优先 | app_state 长按 → 确认 → wifi_trigger |
-| 配网后重启恢复 BLE | radio_ctrl `esp_restart()` |
+| 配网后原地回 BLE | wifi_portal done 回调 → APP_EVT_WIFI_DONE → radio_ctrl_exit_wifi |
+| OTA 独占 STA | radio_ctrl 停 HTTP/DNS/AP + 停 BLE → STA 下载 → 重启 |
 | 无循环依赖 | import/include 链为 DAG |
 
 ## 阶段路线（详见 PROGRESS.md）
@@ -145,6 +146,6 @@ power_engine.snapshot → ble_bikepower_set_data → BLE 通知
 ## 发布流程
 - 分支：GitHub Flow（main + feature/hotfix）。
 - 版本号：SemVer `vMAJOR.MINOR.PATCH`，commit/tag/Release 三者一致。
-- 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + 打 tag（当前 v3.1.2）+ DIS 固件版本同步。
+- 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + 打 tag（当前 v3.1.8）+ DIS 固件版本同步。
 - **固件发行产物必须合并为单文件（强制）**：创建发行版时，必须用 `esptool.py merge_bin` 把 bootloader + partition-table + app 合并为单一 `.bin`，用户一次烧录即可，禁止分发分散的多个 bin 文件。
 - Commit message：`<type>(<scope>): <简体中文概述>` + 逐文件正文 + `Co-authored-by: AI <ai@trae>` + `Model:`。

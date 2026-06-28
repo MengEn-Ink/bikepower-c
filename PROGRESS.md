@@ -1,7 +1,7 @@
 # BikePower C — 项目进度
 
 > 基线方案：[docs/05-cidf-nimble-rewrite.md](docs/05-cidf-nimble-rewrite.md)
-> 目标固件版本：v3.1.3（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v3.1.8（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 参考仓库：git@gitee.com:mengen4jv/bikepower-c.git
 
 ---
@@ -19,8 +19,8 @@
 | 6 | 稳定性与发版（WDT/coredump/老化/tag） | ✅ 完成 | v3.0.0 已发版 |
 | 7 | M5Stamp C3 适配（板型检测/SK6812/配网页面修复） | ✅ 完成 | v3.1.0 已发版 |
 | 8 | WiFi/BLE 共存配网（v3.1.3） | ✅ 代码完成（真机待确认） | BLE 全程在线 + 配置实时生效 + 不重启 |
-| 9 | Captive Portal + OTA 实现（v3.1.5） | ✅ 完成 | DNS 劫持自动弹配网页 + 4MB OTA 分区表 + OTA 上传/防降级/自检回滚，真机升级降级测试通过 |
-| 10 | 家庭网络配置 + OTA 在线检查（v3.1.6） | ✅ 代码完成（真机待确认） | WiFi 扫描选网 + STA 连接路由器 + SNTP + HTTPS 拉 latest.json + 在线下载升级；fd 耗尽修复 + 密码不回显 |
+| 9 | Captive Portal + OTA 实现（v3.1.5） | ✅ 完成 | DNS 劫持自动弹配网页 + 4MB OTA 分区表 + OTA 防降级/自检回滚，真机升级降级测试通过 |
+| 10 | 家庭网络配置 + OTA 在线检查（v3.1.6-v3.1.8） | ✅ 代码完成（真机待确认） | WiFi 扫描选网 + STA 连接路由器 + SNTP + HTTPS 拉 latest.json + 在线下载升级；fd 耗尽修复 + 密码不回显 |
 
 ---
 
@@ -90,19 +90,19 @@
 
 | 模块 | 文件 | 说明 |
 |------|------|------|
-| 射频控制 | [main/radio_ctrl.c](main/radio_ctrl.c) | 唯一 BLE/WiFi 开关，方案 A：停 BLE → 延时释放射频 → 启 WiFi AP；配网结束/超时 `esp_restart()` 恢复 BLE |
+| 射频控制 | [main/radio_ctrl.c](main/radio_ctrl.c) | 唯一 WiFi/BLE 射频入口；配网走 coex 共存（BLE 不停），共存失败才降级为停 BLE 兜底 |
 | 配网门户 | [main/wifi_portal.c](main/wifi_portal.c) | esp_http_server（SoftAP 由 radio_ctrl 启动），内嵌 snprintf HTML 分块发送；移植旧版完整 UI（iOS 三卡 + 训练区间染色 + 动态碎片页）；路由 `/` `/config` `/success` `/more` `/draft` `/ui/module` `/closing` `/time` `/renew` `/mem_stats` `/favicon.ico` |
 | 状态机接入 | [main/app_state.c](main/app_state.c) | ST_WIFI_CONFIRM → ST_WIFI_CONFIG，经 `wifi_trigger` 回调触发 radio_ctrl |
 
-- 超时方案 A：180s（`WIFI_SHUTDOWN_MS`）无续期自动重启恢复 BLE，配网保存后 5s 延迟重启
+- 超时方案：180s（`WIFI_SHUTDOWN_MS`）无续期自动关闭 WiFi 回到 BLE，保存并关闭后 5s 收尾再退出配网
 - 前端每秒轮询 `/time` 显示剩余时间，`/renew` 续期；`/mem_stats` 返回堆内存 JSON，`/favicon.ico` 返回 204
 - 配网表单可改：功率/踏频/心率/模式/体重/FTP/阈值心率/配速机器人/设备名，保存后写入 power_engine + NVS
 
 ### 待人工确认（需配网真机流程）
 
 - [ ] 长按 + 二次确认 → 进入配网，手机连 `BikePower` 热点
-- [ ] 浏览器访问 `192.168.4.1` → 修改参数 → 保存 → 设备重启 → BLE 恢复且参数生效
-- [ ] 180s 无操作 → 自动超时重启恢复 BLE
+- [ ] 浏览器访问 `192.168.4.1` → 修改参数 → 保存并关闭 WiFi → BLE 保持/恢复在线且参数生效
+- [ ] 180s 无操作 → 自动超时关闭 WiFi 回到 BLE
 - [ ] 连上热点后跑 `python3 tests/stage5_portal_test.py` 校验 HTTP 路由（首页/more/碎片/time/mem_stats/favicon/success 守卫）
 
 ---
@@ -124,8 +124,8 @@
 
 - [ ] 72h 老化测试：长时间运行无 coredump、无堆持续下降（跑 `tests/stage5_portal_test.py` / `ble_selftest.py` 辅助）
 - [x] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`（已设为 WARN）
-- [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（代码已对齐 v3.1.2，`ble_selftest.py` 已自动校验厂商/型号/固件三字段，真机待跑）
-- [ ] 打 tag v3.1.2 + Gitee Release（老化通过后由人工执行）
+- [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（代码已对齐 v3.1.8，`ble_selftest.py` 已自动校验厂商/型号/固件三字段，真机待跑）
+- [ ] 打 tag v3.1.8 + Gitee Release（老化通过后由人工执行）
 
 ---
 
