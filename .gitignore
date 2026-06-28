@@ -6,6 +6,9 @@ sdkconfig.old
 *.elf
 *.map
 
+# OTA 测试产物
+ota/
+
 # macOS
 .DS_Store
 
