@@ -1356,7 +1356,6 @@ static esp_err_t h_ota(httpd_req_t *req)
             "<div class=\"warn\">需先在「更多 → 家庭网络」配置家庭 WiFi，才能在线检查更新。</div>"
             "</div>");  // 关闭卡片，box 待续
     } else {
-        SEND(req, home_ssid_html);
         SEND(req,
             "<div class=\"cred-row\"><span class=\"cred-label\">家庭网络</span>"
             "<span class=\"cred-val\">");
