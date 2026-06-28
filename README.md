@@ -79,7 +79,23 @@ WiFi 配网的射频共用流程可参考（v3.1.3 起为共存模式，BLE 不�
 
 ## 构建与烧录步骤
 
-先准备好 ESP-IDF 环境，再在项目根目录执行：
+推荐使用专用脚本自动识别 ESP-IDF 和开发板串口，编译并烧录当前工作区最新版正式固件：
+
+```bash
+./scripts/flash_latest.sh
+```
+
+常用选项：
+
+```bash
+./scripts/flash_latest.sh --port /dev/ttyACM0 --monitor
+./scripts/flash_latest.sh --erase
+./scripts/flash_latest.sh --ota-test-auto-config
+```
+
+其中 `--erase` 仅在首次从旧 2MB 分区切换到当前 4MB OTA 分区布局时使用；`--ota-test-auto-config` 会刷启动后自动进入配网的测试固件，正式使用不要加。
+
+也可以手动准备 ESP-IDF 环境，再在项目根目录执行：
 
 ```bash
 idf.py set-target esp32c3
