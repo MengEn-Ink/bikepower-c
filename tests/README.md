@@ -44,6 +44,11 @@ source $IDF_PATH/export.sh
 |------|------|------|
 | `stage5_portal_test.py` | 配网门户 HTTP 路由自测（8 条用例） | Python3 |
 | `check_portal_js.py` | **门户 JS 语法静态检查（TC-3a，前置门）** | Python3 + Node.js |
+| `check_portal_structure.py` | **门户结构静态检查（TC-3d，路由/HTML/表单）** | Python3 |
+| `check_nvs_schema.py` | **NVS schema 静态一致性检查（TC-3e）** | Python3 |
+| `check_board_desc.py` | **板型描述表静态一致性检查（TC-3f）** | Python3 |
+| `check_tasks_wdt.py` | **任务/队列/WDT 静态完整性检查（TC-3g）** | Python3 |
+| `check_config_consistency.py` | **常量一致性静态检查（TC-3c）** | Python3 |
 | `ota_flow_test.py` | **OTA 全流程自测（TC-3b，静态+动态）** | Python3 + Node.js |
 | `ble_selftest.py` | BLE 五服务 + FTMS ERG 自测 | bleak |
 | `stage3_conn_test.py` | BLE 连接事件驱动状态机验证 | bleak |
@@ -62,6 +67,55 @@ python3 tests/check_portal_js.py --verbose
 从 `main/wifi_portal.c` 提取所有 C 字符串字面量拼接的 HTML，定位所有 `<script>` 块，用 `node --check` 验证 JS 语法。自动替换 C printf 占位符（`%d`/`%s` 等）避免误报。
 
 历史教训：v3.1.6 `/ota` 页 `pollStatus` 结尾 `}}}` 多一个 `}`，导致整个 script 块报 `missing ) after argument list`，"检查更新"按钮点击完全无反应。本脚本在编译前拦截此类 bug。
+
+### check_portal_structure.py（TC-3d，门户结构静态检查）
+
+```bash
+python3 tests/check_portal_structure.py
+```
+
+从 `main/wifi_portal.c` 提取 C 字符串拼接的 HTML，静态校验：
+1. 路由表完整性（/、/save、/scan、/connect、/status、/ota）
+2. HTML 表单标记（data-ssid、home-psk、ssid=/psk= 提交参数）
+3. HTML 基础结构（html/head/body/meta viewport + form action）
+
+### check_nvs_schema.py（TC-3e，NVS schema 一致性）
+
+```bash
+python3 tests/check_nvs_schema.py
+```
+
+校验 `main/nvs_store.c` 使用的 NVS key 与 `main/bikepower_config.h` 的 `NVS_KEY_*` 定义一致：
+1. 所有定义的 key 必须被读写至少一次
+2. nvs_store.c 使用的宏必须在 config 中定义
+3. key 字符串长度 ≤ 15（NVS 限制）
+4. NVS_NAMESPACE 与 NVS_NAMESPACE_WIFI 必须不同
+
+### check_board_desc.py（TC-3f，板型描述表一致性）
+
+```bash
+python3 tests/check_board_desc.py
+```
+
+校验 `main/board_detect.c` 的 `s_board_desc[]` 与 `main/bikepower_config.h` 一致：
+1. 板型枚举数量 = 描述表行数
+2. 描述表每行使用的引脚/驱动/名称宏必须在 config 中定义
+3. Kconfig 板型宏（CONFIG_BOARD_*_C3）与枚举一一对应
+4. BOARD_NAME_* 符合 kebab-case + `-c3` 后缀命名规范
+
+### check_tasks_wdt.py（TC-3g，任务/WDT 完整性）
+
+```bash
+python3 tests/check_tasks_wdt.py
+```
+
+扫描 `main/*.c`，校验：
+1. 每个 `xTaskCreate` 栈大小必须用宏（TASK_STACK_* 或局部 #define）
+2. 每个 `xTaskCreate` 后必须紧跟错误检查（pdPASS/BaseType_t/ESP_LOGE）
+3. `app_main.c` 必须调用 `esp_task_wdt_add` 注册看门狗 + `esp_task_wdt_reset` 喂狗
+4. 优先级硬编码数字降级为 WARN（不阻断）
+
+已知发现：`wifi_portal.c:1709` ota_upgrade_task 缺少错误检查（待修）。
 
 ### ota_flow_test.py（TC-3b，OTA 全流程）
 
