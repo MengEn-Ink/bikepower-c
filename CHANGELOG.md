@@ -4,6 +4,17 @@
 
 ## [未发布]
 
+### 改进（OTA 升级方式精简：仅保留在线下载）
+- 移除 `/ota/upload` 路由及上传固件 bin 文件方式，统一为 HTTPS 在线下载升级，消除「上传 vs 在线」两种入口的认知冲突。
+- `main/ota_update.c` 大幅精简：删除 multipart 流式上传、`ota_update_handle_upload`、`OTA_RECV_CHUNK`/`OTA_HEADER_BUF_LEN`/`OTA_FIRMWARE_MAX` 等上传相关实现与常量；仅保留自检确认/回滚逻辑。
+- `main/ota_update.h` 公开 `ota_version_compare` 接口（语义版本 major.minor.patch 比较，非该格式回退 strcmp），供在线 OTA 防降级统一使用。
+- `main/wifi_portal.c` 修复防降级漏洞：`ota_check_task` 由 `strcmp != 0`（仅判断不同，含降级）改为 `ota_version_compare > 0`（仅远端更新才提示），避免误判降级为「有更新」。
+- `main/wifi_portal.c` `h_ota_check`/`h_ota_upgrade` 不再接收表单 `ssid`/`psk` 参数，统一从 NVS 读取已配置的家庭 WiFi 凭证；未配置时返回错误引导去 `/more` 配置。
+- `main/wifi_portal.c` `/ota` 页面重构：移除上传卡片与上传 JS，凭证改为只读展示已配置 SSID；未配置时显示「去配置家庭网络」入口；前端 `checkUpdate`/`startUpgrade` 不再发送凭证。
+- `main/wifi_portal.c` `/more` 菜单「固件升级」描述由「上传新固件 bin 文件」改为「在线检查并下载最新固件」。
+- `docs/11-ota-user-guide.md` 重写为在线下载流程，移除上传步骤与同版本重刷说明。
+- `.trae/rules/general-rules.md` 模块树 `ota_update.c/.h` 描述更新为「自检确认/回滚 + 语义版本比较工具」。
+
 ### 修复（安全）
 - `wifi_portal.c` h_ota 路由不再明文回显家庭 WiFi 密码到 HTML input value，避免 SoftAP 开放网络下密码泄露；密码框留空时从 NVS 加载已保存密码。
 - `nvs_store.c` `nvs_store_load_wifi_cred` 支持 psk=NULL 可选参数，用于只加载 SSID 不暴露密码的场景。

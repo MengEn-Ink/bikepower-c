@@ -1,5 +1,9 @@
 # OTA 升级与 Captive Portal 落地方案
 
+> ⚠️ 历史方案文档：本文记录 v3.1.4 规划阶段的设计，当时采用「配网页 multipart 上传固件」方式。
+> v3.1.6 起 OTA 升级方式已演进为「HTTPS 在线下载」，移除 `/ota/upload` 上传入口，凭证统一在 `/more` 家庭网络配置。
+> 当前实际流程以 [11-ota-user-guide.md](11-ota-user-guide.md) 为准，本文保留作历史参考。
+
 > 固件版本：v3.1.4（规划）
 > 硬件：ESP32-C3，4MB Flash
 > 关联文档：[内存与新功能评估](09-memory-and-feature-assessment.md)、[04-技术参考](04-technical-reference.md)

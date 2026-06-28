@@ -56,7 +56,7 @@ bikepower-c/
 │   ├── radio_ctrl.c/.h       — BLE/WiFi 射频软切换（唯一 RF 开关）
 │   ├── wifi_portal.c/.h      — HTTP 配网门户（SoftAP 由 radio_ctrl 启动）
 │   ├── captive_portal.c/.h   — 轻量 DNS 劫持（UDP 53 → 192.168.4.1，自动弹配网页）
-│   ├── ota_update.c/.h       — OTA 固件升级（multipart 上传 + 防降级 + 自检回滚）
+│   ├── ota_update.c/.h       — OTA 自检确认/回滚 + 语义版本比较工具（上传方式已移除，下载在 ota_downloader.c）
 │   └── bikepower_config.h    — 全局常量（引脚/阈值/UUID/版本）
 ├── components/bikepower_domain/   — 纯 C 领域层（可 host 单测）
 │   ├── power_engine.c        — 功率/踏频数据引擎
@@ -69,9 +69,9 @@ bikepower-c/
 │   ├── ble_selftest.py       — bleak 五服务 + FTMS ERG 自测
 │   ├── stage3_conn_test.py   — 连接事件驱动状态机验证
 │   ├── stage5_portal_test.py — 配网门户 HTTP 路由自测
-│   ├── ota_upload_test.py    — OTA 固件上传单步测试
-│   ├── ota_full_test.sh      — OTA 全流程自动测试（升级+降级+版本确认）
 │   ├── serial_capture.py     — 串口日志抓取工具
+│   ├── serial_daemon.py      — 串口守护进程
+│   ├── run_stress.sh         — 压力测试
 │   └── README.md             — 测试脚本使用说明
 ├── test/test_domain          — host 单测（领域层）
 ├── docs/                     — 文档（NN-kebab-case.md 编号排序，见文档命名规范）

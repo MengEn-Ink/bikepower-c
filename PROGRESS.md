@@ -163,7 +163,7 @@
 | 探测端点路由 | [main/wifi_portal.c](main/wifi_portal.c) | 注册 10 个 OS 探测端点（/generate_204、/hotspot-detect.html、/ncsi.txt 等），统一 302 重定向到首页 |
 | 4MB OTA 分区表 | [partitions.csv](partitions.csv) | ota_0/ota_1 互切（各 1.75MB）+ otadata，无 factory；固件 1017KB，每分区 45% 空闲 |
 | OTA 回滚支持 | [sdkconfig.defaults](sdkconfig.defaults) | CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y，新固件 PENDING_VERIFY 自检通过才确认 |
-| OTA 落地方案 | [docs/10-ota-implementation-plan.md](docs/10-ota-implementation-plan.md) | 详细方案：配网页 multipart 上传 + 流式 esp_ota_write + 10s 自检回滚 + 防降级 |
+| OTA 落地方案 | [docs/10-ota-implementation-plan.md](docs/10-ota-implementation-plan.md) | 详细方案：HTTPS 在线下载 + 流式 esp_ota_write + 10s 自检回滚 + 防降级（上传方式已移除） |
 
 ### 覆盖的 OS 探测端点
 
@@ -184,14 +184,14 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 - [ ] 退出配网后 DNS 任务已停止（串口日志）
 - [ ] 首次烧录需 `esptool.py erase_flash`（2MB→4MB 分区表变更）
 
-### OTA 后续实施（v3.2.0 规划）
+### OTA 实施（v3.1.6 已完成）
 
-详见 [docs/10-ota-implementation-plan.md](docs/10-ota-implementation-plan.md)，核心步骤：
-1. 新建 ota_update 模块（multipart 流式接收 + esp_ota_begin/write/end）
-2. 配网页"更多配置"加固件升级入口
-3. app_main 集成 PENDING_VERIFY 自检（BLE 起来 + 10s 无 abort → mark_valid）
-4. 版本号防降级
-5. 编译 + 真机测试（正常升级/损坏固件拒绝/回滚验证）
+详见 [docs/11-ota-user-guide.md](docs/11-ota-user-guide.md)，核心实现：
+1. `main/ota_downloader.c` HTTPS 在线下载版本信息 + 固件，分块 esp_ota_write
+2. `main/ota_update.c` PENDING_VERIFY 自检确认/回滚 + 语义版本比较工具（上传方式已移除）
+3. `main/wifi_portal.c` `/ota` 在线检查更新页 + `/ota/check`/`/ota/status`/`/ota/upgrade` 异步任务
+4. 家庭 WiFi 凭证统一在 `/more` 家庭网络配置，OTA 页只读展示，从 NVS 读取
+5. 防降级：`ota_version_compare > 0` 仅远端更新才提示升级
 
 ---
 
