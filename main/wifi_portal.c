@@ -575,8 +575,11 @@ static esp_err_t h_home(httpd_req_t *req)
         // 次按钮"保存并关闭 WiFi" → /close-wifi（保存+实时生效+5s 后关 WiFi 回到 BLE）
         "<button class=\"btn\" type=\"submit\" formaction=\"/config\">&#10003; 保存设置</button>"
         "<button class=\"btn\" type=\"submit\" formaction=\"/close-wifi\" style=\"background:#34c759;margin-top:8px\">&#8634; 保存并退出配网</button></form>"
-        // 保存成功 toast：由首页 URL 携带 saved=1 触发，2s 后自动消失
-        "<div id=\"toast\" style=\"display:none;position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1d1d1f;color:#fff;padding:12px 22px;border-radius:18px;font-size:14px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:50\">&#10003; 已保存并实时生效</div>"
+        // 保存成功 toast：由首页 URL 携带 saved=1 触发；强反馈双行文案，3.5s 后自动消失
+        "<div id=\"toast\" style=\"display:none;position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#34c759;color:#fff;padding:14px 24px;border-radius:18px;box-shadow:0 8px 28px rgba(52,199,89,.35);z-index:50;text-align:center;max-width:88%\">"
+        "<div style=\"font-size:15px;font-weight:800\">&#10003; 已保存到设备</div>"
+        "<div style=\"font-size:12px;font-weight:600;opacity:.92;margin-top:3px\">&#128280; 已通过蓝牙实时生效，无需重连</div>"
+        "</div>"
         "</div><script>");
 
     snprintf(buf, sizeof(buf),
