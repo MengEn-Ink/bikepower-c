@@ -1,7 +1,20 @@
 # 测试脚本使用说明
 
 > BikePower C 设备测试脚本集合
-> 更新日期：2026-06-28
+> 更新日期：2026-06-29（v3.2.0 前后端分离重构后梳理）
+
+---
+
+## 〇、目录分工说明
+
+项目根下有两个测试目录，**职责不同、不合并**（评估结论见文末「test/ 与 tests/ 合并评估」）：
+
+| 目录 | 用途 | 内容 |
+|------|------|------|
+| `test/` | 领域层 host 单测（纯 C） | `test_domain.c` + `Makefile`，产物 `test/test_domain` 已 gitignore |
+| `tests/` | 设备测试 + 静态门禁 + mock + 工具（本目录） | Python / Shell 脚本 |
+
+`test/` 由 ESP-IDF 生态约定保留给 host 单测；`tests/` 放所有需要外部依赖（Python/bleak/pyserial/Node）的脚本。
 
 ---
 
@@ -13,8 +26,9 @@
 |------|------|
 | 操作系统 | Linux（已验证 Ubuntu） |
 | Python | 3.8+ |
+| Node.js | 16+（仅 `check_portal_js.py` / `ota_flow_test.py` / `ota_local_mock.py` 静态部分需要） |
 | 串口权限 | 当前用户在 `dialout` 组（访问 /dev/ttyACM0） |
-| 网络工具 | `nmcli`（NetworkManager CLI，用于 WiFi 连接管理） |
+| 网络工具 | `nmcli`（仅动态配网测试需要切换 WiFi 时用） |
 | 无线网卡 | 支持 AP 模式连接的 WiFi 网卡（如 wlp1s0） |
 
 ### Python 依赖
@@ -25,7 +39,7 @@ pip install pyserial bleak
 
 | 包 | 用途 | 脚本 |
 |----|------|------|
-| `pyserial` | 串口通信（设备重启、日志抓取） | serial_capture.py |
+| `pyserial` | 串口通信（设备重启、日志抓取） | serial_capture.py, serial_daemon.py, ota_serial_monitor.py |
 | `bleak` | BLE 五服务自测 | ble_selftest.py, stage3_conn_test.py |
 
 ### ESP-IDF 工具链（编译固件时需要）
@@ -38,87 +52,46 @@ source $IDF_PATH/export.sh
 
 ---
 
-## 二、脚本清单
+## 二、脚本分类清单（按用途）
 
-| 脚本 | 用途 | 依赖 |
-|------|------|------|
-| `stage5_portal_test.py` | 配网门户 HTTP 路由自测（8 条用例） | Python3 |
-| `check_portal_js.py` | **门户 JS 语法静态检查（TC-3a，前置门）** | Python3 + Node.js |
-| `check_portal_structure.py` | **门户结构静态检查（TC-3d，路由/HTML/表单）** | Python3 |
-| `check_nvs_schema.py` | **NVS schema 静态一致性检查（TC-3e）** | Python3 |
-| `check_board_desc.py` | **板型描述表静态一致性检查（TC-3f）** | Python3 |
-| `check_tasks_wdt.py` | **任务/队列/WDT 静态完整性检查（TC-3g）** | Python3 |
-| `check_config_consistency.py` | **常量一致性静态检查（TC-3c）** | Python3 |
-| `ota_flow_test.py` | **OTA 全流程自测（TC-3b，静态+动态）** | Python3 + Node.js |
-| `ota_local_mock.py` | **OTA 页面本地模拟器（无需连接 BikePower 热点）** | Python3 + Node.js |
-| `ble_selftest.py` | BLE 五服务 + FTMS ERG 自测 | bleak |
-| `stage3_conn_test.py` | BLE 连接事件驱动状态机验证 | bleak |
-| `serial_capture.py` | 串口日志抓取工具 | pyserial |
-| `serial_daemon.py` | 串口日志守护进程（后台常驻，自动让出烧录） | pyserial |
+### A. 静态门禁（无需设备，CI 前置）
 
-### check_portal_js.py（TC-3a，最高优先级前置门）
+每次代码改动必跑的前置门，全部静态扫描源码，零设备依赖。
+
+| 脚本 | 用途 | 规则 ID | 优先级 |
+|------|------|---------|--------|
+| `check_portal_js.py` | 门户 JS 语法静态检查（`main/web/app.js` 跑 `node --check`） | TC-3a | **最高，每次改动必跑** |
+| `check_portal_structure.py` | 门户结构静态检查（路由表 / HTML / 占位符 / API 一致性） | TC-3d | 高 |
+| `check_config_consistency.py` | 常量一致性静态检查（config 头文件 ↔ 引用方） | TC-3c | 高 |
+| `check_nvs_schema.py` | NVS schema 静态一致性检查（nvs_store ↔ config） | TC-3e | 高 |
+| `check_board_desc.py` | 板型描述表静态一致性检查（board_detect ↔ config ↔ Kconfig） | TC-3f | 高 |
+| `check_tasks_wdt.py` | 任务/队列/WDT 静态完整性检查（每个 xTaskCreate 后必须有错误检查） | TC-3g | 高 |
 
 ```bash
-# 任何修改 main/wifi_portal.c 后必跑，JS 语法全绿才能编译/烧录
-python3 tests/check_portal_js.py
-# 详细模式（打印每个 script 块预览）
-python3 tests/check_portal_js.py --verbose
+# 一键跑全部静态门禁
+for s in check_portal_js check_portal_structure check_config_consistency \
+         check_nvs_schema check_board_desc check_tasks_wdt; do
+    python3 tests/$s.py || exit 1
+done
 ```
 
-从 `main/wifi_portal.c` 提取所有 C 字符串字面量拼接的 HTML，定位所有 `<script>` 块，用 `node --check` 验证 JS 语法。自动替换 C printf 占位符（`%d`/`%s` 等）避免误报。
+### B. 设备端动态自测（需真机 + 串口/BLE）
 
-历史教训：v3.1.6 `/ota` 页 `pollStatus` 结尾 `}}}` 多一个 `}`，导致整个 script 块报 `missing ) after argument list`，"检查更新"按钮点击完全无反应。本脚本在编译前拦截此类 bug。
+| 脚本 | 用途 | 依赖 | 触发方式 |
+|------|------|------|----------|
+| `ble_selftest.py` | BLE 五服务（CPS+HRS+CSC+FTMS+DIS）+ FTMS ERG 控制点 | bleak | 设备启动后直接跑 |
+| `stage3_conn_test.py` | BLE 连接事件驱动状态机验证 | bleak | 设备启动后直接跑 |
+| `stage5_portal_test.py` | 配网门户 HTTP 路由自测（/api/xxx JSON 接口） | Python3 | 设备进入配网态后跑 |
+| `ota_flow_test.py --dynamic` | OTA 全流程动态测试（需设备配网 + 家庭 WiFi） | Python3 + Node | 设备配网态后跑 |
 
-### check_portal_structure.py（TC-3d，门户结构静态检查）
+### C. OTA 全流程测试（静态 + 动态）
 
-```bash
-python3 tests/check_portal_structure.py
-```
-
-从 `main/wifi_portal.c` 提取 C 字符串拼接的 HTML，静态校验：
-1. 路由表完整性（/、/save、/scan、/connect、/status、/ota）
-2. HTML 表单标记（data-ssid、home-psk、ssid=/psk= 提交参数）
-3. HTML 基础结构（html/head/body/meta viewport + form action）
-
-### check_nvs_schema.py（TC-3e，NVS schema 一致性）
-
-```bash
-python3 tests/check_nvs_schema.py
-```
-
-校验 `main/nvs_store.c` 使用的 NVS key 与 `main/bikepower_config.h` 的 `NVS_KEY_*` 定义一致：
-1. 所有定义的 key 必须被读写至少一次
-2. nvs_store.c 使用的宏必须在 config 中定义
-3. key 字符串长度 ≤ 15（NVS 限制）
-4. NVS_NAMESPACE 与 NVS_NAMESPACE_WIFI 必须不同
-
-### check_board_desc.py（TC-3f，板型描述表一致性）
-
-```bash
-python3 tests/check_board_desc.py
-```
-
-校验 `main/board_detect.c` 的 `s_board_desc[]` 与 `main/bikepower_config.h` 一致：
-1. 板型枚举数量 = 描述表行数
-2. 描述表每行使用的引脚/驱动/名称宏必须在 config 中定义
-3. Kconfig 板型宏（CONFIG_BOARD_*_C3）与枚举一一对应
-4. BOARD_NAME_* 符合 kebab-case + `-c3` 后缀命名规范
-
-### check_tasks_wdt.py（TC-3g，任务/WDT 完整性）
-
-```bash
-python3 tests/check_tasks_wdt.py
-```
-
-扫描 `main/*.c`，校验：
-1. 每个 `xTaskCreate` 栈大小必须用宏（TASK_STACK_* 或局部 #define）
-2. 每个 `xTaskCreate` 后必须紧跟错误检查（pdPASS/BaseType_t/ESP_LOGE）
-3. `app_main.c` 必须调用 `esp_task_wdt_add` 注册看门狗 + `esp_task_wdt_reset` 喂狗
-4. 优先级硬编码数字降级为 WARN（不阻断）
-
-历史发现：`wifi_portal.c` 的 `ota_upgrade_task` 创建后曾缺少错误检查；现已修复，TC-3g 会阻断同类回归。
-
-### ota_flow_test.py（TC-3b，OTA 全流程）
+| 脚本 | 用途 | 是否需要设备 |
+|------|------|--------------|
+| `ota_flow_test.py --static` | OTA 路由注册、按钮、JS 一致性、JS 语法（默认） | 否 |
+| `ota_flow_test.py --dynamic` | GET /api/ota/status 状态机轮询、配 WiFi 完整检查流程 | 是 |
+| `ota_local_mock.py --self-test` | 本地 mock server + Node 跑固件 /ota 页真实 JS 流程 | 否 |
+| `ota_local_mock.py --serve` | 启动 localhost mock server，浏览器手动测试 | 否 |
 
 ```bash
 # 静态部分（无需设备，默认）
@@ -129,61 +102,101 @@ python3 tests/ota_flow_test.py --dynamic --ip 192.168.4.1
 python3 tests/ota_flow_test.py --dynamic --ip 192.168.4.1 --ssid MyHome --psk secret
 ```
 
-静态部分验证：OTA 路由注册、按钮元素、onclick 绑定、JS 函数定义、x.open 调用与路由一致、JS 语法。
-动态部分验证：GET /ota、POST /ota/check、GET /ota/status 状态机轮询、配 WiFi 后完整检查流程。
+### D. 本地 Mock（无需烧设备调试前端）
 
-### ota_local_mock.py（OTA 页面本地模拟）
+| 脚本 | 用途 | 端口 |
+|------|------|------|
+| `mock_server.py` | 复刻设备全部 /api/xxx JSON 接口 + 首页静态资源，本地调试 `main/web/` 前端 | 默认 8080 |
+| `ota_local_mock.py --serve` | 仅复刻 OTA 相关 /api/ota/* 接口 | 默认 8080 |
 
 ```bash
-# 自动启动 localhost mock server，并用 Node 执行固件 /ota 页面的真实 JS 流程
-python3 tests/ota_local_mock.py --self-test
+# 完整 mock（v3.2.0 推荐入口，覆盖全部 /api/xxx）
+python3 tests/mock_server.py
+# 浏览器访问 http://127.0.0.1:8080/ 调试前端
 
-# 手动打开网页测试
+# OTA 专用 mock
 python3 tests/ota_local_mock.py --serve --port 8080
-# 浏览器访问 http://127.0.0.1:8080/ota
 ```
 
-适用于本机连接 `BikePower` 热点后没有互联网、NetworkManager 自动回连家庭 WiFi、或不方便切换无线网络的场景。它只模拟 `/ota/check`、`/ota/status`、`/ota/upgrade` 的 HTTP 合约和 OTA 页面前端状态机，不覆盖 ESP32 真机 STA 切换、HTTPS 下载写入 flash 和 bootloader 回滚。
+### E. 串口日志工具
 
-### serial_daemon.py（串口日志守护进程）
+| 脚本 | 用途 | 运行模式 |
+|------|------|----------|
+| `serial_capture.py` | 一次性抓取串口日志（指定时长） | 前台阻塞，超时退出 |
+| `serial_daemon.py` | 串口日志守护进程（后台常驻，自动让出烧录串口） | 后台 nohup |
+| `ota_serial_monitor.py` | OTA 测试专用日志抓取（带关键字高亮 + 自动摘要） | 前台，Ctrl+C 退出 |
 
 ```bash
-# 后台启动（自动让出烧录串口）
+# 一次性抓 30 秒
+python3 tests/serial_capture.py --port /dev/ttyACM0 --duration 30
+# 后台守护
 nohup python3 tests/serial_daemon.py -p /dev/ttyACM0 > /tmp/serial_daemon.out 2>&1 &
-# 停止
-pkill -f serial_daemon.py
-# 日志按日滚动：tests/logs/serial_<YYYYMMDD>.log
+# OTA 测试专用监控（默认 1800s）
+python3 tests/ota_serial_monitor.py -p /dev/ttyACM0 -d 600
 ```
 
-> v3.1.6 起 OTA 升级统一为 HTTPS 在线下载方式，已移除基于 `/ota/upload` 上传的 `ota_full_test.sh` 与 `ota_upload_test.py`。在线 OTA 全流程由 `ota_flow_test.py` 覆盖，人工验证参考 [docs/11-ota-user-guide.md](../docs/11-ota-user-guide.md)。
+### F. 压力测试
+
+| 脚本 | 用途 |
+|------|------|
+| `run_stress.sh` | BLE 长连接 + 频繁通知压力测试 |
+
+### G. 测试运行器（统一入口）
+
+| 脚本 | 用途 |
+|------|------|
+| `test_runner.sh` | 统一入口，串联 host 单测 + BLE 自测 + 配网自测 + 压力 + 日志 |
+
+```bash
+bash tests/test_runner.sh -d    # 仅 host 单测
+bash tests/test_runner.sh -b    # BLE 自测（需真机）
+bash tests/test_runner.sh -w    # 配网自测（需真机配网态）
+bash tests/test_runner.sh -a    # 全部
+bash tests/test_runner.sh -s    # 压力测试
+bash tests/test_runner.sh -l    # 串口日志
+```
 
 ---
 
-## 三、其他脚本简述
+## 三、典型场景
 
-### stage5_portal_test.py
+### 场景 1：改了 `main/web/app.js` 后的最小验证
 
 ```bash
-# 前置：已连上设备 SoftAP
-python3 tests/stage5_portal_test.py
-# 输出 8/8 用例通过即配网门户路由正常
+python3 tests/check_portal_js.py                    # TC-3a，必跑
+python3 tests/check_portal_structure.py             # TC-3d
+python3 tests/mock_server.py                        # 本地浏览器手测
 ```
 
-测试配网门户的 8 条 HTTP 路由：首页、草稿提交、Captive Portal 探测端点（generate_204、hotspot-detect.html 等）、成功页守卫。
-
-### ble_selftest.py
+### 场景 2：改了 `main/wifi_portal.c` 后的完整静态门禁
 
 ```bash
-# 前置：设备已启动 BLE 广播
+for s in check_portal_js check_portal_structure check_config_consistency \
+         check_nvs_schema check_board_desc check_tasks_wdt; do
+    python3 tests/$s.py || exit 1
+done
+```
+
+### 场景 3：领域层（components/bikepower_domain）改动
+
+```bash
+make -C test && ./test/test_domain    # host 单测，不在本目录
+```
+
+### 场景 4：完整真机回归（v3.2.0 发版前）
+
+```bash
+# 1. 烧正式固件
+idf.py -p /dev/ttyACM0 flash
+# 2. 串口确认启动
+python3 tests/serial_capture.py --port /dev/ttyACM0 --duration 12
+# 3. BLE 五服务 + ERG
 python3 tests/ble_selftest.py
-# 验证 CPS+HRS+CSC+FTMS+DIS 五服务 + FTMS ERG 控制点
-```
-
-### serial_capture.py
-
-```bash
-# 抓取串口日志
-python3 tests/serial_capture.py --port /dev/ttyACM0 --duration 30
+# 4. 烧测试固件进配网态，跑门户自测
+idf.py reconfigure -DOTA_TEST_AUTO_CONFIG=ON && idf.py build && idf.py -p /dev/ttyACM0 flash
+python3 tests/stage5_portal_test.py --ip 192.168.4.1
+# 5. 烧回正式固件
+idf.py reconfigure -DOTA_TEST_AUTO_CONFIG=OFF && idf.py build && idf.py -p /dev/ttyACM0 flash
 ```
 
 ---
@@ -205,6 +218,8 @@ idf.py build -DOTA_TEST_AUTO_CONFIG=ON
 ```
 
 > `OTA_TEST_AUTO_CONFIG` 是 CMake option，默认 OFF。正式发版编译不带此选项，测试编译传 `-DOTA_TEST_AUTO_CONFIG=ON`。两者代码一致，仅测试固件多一个启动自动配网钩子。
+
+> 切换 option 后必须 `idf.py reconfigure` 或删 `build/CMakeCache.txt`，否则缓存不刷新。
 
 ---
 
@@ -235,5 +250,70 @@ sudo usermod -aG dialout $USER
 
 ```bash
 rm -f build/CMakeCache.txt
-idf.py build -DOTA_TEST_AUTO_CONFIG=ON
+idf.py reconfigure -DOTA_TEST_AUTO_CONFIG=ON
+idf.py build
 ```
+
+### Q4：bleak 连接超时（服务发现卡住）
+
+重置蓝牙适配器后重试：
+
+```bash
+bluetoothctl power off
+sleep 1
+bluetoothctl power on
+sleep 2
+python3 tests/ble_selftest.py
+```
+
+### Q5：本机不能切换 WiFi（保持互联网连接）
+
+- 用 `tests/mock_server.py` 在本地 8080 调试前端（零设备依赖）
+- 动态配网测试改日再做，或换另一台机器执行
+
+---
+
+## 六、test/ 与 tests/ 合并评估（2026-06-29）
+
+**结论：不合并**。两个目录职责不同，合并反而引入风险。
+
+### 当前分工
+
+- `test/` — 领域层 host 单测（纯 C）：`test_domain.c` + `Makefile`，产物 `test/test_domain` 已 gitignore
+- `tests/` — 设备测试 + 静态门禁 + mock + 工具（Python/Shell，本目录）
+
+### 评估过的方案
+
+| 方案 | 改动量 | 优点 | 缺点 |
+|------|--------|------|------|
+| A. 合并到 `tests/host/` 子目录 | ~15 个文件路径改写 | 单一 tests/ 目录 | Makefile 路径变 `../../`，复杂 |
+| B. 合并到 `tests/` 根 | ~15 个文件路径改写 | 最简单 | C 源码与 Python 脚本混杂 |
+| **C. 保持现状（采纳）** | 0 | ESP-IDF 生态约定；Makefile 路径简单；零风险 | 两个测试目录仍存在 |
+
+### 不合并的理由
+
+1. **ESP-IDF 生态约定**：`test/` 是 ESP-IDF 官方约定放 host 单测的目录，与 `tests/`（设备测试脚本）语义不同
+2. **Makefile 路径复杂化**：当前 `test/Makefile` 用 `../components/...` 引用领域层；合并后要改成 `../../components/...`，反而不直观
+3. **影响范围大**：合并需修改 15+ 文件中的路径引用（规则、文档、CHANGELOG、skill、quality_gate.py、test_runner.sh、.gitignore 等），改动风险高于收益
+4. **现有配置已正确**：`.gitignore` 已正确忽略 `test/test_domain` 产物，无冲突
+
+### 影响路径清单（若未来仍要合并，需同步修改）
+
+- `.gitignore`：`test/test_domain` → `tests/host/test_domain`
+- `tests/test_runner.sh`：`HOST_TEST="./test/test_domain"` 与 `make -C test`
+- `scripts/tools/quality_gate.py`：3 处路径引用
+- `.trae/rules/best-practices.md`、`general-rules.md`、`workflows/test-coverage.md`、`workflows/pre-dev-checklist.md`、`workflows/context-engineering.md`
+- `.trae/skills/release/SKILL.md`、`.trae/skills/real-device-test/SKILL.md`
+- `AGENTS.md`、`docs/04-technical-reference.md`、`docs/test-coverage-analysis.md`
+- `CHANGELOG.md`（历史记录，可保留旧路径）
+
+---
+
+## 七、已移除的脚本（历史记录）
+
+| 脚本 | 移除版本 | 原因 | 替代 |
+|------|----------|------|------|
+| `ota_full_test.sh` | v3.1.6 | OTA 升级改为 HTTPS 在线下载，移除上传流程 | `ota_flow_test.py` |
+| `ota_upload_test.py` | v3.1.6 | 同上 | `ota_flow_test.py` |
+
+人工 OTA 验证参考 [docs/11-ota-user-guide.md](../docs/11-ota-user-guide.md)。

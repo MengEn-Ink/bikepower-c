@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""阶段5 配网门户自测：连上 BikePower 热点后验证 HTTP 路由与行为。
+"""阶段5 配网门户自测（v3.2.0 前后端分离重构版）
 
-前置：长按 + 二次确认进入配网模式，手机/电脑连上 `BikePower` AP（密码 12345678），
-设备网关默认 192.168.4.1。默认不提交 /config（提交会触发重启），
-但会提交一次 /draft 草稿（仅内存生效，不持久化、不重启）用于验证 302 重定向。
+连上 BikePower 热点后验证 HTTP 路由与行为。v3.2.0 起：
+  - 前端走 SPA 单页面，C 侧只暴露 /api/xxx JSON 接口
+  - 草稿 / 配置 / 关 WiFi 全部 POST JSON，不再返回 302
+  - 倒计时与续期返回纯数字（保留旧契约，前端直接 parseInt）
+
+默认不提交 /api/config（会重启），但提交一次 /api/draft 草稿（仅内存生效）。
 
 用法:
   python3 tests/stage5_portal_test.py                      # 默认 192.168.4.1，只读校验
@@ -26,13 +29,11 @@ def http_get(url, timeout=TIMEOUT):
     由各用例自己断言预期状态码。只有网络层错误（超时、连接失败等）才抛异常。
     """
     req = urllib.request.Request(url, headers={"Connection": "close"})
-    # 不自动跟随重定向，便于校验 302
     opener = urllib.request.build_opener(_NoRedirect())
     try:
         with opener.open(req, timeout=timeout) as resp:
             return resp.read(), resp.status, dict(resp.headers)
     except urllib.error.HTTPError as e:
-        # 302/404/500 等 HTTP 层响应也返回三元组，交给用例自己判断
         try:
             body = e.read()
         except Exception:
@@ -40,18 +41,14 @@ def http_get(url, timeout=TIMEOUT):
         return body, e.code, dict(e.headers)
 
 
-def http_post(url, data=None, timeout=TIMEOUT):
-    """发 POST 请求并返回 (body, status, headers)。
-
-    data 为 bytes 或 None；Content-Type 默认 application/x-www-form-urlencoded。
-    HTTP 层错误（3xx/4xx/5xx）正常返回，由用例自己断言。
-    """
-    body_data = data if data is not None else b""
+def http_post_json(url, payload, timeout=TIMEOUT):
+    """发 POST 请求，body 为 JSON 字符串。返回 (body, status, headers)。"""
+    body_data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url, data=body_data, method="POST",
         headers={
             "Connection": "close",
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Type": "application/json",
         },
     )
     opener = urllib.request.build_opener(_NoRedirect())
@@ -77,7 +74,6 @@ def _try(label, fn):
         print(f"  {label}: {'通过' if ok else '失败'} {detail}")
         return ok
     except urllib.error.HTTPError as e:
-        # 302/204 等非 2xx 会进这里，交给各用例自己判断
         print(f"  {label}: 失败 HTTPError {e.code}")
         return False
     except Exception as e:
@@ -89,12 +85,12 @@ def main():
     parser = argparse.ArgumentParser(description="阶段5 配网门户自测")
     parser.add_argument("--ip", default="192.168.4.1", help="设备 AP 网关 IP")
     parser.add_argument("--port", type=int, default=80, help="HTTP 端口")
-    parser.add_argument("--renew", action="store_true", help="额外测试 /renew 续期")
+    parser.add_argument("--renew", action="store_true", help="额外测试 /api/renew 续期")
     args = parser.parse_args()
 
     base = f"http://{args.ip}:{args.port}"
     print("=" * 56)
-    print("  BikePower 配网门户自测")
+    print("  BikePower 配网门户自测 (v3.2.0)")
     print(f"  目标: {base}")
     print("=" * 56)
 
@@ -104,33 +100,48 @@ def main():
         body, status, _ = http_get(f"{base}/")
         ok = status == 200 and b"BikePower" in body and len(body) > 500
         return ok, f"status={status} len={len(body)}"
-    results.append(_try("首页 /", home))
+    results.append(_try("首页 SPA /", home))
 
-    def more():
-        body, status, _ = http_get(f"{base}/more")
-        ok = status == 200 and len(body) > 200
-        return ok, f"status={status} len={len(body)}"
-    results.append(_try("更多配置 /more", more))
-
-    def ui_module():
-        body, status, _ = http_get(f"{base}/ui/module?name=device")
-        ok = status == 200 and len(body) > 0
-        return ok, f"status={status} len={len(body)}"
-    results.append(_try("碎片页 /ui/module?name=device", ui_module))
+    def state():
+        body, status, _ = http_get(f"{base}/api/state")
+        ok = False
+        detail = f"status={status} len={len(body)}"
+        if status == 200:
+            try:
+                d = json.loads(body)
+                ok = ("device_name" in d and "firmware_version" in d
+                      and "pacers" in d and "remaining_sec" in d)
+                detail += f" dev={d.get('device_name')} ver={d.get('firmware_version')}"
+            except Exception as e:
+                detail += f" JSON 解析失败: {e}"
+        return ok, detail
+    results.append(_try("设备状态 GET /api/state", state))
 
     def time_ep():
-        body, status, _ = http_get(f"{base}/time")
-        secs = int(body.strip())
-        ok = status == 200 and 0 <= secs <= 180
-        return ok, f"剩余={secs}s"
-    results.append(_try("倒计时 /time", time_ep))
+        body, status, _ = http_get(f"{base}/api/time")
+        detail = f"status={status} body={body[:32]!r}"
+        try:
+            secs = int(body.strip())
+            ok = status == 200 and 0 <= secs <= 180
+            detail = f"剩余={secs}s"
+        except Exception:
+            ok = False
+        return ok, detail
+    results.append(_try("倒计时 GET /api/time", time_ep))
 
     def mem_stats():
-        body, status, _ = http_get(f"{base}/mem_stats")
-        data = json.loads(body.decode())
-        ok = status == 200 and "free" in data and "min_free" in data
-        return ok, f"free={data.get('free')} min_free={data.get('min_free')}"
-    results.append(_try("内存统计 /mem_stats", mem_stats))
+        body, status, _ = http_get(f"{base}/api/mem_stats")
+        detail = f"status={status} len={len(body)}"
+        ok = False
+        if status == 200:
+            try:
+                d = json.loads(body)
+                ok = "free" in d and "min_free" in d
+                detail += f" free={d.get('free')} min_free={d.get('min_free')}"
+            except Exception as e:
+                detail += f" JSON 解析失败: {e}"
+        return ok, detail
+    results.append(_try("内存统计 GET /api/mem_stats", mem_stats))
 
     def favicon():
         body, status, _ = http_get(f"{base}/favicon.ico")
@@ -138,28 +149,68 @@ def main():
         return ok, f"status={status}"
     results.append(_try("favicon /favicon.ico(204)", favicon))
 
-    def success_guard():
-        # 未提交配置直访 /success 应 302 回首页，且响应体为空
-        body, status, headers = http_get(f"{base}/success")
-        ok = status == 302 and headers.get("Location") == "/" and len(body) == 0
-        return ok, f"status={status} loc={headers.get('Location')} len={len(body)}"
-    results.append(_try("成功页直访守卫 /success(302)", success_guard))
+    def ota_status():
+        body, status, _ = http_get(f"{base}/api/ota/status")
+        detail = f"status={status} len={len(body)}"
+        ok = False
+        if status == 200:
+            try:
+                d = json.loads(body)
+                ok = "status" in d
+                detail += f" status={d.get('status')} current={d.get('current','?')}"
+            except Exception as e:
+                detail += f" JSON 解析失败: {e}"
+        return ok, detail
+    results.append(_try("OTA 状态 GET /api/ota/status", ota_status))
 
-    def draft_redirect():
-        # POST /draft 保存草稿后应 302 回首页，且响应体为空
-        form = b"mode=steady&power=150&cadence=80&heartrate=120"
-        body, status, headers = http_post(f"{base}/draft", data=form)
-        ok = status == 302 and headers.get("Location") == "/" and len(body) == 0
-        return ok, f"status={status} loc={headers.get('Location')} len={len(body)}"
-    results.append(_try("草稿提交重定向 POST /draft(302)", draft_redirect))
+    def wifi_scan_status():
+        # 不触发扫描，直接读上一次扫描状态（应为 done/running/idle 之一）
+        body, status, _ = http_get(f"{base}/api/wifi/scan/status")
+        detail = f"status={status} len={len(body)}"
+        ok = False
+        if status == 200:
+            try:
+                d = json.loads(body)
+                ok = "status" in d
+                detail += f" status={d.get('status')}"
+            except Exception as e:
+                detail += f" JSON 解析失败: {e}"
+        return ok, detail
+    results.append(_try("WiFi 扫描状态 GET /api/wifi/scan/status", wifi_scan_status))
+
+    def draft_json():
+        # POST /api/draft 应返回 JSON {"ok":true}，不再 302
+        payload = {
+            "device_name": "BikePower",
+            "mode": "steady",
+            "power": 150,
+            "cadence": 80,
+            "heartrate": 120,
+            "profile_weight": 70,
+            "profile_ftp": 200,
+            "profile_thr_hr": 180,
+            "profile_ride_type": "coco",
+        }
+        body, status, _ = http_post_json(f"{base}/api/draft", payload)
+        detail = f"status={status} body={body[:80]!r}"
+        ok = False
+        if status == 200:
+            try:
+                d = json.loads(body)
+                ok = d.get("ok") is True
+                detail += f" ok={d.get('ok')}"
+            except Exception as e:
+                detail += f" JSON 解析失败: {e}"
+        return ok, detail
+    results.append(_try("草稿提交 POST /api/draft (JSON)", draft_json))
 
     if args.renew:
         def renew():
-            body, status, _ = http_get(f"{base}/renew")
+            body, status, _ = http_get(f"{base}/api/renew")
             secs = int(body.strip())
             ok = status == 200 and secs >= 170
             return ok, f"续期后剩余={secs}s"
-        results.append(_try("续期 /renew", renew))
+        results.append(_try("续期 GET /api/renew", renew))
 
     print("--- 结果 ---")
     passed = sum(1 for r in results if r)
