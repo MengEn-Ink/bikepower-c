@@ -4,6 +4,17 @@
 
 ## [3.1.8] - 2026-06-28
 
+### 测试（Portal 静态检查补强）
+- `tests/check_portal_structure.py` 新增 `--file` 参数，便于用临时样本做回归验证。
+- TC-3d 新增 Portal 回归检查：保存成功强反馈文案、`/ota/upgrade/status` 升级进度端点、OTA changelog JSON/HTML 转义链路、`/more` 个人信息前端范围校验。
+- RED 验证：临时移除“已保存到设备”文案后，`python3 tests/check_portal_structure.py --file <tmp>` 正确失败。
+
+### 测试报告（Portal 静态检查补强）
+- `python3 tests/check_portal_structure.py`：46 通过、0 失败。
+- `python3 tests/check_portal_js.py`：11 个 script 块语法全通过。
+- `python3 tests/check_config_consistency.py`：87 通过、0 失败。
+- `python3 scripts/tools/quality_gate.py`：通过；`idf.py build` 通过，host 单测 1154 断言通过，静态门禁聚合全绿；仅提示当前有本次测试/文档改动未提交。
+
 ### 改进（第八轮 docs 入口一致性）
 - `README.md`、`docs/INDEX.md`、`PROGRESS.md`、`docs/user/04-ota-user-guide.md`、`docs/dev/01-technical-reference.md` 同步最近能力入口描述：OTA 升级进度反馈、OTA/WiFi JSON 与 XSS 加固、配置 JSON 序列化、静态门禁聚合、Release build_all 标准化、`/more` 校验、保存生效强反馈和 P0 真机验收清单。
 - 本轮只改文档/入口说明，不新增文档，不改 C 代码。
