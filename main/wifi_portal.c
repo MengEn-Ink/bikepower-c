@@ -207,6 +207,37 @@ static void html_escape(const char *in, char *out, size_t out_sz)
     out[o] = '\0';
 }
 
+// JSON 字符串值转义：转义 " \ 和控制字符（含 \b\f\n\r\t），避免拼 JSON 时被破坏或注入。
+// out_sz 需含结尾 '\0'，溢出前安全截断。
+static void json_escape(const char *in, char *out, size_t out_sz)
+{
+    if (out_sz == 0) return;
+    size_t o = 0;
+    for (size_t i = 0; in[i] && o + 7 < out_sz; i++) {
+        unsigned char c = (unsigned char)in[i];
+        switch (c) {
+            case '"':  out[o++] = '\\'; out[o++] = '"';  break;
+            case '\\': out[o++] = '\\'; out[o++] = '\\'; break;
+            case '\b': out[o++] = '\\'; out[o++] = 'b';  break;
+            case '\f': out[o++] = '\\'; out[o++] = 'f';  break;
+            case '\n': out[o++] = '\\'; out[o++] = 'n';  break;
+            case '\r': out[o++] = '\\'; out[o++] = 'r';  break;
+            case '\t': out[o++] = '\\'; out[o++] = 't';  break;
+            default:
+                if (c < 0x20) {
+                    // 其余控制字符转 \u00XX
+                    int n = snprintf(out + o, out_sz - o, "\\u%04x", c);
+                    if (n < 0 || (size_t)n >= out_sz - o) { out[o] = '\0'; return; }
+                    o += n;
+                } else {
+                    out[o++] = (char)c;
+                }
+                break;
+        }
+    }
+    out[o] = '\0';
+}
+
 // URL 解码（含 %XX 和 +→空格），就地写 out
 /**
  * 对 URL 编码字符串做解码。
@@ -1371,6 +1402,7 @@ static esp_err_t h_ota(httpd_req_t *req)
 
     SEND(req,
         "<script>"
+        "function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;')}"
         "function checkUpdate(){"
         "var btn=document.getElementById('check-btn');if(!btn){console.log('check-btn not found');return};"
         "btn.disabled=true;btn.textContent='检查中...';"
@@ -1633,14 +1665,19 @@ static esp_err_t h_ota_status(httpd_req_t *req)
 
     char resp[512];
     if (s_ota_check_state == OTA_CHECK_DONE) {
+        char ver_esc[64], clog_esc[256];
+        json_escape(s_ota_check_version, ver_esc, sizeof(ver_esc));
+        json_escape(s_ota_check_changelog, clog_esc, sizeof(clog_esc));
         snprintf(resp, sizeof(resp),
                  "{\"status\":\"done\",\"has_update\":%s,\"version\":\"%s\",\"size\":%d,\"changelog\":\"%s\",\"current\":\"%s\"}",
                  s_ota_check_has_update ? "true" : "false",
-                 s_ota_check_version, s_ota_check_size, s_ota_check_changelog, FIRMWARE_VERSION);
+                 ver_esc, s_ota_check_size, clog_esc, FIRMWARE_VERSION);
     } else if (s_ota_check_state == OTA_CHECK_ERROR) {
+        char err_esc[128];
+        json_escape(s_ota_check_error, err_esc, sizeof(err_esc));
         snprintf(resp, sizeof(resp),
                  "{\"status\":\"error\",\"error\":\"%s\",\"current\":\"%s\"}",
-                 s_ota_check_error, FIRMWARE_VERSION);
+                 err_esc, FIRMWARE_VERSION);
     } else {
         snprintf(resp, sizeof(resp),
                  "{\"status\":\"%s\",\"current\":\"%s\"}", status_str, FIRMWARE_VERSION);
@@ -1863,8 +1900,10 @@ static esp_err_t h_wifi_scan_status(httpd_req_t *req)
     }
     if (s_wifi_scan_state == WIFI_SCAN_ERROR) {
         ESP_LOGW(TAG, "GET /wifi/scan/status 返回 error: %s", s_scan_error);
-        char resp[128];
-        snprintf(resp, sizeof(resp), "{\"status\":\"error\",\"error\":\"%s\"}", s_scan_error);
+        char resp[160];
+        char err_esc[sizeof(s_scan_error) * 2];
+        json_escape(s_scan_error, err_esc, sizeof(err_esc));
+        snprintf(resp, sizeof(resp), "{\"status\":\"error\",\"error\":\"%s\"}", err_esc);
         httpd_resp_sendstr(req, resp);
         return ESP_OK;
     }
@@ -1877,15 +1916,12 @@ static esp_err_t h_wifi_scan_status(httpd_req_t *req)
     int off = 0;
     off += snprintf(resp + off, sizeof(resp) - off, "{\"status\":\"done\",\"count\":%d,\"list\":[", s_scan_count);
     for (int i = 0; i < s_scan_count && off < (int)sizeof(resp) - 80; i++) {
-        char ssid_escaped[HOME_WIFI_SSID_MAX * 2] = {0};
-        const char *src = (const char *)s_scan_aps[i].ssid;
-        for (int j = 0; src[j] && j < (int)sizeof(ssid_escaped) - 8; j++) {
-            char ch = src[j];
-            if (ch == '"' || ch == '\\') {
-                ssid_escaped[strlen(ssid_escaped)] = '\\';
-            }
-            ssid_escaped[strlen(ssid_escaped)] = ch;
-        }
+        char ssid_raw[HOME_WIFI_SSID_MAX + 1] = {0};
+        // SSID 非 NUL 结尾保证：固定字段拷贝后补 '\0'
+        memcpy(ssid_raw, s_scan_aps[i].ssid, sizeof(s_scan_aps[i].ssid) <= HOME_WIFI_SSID_MAX
+               ? sizeof(s_scan_aps[i].ssid) : HOME_WIFI_SSID_MAX);
+        char ssid_escaped[HOME_WIFI_SSID_MAX * 6 + 1] = {0};
+        json_escape(ssid_raw, ssid_escaped, sizeof(ssid_escaped));
         off += snprintf(resp + off, sizeof(resp) - off,
             "%s{\"ssid\":\"%s\",\"rssi\":%d,\"auth\":%d}",
             (i == 0 ? "" : ","), ssid_escaped,
@@ -1969,8 +2005,10 @@ static esp_err_t h_wifi_connect_status(httpd_req_t *req)
         return ESP_OK;
     }
     if (s_wifi_conn_state == WIFI_CONN_ERROR) {
-        char resp[128];
-        snprintf(resp, sizeof(resp), "{\"status\":\"error\",\"error\":\"%s\"}", s_wifi_conn_error);
+        char resp[160];
+        char err_esc[sizeof(s_wifi_conn_error) * 2];
+        json_escape(s_wifi_conn_error, err_esc, sizeof(err_esc));
+        snprintf(resp, sizeof(resp), "{\"status\":\"error\",\"error\":\"%s\"}", err_esc);
         httpd_resp_sendstr(req, resp);
         return ESP_OK;
     }
