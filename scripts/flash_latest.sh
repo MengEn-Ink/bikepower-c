@@ -123,15 +123,17 @@ detect_idf_path() {
     if [ -n "${IDF_PATH:-}" ]; then
         candidates+=("$IDF_PATH")
     fi
+    if [ -n "$home_dir" ]; then
+        candidates+=(
+            "$home_dir/esp/esp-idf-v5.5.4"
+        )
+    fi
     candidates+=(
         "$PROJECT_DIR/../esp32-power/esp-idf"
         "/home/mengen1014/work/esp32-power/esp-idf"
     )
     if [ -n "$home_dir" ]; then
-        candidates+=(
-            "$home_dir/esp/esp-idf-v5.5.4"
-            "$home_dir/esp/esp-idf"
-        )
+        candidates+=("$home_dir/esp/esp-idf")
     fi
 
     for candidate in "${candidates[@]}"; do
@@ -253,7 +255,7 @@ run_quick_checks() {
     done
 }
 
-IDF_DETECTED="$(detect_idf_path)" || die "找不到 ESP-IDF，请设置 IDF_PATH 或安装到 /home/mengen1014/work/esp32-power/esp-idf"
+IDF_DETECTED="$(detect_idf_path)" || die "找不到 ESP-IDF，请设置 IDF_PATH，或准备 $HOME/esp/esp-idf-v5.5.4、$PROJECT_DIR/../esp32-power/esp-idf、/home/mengen1014/work/esp32-power/esp-idf、$HOME/esp/esp-idf，或先激活 idf.py"
 activate_idf "$IDF_DETECTED"
 
 if [ -z "$PORT" ]; then
