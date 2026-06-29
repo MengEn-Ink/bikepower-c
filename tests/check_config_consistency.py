@@ -20,12 +20,12 @@ README = ROOT / "README.md"
 PROGRESS = ROOT / "PROGRESS.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
 DOC_INDEX = ROOT / "docs" / "INDEX.md"
-OTA_GUIDE = ROOT / "docs" / "11-ota-user-guide.md"
-QUICKSTART = ROOT / "docs" / "01-quickstart.md"
-USER_MANUAL = ROOT / "docs" / "02-user-manual.md"
-NIMBLE_REWRITE = ROOT / "docs" / "05-cidf-nimble-rewrite.md"
-MPY_COMPARISON = ROOT / "docs" / "06-micropython-vs-c-comparison.md"
-REVIEW_CHECKLIST = ROOT / "docs" / "08-review-checklist.md"
+OTA_GUIDE = ROOT / "docs" / "user" / "04-ota-user-guide.md"
+QUICKSTART = ROOT / "docs" / "user" / "01-quickstart.md"
+USER_MANUAL = ROOT / "docs" / "user" / "02-user-manual.md"
+NIMBLE_REWRITE = ROOT / "docs" / "archive" / "01-cidf-nimble-rewrite.md"
+MPY_COMPARISON = ROOT / "docs" / "archive" / "02-micropython-vs-c-comparison.md"
+REVIEW_CHECKLIST = ROOT / "docs" / "archive" / "03-review-checklist.md"
 HW_CONSTRAINTS = ROOT / ".trae" / "rules" / "hardware-constraints.md"
 
 TAG = "[TC-3c]"
@@ -193,7 +193,7 @@ check(wifi_shutdown == 180000, f"WIFI_SHUTDOWN_MS = 180000 (实际={wifi_shutdow
 print(f"\n{TAG} [S4b] 用户文档配网描述一致性")
 
 check(f"v{fw_ver}" in user_manual_src,
-      f"docs/02-user-manual.md 固件版本 v{fw_ver} 与 FIRMWARE_VERSION 一致")
+      f"docs/user/02-user-manual.md 固件版本 v{fw_ver} 与 FIRMWARE_VERSION 一致")
 
 legacy_wifi_phrases = [
     "保存并重启",
@@ -204,8 +204,8 @@ legacy_wifi_phrases = [
     "配网完成后设备重启",
 ]
 user_wifi_docs = {
-    "docs/01-quickstart.md": quickstart_src,
-    "docs/02-user-manual.md": user_manual_src,
+    "docs/user/01-quickstart.md": quickstart_src,
+    "docs/user/02-user-manual.md": user_manual_src,
 }
 for doc_name, doc_src in user_wifi_docs.items():
     for phrase in legacy_wifi_phrases:
@@ -224,8 +224,8 @@ legacy_dev_wifi_phrases = [
     "先停 BLE → 延时 200ms → 启 WiFi",
 ]
 dev_wifi_docs = {
-    "docs/05-cidf-nimble-rewrite.md": nimble_rewrite_src,
-    "docs/08-review-checklist.md": review_checklist_src,
+    "docs/archive/01-cidf-nimble-rewrite.md": nimble_rewrite_src,
+    "docs/archive/03-review-checklist.md": review_checklist_src,
 }
 for doc_name, doc_src in dev_wifi_docs.items():
     for phrase in legacy_dev_wifi_phrases:
@@ -236,11 +236,11 @@ for doc_name, doc_src in dev_wifi_docs.items():
 print(f"\n{TAG} [S4d] 技术栈版本文档一致性")
 
 check("ESP-IDF v5.5.1" not in mpy_comparison_src,
-      "docs/06-micropython-vs-c-comparison.md 不含过时 ESP-IDF v5.5.1")
+      "docs/archive/02-micropython-vs-c-comparison.md 不含过时 ESP-IDF v5.5.1")
 check("ESP-IDF v5.5.4" in mpy_comparison_src,
-      "docs/06-micropython-vs-c-comparison.md 含当前 ESP-IDF v5.5.4")
+      "docs/archive/02-micropython-vs-c-comparison.md 含当前 ESP-IDF v5.5.4")
 check("建议改为 v5.5.4" not in review_checklist_src,
-      "docs/08-review-checklist.md 不再以未完成语气建议修复 sdkconfig 版本注释")
+      "docs/archive/03-review-checklist.md 不再以未完成语气建议修复 sdkconfig 版本注释")
 
 
 # ============================ 4e. 文档索引阶段范围一致性 ============================
@@ -273,10 +273,10 @@ check(ota_timeout == 30000, f"OTA_DOWNLOAD_TIMEOUT_MS = 30000 (实际={ota_timeo
 ota_sta_ms = extract_int(config_src, "OTA_STA_CONNECT_MS")
 check(ota_sta_ms == 15000, f"OTA_STA_CONNECT_MS = 15000 (实际={ota_sta_ms})")
 
-# docs/11-ota-user-guide.md 应提到 OTA_VERSION_URL 或 latest.json
+# docs/user/04-ota-user-guide.md 应提到 OTA_VERSION_URL 或 latest.json
 if ota_guide_src:
     check("OTA_VERSION_URL" in ota_guide_src or "latest.json" in ota_guide_src,
-          "docs/11-ota-user-guide.md 提到 OTA_VERSION_URL/latest.json")
+          "docs/user/04-ota-user-guide.md 提到 OTA_VERSION_URL/latest.json")
 
 
 # ============================ 6. BLE 通知间隔一致性 ============================
