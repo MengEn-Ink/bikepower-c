@@ -17,7 +17,9 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG_H = ROOT / "main" / "bikepower_config.h"
 DOMAIN_H = ROOT / "components" / "bikepower_domain" / "include" / "domain_config.h"
 README = ROOT / "README.md"
+PROGRESS = ROOT / "PROGRESS.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
+DOC_INDEX = ROOT / "docs" / "INDEX.md"
 OTA_GUIDE = ROOT / "docs" / "11-ota-user-guide.md"
 QUICKSTART = ROOT / "docs" / "01-quickstart.md"
 USER_MANUAL = ROOT / "docs" / "02-user-manual.md"
@@ -91,7 +93,9 @@ def extract_changelog_unreleased_has_version_bump(changelog: str, target_ver: st
 config_src = read(CONFIG_H)
 domain_src = read(DOMAIN_H)
 readme_src = read(README)
+progress_src = read(PROGRESS)
 changelog_src = read(CHANGELOG)
+doc_index_src = read(DOC_INDEX)
 ota_guide_src = read(OTA_GUIDE) if OTA_GUIDE.exists() else ""
 quickstart_src = read(QUICKSTART)
 user_manual_src = read(USER_MANUAL)
@@ -237,6 +241,18 @@ check("ESP-IDF v5.5.4" in mpy_comparison_src,
       "docs/06-micropython-vs-c-comparison.md 含当前 ESP-IDF v5.5.4")
 check("建议改为 v5.5.4" not in review_checklist_src,
       "docs/08-review-checklist.md 不再以未完成语气建议修复 sdkconfig 版本注释")
+
+
+# ============================ 4e. 文档索引阶段范围一致性 ============================
+print(f"\n{TAG} [S4e] 文档索引阶段范围一致性")
+
+check("阶段 0-9 完成情况" not in doc_index_src,
+      "docs/INDEX.md 不含过时阶段 0-9 项目进度描述")
+check("阶段 0-10 完成情况" in doc_index_src,
+      "docs/INDEX.md 含阶段 0-10 项目进度描述")
+if "| 10 |" in progress_src:
+    check("阶段 0-10" in doc_index_src,
+          "PROGRESS.md 含阶段 10 时 docs/INDEX.md 同步到阶段 0-10")
 
 
 # ============================ 5. OTA 配置一致性 ============================
