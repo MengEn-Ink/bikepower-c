@@ -382,6 +382,17 @@ static void set_no_store_headers(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Expires", "0");
 }
 
+// 底部固定导航栏样式（配置/更多/关于/升级 四页共用）。
+// 关键：navbar 用固定 height（含安全区），nav-item 不再用 min-height 撑高，
+// 彻底消除页面切换时底栏高度抖动；transform:translateZ(0) 提升为合成层减少重绘。
+// body padding-bottom 精确匹配底栏高度，避免内容被遮挡。
+#define NAVBAR_STYLE \
+    ".navbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.06);height:calc(56px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);z-index:100;max-width:420px;margin:0 auto;transform:translateZ(0)}" \
+    ".nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#86868b;font-size:11px;font-weight:700;gap:2px}" \
+    ".nav-item.on{color:#007aff}.nav-ico{font-size:20px}.nav-tx{font-size:11px}" \
+    "@media(prefers-color-scheme:dark){.navbar{background:#1c1c1e;border-color:#3a3a3c}.nav-item{color:#8e8e93}.nav-item.on{color:#0a84ff}}" \
+    "body{padding-bottom:calc(70px + env(safe-area-inset-bottom,0px))!important}"
+
 // ============================ 首页 ============================
 
 /**
@@ -421,7 +432,7 @@ static esp_err_t h_home(httpd_req_t *req)
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<title>BikePower</title><style>"
         "*{margin:0;padding:0;box-sizing:border-box}"
-        "body{background:#f5f5f7;padding:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#111}"
+        "body{background:#f2f2f7;padding:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#111}"
         ".box{max-width:420px;margin:0 auto}"
         ".bar,.brand,.status,.card .val{display:flex;align-items:center}"
         ".seg,.btn{display:flex;align-items:center;justify-content:center}"
@@ -455,11 +466,7 @@ static esp_err_t h_home(httpd_req_t *req)
         ".btn{gap:8px;width:100%;padding:13px;border:0;border-radius:14px;background:#007aff;color:#fff;font-size:15px;font-weight:700;letter-spacing:.02em}"
         ".btn:active{opacity:.85;transform:scale(.99)}"
         "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.card,.note,.mode-info{background:#2c2c2e;border-color:#3a3a3c}.card .val input{color:#f5f5f7}.badge{background:#2c2c2e;border-color:#3a3a3c;color:#f5f5f7}.seg-row{background:#3a3a3c}.seg{color:#8e8e93}.seg.on{background:#2c2c2e;color:#f5f5f7}.mode-info .pacer-sel{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}.renew-btn{background:#ff9f0a}.btn{background:#0a84ff}}"
-        ".navbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.06);padding:6px 0 env(safe-area-inset-bottom,6px);z-index:100;max-width:420px;margin:0 auto}"
-        ".nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#86868b;font-size:11px;font-weight:700;padding:4px 0;min-height:50px;gap:2px}"
-        ".nav-item.on{color:#007aff}.nav-ico{font-size:20px}.nav-tx{font-size:11px}"
-        "@media(prefers-color-scheme:dark){.navbar{background:#1c1c1e;border-color:#3a3a3c}.nav-item{color:#8e8e93}.nav-item.on{color:#0a84ff}}"
-        "body{padding-bottom:70px!important}"
+        NAVBAR_STYLE
         "</style></head><body><div class=\"box\">"
         "<div class=\"bar\"><div class=\"brand\">BikePower <small style=\"font-size:10px;font-weight:600;color:#86868b\">v" FIRMWARE_VERSION "</small></div></div>"
         "<div class=\"status\"><span class=\"ble\">&#9679; 配网中</span>"
@@ -941,11 +948,8 @@ static esp_err_t h_more(httpd_req_t *req)
         ".btn.alt{background:#fff;color:#007aff;border:1px solid rgba(0,122,255,.18)}"
         "input,select{width:100%;padding:11px;border:1px solid rgba(0,0,0,.06);border-radius:12px;font-size:14px;background:#f5f5f7;color:#1d1d1f;font-weight:600}"
         ".field{margin:9px 0}.field label{display:block;font-size:12px;font-weight:600;color:#6e6e73;margin:0 0 5px}"
-        ".navbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.06);padding:6px 0 env(safe-area-inset-bottom,6px);z-index:100;max-width:420px;margin:0 auto}"
-        ".nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#86868b;font-size:11px;font-weight:700;padding:4px 0;min-height:50px;gap:2px}"
-        ".nav-item.on{color:#007aff}.nav-ico{font-size:20px}.nav-tx{font-size:11px}"
-        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.hero,.panel-card{background:#2c2c2e}.module-btn{background:#0a84ff}.btn{background:#0a84ff}input,select{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}.navbar{background:#1c1c1e;border-color:#3a3a3c}.nav-item{color:#8e8e93}.nav-item.on{color:#0a84ff}}"
-        "body{padding-bottom:70px!important}"
+        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.hero,.panel-card{background:#2c2c2e}.module-btn{background:#0a84ff}.btn{background:#0a84ff}input,select{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}}"
+        NAVBAR_STYLE
         "</style></head><body><div class=\"box\">"
         "<div class=\"hero\"><h1>更多配置</h1><p class=\"sub\">选择功能模块进行配置，修改后回首页保存生效。</p></div>"
         "<form method=\"POST\" action=\"/draft\" id=\"core-form\">");
@@ -1101,11 +1105,8 @@ static esp_err_t h_about(httpd_req_t *req)
         ".card h2{font-size:15px;margin-bottom:8px;letter-spacing:-.02em;color:#1d1d1f}"
         ".info-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:13px}"
         ".info-row:last-child{border-bottom:0}.info-row .k{color:#86868b;font-weight:600}.info-row .v{color:#1d1d1f;font-weight:700}"
-        ".navbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.06);padding:6px 0 env(safe-area-inset-bottom,6px);z-index:100;max-width:420px;margin:0 auto}"
-        ".nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#86868b;font-size:11px;font-weight:700;padding:4px 0;min-height:50px;gap:2px}"
-        ".nav-item.on{color:#007aff}.nav-ico{font-size:20px}.nav-tx{font-size:11px}"
-        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.hero,.card{background:#2c2c2e}.info-row{border-color:#3a3a3c}.info-row .v{color:#f5f5f7}.navbar{background:#1c1c1e;border-color:#3a3a3c}.nav-item{color:#8e8e93}.nav-item.on{color:#0a84ff}}"
-        "body{padding-bottom:70px!important}"
+        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.hero,.card{background:#2c2c2e}.info-row{border-color:#3a3a3c}.info-row .v{color:#f5f5f7}}"
+        NAVBAR_STYLE
         "</style></head><body><div class=\"box\">"
         "<div class=\"hero\"><h1>关于</h1><p class=\"sub\">BikePower C 骑行训练控制盒</p></div>");
 
@@ -1332,11 +1333,8 @@ static esp_err_t h_ota(httpd_req_t *req)
         ".warn{margin-top:8px;font-size:12px;color:#856404;background:#fff3cd;border:1px solid #ffeaa7;border-radius:10px;padding:10px;line-height:1.5}"
         ".spinner{display:inline-block;width:14px;height:14px;border:2px solid #007aff;border-top:2px solid transparent;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle;margin-right:6px}"
         "@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}"
-        ".navbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.06);padding:6px 0 env(safe-area-inset-bottom,6px);z-index:100;max-width:420px;margin:0 auto}"
-        ".nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#86868b;font-size:11px;font-weight:700;padding:4px 0;min-height:50px;gap:2px}"
-        ".nav-item.on{color:#007aff}.nav-ico{font-size:20px}.nav-tx{font-size:11px}"
-        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.hero,.card{background:#2c2c2e}.btn{background:#0a84ff}.navbar{background:#1c1c1e;border-color:#3a3a3c}.nav-item{color:#8e8e93}.nav-item.on{color:#0a84ff}.cred-row{background:#3a3a3c}.cred-val{color:#f5f5f7}}"
-        "body{padding-bottom:70px!important}"
+        "@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#f5f5f7}.hero,.card{background:#2c2c2e}.btn{background:#0a84ff}.cred-row{background:#3a3a3c}.cred-val{color:#f5f5f7}}"
+        NAVBAR_STYLE
         "</style></head><body><div class=\"box\">"
         "<div class=\"hero\"><h1>固件升级</h1>"
         "<p class=\"sub\">通过家庭 WiFi 在线检查并下载最新固件，升级后设备自动重启。</p></div>"
