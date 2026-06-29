@@ -154,7 +154,7 @@ typedef enum {
 #define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 保存并关闭 WiFi 前的收尾等待时间（历史命名保留）
 #define WIFI_MAX_STA_CONN      2        // SoftAP最大连接客户端数
 #define HTTP_MAX_BODY_LEN      4096     // HTTP请求体最大长度（字节）
-#define HTTP_MAX_URI_HANDLERS  32       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + v3.1.6 WiFi 配置路由）
+#define HTTP_MAX_URI_HANDLERS  36       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + WiFi 配置 + OTA 升级进度路由）
 
 // ===== Captive Portal =====
 #define CAPTIVE_PORTAL_HOST    "192.168.4.1"  // SoftAP 网关 IP，DNS 劫持目标 + 重定向 Location 主机

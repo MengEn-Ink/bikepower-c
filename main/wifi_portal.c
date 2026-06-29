@@ -597,7 +597,7 @@ static esp_err_t h_home(httpd_req_t *req)
         "d.children[0].style.background=c>=80&&c<=100?\"#16a34a\":c>=60&&c<=120?\"#f97316\":\"#ef4444\";d.children[1].textContent=c?(c>=80&&c<=100?\"稳定 80-100\":c>100?\"偏高\":\"偏低 \"+c+\" RPM\"):\"-\";"
         "updNote(w,h,c,p,hr)}"
         "function updNote(w,h,c,p,hr){var m=curMode();if(m===\"steady\"){var t=\"手动设置三项数据\";if(w&&F)t+=\"，当前 \"+(w/W).toFixed(1)+\" W/kg（\"+P[p]+\"区间）\";if(h&&T)t+=\"，心率 \"+H[hr]+\"区间\";g(\"mn\").textContent=\"固定功率：\"+t+\"。\"}else if(m===\"road\"){g(\"mn\").textContent=\"机器人配速：按体重和 W/kg 换算功率，模拟跟骑。\"}else if(m===\"erg\"){g(\"mn\").textContent=\"ERG：App 下发目标功率，设备跟随训练课表。\"}}"
-        "var R=0;function doRenew(){if(R)return;R=1;var b=g(\"cd\");b.className=\"badge ok\";b.textContent=\"已延长\";fetch(\"/renew\").then(function(r){return r.text()}).then(function(t){var s=parseInt(t);if(s>0){_sv=s;_lt=Date.now();updCd()}});setTimeout(function(){b.className=\"badge\";R=0},1200)}"
+        "var R=0;function doRenew(){if(R)return;R=1;var b=g(\"cd\");b.className=\"badge ok\";b.textContent=\"延长中...\";fetch(\"/renew\").then(function(r){return r.text()}).then(function(t){var s=parseInt(t);if(s>0){_sv=s;_lt=Date.now();updCd();b.className=\"badge ok\";b.textContent=\"已延长\"}else{b.className=\"badge warn\";b.textContent=\"延长失败\"}}).catch(function(){b.className=\"badge warn\";b.textContent=\"延长失败,请重试\"});setTimeout(function(){R=0;updCd()},1200)}"
         "function curMode(){var r=document.getElementsByName(\"mode\");for(var i=0;i<r.length;i++){if(r[i].checked)return r[i].value}return \"steady\"}"
         "function validateForm(){if(curMode()!==\"steady\")return true;var p=parseInt(g(\"p\").value),c=parseInt(g(\"c\").value),h=parseInt(g(\"h\").value);if(p<0||p>2000){alert(\"功率超出范围（0-2000W）\");return false}if(c<20||c>120){alert(\"踏频超出范围（20-120 RPM）\");return false}if(h<60||h>200){alert(\"心率超出范围（60-200 BPM）\");return false}return true}"
         "function syncMode(){var m=curMode();var on=m===\"steady\";"
@@ -617,7 +617,7 @@ static esp_err_t h_home(httpd_req_t *req)
         "g(\"cd\").textContent=s>0?\"剩余 \"+s+\" 秒 · 点击延长\":\"WiFi 正在关闭\";"
         "if(w)g(\"mn\").textContent=\"剩余 \"+s+\" 秒，请保存或点击延长。\";"
         "if(s<=0)location.href=\"/closing\"}"
-        "function tick(){if(document.hidden)return;fetch(\"/time\").then(function(r){return r.text()}).then(function(t){_sv=parseInt(t);_lt=Date.now();updCd()})}"
+        "function tick(){if(document.hidden)return;fetch(\"/time\").then(function(r){return r.text()}).then(function(t){var s=parseInt(t);if(!isNaN(s)){_sv=s;_lt=Date.now();updCd()}}).catch(function(){})}"
         "updCd();setInterval(updCd,1000);setInterval(tick,5000);"
         "</script>"
         "<nav class=\"navbar\"><a class=\"nav-item on\" href=\"/\"><span class=\"nav-ico\">&#9881;</span><span class=\"nav-tx\">配置</span></a><a class=\"nav-item\" href=\"/more\"><span class=\"nav-ico\">&#128218;</span><span class=\"nav-tx\">更多</span></a><a class=\"nav-item\" href=\"/about\"><span class=\"nav-ico\">&#8505;</span><span class=\"nav-tx\">关于</span></a></nav>"
@@ -1022,29 +1022,39 @@ static esp_err_t h_more(httpd_req_t *req)
         "catch(e){st.textContent='解析失败';st.style.color='#ff3b30'}};"
         "x.onerror=function(){st.textContent='网络错误';st.style.color='#ff3b30'};"
         "x.open('POST','/wifi/scan');x.send()}"
+        "function wifiRescanBtn(){return ' <button type=\"button\" onclick=\"wifiStartScan()\" style=\"margin-left:6px;padding:4px 12px;border:0;border-radius:8px;background:#007aff;color:#fff;font-size:12px\">重新扫描</button>'}"
         "function wifiPollScan(){"
         "var st=document.getElementById('scan-status'),lst=document.getElementById('scan-list');"
+        "var tries=0;"
         "var t=setInterval(function(){"
-        "var x=new XMLHttpRequest();"
+        "tries++;"
+        // 扫描轮询上限 20 次 ×1s ≈ 20s，超时退出并提供重试
+        "if(tries>20){clearInterval(t);st.innerHTML='扫描超时。'+wifiRescanBtn();st.style.color='#ff3b30';return}"
+        "var x=new XMLHttpRequest();x.timeout=4000;"
         "x.onload=function(){if(x.status!==200)return;"
         "try{var d=JSON.parse(x.responseText);"
         "if(d.status==='running')return;"
         "clearInterval(t);"
-        "if(d.status==='error'){st.textContent=d.error||'扫描失败';st.style.color='#ff3b30';return}"
+        "if(d.status==='error'){st.innerHTML=(d.error||'扫描失败')+wifiRescanBtn();st.style.color='#ff3b30';return}"
         "if(d.status==='done'&&d.list&&d.list.length>0){"
-        "st.textContent='发现 '+d.count+' 个热点，请选择你的家庭 WiFi：';st.style.color='#1d1d1f';"
+        "st.innerHTML='发现 '+d.count+' 个热点，请选择你的家庭 WiFi：'+wifiRescanBtn();st.style.color='#1d1d1f';"
         "var h='';"
         "for(var i=0;i<d.list.length;i++){"
         "var a=d.list[i];"
-        "var lock=a.auth>0?'<span style=\"color:#86868b\">&#128274;</span>':'<span style=\"color:#34c759\">&#9888;</span>';"
-        "var sig=a.rssi>=-55?'<span style=\"color:#34c759\">\u25cf\u25cf\u25cf</span>':(a.rssi>=-70?'<span style=\"color:#ff9500\">\u25cf\u25cf\u25cf</span>':'<span style=\"color:#ff3b30\">\u25cf\u25cf\u25cf</span>');"
+        // 加密类型：0=开放 2=WPA 3=WPA2 4=WPA/WPA2 5=企业 6=WPA3 7=WPA2/WPA3 其余=加密
+        "var an=a.auth,sec=an===0?'开放':an===2?'WPA':an===3?'WPA2':an===4?'WPA2':an===5?'企业':an===6?'WPA3':an===7?'WPA3':'加密';"
+        "var lock=an===0?'<span style=\"color:#ff9500\">&#9888; 开放</span>':'<span style=\"color:#86868b\">&#128274; '+sec+'</span>';"
+        // 信号格数：≥-60 三格 ≥-72 两格 其余一格；满格亮、空格灰，颜色随强弱
+        "var bars=a.rssi>=-60?3:(a.rssi>=-72?2:1),sc=bars>=3?'#34c759':(bars>=2?'#ff9500':'#ff3b30');"
+        "var sig='';for(var b=0;b<3;b++){sig+='<span style=\"color:'+(b<bars?sc:'#d1d1d6')+'\">\u25cf</span>'}"
+        "var lvl=bars>=3?'强':(bars>=2?'中':'弱');"
         "h+='<div class=\"wifi-item\" data-ssid=\"'+wifiEscAttr(a.ssid)+'\" data-auth=\"'+a.auth+'\" onclick=\"wifiPick(this)\" style=\"padding:12px;margin:6px 0;background:#f5f5f7;border:2px solid transparent;border-radius:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center\">'+"
-        "'<span style=\"font-size:15px;font-weight:700;color:#1d1d1f\">'+wifiEscHtml(a.ssid)+'</span>'+"
-        "'<span style=\"display:flex;align-items:center;gap:8px\">'+lock+' '+sig+' <span style=\"color:#86868b;font-size:11px\">'+a.rssi+'dBm</span></span></div>'}"
+        "'<span style=\"display:flex;flex-direction:column;gap:2px;overflow:hidden\"><span style=\"font-size:15px;font-weight:700;color:#1d1d1f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\">'+wifiEscHtml(a.ssid)+'</span>'+lock+'</span>'+"
+        "'<span style=\"display:flex;align-items:center;gap:6px;flex-shrink:0\">'+sig+' <span style=\"color:#86868b;font-size:11px\">'+lvl+'</span></span></div>'}"
         "lst.innerHTML=h;"
         "if(savedSsid){var m=document.querySelectorAll('.wifi-item');for(var i=0;i<m.length;i++){if(m[i].getAttribute('data-ssid')===savedSsid){wifiPick(m[i]);break}}}}"
-        "else{st.textContent='未发现周边 WiFi 热点';st.style.color='#86868b'}}"
-        "catch(e){st.textContent='解析失败';st.style.color='#ff3b30'}};"
+        "else{st.innerHTML='未发现周边 WiFi 热点，请靠近路由器后重试。'+wifiRescanBtn();st.style.color='#86868b'}}"
+        "catch(e){clearInterval(t);st.innerHTML='解析失败。'+wifiRescanBtn();st.style.color='#ff3b30'}};"
         "x.open('GET','/wifi/scan/status');x.send()},1000)}"
         "function wifiPick(el){"
         "var items=document.querySelectorAll('.wifi-item');"
@@ -1072,8 +1082,12 @@ static esp_err_t h_more(httpd_req_t *req)
         "x.open('POST','/wifi/save');x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');"
         "x.send('ssid='+encodeURIComponent(pickedSsid)+'&psk='+encodeURIComponent(psk))}"
         "function wifiPollConn(btn,r){"
+        "var tries=0;"
         "var t=setInterval(function(){"
-        "var x=new XMLHttpRequest();"
+        "tries++;"
+        // 连接测试轮询上限 20 次 ×1.5s ≈ 30s，超时退出并提供重试
+        "if(tries>20){clearInterval(t);btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30;font-size:13px\">测试超时，凭证已保存。可点「保存并测试连接」重试。</p>';return}"
+        "var x=new XMLHttpRequest();x.timeout=4000;"
         "x.onload=function(){if(x.status!==200)return;"
         "try{var d=JSON.parse(x.responseText);"
         "if(d.status==='running')return;"
@@ -1083,6 +1097,7 @@ static esp_err_t h_more(httpd_req_t *req)
         "catch(e){clearInterval(t);btn.disabled=false;btn.textContent='保存并测试连接';r.innerHTML='<p style=\"color:#ff3b30\">解析失败</p>'}};"
         "x.open('GET','/wifi/connect/status');x.send()},1500)}"
         "function wifiEscHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;')}"
+        "function pskToggle(){var p=document.getElementById('home-psk'),e=document.getElementById('psk-eye');if(!p)return;if(p.type==='password'){p.type='text';e.textContent='隐藏'}else{p.type='password';e.textContent='显示'}}"
         "function wifiEscAttr(s){return s.replace(/&/g,'&amp;').replace(/\"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}"
         "openMod(\"more\");"
         "</script>"
@@ -1425,18 +1440,20 @@ static esp_err_t h_ota(httpd_req_t *req)
         "console.log('POST /ota/check sending');"
         "x.open('POST','/ota/check');x.send()};"
         "function pollStatus(btn,r){"
-        "var secs=0;"
+        "var secs=0,tries=0;"
         "var t=setInterval(function(){"
-        "secs++;"
-        "var x=new XMLHttpRequest();"
+        "secs++;tries++;"
+        // 轮询上限 40 次 ×2s ≈ 80s，超时退出并提供重试入口
+        "if(tries>40){clearInterval(t);btn.disabled=false;btn.textContent='检查更新';r.innerHTML='<p style=\"color:#ff3b30;font-size:13px\">检查超时，请重试。<button type=\"button\" onclick=\"checkUpdate()\" style=\"margin-left:6px;padding:4px 12px;border:0;border-radius:8px;background:#007aff;color:#fff;font-size:12px\">重试</button></p>';return}"
+        "var x=new XMLHttpRequest();x.timeout=5000;"
         "x.onload=function(){if(x.status!==200)return;try{var d=JSON.parse(x.responseText);"
         "if(d.status==='running'){r.innerHTML='<p style=\"font-size:12px;color:#6e6e73\"><span class=\"spinner\"></span>正在连接家庭WiFi并检查... 已用时 '+secs+'s</p>';return}"
         "clearInterval(t);btn.disabled=false;btn.textContent='检查更新';"
-        "if(d.status==='error'){r.innerHTML='<p style=\"color:#ff3b30;font-size:13px\">'+(d.error||'检查失败')+'</p>';return}"
+        "if(d.status==='error'){r.innerHTML='<p style=\"color:#ff3b30;font-size:13px\">'+esc(d.error||'检查失败')+'<button type=\"button\" onclick=\"checkUpdate()\" style=\"margin-left:6px;padding:4px 12px;border:0;border-radius:8px;background:#007aff;color:#fff;font-size:12px\">重试</button></p>';return}"
         "if(d.status==='done'){"
-        "var h='<div class=\"ver\">服务器最新版本：v'+d.version+'</div>';"
-        "h+='<p style=\"font-size:12px;color:#6e6e73;margin-bottom:8px\">当前版本：v'+d.current+'</p>';"
-        "if(d.changelog)h+='<p style=\"font-size:12px;color:#6e6e73;margin-bottom:8px\">'+d.changelog+'</p>';"
+        "var h='<div class=\"ver\">服务器最新版本：v'+esc(d.version)+'</div>';"
+        "h+='<p style=\"font-size:12px;color:#6e6e73;margin-bottom:8px\">当前版本：v'+esc(d.current)+'</p>';"
+        "if(d.changelog)h+='<p style=\"font-size:12px;color:#6e6e73;margin-bottom:8px\">'+esc(d.changelog)+'</p>';"
         "if(d.has_update){h+='<p style=\"color:#34c759;font-size:13px;font-weight:800\">发现新版本！</p>';document.getElementById('upgrade-btn').disabled=false}"
         "else{h+='<p style=\"color:#86868b;font-size:13px\">已是最新版本</p>'}"
         "r.innerHTML=h}}"
@@ -1527,12 +1544,57 @@ static void ota_check_task(void *arg)
     vTaskDelete(NULL);
 }
 
+// ----- 异步升级进度状态机（生命周期安全：portMUX 临界区保护读写） -----
+// 升级任务（写）与 /ota/upgrade/status 轮询（读）跨任务并发访问，
+// 用临界区保证状态/进度/文案的一致性快照，避免读到撕裂数据。
+typedef enum {
+    OTA_UP_IDLE = 0,     // 未触发升级（轮询读到此态不会误触发）
+    OTA_UP_RUNNING,      // 升级流程中（连 WiFi / 获取版本 / 校验等无百分比阶段）
+    OTA_UP_DOWNLOADING,  // 固件下载中（有百分比）
+    OTA_UP_SUCCESS,      // 下载写入成功，准备重启
+    OTA_UP_FAIL,         // 升级失败（错误信息见 phase/error）
+    OTA_UP_REBOOTING,    // 即将 esp_restart
+} ota_up_state_t;
+
+static portMUX_TYPE s_ota_up_mux = portMUX_INITIALIZER_UNLOCKED;
+static ota_up_state_t s_ota_up_state = OTA_UP_IDLE;
+static int s_ota_up_read = 0;     // 已下载字节
+static int s_ota_up_total = 0;    // 固件总字节（0=未知）
+static char s_ota_up_phase[24] = {0};  // 阶段文案
+static char s_ota_up_error[48] = {0};  // 失败原因
+
+// 设置升级状态/阶段/错误（临界区内拷贝，保证状态机原子）。
+static void ota_up_set(ota_up_state_t st, const char *phase, const char *err)
+{
+    char ph[sizeof(s_ota_up_phase)] = {0};
+    char er[sizeof(s_ota_up_error)] = {0};
+    if (phase) snprintf(ph, sizeof(ph), "%s", phase);
+    if (err)   snprintf(er, sizeof(er), "%s", err);
+    portENTER_CRITICAL(&s_ota_up_mux);
+    s_ota_up_state = st;
+    if (phase) memcpy(s_ota_up_phase, ph, sizeof(ph));
+    if (err)   memcpy(s_ota_up_error, er, sizeof(er));
+    portEXIT_CRITICAL(&s_ota_up_mux);
+}
+
+// 下载进度回调（在升级任务上下文调用）：仅更新字节计数，简短非阻塞。
+static void ota_up_progress_cb(int read_bytes, int total_bytes)
+{
+    portENTER_CRITICAL(&s_ota_up_mux);
+    s_ota_up_state = OTA_UP_DOWNLOADING;
+    s_ota_up_read = read_bytes;
+    s_ota_up_total = total_bytes;
+    portEXIT_CRITICAL(&s_ota_up_mux);
+}
+
 /**
  * 异步 OTA 升级任务：停 AP+停 BLE+启 STA+下载+重启。
  * 由 h_ota_upgrade 触发，独立任务执行避免阻塞 HTTP 响应。
  * arg：未使用（凭证从 NVS 读取）。
  * 返回值：无（任务结束前必 esp_restart）。
- * 特殊行为：延迟 3s 等 HTTP 响应发出；任何失败均 esp_restart 回到 BLE 模式。
+ * 特殊行为：延迟 3s 等 HTTP 响应发出；任何失败均标记状态后 esp_restart 回到 BLE 模式。
+ * 说明：进入 STA 独占会停 AP，手机随之掉热点无法继续轮询；
+ *       AP 停前的 RUNNING 态可被前端读到，AP 停后前端优雅降级为「离线升级中」。
  */
 static void ota_upgrade_task(void *arg)
 {
@@ -1541,43 +1603,56 @@ static void ota_upgrade_task(void *arg)
     char psk[HOME_WIFI_PSK_MAX] = {0};
     if (!nvs_store_load_wifi_cred(ssid, sizeof(ssid), psk, sizeof(psk))) {
         ESP_LOGE(TAG, "OTA 升级：无家庭 WiFi 凭证，放弃");
+        ota_up_set(OTA_UP_REBOOTING, "无 WiFi 凭证", "无家庭 WiFi 凭证");
         vTaskDelay(pdMS_TO_TICKS(OTA_REBOOT_AFTER_UPGRADE_MS));
         esp_restart();
     }
 
     ESP_LOGI(TAG, "OTA 升级任务启动，延迟 3s 等 HTTP 响应发出");
+    ota_up_set(OTA_UP_RUNNING, "准备升级", NULL);
     vTaskDelay(pdMS_TO_TICKS(3000));
     esp_task_wdt_reset();
 
     // 1. 进入 STA 独占模式（停 AP+停 BLE+启 STA+连路由器）
+    ota_up_set(OTA_UP_RUNNING, "连接家庭WiFi", NULL);
     esp_err_t ret = radio_ctrl_enter_sta_exclusive(ssid, psk);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "STA 独占失败 ret=%d，重启回 BLE", ret);
+        ota_up_set(OTA_UP_FAIL, "连接失败", "连接家庭WiFi失败");
+        ota_up_set(OTA_UP_REBOOTING, NULL, NULL);
         vTaskDelay(pdMS_TO_TICKS(OTA_REBOOT_AFTER_UPGRADE_MS));
         esp_restart();
     }
     esp_task_wdt_reset();
 
     // 2. 检查版本（获取最新下载 URL）
+    ota_up_set(OTA_UP_RUNNING, "获取版本信息", NULL);
     ota_version_info_t info;
     ret = ota_downloader_check_version(OTA_VERSION_URL, &info);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "版本检查失败 ret=%d，重启回 BLE", ret);
+        ota_up_set(OTA_UP_FAIL, "获取版本失败", "无法获取固件信息");
+        ota_up_set(OTA_UP_REBOOTING, NULL, NULL);
         vTaskDelay(pdMS_TO_TICKS(OTA_REBOOT_AFTER_UPGRADE_MS));
         esp_restart();
     }
     esp_task_wdt_reset();
 
-    // 3. 下载固件并写入 OTA 分区
-    ret = ota_downloader_download_and_upgrade(info.url);
+    // 3. 下载固件并写入 OTA 分区（进度经 ota_up_progress_cb 上报）
+    ota_up_set(OTA_UP_DOWNLOADING, "下载固件", NULL);
+    ret = ota_downloader_download_and_upgrade(info.url, ota_up_progress_cb);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "下载升级失败 ret=%d，重启回 BLE", ret);
+        ota_up_set(OTA_UP_FAIL, "下载失败", "固件下载失败");
+        ota_up_set(OTA_UP_REBOOTING, NULL, NULL);
         vTaskDelay(pdMS_TO_TICKS(OTA_REBOOT_AFTER_UPGRADE_MS));
         esp_restart();
     }
 
     // 4. 延迟后重启进入新固件
     ESP_LOGI(TAG, "升级完成，%dms 后重启", OTA_REBOOT_AFTER_UPGRADE_MS);
+    ota_up_set(OTA_UP_SUCCESS, "下载完成", NULL);
+    ota_up_set(OTA_UP_REBOOTING, "即将重启", NULL);
     vTaskDelay(pdMS_TO_TICKS(OTA_REBOOT_AFTER_UPGRADE_MS));
     esp_restart();
     // esp_restart 不返回，函数到此结束
@@ -1749,15 +1824,87 @@ static esp_err_t h_ota_upgrade(httpd_req_t *req)
     httpd_resp_sendstr(req,
         "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-        "<title>升级中 - BikePower</title></head>"
+        "<title>升级中 - BikePower</title><style>"
+        "@keyframes spin{to{transform:rotate(360deg)}}"
+        "</style></head>"
         "<body style=\"background:#f5f5f7;min-height:100vh;margin:0;padding:24px 16px;display:flex;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;color:#1d1d1f\">"
         "<div style=\"max-width:360px;width:100%;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:26px;padding:28px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.08)\">"
         "<div style=\"width:64px;height:64px;border-radius:50%;margin:0 auto 14px;background:#eef6ff;color:#007aff;font-size:38px;font-weight:800;display:flex;align-items:center;justify-content:center\">&#8593;</div>"
-        "<h1 style=\"font-size:22px;margin:0 0 8px;font-weight:800;letter-spacing:-.03em\">正在下载升级</h1>"
-        "<p style=\"color:#6e6e73;font-size:13px;line-height:1.5;margin:0 0 16px\">设备已断开蓝牙和配网热点，正在通过家庭 WiFi 下载最新固件。</p>"
+        "<h1 style=\"font-size:22px;margin:0 0 8px;font-weight:800;letter-spacing:-.03em\">正在升级</h1>"
+        "<p id=\"phase\" style=\"color:#007aff;font-size:14px;font-weight:700;margin:0 0 10px\">准备升级...</p>"
+        "<div style=\"height:10px;background:#e9e9ec;border-radius:6px;overflow:hidden;margin:0 0 6px\">"
+        "<div id=\"bar\" style=\"height:100%;width:0;background:#007aff;border-radius:6px;transition:width .3s\"></div></div>"
+        "<p id=\"pct\" style=\"color:#86868b;font-size:12px;margin:0 0 14px\">0%</p>"
+        "<p id=\"tip\" style=\"color:#6e6e73;font-size:13px;line-height:1.5;margin:0 0 6px\">设备正通过家庭 WiFi 下载固件。进入下载后会断开配网热点，本页可能无法继续刷新，属正常现象。</p>"
         "<p style=\"color:#86868b;font-size:12px;line-height:1.5;margin:0\">约 2 分钟后设备自动重启，请重新连接蓝牙继续使用。期间请保持通电，勿断电。</p>"
+        "<div id=\"act\" style=\"display:none;margin-top:14px\">"
+        "<a href=\"/ota\" style=\"display:inline-block;padding:11px 22px;background:#007aff;color:#fff;border-radius:14px;text-decoration:none;font-weight:800\">返回固件升级</a></div>"
+        "<script>"
+        "var P=document.getElementById('phase'),B=document.getElementById('bar'),T=document.getElementById('pct'),TIP=document.getElementById('tip'),ACT=document.getElementById('act');"
+        "var miss=0,done=0;"
+        "function poll(){if(done)return;"
+        "var x=new XMLHttpRequest();x.timeout=4000;"
+        "x.onload=function(){miss=0;if(x.status!==200)return;try{var d=JSON.parse(x.responseText);"
+        "if(d.phase)P.textContent=d.phase;"
+        "if(d.total>0){var p=Math.floor(d.read*100/d.total);if(p>100)p=100;B.style.width=p+'%';T.textContent=p+'%'}"
+        "else if(d.state==='downloading'){T.textContent='下载中...'}"
+        "if(d.state==='fail'){done=1;P.style.color='#ff3b30';P.textContent='升级失败：'+(d.error||d.phase||'未知错误');B.style.background='#ff3b30';TIP.textContent='设备将重启回到蓝牙模式，可重新连接后再次尝试升级。';ACT.style.display='block'}"
+        "else if(d.state==='success'||d.state==='rebooting'){done=1;P.style.color='#34c759';P.textContent='升级成功，设备正在重启';B.style.width='100%';B.style.background='#34c759';T.textContent='100%';TIP.textContent='请稍候约 10 秒，待设备重启后重新连接蓝牙。'}"
+        "}catch(e){}};"
+        // 热点断开后请求会失败：累计多次失败即判定为已进入离线下载阶段，优雅降级提示
+        "x.onerror=x.ontimeout=function(){miss++;if(miss>=3&&!done){P.textContent='离线升级中';TIP.textContent='设备已断开配网热点，正在后台下载并写入固件，无法继续上报进度。请勿断电，约 1-2 分钟后设备自动重启。'}};"
+        "x.open('GET','/ota/upgrade/status');x.send()}"
+        "poll();setInterval(poll,1500);"
+        "</script>"
         "</div></body></html>");
 
+    return ESP_OK;
+}
+
+/**
+ * 查询 OTA 升级进度路由（前端轮询）。
+ * 临界区内取状态/进度快照，拼成 JSON 返回，保证读写一致。
+ * 未触发升级时返回 idle，不会误触发升级动作。
+ * req：HTTP 请求对象。
+ * 特殊行为：进入 STA 独占后 AP 关闭，本端点不可达，前端据此降级为离线提示。
+ */
+static esp_err_t h_ota_upgrade_status(httpd_req_t *req)
+{
+    arm_deadline();
+    set_no_store_headers(req);
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_type(req, "application/json");
+
+    ota_up_state_t st;
+    int read, total;
+    char phase[sizeof(s_ota_up_phase)];
+    char err[sizeof(s_ota_up_error)];
+    portENTER_CRITICAL(&s_ota_up_mux);
+    st = s_ota_up_state;
+    read = s_ota_up_read;
+    total = s_ota_up_total;
+    memcpy(phase, s_ota_up_phase, sizeof(phase));
+    memcpy(err, s_ota_up_error, sizeof(err));
+    portEXIT_CRITICAL(&s_ota_up_mux);
+
+    const char *state_str;
+    switch (st) {
+        case OTA_UP_RUNNING:     state_str = "running";     break;
+        case OTA_UP_DOWNLOADING: state_str = "downloading"; break;
+        case OTA_UP_SUCCESS:     state_str = "success";     break;
+        case OTA_UP_FAIL:        state_str = "fail";        break;
+        case OTA_UP_REBOOTING:   state_str = "rebooting";   break;
+        default:                 state_str = "idle";        break;
+    }
+
+    char resp[320];
+    char phase_esc[sizeof(phase) * 2], err_esc[sizeof(err) * 2];
+    json_escape(phase, phase_esc, sizeof(phase_esc));
+    json_escape(err, err_esc, sizeof(err_esc));
+    snprintf(resp, sizeof(resp),
+             "{\"state\":\"%s\",\"read\":%d,\"total\":%d,\"phase\":\"%s\",\"error\":\"%s\"}",
+             state_str, read, total, phase_esc, err_esc);
+    httpd_resp_sendstr(req, resp);
     return ESP_OK;
 }
 
@@ -2046,7 +2193,10 @@ static void send_wifi_panel(httpd_req_t *req)
         "<div id=\"scan-list\"></div>"
         "<div id=\"psk-row\" style=\"display:none;margin-top:12px\">"
         "<div class=\"field\"><label>WiFi 密码</label>"
-        "<input type=\"password\" id=\"home-psk\" placeholder=\"家庭 WiFi 密码\" maxlength=\"63\"></div>"
+        "<div style=\"position:relative\">"
+        "<input type=\"password\" id=\"home-psk\" placeholder=\"家庭 WiFi 密码\" maxlength=\"63\" style=\"padding-right:52px\">"
+        "<span id=\"psk-eye\" onclick=\"pskToggle()\" style=\"position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;color:#007aff;font-weight:700;cursor:pointer;user-select:none\">显示</span>"
+        "</div></div>"
         "</div>"
         "<button class=\"module-btn\" type=\"button\" id=\"save-btn\" style=\"margin-top:10px\" disabled onclick=\"wifiSave()\">保存并测试连接</button>"
         "<div id=\"wifi-result\" style=\"margin-top:10px\"></div>"
@@ -2190,6 +2340,7 @@ static esp_err_t start_httpd(void)
         { .uri = "/ota/check",   .method = HTTP_POST, .handler = h_ota_check },    // v3.1.6 异步触发版本检查（凭证从 NVS 读）
         { .uri = "/ota/status",  .method = HTTP_GET,  .handler = h_ota_status },   // v3.1.6 查询版本检查状态（前端轮询）
         { .uri = "/ota/upgrade", .method = HTTP_POST, .handler = h_ota_upgrade },   // v3.1.6 在线下载升级（凭证从 NVS 读）
+        { .uri = "/ota/upgrade/status", .method = HTTP_GET, .handler = h_ota_upgrade_status }, // 升级进度轮询
         { .uri = "/wifi/scan",          .method = HTTP_POST, .handler = h_wifi_scan },          // v3.1.6 异步扫描周边 WiFi
         { .uri = "/wifi/scan/status",   .method = HTTP_GET,  .handler = h_wifi_scan_status },   // v3.1.6 查询扫描结果（前端轮询）
         { .uri = "/wifi/save",          .method = HTTP_POST, .handler = h_wifi_save },          // v3.1.6 保存家庭 WiFi 凭证+测试连接
