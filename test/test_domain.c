@@ -443,6 +443,68 @@ static void test_config_store(void)
     hr2.has_user_hr = 5;
     CHECK(config_store_validate(&hr2), "has_user_hr 非规范值被修正");
     CHECK(hr2.has_user_hr == 1, "has_user_hr 规范化为1");
+
+    // ===== 序列化 / 反序列化 往返 =====
+    char js[256];
+    config_data_t src;
+    config_store_defaults(&src);
+    src.power = 222;
+    src.cadence = 88;
+    src.ftp = 250;
+    strcpy(src.device_name, "MyBike");
+    size_t wlen = config_store_serialize(&src, js, sizeof(js));
+    CHECK(wlen > 0 && wlen < sizeof(js), "serialize 返回合法长度");
+    CHECK(js[wlen] == '\0' && strlen(js) == wlen, "serialize 以 '\\0' 结尾且长度一致");
+    CHECK(strstr(js, "\"power\":222") != NULL, "serialize 含 power=222");
+    CHECK(strstr(js, "\"device_name\":\"MyBike\"") != NULL, "serialize 含设备名");
+
+    config_data_t dst;
+    CHECK(config_store_deserialize(js, &dst), "deserialize 成功");
+    CHECK(dst.power == 222 && dst.cadence == 88 && dst.ftp == 250, "往返整数字段一致");
+    CHECK(strcmp(dst.device_name, "MyBike") == 0, "往返设备名一致");
+    CHECK(dst.schema_ver == src.schema_ver && dst.mode == src.mode, "往返其余字段一致");
+
+    // 缺键：仅覆盖出现的字段，其余保持默认
+    config_data_t partial;
+    CHECK(config_store_deserialize("{\"schema_ver\":5,\"power\":300}", &partial),
+          "部分键 JSON deserialize 成功");
+    CHECK(partial.power == 300, "出现的 power 被覆盖");
+    CHECK(partial.cadence == DEFAULT_CADENCE, "缺失的 cadence 保持默认");
+    CHECK(strcmp(partial.device_name, DEVICE_NAME_DEFAULT) == 0, "缺失设备名保持默认");
+
+    // 非法 JSON（无 schema_ver）失败且不污染原对象
+    config_data_t guard;
+    config_store_defaults(&guard);
+    guard.power = 123;
+    CHECK(!config_store_deserialize("{\"power\":999}", &guard), "缺 schema_ver -> 失败");
+    CHECK(guard.power == 123, "失败时原对象不被修改");
+    CHECK(!config_store_deserialize(NULL, &guard), "NULL json -> 失败");
+    CHECK(!config_store_deserialize("{}", &guard), "空对象 -> 失败");
+
+    // 越界值经反序列化后被 validate 夹紧
+    config_data_t clamp;
+    CHECK(config_store_deserialize("{\"schema_ver\":5,\"power\":99999}", &clamp),
+          "越界 power JSON deserialize 成功");
+    CHECK(clamp.power == POWER_MAX, "反序列化后 power 被夹到上限");
+
+    // 特殊字符转义往返：含双引号、反斜杠
+    config_data_t spec;
+    config_store_defaults(&spec);
+    strcpy(spec.device_name, "a\"b\\c");
+    CHECK(config_store_serialize(&spec, js, sizeof(js)) > 0, "含特殊字符 serialize 成功");
+    CHECK(strstr(js, "a\\\"b\\\\c") != NULL, "特殊字符被正确转义");
+    config_data_t spec2;
+    CHECK(config_store_deserialize(js, &spec2), "含转义 JSON deserialize 成功");
+    CHECK(strcmp(spec2.device_name, "a\"b\\c") == 0, "转义字符往返还原");
+
+    // 缓冲区不足返回 0，不溢出
+    char tiny[8];
+    CHECK(config_store_serialize(&src, tiny, sizeof(tiny)) == 0, "缓冲不足 serialize 返回 0");
+
+    // NULL 防御
+    CHECK(config_store_serialize(NULL, js, sizeof(js)) == 0, "serialize NULL config -> 0");
+    CHECK(config_store_serialize(&src, NULL, sizeof(js)) == 0, "serialize NULL out -> 0");
+    CHECK(config_store_serialize(&src, js, 0) == 0, "serialize out_sz=0 -> 0");
 }
 
 static void test_ota_version_compare(void)
