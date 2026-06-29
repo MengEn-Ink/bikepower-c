@@ -1,5 +1,7 @@
 # v3.1.6 迭代规划：在线 OTA 下载升级 + FTMS 扩展与内存优化
 
+> 🗄️ **历史 / 归档文档，仅供追溯**：本文为 v3.1.6 迭代规划，相关功能已在 v3.1.6–v3.1.8 落地，进度详见 [PROGRESS.md](../../PROGRESS.md)。文中“待做/规划”表述为历史语境。
+
 > 规划日期：2026-06-27
 > 最近更新：2026-06-28（在线 OTA 下载升级已实现，编译通过待真机测试）
 > 当前版本：v3.1.5（OTA 上传 + Captive Portal 已完成）
@@ -380,6 +382,6 @@ v3.1.5 满负载：                    117 KB
 
 | 文档 | 说明 |
 |------|------|
-| [内存与新功能评估](09-memory-and-feature-assessment.md) | v3.1.5 内存基线与可行性分析 |
-| [技术参考](04-technical-reference.md) | BLE 服务与数据格式详解 |
-| [OTA 落地方案](10-ota-implementation-plan.md) | OTA 实现细节 |
+| [内存与新功能评估](04-memory-and-feature-assessment.md) | v3.1.5 内存基线与可行性分析 |
+| [技术参考](../dev/01-technical-reference.md) | BLE 服务与数据格式详解 |
+| [OTA 落地方案](05-ota-implementation-plan.md) | OTA 实现细节 |

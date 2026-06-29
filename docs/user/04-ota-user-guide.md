@@ -203,8 +203,8 @@ BikePower C 支持通过家庭 WiFi 在线检查并下载最新固件（OTA）�
 
 | 文档 | 说明 |
 |------|------|
-| [OTA 落地方案](10-ota-implementation-plan.md) | 技术实现细节（分区表/协议/状态机/回滚） |
-| [v3.1.6 路线图](12-roadmap-v316.md) | 在线 OTA 与家庭网络配置规划 |
-| [内存与新功能评估](09-memory-and-feature-assessment.md) | OTA 内存预算与可行性分析 |
+| [OTA 落地方案](../archive/05-ota-implementation-plan.md) | 技术实现细节（分区表/协议/状态机/回滚，历史归档） |
+| [v3.1.6 路线图](../archive/06-roadmap-v316.md) | 在线 OTA 与家庭网络配置规划（历史归档） |
+| [内存与新功能评估](../archive/04-memory-and-feature-assessment.md) | OTA 内存预算与可行性分析（历史归档） |
 | [快速上手](01-quickstart.md) | 设备基本使用指南 |
 | [用户手册](02-user-manual.md) | 按钮操作与配网详解 |

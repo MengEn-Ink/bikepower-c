@@ -1,28 +1,43 @@
 # BikePower C — 文档索引
 
-项目文档概览，按读者群体划分。
+项目文档按维度分目录管理：`user/` 产品使用、`dev/` 开发与技术、`archive/` 历史归档、`images/` 配图。
 
 ---
 
-## 🚴 普通用户 / 骑行爱好者
+## 🚴 user/ — 产品使用说明
+
+面向普通用户 / 骑行爱好者。
 
 | 文档 | 说明 |
 |------|------|
-| [快速上手](01-quickstart.md) | 第一次使用 BikePower C 的全流程指南 |
+| [快速上手](user/01-quickstart.md) | 第一次使用：烧录固件 + 首次连接，其余细节链到手册 |
+| [用户手册](user/02-user-manual.md) | 完整操作：按钮、LED、配网字段、骑行模式、FAQ、技术规格 |
+| [硬件指南](user/03-hardware.md) | 推荐开发板、引脚定义、接线、供电、排障 |
+| [OTA 固件升级操作手册](user/04-ota-user-guide.md) | 面向测试/客户的在线 OTA 升级操作指南（当前权威流程） |
 | [README](../README.md) | 项目简介、功能清单、配图说明、引脚表、LED 灯效 |
 
-## 🔧 开发者 / DIY 爱好者
+## 🔧 dev/ — 开发与技术
+
+面向开发者 / 维护者 / 后续接手者。
 
 | 文档 | 说明 |
 |------|------|
-| [硬件指南](03-hardware.md) | 推荐开发板、引脚定义、接线、供电、排障 |
-| [重写方案](05-cidf-nimble-rewrite.md) | 从 MicroPython 到 C 的分阶段重写路线图 |
-| [MicroPython vs C 对比](06-micropython-vs-c-comparison.md) | 两种技术栈的性能/内存/复杂度对比 |
-| [固件防提取/防反编译](07-firmware-security.md) | 编译层加固（已实现）+ Flash 加密/Secure Boot 方案与选型 |
-| [内存与新功能评估](09-memory-and-feature-assessment.md) | v3.1.3/v5.5.4 各场景内存实测、满负载分析、OTA/Captive Portal/FTMS 扩展可行性 |
-| [OTA 与 Captive Portal 落地方案](10-ota-implementation-plan.md) | Captive Portal 实施总结 + OTA 详细方案（分区表/上传协议/回滚自检/防降级/实施清单） |
-| [OTA 固件升级操作手册](11-ota-user-guide.md) | 面向测试/客户的 OTA 升级操作指南（配网/上传/升级步骤/常见问题排查） |
-| [v3.1.6 迭代规划](12-roadmap-v316.md) | FTMS 扩展（坡度/阻力/范围特征）+ 内存优化（WiFi 残留释放/HTTP 缓冲复用）可行性 |
+| [技术参考](dev/01-technical-reference.md) | 三层架构、启动流程、BLE 服务、配网链路、数据格式（基于当前实现） |
+| [固件防提取/防反编译](dev/02-firmware-security.md) | 编译层加固（已实现）+ Flash 加密/Secure Boot 方案与选型 |
+| [测试覆盖率分析](dev/03-test-coverage-analysis.md) | 领域层/应用层模块清单、覆盖矩阵、目标 90% |
+
+## 🗄️ archive/ — 历史 / 归档（仅供追溯）
+
+以下文档对应历史版本或已完成的一次性工作，**不代表 v3.1.8 当前实现**，仅作背景追溯。
+
+| 文档 | 说明 |
+|------|------|
+| [重写方案](archive/01-cidf-nimble-rewrite.md) | 从 MicroPython 到 C 的分阶段重写路线图（早期设计背景） |
+| [MicroPython vs C 对比](archive/02-micropython-vs-c-comparison.md) | 两种技术栈的性能/内存/复杂度对比（选型阶段） |
+| [优化审查清单](archive/03-review-checklist.md) | v3.1.0 多板型/发行流程/配网网页全链路复查（已完成） |
+| [内存与新功能评估](archive/04-memory-and-feature-assessment.md) | v3.1.3 各场景内存实测、满负载分析、扩展可行性 |
+| [OTA 与 Captive Portal 落地方案](archive/05-ota-implementation-plan.md) | v3.1.4 规划阶段「上传固件」方案（已被在线下载取代） |
+| [v3.1.6 迭代规划](archive/06-roadmap-v316.md) | 在线 OTA + FTMS 扩展 + 内存优化规划（已落地） |
 
 ## 🤖 AI 助手
 
@@ -30,12 +45,12 @@
 |----------|------|
 | [AGENTS.md](../AGENTS.md) | AI 助手入口，必读优先级、硬性规则、验证要求 |
 | [project-context.md](../.trae/memory/project-context.md) | 项目记忆（用户偏好、架构决策、踩坑记录） |
-| [general-rules.md](../.trae/rules/general-rules.md) | 项目结构、模块边界、提交流程 |
+| [general-rules.md](../.trae/rules/general-rules.md) | 项目结构、模块边界、提交流程、文档命名规范 |
 | [coding-style.md](../.trae/rules/coding-style.md) | C/ESP-IDF 代码风格 |
 | [hardware-constraints.md](../.trae/rules/hardware-constraints.md) | ESP32-C3 硬件约束 |
 | [wifi-ble-mutex.md](../.trae/rules/wifi-ble-mutex.md) | WiFi/BLE 射频共用规则 |
 
-## 📊 配图
+## 📊 images/ — 配图
 
 | 图片 | 说明 |
 |------|------|
@@ -51,4 +66,3 @@
 |------|------|
 | [项目进度](../PROGRESS.md) | 阶段 0-10 完成情况、待确认项、已知限制 |
 | [更新日志](../CHANGELOG.md) | 版本历史与变更记录 |
-| [优化审查清单](08-review-checklist.md) | v3.1.0 多板型/发行流程/配网网页全链路复查记录（已完成） |

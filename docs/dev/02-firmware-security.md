@@ -34,7 +34,7 @@
 ## 三、方案 C：编译层加固（✅ 已实现）
 
 零硬件风险、完全可逆，不烧 eFuse、不影响串口排障与 coredump 流程。
-配置位于 [`sdkconfig.defaults`](../sdkconfig.defaults)。
+配置位于 [`sdkconfig.defaults`](../../sdkconfig.defaults)。
 
 | 配置项 | 作用 | 状态 |
 |--------|------|------|

@@ -32,7 +32,7 @@ BikePower C 适合智能骑行台、训练 App、DIY 骑行附件和室内训练
 
 当前固件支持通用 ESP32-C3 开发板和 M5Stamp C3，启动时会自动检测板型。
 
-![硬件引脚对照](images/hardware-pinout.png)
+![硬件引脚对照](../images/hardware-pinout.png)
 
 通用 ESP32-C3 开发板默认接线如下：
 

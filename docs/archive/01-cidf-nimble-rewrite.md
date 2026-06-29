@@ -1,5 +1,7 @@
 # BikePower C / ESP-IDF + NimBLE 完全重写方案
 
+> 🗄️ **历史 / 归档文档，仅供追溯**：本文为早期重写设计背景，不代表 v3.1.8 当前实现。权威现状以 [PROGRESS.md](../../PROGRESS.md)、[技术参考](../dev/01-technical-reference.md)、[AGENTS.md](../../AGENTS.md) 为准。
+
 > 本文是 `10-refactor-design.md` 第十一章「技术栈选型」中“转 ESP-IDF + NimBLE”路线的落地方案。
 > 它面向“完全推倒重做、放弃 MicroPython、用 C + ESP-IDF + NimBLE 重写整个固件”的场景。
 > 目标基线：首选 ESP-IDF v6.0.1 stable；若团队希望先沿用本仓库已有 ESP-IDF 5.x 工具链，则至少升级到 v5.5.4 bugfix 线。目标芯片 ESP32-C3（RISC-V 单核 160MHz）。

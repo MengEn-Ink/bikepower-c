@@ -2,7 +2,7 @@
 
 本文面向开发者、维护者和后续接手者。
 内容基于当前仓库实现撰写，重点对应 `main/`、`components/bikepower_domain/`、`tests/` 和 `docs/images/`。
-阅读顺序建议配合 [architecture.png](images/architecture.png)、[main-loop-flow.png](images/main-loop-flow.png)、[button-led-state.png](images/button-led-state.png) 和 [rf-wifi-flow.png](images/rf-wifi-flow.png) 一起看。
+阅读顺序建议配合 [architecture.png](../images/architecture.png)、[main-loop-flow.png](../images/main-loop-flow.png)、[button-led-state.png](../images/button-led-state.png) 和 [rf-wifi-flow.png](../images/rf-wifi-flow.png) 一起看。
 
 当前固件版本为 `v3.1.8`。
 运行环境为 `ESP-IDF v5.5.4 + NimBLE + FreeRTOS`，目标芯片为 `ESP32-C3`。
@@ -59,7 +59,7 @@
 - `esp_timer`：毫秒/微秒计时与定时回调
 - Task WDT：主循环和长任务保护
 
-对应关系可直接对照 [architecture.png](images/architecture.png)。
+对应关系可直接对照 [architecture.png](../images/architecture.png)。
 如果后续要重构，建议维持“三层职责不交叉”的基本形状。
 
 ## 第二章：启动流程
@@ -579,7 +579,7 @@ DIS 读取内容来自编译期常量：
 WiFi 配网链路分布在 `app_state.c`、`radio_ctrl.c`、`wifi_portal.c`。
 当前配网默认使用 ESP-IDF coex 共存模式：BLE 保持在线继续通知，WiFi SoftAP 负责本地门户；仅 OTA 下载升级进入独占 STA，或共存初始化失败兜底时才主动停 BLE。
 
-![WiFi/BLE 射频共用流程](images/rf-wifi-flow.png)
+![WiFi/BLE 射频共用流程](../images/rf-wifi-flow.png)
 
 ### 8.1 射频共用入口
 
@@ -825,7 +825,7 @@ FTMS 控制点收到写请求后只做最少逻辑：
 
 ### 11.3 GPIO 与板型适配
 
-当前固件支持运行时板型检测，可对照 [hardware-pinout.png](images/hardware-pinout.png)。
+当前固件支持运行时板型检测，可对照 [hardware-pinout.png](../images/hardware-pinout.png)。
 
 通用 ESP32-C3 开发板使用：
 

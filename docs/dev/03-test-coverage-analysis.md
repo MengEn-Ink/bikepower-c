@@ -1,6 +1,6 @@
 # 测试覆盖率分析（目标 90%）
 
-> 配套规则：[`.trae/rules/workflows/test-coverage.md`](../.trae/rules/workflows/test-coverage.md)
+> 配套规则：[`.trae/rules/workflows/test-coverage.md`](../../.trae/rules/workflows/test-coverage.md)
 > 维护要求：每次抽取纯逻辑到领域层 / 新增测试脚本后，更新本矩阵。
 
 ## 一、项目模块清单与代码规模
