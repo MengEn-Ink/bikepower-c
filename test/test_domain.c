@@ -297,6 +297,73 @@ static void test_steady_snapshot(void)
     }
 }
 
+static void test_engine_blindspots(void)
+{
+    printf("[test] 引擎/档案 盲区补强\n");
+    power_engine_t e;
+
+    // power_engine_set_power：仅 steady、范围、同值拒绝、成功置 dirty
+    power_engine_init(&e);
+    power_engine_clear_dirty(&e);
+    CHECK(power_engine_set_power(&e, POWER_MAX + 100) == false, "set_power 超上限拒绝");
+    CHECK(power_engine_set_power(&e, POWER_MIN - 1) == false, "set_power 低于下限拒绝");
+    CHECK(power_engine_set_power(&e, e.base_power) == false, "set_power 同值拒绝");
+    CHECK(!power_engine_is_dirty(&e), "set_power 拒绝不置 dirty");
+    CHECK(power_engine_set_power(&e, 222) == true, "set_power 合法成功");
+    CHECK(e.base_power == 222 && e.last_power == 222, "set_power 同步 base/last");
+    CHECK(power_engine_is_dirty(&e), "set_power 成功置 dirty");
+    power_engine_set_mode(&e, RIDE_MODE_ROAD);
+    CHECK(power_engine_set_power(&e, 150) == false, "非 steady set_power 拒绝");
+
+    // set_erg_target 同值幂等：已在 ERG 且目标未变，返回 true 但不置 dirty（防 flash 损耗）
+    power_engine_init(&e);
+    CHECK(power_engine_set_erg_target(&e, 200) == true, "首次 ERG 目标成功");
+    CHECK(e.mode == RIDE_MODE_ERG && e.dirty, "ERG 切模式并置 dirty");
+    power_engine_clear_dirty(&e);
+    CHECK(power_engine_set_erg_target(&e, 200) == true, "同值 ERG 幂等返回 true");
+    CHECK(!power_engine_is_dirty(&e), "同值 ERG 不置 dirty");
+    CHECK(power_engine_set_erg_target(&e, 210) == true, "变更 ERG 目标成功");
+    CHECK(power_engine_is_dirty(&e), "变更 ERG 置 dirty");
+
+    // reset_mode_state：ERG 有目标时 last_power=目标，无目标时回退 base_power
+    power_engine_init(&e);
+    e.mode = RIDE_MODE_ERG;
+    e.has_erg_target = true;
+    e.erg_active_target = 333;
+    power_engine_reset_mode_state(&e);
+    CHECK(e.last_power == 333, "ERG reset 有目标 last_power=目标");
+    e.has_erg_target = false;
+    e.base_power = 180;
+    power_engine_reset_mode_state(&e);
+    CHECK(e.last_power == 180, "ERG reset 无目标回退 base_power");
+
+    // set_pacer_index 在 ROAD 模式触发 reset（last_power 按新机器人功体比变化）
+    power_engine_init(&e);
+    profile_set_weight(&e.profile, 70);
+    power_engine_set_mode(&e, RIDE_MODE_ROAD);
+    power_engine_set_pacer_index(&e, 0);  // Coco wkg_low=24
+    int coco_lp = e.last_power;
+    CHECK(power_engine_set_pacer_index(&e, 3) == true, "ROAD 切 Genie 成功");
+    CHECK(e.last_power != coco_lp, "ROAD 切机器人触发 reset 改变 last_power");
+
+    // profile_set_thr_hr 边界（此前未独立覆盖）
+    profile_t p;
+    profile_init(&p);
+    CHECK(!profile_set_thr_hr(&p, PROFILE_THR_HR_MIN - 1), "thr_hr 下限拒绝");
+    CHECK(!profile_set_thr_hr(&p, PROFILE_THR_HR_MAX + 1), "thr_hr 上限拒绝");
+    CHECK(profile_set_thr_hr(&p, PROFILE_THR_HR_MIN), "thr_hr 边界合法");
+    CHECK(!profile_set_thr_hr(&p, PROFILE_THR_HR_MIN), "thr_hr 同值拒绝");
+
+    // profile_ride_type_index NULL/未知回退默认
+    CHECK(profile_ride_type_index(NULL) == PACER_INDEX_DEFAULT, "ride_type_index NULL 回退默认");
+    CHECK(profile_ride_type_index("nope") == PACER_INDEX_DEFAULT, "ride_type_index 未知回退默认");
+    CHECK(profile_ride_type_index("coco") == 0, "ride_type_index coco=0");
+
+    // profile_set_ride_type_str 空串拒绝
+    CHECK(!profile_set_ride_type_str(&p, ""), "ride_type_str 空串拒绝");
+    CHECK(!profile_set_ride_type_str(&p, NULL), "ride_type_str NULL 拒绝");
+}
+
 static void test_config_store(void)
 {
     printf("[test] 配置 schema 默认/校验/迁移\n");
@@ -739,6 +806,36 @@ static void test_ftms_codec(void)
     uint8_t status[7];
     CHECK(ftms_codec_encode_training_status(0x01, status) == 7, "Training Status 编码长度=7");
     CHECK(status[0] == 0x01, "Training Status=0x01 Started");
+
+    // ===== 异常输入 / 边界用例 =====
+    // decode_cp 防御：NULL buf 与 len=0 均返回 UNSUPPORTED
+    CHECK(ftms_codec_decode_cp(NULL, 1, PMIN, PMAX, &target) == FTMS_CODEC_RSP_UNSUPPORTED,
+          "decode NULL buf -> UNSUPPORTED");
+    CHECK(ftms_codec_decode_cp(req_ctrl, 0, PMIN, PMAX, &target) == FTMS_CODEC_RSP_UNSUPPORTED,
+          "decode len=0 -> UNSUPPORTED");
+
+    // SET_TARGET_POWER 恰好等于上下边界应判定为合法（闭区间）
+    uint8_t req_power_min[3] = { FTMS_CODEC_OP_SET_TARGET_POWER, 0x00, 0x00 };  // 0W==PMIN
+    CHECK(ftms_codec_decode_cp(req_power_min, 3, PMIN, PMAX, &target) == FTMS_CODEC_RSP_SUCCESS,
+          "SET_TARGET_POWER ==power_min -> SUCCESS");
+    CHECK(target == PMIN, "边界目标功率=power_min");
+    uint8_t req_power_max[3] = { FTMS_CODEC_OP_SET_TARGET_POWER, 0x20, 0x03 };  // 800W==PMAX
+    CHECK(ftms_codec_decode_cp(req_power_max, 3, PMIN, PMAX, &target) == FTMS_CODEC_RSP_SUCCESS,
+          "SET_TARGET_POWER ==power_max -> SUCCESS");
+    CHECK(target == PMAX, "边界目标功率=power_max");
+
+    // out_target_power 为 NULL 时不应崩溃，仍正确返回 SUCCESS
+    CHECK(ftms_codec_decode_cp(req_power_ok, 3, PMIN, PMAX, NULL) == FTMS_CODEC_RSP_SUCCESS,
+          "decode out_target=NULL -> SUCCESS 不崩溃");
+
+    // 所有编码函数对 out_buf=NULL 必须返回 0（防御）
+    CHECK(ftms_codec_encode_response(FTMS_CODEC_OP_RESET, FTMS_CODEC_RESULT_SUCCESS, NULL) == 0,
+          "encode_response NULL -> 0");
+    CHECK(ftms_codec_encode_cps(0, 0, 0, NULL) == 0, "encode_cps NULL -> 0");
+    CHECK(ftms_codec_encode_hr(0, NULL) == 0, "encode_hr NULL -> 0");
+    CHECK(ftms_codec_encode_csc(0, 0, NULL) == 0, "encode_csc NULL -> 0");
+    CHECK(ftms_codec_encode_ftms_bike(0, 0, NULL) == 0, "encode_ftms_bike NULL -> 0");
+    CHECK(ftms_codec_encode_training_status(0, NULL) == 0, "encode_training_status NULL -> 0");
 }
 
 static void test_radio_state(void)
@@ -820,6 +917,7 @@ int main(void)
     test_hr_variation_steady();
     test_road_pacer();
     test_steady_snapshot();
+    test_engine_blindspots();
     test_config_store();
     test_ota_version_compare();
     test_json_miniparse();
