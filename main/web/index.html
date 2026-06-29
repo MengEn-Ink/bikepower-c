@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>BikePower</title>
+<!-- INLINE_CSS -->
+</head>
+<body>
+<div class="box">
+
+  <!-- 顶部品牌 + 状态 -->
+  <div class="bar">
+    <div class="brand">🚴 BikePower <small id="home-ver"></small></div>
+    <div class="status">
+      <span class="badge ok" id="badge-time">180s</span>
+    </div>
+  </div>
+
+  <button class="renew-btn" id="renew-btn" onclick="onRenew()">⏱ 续期配网（剩余时间不足）</button>
+
+  <!-- ============ 首页 ============ -->
+  <div class="view" id="view-home">
+    <div class="hero">
+      <h1 id="home-devname">BikePower</h1>
+      <div class="sub">长按按钮可重新进入配网；修改参数后请点击保存。</div>
+    </div>
+
+    <div class="card">
+      <h2>骑行参数</h2>
+      <div class="val"><input type="number" inputmode="numeric" id="home-power" value="0"><span class="unit">W</span></div>
+      <div class="lbl"><span>目标功率</span><span class="zone" id="zone-pwr"><span class="dot"></span>Z?</span></div>
+    </div>
+
+    <div class="card">
+      <h2>踏频</h2>
+      <div class="val"><input type="number" inputmode="numeric" id="home-cadence" value="0"><span class="unit">rpm</span></div>
+      <div class="lbl"><span>目标踏频</span></div>
+    </div>
+
+    <div class="card">
+      <h2>心率</h2>
+      <div class="val"><input type="number" inputmode="numeric" id="home-hr" value="0"><span class="unit">bpm</span></div>
+      <div class="lbl"><span>目标心率</span><span class="zone" id="zone-hr"><span class="dot"></span>Z?</span></div>
+    </div>
+
+    <div class="note">ERG 模式为默认能力：骑行 App 下发 ERG 目标功率时设备自动切换，无需在此手动选择。稳定/路况模式由设备按当前参数输出。</div>
+
+    <div class="cred-row" id="home-wifi" style="display:none">
+      <span class="cred-label">已配家庭 WiFi</span>
+      <span class="cred-val" id="home-wifi-val"></span>
+    </div>
+
+    <button class="btn" id="home-save" onclick="onSave()">保存配置</button>
+    <button class="btn danger" id="home-close" onclick="onCloseWifi()">保存并关闭 WiFi</button>
+  </div>
+
+  <!-- ============ 更多配置 ============ -->
+  <div class="view" id="view-more">
+    <div class="hero">
+      <h1>更多配置</h1>
+      <div class="sub">用户档案影响功率区间与心率分区计算。</div>
+    </div>
+
+    <div class="card">
+      <h2>用户档案</h2>
+      <div class="field">
+        <label>体重 (kg, 40-150)</label>
+        <input type="number" id="more-weight" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label>FTP (W, 50-500)</label>
+        <input type="number" id="more-ftp" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label>阈值心率 (bpm, 100-220)</label>
+        <input type="number" id="more-thr" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label>配速机器人</label>
+        <select id="more-pacer"></select>
+      </div>
+      <div class="note" style="margin-top:8px">机器人模式：开启后设备按所选配速机器人档位自动输出功率，模拟跟随虚拟骑手骑行，无需骑行 App 干预。档位越高跟随的虚拟骑手越强。</div>
+    </div>
+
+    <button class="btn" id="more-save" onclick="onMoreSave()">保存配置</button>
+    <button class="btn alt" onclick="go('/home')">返回</button>
+  </div>
+
+  <!-- ============ 关于 ============ -->
+  <div class="view" id="view-about">
+    <div class="hero">
+      <h1>关于</h1>
+      <div class="sub">设备信息与运行状态。</div>
+    </div>
+
+    <div class="card">
+      <h2>设备信息</h2>
+      <div class="info-row"><span class="k">固件版本</span><span class="v" id="about-ver"></span></div>
+      <div class="info-row"><span class="k">设备名称</span><span class="v" id="about-dev"></span></div>
+    </div>
+
+    <div class="card">
+      <h2>内存统计</h2>
+      <div class="info-row"><span class="k">当前空闲堆</span><span class="v" id="about-mem-free">-</span></div>
+      <div class="info-row"><span class="k">历史最低空闲</span><span class="v" id="about-mem-min">-</span></div>
+    </div>
+
+    <button class="btn alt" onclick="go('/home')">返回</button>
+  </div>
+
+  <!-- ============ OTA ============ -->
+  <div class="view" id="view-ota">
+    <div class="hero">
+      <h1>固件升级</h1>
+      <div class="sub">检查并安装最新固件。升级期间请勿断电。</div>
+    </div>
+
+    <button class="btn" id="ota-check-btn" onclick="otaCheck()">检查更新</button>
+
+    <div class="card" style="margin-top:10px">
+      <h2>状态</h2>
+      <div id="ota-status"><div class="spin"></div>读取状态…</div>
+    </div>
+
+    <button class="btn alt" onclick="go('/home')">返回</button>
+  </div>
+
+  <!-- ============ WiFi 配网 ============ -->
+  <div class="view" id="view-wifi">
+    <div class="hero">
+      <h1>家庭 WiFi</h1>
+      <div class="sub">配置后设备可执行 OTA 升级。</div>
+    </div>
+
+    <div class="card" id="wifi-connected-box" style="display:none">
+      <h2>当前连接</h2>
+      <div class="info-row"><span class="k">状态</span><span class="v" style="color:#15803d">已配置</span></div>
+      <div class="info-row"><span class="k">SSID</span><span class="v" id="wifi-connected-ssid"></span></div>
+      <button class="btn alt" id="wifi-reconfig-btn" onclick="wifiReconfig()" style="margin-top:12px">重新配置</button>
+    </div>
+
+    <div id="wifi-input-box">
+      <button class="btn" id="wifi-scan-btn" onclick="wifiStartScan()">扫描附近 WiFi</button>
+
+      <div class="card" style="margin-top:10px">
+        <h2>可用网络</h2>
+        <div id="wifi-scan-result"></div>
+      </div>
+
+      <div class="card">
+        <h2>手动输入</h2>
+        <div class="field">
+          <label>SSID</label>
+          <input type="text" id="wifi-ssid" maxlength="32">
+        </div>
+        <div class="field">
+          <label>密码 (PSK)</label>
+          <input type="text" id="wifi-psk" maxlength="64">
+        </div>
+      </div>
+
+      <button class="btn" id="wifi-save-btn" onclick="wifiSave()">保存并测试连接</button>
+      <div id="wifi-conn-status" style="margin-top:10px"></div>
+    </div>
+
+    <button class="btn alt" onclick="go('/home')" style="margin-top:10px">返回</button>
+  </div>
+
+  <!-- ============ 关闭提示 ============ -->
+  <div class="view" id="view-closing">
+    <div class="result-card">
+      <div class="icon info">⏳</div>
+      <h1>正在关闭 WiFi</h1>
+      <div class="sub">设备即将返回骑行模式。</div>
+      <div class="countdown" id="closing-countdown">5</div>
+      <div class="sub" id="closing-tip"></div>
+    </div>
+  </div>
+
+  <!-- ============ 成功页 ============ -->
+  <div class="view" id="view-success">
+    <div class="result-card">
+      <div class="icon ok">✓</div>
+      <h1>操作成功</h1>
+      <div class="sub">配置已保存。如需重新进入配网，请长按设备按钮。</div>
+    </div>
+    <button class="btn" onclick="go('/home')">返回首页</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<!-- 底部导航 -->
+<div class="navbar">
+  <a class="nav-item" data-h="/home"><span class="nav-ico">🏠</span><span class="nav-tx">首页</span></a>
+  <a class="nav-item" data-h="/more"><span class="nav-ico">⚙️</span><span class="nav-tx">更多</span></a>
+  <a class="nav-item" data-h="/wifi"><span class="nav-ico">📡</span><span class="nav-tx">WiFi</span></a>
+  <a class="nav-item" data-h="/ota"><span class="nav-ico">⬆️</span><span class="nav-tx">升级</span></a>
+  <a class="nav-item" data-h="/about"><span class="nav-ico">ℹ️</span><span class="nav-tx">关于</span></a>
+</div>
+
+<!-- INLINE_JS -->
+</body>
+</html>
