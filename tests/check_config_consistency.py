@@ -19,6 +19,8 @@ DOMAIN_H = ROOT / "components" / "bikepower_domain" / "include" / "domain_config
 README = ROOT / "README.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
 OTA_GUIDE = ROOT / "docs" / "11-ota-user-guide.md"
+QUICKSTART = ROOT / "docs" / "01-quickstart.md"
+USER_MANUAL = ROOT / "docs" / "02-user-manual.md"
 HW_CONSTRAINTS = ROOT / ".trae" / "rules" / "hardware-constraints.md"
 
 TAG = "[TC-3c]"
@@ -88,6 +90,8 @@ domain_src = read(DOMAIN_H)
 readme_src = read(README)
 changelog_src = read(CHANGELOG)
 ota_guide_src = read(OTA_GUIDE) if OTA_GUIDE.exists() else ""
+quickstart_src = read(QUICKSTART)
+user_manual_src = read(USER_MANUAL)
 hw_src = read(HW_CONSTRAINTS) if HW_CONSTRAINTS.exists() else ""
 
 
@@ -173,6 +177,29 @@ check("192.168.4.1" in readme_src, "README 含网关 192.168.4.1")
 
 wifi_shutdown = extract_int(config_src, "WIFI_SHUTDOWN_MS")
 check(wifi_shutdown == 180000, f"WIFI_SHUTDOWN_MS = 180000 (实际={wifi_shutdown})")
+
+
+# ============================ 4b. 用户文档配网描述一致性 ============================
+print(f"\n{TAG} [S4b] 用户文档配网描述一致性")
+
+check(f"v{fw_ver}" in user_manual_src,
+      f"docs/02-user-manual.md 固件版本 v{fw_ver} 与 FIRMWARE_VERSION 一致")
+
+legacy_wifi_phrases = [
+    "保存并重启",
+    "设备关闭蓝牙",
+    "设备自动重启并恢复蓝牙模式",
+    "保存后等设备重启",
+    "配网时会暂时关闭 BLE",
+    "配网完成后设备重启",
+]
+user_wifi_docs = {
+    "docs/01-quickstart.md": quickstart_src,
+    "docs/02-user-manual.md": user_manual_src,
+}
+for doc_name, doc_src in user_wifi_docs.items():
+    for phrase in legacy_wifi_phrases:
+        check(phrase not in doc_src, f"{doc_name} 不含旧版普通配网短语：{phrase}")
 
 
 # ============================ 5. OTA 配置一致性 ============================
