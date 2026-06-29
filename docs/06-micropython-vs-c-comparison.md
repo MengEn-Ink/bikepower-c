@@ -54,7 +54,7 @@
 
 | 维度 | MicroPython | C |
 |------|:-----------:|:-:|
-| 框架 | MicroPython v1.24+ | ESP-IDF v5.5.1 |
+| 框架 | MicroPython v1.24+ | ESP-IDF v5.5.4 |
 | BLE 栈 | MicroPython bluetooth (NimBLE) | 原生 NimBLE |
 | RTOS | _thread（受限） | FreeRTOS（完整 Queue/信号量/任务） |
 | HTTP 服务 | 手写 socket + 分块 | esp_http_server |

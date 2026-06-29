@@ -96,7 +96,7 @@
 
 | 位置 | 问题 | 建议 |
 |------|------|------|
-| [sdkconfig.defaults#L1](file:///Users/bytedance/work/bikepower-c/sdkconfig.defaults#L1) | 头注释写 "v5.5.1"，实际 v5.5.4 | 改为 v5.5.4 |
+| [sdkconfig.defaults#L1](file:///Users/bytedance/work/bikepower-c/sdkconfig.defaults#L1) | 历史发现已修复：头注释已从 v5.5.1 对齐到 v5.5.4 | 已完成 |
 | [board_detect.h#L11-L12](file:///Users/bytedance/work/bikepower-c/main/board_detect.h#L11-L12) | 注释只提 GPIO 检测，未提 Kconfig 优先 | 补充说明 |
 
 ---

@@ -22,6 +22,7 @@ OTA_GUIDE = ROOT / "docs" / "11-ota-user-guide.md"
 QUICKSTART = ROOT / "docs" / "01-quickstart.md"
 USER_MANUAL = ROOT / "docs" / "02-user-manual.md"
 NIMBLE_REWRITE = ROOT / "docs" / "05-cidf-nimble-rewrite.md"
+MPY_COMPARISON = ROOT / "docs" / "06-micropython-vs-c-comparison.md"
 REVIEW_CHECKLIST = ROOT / "docs" / "08-review-checklist.md"
 HW_CONSTRAINTS = ROOT / ".trae" / "rules" / "hardware-constraints.md"
 
@@ -95,6 +96,7 @@ ota_guide_src = read(OTA_GUIDE) if OTA_GUIDE.exists() else ""
 quickstart_src = read(QUICKSTART)
 user_manual_src = read(USER_MANUAL)
 nimble_rewrite_src = read(NIMBLE_REWRITE)
+mpy_comparison_src = read(MPY_COMPARISON)
 review_checklist_src = read(REVIEW_CHECKLIST)
 hw_src = read(HW_CONSTRAINTS) if HW_CONSTRAINTS.exists() else ""
 
@@ -224,6 +226,17 @@ dev_wifi_docs = {
 for doc_name, doc_src in dev_wifi_docs.items():
     for phrase in legacy_dev_wifi_phrases:
         check(phrase not in doc_src, f"{doc_name} 不含旧版开发者配网结论：{phrase}")
+
+
+# ============================ 4d. 技术栈版本文档一致性 ============================
+print(f"\n{TAG} [S4d] 技术栈版本文档一致性")
+
+check("ESP-IDF v5.5.1" not in mpy_comparison_src,
+      "docs/06-micropython-vs-c-comparison.md 不含过时 ESP-IDF v5.5.1")
+check("ESP-IDF v5.5.4" in mpy_comparison_src,
+      "docs/06-micropython-vs-c-comparison.md 含当前 ESP-IDF v5.5.4")
+check("建议改为 v5.5.4" not in review_checklist_src,
+      "docs/08-review-checklist.md 不再以未完成语气建议修复 sdkconfig 版本注释")
 
 
 # ============================ 5. OTA 配置一致性 ============================
