@@ -21,6 +21,8 @@ CHANGELOG = ROOT / "CHANGELOG.md"
 OTA_GUIDE = ROOT / "docs" / "11-ota-user-guide.md"
 QUICKSTART = ROOT / "docs" / "01-quickstart.md"
 USER_MANUAL = ROOT / "docs" / "02-user-manual.md"
+NIMBLE_REWRITE = ROOT / "docs" / "05-cidf-nimble-rewrite.md"
+REVIEW_CHECKLIST = ROOT / "docs" / "08-review-checklist.md"
 HW_CONSTRAINTS = ROOT / ".trae" / "rules" / "hardware-constraints.md"
 
 TAG = "[TC-3c]"
@@ -92,6 +94,8 @@ changelog_src = read(CHANGELOG)
 ota_guide_src = read(OTA_GUIDE) if OTA_GUIDE.exists() else ""
 quickstart_src = read(QUICKSTART)
 user_manual_src = read(USER_MANUAL)
+nimble_rewrite_src = read(NIMBLE_REWRITE)
+review_checklist_src = read(REVIEW_CHECKLIST)
 hw_src = read(HW_CONSTRAINTS) if HW_CONSTRAINTS.exists() else ""
 
 
@@ -200,6 +204,26 @@ user_wifi_docs = {
 for doc_name, doc_src in user_wifi_docs.items():
     for phrase in legacy_wifi_phrases:
         check(phrase not in doc_src, f"{doc_name} 不含旧版普通配网短语：{phrase}")
+
+
+# ============================ 4c. 开发者文档配网策略一致性 ============================
+print(f"\n{TAG} [S4c] 开发者文档配网策略一致性")
+
+legacy_dev_wifi_phrases = [
+    "默认仍采用“配网时停 BLE”",
+    "默认仍建议配网时停 BLE",
+    "当前项目规则已经把“进入 WiFi 配网前停止 BLE”",
+    "保存重启",
+    "二者不能同时 init",
+    "先停 BLE → 延时 200ms → 启 WiFi",
+]
+dev_wifi_docs = {
+    "docs/05-cidf-nimble-rewrite.md": nimble_rewrite_src,
+    "docs/08-review-checklist.md": review_checklist_src,
+}
+for doc_name, doc_src in dev_wifi_docs.items():
+    for phrase in legacy_dev_wifi_phrases:
+        check(phrase not in doc_src, f"{doc_name} 不含旧版开发者配网结论：{phrase}")
 
 
 # ============================ 5. OTA 配置一致性 ============================

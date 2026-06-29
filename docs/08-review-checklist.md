@@ -82,9 +82,11 @@
 
 ## E. 其它链路复查
 
+> 当前规则已演进为 v3.1.8 事实：普通配网走 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE` 共存，BLE 保持在线；OTA 独占 STA 或共存初始化失败兜底时，才由 `radio_ctrl` 停 BLE。
+
 | 模块 | 结论 |
 |------|------|
-| [radio_ctrl.c](file:///Users/bytedance/work/bikepower-c/main/radio_ctrl.c) | 先停 BLE → 延时 200ms → 启 WiFi，符合 WB-MUTEX 时序，正常 |
+| [radio_ctrl.c](file:///Users/bytedance/work/bikepower-c/main/radio_ctrl.c) | 普通配网经 `radio_ctrl` 启用 coex，BLE 保持在线；OTA 独占 STA / 共存失败兜底才停 BLE，符合当前 WB-MUTEX 规则 |
 | [board_detect.c](file:///Users/bytedance/work/bikepower-c/main/board_detect.c) | Kconfig 优先 + GPIO 自动检测回退，逻辑正常 |
 | body/字段缓冲 | recv_body≤4096，device_name≤64，无溢出风险 |
 
