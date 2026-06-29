@@ -2,6 +2,50 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
+## [3.2.0] - 2026-06-29
+
+### 重构（配网门户前后端分离）
+- `main/wifi_portal.c` 大幅瘦身（2277 → 1076 行）：21 个 `snprintf` 拼 HTML 的 handler 全部改为 15 个 `/api/xxx` JSON 接口，C 侧不再含任何 HTML/CSS/JS 字符串。
+- 新增 `main/web/` 目录存放前端三件套：`index.html`（SPA 入口，含 `<!-- INLINE_CSS -->` 与 `<!-- INLINE_JS -->` 占位符）、`app.css`（统一所有视图样式）、`app.js`（SPA 路由 + `XMLHttpRequest` 调用 `/api/xxx` 自行渲染）。
+- 新增 `scripts/inline_static.py`：编译时把 `app.css` 与 `app.js` 内联到 `index.html`，生成 `main/web_index_html.h`，C 侧 `GET /` 直接吐出整页 HTML。
+  - 采用内联方案而非外部 `.css/.js` 链接：iOS Captive Portal WebView 不加载外部资源，必须单文件。
+- 更新 `main/CMakeLists.txt`：`add_custom_command` 调用 `inline_static.py` 生成头文件，依赖 `web/index.html + app.css + app.js`。注意 `add_custom_command` 必须放在 `idf_component_register` 之后，否则 ESP-IDF 在 `component_get_requirements` 阶段报 `command is not scriptable`。
+
+### 路由契约变更（不向后兼容）
+- 旧路由 `/save /scan /connect /status /ota /more /about /ui/module /success /closing /draft /time /renew /mem_stats` 全部废弃。
+- 新路由统一前缀 `/api/`，POST 接口返回 JSON `{"ok":true}` 或 `{"status":"..."}`，不再返回 302 重定向。
+- `GET /` 由「拼首页 HTML」改为「吐内联 HTML 整页」，前端 SPA 通过 `location.hash` 切换视图。
+
+### 测试体系更新
+- `tests/check_portal_js.py` 重写：直接对 `main/web/app.js` 跑 `node --check`，不再从 C 字符串提取 `<script>` 块。
+- `tests/check_portal_structure.py` 重写：校验 `index.html` 基础结构 + 占位符、`wifi_portal.c` 路由表完整性、`app.js` 前端 API 调用完整性（35 项断言全绿）。
+- `tests/stage5_portal_test.py` 重写：适配新 JSON 路由，`/api/draft` 改为 POST JSON 验证 `{"ok":true}`。
+- `tests/ota_flow_test.py` 重写：静态部分校验 `app.js` 中 OTA 函数定义与 API 调用一致性，动态部分校验 `/api/ota/check|status|upgrade` 状态机。
+- 新增 `tests/mock_server.py`：~250 行 Python 标准库 `http.server` 实现，复刻全部 `/api/xxx` 接口返回假数据，前端可在本地不烧设备调试。Mock 行为：OTA 检查 2s 后转 `done has_update=true`，WiFi 扫描 1.5s 后返回 3 个假 AP，WiFi 连接 2s 后 `connected=true`。
+
+### 文档同步
+- `README.md` 目录结构补充 `main/web/` 子目录。
+- `docs/04-technical-reference.md` 第 8.3 节路由表更新为 v3.2.0 的 15 个 `/api/xxx` 接口，删除旧 21 路由描述。
+- `main/bikepower_config.h` `FIRMWARE_VERSION` 由 `3.1.8` 升至 `3.2.0`。
+
+### 测试报告（本轮审计）
+- 静态门禁：`check_portal_js.py`、`check_portal_structure.py`（35 通过 0 失败）、`ota_flow_test.py --static`（ALL PASS）、`check_config_consistency.py`（56 通过 0 失败）全部通过。
+- Mock server 烟雾测试：`tests/mock_server.py --port 8099` 启动后，全部 `/api/xxx` 端点响应符合契约，OTA/WiFi 扫描/WiFi 连接异步状态机正确推进，Captive Portal `/generate_204` 返回 302 Location: `/`。
+- 编译：`idf.py build` 通过，app 大小 `0x131de0`，OTA 分区剩余 32%。
+
+### 已知限制
+- 配网页面 HTML/CSS/JS 仍以字符串内联到固件，未启用 gzip 压缩（待后续优化）。
+- 前端无构建工具链（无 webpack/vite），`app.js` 手写 ES5 兼容 iOS Captive Portal WebView，不使用 ES6 模块。
+
+### 项目结构与文档梳理（2026-06-29）
+- 评估 `test/` 与 `tests/` 目录合并方案，结论**不合并**：
+  - `test/` 按 ESP-IDF 生态约定保留给领域层 host 单测（纯 C，`test_domain.c` + `Makefile`，产物已 gitignore）。
+  - `tests/` 放所有需要外部依赖（Python/bleak/pyserial/Node）的设备测试、静态门禁、mock、串口工具。
+  - 合并需修改 15+ 文件路径引用（规则、文档、skill、quality_gate.py、test_runner.sh、.gitignore），风险高于收益；Makefile 路径反而要从 `../components/` 变 `../../components/`。
+- 重写 `tests/README.md`：按 7 大分类组织（A 静态门禁 / B 动态自测 / C OTA 全流程 / D 本地 Mock / E 串口日志 / F 压力测试 / G 运行器），新增典型场景与 Q5（本机不能切换 WiFi 时用 mock_server）、Q4（bleak 超时重置蓝牙），附「test/ 与 tests/ 合并评估」专章。
+- 重写 `docs/INDEX.md`：补全 workflows/ 全部 7 个流程规则索引、domain/ 2 个领域规则索引、test-coverage-analysis.md、tests/README.md、test/test_domain.c 入口；区分治理层（tier-1）/项目层（tier-2）规则。
+- `.trae/rules/general-rules.md` 项目版本号 `v3.1.8 → v3.2.0`。
+
 ## [3.1.8] - 2026-06-28
 
 ### 新增（部署脚本）

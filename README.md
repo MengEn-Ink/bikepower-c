@@ -156,6 +156,10 @@ bikepower-c/
 │   ├── ble_bikepower.c
 │   ├── radio_ctrl.c
 │   ├── wifi_portal.c
+│   ├── web/                      # 前端三件套（v3.2.0 起独立，编译时内联到固件）
+│   │   ├── index.html
+│   │   ├── app.css
+│   │   └── app.js
 │   └── bikepower_config.h
 ├── components/
 │   └── bikepower_domain/

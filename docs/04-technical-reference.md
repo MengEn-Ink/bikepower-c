@@ -614,6 +614,10 @@ SoftAP 由 `radio_ctrl_start_wifi_ap()` 启动，HTTP 门户由 `wifi_portal_sta
 
 ### 8.3 HTTP 服务与路由
 
+v3.2.0 起配网门户前后端分离：
+- 前端三件套 `main/web/index.html + app.css + app.js` 由 `scripts/inline_static.py` 在编译时内联为 `web_index_html.h`，C 侧 `GET /` 原样吐出整页 HTML（CSS/JS 已内联，兼容 iOS Captive Portal WebView 不加载外部资源）。
+- 业务接口全部走 `/api/xxx` JSON，前端 SPA 通过 `XMLHttpRequest` 调用并自行渲染。
+
 `start_httpd()` 使用 `HTTPD_DEFAULT_CONFIG()`，并设置：
 
 - `cfg.server_port = WIFI_PORT`
@@ -622,41 +626,35 @@ SoftAP 由 `radio_ctrl_start_wifi_ap()` 启动，HTTP 门户由 `wifi_portal_sta
 - `cfg.stack_size = 8192`
 - `cfg.keep_alive_enable = false`
 
-已注册业务路由 21 个，另有 10 个 Captive Portal 探测路由：
+已注册业务路由 15 个，另有 10 个 Captive Portal 探测路由：
 
-- `GET /`
-- `POST /config`
-- `POST /close-wifi`
-- `GET /success`
-- `GET /more`
-- `GET /about`
-- `GET /ota`
-- `POST /ota/check`
-- `GET /ota/status`
-- `POST /ota/upgrade`
-- `POST /wifi/scan`
-- `GET /wifi/scan/status`
-- `POST /wifi/save`
-- `GET /wifi/connect/status`
-- `POST /draft`
-- `GET /ui/module`
-- `GET /closing`
-- `GET /time`
-- `GET /renew`
-- `GET /mem_stats`
-- `GET /favicon.ico`
+- `GET /`（返回内联 HTML 整页）
+- `GET /favicon.ico`（204）
+- `GET /api/state`（设备全状态：device_name/firmware_version/power/cadence/heartrate/mode/profile_*/pacers/remaining_sec/closing/home_wifi_ssid）
+- `GET /api/time`（纯数字剩余秒数）
+- `GET /api/renew`（续期，返回新的剩余秒数）
+- `GET /api/mem_stats`（`{"free":..,"min_free":..}`）
+- `POST /api/config`（保存配置，返回 `{"ok":true}`）
+- `POST /api/draft`（仅内存生效，返回 `{"ok":true}`）
+- `POST /api/close-wifi`（保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE）
+- `POST /api/ota/check`（异步触发版本检查，返回 `{"status":"started"|"running"|"error"}`）
+- `GET /api/ota/status`（轮询检查状态：`status` ∈ `idle/running/done/error`，done 时附 `has_update/version/size/changelog`）
+- `POST /api/ota/upgrade`（触发在线升级，返回 `{"ok":true}`）
+- `POST /api/wifi/scan`（异步触发扫描，返回 `{"status":"started"}`）
+- `GET /api/wifi/scan/status`（轮询扫描状态，done 时附 `count/networks`）
+- `POST /api/wifi/save`（保存 SSID/PSK 并异步测试连接，返回 `{"status":"started"}`）
+- `GET /api/wifi/connect/status`（轮询连接状态，done 时附 `connected/ssid/ip`）
 
 其中：
 
-- `/config`：保存配置并实时生效
-- `/close-wifi`：保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE
-- `/draft`：只把更多配置页字段回写到内存，不保存不重启
-- `/ota/check`：异步连接家庭 WiFi，拉取 `latest.json`
-- `/ota/upgrade`：进入独占 STA，下载固件并写入 OTA 分区，完成后重启
-- `/time`：返回剩余秒数
-- `/renew`：续期
-- `/mem_stats`：返回 `free` 和 `min_free`
-- `/success`：带 PRG 守卫，未提交时直访返回 302 到 `/`
+- `/api/config`：保存配置并实时生效到 BLE 通知
+- `/api/close-wifi`：保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE
+- `/api/draft`：只把首页/更多页字段回写到内存，不保存不重启
+- `/api/ota/check`：异步连接家庭 WiFi，拉取 `latest.json`
+- `/api/ota/upgrade`：进入独占 STA，下载固件并写入 OTA 分区，完成后重启
+- `/api/time`：返回剩余秒数
+- `/api/renew`：续期
+- `/api/mem_stats`：返回 `free` 和 `min_free`
 
 ### 8.4 超时恢复
 

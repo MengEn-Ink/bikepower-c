@@ -7,7 +7,7 @@
 - **名称**：BikePower C — ESP32-C3 蓝牙功率计模拟器（C 重写版）
 - **运行环境**：ESP-IDF v5.5.4 + NimBLE + FreeRTOS（非 MicroPython）
 - **硬件平台**：合宙 ESP32-C3（RISC-V 单核 160MHz, 400KB SRAM, WiFi+BLE5.0）
-- **当前版本**：v3.1.8
+- **当前版本**：v3.2.0
 - **参考仓库**：git@gitee.com:mengen4jv/bikepower-c.git
 - **构建/烧录**：`idf.py build` / `idf.py -p <port> flash monitor`
 
@@ -54,9 +54,13 @@ bikepower-c/
 │   ├── ble_bikepower.c/.h    — NimBLE 五服务 + FTMS ERG
 │   ├── nvs_store.c/.h        — NVS 配置持久化桥接
 │   ├── radio_ctrl.c/.h       — BLE/WiFi 射频软切换（唯一 RF 开关）
-│   ├── wifi_portal.c/.h      — HTTP 配网门户（SoftAP 由 radio_ctrl 启动）
+│   ├── wifi_portal.c/.h      — HTTP 配网门户（v3.2.0 起仅 /api/xxx JSON 接口，HTML 由 web/ 内联）
 │   ├── captive_portal.c/.h   — 轻量 DNS 劫持（UDP 53 → 192.168.4.1，自动弹配网页）
 │   ├── ota_update.c/.h       — OTA 自检确认/回滚 + 语义版本比较工具（上传方式已移除，下载在 ota_downloader.c）
+│   ├── web/                  — 前端三件套（v3.2.0 起，编译时由 scripts/inline_static.py 内联到固件）
+│   │   ├── index.html        — SPA 入口（含 <!-- INLINE_CSS --> / <!-- INLINE_JS --> 占位符）
+│   │   ├── app.css           — 统一所有视图样式
+│   │   └── app.js            — SPA 路由 + XMLHttpRequest 调用 /api/xxx 自行渲染
 │   └── bikepower_config.h    — 全局常量（引脚/阈值/UUID/版本）
 ├── components/bikepower_domain/   — 纯 C 领域层（可 host 单测）
 │   ├── power_engine.c        — 功率/踏频数据引擎
@@ -65,10 +69,18 @@ bikepower-c/
 │   ├── config_store.c       — 配置 schema（defaults/validate/migrate）
 │   ├── domain_rng.c         — 随机数
 │   └── include/             — 头文件 + domain_config.h
+├── scripts/
+│   ├── inline_static.py      — 编译时把 web/app.css + web/app.js 内联到 web/index.html，生成 main/web_index_html.h
+│   └── flash_latest.sh       — 自动探测 ESP-IDF 路径与串口，编译并烧录最新正式固件
 ├── tests/
 │   ├── ble_selftest.py       — bleak 五服务 + FTMS ERG 自测
 │   ├── stage3_conn_test.py   — 连接事件驱动状态机验证
-│   ├── stage5_portal_test.py — 配网门户 HTTP 路由自测
+│   ├── stage5_portal_test.py — 配网门户 /api/xxx JSON 路由自测
+│   ├── check_portal_js.py    — TC-3a：对 main/web/app.js 跑 node --check
+│   ├── check_portal_structure.py — TC-3d：校验 index.html 结构 + 路由表一致性 + 前端 API 调用
+│   ├── ota_flow_test.py      — TC-3b：OTA 静态 + 动态流程自测
+│   ├── check_config_consistency.py — TC-7c：常量一致性校验
+│   ├── mock_server.py        — v3.2.0 起本地 mock /api/xxx 接口，前端不烧设备调试
 │   ├── serial_capture.py     — 串口日志抓取工具
 │   ├── serial_daemon.py      — 串口守护进程
 │   ├── run_stress.sh         — 压力测试

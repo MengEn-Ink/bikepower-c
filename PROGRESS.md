@@ -1,7 +1,7 @@
 # BikePower C — 项目进度
 
 > 基线方案：[docs/05-cidf-nimble-rewrite.md](docs/05-cidf-nimble-rewrite.md)
-> 当前固件版本：v3.1.8（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v3.2.0（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 参考仓库：git@gitee.com:mengen4jv/bikepower-c.git
 
 ---
@@ -21,6 +21,8 @@
 | 8 | WiFi/BLE 共存配网（v3.1.3） | ✅ 代码完成（真机待确认） | BLE 全程在线 + 配置实时生效 + 不重启 |
 | 9 | Captive Portal + OTA 实现（v3.1.5） | ✅ 完成 | DNS 劫持自动弹配网页 + 4MB OTA 分区表 + OTA 防降级/自检回滚，真机升级降级测试通过 |
 | 10 | 家庭网络配置 + OTA 在线检查（v3.1.6-v3.1.8） | ✅ 代码完成（真机待确认） | WiFi 扫描选网 + STA 连接路由器 + SNTP + HTTPS 拉 latest.json + 在线下载升级；fd 耗尽修复 + 密码不回显 |
+| 11 | 配网门户前后端分离（v3.2.0） | ✅ 代码完成 + 真机 BLE 自测通过 | 21 HTML handler → 15 `/api/xxx` JSON + 前端三件套 `main/web/` + `inline_static.py` 编译时内联 + `mock_server.py` 本地调试 |
+| 12 | 项目结构与文档梳理（v3.2.0） | ✅ 完成 | `test/` 与 `tests/` 合并评估（不合并）+ `tests/README.md` 7 大分类重写 + `docs/INDEX.md` 补全 workflows/domain 规则索引 |
 
 ---
 
@@ -200,3 +202,5 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 - ESP-IDF 已升级至 v5.5.4（修复了 NimBLE host 潜在断连问题；工具链 esp-14.2.0_20260121）。
 - WiFi/BLE 共存：配网期间 BLE 保持在线（`CONFIG_ESP_COEX_SW_COEXIST_ENABLE`），仅资源初始化失败时降级为停 BLE + 重启（见 [.trae/rules/wifi-ble-mutex.md](.trae/rules/wifi-ble-mutex.md)）
 - 物理按钮/LED 灯效需人工确认，自动化测试只能覆盖 BLE 连接驱动的状态迁移
+- 配网门户动态测试（stage5_portal_test.py）需本机连 BikePower 热点；本机不能切换 WiFi 时改用 `tests/mock_server.py` 本地调试，或换另一台机器执行
+- `test/` 与 `tests/` 目录职责不同不合并（评估结论见 [tests/README.md](tests/README.md) 第六章）：`test/` 放 ESP-IDF 约定的 host 单测（纯 C），`tests/` 放所有 Python/Shell 设备测试与静态门禁

@@ -60,33 +60,33 @@
 
 - 目标：在烧录前拦截 JS 语法错误（如 `}}}` 多括号、缺括号导致整个 `<script>` 块失效，按钮点击无反应）
 - 入口：`tests/check_portal_js.py`
-- 覆盖内容：
-- 从 `main/wifi_portal.c` 提取所有 C 字符串字面量拼接的 HTML
-- 定位所有 `<script>...</script>` 块
-- 用 `node --check` 验证每个块的 JS 语法
+- 覆盖内容（v3.2.0 重构后）：
+- 直接对 `main/web/app.js` 跑 `node --check`，不再从 C 字符串提取 `<script>` 块
+- 校验文件非空、node 可用
 - 适用改动：
-- `main/wifi_portal.c` 任何含 `<script>` 的页面（/ota、/more、/、/about 等）
-- 任何修改 C 字符串内嵌 JS 的改动
-- 历史教训：v3.1.6 `/ota` 页 `pollStatus` 结尾 `}}}` 多一个 `}`，导致 `setInterval(function(){...},2000)` 的 `)` 失配，整个 script 块报 `missing ) after argument list`，"检查更新"按钮点击完全无反应
+- `main/web/app.js` 任何改动
+- `main/web/index.html` 或 `main/web/app.css` 改动后建议同步跑
+- 历史教训：v3.1.6 `/ota` 页 `pollStatus` 结尾 `}}}` 多一个 `}`，导致 `setInterval(function(){...},2000)` 的 `)` 失配，整个 script 块报 `missing ) after argument list`，"检查更新"按钮点击完全无反应。v3.2.0 起 JS 独立成文件，此类问题由 `node --check` 直接拦截。
 
 ### `TC-3b`：OTA 全流程自测
 
 - 目标：验证 OTA 检查/升级链路的 HTTP 路由、状态机、JS 语法
 - 入口：`tests/ota_flow_test.py`
-- 覆盖内容：
+- 覆盖内容（v3.2.0 重构后）：
 - **静态部分（无需设备）**：
-  - 提取 `/ota` 页面 JS，验证 `checkUpdate`/`pollStatus`/`startUpgrade` 函数定义存在且语法正确
-  - 验证 `x.open('POST','/ota/check')`、`x.open('GET','/ota/status')`、`x.open('POST','/ota/upgrade')` 调用存在
-  - 验证按钮 `onclick` 绑定与函数名一致
-  - 验证 C 代码中 `/ota/check`、`/ota/status`、`/ota/upgrade` 三个路由 handler 已注册
+  - 校验 `wifi_portal.c` 中 `/api/ota/check`、`/api/ota/status`、`/api/ota/upgrade` 三个路由 handler 已注册
+  - 校验 `main/web/index.html` 含 OTA 视图 `#view-ota` 与按钮 `#ota-check-btn`
+  - 校验 `main/web/app.js` 定义 `otaCheck`/`otaPollStatus`/`otaStartUpgrade` 三个函数
+  - 校验 `app.js` 中调用的 `/api/ota/check|status|upgrade` 与后端路由一致
+  - `node --check` 验证 `app.js` 语法
 - **动态部分（需设备进入配网态）**：
-  - `GET /ota` 返回 200 且含 `check-btn`、`upgrade-btn`
-  - `POST /ota/check` 未配 WiFi 时返回 `{"status":"error",...}`
-  - `GET /ota/status` 返回 JSON 且含 `status` 字段
-  - 配好家庭 WiFi 后 `POST /ota/check` 返回 `{"status":"started"}` 或 `{"status":"running"}`
-  - 轮询 `/ota/status` 直到 `done`/`error`，验证字段完整
+  - `GET /api/ota/status` 返回 200 且含 `status` 字段
+  - `POST /api/ota/check` 未配 WiFi 时返回 `started/running/done/error`（任一）
+  - 配好家庭 WiFi 后 `POST /api/ota/check` 进入 `running`
+  - 轮询 `/api/ota/status` 直到 `done`/`error`，验证字段完整
 - 适用改动：
-- `main/wifi_portal.c` 中 `h_ota`/`h_ota_check`/`h_ota_status`/`h_ota_upgrade` 及 `/ota` 页面 JS
+- `main/wifi_portal.c` 中 OTA 相关 handler
+- `main/web/app.js` 中 OTA 相关函数
 - `main/ota_update.c`、`main/ota_downloader.c` 版本检查/下载逻辑
 - `main/radio_ctrl.c` 的 `radio_ctrl_sta_connect`/`radio_ctrl_enter_sta_exclusive`
 
@@ -109,10 +109,13 @@
   3. 受影响的测试层（TC-1/TC-2/TC-3/TC-3a/TC-3b）
   4. 需要同步更新的文档（对照 best-practices.md「代码→文档映射表」）
 - `TC-8b`：修改 `main/wifi_portal.c` 时必须评估：
-  - 是否含 `<script>` → 跑 TC-3a
-  - 是否改 HTTP 路由 → 跑 TC-3
-  - 是否改 OTA 页/handler → 跑 TC-3b
+  - 是否改 HTTP 路由 → 跑 TC-3 + TC-3d（`check_portal_structure.py`）
+  - 是否改 OTA handler → 跑 TC-3b
   - 是否改 BLE 通知 → 跑 TC-2
+- `TC-8b-2`：修改 `main/web/` 下任何文件时必须评估：
+  - `app.js` 改动 → 跑 TC-3a（`check_portal_js.py`）
+  - `index.html` 改动 → 跑 TC-3d（占位符与视图元素）
+  - 路由契约改动 → 同步 `tests/mock_server.py` 与 `tests/check_portal_structure.py` 的 `REQUIRED_BACKEND_ROUTES`/`REQUIRED_FRONTEND_APIS`
 - `TC-8c`：修改 `main/bikepower_config.h` 常量时必须 grep 全仓引用，列出所有受影响模块。
 
 ## 全绿标准（**功能完成必须测试全绿才能提交**）
