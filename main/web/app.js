@@ -120,7 +120,6 @@ function captureDraft() {
 
 /* ============ 首页 ============ */
 function renderHome() {
-  $("home-devname").textContent = STATE.device_name;
   $("home-ver").textContent = "v" + STATE.firmware_version;
   $("home-power").value = STATE.power;
   $("home-cadence").value = STATE.cadence;

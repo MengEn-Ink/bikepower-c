@@ -62,7 +62,6 @@ REQUIRED_FRONTEND_APIS = [
     "/api/time",
     "/api/renew",
     "/api/config",
-    "/api/draft",
     "/api/close-wifi",
     "/api/ota/check",
     "/api/ota/status",

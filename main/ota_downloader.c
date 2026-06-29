@@ -44,7 +44,7 @@ static bool ota_sync_time(void)
     esp_sntp_init();
 
     int retry = 0;
-    while (time(NULL) < 1700000000 && retry < 10) {
+    while (time(NULL) < 1700000000 && retry < 30) {
         vTaskDelay(pdMS_TO_TICKS(500));
         retry++;
     }

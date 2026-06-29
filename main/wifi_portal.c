@@ -526,7 +526,9 @@ static void ota_check_task(void *arg)
 
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "异步检查：版本拉取失败 ret=%d", ret);
-        snprintf(s_ota_check_error, sizeof(s_ota_check_error), "无法获取版本信息");
+        const char *reason = "无法获取版本信息";
+        if (ret == ESP_ERR_NO_MEM) reason = "内存不足";
+        snprintf(s_ota_check_error, sizeof(s_ota_check_error), "%s(err=%d)", reason, ret);
         s_ota_check_state = OTA_CHECK_ERROR;
         vTaskDelete(NULL);
         return;
@@ -981,7 +983,7 @@ static esp_err_t start_httpd(void)
         /* 状态与计时 */
         { .uri = "/api/state",       .method = HTTP_GET,  .handler = h_api_state },
         { .uri = "/api/time",        .method = HTTP_GET,  .handler = h_api_time },
-        { .uri = "/api/renew",       .method = HTTP_GET,  .handler = h_api_renew },
+        { .uri = "/api/renew",       .method = HTTP_POST, .handler = h_api_renew },
         { .uri = "/api/mem_stats",   .method = HTTP_GET,  .handler = h_api_mem_stats },
         /* 配置 */
         { .uri = "/api/config",      .method = HTTP_POST, .handler = h_api_config },

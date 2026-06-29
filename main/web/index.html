@@ -23,9 +23,9 @@
 
   <!-- ============ 首页 ============ -->
   <div class="view" id="view-home">
-    <div class="hero">
-      <h1 id="home-devname">BikePower</h1>
-      <div class="sub">长按按钮可重新进入配网；修改参数后请点击保存。</div>
+    <div class="cred-row" id="home-wifi" style="display:none">
+      <span class="cred-label">已配家庭 WiFi</span>
+      <span class="cred-val" id="home-wifi-val"></span>
     </div>
 
     <div class="card">
@@ -46,15 +46,10 @@
       <div class="lbl"><span>目标心率</span><span class="zone" id="zone-hr"><span class="dot"></span>Z?</span></div>
     </div>
 
-    <div class="note">ERG 模式为默认能力：骑行 App 下发 ERG 目标功率时设备自动切换，无需在此手动选择。稳定/路况模式由设备按当前参数输出。</div>
-
-    <div class="cred-row" id="home-wifi" style="display:none">
-      <span class="cred-label">已配家庭 WiFi</span>
-      <span class="cred-val" id="home-wifi-val"></span>
-    </div>
+    <div class="note">ERG 模式为默认能力：骑行 App 下发 ERG 目标功率时设备自动切换，无需手动选择。修改参数后请点击保存。</div>
 
     <button class="btn" id="home-save" onclick="onSave()">保存配置</button>
-    <button class="btn danger" id="home-close" onclick="onCloseWifi()">保存并关闭 WiFi</button>
+    <button class="btn danger" id="home-close" onclick="onCloseWifi()" style="margin-top:10px">保存并关闭 WiFi</button>
   </div>
 
   <!-- ============ 更多配置 ============ -->
