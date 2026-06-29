@@ -13,8 +13,8 @@
 | [快速上手](user/01-quickstart.md) | 第一次使用：烧录固件 + 首次连接，其余细节链到手册 |
 | [用户手册](user/02-user-manual.md) | 完整操作：按钮、LED、配网字段、骑行模式、FAQ、技术规格 |
 | [硬件指南](user/03-hardware.md) | 推荐开发板、引脚定义、接线、供电、排障 |
-| [OTA 固件升级操作手册](user/04-ota-user-guide.md) | 面向测试/客户的在线 OTA 升级操作指南（当前权威流程） |
-| [README](../README.md) | 项目简介、功能清单、配图说明、引脚表、LED 灯效 |
+| [OTA 固件升级操作手册](user/04-ota-user-guide.md) | 面向测试/客户的在线 OTA 升级操作指南，含进度反馈、防降级和回滚说明 |
+| [README](../README.md) | 项目简介、功能清单、构建/门禁/Release 入口、配图说明、引脚表、LED 灯效 |
 
 ## 🔧 dev/ — 开发与技术
 
@@ -22,7 +22,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [技术参考](dev/01-technical-reference.md) | 三层架构、启动流程、BLE 服务、配网链路、数据格式（基于当前实现） |
+| [技术参考](dev/01-technical-reference.md) | 三层架构、启动流程、BLE 服务、配网/OTA 链路、配置 JSON、测试门禁（基于当前实现） |
 | [固件防提取/防反编译](dev/02-firmware-security.md) | 编译层加固（已实现）+ Flash 加密/Secure Boot 方案与选型 |
 | [测试覆盖率分析](dev/03-test-coverage-analysis.md) | 领域层/应用层模块清单、覆盖矩阵、目标 90% |
 
@@ -64,5 +64,5 @@
 
 | 文档 | 说明 |
 |------|------|
-| [项目进度](../PROGRESS.md) | 阶段 0-10 完成情况、待确认项、已知限制 |
+| [项目进度](../PROGRESS.md) | 阶段 0-10 完成情况、第七轮 P0 真机验收清单、待确认项、已知限制 |
 | [更新日志](../CHANGELOG.md) | 版本历史与变更记录 |

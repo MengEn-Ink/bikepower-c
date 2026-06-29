@@ -52,8 +52,10 @@ BikePower C 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，�
 - 提供 LED 状态提示，方便判断当前设备状态
 - 支持 WiFi 配网门户，可在手机浏览器里修改核心参数
 - 支持配置保存，重启后继续使用上一次设置
-- 支持 OTA 固件升级：通过家庭 WiFi 在线检查并下载最新固件（v3.1.6）
-- 支持家庭网络配置：扫描周边 WiFi，选择并输入密码连接路由器，用于 OTA 在线检查（v3.1.6）
+- 支持 OTA 固件升级：通过家庭 WiFi 在线检查并下载最新固件，升级页显示进度并内置防降级/回滚保护
+- 支持家庭网络配置：扫描周边 WiFi，选择并输入密码连接路由器，用于 OTA 在线检查
+- 支持配置 JSON 序列化能力，领域层可做配置导入/导出、备份/恢复和 host 单测覆盖
+- 提供静态门禁聚合与标准化 Release 构建脚本，便于发版前统一验证和产出 merged bin
 
 ## 软件架构
 
@@ -106,6 +108,19 @@ idf.py -p <port> monitor
 
 `<port>` 请替换为你的实际串口，例如 macOS 下常见 `/dev/cu.usbmodem*`，Linux 下常见 `/dev/ttyUSB0` 或 `/dev/ttyACM0`。
 
+发版构建使用 `scripts/build_all.sh`。该脚本可编译 generic-c3 / m5stamp-c3 产物，生成 merged bin、SHA256、manifest 与 `latest.json` 草案；`--dry-run` 只预览，不编译、不写文件、不打 tag、不创建 Release。
+
+```bash
+./scripts/build_all.sh --dry-run
+./scripts/build_all.sh
+```
+
+提交前推荐先跑聚合门禁：
+
+```bash
+python3 scripts/tools/quality_gate.py
+```
+
 ## 使用说明
 
 设备的日常操作很简单，主要靠一个按钮：
@@ -125,7 +140,7 @@ idf.py -p <port> monitor
 3. 手机连接设备发出的 WiFi AP：`BikePower`
 4. 打开浏览器访问 `192.168.4.1`
 5. 修改需要的配置参数
-6. 点击保存，配置实时生效到 BLE 通知，骑行 App 立即看到新值
+6. 点击保存，页面会显示“已保存到设备”，配置实时生效到 BLE 通知，骑行 App 立即看到新值
 7. 倒计时结束后 WiFi 自动关闭，蓝牙全程未断开，回到骑行 App 继续骑行即可
 
 > 注：WiFi 与 BLE 共存（`CONFIG_ESP_COEX_SW_COEXIST_ENABLE`），配网期间骑行 App 不会断连；仅在 WiFi 资源初始化失败的极端情况下才会降级为停 BLE + 重启。

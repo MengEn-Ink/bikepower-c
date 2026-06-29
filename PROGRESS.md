@@ -20,7 +20,7 @@
 | 7 | M5Stamp C3 适配（板型检测/SK6812/配网页面修复） | ✅ 完成 | v3.1.0 已发版 |
 | 8 | WiFi/BLE 共存配网（v3.1.3） | ✅ 代码完成（真机待确认） | BLE 全程在线 + 配置实时生效 + 不重启 |
 | 9 | Captive Portal + OTA 实现（v3.1.5） | ✅ 完成 | DNS 劫持自动弹配网页 + 4MB OTA 分区表 + OTA 防降级/自检回滚，真机升级降级测试通过 |
-| 10 | 家庭网络配置 + OTA 在线检查（v3.1.6-v3.1.8） | ✅ 代码完成（真机待确认） | WiFi 扫描选网 + STA 连接路由器 + SNTP + HTTPS 拉 latest.json + 在线下载升级；fd 耗尽修复 + 密码不回显 |
+| 10 | 家庭网络配置 + OTA 在线检查（v3.1.6-v3.1.8） | ✅ 代码完成（真机待确认） | WiFi 扫描选网 + STA 连接路由器 + SNTP + HTTPS 拉 latest.json + 在线下载升级；进度反馈 + JSON/XSS 加固 + fd 耗尽修复 + 密码不回显 |
 
 ---
 
@@ -35,6 +35,9 @@
 - [x] 配网门户路由与前端校验已具备自动化覆盖：`tests/stage5_portal_test.py`、`tests/check_portal_structure.py`、`tests/check_portal_js.py`。
 - [x] Captive Portal DNS 与 10 个系统探测端点已实现：Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 探测路由统一 302 到首页。
 - [x] OTA 在线检查/下载升级已实现：`/ota`、`/ota/check`、`/ota/status`、`/ota/upgrade`，家庭 WiFi 凭证从 `/more` 保存的 NVS namespace 读取，升级阶段进入 OTA 独占 STA。
+- [x] OTA 页面安全与体验已补强：`/ota/upgrade/status` 轮询展示下载/写入进度，JSON 输出转义，远端 changelog 前端转义渲染，`tests/ota_local_mock.py --self-test` 覆盖进度与 XSS 回归。
+- [x] 配网入口交互已补强：`/more` 个人信息前端范围校验，首页保存成功带 `saved=1` 强反馈，不关闭 WiFi 时可继续修改。
+- [x] 配置导入/导出基础能力已落到领域层：`config_store_serialize` / `config_store_deserialize` 支持 JSON 往返、缺字段默认值和范围夹紧。
 - [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成 merged bin、SHA256、manifest 与 `latest.json` 草案；脚本不自动打 tag、不创建 Gitee Release。
 - [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合。
 

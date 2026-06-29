@@ -4,6 +4,14 @@
 
 ## [3.1.8] - 2026-06-28
 
+### 改进（第八轮 docs 入口一致性）
+- `README.md`、`docs/INDEX.md`、`PROGRESS.md`、`docs/user/04-ota-user-guide.md`、`docs/dev/01-technical-reference.md` 同步最近能力入口描述：OTA 升级进度反馈、OTA/WiFi JSON 与 XSS 加固、配置 JSON 序列化、静态门禁聚合、Release build_all 标准化、`/more` 校验、保存生效强反馈和 P0 真机验收清单。
+- 本轮只改文档/入口说明，不新增文档，不改 C 代码。
+
+### 测试报告（第八轮 docs 入口一致性）
+- `python3 tests/check_config_consistency.py`：87 通过、0 失败。
+- `python3 scripts/tools/quality_gate.py`：通过；`idf.py build` 通过，host 单测 1154 断言通过，静态门禁聚合全绿；仅提示当前有本次文档改动未提交。
+
 ### 改进（第七轮 P0 真机验收清单）
 - `PROGRESS.md` 新增“第七轮 P0 真机验收清单（当前交付口径）”，集中区分已就绪交付物与待人工确认项，覆盖按钮/LED、配网、Captive Portal 多系统弹窗、OTA 真机验证、72h 老化和 Release 人工步骤。
 - `PROGRESS.md` 修正阶段3二次确认说明，当前版本会进入阶段5配网链路，不再保留旧阶段“wifi_trigger 未注册”的过时描述。

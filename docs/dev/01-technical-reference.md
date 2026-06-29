@@ -622,7 +622,7 @@ SoftAP 由 `radio_ctrl_start_wifi_ap()` 启动，HTTP 门户由 `wifi_portal_sta
 - `cfg.stack_size = 8192`
 - `cfg.keep_alive_enable = false`
 
-已注册业务路由 21 个，另有 10 个 Captive Portal 探测路由：
+已注册业务路由 22 个，另有 10 个 Captive Portal 探测路由：
 
 - `GET /`
 - `POST /config`
@@ -634,6 +634,7 @@ SoftAP 由 `radio_ctrl_start_wifi_ap()` 启动，HTTP 门户由 `wifi_portal_sta
 - `POST /ota/check`
 - `GET /ota/status`
 - `POST /ota/upgrade`
+- `GET /ota/upgrade/status`
 - `POST /wifi/scan`
 - `GET /wifi/scan/status`
 - `POST /wifi/save`
@@ -653,6 +654,7 @@ SoftAP 由 `radio_ctrl_start_wifi_ap()` 启动，HTTP 门户由 `wifi_portal_sta
 - `/draft`：只把更多配置页字段回写到内存，不保存不重启
 - `/ota/check`：异步连接家庭 WiFi，拉取 `latest.json`
 - `/ota/upgrade`：进入独占 STA，下载固件并写入 OTA 分区，完成后重启
+- `/ota/upgrade/status`：返回升级进度快照，供升级页轮询展示下载/写入阶段
 - `/time`：返回剩余秒数
 - `/renew`：续期
 - `/mem_stats`：返回 `free` 和 `min_free`
@@ -678,6 +680,12 @@ SoftAP 由 `radio_ctrl_start_wifi_ap()` 启动，HTTP 门户由 `wifi_portal_sta
 6. 状态机在 app_main 上下文调用 `radio_ctrl_exit_wifi()`
 
 所以当前版本的配网退出不重启设备；BLE 在普通配网期间保持在线。OTA 升级是例外：升级任务会关闭 AP 和 BLE，切到 STA 独占模式下载固件，最终通过 `esp_restart()` 进入新固件或回到 BLE。
+
+### 8.5 前端反馈与 JSON 安全
+
+配网首页的 `/config` 采用 PRG 流程，保存成功后 302 回 `/?saved=1`，首页显示“已保存到设备”的强反馈；`/close-wifi` 仍用于保存并进入 5 秒收尾窗口。`/more` 下的个人信息表单在前端校验体重、FTP、阈值心率等范围，非法值会阻止提交并给出字段级提示。
+
+WiFi 扫描、家庭网络保存、OTA 检查和 OTA 升级状态都返回 JSON。`wifi_portal.c` 使用 `json_escape()` 转义字符串字段，避免 SSID、错误信息或远端 changelog 破坏 JSON；OTA 页面渲染远端更新说明时做 HTML 转义，测试脚本 `tests/ota_local_mock.py --self-test` 覆盖升级进度轮询和 XSS 回归。
 
 ## 第九章：配置持久化
 
@@ -736,7 +744,11 @@ namespace 固定为：
 - `ride_type` 合法性
 - 设备名空串回退为 `DEVICE_NAME_DEFAULT`
 
-### 9.4 脏标记落盘策略
+### 9.4 配置 JSON 序列化
+
+领域层提供 `config_store_serialize()` 和 `config_store_deserialize()`，用于配置导出/导入、备份/恢复和 host 单测。序列化输出包含 schema、功率、踏频、模式、心率、体重、FTP、阈值心率、骑行类型和设备名；设备名按 JSON 规则转义双引号、反斜杠和控制字符。反序列化要求 JSON 至少包含 `schema_ver`，缺失字段先保留默认值，最后复用 `config_store_validate()` 做范围夹紧。
+
+### 9.5 脏标记落盘策略
 
 落盘触发来源有两类：
 
@@ -865,6 +877,8 @@ idf.py build
 
 根据项目规则，C 代码改动后 `idf.py build` 必须通过。
 
+发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建，正式运行会为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256、manifest 与 `latest.json` 草案；脚本不会打 git tag，也不会创建 Gitee Release。
+
 ### 12.2 领域层 host 单测
 
 领域层测试位于：
@@ -921,12 +935,14 @@ LED 物理变化仍需人工肉眼确认。
 如果你要改动功能，建议按下面顺序验证：
 
 1. 改领域层先跑 host 单测
-2. 跑 `idf.py build`
-3. 烧录到 ESP32-C3
-4. 看串口启动日志
-5. 跑 `tests/ble_selftest.py`
-6. 涉及配网时再跑 `tests/stage5_portal_test.py`
-7. 涉及按钮和 LED 时做人工真机操作确认
+2. 跑 `python3 tests/check_config_consistency.py`
+3. 跑 `python3 scripts/tools/quality_gate.py` 聚合构建、host 单测和静态门禁
+4. 烧录到 ESP32-C3
+5. 看串口启动日志
+6. 跑 `tests/ble_selftest.py`
+7. 涉及配网时再跑 `tests/stage5_portal_test.py`
+8. 涉及 OTA 页面时跑 `python3 tests/ota_local_mock.py --self-test`
+9. 涉及按钮和 LED 时做人工真机操作确认
 
 ## 结语
 
