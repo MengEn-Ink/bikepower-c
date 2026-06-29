@@ -85,7 +85,7 @@ typedef enum {
 #define HOME_WIFI_PSK_MAX      64
 
 // ===== 在线 OTA 下载（v3.1.6：STA 模式 HTTPS 下载固件） =====
-// latest.json 放仓库 ota/ 目录，raw 访问需仓库公开；格式见 docs/12-roadmap-v316.md
+// latest.json 放仓库 ota/ 目录，raw 访问需仓库公开；格式见 docs/archive/06-roadmap-v316.md
 #define OTA_VERSION_URL        "https://gitee.com/mengen4jv/bikepower-c/raw/main/ota/latest.json"
 #define OTA_DOWNLOAD_TIMEOUT_MS  30000   // HTTPS 单次请求超时
 #define OTA_STA_CONNECT_MS       15000   // STA 连路由器超时

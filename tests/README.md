@@ -155,7 +155,7 @@ pkill -f serial_daemon.py
 # 日志按日滚动：tests/logs/serial_<YYYYMMDD>.log
 ```
 
-> v3.1.6 起 OTA 升级统一为 HTTPS 在线下载方式，已移除基于 `/ota/upload` 上传的 `ota_full_test.sh` 与 `ota_upload_test.py`。在线 OTA 全流程由 `ota_flow_test.py` 覆盖，人工验证参考 [docs/11-ota-user-guide.md](../docs/11-ota-user-guide.md)。
+> v3.1.6 起 OTA 升级统一为 HTTPS 在线下载方式，已移除基于 `/ota/upload` 上传的 `ota_full_test.sh` 与 `ota_upload_test.py`。在线 OTA 全流程由 `ota_flow_test.py` 覆盖，人工验证参考 [docs/user/04-ota-user-guide.md](../docs/user/04-ota-user-guide.md)。
 
 ---
 

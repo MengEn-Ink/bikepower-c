@@ -1,6 +1,6 @@
 # BikePower C — 项目进度
 
-> 基线方案：[docs/05-cidf-nimble-rewrite.md](docs/05-cidf-nimble-rewrite.md)
+> 基线方案：[docs/archive/01-cidf-nimble-rewrite.md](docs/archive/01-cidf-nimble-rewrite.md)
 > 当前固件版本：v3.1.8（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 参考仓库：git@gitee.com:mengen4jv/bikepower-c.git
 
@@ -163,7 +163,7 @@
 | 探测端点路由 | [main/wifi_portal.c](main/wifi_portal.c) | 注册 10 个 OS 探测端点（/generate_204、/hotspot-detect.html、/ncsi.txt 等），统一 302 重定向到首页 |
 | 4MB OTA 分区表 | [partitions.csv](partitions.csv) | ota_0/ota_1 互切（各 1.75MB）+ otadata，无 factory；固件 1017KB，每分区 45% 空闲 |
 | OTA 回滚支持 | [sdkconfig.defaults](sdkconfig.defaults) | CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y，新固件 PENDING_VERIFY 自检通过才确认 |
-| OTA 落地方案 | [docs/10-ota-implementation-plan.md](docs/10-ota-implementation-plan.md) | 详细方案：HTTPS 在线下载 + 流式 esp_ota_write + 10s 自检回滚 + 防降级（上传方式已移除） |
+| OTA 落地方案 | [docs/archive/05-ota-implementation-plan.md](docs/archive/05-ota-implementation-plan.md) | 详细方案：HTTPS 在线下载 + 流式 esp_ota_write + 10s 自检回滚 + 防降级（上传方式已移除） |
 
 ### 覆盖的 OS 探测端点
 
@@ -186,7 +186,7 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 
 ### OTA 实施（v3.1.6 已完成）
 
-详见 [docs/11-ota-user-guide.md](docs/11-ota-user-guide.md)，核心实现：
+详见 [docs/user/04-ota-user-guide.md](docs/user/04-ota-user-guide.md)，核心实现：
 1. `main/ota_downloader.c` HTTPS 在线下载版本信息 + 固件，分块 esp_ota_write
 2. `main/ota_update.c` PENDING_VERIFY 自检确认/回滚 + 语义版本比较工具（上传方式已移除）
 3. `main/wifi_portal.c` `/ota` 在线检查更新页 + `/ota/check`/`/ota/status`/`/ota/upgrade` 异步任务

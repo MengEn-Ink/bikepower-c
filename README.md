@@ -41,7 +41,7 @@ BikePower C 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，�
 
 ![硬件引脚对照](docs/images/hardware-pinout.png)
 
-更详细的硬件建议见 [docs/03-hardware.md](docs/03-hardware.md)。
+更详细的硬件建议见 [docs/user/03-hardware.md](docs/user/03-hardware.md)。
 
 ## 核心功能清单
 
@@ -160,13 +160,10 @@ bikepower-c/
 ├── components/
 │   └── bikepower_domain/
 ├── docs/
-│   ├── 01-quickstart.md
-│   ├── 02-user-manual.md
-│   ├── 03-hardware.md
-│   ├── 04-technical-reference.md
-│   ├── 05-cidf-nimble-rewrite.md
-│   ├── 06-micropython-vs-c-comparison.md
 │   ├── INDEX.md
+│   ├── user/        # 产品使用说明（快速上手/手册/硬件/OTA）
+│   ├── dev/         # 开发与技术（技术参考/固件安全/测试覆盖）
+│   ├── archive/     # 历史归档（仅供追溯）
 │   └── images/
 ├── tests/
 ├── test/

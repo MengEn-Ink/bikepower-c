@@ -125,7 +125,7 @@
 
 ## 覆盖率目标与现状（目标 90%）
 
-> 详细矩阵见 [docs/test-coverage-analysis.md](../../../docs/test-coverage-analysis.md)。
+> 详细矩阵见 [docs/dev/03-test-coverage-analysis.md](../../../docs/dev/03-test-coverage-analysis.md)。
 
 ### 自动化测试覆盖率口径
 
@@ -142,5 +142,5 @@
 4. **跑 TC-1**：`make -C test && ./test/test_domain`，断言全绿。
 5. **跑 TC-3a/3b/3c**：涉及 wifi_portal / OTA / 常量时跑对应静态脚本。
 6. **跑 TC-2/3**：涉及 BLE / 配网行为时跑真机脚本。
-7. **更新本文件断言数 + docs/test-coverage-analysis.md 矩阵**。
+7. **更新本文件断言数 + docs/dev/03-test-coverage-analysis.md 矩阵**。
 8. **提交前全绿**：TC-9a 硬性门。
