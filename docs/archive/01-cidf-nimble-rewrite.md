@@ -7,7 +7,7 @@
 > 目标基线：首选 ESP-IDF v6.0.1 stable；若团队希望先沿用本仓库已有 ESP-IDF 5.x 工具链，则至少升级到 v5.5.4 bugfix 线。目标芯片 ESP32-C3（RISC-V 单核 160MHz）。
 > 本文是设计与施工说明，不是当前实现的行为规格。落地前仍需按第九章五步迁移拆批验证。
 
-> **当前实现校准（v3.1.8）**：本文保留 C 重写早期设计背景，但当前固件已经演进为普通配网默认启用 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE` 共存，BLE 保持在线，配置实时生效且退出配网不重启。独占 STA 与停 BLE 仅用于 OTA 升级，或共存初始化失败时由 `radio_ctrl` 兜底处理。当前硬规则以 `AGENTS.md`、`.trae/rules/wifi-ble-mutex.md` 和 `docs/04-technical-reference.md` 为准。
+> **当前实现校准（v3.1.8）**：本文保留 C 重写早期设计背景，但当前固件已经演进为普通配网默认启用 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE` 共存，BLE 保持在线，配置实时生效且退出配网不重启。独占 STA 与停 BLE 仅用于 OTA 升级，或共存初始化失败时由 `radio_ctrl` 兜底处理。当前硬规则以 `AGENTS.md`、`.trae/rules/wifi-ble-mutex.md` 和 `docs/dev/01-technical-reference.md` 为准。
 
 ---
 

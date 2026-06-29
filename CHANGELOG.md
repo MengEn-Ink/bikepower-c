@@ -4,6 +4,14 @@
 
 ## [3.1.8] - 2026-06-28
 
+### 改进（第七轮 P0 真机验收清单）
+- `PROGRESS.md` 新增“第七轮 P0 真机验收清单（当前交付口径）”，集中区分已就绪交付物与待人工确认项，覆盖按钮/LED、配网、Captive Portal 多系统弹窗、OTA 真机验证、72h 老化和 Release 人工步骤。
+- `PROGRESS.md` 修正阶段3二次确认说明，当前版本会进入阶段5配网链路，不再保留旧阶段“wifi_trigger 未注册”的过时描述。
+
+### 测试报告（第七轮 P0 清单整理）
+- `python3 tests/check_config_consistency.py`：87 通过、0 失败。
+- `python3 scripts/tools/quality_gate.py`：通过；`idf.py build` 通过，host 单测 1154 断言通过，静态门禁聚合全绿；仅提示当前有本次文档改动未提交。
+
 ### 新增（部署脚本）
 - 新增 `scripts/flash_latest.sh`：自动探测 ESP-IDF 路径和 Espressif USB JTAG/serial 串口，默认运行快速静态门禁、编译正式固件、烧录开发板并抓取启动日志。
 - 脚本支持 `--erase`、`--monitor`、`--no-checks`、`--capture-seconds`、`--ota-test-auto-config` 等选项，避免手工反复输入 `idf.py build/flash/monitor`。
@@ -15,7 +23,7 @@
 - 网络/OTA 辅助任务统一使用 `TASK_PRIO_NET`，TC-3g 对 `xTaskCreate` 栈大小、优先级和错误检查全绿。
 
 ### 改进（规则、文档与测试自动化）
-- `AGENTS.md`、`.trae/rules/*`、`PROGRESS.md`、`docs/04-technical-reference.md` 同步当前 v3.1.8 事实：普通配网走 coex 共存且 BLE 不停，OTA 独占 STA 才停 BLE；修正旧版“必须先停 BLE/配网后重启恢复”的过时描述。
+- `AGENTS.md`、`.trae/rules/*`、`PROGRESS.md`、`docs/dev/01-technical-reference.md` 同步当前 v3.1.8 事实：普通配网走 coex 共存且 BLE 不停，OTA 独占 STA 才停 BLE；修正旧版“必须先停 BLE/配网后重启恢复”的过时描述。
 - `tests/stage3_conn_test.py` 支持 `--port/-p` 并自动扫描 Espressif USB JTAG/serial 串口，修复 Linux 下默认写死 `/dev/cu.usbmodem101` 导致连接事件验证误失败。
 - 新增 `tests/ota_local_mock.py`：从 `main/wifi_portal.c` 提取真实 `/ota` 页面 JS，在 localhost mock `/ota/check`、`/ota/status`、`/ota/upgrade`，无需连接 BikePower 热点即可验证 OTA 页面流程。
 - 真机流程记录：测试固件 `OTA_TEST_AUTO_CONFIG=ON` 可自动进配网，串口确认 v3.1.8、BLE 广播、SoftAP/DNS/HTTP 启动，配网态堆约 116KB；本机 NetworkManager 连接 BikePower 后会因无互联网/路由切换不稳定，后续 OTA 页面流程改用本地模拟验证。
@@ -43,7 +51,7 @@
   - `components/bikepower_domain/json_miniparse.c/.h`：latest.json 解析（从 `main/ota_downloader.c` 抽取 static 函数），覆盖版本检查字段提取。
 - `test/test_domain.c` 新增 `test_ota_version_compare`（13 断言）+ `test_json_miniparse`（13 断言），host 单测断言数 581 → 946。
 - 新增 `tests/check_config_consistency.py`（TC-3c 常量一致性静态检查）：56 项校验 `bikepower_config.h` / `domain_config.h` / `README.md` / `docs/` 之间常量值一致，防止文档与代码漂移。
-- 新增 `docs/test-coverage-analysis.md` 测试覆盖率分析文档：模块清单、覆盖率矩阵、当前 28% → 目标 90% 路径、Loop 模式测试建立流程。
+- 新增 `docs/dev/03-test-coverage-analysis.md` 测试覆盖率分析文档：模块清单、覆盖率矩阵、当前 28% → 目标 90% 路径、Loop 模式测试建立流程。
 - 更新 `.trae/rules/workflows/test-coverage.md`：TC-1 覆盖对象新增 ota_version/json_miniparse，新增 TC-3c 常量一致性规则，新增「覆盖率目标与现状」+「Loop 模式测试建立流程」章节。
 - 抽取按钮按压时长分类到领域层（host 可测）：
   - `components/bikepower_domain/button_logic.c/.h`：短按/中区间/长按分类、REPEAT 调功判定、确认窗口超时（从 `main/app_state.c` 抽取）。
@@ -53,7 +61,7 @@
   - `components/bikepower_domain/led_pattern.c/.h`：pattern→GRB 颜色映射、闪烁节拍判定、初始 on 状态（从 `main/led.c` 抽取）。
   - `main/led.c` `led_output`/`led_task` 改为调用领域层函数，删除 `s_color_slow`/`s_color_solid`/`s_color_fast` 静态数组（颜色映射统一由领域层提供）。
   - `test/test_domain.c` 新增 `test_led_pattern`（15 断言），覆盖 4 种灯效颜色 + 闪烁周期边界 + 初始状态。
-- `docs/test-coverage-analysis.md` 更新覆盖率矩阵：领域层 864→944 行（+button_logic 38 + led_pattern 42），自动化覆盖率 27.7%→30.0%，host 单测断言 946→979。
+- `docs/dev/03-test-coverage-analysis.md` 更新覆盖率矩阵：领域层 864→944 行（+button_logic 38 + led_pattern 42），自动化覆盖率 27.7%→30.0%，host 单测断言 946→979。
 
 ### 改进（OTA 升级方式精简：仅保留在线下载）
 - 移除 `/ota/upload` 路由及上传固件 bin 文件方式，统一为 HTTPS 在线下载升级，消除「上传 vs 在线」两种入口的认知冲突。
@@ -62,7 +70,7 @@
 - `main/wifi_portal.c` `h_ota_check`/`h_ota_upgrade` 不再接收表单 `ssid`/`psk` 参数，统一从 NVS 读取已配置的家庭 WiFi 凭证；未配置时返回错误引导去 `/more` 配置。
 - `main/wifi_portal.c` `/ota` 页面重构：移除上传卡片与上传 JS，凭证改为只读展示已配置 SSID；未配置时显示「去配置家庭网络」入口；前端 `checkUpdate`/`startUpgrade` 不再发送凭证。
 - `main/wifi_portal.c` `/more` 菜单「固件升级」描述由「上传新固件 bin 文件」改为「在线检查并下载最新固件」。
-- `docs/11-ota-user-guide.md` 重写为在线下载流程，移除上传步骤与同版本重刷说明。
+- `docs/user/04-ota-user-guide.md` 重写为在线下载流程，移除上传步骤与同版本重刷说明。
 - `.trae/rules/general-rules.md` 模块树 `ota_update.c/.h` 描述更新为「自检确认/回滚 + 语义版本比较工具」。
 
 ### 修复（安全）
@@ -195,7 +203,7 @@
 ### 文档同步
 - 修正源码头注释与日志中残留的 ESP-IDF 版本号 v5.5.1 → v5.5.4（`app_main.c`/`button.h`/`wifi_portal.h`/`radio_ctrl.h`/`app_state.h`/`app_events.h`/`led.h`/`sdkconfig.defaults`）。
 - 修正 `wifi_portal.c` `recv_body` 注释请求体上限 2048 → 4096，与代码一致。
-- 同步 `docs/04-technical-reference.md` 中 `max_connection` 3 → 2。
+- 同步 `docs/dev/01-technical-reference.md` 中 `max_connection` 3 → 2。
 - 新增 `.clangd` 配置适配 RISC-V 工具链，消除 IDE 伪报错。
 
 ### 测试报告

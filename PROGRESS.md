@@ -24,6 +24,41 @@
 
 ---
 
+## 第七轮 P0 真机验收清单（当前交付口径）
+
+本清单用于交付前集中跟踪“代码/自动化已就绪”和“仍需人工真机确认”的边界。未勾选项不得在发版说明中标为已完成；物理按钮、LED、系统级 Captive Portal 弹窗、72h 老化和 Gitee Release 创建均保留人工确认。
+
+### 就绪交付物
+
+- [x] 固件版本统一为 `v3.1.8`，DIS 固件字段来自 `FIRMWARE_VERSION = "3.1.8"`，`tests/ble_selftest.py` 会校验厂商/型号/固件三字段。
+- [x] 普通配网链路走 `radio_ctrl` + coex 共存：长按二次确认进入配网，BLE 默认不停，保存或超时后关闭 WiFi 原地回 `ST_BLE_ACTIVE`。
+- [x] 配网门户路由与前端校验已具备自动化覆盖：`tests/stage5_portal_test.py`、`tests/check_portal_structure.py`、`tests/check_portal_js.py`。
+- [x] Captive Portal DNS 与 10 个系统探测端点已实现：Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 探测路由统一 302 到首页。
+- [x] OTA 在线检查/下载升级已实现：`/ota`、`/ota/check`、`/ota/status`、`/ota/upgrade`，家庭 WiFi 凭证从 `/more` 保存的 NVS namespace 读取，升级阶段进入 OTA 独占 STA。
+- [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成 merged bin、SHA256、manifest 与 `latest.json` 草案；脚本不自动打 tag、不创建 Gitee Release。
+- [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合。
+
+### 待人工确认（P0）
+
+- [ ] 按钮短按：短按一次后串口出现 `短按 功率-20W`，BLE 通知功率同步下降 20W。
+- [ ] 按钮长按调功：steady 模式下按住约 1s，串口出现多次 `adjust`，功率按 20W 步进上升。
+- [ ] 按钮长按确认：按住 ≥2s 松开后出现 `长按2秒，LED快闪等待二次确认`，LED 进入确认快闪。
+- [ ] 二次确认进入配网：确认窗口内再按一次，串口出现 `二次确认，进入WiFi配网模式`，设备开放 `BikePower` 热点。
+- [ ] 确认窗口超时：不二次按键等待 3s，串口出现 `确认窗口超时` 并回到 BLE 活跃态。
+- [ ] LED 灯效人工观察：通用板广播慢闪/连接常亮/确认快闪；M5Stamp C3 蓝色慢闪/绿色常亮/黄色快闪。
+- [ ] 配网真机流程：手机连接 `BikePower` 热点，访问 `192.168.4.1`，修改功率/踏频/心率/模式/设备名并保存，确认 BLE 保持在线且参数实时生效。
+- [ ] 配网关闭流程：点击“保存并关闭 WiFi”后 5s 收尾退出，HTTP/SoftAP/DNS 停止，设备不重启并回到 BLE。
+- [ ] 配网超时流程：180s 无操作自动关闭 WiFi，回到 BLE，串口无异常重启。
+- [ ] Captive Portal 多系统弹窗：iOS、Android、Windows 分别连接 `BikePower` 热点后能自动弹出配网页；不弹窗时手动访问 `192.168.4.1` 仍可配网。
+- [ ] Captive Portal 生命周期：退出配网后串口确认 DNS 任务停止，不再响应劫持。
+- [ ] OTA 真机在线检查：在 `/more` 保存家庭 WiFi 后进入 `/ota`，点击检查更新可完成 STA 连接、SNTP、HTTPS 拉取 `latest.json`，失败时页面给出明确错误。
+- [ ] OTA 真机升级：准备远端更高版本 `latest.json` 和 merged bin，点击升级后下载写入 OTA 分区，重启进入新固件并通过自检确认。
+- [ ] OTA 防降级/无更新：远端版本低于或等于本机 `3.1.8` 时不得解锁升级按钮，不写 flash。
+- [ ] 72h 老化：长时间运行无 coredump、无 WDT、无堆持续下降；建议周期性跑 `tests/ble_selftest.py` 和 `tests/stage5_portal_test.py` 采样。
+- [ ] Release 人工步骤：老化通过后执行 `scripts/build_all.sh 3.1.8`，人工填写 `latest.json` changelog，校验 SHA256，打 `v3.1.8` tag，创建 Gitee Release 并上传 merged bin/manifest/latest.json。
+
+---
+
 ## 阶段3 完成情况（当前）
 
 ### 已实现
@@ -57,7 +92,7 @@
 - [ ] 短按一次 → 串口出现 `短按 功率-20W`
 - [ ] 按住 1s 松开 → 串口出现多次 `adjust` 且功率上升（steady 模式下）
 - [ ] 按住 ≥2s 松开 → `长按2秒，LED快闪等待二次确认`，LED 快闪
-- [ ] 快闪窗口内再按 → `二次确认，进入WiFi配网模式`（当前阶段3 wifi_trigger 未注册，会打印"未就绪"并恢复）
+- [ ] 快闪窗口内再按 → `二次确认，进入WiFi配网模式`，进入阶段5配网链路
 - [ ] 不按等待 3s → `确认窗口超时`
 - [ ] LED 灯效：广播慢闪 / 连接常亮 / 确认快闪
 
