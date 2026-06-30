@@ -24,7 +24,7 @@
 | `GND` | 公共地 | 外设接入时必须共地 |
 | `UART0` | 调试串口 | 用于日志查看、烧录和故障定位 |
 
-![硬件引脚对照](images/hardware-pinout.png)
+![硬件引脚对照](../images/hardware-pinout.png)
 
 说明：
 

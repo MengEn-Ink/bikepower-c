@@ -1,9 +1,13 @@
 # BikePower C / ESP-IDF + NimBLE 完全重写方案
 
+> 🗄️ **历史 / 归档文档，仅供追溯**：本文为早期重写设计背景，不代表 v3.1.8 当前实现。权威现状以 [PROGRESS.md](../../PROGRESS.md)、[技术参考](../dev/01-technical-reference.md)、[AGENTS.md](../../AGENTS.md) 为准。
+
 > 本文是 `10-refactor-design.md` 第十一章「技术栈选型」中“转 ESP-IDF + NimBLE”路线的落地方案。
 > 它面向“完全推倒重做、放弃 MicroPython、用 C + ESP-IDF + NimBLE 重写整个固件”的场景。
 > 目标基线：首选 ESP-IDF v6.0.1 stable；若团队希望先沿用本仓库已有 ESP-IDF 5.x 工具链，则至少升级到 v5.5.4 bugfix 线。目标芯片 ESP32-C3（RISC-V 单核 160MHz）。
 > 本文是设计与施工说明，不是当前实现的行为规格。落地前仍需按第九章五步迁移拆批验证。
+
+> **当前实现校准（v3.1.8）**：本文保留 C 重写早期设计背景，但当前固件已经演进为普通配网默认启用 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE` 共存，BLE 保持在线，配置实时生效且退出配网不重启。独占 STA 与停 BLE 仅用于 OTA 升级，或共存初始化失败时由 `radio_ctrl` 兜底处理。当前硬规则以 `AGENTS.md`、`.trae/rules/wifi-ble-mutex.md` 和 `docs/dev/01-technical-reference.md` 为准。
 
 ---
 
@@ -16,7 +20,7 @@
 | ESP-IDF 稳定版 | 官方 stable 文档当前指向 v6.0.1，生产用途应优先选择 stable 版本 | 新建 C 工程首选 v6.0.1，不再以 v5.4.1 作为目标基线 |
 | ESP-IDF 5.x 备选 | v5.5.4 是 v5.5 bugfix 版本，并修复了 v5.5.3 中 ESP32/ESP32-C3/ESP32-S3 潜在 NimBLE host 断连问题 | 若保守留在 5.x，直接用 v5.5.4，不建议停在 v5.5.1 或 v5.5.3 |
 | ESP-NimBLE | ESP-IDF 提供移植到 ESP32-C3 + FreeRTOS 的 NimBLE host，底层 controller 仍通过 VHCI 接口工作 | 方案继续采用 NimBLE host，避免 Bluedroid |
-| WiFi/BLE 共存 | ESP-IDF 官方支持 WiFi/BLE RF coexistence，采用时间片仲裁；这不是“硬件绝对不能同时 init” | BikePower 默认仍采用“配网时停 BLE”的独占流程，但把共存列为后续实验方案 |
+| WiFi/BLE 共存 | ESP-IDF 官方支持 WiFi/BLE RF coexistence，采用时间片仲裁；这不是“硬件绝对不能同时 init” | v3.1.8 当前普通配网默认采用 coex 共存，BLE 保持在线；独占 STA 仅用于 OTA 或共存失败兜底 |
 | HTTP server | `esp_http_server` 是轻量 HTTP server，支持可配置任务栈、URI handler、chunk response；API 本身不保证线程安全 | Web 配网使用 `esp_http_server`，所有 HTTP 操作收口在 httpd task 或加锁 |
 | NVS | NVS 是面向 flash 的 key-value 存储，key 长度有限，适合小配置 | C 版配置从 JSON 文件迁到 NVS，schema key 必须短且稳定 |
 
@@ -51,7 +55,7 @@ MicroPython 版本的根本约束是内存：堆约 150KB，BLE 启动后仅剩�
 | 开发成本 | 相比 MicroPython 约翻倍，BLE GATT 表手写、回调式异步、内存手动管理 |
 | 调试成本 | 需熟悉 `idf.py monitor` + GDB stub + coredump 分析 |
 | 迭代速度 | 每次改动需重新编译烧录（约 30-90s），不像 MicroPython 改文件即生效 |
-| 射频策略 | ⚠️ ESP-IDF 支持 WiFi/BLE 共存，但共享 2.4GHz RF 会引入时间片竞争；BikePower 默认仍建议配网时停 BLE（见第七章） |
+| 射频策略 | ⚠️ ESP-IDF 支持 WiFi/BLE 共存，但共享 2.4GHz RF 会引入时间片竞争；BikePower v3.1.8 普通配网已采用 coex 共存并保持 BLE 在线，OTA 独占 STA 才停 BLE |
 
 > ⚠️ 质疑（AC-更优方案）：如果团队没有 C 嵌入式经验，且当前 MicroPython 版本功能已满足，**不建议**为了“更优雅”而重写。本方案仅在“内存焦虑无法靠优化解决”或“要做产品级量产/功耗优化”时才立项。
 
@@ -378,35 +382,37 @@ C 版建议放弃 JSON 文件，改用 ESP-IDF **NVS**（键值存储，原子�
 
 ## 七、WiFi/BLE 射频策略（C 版策略）
 
-⚠️ 需要修正一个常见误区：ESP32-C3 在 ESP-IDF 下支持 WiFi/BLE 共存，底层通过 coexistence 模块按优先级和时间片仲裁 RF。它不是“物理上绝对不能同时 init”。但 BikePower 的产品流程是短时配网工具，配网时继续维持 BLE 五服务通知的收益很低，成本很高：
+⚠️ 需要修正一个常见误区：ESP32-C3 在 ESP-IDF 下支持 WiFi/BLE 共存，底层通过 coexistence 模块按优先级和时间片仲裁 RF。它不是“物理上绝对不能同时 init”。
 
-- 1s BLE 通知节拍会受到 WiFi SoftAP/http 流量影响。
-- 同时保留 WiFi、NimBLE、HTTP server 会抬高 RAM 峰值。
-- 用户保存后仍需要回到骑行 App 重新连接，维持 BLE 连接价值有限。
-- 当前项目规则已经把“进入 WiFi 配网前停止 BLE”作为可靠性边界。
+v3.0.0 早期设计曾倾向“独占配网 + 可恢复软切换”，主要担心 SoftAP/http 流量影响 1s BLE 通知节拍、抬高 RAM 峰值、增加调试复杂度。v3.1.8 当前实现已经完成策略演进：
 
-因此 C 版默认不采用长期共存，而采用“独占配网 + 可恢复软切换”：
+- 普通配网默认启用 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE` 共存，BLE 不停、不断开现有连接。
+- 配网期间主循环继续生成快照并通过 BLE 通知，网页“保存设置”后配置实时生效。
+- 用户点击“保存并退出配网”或 180s 超时后，由 `wifi_portal` 回调投递 `APP_EVT_WIFI_DONE`，`radio_ctrl` 关闭 HTTP/SoftAP 并回到 BLE 正常工作状态。
+- OTA 下载进入独占 STA，或共存初始化失败兜底时，才由 `radio_ctrl` 停 BLE 后重试或重启恢复。
+
+当前普通配网流程：
 
 ```text
 enter_wifi_config():
-  1. ble_gap_adv_stop() + 断开所有连接
-  2. nimble_port_stop()  → nimble_port_deinit()  (释放 BLE 控制器)
-  3. esp_wifi_init() → 配 AP → esp_wifi_start()
-  4. 启动 httpd
+  1. 确认 coex 配置启用，BLE 保持在线
+  2. radio_ctrl_enter_wifi() → esp_wifi_init() → 配 AP → esp_wifi_start()
+  3. 启动 httpd / DNS captive portal
+  4. 网页保存配置 → power_engine setter / NVS，BLE 通知实时反映新值
 配网结束 / 超时:
-  5. httpd_stop() → esp_wifi_stop() → esp_wifi_deinit()
-  6. 尝试 nimble_port_init() 重新拉起 BLE
-  7. 若 BLE 重激活失败 → esp_restart() 兜底
+  5. APP_EVT_WIFI_DONE → radio_ctrl_exit_wifi()
+  6. httpd_stop() → esp_wifi_stop() → esp_wifi_deinit()
+  7. 回到 ST_BLE_ACTIVE，不重启设备
 ```
 
 | 方案 | 优点 | 风险 | C 版可行性 |
 |------|------|------|-----------|
 | A 每次 esp_restart | 100% 可靠 | 体验差 | 高 |
-| B 软切换不重启 | 体验好 | 控制器二次 init 偶发失败 | 中（比 MPy 高） |
-| C 软切换 + 兜底重启 | 兼顾 | 实现复杂 | **推荐** |
-| D WiFi/BLE 共存 | 理论体验最好 | 内存、通知抖动、连接稳定性和调试复杂度最高 | 仅实验，不作 v3.0.0 默认 |
+| B 独占软切换不重启 | 体验好 | 控制器二次 init 偶发失败 | 历史备选 |
+| C 独占软切换 + 兜底重启 | 兼顾 | 实现复杂 | v3.0.0 早期方案 |
+| D WiFi/BLE 共存 | BLE 在线、配置实时生效、不重启 | 需要 coex 配置与真机验证 | **v3.1.8 当前默认** |
 
-> 注意：如果未来试验 D，共存必须显式启用 ESP-IDF wireless coexistence 配置，并用真机证明 Zwift/TrainerRoad 连接、FTMS ERG、HTTP 配网和 30 分钟通知稳定性同时满足。未通过前，不得替代默认独占配网方案。
+> 注意：当前规则已演进为 coex 默认路径。后续任何改动都不得绕过 `radio_ctrl` 直接启停 WiFi；只有 OTA 独占 STA 或共存初始化失败兜底时，才允许由 `radio_ctrl` 停 BLE。
 
 ---
 
@@ -476,10 +482,10 @@ gpio_isr_handler_add(BTN_PIN, btn_isr, NULL);
 
 ### 阶段 5：WiFi 配网（3-4 天）
 
-12. `radio_ctrl` 实现 BLE↔WiFi 软切换（方案 C）。
+12. `radio_ctrl` 实现 WiFi/BLE 共存配网入口，普通配网保持 BLE 在线；同时保留 OTA/失败兜底的独占路径。
 13. esp_wifi AP + esp_http_server + 嵌入式 HTML 页面 + 路由。
-14. 倒计时 / renew / 保存重启。
-    - 验收：长按确认→配网页→保存→重启→BLE 恢复，全链路通。
+14. 倒计时 / renew / 保存设置实时生效 / 保存并退出配网。
+    - 验收：长按确认→配网页→保存设置实时生效→保存并退出配网→WiFi 关闭且 BLE 保持正常，全链路通。
 
 ### 阶段 6：稳定性与发版（2 天）
 
@@ -497,8 +503,8 @@ gpio_isr_handler_add(BTN_PIN, btn_isr, NULL);
 | NimBLE 初始化顺序 | 必须 `nvs_flash_init()` → `nimble_port_init()` → 注册服务 → `nimble_port_freertos_init()` 启 host task，顺序错会 assert |
 | GATT 句柄 | `val_handle` 必须在 `ble_gatts_count_cfg` + `ble_gatts_add_svcs` 后才有效，不能在注册前缓存 |
 | 通知 mbuf | `ble_gatts_notify_custom` 会接管 mbuf，不能复用同一个 om 给多次 notify，每次重新 `ble_hs_mbuf_from_flat` |
-| WiFi/BLE 内存 | 二者不能同时 init，切换必须完整 deinit 一方；同时 enable 会 `ESP_ERR_NO_MEM` 或 controller 冲突 |
-| WiFi/BLE 共存 | ESP-IDF 支持共存但不是免费午餐；BikePower v3.0.0 默认停 BLE 后配网，D 方案必须另开实验分支 |
+| WiFi/BLE 内存 | 普通配网允许 WiFi/BLE coex 同时启用，但必须经 `radio_ctrl` 管理生命周期并监控堆水位；OTA 独占 STA 或共存失败兜底才停 BLE |
+| WiFi/BLE 共存 | ESP-IDF 支持共存但不是免费午餐；BikePower v3.1.8 默认普通配网 coex，后续需持续验证 BLE 通知、HTTP 配网和堆水位 |
 | 栈溢出 | NimBLE 回调里别放大数组；FreeRTOS 任务栈给够（host 任务 ≥4KB） |
 | 中断上下文 | GPIO ISR 里只能入队，禁止调 BLE/日志 API；用 `xQueueSendFromISR` |
 | esp_timer 回调 | 跑在 timer task 上下文，别做耗时操作；通知发送本身轻量可接受 |
@@ -538,8 +544,8 @@ C 重写版至少满足：
 - 五服务 BLE 广播 + 通知，Zwift/TrainerRoad 正常识别功率/心率/踏频。
 - FTMS ERG 模式目标功率可被骑行软件下发并生效。
 - 三骑行模式（steady/road/erg）输出与 MicroPython 版数值趋势一致。
-- 长按二次确认 → 关 BLE → 开 WiFi AP → 配网页 → 保存 → 重启 → BLE 恢复，全链路可靠。
-- WiFi 不会在 BLE 未关闭时启动；开机不自动进 WiFi。
+- 长按二次确认 → BLE 保持在线 → 开 WiFi AP → 配网页 → 保存设置实时生效 → 保存并退出配网 → WiFi 关闭且 BLE 正常，全链路可靠。
+- 普通配网 WiFi 启停必须经 `radio_ctrl` coex 路径；开机不自动进 WiFi；OTA 独占 STA 或共存失败兜底才停 BLE。
 - 配置持久化（NVS）断电可恢复。
 - 领域层 host 单测覆盖状态机、配置迁移、模式计算、心率模型。
 - Task WDT 启用，72h 老化无 coredump、无内存泄漏。

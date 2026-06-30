@@ -580,7 +580,7 @@ static void ota_upgrade_task(void *arg)
     }
     esp_task_wdt_reset();
 
-    ret = ota_downloader_download_and_upgrade(info.url);
+    ret = ota_downloader_download_and_upgrade(info.url, NULL);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "下载升级失败 ret=%d，重启回 BLE", ret);
         vTaskDelay(pdMS_TO_TICKS(OTA_REBOOT_AFTER_UPGRADE_MS));

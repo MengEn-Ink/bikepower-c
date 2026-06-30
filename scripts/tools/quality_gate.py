@@ -134,13 +134,15 @@ required_assets = [
     "PROGRESS.md",
     "LICENSE",
     "docs/INDEX.md",
-    "docs/01-quickstart.md",
-    "docs/02-user-manual.md",
-    "docs/03-hardware.md",
-    "docs/04-technical-reference.md",
-    "docs/05-cidf-nimble-rewrite.md",
-    "docs/06-micropython-vs-c-comparison.md",
-    "docs/07-firmware-security.md",
+    "docs/user/01-quickstart.md",
+    "docs/user/02-user-manual.md",
+    "docs/user/03-hardware.md",
+    "docs/user/04-ota-user-guide.md",
+    "docs/dev/01-technical-reference.md",
+    "docs/dev/02-firmware-security.md",
+    "docs/dev/03-test-coverage-analysis.md",
+    "docs/archive/01-cidf-nimble-rewrite.md",
+    "docs/archive/02-micropython-vs-c-comparison.md",
     "main/app_main.c",
     "main/ble_bikepower.c",
     "main/wifi_portal.c",
@@ -178,7 +180,42 @@ for path in ["main/bikepower_config.h", "components/bikepower_domain/include/dom
 
 ok(f"检查了 {len(config_vars)} 个宏定义，无冲突")
 
-# 6. 总体
+# 6. 静态门禁聚合（调起 tests/ 下的纯静态检查脚本）
+print("\n=== 6. 静态门禁聚合 ===")
+# (脚本相对路径, 人类可读名称)
+STATIC_CHECKS = [
+    ("tests/check_config_consistency.py", "常量一致性 (TC-3c)"),
+    ("tests/check_nvs_schema.py", "NVS schema (TC-3e)"),
+    ("tests/check_tasks_wdt.py", "任务/队列/WDT 完整性 (TC-3g)"),
+    ("tests/check_board_desc.py", "板型描述表 (TC-3f)"),
+    ("tests/check_portal_structure.py", "门户结构 (TC-3d)"),
+    ("tests/check_portal_js.py", "门户 JS 语法 (TC-3a)"),
+]
+# 环境缺失标志：命中则降级为 warn（无设备/无依赖环境仍可跑），不算真实失败
+ENV_MISSING_MARKERS = [
+    "未找到 node",
+    "无法验证 JS",
+    "未安装",
+    "command not found",
+    "No module named",
+    "ModuleNotFoundError",
+]
+for rel_path, name in STATIC_CHECKS:
+    full = os.path.join(PROJECT, rel_path)
+    if not os.path.exists(full):
+        fail(f"{name}: 脚本缺失 {rel_path}")
+        continue
+    out, rc = run(f"python3 {rel_path} 2>&1")
+    if rc == 0:
+        ok(f"{name} 通过")
+    elif any(marker in out for marker in ENV_MISSING_MARKERS):
+        # 环境缺失（如未装 node）：降级 warn 并说明原因，不掩盖真实失败
+        reason = next(m for m in ENV_MISSING_MARKERS if m in out)
+        warn(f"{name} 因环境缺失跳过（命中标志：{reason}）")
+    else:
+        fail(f"{name} 检查失败: {out.strip().splitlines()[-1] if out.strip() else f'rc={rc}'}")
+
+# 7. 总体
 print(f"\n{'='*40}")
 print(f"结果: ✅ {SCORE['pass']}  ⚠️  {SCORE['warn']}  ❌ {SCORE['fail']}")
 if SCORE["fail"] > 0:

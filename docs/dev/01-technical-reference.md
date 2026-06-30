@@ -2,7 +2,7 @@
 
 本文面向开发者、维护者和后续接手者。
 内容基于当前仓库实现撰写，重点对应 `main/`、`components/bikepower_domain/`、`tests/` 和 `docs/images/`。
-阅读顺序建议配合 [architecture.png](images/architecture.png)、[main-loop-flow.png](images/main-loop-flow.png)、[button-led-state.png](images/button-led-state.png) 和 [rf-wifi-flow.png](images/rf-wifi-flow.png) 一起看。
+阅读顺序建议配合 [architecture.png](../images/architecture.png)、[main-loop-flow.png](../images/main-loop-flow.png)、[button-led-state.png](../images/button-led-state.png) 和 [rf-wifi-flow.png](../images/rf-wifi-flow.png) 一起看。
 
 当前固件版本为 `v3.1.8`。
 运行环境为 `ESP-IDF v5.5.4 + NimBLE + FreeRTOS`，目标芯片为 `ESP32-C3`。
@@ -59,7 +59,7 @@
 - `esp_timer`：毫秒/微秒计时与定时回调
 - Task WDT：主循环和长任务保护
 
-对应关系可直接对照 [architecture.png](images/architecture.png)。
+对应关系可直接对照 [architecture.png](../images/architecture.png)。
 如果后续要重构，建议维持“三层职责不交叉”的基本形状。
 
 ## 第二章：启动流程
@@ -579,7 +579,7 @@ DIS 读取内容来自编译期常量：
 WiFi 配网链路分布在 `app_state.c`、`radio_ctrl.c`、`wifi_portal.c`。
 当前配网默认使用 ESP-IDF coex 共存模式：BLE 保持在线继续通知，WiFi SoftAP 负责本地门户；仅 OTA 下载升级进入独占 STA，或共存初始化失败兜底时才主动停 BLE。
 
-![WiFi/BLE 射频共用流程](images/rf-wifi-flow.png)
+![WiFi/BLE 射频共用流程](../images/rf-wifi-flow.png)
 
 ### 8.1 射频共用入口
 
@@ -632,10 +632,9 @@ v3.2.0 起配网门户前后端分离：
 - `GET /favicon.ico`（204）
 - `GET /api/state`（设备全状态：device_name/firmware_version/power/cadence/heartrate/mode/profile_*/pacers/remaining_sec/closing/home_wifi_ssid）
 - `GET /api/time`（纯数字剩余秒数）
-- `GET /api/renew`（续期，返回新的剩余秒数）
+- `POST /api/renew`（续期，返回新的剩余秒数）
 - `GET /api/mem_stats`（`{"free":..,"min_free":..}`）
 - `POST /api/config`（保存配置，返回 `{"ok":true}`）
-- `POST /api/draft`（仅内存生效，返回 `{"ok":true}`）
 - `POST /api/close-wifi`（保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE）
 - `POST /api/ota/check`（异步触发版本检查，返回 `{"status":"started"|"running"|"error"}`）
 - `GET /api/ota/status`（轮询检查状态：`status` ∈ `idle/running/done/error`，done 时附 `has_update/version/size/changelog`）
@@ -649,7 +648,6 @@ v3.2.0 起配网门户前后端分离：
 
 - `/api/config`：保存配置并实时生效到 BLE 通知
 - `/api/close-wifi`：保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE
-- `/api/draft`：只把首页/更多页字段回写到内存，不保存不重启
 - `/api/ota/check`：异步连接家庭 WiFi，拉取 `latest.json`
 - `/api/ota/upgrade`：进入独占 STA，下载固件并写入 OTA 分区，完成后重启
 - `/api/time`：返回剩余秒数
@@ -676,6 +674,12 @@ v3.2.0 起配网门户前后端分离：
 6. 状态机在 app_main 上下文调用 `radio_ctrl_exit_wifi()`
 
 所以当前版本的配网退出不重启设备；BLE 在普通配网期间保持在线。OTA 升级是例外：升级任务会关闭 AP 和 BLE，切到 STA 独占模式下载固件，最终通过 `esp_restart()` 进入新固件或回到 BLE。
+
+### 8.5 前端反馈与 JSON 安全
+
+配网首页的 `/config` 采用 PRG 流程，保存成功后 302 回 `/?saved=1`，首页显示“已保存到设备”的强反馈；`/close-wifi` 仍用于保存并进入 5 秒收尾窗口。`/more` 下的个人信息表单在前端校验体重、FTP、阈值心率等范围，非法值会阻止提交并给出字段级提示。
+
+WiFi 扫描、家庭网络保存、OTA 检查和 OTA 升级状态都返回 JSON。`wifi_portal.c` 使用 `json_escape()` 转义字符串字段，避免 SSID、错误信息或远端 changelog 破坏 JSON；OTA 页面渲染远端更新说明时做 HTML 转义，测试脚本 `tests/ota_local_mock.py --self-test` 覆盖升级进度轮询和 XSS 回归。
 
 ## 第九章：配置持久化
 
@@ -734,7 +738,11 @@ namespace 固定为：
 - `ride_type` 合法性
 - 设备名空串回退为 `DEVICE_NAME_DEFAULT`
 
-### 9.4 脏标记落盘策略
+### 9.4 配置 JSON 序列化
+
+领域层提供 `config_store_serialize()` 和 `config_store_deserialize()`，用于配置导出/导入、备份/恢复和 host 单测。序列化输出包含 schema、功率、踏频、模式、心率、体重、FTP、阈值心率、骑行类型和设备名；设备名按 JSON 规则转义双引号、反斜杠和控制字符。反序列化要求 JSON 至少包含 `schema_ver`，缺失字段先保留默认值，最后复用 `config_store_validate()` 做范围夹紧。
+
+### 9.5 脏标记落盘策略
 
 落盘触发来源有两类：
 
@@ -823,7 +831,7 @@ FTMS 控制点收到写请求后只做最少逻辑：
 
 ### 11.3 GPIO 与板型适配
 
-当前固件支持运行时板型检测，可对照 [hardware-pinout.png](images/hardware-pinout.png)。
+当前固件支持运行时板型检测，可对照 [hardware-pinout.png](../images/hardware-pinout.png)。
 
 通用 ESP32-C3 开发板使用：
 
@@ -862,6 +870,8 @@ idf.py build
 ```
 
 根据项目规则，C 代码改动后 `idf.py build` 必须通过。
+
+发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建，正式运行会为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256、manifest 与 `latest.json` 草案；脚本不会打 git tag，也不会创建 Gitee Release。
 
 ### 12.2 领域层 host 单测
 
@@ -919,12 +929,14 @@ LED 物理变化仍需人工肉眼确认。
 如果你要改动功能，建议按下面顺序验证：
 
 1. 改领域层先跑 host 单测
-2. 跑 `idf.py build`
-3. 烧录到 ESP32-C3
-4. 看串口启动日志
-5. 跑 `tests/ble_selftest.py`
-6. 涉及配网时再跑 `tests/stage5_portal_test.py`
-7. 涉及按钮和 LED 时做人工真机操作确认
+2. 跑 `python3 tests/check_config_consistency.py`
+3. 跑 `python3 scripts/tools/quality_gate.py` 聚合构建、host 单测和静态门禁
+4. 烧录到 ESP32-C3
+5. 看串口启动日志
+6. 跑 `tests/ble_selftest.py`
+7. 涉及配网时再跑 `tests/stage5_portal_test.py`
+8. 涉及 OTA 页面时跑 `python3 tests/ota_local_mock.py --self-test`
+9. 涉及按钮和 LED 时做人工真机操作确认
 
 ## 结语
 

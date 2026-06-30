@@ -148,7 +148,7 @@ esp_err_t ota_downloader_check_version(const char *json_url, ota_version_info_t 
 
 // ============================ 下载升级 ============================
 
-esp_err_t ota_downloader_download_and_upgrade(const char *url)
+esp_err_t ota_downloader_download_and_upgrade(const char *url, ota_progress_cb_t cb)
 {
     if (url == NULL || url[0] == '\0') {
         return ESP_ERR_INVALID_ARG;
@@ -172,12 +172,51 @@ esp_err_t ota_downloader_download_and_upgrade(const char *url)
         .partial_http_download = false,
     };
 
-    esp_err_t ret = esp_https_ota(&ota_cfg);
+    // 迭代式 OTA：begin → 循环 perform 上报进度 → finish，便于回调下载百分比
+    esp_https_ota_handle_t handle = NULL;
+    esp_err_t ret = esp_https_ota_begin(&ota_cfg, &handle);
+    if (ret != ESP_OK || handle == NULL) {
+        ESP_LOGE(TAG, "esp_https_ota_begin 失败 ret=%d 堆=%lu", ret, (unsigned long)esp_get_free_heap_size());
+        return ret != ESP_OK ? ret : ESP_FAIL;
+    }
+
+    int total = esp_https_ota_get_image_size(handle);   // 来自 Content-Length，可能 -1/0
+    if (cb) {
+        cb(0, total > 0 ? total : 0);
+    }
+
+    while (1) {
+        ret = esp_https_ota_perform(handle);
+        if (ret != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
+            break;   // 完成或出错退出循环
+        }
+        int read = esp_https_ota_get_image_len_read(handle);
+        if (cb) {
+            cb(read, total > 0 ? total : 0);
+        }
+    }
+
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "esp_https_ota 失败 ret=%d 堆=%lu", ret, (unsigned long)esp_get_free_heap_size());
+        ESP_LOGE(TAG, "esp_https_ota_perform 失败 ret=%d 堆=%lu", ret, (unsigned long)esp_get_free_heap_size());
+        esp_https_ota_abort(handle);
         return ret;
     }
 
+    if (!esp_https_ota_is_complete_data_received(handle)) {
+        ESP_LOGE(TAG, "固件数据不完整（连接中断），放弃");
+        esp_https_ota_abort(handle);
+        return ESP_FAIL;
+    }
+
+    ret = esp_https_ota_finish(handle);   // 校验 + set_boot_partition
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_https_ota_finish 失败 ret=%d", ret);
+        return ret;
+    }
+
+    if (cb && total > 0) {
+        cb(total, total);   // 收尾上报 100%
+    }
     ESP_LOGI(TAG, "固件下载写入完成，待重启进入新固件 堆=%lu", (unsigned long)esp_get_free_heap_size());
     return ESP_OK;
 }

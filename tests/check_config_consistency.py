@@ -17,8 +17,15 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG_H = ROOT / "main" / "bikepower_config.h"
 DOMAIN_H = ROOT / "components" / "bikepower_domain" / "include" / "domain_config.h"
 README = ROOT / "README.md"
+PROGRESS = ROOT / "PROGRESS.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
-OTA_GUIDE = ROOT / "docs" / "11-ota-user-guide.md"
+DOC_INDEX = ROOT / "docs" / "INDEX.md"
+OTA_GUIDE = ROOT / "docs" / "user" / "04-ota-user-guide.md"
+QUICKSTART = ROOT / "docs" / "user" / "01-quickstart.md"
+USER_MANUAL = ROOT / "docs" / "user" / "02-user-manual.md"
+NIMBLE_REWRITE = ROOT / "docs" / "archive" / "01-cidf-nimble-rewrite.md"
+MPY_COMPARISON = ROOT / "docs" / "archive" / "02-micropython-vs-c-comparison.md"
+REVIEW_CHECKLIST = ROOT / "docs" / "archive" / "03-review-checklist.md"
 HW_CONSTRAINTS = ROOT / ".trae" / "rules" / "hardware-constraints.md"
 
 TAG = "[TC-3c]"
@@ -86,8 +93,15 @@ def extract_changelog_unreleased_has_version_bump(changelog: str, target_ver: st
 config_src = read(CONFIG_H)
 domain_src = read(DOMAIN_H)
 readme_src = read(README)
+progress_src = read(PROGRESS)
 changelog_src = read(CHANGELOG)
+doc_index_src = read(DOC_INDEX)
 ota_guide_src = read(OTA_GUIDE) if OTA_GUIDE.exists() else ""
+quickstart_src = read(QUICKSTART)
+user_manual_src = read(USER_MANUAL)
+nimble_rewrite_src = read(NIMBLE_REWRITE)
+mpy_comparison_src = read(MPY_COMPARISON)
+review_checklist_src = read(REVIEW_CHECKLIST)
 hw_src = read(HW_CONSTRAINTS) if HW_CONSTRAINTS.exists() else ""
 
 
@@ -175,6 +189,72 @@ wifi_shutdown = extract_int(config_src, "WIFI_SHUTDOWN_MS")
 check(wifi_shutdown == 180000, f"WIFI_SHUTDOWN_MS = 180000 (实际={wifi_shutdown})")
 
 
+# ============================ 4b. 用户文档配网描述一致性 ============================
+print(f"\n{TAG} [S4b] 用户文档配网描述一致性")
+
+check(f"v{fw_ver}" in user_manual_src,
+      f"docs/user/02-user-manual.md 固件版本 v{fw_ver} 与 FIRMWARE_VERSION 一致")
+
+legacy_wifi_phrases = [
+    "保存并重启",
+    "设备关闭蓝牙",
+    "设备自动重启并恢复蓝牙模式",
+    "保存后等设备重启",
+    "配网时会暂时关闭 BLE",
+    "配网完成后设备重启",
+]
+user_wifi_docs = {
+    "docs/user/01-quickstart.md": quickstart_src,
+    "docs/user/02-user-manual.md": user_manual_src,
+}
+for doc_name, doc_src in user_wifi_docs.items():
+    for phrase in legacy_wifi_phrases:
+        check(phrase not in doc_src, f"{doc_name} 不含旧版普通配网短语：{phrase}")
+
+
+# ============================ 4c. 开发者文档配网策略一致性 ============================
+print(f"\n{TAG} [S4c] 开发者文档配网策略一致性")
+
+legacy_dev_wifi_phrases = [
+    "默认仍采用“配网时停 BLE”",
+    "默认仍建议配网时停 BLE",
+    "当前项目规则已经把“进入 WiFi 配网前停止 BLE”",
+    "保存重启",
+    "二者不能同时 init",
+    "先停 BLE → 延时 200ms → 启 WiFi",
+]
+dev_wifi_docs = {
+    "docs/archive/01-cidf-nimble-rewrite.md": nimble_rewrite_src,
+    "docs/archive/03-review-checklist.md": review_checklist_src,
+}
+for doc_name, doc_src in dev_wifi_docs.items():
+    for phrase in legacy_dev_wifi_phrases:
+        check(phrase not in doc_src, f"{doc_name} 不含旧版开发者配网结论：{phrase}")
+
+
+# ============================ 4d. 技术栈版本文档一致性 ============================
+print(f"\n{TAG} [S4d] 技术栈版本文档一致性")
+
+check("ESP-IDF v5.5.1" not in mpy_comparison_src,
+      "docs/archive/02-micropython-vs-c-comparison.md 不含过时 ESP-IDF v5.5.1")
+check("ESP-IDF v5.5.4" in mpy_comparison_src,
+      "docs/archive/02-micropython-vs-c-comparison.md 含当前 ESP-IDF v5.5.4")
+check("建议改为 v5.5.4" not in review_checklist_src,
+      "docs/archive/03-review-checklist.md 不再以未完成语气建议修复 sdkconfig 版本注释")
+
+
+# ============================ 4e. 文档索引阶段范围一致性 ============================
+print(f"\n{TAG} [S4e] 文档索引阶段范围一致性")
+
+check("阶段 0-9 完成情况" not in doc_index_src,
+      "docs/INDEX.md 不含过时阶段 0-9 项目进度描述")
+check("阶段 0-10 完成情况" in doc_index_src,
+      "docs/INDEX.md 含阶段 0-10 项目进度描述")
+if "| 10 |" in progress_src:
+    check("阶段 0-10" in doc_index_src,
+          "PROGRESS.md 含阶段 10 时 docs/INDEX.md 同步到阶段 0-10")
+
+
 # ============================ 5. OTA 配置一致性 ============================
 print(f"\n{TAG} [S5] OTA 配置一致性")
 
@@ -193,10 +273,10 @@ check(ota_timeout == 30000, f"OTA_DOWNLOAD_TIMEOUT_MS = 30000 (实际={ota_timeo
 ota_sta_ms = extract_int(config_src, "OTA_STA_CONNECT_MS")
 check(ota_sta_ms == 15000, f"OTA_STA_CONNECT_MS = 15000 (实际={ota_sta_ms})")
 
-# docs/11-ota-user-guide.md 应提到 OTA_VERSION_URL 或 latest.json
+# docs/user/04-ota-user-guide.md 应提到 OTA_VERSION_URL 或 latest.json
 if ota_guide_src:
     check("OTA_VERSION_URL" in ota_guide_src or "latest.json" in ota_guide_src,
-          "docs/11-ota-user-guide.md 提到 OTA_VERSION_URL/latest.json")
+          "docs/user/04-ota-user-guide.md 提到 OTA_VERSION_URL/latest.json")
 
 
 # ============================ 6. BLE 通知间隔一致性 ============================

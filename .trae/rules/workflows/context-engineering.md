@@ -18,13 +18,13 @@
 - 改 BLE 或 BLE 自测，读 `.trae/rules/domain/ble.md`
 - 改配网、radio 或门户自测，读 `.trae/rules/domain/wifi.md`
 - 改测试流程、提交流程或治理流程，读 `.trae/rules/workflows/*.md`
-5. `CE-5`：再读与任务直接相关的技术文档，优先 `PROGRESS.md`、`docs/04-technical-reference.md` 和对应实现文件。
+5. `CE-5`：再读与任务直接相关的技术文档，优先 `PROGRESS.md`、`docs/dev/01-technical-reference.md` 和对应实现文件。
 6. `CE-6`：最后结合当前 `git status --short`、打开文件和用户请求，确定本次允许修改的范围。
 
 ## 任务路由建议
 
 - 改 `main/ble_bikepower.c`、`app_main.c`、`tests/ble_selftest.py`：
-先读 `domain/ble.md`，再读 `docs/04-technical-reference.md` 第四章和测试脚本。
+先读 `domain/ble.md`，再读 `docs/dev/01-technical-reference.md` 第四章和测试脚本。
 - 改 `main/wifi_portal.c`、`main/radio_ctrl.c`、`tests/stage5_portal_test.py`：
 先读 `domain/wifi.md` 和 `wifi-ble-mutex.md`，再读技术参考第八章。
 - 改 `components/bikepower_domain/`：

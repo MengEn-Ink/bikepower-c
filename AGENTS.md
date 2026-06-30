@@ -13,7 +13,8 @@
 - [.trae/rules/coding-style.md](.trae/rules/coding-style.md) — C/ESP-IDF 代码风格与 FreeRTOS 约束。
 - [.trae/rules/hardware-constraints.md](.trae/rules/hardware-constraints.md) — ESP32-C3 硬件约束。
 - [.trae/rules/wifi-ble-mutex.md](.trae/rules/wifi-ble-mutex.md) — WiFi/BLE 射频共用（硬约束）。
-- [docs/05-cidf-nimble-rewrite.md](docs/05-cidf-nimble-rewrite.md) — 基线重写方案（分阶段路线图）。
+- [docs/dev/01-technical-reference.md](docs/dev/01-technical-reference.md) — 技术参考（当前实现的权威行为规格）。
+- [docs/archive/01-cidf-nimble-rewrite.md](docs/archive/01-cidf-nimble-rewrite.md) — 基线重写方案（历史归档，仅供追溯）。
 
 ## Hard Rules
 

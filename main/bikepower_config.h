@@ -85,7 +85,7 @@ typedef enum {
 #define HOME_WIFI_PSK_MAX      64
 
 // ===== 在线 OTA 下载（v3.1.6：STA 模式 HTTPS 下载固件） =====
-// latest.json 放仓库 ota/ 目录，raw 访问需仓库公开；格式见 docs/12-roadmap-v316.md
+// latest.json 放仓库 ota/ 目录，raw 访问需仓库公开；格式见 docs/archive/06-roadmap-v316.md
 #define OTA_VERSION_URL        "https://gitee.com/mengen4jv/bikepower-c/raw/main/ota/latest.json"
 #define OTA_DOWNLOAD_TIMEOUT_MS  30000   // HTTPS 单次请求超时
 #define OTA_STA_CONNECT_MS       15000   // STA 连路由器超时
@@ -154,7 +154,7 @@ typedef enum {
 #define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 保存并关闭 WiFi 前的收尾等待时间（历史命名保留）
 #define WIFI_MAX_STA_CONN      2        // SoftAP最大连接客户端数
 #define HTTP_MAX_BODY_LEN      4096     // HTTP请求体最大长度（字节）
-#define HTTP_MAX_URI_HANDLERS  32       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + v3.1.6 WiFi 配置路由）
+#define HTTP_MAX_URI_HANDLERS  36       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + WiFi 配置 + OTA 升级进度路由）
 
 // ===== Captive Portal =====
 #define CAPTIVE_PORTAL_HOST    "192.168.4.1"  // SoftAP 网关 IP，DNS 劫持目标 + 重定向 Location 主机

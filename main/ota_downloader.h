@@ -44,11 +44,20 @@ typedef struct {
 esp_err_t ota_downloader_check_version(const char *json_url, ota_version_info_t *info);
 
 /**
+ * 下载进度回调：在固件下载过程中周期性上报已写入/总字节数。
+ * read_bytes：已下载并写入 OTA 分区的字节数。
+ * total_bytes：固件总字节数（来自 HTTP Content-Length，0 表示未知）。
+ * 注意：回调在下载任务上下文执行，实现需简短且非阻塞（仅更新状态变量）。
+ */
+typedef void (*ota_progress_cb_t)(int read_bytes, int total_bytes);
+
+/**
  * HTTPS 流式下载固件并写入 OTA 分区，完成后切换启动分区。
- * 用 esp_https_ota 组件一站式下载+写入+切换，证书用 mbedTLS 证书包。
+ * 用 esp_https_ota 迭代式 API（begin/perform/finish）下载+写入+切换，证书用 mbedTLS 证书包。
  * url：固件 bin 的完整 HTTPS URL。
+ * cb：下载进度回调，可为 NULL；非 NULL 时每收到一块数据上报一次已读/总字节。
  * 返回值：ESP_OK 表示下载并写入成功（已 set_boot_partition，待重启），否则为错误码。
  * 特殊行为：调用前必须已连上路由器；成功后调用方需 esp_restart 进入新固件；
  *           下载过程阻塞，可能耗时 30-120s（取决于固件大小和网络）。
  */
-esp_err_t ota_downloader_download_and_upgrade(const char *url);
+esp_err_t ota_downloader_download_and_upgrade(const char *url, ota_progress_cb_t cb);

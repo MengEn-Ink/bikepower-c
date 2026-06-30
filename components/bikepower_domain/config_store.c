@@ -2,7 +2,10 @@
  * 配置 schema 实现 — 见 config_store.h
  */
 #include "config_store.h"
+#include "json_miniparse.h"
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 static int clamp_int(int v, int lo, int hi)
 {
@@ -82,5 +85,142 @@ bool config_store_migrate(config_data_t *c)
         return false;
     }
     config_store_defaults(c);
+    return true;
+}
+
+/* 把字符串按 JSON 规则转义写入 dst（含两端不含引号）。
+ * 返回写入字符数；若空间不足（含结尾 '\0' 预留由调用方保证）则返回 (size_t)-1。 */
+static size_t json_escape(const char *src, char *dst, size_t dst_sz)
+{
+    size_t n = 0;
+    for (const char *p = src; *p; p++) {
+        unsigned char ch = (unsigned char)*p;
+        char tmp[8];
+        const char *seg;
+        size_t seglen;
+        switch (ch) {
+        case '"':  seg = "\\\""; seglen = 2; break;
+        case '\\': seg = "\\\\"; seglen = 2; break;
+        case '\b': seg = "\\b";  seglen = 2; break;
+        case '\f': seg = "\\f";  seglen = 2; break;
+        case '\n': seg = "\\n";  seglen = 2; break;
+        case '\r': seg = "\\r";  seglen = 2; break;
+        case '\t': seg = "\\t";  seglen = 2; break;
+        default:
+            if (ch < 0x20) {
+                snprintf(tmp, sizeof(tmp), "\\u%04x", ch);
+                seg = tmp; seglen = 6;
+            } else {
+                tmp[0] = (char)ch; tmp[1] = '\0';
+                seg = tmp; seglen = 1;
+            }
+            break;
+        }
+        if (n + seglen >= dst_sz) return (size_t)-1;
+        memcpy(dst + n, seg, seglen);
+        n += seglen;
+    }
+    if (n >= dst_sz) return (size_t)-1;
+    dst[n] = '\0';
+    return n;
+}
+
+/* 把 JSON 字符串值反转义到 dst。src 指向值首字符（引号之后），
+ * 解析到未转义的 '"' 结束。返回 true 表示成功。 */
+static bool json_unescape(const char *src, char *dst, size_t dst_sz)
+{
+    size_t n = 0;
+    for (const char *p = src; *p && *p != '"'; p++) {
+        char out;
+        if (*p == '\\') {
+            p++;
+            switch (*p) {
+            case '"':  out = '"';  break;
+            case '\\': out = '\\'; break;
+            case '/':  out = '/';  break;
+            case 'b':  out = '\b'; break;
+            case 'f':  out = '\f'; break;
+            case 'n':  out = '\n'; break;
+            case 'r':  out = '\r'; break;
+            case 't':  out = '\t'; break;
+            case 'u': {
+                /* \uXXXX：仅支持 00-FF 范围（设备名为 ASCII），高字节忽略 */
+                char hex[5] = {0};
+                for (int i = 0; i < 4 && p[1]; i++) hex[i] = *(++p);
+                out = (char)(strtol(hex, NULL, 16) & 0xFF);
+                break;
+            }
+            case '\0': return false;  /* 反斜杠后截断 */
+            default:   out = *p;      break;
+            }
+        } else {
+            out = *p;
+        }
+        if (n + 1 >= dst_sz) break;  /* 截断保护，保留结尾 '\0' */
+        dst[n++] = out;
+    }
+    dst[n] = '\0';
+    return true;
+}
+
+size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
+{
+    if (c == NULL || out == NULL || out_sz == 0) return 0;
+
+    /* device_name 转义后最大膨胀 6 倍（\u00XX），按 DEVICE_NAME_MAX 预留 */
+    char esc[DEVICE_NAME_MAX * 6];
+    if (json_escape(c->device_name, esc, sizeof(esc)) == (size_t)-1) return 0;
+
+    /* 先写入栈缓冲，确认总长后再拷贝出参，避免向 out 写截断内容 */
+    char buf[256];
+    int n = snprintf(buf, sizeof(buf),
+        "{\"schema_ver\":%d,\"power\":%d,\"cadence\":%d,\"mode\":%d,"
+        "\"heartrate\":%d,\"has_user_hr\":%d,\"weight\":%d,\"ftp\":%d,"
+        "\"thr_hr\":%d,\"ride_type\":%d,\"device_name\":\"%s\"}",
+        c->schema_ver, c->power, c->cadence, c->mode,
+        c->heartrate, c->has_user_hr, c->weight, c->ftp,
+        c->thr_hr, c->ride_type, esc);
+
+    if (n < 0 || (size_t)n >= sizeof(buf)) return 0;  /* 编码错误或内部缓冲不足 */
+    if ((size_t)n >= out_sz) return 0;                /* 出参缓冲不足，不溢出 */
+    memcpy(out, buf, (size_t)n + 1);
+    return (size_t)n;
+}
+
+bool config_store_deserialize(const char *json, config_data_t *c)
+{
+    if (json == NULL || c == NULL) return false;
+    /* 必备结构校验：缺 schema_ver 键视为非法 JSON，避免静默落默认配置 */
+    if (strstr(json, "\"schema_ver\":") == NULL) return false;
+
+    /* 解析到临时对象，成功才写出，失败不污染调用方的 c */
+    config_data_t tmp;
+    config_store_defaults(&tmp);
+
+    /* 仅覆盖 JSON 中出现的整数键，缺键字段保持默认 */
+    struct { const char *key; int *field; } int_keys[] = {
+        {"schema_ver", &tmp.schema_ver}, {"power", &tmp.power},
+        {"cadence", &tmp.cadence}, {"mode", &tmp.mode},
+        {"heartrate", &tmp.heartrate}, {"has_user_hr", &tmp.has_user_hr},
+        {"weight", &tmp.weight}, {"ftp", &tmp.ftp},
+        {"thr_hr", &tmp.thr_hr}, {"ride_type", &tmp.ride_type},
+    };
+    for (size_t i = 0; i < sizeof(int_keys) / sizeof(int_keys[0]); i++) {
+        char pat[40];
+        snprintf(pat, sizeof(pat), "\"%s\":", int_keys[i].key);
+        if (strstr(json, pat)) {
+            *int_keys[i].field = json_get_int(json, int_keys[i].key);
+        }
+    }
+
+    /* device_name：定位值起点后做反转义（json_get_str 不处理转义） */
+    const char *dp = strstr(json, "\"device_name\":\"");
+    if (dp) {
+        dp += strlen("\"device_name\":\"");
+        json_unescape(dp, tmp.device_name, DEVICE_NAME_MAX);
+    }
+
+    config_store_validate(&tmp);
+    *c = tmp;
     return true;
 }

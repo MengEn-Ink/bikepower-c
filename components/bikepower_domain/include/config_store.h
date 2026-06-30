@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include "domain_config.h"
 
 /*
@@ -41,3 +42,27 @@ bool config_store_validate(config_data_t *c);
  * 返回是否发生迁移。
  */
 bool config_store_migrate(config_data_t *c);
+
+/**
+ * 将配置对象序列化为 JSON 文本（用于导出/备份）。
+ * 输出形如 {"schema_ver":N,"power":N,...,"device_name":"xxx"}。
+ * c：待序列化的配置对象。
+ * out：输出缓冲区。
+ * out_sz：缓冲区大小。
+ * 返回值：成功返回写入的字符数（不含结尾 '\0'，>0）；
+ *         参数非法或缓冲区不足返回 0（不会写入截断/溢出内容）。
+ * 特殊行为：device_name 按 JSON 规则转义双引号、反斜杠与控制字符（\b\f\n\r\t 及 \u00XX）。
+ */
+size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz);
+
+/**
+ * 从 JSON 文本反序列化为配置对象（用于导入/恢复）。
+ * 先 config_store_defaults 填充，再仅覆盖 JSON 中出现的键，最后复用 validate 夹紧。
+ * device_name 会做 JSON 反转义（与 serialize 配对，保证往返一致）。
+ * json：输入 JSON 字符串。
+ * c：输出配置对象。
+ * 返回值：true 表示解析成功（即使有字段被 validate 修正）；
+ *         json 或 c 为 NULL，或 JSON 缺少必备结构（无 schema_ver 键）返回 false。
+ * 特殊行为：失败时 c 保持调用前内容不变（先解析到临时对象，成功才写出），不留半初始化配置。
+ */
+bool config_store_deserialize(const char *json, config_data_t *c);

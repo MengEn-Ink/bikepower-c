@@ -22,19 +22,21 @@
 
 ## 文档命名规范（强制）
 
-`docs/` 目录下所有 Markdown 文档必须使用 `NN-kebab-case.md` 格式排序命名：
+`docs/` 目录下文档按维度分子目录管理，所有 Markdown 文档使用 `docs/<category>/NN-kebab-case.md` 格式命名：
 
 | 规则 | 说明 |
 |------|------|
-| 格式 `NN-名称.md` | NN 为两位数字前缀（01-99），决定文档排列顺序 |
+| 分类子目录 | `docs/user/`（产品使用）、`docs/dev/`（开发与技术）、`docs/archive/`（历史归档，仅供追溯） |
+| 格式 `NN-名称.md` | NN 为两位数字前缀（01-99），**在所属子目录内**决定排列顺序 |
 | kebab-case | 名称用小写+连字符（如 `ota-user-guide`） |
-| 编号连续递增 | 新增文档取当前最大编号 +1，不跳号、不复用已删除编号 |
-| 例外：`INDEX.md` | 索引文件不加编号，始终排在文件列表最后 |
-| 例外：`images/` 子目录 | 图片资源不编号 |
-| 重命名同步 | 重命名文档时必须同步更新 INDEX.md 及所有交叉引用 |
-| 禁止无编号文档 | 禁止在 docs/ 放无编号的 .md（INDEX.md 除外） |
+| 编号连续递增 | 新增文档取所属子目录当前最大编号 +1，不跳号、不复用已删除编号 |
+| 过时不删除 | 过时/已完成文档移入 `docs/archive/` 并在顶部加归档标注，不物理删除 |
+| 例外：`INDEX.md` | 索引文件留在 `docs/` 根，不加编号 |
+| 例外：`images/` 子目录 | 图片资源留在 `docs/images/`，不编号 |
+| 移动/重命名同步 | 必须同步更新 INDEX.md、跨文件交叉引用，以及门禁脚本（`tests/check_config_consistency.py`、`scripts/tools/quality_gate.py`）中硬编码的文档路径 |
+| 禁止无编号文档 | 禁止在分类子目录放无编号的 .md |
 
-当前编号分配见 [docs/INDEX.md](../../docs/INDEX.md)。
+当前目录划分与编号分配见 [docs/INDEX.md](../../docs/INDEX.md)。
 
 ## 文件结构
 ```
@@ -86,20 +88,25 @@ bikepower-c/
 │   ├── run_stress.sh         — 压力测试
 │   └── README.md             — 测试脚本使用说明
 ├── test/test_domain          — host 单测（领域层）
-├── docs/                     — 文档（NN-kebab-case.md 编号排序，见文档命名规范）
-│   ├── 01-quickstart.md      — 快速上手
-│   ├── 02-user-manual.md     — 用户手册
-│   ├── 03-hardware.md        — 硬件指南
-│   ├── 04-technical-reference.md — 技术参考
-│   ├── 05-cidf-nimble-rewrite.md — 基线重写方案
-│   ├── 06-micropython-vs-c-comparison.md — 技术栈对比
-│   ├── 07-firmware-security.md — 固件安全
-│   ├── 08-review-checklist.md — 审查清单
-│   ├── 09-memory-and-feature-assessment.md — 内存与新功能评估
-│   ├── 10-ota-implementation-plan.md — OTA 落地方案
-│   ├── 11-ota-user-guide.md  — OTA 操作手册
-│   ├── 12-roadmap-v316.md    — v3.1.6 迭代规划
-│   └── INDEX.md              — 文档索引
+├── docs/                     — 文档（docs/<category>/NN-kebab-case.md，见文档命名规范）
+│   ├── INDEX.md              — 文档索引（根目录，不编号）
+│   ├── user/                 — 产品使用说明
+│   │   ├── 01-quickstart.md          — 快速上手
+│   │   ├── 02-user-manual.md         — 用户手册
+│   │   ├── 03-hardware.md            — 硬件指南
+│   │   └── 04-ota-user-guide.md      — OTA 操作手册
+│   ├── dev/                  — 开发与技术
+│   │   ├── 01-technical-reference.md — 技术参考（当前实现权威规格）
+│   │   ├── 02-firmware-security.md   — 固件安全
+│   │   └── 03-test-coverage-analysis.md — 测试覆盖率分析
+│   ├── archive/              — 历史归档（仅供追溯）
+│   │   ├── 01-cidf-nimble-rewrite.md — 基线重写方案
+│   │   ├── 02-micropython-vs-c-comparison.md — 技术栈对比
+│   │   ├── 03-review-checklist.md    — 审查清单
+│   │   ├── 04-memory-and-feature-assessment.md — 内存与新功能评估
+│   │   ├── 05-ota-implementation-plan.md — OTA 落地方案
+│   │   └── 06-roadmap-v316.md        — v3.1.6 迭代规划
+│   └── images/               — 配图（不编号）
 ├── .trae/rules/            — AI 规则（C/ESP-IDF 版）
 │   ├── general-rules.md      — 项目结构 + 模块边界 + 提交/发版规则
 │   ├── coding-style.md       — C/ESP-IDF 代码风格 + FreeRTOS 约束

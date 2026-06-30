@@ -135,6 +135,8 @@ nohup python3 tests/serial_daemon.py -p /dev/ttyACM0 > /tmp/serial_daemon.out 2>
 python3 tests/ota_serial_monitor.py -p /dev/ttyACM0 -d 600
 ```
 
+> v3.1.6 起 OTA 升级统一为 HTTPS 在线下载方式，已移除基于 `/ota/upload` 上传的 `ota_full_test.sh` 与 `ota_upload_test.py`。在线 OTA 全流程由 `ota_flow_test.py` 覆盖，人工验证参考 [docs/user/04-ota-user-guide.md](../docs/user/04-ota-user-guide.md)。
+
 ### F. 压力测试
 
 | 脚本 | 用途 |

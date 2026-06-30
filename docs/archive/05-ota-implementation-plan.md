@@ -1,12 +1,14 @@
 # OTA 升级与 Captive Portal 落地方案
 
+> 🗄️ **历史 / 归档文档，仅供追溯**：本文记录 v3.1.4 规划阶段「配网页上传固件」方案，已被 v3.1.6 起的「HTTPS 在线下载」取代。当前 OTA 实际流程以 [OTA 固件升级操作手册](../user/04-ota-user-guide.md) 为准。
+
 > ⚠️ 历史方案文档：本文记录 v3.1.4 规划阶段的设计，当时采用「配网页 multipart 上传固件」方式。
 > v3.1.6 起 OTA 升级方式已演进为「HTTPS 在线下载」，移除 `/ota/upload` 上传入口，凭证统一在 `/more` 家庭网络配置。
-> 当前实际流程以 [11-ota-user-guide.md](11-ota-user-guide.md) 为准，本文保留作历史参考。
+> 当前实际流程以 [OTA 固件升级操作手册](../user/04-ota-user-guide.md) 为准，本文保留作历史参考。
 
 > 固件版本：v3.1.4（规划）
 > 硬件：ESP32-C3，4MB Flash
-> 关联文档：[内存与新功能评估](09-memory-and-feature-assessment.md)、[04-技术参考](04-technical-reference.md)
+> 关联文档：[内存与新功能评估](04-memory-and-feature-assessment.md)、[技术参考](../dev/01-technical-reference.md)
 
 ---
 
@@ -32,11 +34,11 @@
 
 | 组件 | 文件 | 职责 |
 |------|------|------|
-| DNS 服务器 | [main/captive_portal.c](../main/captive_portal.c) | UDP 53 监听，所有 A 记录查询应答 192.168.4.1 |
-| 探测 handler | [main/captive_portal.c](../main/captive_portal.c) | 302 重定向到 http://192.168.4.1/ |
-| 生命周期集成 | [main/radio_ctrl.c](../main/radio_ctrl.c) | AP 启动后启动 DNS，退出配网时停止 |
-| 路由注册 | [main/wifi_portal.c](../main/wifi_portal.c) | 注册 10 个 OS 探测端点 |
-| 常量 | [main/bikepower_config.h](../main/bikepower_config.h) | CAPTIVE_PORTAL_HOST、HTTP_MAX_URI_HANDLERS |
+| DNS 服务器 | [main/captive_portal.c](../../main/captive_portal.c) | UDP 53 监听，所有 A 记录查询应答 192.168.4.1 |
+| 探测 handler | [main/captive_portal.c](../../main/captive_portal.c) | 302 重定向到 http://192.168.4.1/ |
+| 生命周期集成 | [main/radio_ctrl.c](../../main/radio_ctrl.c) | AP 启动后启动 DNS，退出配网时停止 |
+| 路由注册 | [main/wifi_portal.c](../../main/wifi_portal.c) | 注册 10 个 OS 探测端点 |
+| 常量 | [main/bikepower_config.h](../../main/bikepower_config.h) | CAPTIVE_PORTAL_HOST、HTTP_MAX_URI_HANDLERS |
 
 ### 2.2 覆盖的 OS 探测端点
 

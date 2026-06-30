@@ -1,5 +1,7 @@
 # MicroPython vs C 方案对比与未来规划
 
+> 🗄️ **历史 / 归档文档，仅供追溯**：本文为技术栈选型阶段的对比记录，不代表 v3.1.8 当前实现。
+
 > 日期：2026-06-12
 > 对比对象：esp32-power（MicroPython v2.3.0）vs bikepower-c（C/ESP-IDF v3.0.0）
 > 硬件平台：ESP32-C3（RISC-V 160MHz, 400KB SRAM, 2MB Flash）
@@ -54,7 +56,7 @@
 
 | 维度 | MicroPython | C |
 |------|:-----------:|:-:|
-| 框架 | MicroPython v1.24+ | ESP-IDF v5.5.1 |
+| 框架 | MicroPython v1.24+ | ESP-IDF v5.5.4 |
 | BLE 栈 | MicroPython bluetooth (NimBLE) | 原生 NimBLE |
 | RTOS | _thread（受限） | FreeRTOS（完整 Queue/信号量/任务） |
 | HTTP 服务 | 手写 socket + 分块 | esp_http_server |
