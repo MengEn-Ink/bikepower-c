@@ -23,11 +23,6 @@
 
   <!-- ============ 首页 ============ -->
   <div class="view" id="view-home">
-    <div class="cred-row" id="home-wifi" style="display:none">
-      <span class="cred-label">已配家庭 WiFi</span>
-      <span class="cred-val" id="home-wifi-val"></span>
-    </div>
-
     <div class="card">
       <h2>骑行参数</h2>
       <div class="val"><input type="number" inputmode="numeric" id="home-power" value="0"><span class="unit">W</span></div>
@@ -106,64 +101,6 @@
     <button class="btn alt" onclick="go('/home')">返回</button>
   </div>
 
-  <!-- ============ OTA ============ -->
-  <div class="view" id="view-ota">
-    <div class="hero">
-      <h1>固件升级</h1>
-      <div class="sub">检查并安装最新固件。升级期间请勿断电。</div>
-    </div>
-
-    <button class="btn" id="ota-check-btn" onclick="otaCheck()">检查更新</button>
-
-    <div class="card" style="margin-top:10px">
-      <h2>状态</h2>
-      <div id="ota-status"><div class="spin"></div>读取状态…</div>
-    </div>
-
-    <button class="btn alt" onclick="go('/home')">返回</button>
-  </div>
-
-  <!-- ============ WiFi 配网 ============ -->
-  <div class="view" id="view-wifi">
-    <div class="hero">
-      <h1>家庭 WiFi</h1>
-      <div class="sub">配置后设备可执行 OTA 升级。</div>
-    </div>
-
-    <div class="card" id="wifi-connected-box" style="display:none">
-      <h2>当前连接</h2>
-      <div class="info-row"><span class="k">状态</span><span class="v" style="color:#15803d">已配置</span></div>
-      <div class="info-row"><span class="k">SSID</span><span class="v" id="wifi-connected-ssid"></span></div>
-      <button class="btn alt" id="wifi-reconfig-btn" onclick="wifiReconfig()" style="margin-top:12px">重新配置</button>
-    </div>
-
-    <div id="wifi-input-box">
-      <button class="btn" id="wifi-scan-btn" onclick="wifiStartScan()">扫描附近 WiFi</button>
-
-      <div class="card" style="margin-top:10px">
-        <h2>可用网络</h2>
-        <div id="wifi-scan-result"></div>
-      </div>
-
-      <div class="card">
-        <h2>手动输入</h2>
-        <div class="field">
-          <label>SSID</label>
-          <input type="text" id="wifi-ssid" maxlength="32">
-        </div>
-        <div class="field">
-          <label>密码 (PSK)</label>
-          <input type="text" id="wifi-psk" maxlength="64">
-        </div>
-      </div>
-
-      <button class="btn" id="wifi-save-btn" onclick="wifiSave()">保存并测试连接</button>
-      <div id="wifi-conn-status" style="margin-top:10px"></div>
-    </div>
-
-    <button class="btn alt" onclick="go('/home')" style="margin-top:10px">返回</button>
-  </div>
-
   <!-- ============ 关闭提示 ============ -->
   <div class="view" id="view-closing">
     <div class="result-card">
@@ -192,8 +129,6 @@
 <div class="navbar">
   <a class="nav-item" data-h="/home"><span class="nav-ico">🏠</span><span class="nav-tx">首页</span></a>
   <a class="nav-item" data-h="/more"><span class="nav-ico">⚙️</span><span class="nav-tx">更多</span></a>
-  <a class="nav-item" data-h="/wifi"><span class="nav-ico">📡</span><span class="nav-tx">WiFi</span></a>
-  <a class="nav-item" data-h="/ota"><span class="nav-ico">⬆️</span><span class="nav-tx">升级</span></a>
   <a class="nav-item" data-h="/about"><span class="nav-ico">ℹ️</span><span class="nav-tx">关于</span></a>
 </div>
 

@@ -10,8 +10,7 @@ var STATE = {
   profile_weight: 0, profile_ftp: 0, profile_thr_hr: 0, profile_ride_type: "coco",
   pacers: [],
   remaining_sec: 180,
-  closing: false,
-  home_wifi_ssid: ""
+  closing: false
 };
 
 /* ============ 工具函数 ============ */
@@ -71,8 +70,6 @@ var ROUTES = {
   "/home": renderHome,
   "/more": renderMore,
   "/about": renderAbout,
-  "/ota": renderOta,
-  "/wifi": renderWifi,
   "/closing": renderClosing,
   "/success": renderSuccess
 };
@@ -124,12 +121,6 @@ function renderHome() {
   $("home-power").value = STATE.power;
   $("home-cadence").value = STATE.cadence;
   $("home-hr").value = STATE.heartrate;
-  if (STATE.home_wifi_ssid) {
-    $("home-wifi").style.display = "flex";
-    $("home-wifi-val").textContent = STATE.home_wifi_ssid;
-  } else {
-    $("home-wifi").style.display = "none";
-  }
   updateZoneBadges();
 }
 function updateZoneBadges() {
@@ -277,204 +268,6 @@ function renderAbout() {
   });
 }
 
-/* ============ OTA ============ */
-var otaPollTimer = null;
-function renderOta() {
-  otaStopPoll();
-  $("ota-status").innerHTML = '<div class="spin"></div>读取状态…';
-  api("/api/ota/status", "GET", null, function (status, data) {
-    if (status === 200 && data) {
-      otaRenderStatus(data);
-    } else {
-      $("ota-status").innerHTML = '<div class="warn">无法读取 OTA 状态</div>';
-    }
-  });
-}
-function otaStopPoll() {
-  if (otaPollTimer) { clearInterval(otaPollTimer); otaPollTimer = null; }
-}
-function otaRenderStatus(d) {
-  var box = $("ota-status");
-  var st = d.status || "idle";
-  if (st === "started") st = "running";
-  var html = "";
-  html += '<div class="info-row"><span class="k">当前版本</span><span class="v">v' + escapeHtml(d.current || STATE.firmware_version) + '</span></div>';
-  if (st === "running") {
-    html += '<div class="info-row"><span class="k">检查中</span><span class="v"><span class="spinner"></span>查询服务器…</span></div>';
-  } else if (st === "done") {
-    html += '<div class="info-row"><span class="k">最新版本</span><span class="v">' + (d.has_update ? escapeHtml(d.version || "") : "已是最新") + '</span></div>';
-    if (d.has_update) {
-      html += '<div class="info-row"><span class="k">大小</span><span class="v">' + ((d.size || 0) / 1024).toFixed(0) + ' KB</span></div>';
-      if (d.changelog) {
-        html += '<div class="note" style="margin-top:8px">' + escapeHtml(d.changelog) + '</div>';
-      }
-      html += '<button class="btn green" id="ota-up-btn" onclick="otaStartUpgrade()" style="margin-top:10px">立即升级</button>';
-    } else {
-      html += '<div class="note" style="margin-top:8px">设备已是最新版本</div>';
-    }
-  } else if (st === "error") {
-    html += '<div class="warn" style="margin-top:8px">检查失败：' + escapeHtml(d.error || "未知错误") + '</div>';
-  } else {
-    html += '<div class="note" style="margin-top:8px">尚未检查更新</div>';
-  }
-  box.innerHTML = html;
-  var chk = $("ota-check-btn");
-  if (chk) chk.disabled = (st === "running");
-}
-function otaCheck() {
-  var btn = $("ota-check-btn");
-  if (btn) { btn.disabled = true; btn.textContent = "检查中…"; }
-  api("/api/ota/check", "POST", null, function (status, data) {
-    if (btn) { btn.disabled = false; btn.textContent = "检查更新"; }
-    if (status === 200 && data) {
-      otaRenderStatus(data);
-      if ((data.status === "running" || data.status === "started") && !otaPollTimer) {
-        otaPollTimer = setInterval(otaPollStatus, 1500);
-      }
-    } else {
-      $("ota-status").innerHTML = '<div class="warn">请求失败: ' + status + '</div>';
-    }
-  });
-}
-function otaPollStatus() {
-  api("/api/ota/status", "GET", null, function (status, data) {
-    if (status === 200 && data) {
-      otaRenderStatus(data);
-      if (data.status === "done" || data.status === "error") otaStopPoll();
-    }
-  });
-}
-function otaStartUpgrade() {
-  if (!confirm("确认开始固件升级？升级期间请勿断电。")) return;
-  var btn = $("ota-up-btn");
-  if (btn) { btn.disabled = true; btn.textContent = "升级中…"; }
-  api("/api/ota/upgrade", "POST", null, function (status, data) {
-    if (status === 200 && data && data.ok) {
-      $("ota-status").innerHTML = '<div class="result-card"><div class="icon info">⏳</div><h1>升级进行中</h1><div class="sub">设备将自动重启，请等待约 1 分钟后重新进入配网。</div></div>';
-    } else {
-      toast("升级失败: " + ((data && data.error) || status));
-      if (btn) { btn.disabled = false; btn.textContent = "立即升级"; }
-    }
-  });
-}
-
-/* ============ WiFi 配网 ============ */
-var wifiScanTimer = null;
-var wifiConnTimer = null;
-var wifiPickedSsid = "";
-function renderWifi() {
-  wifiStopScan();
-  wifiStopConn();
-  $("wifi-ssid").value = "";
-  $("wifi-psk").value = "";
-  $("wifi-scan-result").innerHTML = "";
-  $("wifi-conn-status").innerHTML = "";
-  if (STATE.home_wifi_ssid) {
-    $("wifi-connected-box").style.display = "block";
-    $("wifi-input-box").style.display = "none";
-    $("wifi-connected-ssid").textContent = STATE.home_wifi_ssid;
-  } else {
-    $("wifi-connected-box").style.display = "none";
-    $("wifi-input-box").style.display = "block";
-  }
-}
-function wifiReconfig() {
-  $("wifi-connected-box").style.display = "none";
-  $("wifi-input-box").style.display = "block";
-  $("wifi-ssid").value = STATE.home_wifi_ssid || "";
-  $("wifi-psk").value = "";
-  $("wifi-conn-status").innerHTML = "";
-}
-function wifiStartScan() {
-  var btn = $("wifi-scan-btn");
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>扫描中…';
-  $("wifi-scan-result").innerHTML = "";
-  api("/api/wifi/scan", "POST", null, function (status, data) {
-    if (status === 200 && data && (data.status === "started" || data.status === "running")) {
-      wifiScanTimer = setInterval(wifiPollScan, 1000);
-    } else {
-      btn.disabled = false;
-      btn.textContent = "扫描附近 WiFi";
-      $("wifi-scan-result").innerHTML = '<div class="warn">扫描未启动: ' + ((data && data.error) || status) + '</div>';
-    }
-  });
-}
-function wifiStopScan() {
-  if (wifiScanTimer) { clearInterval(wifiScanTimer); wifiScanTimer = null; }
-  var btn = $("wifi-scan-btn");
-  if (btn) { btn.disabled = false; btn.textContent = "扫描附近 WiFi"; }
-}
-function wifiPollScan() {
-  api("/api/wifi/scan/status", "GET", null, function (status, data) {
-    if (status !== 200 || !data) return;
-    if (data.status === "running") return;
-    wifiStopScan();
-    if (data.status === "done" && data.networks) {
-      var box = $("wifi-scan-result");
-      box.innerHTML = "";
-      for (var i = 0; i < data.networks.length; i++) {
-        var n = data.networks[i];
-        var item = el("div", { class: "wifi-item" + (n.ssid === wifiPickedSsid ? " picked" : ""),
-          onclick: (function (ssid) { return function () { wifiPick(ssid); }; })(n.ssid) },
-          '<span style="font-weight:700">' + escapeHtml(n.ssid) + '</span>' +
-          '<span style="font-size:12px;color:#86868b">' + (n.rssi || 0) + ' dBm</span>');
-        box.appendChild(item);
-      }
-      if (data.networks.length === 0) {
-        box.innerHTML = '<div class="note">未找到 WiFi 网络</div>';
-      }
-    } else {
-      $("wifi-scan-result").innerHTML = '<div class="warn">扫描失败: ' + escapeHtml(data.error || "") + '</div>';
-    }
-  });
-}
-function wifiPick(ssid) {
-  wifiPickedSsid = ssid;
-  $("wifi-ssid").value = ssid;
-  var items = document.querySelectorAll(".wifi-item");
-  for (var i = 0; i < items.length; i++) {
-    items[i].classList.toggle("picked", items[i].querySelector("span").textContent === ssid);
-  }
-}
-function wifiSave() {
-  var ssid = $("wifi-ssid").value.trim();
-  var psk = $("wifi-psk").value;
-  if (!ssid) { toast("请输入 SSID"); return; }
-  var btn = $("wifi-save-btn");
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>测试连接中…';
-  $("wifi-conn-status").innerHTML = "";
-  api("/api/wifi/save", "POST", { ssid: ssid, psk: psk }, function (status, data) {
-    if (status === 200 && data && (data.status === "started" || data.status === "running")) {
-      wifiConnTimer = setInterval(wifiPollConn, 1000);
-    } else {
-      btn.disabled = false;
-      btn.textContent = "保存并测试连接";
-      $("wifi-conn-status").innerHTML = '<div class="warn">连接测试未启动: ' + ((data && data.error) || status) + '</div>';
-    }
-  });
-}
-function wifiStopConn() {
-  if (wifiConnTimer) { clearInterval(wifiConnTimer); wifiConnTimer = null; }
-  var btn = $("wifi-save-btn");
-  if (btn) { btn.disabled = false; btn.textContent = "保存并测试连接"; }
-}
-function wifiPollConn() {
-  api("/api/wifi/connect/status", "GET", null, function (status, data) {
-    if (status !== 200 || !data) return;
-    if (data.status === "running") return;
-    wifiStopConn();
-    var box = $("wifi-conn-status");
-    if (data.status === "done" && data.connected) {
-      box.innerHTML = '<div class="result-card"><div class="icon ok">✓</div><h1>连接成功</h1><div class="sub">已连接到 ' + escapeHtml(data.ssid || "") + '，IP: ' + escapeHtml(data.ip || "") + '</div></div>';
-      STATE.home_wifi_ssid = data.ssid || "";
-    } else {
-      box.innerHTML = '<div class="result-card"><div class="icon warn">!</div><h1>连接失败</h1><div class="sub">' + escapeHtml(data.error || "请检查 SSID 和密码") + '</div></div>';
-    }
-  });
-}
-
 /* ============ 关闭提示 ============ */
 function renderClosing() {
   var box = $("closing-countdown");
@@ -557,7 +350,6 @@ function init() {
       STATE.pacers = data.pacers || [];
       STATE.remaining_sec = data.remaining_sec != null ? data.remaining_sec : 180;
       STATE.closing = !!data.closing;
-      STATE.home_wifi_ssid = data.home_wifi_ssid || "";
       startTimePoll();
       route();
     } else {
