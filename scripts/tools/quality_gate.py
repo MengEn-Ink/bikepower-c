@@ -137,7 +137,6 @@ required_assets = [
     "docs/user/01-quickstart.md",
     "docs/user/02-user-manual.md",
     "docs/user/03-hardware.md",
-    "docs/user/04-ota-user-guide.md",
     "docs/dev/01-technical-reference.md",
     "docs/dev/02-firmware-security.md",
     "docs/dev/03-test-coverage-analysis.md",

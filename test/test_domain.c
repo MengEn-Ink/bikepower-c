@@ -12,7 +12,6 @@
 #include "hr_model.h"
 #include "power_engine.h"
 #include "config_store.h"
-#include "ota_version.h"
 #include "json_miniparse.h"
 #include "button_logic.h"
 #include "led_pattern.h"
@@ -21,7 +20,6 @@
 #include "dns_packet.h"
 #include "ftms_codec.h"
 #include "radio_state.h"
-#include "ota_selftest.h"
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -507,24 +505,6 @@ static void test_config_store(void)
     CHECK(config_store_serialize(&src, js, 0) == 0, "serialize out_sz=0 -> 0");
 }
 
-static void test_ota_version_compare(void)
-{
-    printf("[test] OTA 语义版本比较\n");
-    CHECK(ota_version_compare("3.1.8", "3.1.7") > 0, "升级 3.1.8 > 3.1.7");
-    CHECK(ota_version_compare("3.1.7", "3.1.7") == 0, "相同版本 3.1.7 == 3.1.7");
-    CHECK(ota_version_compare("3.1.6", "3.1.7") < 0, "降级 3.1.6 < 3.1.7 被拒");
-    CHECK(ota_version_compare("3.2.0", "3.1.7") > 0, "minor 升 3.2.0 > 3.1.7");
-    CHECK(ota_version_compare("4.0.0", "3.1.7") > 0, "major 升 4.0.0 > 3.1.7");
-    CHECK(ota_version_compare("3.1.10", "3.1.9") > 0, "patch 双位 3.1.10 > 3.1.9");
-    CHECK(ota_version_compare("3.1.7", "3.1.10") < 0, "patch 双位 3.1.7 < 3.1.10");
-    CHECK(ota_version_compare("10.0.0", "9.9.9") > 0, "双位 major 10 > 9");
-    CHECK(ota_version_compare("v3.1.8", "3.1.7") != 0, "非 x.y.z 格式回退 strcmp");
-    // 注意：sscanf("3.1.7-rc1") 仍能解析出 3.1.7，故与 3.1.7 相等
-    CHECK(ota_version_compare("3.1.7-rc1", "3.1.7") == 0, "带后缀 sscanf 仍解析前缀相等");
-    CHECK(ota_version_compare("", "") == 0, "空字符串相等");
-    CHECK(ota_version_compare("3.1.8", "") > 0, "空当前版本");
-}
-
 static void test_json_miniparse(void)
 {
     printf("[test] JSON 最小解析\n");
@@ -929,44 +909,6 @@ static void test_radio_state(void)
     CHECK(radio_state_can_switch_to_ap(RADIO_MODE_STA, true) == false, "STA -> 不可切");
 }
 
-static void test_ota_selftest(void)
-{
-    printf("[test] OTA 自检状态机\n");
-
-    // IDLE 状态
-    CHECK(ota_selftest_advance(OTA_SELFTEST_IDLE, OTA_SELFTEST_EVT_START) == OTA_SELFTEST_PENDING,
-          "IDLE + START -> PENDING");
-    CHECK(ota_selftest_advance(OTA_SELFTEST_IDLE, OTA_SELFTEST_EVT_TIMEOUT) == OTA_SELFTEST_IDLE,
-          "IDLE + TIMEOUT -> 保持 IDLE");
-    CHECK(ota_selftest_advance(OTA_SELFTEST_IDLE, OTA_SELFTEST_EVT_MARK_INVALID) == OTA_SELFTEST_IDLE,
-          "IDLE + MARK_INVALID -> 保持 IDLE");
-
-    // PENDING 状态
-    CHECK(ota_selftest_advance(OTA_SELFTEST_PENDING, OTA_SELFTEST_EVT_TIMEOUT) == OTA_SELFTEST_CONFIRMED,
-          "PENDING + TIMEOUT -> CONFIRMED");
-    CHECK(ota_selftest_advance(OTA_SELFTEST_PENDING, OTA_SELFTEST_EVT_MARK_VALID) == OTA_SELFTEST_CONFIRMED,
-          "PENDING + MARK_VALID -> CONFIRMED");
-    CHECK(ota_selftest_advance(OTA_SELFTEST_PENDING, OTA_SELFTEST_EVT_MARK_INVALID) == OTA_SELFTEST_ROLLED_BACK,
-          "PENDING + MARK_INVALID -> ROLLED_BACK");
-    CHECK(ota_selftest_advance(OTA_SELFTEST_PENDING, OTA_SELFTEST_EVT_START) == OTA_SELFTEST_PENDING,
-          "PENDING + START -> 保持 PENDING（幂等）");
-
-    // 终态
-    CHECK(ota_selftest_advance(OTA_SELFTEST_CONFIRMED, OTA_SELFTEST_EVT_MARK_INVALID) == OTA_SELFTEST_CONFIRMED,
-          "CONFIRMED 是终态");
-    CHECK(ota_selftest_advance(OTA_SELFTEST_ROLLED_BACK, OTA_SELFTEST_EVT_MARK_VALID) == OTA_SELFTEST_ROLLED_BACK,
-          "ROLLED_BACK 是终态");
-
-    // 辅助判定
-    CHECK(ota_selftest_can_rollback(OTA_SELFTEST_PENDING) == true, "PENDING 可回滚");
-    CHECK(ota_selftest_can_rollback(OTA_SELFTEST_CONFIRMED) == false, "CONFIRMED 不可回滚");
-    CHECK(ota_selftest_can_rollback(OTA_SELFTEST_IDLE) == false, "IDLE 不可回滚");
-    CHECK(ota_selftest_can_rollback(OTA_SELFTEST_ROLLED_BACK) == false, "ROLLED_BACK 不可回滚");
-
-    CHECK(ota_selftest_should_start(1) == true, "PENDING_VERIFY 状态需启动自检");
-    CHECK(ota_selftest_should_start(0) == false, "非 PENDING_VERIFY 不启动自检");
-}
-
 int main(void)
 {
     test_profile();
@@ -981,7 +923,6 @@ int main(void)
     test_steady_snapshot();
     test_engine_blindspots();
     test_config_store();
-    test_ota_version_compare();
     test_json_miniparse();
     test_button_logic();
     test_led_pattern();
@@ -990,7 +931,6 @@ int main(void)
     test_dns_packet();
     test_ftms_codec();
     test_radio_state();
-    test_ota_selftest();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

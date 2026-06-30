@@ -149,61 +149,6 @@ def main():
         return ok, f"status={status}"
     results.append(_try("favicon /favicon.ico(204)", favicon))
 
-    def ota_status():
-        body, status, _ = http_get(f"{base}/api/ota/status")
-        detail = f"status={status} len={len(body)}"
-        ok = False
-        if status == 200:
-            try:
-                d = json.loads(body)
-                ok = "status" in d
-                detail += f" status={d.get('status')} current={d.get('current','?')}"
-            except Exception as e:
-                detail += f" JSON 解析失败: {e}"
-        return ok, detail
-    results.append(_try("OTA 状态 GET /api/ota/status", ota_status))
-
-    def wifi_scan_status():
-        # 不触发扫描，直接读上一次扫描状态（应为 done/running/idle 之一）
-        body, status, _ = http_get(f"{base}/api/wifi/scan/status")
-        detail = f"status={status} len={len(body)}"
-        ok = False
-        if status == 200:
-            try:
-                d = json.loads(body)
-                ok = "status" in d
-                detail += f" status={d.get('status')}"
-            except Exception as e:
-                detail += f" JSON 解析失败: {e}"
-        return ok, detail
-    results.append(_try("WiFi 扫描状态 GET /api/wifi/scan/status", wifi_scan_status))
-
-    def draft_json():
-        # POST /api/draft 应返回 JSON {"ok":true}，不再 302
-        payload = {
-            "device_name": "BikePower",
-            "mode": "steady",
-            "power": 150,
-            "cadence": 80,
-            "heartrate": 120,
-            "profile_weight": 70,
-            "profile_ftp": 200,
-            "profile_thr_hr": 180,
-            "profile_ride_type": "coco",
-        }
-        body, status, _ = http_post_json(f"{base}/api/draft", payload)
-        detail = f"status={status} body={body[:80]!r}"
-        ok = False
-        if status == 200:
-            try:
-                d = json.loads(body)
-                ok = d.get("ok") is True
-                detail += f" ok={d.get('ok')}"
-            except Exception as e:
-                detail += f" JSON 解析失败: {e}"
-        return ok, detail
-    results.append(_try("草稿提交 POST /api/draft (JSON)", draft_json))
-
     if args.renew:
         def renew():
             body, status, _ = http_get(f"{base}/api/renew")

@@ -84,15 +84,10 @@ def main():
         check(len(val) <= 15,
               f"{macro} = {val!r} 长度 {len(val)} > 15（NVS key 上限）")
 
-    # 6. 校验：两个 namespace 必须不同
-    print(f"\n{TAG} [3/3] namespace 唯一性")
+    # 6. 校验：主 namespace 必须定义
+    print(f"\n{TAG} [3/3] namespace 定义完整性")
     ns_main = key_defs.get("NVS_NAMESPACE")
-    ns_wifi = key_defs.get("NVS_NAMESPACE_WIFI")
-    if ns_main and ns_wifi:
-        check(ns_main != ns_wifi,
-              f"NVS_NAMESPACE({ns_main!r}) 与 NVS_NAMESPACE_WIFI({ns_wifi!r}) 重复")
-    else:
-        check(False, "NVS_NAMESPACE 或 NVS_NAMESPACE_WIFI 未定义")
+    check(bool(ns_main), "NVS_NAMESPACE 已定义")
 
     # 总结
     print(f"\n{TAG} 结果: {g_pass} 通过, {g_fail} 失败")

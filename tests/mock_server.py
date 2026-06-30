@@ -17,21 +17,12 @@
   - GET /api/renew        重置倒计时为 180
   - GET /api/mem_stats    JSON 假内存数据
   - POST /api/config      {"ok":true}（保存到运行时状态）
-  - POST /api/draft       {"ok":true}（仅运行时）
   - POST /api/close-wifi  {"ok":true}
-  - POST /api/ota/check   触发异步检查（2s 后转 done，has_update=true）
-  - GET /api/ota/status   状态机查询
-  - POST /api/ota/upgrade {"ok":true}
-  - POST /api/wifi/scan   触发异步扫描（1.5s 后转 done，返回 3 个假 AP）
-  - GET /api/wifi/scan/status
-  - POST /api/wifi/save   保存 SSID/PSK，2s 后转 done/connected
-  - GET /api/wifi/connect/status
 """
 import argparse
 import json
 import os
 import threading
-import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -39,7 +30,7 @@ WEB_DIR = os.path.join(REPO_ROOT, "main", "web")
 
 MOCK_STATE = {
     "device_name": "BikePower-Mock",
-    "firmware_version": "3.2.0-mock",
+    "firmware_version": "4.0.0-mock",
     "power": 150,
     "cadence": 80,
     "heartrate": 130,
@@ -50,7 +41,6 @@ MOCK_STATE = {
     "profile_ride_type": "coco",
     "remaining_sec": 180,
     "closing": False,
-    "home_wifi_ssid": "",
     "pacers": [
         {"id": "coco", "name": "Coco", "wkg_low": 1.5, "wkg_high": 2.0},
         {"id": "flat", "name": "Flat Road", "wkg_low": 2.5, "wkg_high": 3.0},
@@ -60,9 +50,6 @@ MOCK_STATE = {
 
 LOCK = threading.Lock()
 REMAINING_SEC = [180]
-OTA_CHECK = {"state": "idle", "version": "", "changelog": "", "error": "", "has_update": False, "size": 0}
-WIFI_SCAN = {"state": "idle", "networks": [], "error": ""}
-WIFI_CONN = {"state": "idle", "ssid": "", "ip": "", "error": ""}
 
 
 def _inline_html():
@@ -84,49 +71,6 @@ def _tick_remaining():
         if REMAINING_SEC[0] > 0:
             REMAINING_SEC[0] -= 1
         return REMAINING_SEC[0]
-
-
-def _ota_check_thread():
-    """模拟设备端 ota_check_task：2s running → done has_update=true。"""
-    with LOCK:
-        OTA_CHECK["state"] = "running"
-        OTA_CHECK["version"] = ""
-        OTA_CHECK["error"] = ""
-    time.sleep(2.0)
-    with LOCK:
-        OTA_CHECK["state"] = "done"
-        OTA_CHECK["version"] = "3.2.1"
-        OTA_CHECK["changelog"] = "Mock 更新说明：修复若干 bug。"
-        OTA_CHECK["has_update"] = True
-        OTA_CHECK["size"] = 655360
-
-
-def _wifi_scan_thread():
-    """模拟设备端 wifi_scan_task：1.5s running → done，返回 3 个假 AP。"""
-    with LOCK:
-        WIFI_SCAN["state"] = "running"
-        WIFI_SCAN["error"] = ""
-    time.sleep(1.5)
-    with LOCK:
-        WIFI_SCAN["state"] = "done"
-        WIFI_SCAN["networks"] = [
-            {"ssid": "MockHome-5G", "rssi": -45, "auth": 4},
-            {"ssid": "MockHome-2.4G", "rssi": -56, "auth": 4},
-            {"ssid": "Neighbor-Free", "rssi": -78, "auth": 0},
-        ]
-
-
-def _wifi_connect_thread(ssid):
-    """模拟设备端 wifi_connect_task：2s running → done connected=true。"""
-    with LOCK:
-        WIFI_CONN["state"] = "running"
-        WIFI_CONN["ssid"] = ssid
-        WIFI_CONN["error"] = ""
-    time.sleep(2.0)
-    with LOCK:
-        WIFI_CONN["state"] = "done"
-        WIFI_CONN["ip"] = "192.168.1.42"
-        MOCK_STATE["home_wifi_ssid"] = ssid
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -184,45 +128,6 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/mem_stats":
             self._send_json({"free": 120000, "min_free": 98000})
             return
-        if path == "/api/ota/status":
-            with LOCK:
-                st = OTA_CHECK["state"]
-                resp = {"status": st, "current": MOCK_STATE["firmware_version"]}
-                if st == "done":
-                    resp.update({
-                        "has_update": OTA_CHECK["has_update"],
-                        "version": OTA_CHECK["version"],
-                        "size": OTA_CHECK["size"],
-                        "changelog": OTA_CHECK["changelog"],
-                    })
-                elif st == "error":
-                    resp["error"] = OTA_CHECK["error"]
-            self._send_json(resp)
-            return
-        if path == "/api/wifi/scan/status":
-            with LOCK:
-                st = WIFI_SCAN["state"]
-                resp = {"status": st}
-                if st == "done":
-                    resp["count"] = len(WIFI_SCAN["networks"])
-                    resp["networks"] = WIFI_SCAN["networks"]
-                elif st == "error":
-                    resp["error"] = WIFI_SCAN["error"]
-            self._send_json(resp)
-            return
-        if path == "/api/wifi/connect/status":
-            with LOCK:
-                st = WIFI_CONN["state"]
-                resp = {"status": st}
-                if st == "done":
-                    resp["connected"] = True
-                    resp["ssid"] = WIFI_CONN["ssid"]
-                    resp["ip"] = WIFI_CONN["ip"]
-                elif st == "error":
-                    resp["connected"] = False
-                    resp["error"] = WIFI_CONN["error"]
-            self._send_json(resp)
-            return
         # Captive Portal 检测端点：302 回首页
         if path in ("/generate_204", "/gen_204", "/hotspot-detect.html",
                     "/library/test/success.html", "/ncsi.txt",
@@ -250,61 +155,10 @@ class Handler(BaseHTTPRequestHandler):
                         MOCK_STATE[k] = data[k]
             self._send_json({"ok": True})
             return
-        if path == "/api/draft":
-            try:
-                data = json.loads(body) if body else {}
-            except Exception:
-                data = {}
-            with LOCK:
-                for k in ("device_name", "mode", "power", "cadence",
-                          "heartrate", "profile_weight", "profile_ftp",
-                          "profile_thr_hr", "profile_ride_type"):
-                    if k in data:
-                        MOCK_STATE[k] = data[k]
-            self._send_json({"ok": True})
-            return
         if path == "/api/close-wifi":
             with LOCK:
                 MOCK_STATE["closing"] = True
             self._send_json({"ok": True})
-            return
-        if path == "/api/ota/check":
-            with LOCK:
-                if OTA_CHECK["state"] == "running":
-                    self._send_json({"status": "running",
-                                     "current": MOCK_STATE["firmware_version"]})
-                    return
-            threading.Thread(target=_ota_check_thread, daemon=True).start()
-            self._send_json({"status": "started",
-                             "current": MOCK_STATE["firmware_version"]})
-            return
-        if path == "/api/ota/upgrade":
-            self._send_json({"ok": True})
-            return
-        if path == "/api/wifi/scan":
-            with LOCK:
-                if WIFI_SCAN["state"] == "running":
-                    self._send_json({"status": "running"})
-                    return
-            threading.Thread(target=_wifi_scan_thread, daemon=True).start()
-            self._send_json({"status": "started"})
-            return
-        if path == "/api/wifi/save":
-            try:
-                data = json.loads(body) if body else {}
-            except Exception:
-                data = {}
-            ssid = data.get("ssid", "")
-            psk = data.get("psk", "")
-            if not ssid:
-                self._send_json({"status": "error", "error": "请输入 WiFi 名称"})
-                return
-            with LOCK:
-                if WIFI_CONN["state"] == "running":
-                    self._send_json({"status": "running"})
-                    return
-            threading.Thread(target=_wifi_connect_thread, args=(ssid,), daemon=True).start()
-            self._send_json({"status": "started"})
             return
         self._send_text("Not Found", 404)
 
@@ -323,9 +177,6 @@ def main():
     print(f"Mock server: http://{args.bind}:{args.port}")
     print(f"  web 目录: {WEB_DIR}")
     print(f"  倒计时: 180s 自动递减，/api/renew 重置")
-    print(f"  OTA: POST /api/ota/check 2s 后转 done has_update=true")
-    print(f"  WiFi: POST /api/wifi/scan 1.5s 后返回 3 个假 AP")
-    print(f"  WiFi: POST /api/wifi/save 2s 后连接成功")
     print(f"  Ctrl+C 退出")
     try:
         httpd.serve_forever()

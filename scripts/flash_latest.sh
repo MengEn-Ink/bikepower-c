@@ -240,7 +240,6 @@ stop_project_serial_daemon() {
 run_quick_checks() {
     local checks=(
         "python3 tests/check_portal_js.py"
-        "python3 tests/ota_flow_test.py --static"
         "python3 tests/check_config_consistency.py"
         "python3 tests/check_tasks_wdt.py"
         "python3 tests/check_nvs_schema.py"

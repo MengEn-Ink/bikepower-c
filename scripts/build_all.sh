@@ -18,9 +18,6 @@ RELEASE_DIR="$PROJECT_DIR/build/release"
 # 对齐build_firmware.sh逻辑：优先使用环境变量IDF_PATH，默认macOS路径
 IDF_PATH="${IDF_PATH:-$HOME/esp/esp-idf-v5.5.4}"
 
-# Gitee raw 固件下载 URL 模板（不含 token；{name} 由产物文件名替换）
-GITEE_RAW_BASE="https://gitee.com/mengen4jv/bikepower-c/raw/main/ota"
-
 usage() {
     cat <<'EOF'
 用法: ./scripts/build_all.sh [选项] [板型...]
@@ -32,7 +29,7 @@ usage() {
   m5stamp     仅编译 M5Stamp C3
 
 选项:
-      --dry-run   只打印将执行的版本、产物路径、将生成的 sha256/manifest/latest.json，
+      --dry-run   只打印将执行的版本、产物路径、将生成的 sha256/manifest，
                   不编译、不写任何文件
   -h, --help      显示本帮助
 
@@ -40,12 +37,10 @@ usage() {
   bikepower-c-<版本>-<板型>.bin         合并单文件固件（bootloader+分区表+app）
   bikepower-c-<版本>-<板型>.bin.sha256  对应 SHA256 校验文件
   manifest.txt                          产物清单（文件名/大小/SHA256/版本）
-  latest.json                           OTA 元数据草案（changelog 为占位，需人工填写后才能发布）
 
 说明:
-  - 本脚本仅在本地生成产物，不会打 git tag、不会创建 Gitee Release、不做真机 OTA。
-  - latest.json 的 url 使用 Gitee raw 模板（不含 token），changelog 字段为占位文本，
-    发布前请人工替换为真实更新说明，并将固件与 latest.json 上传到 ota/ 目录。
+  - 本脚本仅在本地生成产物，不会打 git tag、不会创建 Gitee Release。
+  - 已移除在线 OTA，固件升级走全量重新烧录（见 README，分区表变更需 erase_flash）。
 
 示例:
   ./scripts/build_all.sh                # 编译两种板型并生成 release 产物
@@ -124,9 +119,6 @@ if [ "$DRY_RUN" -eq 1 ]; then
         echo "  - ${fw}.sha256   （SHA256 校验）"
     done
     echo "  - manifest.txt     （产物清单：文件名/大小/SHA256/版本）"
-    echo "  - latest.json      （OTA 元数据草案，changelog 为占位待人工填写）"
-    first_bn="$(board_name_of "${TARGETS[0]}")"
-    echo "latest.json.url 模板示例: ${GITEE_RAW_BASE}/bikepower-c-${VERSION}-${first_bn}.bin"
     exit 0
 fi
 
@@ -187,9 +179,9 @@ for target in "${TARGETS[@]}"; do
 done
 
 # ============================ Release 标准化 ============================
-# 对每个固件产物生成 SHA256 旁文件，并汇总产物清单与 OTA 元数据草案。
+# 对每个固件产物生成 SHA256 旁文件，并汇总产物清单。
 echo ""
-echo "=== Release 标准化：SHA256 / manifest / latest.json ==="
+echo "=== Release 标准化：SHA256 / manifest ==="
 
 MANIFEST="$RELEASE_DIR/manifest.txt"
 {
@@ -217,33 +209,12 @@ for fw in "${PRODUCED_BINS[@]}"; do
     esac
 done
 
-# 生成 latest.json 草案（字段对齐 ota_downloader：version/url/size/changelog）
-# 默认指向第一个板型固件；changelog 为占位，需人工填写后才能发布。
-PRIMARY_FW="${PRODUCED_BINS[0]}"
-PRIMARY_PATH="$RELEASE_DIR/$PRIMARY_FW"
-PRIMARY_SIZE="$(wc -c < "$PRIMARY_PATH" | tr -d ' ')"
-LATEST_JSON="$RELEASE_DIR/latest.json"
-cat > "$LATEST_JSON" <<JSONEOF
-{
-  "version": "${VERSION}",
-  "url": "${GITEE_RAW_BASE}/${PRIMARY_FW}",
-  "size": ${PRIMARY_SIZE},
-  "changelog": "TODO: 发布前请人工填写本版本更新说明"
-}
-JSONEOF
-
-# 校验 latest.json 中 version 与产物一致
-if ! grep -q "\"version\": \"${VERSION}\"" "$LATEST_JSON"; then
-    echo "错误：latest.json version 与 v${VERSION} 不一致"
-    exit 1
-fi
-
 echo ""
 echo "=== 构建完成，产物在 $RELEASE_DIR/ ==="
 ls -lh "$RELEASE_DIR/"
 echo ""
 echo "⚠️  发布前人工步骤（本脚本不自动执行）："
-echo "   1. 编辑 $LATEST_JSON 的 changelog 为真实更新说明"
-echo "   2. 确认 url 指向的板型固件正确（默认 ${PRIMARY_FW}）"
-echo "   3. 将固件与 latest.json 上传到仓库 ota/ 目录后再发布"
+echo "   1. 校验各产物 SHA256 与 manifest.txt 一致"
+echo "   2. 打 git tag、创建 Gitee Release 并上传 merged bin + manifest"
 echo "   本脚本不会打 git tag、不会创建 Gitee Release。"
+echo "   已移除在线 OTA：升级走全量重新烧录（分区表变更需 erase_flash）。"

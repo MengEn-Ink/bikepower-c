@@ -63,13 +63,6 @@ REQUIRED_FRONTEND_APIS = [
     "/api/renew",
     "/api/config",
     "/api/close-wifi",
-    "/api/ota/check",
-    "/api/ota/status",
-    "/api/ota/upgrade",
-    "/api/wifi/scan",
-    "/api/wifi/scan/status",
-    "/api/wifi/save",
-    "/api/wifi/connect/status",
     "/api/mem_stats",
 ]
 

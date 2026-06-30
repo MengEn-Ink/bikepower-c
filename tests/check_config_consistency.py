@@ -20,7 +20,6 @@ README = ROOT / "README.md"
 PROGRESS = ROOT / "PROGRESS.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
 DOC_INDEX = ROOT / "docs" / "INDEX.md"
-OTA_GUIDE = ROOT / "docs" / "user" / "04-ota-user-guide.md"
 QUICKSTART = ROOT / "docs" / "user" / "01-quickstart.md"
 USER_MANUAL = ROOT / "docs" / "user" / "02-user-manual.md"
 NIMBLE_REWRITE = ROOT / "docs" / "archive" / "01-cidf-nimble-rewrite.md"
@@ -96,7 +95,6 @@ readme_src = read(README)
 progress_src = read(PROGRESS)
 changelog_src = read(CHANGELOG)
 doc_index_src = read(DOC_INDEX)
-ota_guide_src = read(OTA_GUIDE) if OTA_GUIDE.exists() else ""
 quickstart_src = read(QUICKSTART)
 user_manual_src = read(USER_MANUAL)
 nimble_rewrite_src = read(NIMBLE_REWRITE)
@@ -255,30 +253,6 @@ if "| 10 |" in progress_src:
           "PROGRESS.md 含阶段 10 时 docs/INDEX.md 同步到阶段 0-10")
 
 
-# ============================ 5. OTA 配置一致性 ============================
-print(f"\n{TAG} [S5] OTA 配置一致性")
-
-ota_url = extract_define(config_src, "OTA_VERSION_URL")
-check(ota_url is not None and "gitee.com" in ota_url,
-      f"OTA_VERSION_URL 指向 gitee (实际={ota_url})")
-check(ota_url is not None and "latest.json" in ota_url,
-      "OTA_VERSION_URL 含 latest.json")
-
-ota_buf = extract_int(config_src, "OTA_BUF_SIZE")
-check(ota_buf == 4096, f"OTA_BUF_SIZE = 4096 (实际={ota_buf})")
-
-ota_timeout = extract_int(config_src, "OTA_DOWNLOAD_TIMEOUT_MS")
-check(ota_timeout == 30000, f"OTA_DOWNLOAD_TIMEOUT_MS = 30000 (实际={ota_timeout})")
-
-ota_sta_ms = extract_int(config_src, "OTA_STA_CONNECT_MS")
-check(ota_sta_ms == 15000, f"OTA_STA_CONNECT_MS = 15000 (实际={ota_sta_ms})")
-
-# docs/user/04-ota-user-guide.md 应提到 OTA_VERSION_URL 或 latest.json
-if ota_guide_src:
-    check("OTA_VERSION_URL" in ota_guide_src or "latest.json" in ota_guide_src,
-          "docs/user/04-ota-user-guide.md 提到 OTA_VERSION_URL/latest.json")
-
-
 # ============================ 6. BLE 通知间隔一致性 ============================
 print(f"\n{TAG} [S6] BLE 通知间隔一致性")
 
@@ -306,8 +280,7 @@ if hw_src:
 # ============================ 8. 任务栈大小非零 ============================
 print(f"\n{TAG} [S8] 任务栈大小合理性")
 
-for stk_name in ["TASK_STACK_BTN", "TASK_STACK_LED", "TASK_STACK_HTTPD",
-                 "TASK_STACK_OTA_UPGRADE", "TASK_STACK_OTA_CHECK"]:
+for stk_name in ["TASK_STACK_BTN", "TASK_STACK_LED", "TASK_STACK_HTTPD"]:
     v = extract_int(config_src, stk_name)
     check(v is not None and v >= 1024, f"{stk_name} >= 1024 (实际={v})")
 
