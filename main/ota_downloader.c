@@ -67,13 +67,17 @@ esp_err_t ota_downloader_check_version(const char *json_url, ota_version_info_t 
 
     ota_sync_time();   // 同步时间确保 HTTPS 证书校验通过
 
+    // 用 perform() 模式让 ESP-IDF 自动跟随 301/302/307/308 重定向
+    // （手动 open/fetch_headers 模式下自动重定向不生效，且 Location 头难取）
     esp_http_client_config_t cfg = {
         .url = json_url,
         .timeout_ms = OTA_DOWNLOAD_TIMEOUT_MS,
         .cert_pem = NULL,
-        .crt_bundle_attach = esp_crt_bundle_attach,   // 启用证书包验证
+        .crt_bundle_attach = esp_crt_bundle_attach,
         .disable_auto_redirect = false,
-        .max_redirection_count = 10,   // Gitee latest.json 返回 302，必须跟随重定向
+        .max_redirection_count = 5,
+        .event_handler = NULL,
+        .buffer_size = 1024,
     };
     esp_http_client_handle_t client = esp_http_client_init(&cfg);
     if (client == NULL) {
@@ -81,39 +85,35 @@ esp_err_t ota_downloader_check_version(const char *json_url, ota_version_info_t 
         return ESP_FAIL;
     }
 
-    esp_err_t ret = esp_http_client_open(client, 0);
+    esp_err_t ret = esp_http_client_perform(client);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "http_client_open 失败 ret=%d", ret);
+        ESP_LOGE(TAG, "http_client_perform 失败 ret=%d", ret);
         esp_http_client_cleanup(client);
         return ret;
     }
 
-    int content_length = esp_http_client_fetch_headers(client);
-    if (content_length < 0) {
-        // chunked 传输时返回 -1，按上限读取
-        content_length = OTA_JSON_BUF_MAX;
-    } else if (content_length > OTA_JSON_BUF_MAX) {
-        content_length = OTA_JSON_BUF_MAX;
-    }
-
     int http_status = esp_http_client_get_status_code(client);
+    int content_length = esp_http_client_get_content_length(client);
     ESP_LOGI(TAG, "latest.json HTTP %d content_length=%d", http_status, content_length);
 
     char *buf = malloc(OTA_JSON_BUF_MAX);
     if (buf == NULL) {
         ESP_LOGE(TAG, "JSON 缓冲分配失败");
-        esp_http_client_close(client);
         esp_http_client_cleanup(client);
         return ESP_ERR_NO_MEM;
     }
+
     int total_read = 0;
-    while (total_read < content_length) {
-        int r = esp_http_client_read(client, buf + total_read, OTA_JSON_BUF_MAX - total_read);
-        if (r <= 0) break;
-        total_read += r;
+    if (http_status == 200) {
+        // perform() 已将响应体读入内部缓冲，用 read 抽取
+        while (total_read < OTA_JSON_BUF_MAX - 1) {
+            int r = esp_http_client_read(client, buf + total_read, OTA_JSON_BUF_MAX - total_read);
+            if (r <= 0) break;
+            total_read += r;
+            if (total_read >= content_length && content_length > 0) break;
+        }
     }
     buf[total_read < OTA_JSON_BUF_MAX ? total_read : OTA_JSON_BUF_MAX - 1] = '\0';
-    esp_http_client_close(client);
     esp_http_client_cleanup(client);
 
     ESP_LOGI(TAG, "latest.json 读取 %d 字节", total_read);
