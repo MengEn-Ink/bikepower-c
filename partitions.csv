@@ -1,10 +1,7 @@
 # Name,    Type, SubType, Offset,   Size
-# 4MB Flash OTA 布局：ota_0/ota_1 互切（各 1.75MB），otadata 管理启动分区，无 factory 出厂分区。
-# 首次烧录烧到 ota_0（offset 0x10000），otadata 为空时 bootloader 选第一个 ota 分区启动。
-# 后续 OTA 写 ota_1 切换启动，再 OTA 写 ota_0 切回，互不覆盖。
+# 4MB Flash 单 app 布局（已移除 OTA）：单 factory 分区启动，无 ota_0/ota_1/otadata。
+# 从旧的双 OTA 布局升级到本布局需全量重新烧录（erase_flash + 全量 flash），不能走 OTA 平滑迁移。
 nvs,       data, nvs,      0x9000,   0x6000
 phy_init,  data, phy,      0xf000,   0x1000
-ota_0,     app,  ota_0,    0x10000,  0x1C0000
-ota_1,     app,  ota_1,    0x1D0000, 0x1C0000
-otadata,   data, ota,      0x390000, 0x2000
-coredump,  data, coredump, 0x392000, 0x10000
+factory,   app,  factory,  0x10000,  0x3E0000
+coredump,  data, coredump, 0x3F0000, 0x10000

@@ -17,7 +17,6 @@
 #include "nvs_flash.h"
 #include "bikepower_config.h"
 #include "ble_bikepower.h"
-#include "ota_update.h"
 #include "power_engine.h"
 #include "nvs_store.h"
 #include "app_events.h"
@@ -153,13 +152,7 @@ void app_main(void)
     if (ble_ret != ESP_OK) {
         ESP_LOGE(TAG, "BLE 启动失败 ret=%d，进入错误恢复态", ble_ret);
         app_state_set_error();
-        // OTA 自检：BLE 起不来属于关键初始化失败，立即回滚到上一固件
-        ota_update_mark_invalid_and_rollback();
     }
-
-    // OTA 自检：新固件首次启动（PENDING_VERIFY）启动 10s 自检窗口，
-    // 到期未 abort 则确认有效；上方 BLE 失败已立即回滚。
-    ota_update_check_and_confirm();
 
     // 看门狗：主循环每拍喂狗（idf 默认已为 IDLE 任务注册 TWDT，这里订阅当前任务）
     esp_err_t wdt_err = esp_task_wdt_add(NULL);

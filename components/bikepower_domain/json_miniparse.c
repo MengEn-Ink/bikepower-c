@@ -1,8 +1,8 @@
 /**
  * JSON 最小解析（纯 C，不依赖 ESP-IDF，可 host 编译）
  *
- * 从 main/ota_downloader.c 抽取的 static 函数，便于 host 单元测试。
- * 仅支持 latest.json 这类工具生成的无转义 JSON。
+ * 轻量 JSON 字段提取，供 config_store 与 wifi_portal 解析配置 JSON 请求体。
+ * 仅支持工具生成的无转义扁平 JSON。
  */
 #include "json_miniparse.h"
 #include <string.h>

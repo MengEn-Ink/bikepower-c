@@ -77,21 +77,6 @@ typedef enum {
 #define NVS_KEY_RIDE_TYPE      "ride"
 #define NVS_KEY_DEVICE_NAME    "devname"
 
-// ===== 家庭 WiFi 凭证（独立 namespace，避免改 config_data_t schema） =====
-#define NVS_NAMESPACE_WIFI     "wifica"
-#define NVS_KEY_HOME_SSID      "ssid"
-#define NVS_KEY_HOME_PSK       "psk"
-#define HOME_WIFI_SSID_MAX     32
-#define HOME_WIFI_PSK_MAX      64
-
-// ===== 在线 OTA 下载（v3.1.6：STA 模式 HTTPS 下载固件） =====
-// latest.json 放仓库 ota/ 目录，raw 访问需仓库公开；格式见 docs/archive/06-roadmap-v316.md
-#define OTA_VERSION_URL        "https://gitee.com/mengen4jv/bikepower-c/raw/main/ota/latest.json"
-#define OTA_DOWNLOAD_TIMEOUT_MS  30000   // HTTPS 单次请求超时
-#define OTA_STA_CONNECT_MS       15000   // STA 连路由器超时
-#define OTA_BUF_SIZE             4096    // HTTPS 下载缓冲
-#define OTA_REBOOT_AFTER_UPGRADE_MS 3000 // 下载完成后延迟重启时间
-
 // ===== BLE 连接与广播 =====
 #define BLE_ADVERTISING_INTERVAL_MS  500    // 广播间隔
 #define BLE_NOTIFY_INTERVAL_MS       1000   // 通知间隔
@@ -124,10 +109,7 @@ typedef enum {
 #define TASK_STACK_LED          2048   // LED任务栈大小（字节）
 #define TASK_PRIO_LED           3      // LED任务调度优先级
 #define TASK_STACK_HTTPD        8192   // HTTP服务器任务栈大小（字节）
-#define TASK_PRIO_NET           5      // 网络/OTA 辅助任务调度优先级
-
-#define TASK_STACK_OTA_UPGRADE  8192   // OTA 升级任务栈大小（v3.1.6：HTTPS 下载+写入）
-#define TASK_STACK_OTA_CHECK    8192   // OTA 版本检查任务栈大小（v3.1.6：STA+SNTP+HTTPS 客户端）
+#define TASK_PRIO_NET           5      // 网络辅助任务调度优先级
 
 // ===== 按钮时间阈值（毫秒） =====
 #define SHORT_PRESS_MS         500
@@ -154,7 +136,7 @@ typedef enum {
 #define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 保存并关闭 WiFi 前的收尾等待时间（历史命名保留）
 #define WIFI_MAX_STA_CONN      2        // SoftAP最大连接客户端数
 #define HTTP_MAX_BODY_LEN      4096     // HTTP请求体最大长度（字节）
-#define HTTP_MAX_URI_HANDLERS  36       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + WiFi 配置 + OTA 升级进度路由）
+#define HTTP_MAX_URI_HANDLERS  20       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + 配置接口）
 
 // ===== Captive Portal =====
 #define CAPTIVE_PORTAL_HOST    "192.168.4.1"  // SoftAP 网关 IP，DNS 劫持目标 + 重定向 Location 主机
@@ -173,7 +155,7 @@ typedef enum {
 #define DEVICE_NAME          "BikePower"
 #define DEVICE_MANUFACTURER  "BikePower"
 #define DEVICE_MODEL         "ESP32-C3"
-#define FIRMWARE_VERSION     "3.2.0"
+#define FIRMWARE_VERSION     "4.0.0"
 
 // ===== 看门狗 =====
 #define WDT_TIMEOUT_MS       5000

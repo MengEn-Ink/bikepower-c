@@ -4,7 +4,6 @@ idf_component_register(
          "hr_model.c"
          "power_engine.c"
          "config_store.c"
-         "ota_version.c"
          "json_miniparse.c"
          "button_logic.c"
          "led_pattern.c"
@@ -13,6 +12,5 @@ idf_component_register(
          "dns_packet.c"
          "ftms_codec.c"
          "radio_state.c"
-         "ota_selftest.c"
     INCLUDE_DIRS "include"
 )

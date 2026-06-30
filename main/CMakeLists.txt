@@ -9,12 +9,10 @@ idf_component_register(
          "radio_ctrl.c"
          "wifi_portal.c"
          "captive_portal.c"
-         "ota_update.c"
-         "ota_downloader.c"
     INCLUDE_DIRS "."
     REQUIRES nvs_flash bt esp_timer esp_driver_gpio esp_system
              esp_wifi esp_event esp_netif esp_http_server bikepower_domain
-             esp_driver_rmt app_update esp_https_ota esp_http_client mbedtls
+             esp_driver_rmt
 )
 
 # ===== web 静态资源内联（v3.2.0 前后端分离） =====
