@@ -13,7 +13,6 @@
 | [快速上手](user/01-quickstart.md) | 第一次使用：烧录固件 + 首次连接，其余细节链到手册 |
 | [用户手册](user/02-user-manual.md) | 完整操作：按钮、LED、配网字段、骑行模式、FAQ、技术规格 |
 | [硬件指南](user/03-hardware.md) | 推荐开发板、引脚定义、接线、供电、排障 |
-| [OTA 固件升级操作手册](user/04-ota-user-guide.md) | 面向测试/客户的在线 OTA 升级操作指南，含进度反馈、防降级和回滚说明 |
 | [README](../README.md) | 项目简介、功能清单、构建/门禁/Release 入口、配图说明、引脚表、LED 灯效 |
 
 ## 🔧 dev/ — 开发与技术
@@ -22,7 +21,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [技术参考](dev/01-technical-reference.md) | 三层架构、启动流程、BLE 服务、配网/OTA 链路、配置 JSON、测试门禁（基于当前实现） |
+| [技术参考](dev/01-technical-reference.md) | 三层架构、启动流程、BLE 服务、配网链路、配置 JSON、测试门禁（基于当前实现） |
 | [固件防提取/防反编译](dev/02-firmware-security.md) | 编译层加固（已实现）+ Flash 加密/Secure Boot 方案与选型 |
 | [测试覆盖率分析](dev/03-test-coverage-analysis.md) | 领域层/应用层模块清单、覆盖矩阵、目标 90% |
 
@@ -36,8 +35,8 @@
 | [MicroPython vs C 对比](archive/02-micropython-vs-c-comparison.md) | 两种技术栈的性能/内存/复杂度对比（选型阶段） |
 | [优化审查清单](archive/03-review-checklist.md) | v3.1.0 多板型/发行流程/配网网页全链路复查（已完成） |
 | [内存与新功能评估](archive/04-memory-and-feature-assessment.md) | v3.1.3 各场景内存实测、满负载分析、扩展可行性 |
-| [OTA 与 Captive Portal 落地方案](archive/05-ota-implementation-plan.md) | v3.1.4 规划阶段「上传固件」方案（已被在线下载取代） |
-| [v3.1.6 迭代规划](archive/06-roadmap-v316.md) | 在线 OTA + FTMS 扩展 + 内存优化规划（已落地） |
+| [v3.1.6 迭代规划](archive/06-roadmap-v316.md) | 在线 OTA + FTMS 扩展 + 内存优化规划（OTA 已于 v4.0.0 移除，仅供追溯） |
+| [移除 OTA + 网页端精简方案](archive/07-remove-ota-plan.md) | v4.0.0 移除在线 OTA + 家庭网络、分区表改单 factory、网页端精简方案 |
 
 ## 🤖 AI 助手
 

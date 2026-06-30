@@ -7,12 +7,12 @@
 - **名称**：BikePower C — ESP32-C3 蓝牙功率计模拟器（C 重写版）
 - **运行环境**：ESP-IDF v5.5.4 + NimBLE + FreeRTOS（非 MicroPython）
 - **硬件平台**：合宙 ESP32-C3（RISC-V 单核 160MHz, 400KB SRAM, WiFi+BLE5.0）
-- **当前版本**：v3.2.0
+- **当前版本**：v4.0.0
 - **参考仓库**：git@gitee.com:mengen4jv/bikepower-c.git
 - **构建/烧录**：`idf.py build` / `idf.py -p <port> flash monitor`
 
 ## 强制规则
-1. **蓝牙优先**：BLE 是核心功能，配网默认保持在线；仅 OTA 独占 STA 或共存初始化失败兜底时由 `radio_ctrl` 主动停 BLE。
+1. **蓝牙优先**：BLE 是核心功能，配网默认保持在线；仅共存初始化失败兜底时由 `radio_ctrl` 主动停 BLE。
 2. **WiFi/BLE 射频共用**：WiFi 启停必须经 `radio_ctrl`，配网走 coex 共存模式（见 wifi-ble-mutex.md）。
 3. **异常恢复**：BLE 初始化失败走可控恢复（记录 + 必要时 `esp_restart()`）。
 4. **分阶段验证**：每阶段编译 → 烧录 → 真机验证 → 分批提交推送，禁止只写不验证。
@@ -58,7 +58,6 @@ bikepower-c/
 │   ├── radio_ctrl.c/.h       — BLE/WiFi 射频软切换（唯一 RF 开关）
 │   ├── wifi_portal.c/.h      — HTTP 配网门户（v3.2.0 起仅 /api/xxx JSON 接口，HTML 由 web/ 内联）
 │   ├── captive_portal.c/.h   — 轻量 DNS 劫持（UDP 53 → 192.168.4.1，自动弹配网页）
-│   ├── ota_update.c/.h       — OTA 自检确认/回滚 + 语义版本比较工具（上传方式已移除，下载在 ota_downloader.c）
 │   ├── web/                  — 前端三件套（v3.2.0 起，编译时由 scripts/inline_static.py 内联到固件）
 │   │   ├── index.html        — SPA 入口（含 <!-- INLINE_CSS --> / <!-- INLINE_JS --> 占位符）
 │   │   ├── app.css           — 统一所有视图样式
@@ -80,7 +79,6 @@ bikepower-c/
 │   ├── stage5_portal_test.py — 配网门户 /api/xxx JSON 路由自测
 │   ├── check_portal_js.py    — TC-3a：对 main/web/app.js 跑 node --check
 │   ├── check_portal_structure.py — TC-3d：校验 index.html 结构 + 路由表一致性 + 前端 API 调用
-│   ├── ota_flow_test.py      — TC-3b：OTA 静态 + 动态流程自测
 │   ├── check_config_consistency.py — TC-7c：常量一致性校验
 │   ├── mock_server.py        — v3.2.0 起本地 mock /api/xxx 接口，前端不烧设备调试
 │   ├── serial_capture.py     — 串口日志抓取工具
@@ -94,7 +92,6 @@ bikepower-c/
 │   │   ├── 01-quickstart.md          — 快速上手
 │   │   ├── 02-user-manual.md         — 用户手册
 │   │   ├── 03-hardware.md            — 硬件指南
-│   │   └── 04-ota-user-guide.md      — OTA 操作手册
 │   ├── dev/                  — 开发与技术
 │   │   ├── 01-technical-reference.md — 技术参考（当前实现权威规格）
 │   │   ├── 02-firmware-security.md   — 固件安全
@@ -104,8 +101,8 @@ bikepower-c/
 │   │   ├── 02-micropython-vs-c-comparison.md — 技术栈对比
 │   │   ├── 03-review-checklist.md    — 审查清单
 │   │   ├── 04-memory-and-feature-assessment.md — 内存与新功能评估
-│   │   ├── 05-ota-implementation-plan.md — OTA 落地方案
-│   │   └── 06-roadmap-v316.md        — v3.1.6 迭代规划
+│   │   ├── 06-roadmap-v316.md        — v3.1.6 迭代规划（OTA 已于 v4.0.0 移除）
+│   │   └── 07-remove-ota-plan.md     — v4.0.0 移除 OTA + 网页端精简方案
 │   └── images/               — 配图（不编号）
 ├── .trae/rules/            — AI 规则（C/ESP-IDF 版）
 │   ├── general-rules.md      — 项目结构 + 模块边界 + 提交/发版规则
@@ -144,10 +141,9 @@ power_engine.snapshot → ble_bikepower_set_data → BLE 通知
 ## 模块互斥约束
 | 约束 | 执行者 |
 |------|--------|
-| WiFi/BLE 射频共用 | radio_ctrl 统一管理 AP/APSTA/STA，配网 coex 共存 |
+| WiFi/BLE 射频共用 | radio_ctrl 统一管理 AP，配网 coex 共存 |
 | 蓝牙优先 | app_state 长按 → 确认 → wifi_trigger |
 | 配网后原地回 BLE | wifi_portal done 回调 → APP_EVT_WIFI_DONE → radio_ctrl_exit_wifi |
-| OTA 独占 STA | radio_ctrl 停 HTTP/DNS/AP + 停 BLE → STA 下载 → 重启 |
 | 无循环依赖 | import/include 链为 DAG |
 
 ## 阶段路线（详见 PROGRESS.md）
@@ -165,6 +161,6 @@ power_engine.snapshot → ble_bikepower_set_data → BLE 通知
 ## 发布流程
 - 分支：GitHub Flow（main + feature/hotfix）。
 - 版本号：SemVer `vMAJOR.MINOR.PATCH`，commit/tag/Release 三者一致。
-- 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + 打 tag（当前 v3.1.8）+ DIS 固件版本同步。
+- 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + 打 tag（当前 v4.0.0）+ DIS 固件版本同步。
 - **固件发行产物必须合并为单文件（强制）**：创建发行版时，必须用 `esptool.py merge_bin` 把 bootloader + partition-table + app 合并为单一 `.bin`，用户一次烧录即可，禁止分发分散的多个 bin 文件。
 - Commit message：`<type>(<scope>): <简体中文概述>` + 逐文件正文 + `Co-authored-by: AI <ai@trae>` + `Model:`。

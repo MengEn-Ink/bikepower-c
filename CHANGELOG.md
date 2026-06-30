@@ -2,6 +2,28 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
+## [4.0.0] - 2026-06-30
+
+### 移除（不向后兼容）
+- 移除在线 OTA 功能：删除 `main/ota_downloader.c/.h`、`main/ota_update.c/.h` 及领域层 `ota_version.c/.h`、`ota_selftest.c/.h`。
+- 移除家庭网络配置：`/api/wifi/*`（扫描/选网/测试连接/保存凭证）一并删除（其唯一用途是为 OTA 提供 STA 凭证）。
+- `main/wifi_portal.c` 删除 `/api/ota/check|status|upgrade`、`/api/wifi/*` 路由与异步任务，及死路由 `/api/draft`。
+- `main/radio_ctrl.c/.h` 删除 STA 相关全部代码（`radio_ctrl_sta_connect/disconnect`、`radio_ctrl_enter_sta_exclusive`、`radio_ctrl_wifi_scan`）。
+- `main/nvs_store.c/.h` 删除家庭 WiFi 凭证读写；`main/bikepower_config.h` 删除 OTA 常量与家庭 WiFi namespace/key。
+- `main/app_main.c` 删除 OTA 启动自检确认/回滚调用。
+- 前端 `main/web/`：删除「升级」「WiFi」视图、对应导航项、`/ota` `/wifi` 路由、`captureDraft` 之外的 draft 提交，及旧版未引用 CSS。
+
+### 分区表与构建
+- `partitions.csv` 由双 OTA（`ota_0`/`ota_1`/`otadata`）改为单 `factory` 分区，Flash 仍维持 4MB，app 可用空间从 1.75MB 提升到约 3.875MB。
+- `sdkconfig.defaults` 删除 `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`；`main/CMakeLists.txt` 删除 `app_update`/`esp_https_ota`/`esp_http_client`/`mbedtls` 组件依赖。
+- 固件版本号升至 `v4.0.0`（分区表不兼容，需 `erase_flash` 全量重新烧录，不能走 OTA 平滑迁移）。
+
+### 测试与文档
+- 删除 `tests/ota_flow_test.py`、`tests/ota_local_mock.py`、`tests/ota_serial_monitor.py` 与 `docs/user/04-ota-user-guide.md`、`docs/archive/05-ota-implementation-plan.md`。
+- 同步清理 `tests/check_config_consistency.py`、`tests/check_portal_structure.py`、`tests/check_nvs_schema.py`、`tests/mock_server.py`、`tests/stage5_portal_test.py`、`scripts/build_all.sh`、`scripts/flash_latest.sh`、`scripts/tools/quality_gate.py`、`test/test_domain.c` 中的 OTA/WiFi 引用。
+- host 单测 1127 通过 0 失败；门户结构/JS/配置一致性/NVS schema/任务 WDT/板型静态门禁全绿。
+- 方案文档见 [docs/archive/07-remove-ota-plan.md](docs/archive/07-remove-ota-plan.md)。
+
 ## [3.2.0] - 2026-06-29
 
 ### 重构（配网门户前后端分离）

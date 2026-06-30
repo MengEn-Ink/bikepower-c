@@ -9,7 +9,7 @@
 ### WiFi/BLE 射频共用
 - ESP32-C3 只有一路 RF，但当前 sdkconfig 启用 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE`，配网默认由 coex 模块仲裁 WiFi/BLE 时间片。
 - **禁止**：绕过 `radio_ctrl` 直接调用 `esp_wifi_*` 启停 WiFi。
-- **必须**：普通配网保持 BLE 在线；OTA 下载进入独占 STA、或共存初始化失败兜底时，才由 `radio_ctrl` 先停 NimBLE（停广播、断连接、`nimble_port_stop` / 关闭 host）。
+- **必须**：普通配网保持 BLE 在线；仅共存初始化失败兜底时，才由 `radio_ctrl` 先停 NimBLE（停广播、断连接、`nimble_port_stop` / 关闭 host）。
 - 详见 `.trae/rules/wifi-ble-mutex.md`。
 
 ### 内存约束

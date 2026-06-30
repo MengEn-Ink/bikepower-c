@@ -52,8 +52,6 @@ BikePower C 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，�
 - 提供 LED 状态提示，方便判断当前设备状态
 - 支持 WiFi 配网门户，可在手机浏览器里修改核心参数
 - 支持配置保存，重启后继续使用上一次设置
-- 支持 OTA 固件升级：通过家庭 WiFi 在线检查并下载最新固件，升级页显示进度并内置防降级/回滚保护
-- 支持家庭网络配置：扫描周边 WiFi，选择并输入密码连接路由器，用于 OTA 在线检查
 - 支持配置 JSON 序列化能力，领域层可做配置导入/导出、备份/恢复和 host 单测覆盖
 - 提供静态门禁聚合与标准化 Release 构建脚本，便于发版前统一验证和产出 merged bin
 
@@ -95,7 +93,7 @@ WiFi 配网的射频共用流程可参考（v3.1.3 起为共存模式，BLE 不�
 ./scripts/flash_latest.sh --ota-test-auto-config
 ```
 
-其中 `--erase` 仅在首次从旧 2MB 分区切换到当前 4MB OTA 分区布局时使用；`--ota-test-auto-config` 会刷启动后自动进入配网的测试固件，正式使用不要加。
+其中 `--erase` 在从旧的双 OTA 分区布局切换到当前 4MB 单 factory 布局时必须使用（分区表变更需全量擦写）；`--ota-test-auto-config` 会刷启动后自动进入配网的测试固件，正式使用不要加。
 
 也可以手动准备 ESP-IDF 环境，再在项目根目录执行：
 
@@ -108,7 +106,7 @@ idf.py -p <port> monitor
 
 `<port>` 请替换为你的实际串口，例如 macOS 下常见 `/dev/cu.usbmodem*`，Linux 下常见 `/dev/ttyUSB0` 或 `/dev/ttyACM0`。
 
-发版构建使用 `scripts/build_all.sh`。该脚本可编译 generic-c3 / m5stamp-c3 产物，生成 merged bin、SHA256、manifest 与 `latest.json` 草案；`--dry-run` 只预览，不编译、不写文件、不打 tag、不创建 Release。
+发版构建使用 `scripts/build_all.sh`。该脚本可编译 generic-c3 / m5stamp-c3 产物，生成 merged bin、SHA256 与 manifest；`--dry-run` 只预览，不编译、不写文件、不打 tag、不创建 Release。
 
 ```bash
 ./scripts/build_all.sh --dry-run
@@ -180,7 +178,7 @@ bikepower-c/
 │   └── bikepower_domain/
 ├── docs/
 │   ├── INDEX.md
-│   ├── user/        # 产品使用说明（快速上手/手册/硬件/OTA）
+│   ├── user/        # 产品使用说明（快速上手/手册/硬件）
 │   ├── dev/         # 开发与技术（技术参考/固件安全/测试覆盖）
 │   ├── archive/     # 历史归档（仅供追溯）
 │   └── images/

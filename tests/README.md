@@ -26,7 +26,7 @@
 |------|------|
 | 操作系统 | Linux（已验证 Ubuntu） |
 | Python | 3.8+ |
-| Node.js | 16+（仅 `check_portal_js.py` / `ota_flow_test.py` / `ota_local_mock.py` 静态部分需要） |
+| Node.js | 16+（仅 `check_portal_js.py` 需要） |
 | 串口权限 | 当前用户在 `dialout` 组（访问 /dev/ttyACM0） |
 | 网络工具 | `nmcli`（仅动态配网测试需要切换 WiFi 时用） |
 | 无线网卡 | 支持 AP 模式连接的 WiFi 网卡（如 wlp1s0） |
@@ -39,7 +39,7 @@ pip install pyserial bleak
 
 | 包 | 用途 | 脚本 |
 |----|------|------|
-| `pyserial` | 串口通信（设备重启、日志抓取） | serial_capture.py, serial_daemon.py, ota_serial_monitor.py |
+| `pyserial` | 串口通信（设备重启、日志抓取） | serial_capture.py, serial_daemon.py |
 | `bleak` | BLE 五服务自测 | ble_selftest.py, stage3_conn_test.py |
 
 ### ESP-IDF 工具链（编译固件时需要）
@@ -82,40 +82,17 @@ done
 | `ble_selftest.py` | BLE 五服务（CPS+HRS+CSC+FTMS+DIS）+ FTMS ERG 控制点 | bleak | 设备启动后直接跑 |
 | `stage3_conn_test.py` | BLE 连接事件驱动状态机验证 | bleak | 设备启动后直接跑 |
 | `stage5_portal_test.py` | 配网门户 HTTP 路由自测（/api/xxx JSON 接口） | Python3 | 设备进入配网态后跑 |
-| `ota_flow_test.py --dynamic` | OTA 全流程动态测试（需设备配网 + 家庭 WiFi） | Python3 + Node | 设备配网态后跑 |
 
-### C. OTA 全流程测试（静态 + 动态）
-
-| 脚本 | 用途 | 是否需要设备 |
-|------|------|--------------|
-| `ota_flow_test.py --static` | OTA 路由注册、按钮、JS 一致性、JS 语法（默认） | 否 |
-| `ota_flow_test.py --dynamic` | GET /api/ota/status 状态机轮询、配 WiFi 完整检查流程 | 是 |
-| `ota_local_mock.py --self-test` | 本地 mock server + Node 跑固件 /ota 页真实 JS 流程 | 否 |
-| `ota_local_mock.py --serve` | 启动 localhost mock server，浏览器手动测试 | 否 |
-
-```bash
-# 静态部分（无需设备，默认）
-python3 tests/ota_flow_test.py --static
-# 动态部分（需设备进入配网态）
-python3 tests/ota_flow_test.py --dynamic --ip 192.168.4.1
-# 动态部分 + 完整家庭 WiFi 流程
-python3 tests/ota_flow_test.py --dynamic --ip 192.168.4.1 --ssid MyHome --psk secret
-```
-
-### D. 本地 Mock（无需烧设备调试前端）
+### C. 本地 Mock（无需烧设备调试前端）
 
 | 脚本 | 用途 | 端口 |
 |------|------|------|
 | `mock_server.py` | 复刻设备全部 /api/xxx JSON 接口 + 首页静态资源，本地调试 `main/web/` 前端 | 默认 8080 |
-| `ota_local_mock.py --serve` | 仅复刻 OTA 相关 /api/ota/* 接口 | 默认 8080 |
 
 ```bash
-# 完整 mock（v3.2.0 推荐入口，覆盖全部 /api/xxx）
+# 完整 mock（覆盖全部 /api/xxx）
 python3 tests/mock_server.py
 # 浏览器访问 http://127.0.0.1:8080/ 调试前端
-
-# OTA 专用 mock
-python3 tests/ota_local_mock.py --serve --port 8080
 ```
 
 ### E. 串口日志工具
@@ -124,18 +101,19 @@ python3 tests/ota_local_mock.py --serve --port 8080
 |------|------|----------|
 | `serial_capture.py` | 一次性抓取串口日志（指定时长） | 前台阻塞，超时退出 |
 | `serial_daemon.py` | 串口日志守护进程（后台常驻，自动让出烧录串口） | 后台 nohup |
-| `ota_serial_monitor.py` | OTA 测试专用日志抓取（带关键字高亮 + 自动摘要） | 前台，Ctrl+C 退出 |
 
 ```bash
 # 一次性抓 30 秒
 python3 tests/serial_capture.py --port /dev/ttyACM0 --duration 30
-# 后台守护
-nohup python3 tests/serial_daemon.py -p /dev/ttyACM0 > /tmp/serial_daemon.out 2>&1 &
-# OTA 测试专用监控（默认 1800s）
-python3 tests/ota_serial_monitor.py -p /dev/ttyACM0 -d 600
+# 后台守护（不传 -p 自动探测端口：Linux /dev/ttyACM*、macOS /dev/cu.usbmodem*）
+nohup python3 tests/serial_daemon.py > /tmp/serial_daemon.out 2>&1 &
+# 也可显式指定端口
+nohup python3 tests/serial_daemon.py -p /dev/cu.usbmodem101 > /tmp/serial_daemon.out 2>&1 &
 ```
 
-> v3.1.6 起 OTA 升级统一为 HTTPS 在线下载方式，已移除基于 `/ota/upload` 上传的 `ota_full_test.sh` 与 `ota_upload_test.py`。在线 OTA 全流程由 `ota_flow_test.py` 覆盖，人工验证参考 [docs/user/04-ota-user-guide.md](../docs/user/04-ota-user-guide.md)。
+> 守护进程异步写入 `tests/logs/serial_<YYYYMMDD>.log`（按日滚动，已被 `.gitignore` 忽略），烧录时自动让出串口、烧完自动重连，跨 Linux/macOS。停止：`pkill -f serial_daemon.py`。
+
+> v4.0.0 起已移除在线 OTA 与家庭网络配置，固件升级走全量重新烧录（分区表变更需 `erase_flash`）。
 
 ### F. 压力测试
 
@@ -315,7 +293,8 @@ python3 tests/ble_selftest.py
 
 | 脚本 | 移除版本 | 原因 | 替代 |
 |------|----------|------|------|
-| `ota_full_test.sh` | v3.1.6 | OTA 升级改为 HTTPS 在线下载，移除上传流程 | `ota_flow_test.py` |
-| `ota_upload_test.py` | v3.1.6 | 同上 | `ota_flow_test.py` |
-
-人工 OTA 验证参考 [docs/11-ota-user-guide.md](../docs/11-ota-user-guide.md)。
+| `ota_full_test.sh` | v3.1.6 | OTA 升级改为 HTTPS 在线下载，移除上传流程 | （在线 OTA 已于 v4.0.0 整体移除） |
+| `ota_upload_test.py` | v3.1.6 | 同上 | （同上） |
+| `ota_flow_test.py` | v4.0.0 | 移除在线 OTA 功能 | 无 |
+| `ota_local_mock.py` | v4.0.0 | 移除在线 OTA 功能 | `mock_server.py` |
+| `ota_serial_monitor.py` | v4.0.0 | 移除在线 OTA 功能 | `serial_capture.py` |
