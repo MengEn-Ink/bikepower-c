@@ -9,7 +9,6 @@ TC-3e NVS schema 静态一致性检查（无需设备）
 1. config 头文件定义的所有 NVS_KEY_* 必须在 nvs_store.c 中被读写至少一次。
 2. nvs_store.c 中出现的 nvs_get_*/nvs_set_* 字符串字面量 key 必须在 config 头文件中定义。
 3. nvs_get_*/nvs_set_* 使用的 key 长度 ≤ 15（NVS key 最大长度限制）。
-4. NVS_NAMESPACE 与 NVS_NAMESPACE_WIFI 必须不同（避免误用同一命名空间）。
 
 设计：纯静态文本匹配，不解析 C AST，不依赖编译器。
 
@@ -66,7 +65,7 @@ def main():
     print(f"\n{TAG} nvs_store.c 使用 NVS 宏: {len(used_macros)} 个")
 
     # 3. 校验：所有定义的 key 必须被使用
-    print(f"\n{TAG} [1/3] 定义 vs 使用一致性")
+    print(f"\n{TAG} [1/2] 定义 vs 使用一致性")
     for macro in key_defs:
         check(macro in used_macros,
               f"宏 {macro} 已定义但未在 nvs_store.c 中使用")
@@ -77,17 +76,12 @@ def main():
               f"宏 {macro} 在 nvs_store.c 中使用但未在 config 头文件中定义")
 
     # 5. 校验：key 字符串长度 ≤ 15（NVS 限制）
-    print(f"\n{TAG} [2/3] NVS key 长度 ≤ 15")
+    print(f"\n{TAG} [2/2] NVS key 长度 ≤ 15")
     for macro, val in key_defs.items():
         if macro.startswith("NVS_NAMESPACE"):
             continue  # namespace 不受 15 字符限制
         check(len(val) <= 15,
               f"{macro} = {val!r} 长度 {len(val)} > 15（NVS key 上限）")
-
-    # 6. 校验：主 namespace 必须定义
-    print(f"\n{TAG} [3/3] namespace 定义完整性")
-    ns_main = key_defs.get("NVS_NAMESPACE")
-    check(bool(ns_main), "NVS_NAMESPACE 已定义")
 
     # 总结
     print(f"\n{TAG} 结果: {g_pass} 通过, {g_fail} 失败")

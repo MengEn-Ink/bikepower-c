@@ -13,7 +13,7 @@ def parse_args():
     parser.add_argument("-d", "--duration", type=float, help="抓取时长秒数")
     parser.add_argument("-o", "--output", help="日志输出文件；不指定则输出到 stdout")
     args = parser.parse_args()
-    port = args.port or args.port_pos or "/dev/cu.usbmodem101"
+    port = args.port or args.port_pos or "/dev/ttyACM0"
     duration = args.duration if args.duration is not None else (args.duration_pos if args.duration_pos is not None else 13.0)
     if duration < 0:
         parser.error("duration 必须大于等于 0")

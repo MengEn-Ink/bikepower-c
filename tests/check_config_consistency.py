@@ -253,8 +253,8 @@ if "| 10 |" in progress_src:
           "PROGRESS.md 含阶段 10 时 docs/INDEX.md 同步到阶段 0-10")
 
 
-# ============================ 6. BLE 通知间隔一致性 ============================
-print(f"\n{TAG} [S6] BLE 通知间隔一致性")
+# ============================ 5. BLE 通知间隔一致性 ============================
+print(f"\n{TAG} [S5] BLE 通知间隔一致性")
 
 notify_ms = extract_int(config_src, "BLE_NOTIFY_INTERVAL_MS")
 check(notify_ms == 1000, f"BLE_NOTIFY_INTERVAL_MS = 1000 (实际={notify_ms})")
@@ -264,7 +264,7 @@ check(advert_ms == 500, f"BLE_ADVERTISING_INTERVAL_MS = 500 (实际={advert_ms})
 
 
 # ============================ 7. 内存阈值一致性 ============================
-print(f"\n{TAG} [S7] 内存阈值一致性")
+print(f"\n{TAG} [S6] 内存阈值一致性")
 
 heap_warn = extract_int(config_src, "HEAP_WARN_BYTES")
 heap_crit = extract_int(config_src, "HEAP_CRIT_BYTES")
@@ -277,16 +277,16 @@ if hw_src:
           "hardware-constraints.md 提到堆告警阈值 40KB/20KB")
 
 
-# ============================ 8. 任务栈大小非零 ============================
-print(f"\n{TAG} [S8] 任务栈大小合理性")
+# ============================ 7. 任务栈大小合理性 ============================
+print(f"\n{TAG} [S7] 任务栈大小合理性")
 
 for stk_name in ["TASK_STACK_BTN", "TASK_STACK_LED", "TASK_STACK_HTTPD"]:
     v = extract_int(config_src, stk_name)
     check(v is not None and v >= 1024, f"{stk_name} >= 1024 (实际={v})")
 
 
-# ============================ 9. FTMS OpCode 唯一性 ============================
-print(f"\n{TAG} [S9] FTMS OpCode 值不冲突")
+# ============================ 8. FTMS OpCode 唯一性 ============================
+print(f"\n{TAG} [S8] FTMS OpCode 值不冲突")
 
 ftms_ops = {
     "FTMS_OP_REQUEST_CONTROL": extract_int(config_src, "FTMS_OP_REQUEST_CONTROL"),
@@ -299,8 +299,8 @@ values = [v for v in ftms_ops.values() if v is not None]
 check(len(values) == len(set(values)), f"FTMS OpCode 值唯一 (实际={values})")
 
 
-# ============================ 10. 板型枚举完整性 ============================
-print(f"\n{TAG} [S10] 板型枚举完整性")
+# ============================ 9. 板型枚举完整性 ============================
+print(f"\n{TAG} [S9] 板型枚举完整性")
 
 check("BOARD_GENERIC_C3" in config_src, "BOARD_GENERIC_C3 枚举存在")
 check("BOARD_M5STAMP_C3" in config_src, "BOARD_M5STAMP_C3 枚举存在")
@@ -317,8 +317,8 @@ check(led_generic == 12, f"LED_PIN_GENERIC = 12 (实际={led_generic})")
 check(led_m5stamp == 2, f"LED_PIN_M5STAMP = 2 (实际={led_m5stamp})")
 
 
-# ============================ 11. NVS key 长度限制 ============================
-print(f"\n{TAG} [S11] NVS key 长度 <= 15（ESP-IDF 限制）")
+# ============================ 10. NVS key 长度限制 ============================
+print(f"\n{TAG} [S10] NVS key 长度 <= 15（ESP-IDF 限制）")
 
 nvs_keys = re.findall(r'^#define\s+(NVS_KEY_\w+)\s+"([^"]+)"', config_src, re.MULTILINE)
 for key_name, key_val in nvs_keys:
