@@ -22,7 +22,7 @@
 - `button_logic.c`
 - `button_debounce.c`
 - `led_pattern.c`
-- 当前断言规模：`1312` 条
+- 当前断言规模：`1322` 条
 - 适用改动：
 - `components/bikepower_domain/` 下的逻辑变更
 - 配置 schema、范围校验、模式计算、心率模型变更

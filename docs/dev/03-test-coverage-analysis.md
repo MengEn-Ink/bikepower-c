@@ -10,16 +10,16 @@
 
 | 文件 | 行数 | 职责 | 可测性 |
 |------|------|------|--------|
-| `power_engine.c` | 449 | 功率/踏频/心率快照生成 + 浮动幅度平滑游走 | ✅ host 单测 |
+| `power_engine.c` | 464 | 功率/踏频/心率快照生成 + 浮动幅度平滑游走 | ✅ host 单测 |
 | `hr_model.c` | 233 | 心率一阶动力学 + HRV + 固定心率浮动 | ✅ host 单测 |
-| `profile.c` | 120 | 用户档案 + 配速机器人 | ✅ host 单测 |
-| `config_store.c` | 241 | 配置 schema 默认/校验/迁移/序列化 | ✅ host 单测 |
+| `profile.c` | 181 | 用户档案 + 配速机器人 | ✅ host 单测 |
+| `config_store.c` | 312 | 配置 schema 默认/校验/迁移/序列化 | ✅ host 单测 |
 | `json_miniparse.c` | 36 | 扁平 JSON 字段提取（配网请求体解析） | ✅ host 单测 |
 | `button_logic.c` | 27 | 按压时长分类（短按/长按/确认） | ✅ host 单测 |
 | `led_pattern.c` | 44 | LED 模式→颜色映射 + 闪烁节拍 | ✅ host 单测 |
 | `button_debounce.c` | 22 | 按钮去抖/长按节拍判定 | ✅ host 单测 |
 | `domain_rng.c` | 40 | xorshift32 随机数 | ✅ host 单测 |
-| **小计** | **1212** | | **100% host 可测** |
+| **小计** | **1359** | | **100% host 可测** |
 
 > 抽取原则（v4.0.0 校准）：仅抽取**生产代码真正调用**的纯逻辑（button_logic/led_pattern/button_debounce 分别被 app_state/led/button 引用）。此前为刷覆盖率抽取但 main/ 未采用的 `ftms_codec`/`app_state_machine`/`radio_state`/`dns_packet` 已删除（避免与 ble_bikepower/app_state/radio_ctrl/captive_portal 的手写实现形成并行双份）。
 
@@ -28,16 +28,16 @@
 | 文件 | 行数 | 职责 | 可测性分类 |
 |------|------|------|-----------|
 | `ble_bikepower.c` | 913 | BLE 五服务 + FTMS 编解码 | 🟡 GATT 注册/编解码真机必测（`ble_selftest.py`） |
-| `wifi_portal.c` | 566 | HTTP 配网门户（纯 /api/xxx JSON） | 🟡 静态可校验（路由/HTML/JS/表单，TC-3a/3d）；handler 运行时真机必测 |
+| `wifi_portal.c` | 699 | HTTP 配网门户（纯 /api/xxx JSON） | 🟡 静态可校验（路由/HTML/JS/表单，TC-3a/3d）；handler 运行时真机必测 |
 | `radio_ctrl.c` | 278 | WiFi/BLE 射频互斥（AP + coex） | 🟡 WiFi 启停真机必测 |
 | `app_state.c` | 275 | 应用状态机 + 事件分发 | 🟡 决策/副作用真机必测 |
-| `nvs_store.c` | 234 | NVS 配置持久化 | 🟡 schema 静态校验（TC-3e）；运行时真机必测 |
+| `nvs_store.c` | 292 | NVS 配置持久化 | 🟡 schema 静态校验（TC-3e）；运行时真机必测 |
 | `led.c` | 226 | LED 模式（GPIO/RMT） | 🟡 颜色映射已抽领域层；RMT/GPIO 真机必测 |
 | `button.c` | 194 | 按钮去抖/长按 | 🟡 去抖逻辑已抽领域层；ISR/任务真机必测 |
 | `captive_portal.c` | 176 | DNS 劫持 + 探测端点 | 🟡 socket 真机必测 |
 | `app_main.c` | 272 | 主循环 + 任务创建 | 🟡 任务/WDT 静态校验（TC-3g）；主循环真机必测 |
 | `board_detect.c` | 93 | 板级检测 | 🟡 描述表静态校验（TC-3f）；GPIO 检测真机必测 |
-| **小计** | **3227** | | |
+| **小计** | **3418** | | |
 
 ### 头文件（不计入覆盖率分母）
 
@@ -49,7 +49,7 @@
 
 | 层 | 入口 | 覆盖对象 | 状态 |
 |----|------|---------|------|
-| TC-1 host 单测 | `test/test_domain` | 领域层 9 个文件 | ✅ 全绿（1312 断言，含浮动幅度 setter/游走/固定心率浮动、按钮去抖与 LED 灯效配置） |
+| TC-1 host 单测 | `test/test_domain` | 领域层 9 个文件 | ✅ 全绿（1322 断言，含自定义配速昵称、浮动幅度 setter/游走/固定心率浮动、按钮去抖与 LED 灯效配置） |
 | TC-3a JS 静态 | `tests/check_portal_js.py` | `main/web/app.js` node --check | ✅ |
 | TC-3c 常量一致性 | `tests/check_config_consistency.py` | config 头文件 ↔ 文档 | ✅ |
 | TC-3d 门户结构 | `tests/check_portal_structure.py` | 路由表/HTML/前端 API 调用 | ✅ |

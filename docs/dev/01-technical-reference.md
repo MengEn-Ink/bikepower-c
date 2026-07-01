@@ -447,10 +447,11 @@ DIS 读取内容来自编译期常量：
 
 `build_road()` 的特点：
 
-- 按当前 `ride_type` 取 `ROAD_PACERS[]`
+- 预设档按当前 `ride_type` 取 `ROAD_PACERS[]`；自定义档 `ride_type=5` 取 profile 中的 `custom_wkg_low/high`
 - 在对应 `wkg_low` 到 `wkg_high` 之间随机取样
 - 计算公式约为 `power = weight * wkg / 10`
 - 再按功率推导目标心率
+- 自定义档昵称 `custom_pacer_name` 会持久化，并在网页下拉框中与当前 W/kg 区间一起显示
 
 当前配速机器人表定义在 `profile.c`：
 
@@ -459,6 +460,7 @@ DIS 读取内容来自编译期常量：
 - `Jacques`：`3.0-3.5 W/kg`
 - `Genie`：`3.5-3.9 W/kg`
 - `Constance`：`4.0-4.4 W/kg`
+- `自定义`：默认 `2.5-3.0 W/kg`，可在网页端修改昵称与 `1.0-7.0 W/kg` 范围
 
 ### 6.6 ERG 模式
 
@@ -676,7 +678,7 @@ v3.2.0 起配网门户前后端分离：
 
 ### 8.5 前端反馈与 JSON 安全
 
-配网门户是单页 SPA。首页与设置页通过 `location.hash` 切换，保存入口统一为 `POST /api/config`，保存并关闭 WiFi 入口为 `POST /api/close-wifi`。前端提交完整 JSON payload，保存成功后页面显示即时反馈；字段级校验覆盖功率、踏频、心率、体重、FTP、阈值心率、调功步进、浮动幅度、自定义 W/kg 与 LED 配置。
+配网门户是单页 SPA。首页与设置页通过 `location.hash` 切换，保存入口统一为 `POST /api/config`，保存并关闭 WiFi 入口为 `POST /api/close-wifi`。前端提交完整 JSON payload，保存成功后页面显示即时反馈；字段级校验覆盖功率、踏频、心率、体重、FTP、阈值心率、设备名称、调功步进、浮动幅度、自定义 W/kg 与 LED 配置。设备名称在设置页默认文本展示，点击右侧编辑按钮后进入输入态，点对勾确认后再随“保存设置”持久化；物理按钮和 LED 配置卡片默认收起，仅用户主动展开时显示编辑控件。
 
 `wifi_portal.c` 使用 `json_escape()` 转义字符串字段，避免设备名等用户可控内容破坏 JSON；前端渲染动态文本时使用 HTML 转义。`tests/check_portal_js.py` 与 `tests/check_portal_structure.py` 分别覆盖 JS 语法和前后端路由/视图契约。
 
@@ -707,6 +709,7 @@ namespace 固定为：
 - `NVS_KEY_RIDE_TYPE = "ride"`
 - `NVS_KEY_CUSTOM_WKG_LO = "cwkglo"`
 - `NVS_KEY_CUSTOM_WKG_HI = "cwkghi"`
+- `NVS_KEY_CUSTOM_NAME = "cname"`
 - `NVS_KEY_DEVICE_NAME = "devname"`
 - `NVS_KEY_LED_SILENT = "ledsil"`
 - `NVS_KEY_LED_WAIT_MODE = "ledwm"`

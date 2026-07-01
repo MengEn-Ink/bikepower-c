@@ -12,6 +12,14 @@
 - 验证：`python3 -m unittest tests/test_serial_daemon.py`、`python3 -m py_compile tests/serial_daemon.py tests/test_serial_daemon.py`、`bash -n scripts/log_daemon.sh scripts/flash_latest.sh`、`git diff --check`、`bash scripts/flash_latest.sh` 通过；真机启动日志 `tests/logs/flash_latest_20260701_204055.log` 无 ERROR/WARN/panic/WDT/Backtrace。
 
 ### 网页端
+- `main/web/`：恢复设备名称“文本展示 → 右侧编辑 → 对勾确认”的交互，不再默认展示为直接输入框；确认后随“保存设置”持久化。
+- `main/web/`：物理按钮和 LED 指示灯配置改为默认收起的折叠卡片，点击卡片标题才展开编辑，减少设置页首屏信息密度。
+- `main/web/app.css`：优化设置页视觉层次，增加浅蓝渐变头部、设备名称信息卡、折叠标题栏和暗色模式适配。
+- `tests/check_portal_structure.py`：新增设备名称确认交互与折叠卡片默认收起的静态契约检查。
+- `main/web/`：修复自定义配速机器人 W/kg 修改后下拉框仍显示旧区间的问题；新增自定义机器人昵称输入，保存后下拉框显示新昵称与当前 W/kg 范围。
+- `components/bikepower_domain/`、`main/nvs_store.c`、`main/wifi_portal.c`：新增 `custom_pacer_name` 配置字段，贯通默认值、校验、序列化、NVS 持久化与 `/api/state` / `/api/config`。
+- `tests/`：补充 host 单测、门户结构检查、NVS schema 检查、mock server 与配网自测对自定义昵称/区间契约的覆盖。
+- 验证：`test/test_domain` 1322 通过 0 失败；`check_portal_js.py`、`check_portal_structure.py`、`check_nvs_schema.py`、`check_config_consistency.py`、`check_tasks_wdt.py`、`check_board_desc.py` 全绿；`stage5_portal_test.py --ip 127.0.0.1 --port 18080` mock 自测 5/5 通过；`flash_latest.sh --capture-seconds 20` 编译/烧录通过，启动日志 `tests/logs/flash_latest_20260701_221449.log` 无 panic/WDT/Backtrace；`ble_selftest.py` 通过。
 - `main/web/`：底部导航由“首页 / 更多 / 关于”重构为“首页 / 设置”两 Tab；原“更多”和“关于”并入设置页，设置页内分为“用户资料 / 设备信息 / 关于”三级内容入口。
 - 设备名称编辑从关于页挪入“设置 → 设备信息”，与固件版本同组展示；“用户资料”保留体重、FTP、阈值心率和物理按钮调功步进。
 - 首页进一步压缩卡片、输入、步进器和分段控件高度，减少固定模式首屏滚动压力。
