@@ -45,10 +45,12 @@
       </div>
     </div>
 
-    <div class="note">ERG 模式为默认能力：骑行 App 下发 ERG 目标功率时设备自动切换，无需手动选择。修改参数后请点击保存。</div>
+    <div class="note">ERG 模式为默认能力：骑行 App 下发 ERG 目标功率时设备自动切换。修改参数后请点击保存。</div>
 
-    <button class="btn" id="home-save" onclick="onSave()">保存配置</button>
-    <button class="btn danger" id="home-close" onclick="onCloseWifi()" style="margin-top:10px">保存并关闭 WiFi</button>
+    <div class="btn-row">
+      <button class="btn" id="home-save" onclick="onSave()">保存配置</button>
+      <button class="btn danger" id="home-close" onclick="onCloseWifi()">保存并关闭 WiFi</button>
+    </div>
   </div>
 
   <!-- ============ 更多配置 ============ -->
@@ -76,33 +78,71 @@
         <label>配速机器人</label>
         <select id="more-pacer"></select>
       </div>
-      <div class="note" style="margin-top:8px">机器人模式：开启后设备按所选配速机器人档位自动输出功率，模拟跟随虚拟骑手骑行，无需骑行 App 干预。档位越高跟随的虚拟骑手越强。</div>
+      <div class="note">机器人模式：开启后设备按所选档位自动输出功率，模拟跟随虚拟骑手骑行，无需骑行 App 干预。</div>
     </div>
 
-    <button class="btn" id="more-save" onclick="onMoreSave()">保存配置</button>
-    <button class="btn alt" onclick="go('/home')">返回</button>
+    <div class="btn-row">
+      <button class="btn" id="more-save" onclick="onMoreSave()">保存配置</button>
+      <button class="btn alt" onclick="go('/home')">返回</button>
+    </div>
   </div>
 
   <!-- ============ 关于 ============ -->
   <div class="view" id="view-about">
     <div class="hero">
       <h1>关于</h1>
-      <div class="sub">设备信息与运行状态。</div>
+      <div class="sub">左右滑动查看设备信息 / 使用说明 / 注意事项</div>
     </div>
 
-    <div class="card">
-      <h2>设备信息</h2>
-      <div class="info-row"><span class="k">固件版本</span><span class="v" id="about-ver"></span></div>
-      <div class="info-row"><span class="k">设备名称</span><span class="v" id="about-dev"></span></div>
-    </div>
+    <div class="pager" id="about-pager">
+      <div class="pager-track">
 
-    <div class="card">
-      <h2>内存统计</h2>
-      <div class="info-row"><span class="k">当前空闲堆</span><span class="v" id="about-mem-free">-</span></div>
-      <div class="info-row"><span class="k">历史最低空闲</span><span class="v" id="about-mem-min">-</span></div>
-    </div>
+        <!-- Page 1: 设备信息 -->
+        <div class="page">
+          <div class="card">
+            <h2>设备信息</h2>
+            <div class="info-row"><span class="k">固件版本</span><span class="v" id="about-ver"></span></div>
+            <div class="info-row dev-name-row">
+              <span class="k">设备名称</span>
+              <span class="v name-display" id="about-dev-wrap">
+                <span id="about-dev"></span>
+                <span class="name-edit-icon" onclick="onEditDeviceName()">✎</span>
+              </span>
+            </div>
+            <div class="name-edit-wrap" id="name-edit-wrap" style="display:none">
+              <input type="text" id="about-dev-input" maxlength="20" placeholder="输入新名称">
+              <span class="name-ok-icon" onclick="onSaveDeviceName()">✓</span>
+            </div>
+          </div>
+        </div>
 
-    <button class="btn alt" onclick="go('/home')">返回</button>
+        <!-- Page 2: 使用说明 -->
+        <div class="page">
+          <div class="card">
+            <h2>使用说明</h2>
+            <p><b>1. 连接骑行 App</b>：在 Zwift、TrainerRoad 等骑行 App 中搜索并连接 BikePower BLE 设备即可输出功率。</p>
+            <p><b>2. ERG 模式</b>：骑行 App 下发 ERG 目标功率时设备自动切换，无需手动选择。</p>
+            <p><b>3. 调整目标值</b>：在首页输入目标功率/踏频/心率，点击保存即生效。</p>
+            <p><b>4. 配网窗口</b>：默认 180 秒，剩余时间不足时点击"续期配网"延长。</p>
+            <p><b>5. 重新进入配网</b>：长按设备按钮 2 秒可重新进入配网模式。</p>
+          </div>
+        </div>
+
+        <!-- Page 3: 注意事项 -->
+        <div class="page">
+          <div class="card">
+            <h2>注意事项</h2>
+            <p><b>· 保存生效</b>：修改参数后请点击"保存配置"才会持久化到设备。</p>
+            <p><b>· 关闭 WiFi</b>：点击"保存并关闭 WiFi"后设备返回骑行模式，BLE 持续在线。</p>
+            <p><b>· 心率联动</b>：联动模式心率随功率自动调整；锁死模式心率恒定为填写值。</p>
+            <p><b>· 配网超时</b>：长时间无操作 WiFi 自动关闭，需长按按钮重新进入。</p>
+            <p><b>· 固件升级</b>：暂不支持 OTA，请通过烧录工具更新固件。</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="pager-dots" id="about-pager-dots"></div>
   </div>
 
   <!-- ============ 关闭提示 ============ -->

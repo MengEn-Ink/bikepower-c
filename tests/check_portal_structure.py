@@ -57,13 +57,13 @@ REQUIRED_PLACEHOLDERS = [
 ]
 
 # 前端 app.js 必须调用的核心 API（防止删错路由后前端黑屏）
+# 注：/api/mem_stats 自 v3.2.1 起不再被前端调用（关于页移除内存统计展示）
 REQUIRED_FRONTEND_APIS = [
     "/api/state",
     "/api/time",
     "/api/renew",
     "/api/config",
     "/api/close-wifi",
-    "/api/mem_stats",
 ]
 
 # wifi_portal.c 必须注册的核心路由（防止改坏路由表）

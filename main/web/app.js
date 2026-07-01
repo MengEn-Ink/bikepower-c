@@ -4,6 +4,8 @@
 /* ============ 全局状态 ============ */
 var STATE = {
   device_name: "",
+  device_name_draft: null,
+  device_name_editing: false,
   firmware_version: "",
   power: 0, cadence: 0, heartrate: 0,
   mode: "steady",
@@ -113,6 +115,14 @@ function captureDraft() {
     STATE.profile_thr_hr = parseInt($("more-thr").value, 10) || 0;
     var sel = $("more-pacer");
     if (sel) STATE.profile_ride_type = sel.value;
+    return;
+  }
+  var about = $("view-about");
+  if (about && about.classList.contains("active")) {
+    if (STATE.device_name_editing) {
+      var inp = $("about-dev-input");
+      if (inp) STATE.device_name_draft = inp.value;
+    }
   }
 }
 
@@ -198,10 +208,8 @@ function collectConfig() {
 function onSave() {
   var btn = $("home-save");
   btn.disabled = true;
-  btn.textContent = "保存中…";
   api("/api/config", "POST", collectConfig(), function (status, data) {
     btn.disabled = false;
-    btn.textContent = "保存配置";
     if (status === 200 && data && data.ok) {
       toast("已保存");
     } else {
@@ -216,12 +224,11 @@ function onCloseWifi() {
   /* iOS Captive Portal WebView 不支持 confirm()，改用二次点击确认 */
   if (!s_closeArmed) {
     s_closeArmed = true;
-    btn.textContent = "⚠️ 再次点击确认关闭 WiFi";
     btn.classList.add("warn");
+    toast("再次点击确认关闭 WiFi");
     if (s_closeTimer) clearTimeout(s_closeTimer);
     s_closeTimer = setTimeout(function () {
       s_closeArmed = false;
-      btn.textContent = "保存并关闭 WiFi";
       btn.classList.remove("warn");
     }, 3000);
     return;
@@ -230,10 +237,8 @@ function onCloseWifi() {
   s_closeArmed = false;
   btn.classList.remove("warn");
   btn.disabled = true;
-  btn.textContent = "保存中…";
   api("/api/close-wifi", "POST", collectConfig(), function (status, data) {
     btn.disabled = false;
-    btn.textContent = "保存并关闭 WiFi";
     if (status === 200 && data && data.ok) {
       go("/closing");
     } else {
@@ -264,7 +269,6 @@ function renderPacerSel() {
 function onMoreSave() {
   var btn = $("more-save");
   btn.disabled = true;
-  btn.textContent = "保存中…";
   var body = {
     device_name: STATE.device_name,
     mode: STATE.mode,
@@ -278,7 +282,6 @@ function onMoreSave() {
   };
   api("/api/config", "POST", body, function (status, data) {
     btn.disabled = false;
-    btn.textContent = "保存配置";
     if (status === 200 && data && data.ok) {
       STATE.profile_weight = body.profile_weight;
       STATE.profile_ftp = body.profile_ftp;
@@ -295,16 +298,100 @@ function onMoreSave() {
 /* ============ 关于 ============ */
 function renderAbout() {
   $("about-ver").textContent = "v" + STATE.firmware_version;
-  $("about-dev").textContent = STATE.device_name;
-  apiText("/api/mem_stats", "GET", function (status, text) {
-    if (status === 200 && text) {
-      try {
-        var d = JSON.parse(text);
-        $("about-mem-free").textContent = (d.free / 1024).toFixed(1) + " KB";
-        $("about-mem-min").textContent = (d.min_free / 1024).toFixed(1) + " KB";
-      } catch (e) { /* ignore */ }
+  var dev = $("about-dev");
+  var display = $("about-dev-wrap");
+  var wrap = $("name-edit-wrap");
+  var inp = $("about-dev-input");
+  if (STATE.device_name_editing) {
+    /* 编辑模式：显示输入框，隐藏铅笔 */
+    if (dev) dev.textContent = STATE.device_name;
+    if (display) display.style.display = "none";
+    if (wrap) wrap.style.display = "flex";
+    if (inp) {
+      inp.value = STATE.device_name_draft != null ? STATE.device_name_draft : STATE.device_name;
+    }
+  } else {
+    /* 显示模式：显示名称 + 铅笔，隐藏输入框 */
+    if (dev) dev.textContent = STATE.device_name_draft != null ? STATE.device_name_draft : STATE.device_name;
+    if (display) display.style.display = "flex";
+    if (wrap) wrap.style.display = "none";
+  }
+  setupAboutPager();
+}
+function onEditDeviceName() {
+  STATE.device_name_editing = true;
+  var inp = $("about-dev-input");
+  if (inp) inp.value = STATE.device_name_draft != null ? STATE.device_name_draft : STATE.device_name;
+  var wrap = $("name-edit-wrap");
+  if (wrap) wrap.style.display = "flex";
+  var display = $("about-dev-wrap");
+  if (display) display.style.display = "none";
+  if (inp) {
+    inp.focus();
+    /* 选中现有名称便于修改 */
+    try { inp.select(); } catch (e) { /* ignore */ }
+  }
+}
+function onSaveDeviceName() {
+  var inp = $("about-dev-input");
+  if (!inp) return;
+  var name = (inp.value || "").trim();
+  if (!name) { toast("名称不能为空"); return; }
+  if (name.length > 20) { toast("名称过长（最多 20 字符）"); return; }
+  /* 保留当前其他配置，仅更新 device_name */
+  var body = collectConfig();
+  body.device_name = name;
+  api("/api/config", "POST", body, function (status, data) {
+    if (status === 200 && data && data.ok) {
+      STATE.device_name = name;
+      STATE.device_name_draft = null;
+      STATE.device_name_editing = false;
+      var dev = $("about-dev");
+      if (dev) dev.textContent = name;
+      var wrap = $("name-edit-wrap");
+      if (wrap) wrap.style.display = "none";
+      var display = $("about-dev-wrap");
+      if (display) display.style.display = "flex";
+      toast("设备名称已保存");
+    } else {
+      toast("保存失败: " + ((data && data.error) || status));
     }
   });
+}
+
+/* ============ 关于页分页滑动 ============ */
+var s_pagerBound = false;
+function setupAboutPager() {
+  var pager = $("about-pager");
+  if (!pager) return;
+  var dotsBox = $("about-pager-dots");
+  if (!dotsBox) return;
+  var pages = pager.querySelectorAll(".page");
+  /* 初始化小圆点（只在首次渲染时创建） */
+  if (dotsBox.children.length !== pages.length) {
+    dotsBox.innerHTML = "";
+    for (var i = 0; i < pages.length; i++) {
+      var d = el("div", { class: "pager-dot" + (i === 0 ? " on" : "") });
+      d.setAttribute("data-idx", String(i));
+      d.onclick = (function (idx) {
+        return function () {
+          pager.scrollTo({ left: idx * pager.clientWidth, behavior: "smooth" });
+        };
+      })(i);
+      dotsBox.appendChild(d);
+    }
+  }
+  /* 绑定滚动监听（只绑定一次） */
+  if (!s_pagerBound) {
+    s_pagerBound = true;
+    pager.addEventListener("scroll", function () {
+      var idx = Math.round(pager.scrollLeft / pager.clientWidth);
+      var dots = dotsBox.querySelectorAll(".pager-dot");
+      for (var j = 0; j < dots.length; j++) {
+        dots[j].classList.toggle("on", j === idx);
+      }
+    }, { passive: true });
+  }
 }
 
 /* ============ 关闭提示 ============ */
