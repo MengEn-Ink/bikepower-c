@@ -163,6 +163,7 @@ void app_main(void)
     int tick = 0;
     int last_conn = 0;
     int ble_retry_tick = 0;
+    int hb_count = 0;  // 心跳序号（10s 递增，用于遥测与内存基线）
     app_evt_t e;
 
     while (1) {
@@ -244,11 +245,26 @@ void app_main(void)
 
         if (++tick >= MAIN_HEARTBEAT_INTERVAL_TICKS) {  // 每 10s 一次心跳日志
             tick = 0;
+            hb_count++;
             uint32_t heap = esp_get_free_heap_size();
-            ESP_LOGI(TAG, "心跳 堆=%lu p=%dW hr=%d c=%d mode=%d conn=%d state=%d",
-                     (unsigned long)heap,
-                     s.power, s.heartrate, s.cadence, s.mode,
+            uint32_t min_heap = esp_get_minimum_free_heap_size();
+            const char *mode_str = (s.mode == RIDE_MODE_STEADY) ? "steady"
+                                : (s.mode == RIDE_MODE_ROAD) ? "road"
+                                : (s.mode == RIDE_MODE_ERG) ? "erg" : "?";
+
+            ESP_LOGI(TAG, "遥测 #%d 堆=%lu/%lu p=%dW(%d) c=%dRPM hr=%dBPM m=%s step=%d conn=%d state=%d",
+                     hb_count,
+                     (unsigned long)heap, (unsigned long)min_heap,
+                     s.power, s_engine.base_power,
+                     s.cadence, s.heartrate,
+                     mode_str, s_engine.power_step,
                      conn, app_state_get());
+
+            // 每 30 个心跳（300s）输出内存基线
+            if (hb_count % 30 == 0) {
+                ESP_LOGI(TAG, "内存基线 #%d 空闲=%lu 最低=%lu",
+                         hb_count, (unsigned long)heap, (unsigned long)min_heap);
+            }
 
             if (heap < HEAP_CRIT_BYTES) {
                 ESP_LOGE(TAG, "空闲堆严重不足 %lu < %d，存在崩溃风险",
@@ -260,6 +276,7 @@ void app_main(void)
 
             // 配置脏标记则周期落盘（调功/改配置后断电可恢复）
             if (power_engine_is_dirty(&s_engine)) {
+                ESP_LOGI(TAG, "心跳触发 NVS 落盘");
                 if (nvs_store_save(&s_engine)) {
                     power_engine_clear_dirty(&s_engine);
                 }

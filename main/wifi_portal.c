@@ -217,49 +217,114 @@ static const char *mode_to_id(int mode)
 static void apply_json_fields(power_engine_t *e, const char *body)
 {
     char val[64];
+    int new_val, old_val;
 
     if (json_get_str(body, "mode", val, sizeof(val))) {
         int m = mode_from_id(val);
-        if (m >= 0) power_engine_set_mode(e, (ride_mode_t)m);
+        if (m >= 0) {
+            ride_mode_t old_mode = e->mode;
+            power_engine_set_mode(e, (ride_mode_t)m);
+            if (old_mode != e->mode)
+                ESP_LOGI(TAG, "  mode: %s → %s", mode_to_id((int)old_mode), mode_to_id(m));
+        }
     }
     if (json_get_str(body, "device_name", val, sizeof(val))) {
+        ESP_LOGI(TAG, "  device_name: %s → %s", e->device_name, val);
         power_engine_set_device_name(e, val);
     }
     /* 手动三项：setter 内部仅 STEADY 生效，非 STEADY 自动拒绝 */
-    power_engine_set_power(e, json_get_int_def(body, "power", e->base_power));
-    power_engine_set_cadence(e, json_get_int_def(body, "cadence", e->cadence_base));
+    old_val = e->base_power;
+    new_val = json_get_int_def(body, "power", old_val);
+    power_engine_set_power(e, new_val);
+    if (new_val != old_val && e->base_power == new_val)
+        ESP_LOGI(TAG, "  power: %dW → %dW", old_val, new_val);
+
+    old_val = e->cadence_base;
+    new_val = json_get_int_def(body, "cadence", old_val);
+    power_engine_set_cadence(e, new_val);
+    if (new_val != old_val && e->cadence_base == new_val)
+        ESP_LOGI(TAG, "  cadence: %dRPM → %dRPM", old_val, new_val);
+
     /* 浮动幅度三项：任意模式接受设置（仅固定模式生效），setter 内部夹紧范围 */
-    power_engine_set_power_float(e, json_get_int_def(body, "power_float", e->power_float));
-    power_engine_set_cadence_float(e, json_get_int_def(body, "cadence_float", e->cadence_float));
-    power_engine_set_hr_float(e, json_get_int_def(body, "hr_float", e->hr_float));
+    old_val = e->power_float;
+    new_val = json_get_int_def(body, "power_float", old_val);
+    power_engine_set_power_float(e, new_val);
+    if (old_val != e->power_float)
+        ESP_LOGI(TAG, "  power_float: %d → %d", old_val, e->power_float);
+
+    old_val = e->cadence_float;
+    new_val = json_get_int_def(body, "cadence_float", old_val);
+    power_engine_set_cadence_float(e, new_val);
+    if (old_val != e->cadence_float)
+        ESP_LOGI(TAG, "  cadence_float: %d → %d", old_val, e->cadence_float);
+
+    old_val = e->hr_float;
+    new_val = json_get_int_def(body, "hr_float", old_val);
+    power_engine_set_hr_float(e, new_val);
+    if (old_val != e->hr_float)
+        ESP_LOGI(TAG, "  hr_float: %d → %d", old_val, e->hr_float);
+
     /* 调功步进：任意模式接受设置，setter 内部夹紧到 [POWER_STEP_MIN, POWER_STEP_MAX] */
-    power_engine_set_power_step(e, json_get_int_def(body, "power_step", e->power_step));
+    old_val = e->power_step;
+    new_val = json_get_int_def(body, "power_step", old_val);
+    power_engine_set_power_step(e, new_val);
+    if (old_val != e->power_step)
+        ESP_LOGI(TAG, "  power_step: %d → %d", old_val, e->power_step);
+
     /* 心率锁定：hr_lock=1 锁定到 heartrate 值，hr_lock=0 解锁随功率联动 */
     if (json_has_key(body, "hr_lock")) {
         if (json_get_int(body, "hr_lock")) {
-            power_engine_set_heartrate(e, json_get_int_def(body, "heartrate", e->last_heartrate));
+            old_val = e->has_user_hr ? e->user_heartrate : 0;
+            new_val = json_get_int_def(body, "heartrate", e->last_heartrate);
+            power_engine_set_heartrate(e, new_val);
+            ESP_LOGI(TAG, "  hr_lock: ON heartrate=%dBPM (was %d)", new_val, old_val);
         } else {
             power_engine_clear_user_hr(e);
+            ESP_LOGI(TAG, "  hr_lock: OFF");
         }
     } else if (json_has_key(body, "heartrate")) {
-        power_engine_set_heartrate(e, json_get_int_def(body, "heartrate", e->last_heartrate));
+        new_val = json_get_int_def(body, "heartrate", e->last_heartrate);
+        power_engine_set_heartrate(e, new_val);
+        ESP_LOGI(TAG, "  heartrate: %dBPM", new_val);
     }
 
-    profile_set_weight(&e->profile, json_get_int_def(body, "profile_weight", e->profile.weight));
-    profile_set_ftp(&e->profile, json_get_int_def(body, "profile_ftp", e->profile.ftp));
-    profile_set_thr_hr(&e->profile, json_get_int_def(body, "profile_thr_hr", e->profile.thr_hr));
+    old_val = e->profile.weight;
+    new_val = json_get_int_def(body, "profile_weight", old_val);
+    profile_set_weight(&e->profile, new_val);
+    if (old_val != e->profile.weight)
+        ESP_LOGI(TAG, "  weight: %d → %d kg", old_val, e->profile.weight);
+
+    old_val = e->profile.ftp;
+    new_val = json_get_int_def(body, "profile_ftp", old_val);
+    profile_set_ftp(&e->profile, new_val);
+    if (old_val != e->profile.ftp)
+        ESP_LOGI(TAG, "  ftp: %d → %dW", old_val, e->profile.ftp);
+
+    old_val = e->profile.thr_hr;
+    new_val = json_get_int_def(body, "profile_thr_hr", old_val);
+    profile_set_thr_hr(&e->profile, new_val);
+    if (old_val != e->profile.thr_hr)
+        ESP_LOGI(TAG, "  thr_hr: %d → %dBPM", old_val, e->profile.thr_hr);
+
     /* 自定义档 W/kg 范围：先于 ride_type 设置，保证切到自定义档时范围已就绪 */
     if (json_has_key(body, "custom_wkg_low") || json_has_key(body, "custom_wkg_high")) {
-        profile_set_custom_wkg(&e->profile,
-            json_get_int_def(body, "custom_wkg_low", e->profile.custom_wkg_low),
-            json_get_int_def(body, "custom_wkg_high", e->profile.custom_wkg_high));
+        int cl = json_get_int_def(body, "custom_wkg_low", e->profile.custom_wkg_low);
+        int ch = json_get_int_def(body, "custom_wkg_high", e->profile.custom_wkg_high);
+        profile_set_custom_wkg(&e->profile, cl, ch);
+        ESP_LOGI(TAG, "  custom_wkg: %d.%d~%d.%d",
+                 e->profile.custom_wkg_low / 10, e->profile.custom_wkg_low % 10,
+                 e->profile.custom_wkg_high / 10, e->profile.custom_wkg_high % 10);
     }
     if (json_get_str(body, "profile_ride_type", val, sizeof(val)) && val[0]) {
+        int old_rt = e->profile.ride_type;
         profile_set_ride_type_str(&e->profile, val);
+        if (old_rt != e->profile.ride_type)
+            ESP_LOGI(TAG, "  ride_type: %d → %d", old_rt, e->profile.ride_type);
     }
 
     if (json_has_key(body, "led_silent")) {
         e->led.silent = (uint8_t)json_get_int(body, "led_silent");
+        ESP_LOGI(TAG, "  led_silent: %d", e->led.silent);
     }
 #define APPLY_LED_SCENE(prefix, scene_id) do { \
         if (json_has_key(body, prefix "_mode")) { \
@@ -405,9 +470,12 @@ static esp_err_t h_api_config(httpd_req_t *req)
         power_engine_clear_dirty(s_engine);
         if (name_changed) ble_bikepower_refresh_device_name();
         app_state_refresh_led();
-        ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d name=%s",
+        ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d",
                  s_engine->base_power, s_engine->cadence_base,
-                 (int)s_engine->mode, s_engine->device_name);
+                 (int)s_engine->mode, s_engine->device_name,
+                 s_engine->power_step,
+                 s_engine->power_float, s_engine->cadence_float, s_engine->hr_float,
+                 s_engine->profile.ride_type);
         send_json(req, "{\"ok\":true}");
     } else {
         ESP_LOGE(TAG, "配置保存失败，s_engine 保持原值");
@@ -451,9 +519,12 @@ static esp_err_t h_api_close_wifi(httpd_req_t *req)
         power_engine_clear_dirty(s_engine);
         if (name_changed) ble_bikepower_refresh_device_name();
         app_state_refresh_led();
-        ESP_LOGI(TAG, "配置已保存并准备关闭 WiFi p=%dW c=%dRPM mode=%d name=%s",
+        ESP_LOGI(TAG, "配置已保存并准备关闭 WiFi p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d",
                  s_engine->base_power, s_engine->cadence_base,
-                 (int)s_engine->mode, s_engine->device_name);
+                 (int)s_engine->mode, s_engine->device_name,
+                 s_engine->power_step,
+                 s_engine->power_float, s_engine->cadence_float, s_engine->hr_float,
+                 s_engine->profile.ride_type);
         /* 5s 收尾窗口：让前端切到 #/closing 页面后关闭 WiFi */
         s_closing = true;
         s_deadline_sec = now_sec() + WIFI_PORTAL_REBOOT_DELAY_SEC;
@@ -479,6 +550,7 @@ static esp_err_t h_api_time(httpd_req_t *req)
 static esp_err_t h_api_renew(httpd_req_t *req)
 {
     arm_deadline();
+    ESP_LOGI(TAG, "配网窗口已续期 剩余%d秒", remaining_seconds());
     return h_api_time(req);
 }
 

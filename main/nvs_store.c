@@ -166,9 +166,11 @@ void nvs_store_load(power_engine_t *e)
     bool fixed = config_store_validate(&c);
     config_to_engine(&c, e);
 
-    ESP_LOGI(TAG, "配置加载完成 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d ftp=%d thr=%d ride=%d%s%s",
+    ESP_LOGI(TAG, "配置加载完成 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d kg ftp=%dW thr=%dBPM ride=%d pf=%d cf=%d hf=%d step=%d dn=%s%s%s",
              c.power, c.cadence, c.mode, c.heartrate, c.has_user_hr,
              c.weight, c.ftp, c.thr_hr, c.ride_type,
+             c.power_float, c.cadence_float, c.hr_float, c.power_step,
+             c.device_name,
              migrated ? " [migrated]" : "", fixed ? " [clamped]" : "");
 
     if (migrated || fixed) {
@@ -264,7 +266,11 @@ bool nvs_store_save(power_engine_t *e)
     xSemaphoreGive(s_save_mutex);
 
     if (ok) {
-        ESP_LOGI(TAG, "配置已保存 p=%dW mode=%d", c.power, c.mode);
+        ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d ftp=%d thr=%d ride=%d pf=%d cf=%d hf=%d step=%d dn=%s",
+                 c.power, c.cadence, c.mode, c.heartrate, c.has_user_hr,
+                 c.weight, c.ftp, c.thr_hr, c.ride_type,
+                 c.power_float, c.cadence_float, c.hr_float, c.power_step,
+                 c.device_name);
     }
     return ok;
 }
