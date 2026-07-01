@@ -74,6 +74,7 @@ typedef enum {
 #define NVS_KEY_POWER_FLOAT    "pfloat"
 #define NVS_KEY_CADENCE_FLOAT  "cfloat"
 #define NVS_KEY_HR_FLOAT       "hrfloat"
+#define NVS_KEY_POWER_STEP     "pstep"
 #define NVS_KEY_WEIGHT         "weight"
 #define NVS_KEY_FTP            "ftp"
 #define NVS_KEY_THR_HR         "thr_hr"

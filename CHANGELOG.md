@@ -4,6 +4,14 @@
 
 ## [未发布]
 
+### 新增（调功步进可配置，可配网调整并持久化）
+- `components/bikepower_domain/`：新增 `power_step` 引擎字段与 `power_engine_set_power_step` setter（越界夹紧 `[POWER_STEP_MIN, POWER_STEP_MAX]` = 5~50W，默认 20W）；`domain_config.h` 新增 `POWER_STEP_MIN/MAX/DEFAULT`；`config_store` 三处（defaults/validate/serialize/deserialize）同步，serialize 栈缓冲 320→352。
+- `main/app_state.c`：物理按钮短按 −步进、长按连续 +步进 改用 `s_engine->power_step`（原硬编码 `POWER_STEP_W`）。
+- `main/nvs_store.c` + `main/bikepower_config.h`：新增 `NVS_KEY_POWER_STEP`（"pstep"）与 engine↔config 双向映射。
+- `main/wifi_portal.c`：`/api/state` 输出 `power_step`；`apply_json_fields` 解析 `power_step`（任意模式接受、setter 夹紧）。
+- `main/web/`：「更多」页新增「物理按钮 · 调功步进 ±[−][+]」步进器（5W 一档，5~50W）。
+- `tests/mock_server.py` 同步 `power_step` 字段与 `/api/config` 接受；`test/test_domain.c` 新增调功步进 setter 边界与 config 往返断言（host 单测 1177 通过）。
+
 ### 修复
 - 修复配速机器人（road 模式）在网页端完全不生效的缺陷：此前「更多」页的机器人下拉框只写 `profile_ride_type`，而该字段仅在 `mode==road` 时被 `build_road` 使用，但前端无任何切换 `mode` 的入口（`STATE.mode` 恒为 `/api/state` 回显值），导致选择任何档位都不改变输出。现首页顶部新增「固定模式 / 配速机器人」分段控件，真正驱动引擎 `mode`。
 

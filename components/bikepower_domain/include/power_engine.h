@@ -51,6 +51,7 @@ typedef struct {
     int power_float;          // 功率浮动幅度（±W，仅固定模式生效）
     int cadence_float;        // 踏频浮动幅度（±RPM，仅固定模式生效）
     int hr_float;             // 固定心率浮动幅度（±BPM，仅固定模式+锁定心率生效）
+    int power_step;           // 物理按钮调功步进（W），可配网修改并持久化
     fluct_walk_t power_walk;  // 功率平滑游走状态
     fluct_walk_t cadence_walk;// 踏频平滑游走状态
     ride_mode_t mode;
@@ -90,6 +91,8 @@ bool power_engine_set_power_float(power_engine_t *e, int amp);
 bool power_engine_set_cadence_float(power_engine_t *e, int amp);
 /* 设置固定心率浮动幅度（±BPM），越界夹紧，仅影响固定模式锁定心率输出。 */
 bool power_engine_set_hr_float(power_engine_t *e, int amp);
+/* 设置物理按钮调功步进（W），越界夹紧到 [POWER_STEP_MIN, POWER_STEP_MAX]。 */
+bool power_engine_set_power_step(power_engine_t *e, int step);
 /* 切换骑行模式，并在模式变化后重置内部状态。 */
 bool power_engine_set_mode(power_engine_t *e, ride_mode_t mode);
 /* 读取当前 profile 选择的配速机器人索引。 */

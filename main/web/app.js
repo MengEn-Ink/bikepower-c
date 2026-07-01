@@ -10,6 +10,7 @@ var STATE = {
   power: 0, cadence: 0, heartrate: 0,
   mode: "steady",
   power_float: 5, cadence_float: 2, hr_float: 2,
+  power_step: 20,
   profile_weight: 0, profile_ftp: 0, profile_thr_hr: 0, profile_ride_type: "coco",
   pacers: [],
   remaining_sec: 180,
@@ -17,11 +18,12 @@ var STATE = {
   hr_locked: false
 };
 
-/* 浮动幅度范围（与 domain_config.h 一致） */
+/* 浮动幅度/步进范围（与 domain_config.h 一致；step 为单次加减量，默认 1） */
 var FLOAT_RANGE = {
   power: { min: 0, max: 100, key: "power_float" },
   cadence: { min: 0, max: 20, key: "cadence_float" },
-  hr: { min: 0, max: 20, key: "hr_float" }
+  hr: { min: 0, max: 20, key: "hr_float" },
+  pstep: { min: 5, max: 50, key: "power_step", step: 5 }
 };
 
 /* ============ 工具函数 ============ */
@@ -176,8 +178,9 @@ function onModeSwitch(mode) {
 function onFloatAdj(kind, delta) {
   var r = FLOAT_RANGE[kind];
   if (!r) return;
+  var stepSize = r.step || 1;
   var cur = STATE[r.key] || 0;
-  var next = clamp(cur + delta, r.min, r.max);
+  var next = clamp(cur + delta * stepSize, r.min, r.max);
   STATE[r.key] = next;
   var lbl = $("float-" + kind);
   if (lbl) lbl.textContent = next;
@@ -283,6 +286,7 @@ function collectConfig() {
     power_float: STATE.power_float,
     cadence_float: STATE.cadence_float,
     hr_float: STATE.hr_float,
+    power_step: STATE.power_step,
     profile_weight: STATE.profile_weight,
     profile_ftp: STATE.profile_ftp,
     profile_thr_hr: STATE.profile_thr_hr,
@@ -336,6 +340,8 @@ function renderMore() {
   $("more-weight").value = STATE.profile_weight;
   $("more-ftp").value = STATE.profile_ftp;
   $("more-thr").value = STATE.profile_thr_hr;
+  var ps = $("float-pstep");
+  if (ps) ps.textContent = STATE.power_step;
 }
 function onMoreSave() {
   var btn = $("more-save");
@@ -366,6 +372,7 @@ function collectConfigBase() {
     power_float: STATE.power_float,
     cadence_float: STATE.cadence_float,
     hr_float: STATE.hr_float,
+    power_step: STATE.power_step,
     profile_weight: STATE.profile_weight,
     profile_ftp: STATE.profile_ftp,
     profile_thr_hr: STATE.profile_thr_hr,
@@ -550,6 +557,7 @@ function init() {
       STATE.power_float = data.power_float != null ? data.power_float : 5;
       STATE.cadence_float = data.cadence_float != null ? data.cadence_float : 2;
       STATE.hr_float = data.hr_float != null ? data.hr_float : 2;
+      STATE.power_step = data.power_step != null ? data.power_step : 20;
       STATE.profile_weight = data.profile_weight || 70;
       STATE.profile_ftp = data.profile_ftp || 200;
       STATE.profile_thr_hr = data.profile_thr_hr || 180;

@@ -38,6 +38,7 @@ MOCK_STATE = {
     "power_float": 5,
     "cadence_float": 2,
     "hr_float": 2,
+    "power_step": 20,
     "profile_weight": 70,
     "profile_ftp": 200,
     "profile_thr_hr": 170,
@@ -156,6 +157,7 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 for k in ("device_name", "mode", "power", "cadence",
                           "heartrate", "power_float", "cadence_float", "hr_float",
+                          "power_step",
                           "profile_weight", "profile_ftp",
                           "profile_thr_hr", "profile_ride_type"):
                     if k in data:

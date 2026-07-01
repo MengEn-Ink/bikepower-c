@@ -234,7 +234,7 @@ void app_state_handle_event(const app_evt_t *e)
         if (s_state != ST_BLE_ACTIVE) break;
         if (button_repeat_should_adjust((uint32_t)e->data, WIFI_BTN_HOLD_MS)) {
             // 只有在进入 WiFi 长按阈值之前，长按重复事件才用于持续加功率。
-            power_engine_adjust_power(s_engine, POWER_STEP_W);
+            power_engine_adjust_power(s_engine, s_engine->power_step);
             s_auto_adjusted = true;
         }
         break;
@@ -246,8 +246,8 @@ void app_state_handle_event(const app_evt_t *e)
         {
             btn_release_action_t act = button_classify_release((uint32_t)e->data, SHORT_PRESS_MS, WIFI_BTN_HOLD_MS);
             if (act == BTN_RELEASE_SHORT) {
-                int p = power_engine_adjust_power(s_engine, -POWER_STEP_W);
-                ESP_LOGI(TAG, "短按 功率-%dW -> %dW", POWER_STEP_W, p);
+                int p = power_engine_adjust_power(s_engine, -s_engine->power_step);
+                ESP_LOGI(TAG, "短按 功率-%dW -> %dW", s_engine->power_step, p);
             } else if (act == BTN_RELEASE_LONG) {
                 enter_confirm_window();
             }

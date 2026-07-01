@@ -23,6 +23,7 @@ typedef struct {
     int power_float;    // 功率浮动幅度（±W）
     int cadence_float;  // 踏频浮动幅度（±RPM）
     int hr_float;       // 固定心率浮动幅度（±BPM）
+    int power_step;     // 物理按钮调功步进（W）
     int weight;         // profile.weight
     int ftp;            // profile.ftp
     int thr_hr;         // profile.thr_hr

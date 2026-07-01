@@ -76,6 +76,7 @@ void power_engine_init(power_engine_t *e)
     e->power_float = POWER_FLOAT_DEFAULT;
     e->cadence_float = CADENCE_FLOAT_DEFAULT;
     e->hr_float = HR_FLOAT_DEFAULT;
+    e->power_step = POWER_STEP_DEFAULT;
     fluct_walk_reset(&e->power_walk);
     fluct_walk_reset(&e->cadence_walk);
     e->mode = DEFAULT_RIDE_MODE;
@@ -360,6 +361,21 @@ bool power_engine_set_hr_float(power_engine_t *e, int amp)
     amp = clampi(amp, HR_FLOAT_MIN, HR_FLOAT_MAX);
     if (e->hr_float == amp) return false;
     e->hr_float = amp;
+    e->dirty = true;
+    return true;
+}
+
+/*
+ * 设置物理按钮调功步进（W）。
+ * 参数：e 为功率引擎对象；step 为目标步进值。
+ * 返回值：数值实际变化返回 true，否则返回 false。
+ * 特殊行为：越界值夹紧到 [POWER_STEP_MIN, POWER_STEP_MAX]；变化后置 dirty。影响物理按钮短按/长按调功幅度。
+ */
+bool power_engine_set_power_step(power_engine_t *e, int step)
+{
+    step = clampi(step, POWER_STEP_MIN, POWER_STEP_MAX);
+    if (e->power_step == step) return false;
+    e->power_step = step;
     e->dirty = true;
     return true;
 }

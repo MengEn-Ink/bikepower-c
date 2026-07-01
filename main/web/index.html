@@ -122,6 +122,17 @@
       <div class="note">体重 × 配速机器人功体比 = 机器人模式输出功率；FTP 决定功率分区；阈值心率决定心率分区映射。</div>
     </div>
 
+    <div class="card">
+      <h2>物理按钮</h2>
+      <div class="float-row">
+        <span class="float-lbl">调功步进</span>
+        <button class="fbtn" onclick="onFloatAdj('pstep',-1)">−</button>
+        <span class="float-val"><span id="float-pstep">20</span> W</span>
+        <button class="fbtn" onclick="onFloatAdj('pstep',1)">+</button>
+      </div>
+      <div class="note">设备实体按钮短按 −步进、长按连续 +步进 调整固定模式功率。范围 5~50 W，默认 20 W。</div>
+    </div>
+
     <div class="btn-row">
       <button class="btn" id="more-save" onclick="onMoreSave()">保存配置</button>
       <button class="btn alt" onclick="go('/home')">返回</button>

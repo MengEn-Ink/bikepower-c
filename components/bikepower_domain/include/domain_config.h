@@ -14,8 +14,11 @@
 #define HR_MIN                60
 #define HR_MAX                200
 
-// ===== 调功步进 =====
-#define POWER_STEP_W          20
+// ===== 调功步进（可配网修改并持久化） =====
+#define POWER_STEP_W          20      // 物理按钮短按/长按调功步进默认值（历史常量，作为默认）
+#define POWER_STEP_MIN        5       // 可配置步进下限
+#define POWER_STEP_MAX        50      // 可配置步进上限
+#define POWER_STEP_DEFAULT    20      // 可配置步进默认值
 
 // ===== 默认值 =====
 #define DEFAULT_POWER         260
