@@ -38,6 +38,7 @@ void config_store_defaults(config_data_t *c)
     c->ride_type = PACER_INDEX_DEFAULT;
     c->custom_wkg_low = CUSTOM_WKG_LOW_DEFAULT;
     c->custom_wkg_high = CUSTOM_WKG_HIGH_DEFAULT;
+    led_config_defaults(&c->led);
     strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
@@ -68,6 +69,7 @@ bool config_store_validate(config_data_t *c)
     c->custom_wkg_low = clamp_int(c->custom_wkg_low, CUSTOM_WKG_MIN, CUSTOM_WKG_MAX);
     c->custom_wkg_high = clamp_int(c->custom_wkg_high, CUSTOM_WKG_MIN, CUSTOM_WKG_MAX);
     if (c->custom_wkg_low > c->custom_wkg_high) c->custom_wkg_high = c->custom_wkg_low;
+    led_config_validate(&c->led);
 
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
     if (c->device_name[0] == '\0') {
@@ -89,6 +91,7 @@ bool config_store_validate(config_data_t *c)
         || in.ride_type != c->ride_type
         || in.custom_wkg_low != c->custom_wkg_low
         || in.custom_wkg_high != c->custom_wkg_high
+        || memcmp(&in.led, &c->led, sizeof(c->led)) != 0
         || strncmp(in.device_name, c->device_name, DEVICE_NAME_MAX) != 0;
 }
 
@@ -191,7 +194,7 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
     if (json_escape(c->device_name, esc, sizeof(esc)) == (size_t)-1) return 0;
 
     /* 先写入栈缓冲，确认总长后再拷贝出参，避免向 out 写截断内容 */
-    char buf[416];
+    char buf[768];
     int n = snprintf(buf, sizeof(buf),
         "{\"schema_ver\":%d,\"power\":%d,\"cadence\":%d,\"mode\":%d,"
         "\"heartrate\":%d,\"has_user_hr\":%d,"
@@ -200,6 +203,12 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         "\"weight\":%d,\"ftp\":%d,"
         "\"thr_hr\":%d,\"ride_type\":%d,"
         "\"custom_wkg_low\":%d,\"custom_wkg_high\":%d,"
+        "\"led_silent\":%d,"
+        "\"led_wait_mode\":%d,\"led_wait_color\":%d,"
+        "\"led_conn_mode\":%d,\"led_conn_color\":%d,"
+        "\"led_wifi_mode\":%d,\"led_wifi_color\":%d,"
+        "\"led_confirm_mode\":%d,\"led_confirm_color\":%d,"
+        "\"led_error_mode\":%d,\"led_error_color\":%d,"
         "\"device_name\":\"%s\"}",
         c->schema_ver, c->power, c->cadence, c->mode,
         c->heartrate, c->has_user_hr,
@@ -208,6 +217,12 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         c->weight, c->ftp,
         c->thr_hr, c->ride_type,
         c->custom_wkg_low, c->custom_wkg_high,
+        c->led.silent,
+        c->led.scenes[LED_SCENE_WAIT_CONN].mode, c->led.scenes[LED_SCENE_WAIT_CONN].color,
+        c->led.scenes[LED_SCENE_CONNECTED].mode, c->led.scenes[LED_SCENE_CONNECTED].color,
+        c->led.scenes[LED_SCENE_WIFI_CONFIG].mode, c->led.scenes[LED_SCENE_WIFI_CONFIG].color,
+        c->led.scenes[LED_SCENE_WIFI_CONFIRM].mode, c->led.scenes[LED_SCENE_WIFI_CONFIRM].color,
+        c->led.scenes[LED_SCENE_ERROR].mode, c->led.scenes[LED_SCENE_ERROR].color,
         esc);
 
     if (n < 0 || (size_t)n >= sizeof(buf)) return 0;  /* 编码错误或内部缓冲不足 */
@@ -243,6 +258,27 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         snprintf(pat, sizeof(pat), "\"%s\":", int_keys[i].key);
         if (strstr(json, pat)) {
             *int_keys[i].field = json_get_int(json, int_keys[i].key);
+        }
+    }
+
+    struct { const char *key; uint8_t *field; } led_keys[] = {
+        {"led_silent", &tmp.led.silent},
+        {"led_wait_mode", &tmp.led.scenes[LED_SCENE_WAIT_CONN].mode},
+        {"led_wait_color", &tmp.led.scenes[LED_SCENE_WAIT_CONN].color},
+        {"led_conn_mode", &tmp.led.scenes[LED_SCENE_CONNECTED].mode},
+        {"led_conn_color", &tmp.led.scenes[LED_SCENE_CONNECTED].color},
+        {"led_wifi_mode", &tmp.led.scenes[LED_SCENE_WIFI_CONFIG].mode},
+        {"led_wifi_color", &tmp.led.scenes[LED_SCENE_WIFI_CONFIG].color},
+        {"led_confirm_mode", &tmp.led.scenes[LED_SCENE_WIFI_CONFIRM].mode},
+        {"led_confirm_color", &tmp.led.scenes[LED_SCENE_WIFI_CONFIRM].color},
+        {"led_error_mode", &tmp.led.scenes[LED_SCENE_ERROR].mode},
+        {"led_error_color", &tmp.led.scenes[LED_SCENE_ERROR].color},
+    };
+    for (size_t i = 0; i < sizeof(led_keys) / sizeof(led_keys[0]); i++) {
+        char pat[48];
+        snprintf(pat, sizeof(pat), "\"%s\":", led_keys[i].key);
+        if (strstr(json, pat)) {
+            *led_keys[i].field = (uint8_t)json_get_int(json, led_keys[i].key);
         }
     }
 

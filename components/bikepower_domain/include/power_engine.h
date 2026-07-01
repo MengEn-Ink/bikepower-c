@@ -10,6 +10,7 @@
 #include "domain_config.h"
 #include "profile.h"
 #include "hr_model.h"
+#include "led_pattern.h"
 
 /*
  * 单次领域层输出快照。
@@ -60,6 +61,7 @@ typedef struct {
     int last_power;
     int last_cadence;
     profile_t profile;
+    led_config_t led;
     hr_state_t hr;
     snapshot_t snapshot;
     long snapshot_count;

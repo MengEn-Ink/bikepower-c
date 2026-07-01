@@ -458,6 +458,9 @@ static void test_config_store(void)
     CHECK(c.thr_hr == PROFILE_THR_HR_DEFAULT, "默认阈值心率");
     CHECK(c.ride_type == PACER_INDEX_DEFAULT, "默认配速机器人");
     CHECK(strcmp(c.device_name, DEVICE_NAME_DEFAULT) == 0, "默认设备名");
+    CHECK(c.led.scenes[LED_SCENE_WAIT_CONN].mode == LED_MODE_SLOW, "默认待连接慢闪");
+    CHECK(c.led.scenes[LED_SCENE_CONNECTED].color == LED_COLOR_GREEN, "默认已连接绿色");
+    CHECK(c.led.silent == 0, "默认 LED 非静默");
 
     // 合法数据不修正
     CHECK(!config_store_validate(&c), "默认值无需校验修正");
@@ -487,6 +490,9 @@ static void test_config_store(void)
     b.ftp = 9999;
     b.thr_hr = 0;
     b.ride_type = 99;
+    b.led.scenes[LED_SCENE_WAIT_CONN].mode = 99;
+    b.led.scenes[LED_SCENE_CONNECTED].color = 99;
+    b.led.silent = 9;
     CHECK(config_store_validate(&b), "越界数据被修正");
     CHECK(b.power == POWER_MAX, "功率夹到上限");
     CHECK(b.cadence == CADENCE_MIN, "踏频夹到下限");
@@ -496,6 +502,9 @@ static void test_config_store(void)
     CHECK(b.ftp == PROFILE_FTP_MAX, "FTP夹上限");
     CHECK(b.thr_hr == PROFILE_THR_HR_MIN, "阈值心率夹下限");
     CHECK(b.ride_type == PACER_INDEX_DEFAULT, "非法配速机器人回默认");
+    CHECK(b.led.scenes[LED_SCENE_WAIT_CONN].mode == LED_MODE_SLOW, "非法 LED 模式回默认慢闪");
+    CHECK(b.led.scenes[LED_SCENE_CONNECTED].color == LED_COLOR_BLUE, "非法 LED 颜色回默认蓝色");
+    CHECK(b.led.silent == 1, "LED 静默规范化为1");
 
     // 版本不匹配触发迁移重置
     config_data_t m;
@@ -523,7 +532,7 @@ static void test_config_store(void)
     CHECK(hr2.has_user_hr == 1, "has_user_hr 规范化为1");
 
     // ===== 序列化 / 反序列化 往返 =====
-    char js[352];
+    char js[768];
     config_data_t src;
     config_store_defaults(&src);
     src.power = 222;
@@ -533,6 +542,11 @@ static void test_config_store(void)
     src.cadence_float = 7;
     src.hr_float = 9;
     src.power_step = 25;
+    src.led.silent = 1;
+    src.led.scenes[LED_SCENE_CONNECTED].mode = LED_MODE_BREATH;
+    src.led.scenes[LED_SCENE_CONNECTED].color = LED_COLOR_MAGENTA;
+    src.led.scenes[LED_SCENE_WIFI_CONFIRM].mode = LED_MODE_DOUBLE;
+    src.led.scenes[LED_SCENE_WIFI_CONFIRM].color = LED_COLOR_YELLOW;
     strcpy(src.device_name, "MyBike");
     size_t wlen = config_store_serialize(&src, js, sizeof(js));
     CHECK(wlen > 0 && wlen < sizeof(js), "serialize 返回合法长度");
@@ -540,6 +554,9 @@ static void test_config_store(void)
     CHECK(strstr(js, "\"power\":222") != NULL, "serialize 含 power=222");
     CHECK(strstr(js, "\"power_float\":12") != NULL, "serialize 含 power_float=12");
     CHECK(strstr(js, "\"power_step\":25") != NULL, "serialize 含 power_step=25");
+    CHECK(strstr(js, "\"led_silent\":1") != NULL, "serialize 含 led_silent=1");
+    CHECK(strstr(js, "\"led_conn_mode\":5") != NULL, "serialize 含已连接 LED 模式");
+    CHECK(strstr(js, "\"led_confirm_mode\":4") != NULL, "serialize 含确认 LED 模式");
     CHECK(strstr(js, "\"device_name\":\"MyBike\"") != NULL, "serialize 含设备名");
 
     config_data_t dst;
@@ -547,6 +564,10 @@ static void test_config_store(void)
     CHECK(dst.power == 222 && dst.cadence == 88 && dst.ftp == 250, "往返整数字段一致");
     CHECK(dst.power_float == 12 && dst.cadence_float == 7 && dst.hr_float == 9, "往返浮动字段一致");
     CHECK(dst.power_step == 25, "往返调功步进一致");
+    CHECK(dst.led.silent == 1, "往返 LED 静默一致");
+    CHECK(dst.led.scenes[LED_SCENE_CONNECTED].mode == LED_MODE_BREATH, "往返已连接 LED 模式一致");
+    CHECK(dst.led.scenes[LED_SCENE_CONNECTED].color == LED_COLOR_MAGENTA, "往返已连接 LED 颜色一致");
+    CHECK(dst.led.scenes[LED_SCENE_WIFI_CONFIRM].mode == LED_MODE_DOUBLE, "往返确认 LED 模式一致");
     CHECK(strcmp(dst.device_name, "MyBike") == 0, "往返设备名一致");
     CHECK(dst.schema_ver == src.schema_ver && dst.mode == src.mode, "往返其余字段一致");
 
@@ -556,6 +577,7 @@ static void test_config_store(void)
           "部分键 JSON deserialize 成功");
     CHECK(partial.power == 300, "出现的 power 被覆盖");
     CHECK(partial.cadence == DEFAULT_CADENCE, "缺失的 cadence 保持默认");
+    CHECK(partial.led.scenes[LED_SCENE_CONNECTED].mode == LED_MODE_SOLID, "缺失 LED 保持默认");
     CHECK(strcmp(partial.device_name, DEVICE_NAME_DEFAULT) == 0, "缺失设备名保持默认");
 
     // 非法 JSON（无 schema_ver）失败且不污染原对象
@@ -673,40 +695,65 @@ static void test_button_logic(void)
 
 static void test_led_pattern(void)
 {
-    printf("[test] LED 模式映射\n");
+    printf("[test] LED 灯效配置/决策\n");
     const uint8_t B = 0x30;
     uint8_t rgb[3];
+    led_config_t cfg;
+    led_config_defaults(&cfg);
 
-    // led_pattern_to_rgb 颜色映射
-    led_pattern_to_rgb(LED_PATTERN_OFF, B, rgb);
-    CHECK(rgb[0] == 0 && rgb[1] == 0 && rgb[2] == 0, "OFF 全灭");
+    CHECK(cfg.scenes[LED_SCENE_WAIT_CONN].mode == LED_MODE_SLOW, "默认待连接慢闪");
+    CHECK(cfg.scenes[LED_SCENE_CONNECTED].mode == LED_MODE_SOLID, "默认已连接常亮");
+    CHECK(cfg.scenes[LED_SCENE_WIFI_CONFIG].color == LED_COLOR_CYAN, "默认配网青色");
 
-    led_pattern_to_rgb(LED_PATTERN_SLOW, B, rgb);
-    CHECK(rgb[0] == 0 && rgb[1] == 0 && rgb[2] == B, "SLOW 蓝色 [0,0,B]");
+    led_effect_t e = led_resolve(LED_SCENE_CONNECTED, &cfg, true);
+    CHECK(e.mode == LED_MODE_SOLID && e.color == LED_COLOR_GREEN, "已连接场景解析默认常亮绿色");
 
-    led_pattern_to_rgb(LED_PATTERN_SOLID, B, rgb);
-    CHECK(rgb[0] == B && rgb[1] == 0 && rgb[2] == 0, "SOLID 绿色 [B,0,0]");
+    cfg.silent = 1;
+    e = led_resolve(LED_SCENE_CONNECTED, &cfg, true);
+    CHECK(e.mode == LED_MODE_OFF, "静默时非异常场景灭灯");
+    cfg.scenes[LED_SCENE_ERROR].mode = LED_MODE_OFF;
+    e = led_resolve(LED_SCENE_ERROR, &cfg, true);
+    CHECK(e.mode == LED_MODE_FAST && e.color == LED_COLOR_RED, "异常场景忽略静默且强制可见");
 
-    led_pattern_to_rgb(LED_PATTERN_FAST, B, rgb);
-    CHECK(rgb[0] == B && rgb[1] == B && rgb[2] == 0, "FAST 黄色 [B,B,0]");
+    cfg.silent = 0;
+    cfg.scenes[LED_SCENE_CONNECTED].mode = LED_MODE_BREATH;
+    e = led_resolve(LED_SCENE_CONNECTED, &cfg, false);
+    CHECK(e.mode == LED_MODE_SLOW, "非 RGB 板呼吸降级为慢闪");
 
-    // 亮度参数生效
-    led_pattern_to_rgb(LED_PATTERN_SLOW, 0x10, rgb);
-    CHECK(rgb[2] == 0x10, "SLOW 自定义亮度");
+    cfg.scenes[LED_SCENE_WAIT_CONN].mode = 99;
+    cfg.scenes[LED_SCENE_WAIT_CONN].color = 99;
+    cfg.silent = 9;
+    CHECK(led_config_validate(&cfg), "LED 配置越界被修正");
+    CHECK(cfg.scenes[LED_SCENE_WAIT_CONN].mode == LED_MODE_SLOW, "LED 模式越界回慢闪");
+    CHECK(cfg.scenes[LED_SCENE_WAIT_CONN].color == LED_COLOR_BLUE, "LED 颜色越界回蓝色");
+    CHECK(cfg.silent == 1, "LED 静默越界规范化");
 
-    // led_blink_should_toggle 节拍
-    CHECK(led_blink_should_toggle(LED_PATTERN_OFF, 5000, 1000, 200) == false, "OFF 不闪烁");
-    CHECK(led_blink_should_toggle(LED_PATTERN_SOLID, 5000, 1000, 200) == false, "SOLID 不闪烁");
-    CHECK(led_blink_should_toggle(LED_PATTERN_SLOW, 999, 1000, 200) == false, "SLOW 999ms 未到周期");
-    CHECK(led_blink_should_toggle(LED_PATTERN_SLOW, 1000, 1000, 200) == true, "SLOW 1000ms 边界翻转");
-    CHECK(led_blink_should_toggle(LED_PATTERN_FAST, 199, 1000, 200) == false, "FAST 199ms 未到周期");
-    CHECK(led_blink_should_toggle(LED_PATTERN_FAST, 200, 1000, 200) == true, "FAST 200ms 边界翻转");
+    led_color_to_rgb(LED_COLOR_RED, B, rgb);
+    CHECK(rgb[0] == 0 && rgb[1] == B && rgb[2] == 0, "红色转 GRB");
 
-    // led_pattern_initial_on 初始状态
-    CHECK(led_pattern_initial_on(LED_PATTERN_OFF) == 0, "OFF 初始灭");
-    CHECK(led_pattern_initial_on(LED_PATTERN_SLOW) == 0, "SLOW 初始灭");
-    CHECK(led_pattern_initial_on(LED_PATTERN_SOLID) == 1, "SOLID 初始亮");
-    CHECK(led_pattern_initial_on(LED_PATTERN_FAST) == 0, "FAST 初始灭");
+    led_color_to_rgb(LED_COLOR_GREEN, B, rgb);
+    CHECK(rgb[0] == B && rgb[1] == 0 && rgb[2] == 0, "绿色转 GRB");
+
+    led_color_to_rgb(LED_COLOR_BLUE, B, rgb);
+    CHECK(rgb[0] == 0 && rgb[1] == 0 && rgb[2] == B, "蓝色转 GRB");
+
+    led_color_to_rgb(LED_COLOR_WHITE, 0x10, rgb);
+    CHECK(rgb[0] == 0x10 && rgb[1] == 0x10 && rgb[2] == 0x10, "白色亮度生效");
+
+    CHECK(led_mode_period_ms(LED_MODE_SLOW, 1000, 200) == 2000, "慢闪周期");
+    CHECK(led_mode_period_ms(LED_MODE_FAST, 1000, 200) == 400, "快闪周期");
+    CHECK(led_mode_scale(LED_MODE_OFF, 0, 1000, 200) == 0, "OFF 亮度 0");
+    CHECK(led_mode_scale(LED_MODE_SOLID, 0, 1000, 200) == 255, "常亮亮度 255");
+    CHECK(led_mode_scale(LED_MODE_SLOW, 999, 1000, 200) == 255, "慢闪前半亮");
+    CHECK(led_mode_scale(LED_MODE_SLOW, 1000, 1000, 200) == 0, "慢闪后半灭");
+    CHECK(led_mode_scale(LED_MODE_FAST, 199, 1000, 200) == 255, "快闪前半亮");
+    CHECK(led_mode_scale(LED_MODE_FAST, 200, 1000, 200) == 0, "快闪后半灭");
+    CHECK(led_mode_scale(LED_MODE_DOUBLE, 0, 1000, 200) == 255, "双闪第一下亮");
+    CHECK(led_mode_scale(LED_MODE_DOUBLE, 120, 1000, 200) == 0, "双闪间隔灭");
+    CHECK(led_mode_scale(LED_MODE_DOUBLE, 300, 1000, 200) == 255, "双闪第二下亮");
+    CHECK(led_mode_scale(LED_MODE_BREATH, 0, 1000, 200) == 0, "呼吸起点灭");
+    CHECK(led_mode_scale(LED_MODE_BREATH, 1000, 1000, 200) == 255, "呼吸半周期最亮");
+    CHECK(led_mode_scale(LED_MODE_BREATH, 2000, 1000, 200) == 0, "呼吸周期末灭");
 }
 
 static void test_button_debounce(void)

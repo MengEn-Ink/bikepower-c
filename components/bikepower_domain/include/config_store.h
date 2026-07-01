@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "domain_config.h"
+#include "led_pattern.h"
 
 /*
  * 配置持久化数据结构。
@@ -30,6 +31,7 @@ typedef struct {
     int ride_type;      // profile.ride_type 0-5（5=自定义）
     int custom_wkg_low; // 自定义档 W/kg 下限（×10）
     int custom_wkg_high;// 自定义档 W/kg 上限（×10）
+    led_config_t led;   // LED 场景灯效配置
     char device_name[DEVICE_NAME_MAX];  // BLE 广播名
 } config_data_t;
 

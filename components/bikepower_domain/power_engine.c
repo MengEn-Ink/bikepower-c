@@ -85,6 +85,7 @@ void power_engine_init(power_engine_t *e)
     e->last_power = DEFAULT_POWER;
     e->last_cadence = DEFAULT_CADENCE;
     profile_init(&e->profile);
+    led_config_defaults(&e->led);
     hr_model_init(&e->hr, DEFAULT_HEARTRATE);
     e->snapshot.power = DEFAULT_POWER;
     e->snapshot.cadence = DEFAULT_CADENCE;
