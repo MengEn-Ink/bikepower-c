@@ -2,10 +2,10 @@
  * 应用状态机（对齐 doc 11 §8.1）
  *
  * 消费按钮/连接事件，驱动调功、二次确认窗口与 LED。
- * 按钮语义（与 MicroPython specs/button-handler.md 一致）：
- *   短按 <500ms        -> adjust_power(-20)
- *   长按 >=500ms       -> 每 BTN_AUTO_REPEAT_MS adjust_power(+20)（仅 steady 生效）
- *   长按 >=2000ms 释放 -> 回滚本次自动调功，进入确认窗口（LED 快闪）
+ * 按钮语义：
+ *   短按 <500ms        -> adjust_power(-power_step)
+ *   长按 >=500ms       -> 每 BTN_AUTO_REPEAT_MS adjust_power(+power_step)（仅 steady 生效）
+ *   长按 >=2000ms 释放 -> 回滚本次自动调功，进入确认窗口（LED 按配置切换）
  *   确认窗口内再按      -> 触发 WiFi 配网（阶段5接入，经 wifi_trigger 回调）
  *   确认窗口 3s 超时    -> 取消，恢复 BLE_ACTIVE
  */
@@ -41,16 +41,35 @@ static uint32_t now_ms(void)
     return (uint32_t)(esp_timer_get_time() / 1000);
 }
 
+static void apply_led_scene(led_scene_t scene)
+{
+    if (!s_engine) return;
+    led_apply_scene(scene, &s_engine->led);
+}
+
 /**
  * 根据当前连接状态刷新空闲态 LED 灯效。
- * 未连接时慢闪，已连接时常亮。
+ * 未连接/已连接灯效由 led_config 对应场景决定。
  * 无参数。
  * 返回值：无。
  * 特殊行为：只应用于 BLE 活动态，不负责 WiFi 确认和配网中的灯效。
  */
 static void update_idle_led(void)
 {
-    led_set_pattern(s_connected ? LED_SOLID : LED_SLOW);
+    apply_led_scene(s_connected ? LED_SCENE_CONNECTED : LED_SCENE_WAIT_CONN);
+}
+
+void app_state_refresh_led(void)
+{
+    if (s_state == ST_ERROR_RECOVERY) {
+        apply_led_scene(LED_SCENE_ERROR);
+    } else if (s_state == ST_WIFI_CONFIRM) {
+        apply_led_scene(LED_SCENE_WIFI_CONFIRM);
+    } else if (s_state == ST_WIFI_CONFIG) {
+        apply_led_scene(LED_SCENE_WIFI_CONFIG);
+    } else {
+        update_idle_led();
+    }
 }
 
 /**
@@ -107,7 +126,7 @@ app_state_t app_state_get(void)
 
 /**
  * 进入错误恢复态。
- * BLE 启动失败或其他可恢复错误时调用，LED 切到快闪提示。
+ * BLE 启动失败或其他可恢复错误时调用，LED 切到异常场景。
  * 无参数。
  * 返回值：无。
  * 特殊行为：只改变状态和 LED，不复位或重启。
@@ -116,7 +135,7 @@ void app_state_set_error(void)
 {
     s_state = ST_ERROR_RECOVERY;
     s_connected = false;
-    led_set_pattern(LED_FAST);
+    apply_led_scene(LED_SCENE_ERROR);
     ESP_LOGW(TAG, "进入错误恢复态 ST_ERROR_RECOVERY");
 }
 
@@ -140,7 +159,7 @@ void app_state_clear_error(void)
  * 长按达到阈值后回滚本次自动调功，并切换到等待二次确认的状态。
  * 无参数。
  * 返回值：无。
- * 特殊行为：会将 LED 切到快闪，并记录确认窗口起始时间。
+ * 特殊行为：会将 LED 切到二次确认场景，并记录确认窗口起始时间。
  */
 static void enter_confirm_window(void)
 {
@@ -156,8 +175,8 @@ static void enter_confirm_window(void)
     }
     s_state = ST_WIFI_CONFIRM;
     s_confirm_start = now_ms();
-    led_set_pattern(LED_FAST);
-    ESP_LOGI(TAG, "长按2秒，LED快闪等待二次确认...");
+    apply_led_scene(LED_SCENE_WIFI_CONFIRM);
+    ESP_LOGI(TAG, "长按2秒，LED切到二次确认场景，等待二次确认...");
 }
 
 /**
@@ -172,7 +191,7 @@ static void trigger_wifi(void)
     ESP_LOGI(TAG, "二次确认，进入WiFi配网模式");
     if (s_wifi_trigger) {
         s_state = ST_WIFI_CONFIG;
-        led_set_pattern(LED_OFF);
+        apply_led_scene(LED_SCENE_WIFI_CONFIG);
         s_wifi_trigger();
     } else {
         ESP_LOGW(TAG, "WiFi 配网未就绪（阶段5接入），取消");

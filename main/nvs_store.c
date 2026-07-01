@@ -43,6 +43,7 @@ static void engine_to_config(power_engine_t *e, config_data_t *c)
     c->ride_type = e->profile.ride_type;
     c->custom_wkg_low = e->profile.custom_wkg_low;
     c->custom_wkg_high = e->profile.custom_wkg_high;
+    c->led = e->led;
     strncpy(c->device_name, e->device_name, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
@@ -72,6 +73,7 @@ static void config_to_engine(const config_data_t *c, power_engine_t *e)
     profile_set_thr_hr(&e->profile, c->thr_hr);
     profile_set_custom_wkg(&e->profile, c->custom_wkg_low, c->custom_wkg_high);
     profile_set_ride_type(&e->profile, c->ride_type);
+    e->led = c->led;
     power_engine_set_device_name(e, c->device_name);
 }
 
@@ -140,6 +142,18 @@ void nvs_store_load(power_engine_t *e)
     get_i32(h, NVS_KEY_RIDE_TYPE, &c.ride_type);
     get_i32(h, NVS_KEY_CUSTOM_WKG_LO, &c.custom_wkg_low);
     get_i32(h, NVS_KEY_CUSTOM_WKG_HI, &c.custom_wkg_high);
+    int led_tmp;
+    led_tmp = c.led.silent; get_i32(h, NVS_KEY_LED_SILENT, &led_tmp); c.led.silent = (uint8_t)led_tmp;
+    led_tmp = c.led.scenes[LED_SCENE_WAIT_CONN].mode; get_i32(h, NVS_KEY_LED_WAIT_MODE, &led_tmp); c.led.scenes[LED_SCENE_WAIT_CONN].mode = (uint8_t)led_tmp;
+    led_tmp = c.led.scenes[LED_SCENE_WAIT_CONN].color; get_i32(h, NVS_KEY_LED_WAIT_COLOR, &led_tmp); c.led.scenes[LED_SCENE_WAIT_CONN].color = (uint8_t)led_tmp;
+    led_tmp = c.led.scenes[LED_SCENE_CONNECTED].mode; get_i32(h, NVS_KEY_LED_CONN_MODE, &led_tmp); c.led.scenes[LED_SCENE_CONNECTED].mode = (uint8_t)led_tmp;
+    led_tmp = c.led.scenes[LED_SCENE_CONNECTED].color; get_i32(h, NVS_KEY_LED_CONN_COLOR, &led_tmp); c.led.scenes[LED_SCENE_CONNECTED].color = (uint8_t)led_tmp;
+    led_tmp = c.led.scenes[LED_SCENE_WIFI_CONFIG].mode; get_i32(h, NVS_KEY_LED_WIFI_MODE, &led_tmp); c.led.scenes[LED_SCENE_WIFI_CONFIG].mode = (uint8_t)led_tmp;
+    led_tmp = c.led.scenes[LED_SCENE_WIFI_CONFIG].color; get_i32(h, NVS_KEY_LED_WIFI_COLOR, &led_tmp); c.led.scenes[LED_SCENE_WIFI_CONFIG].color = (uint8_t)led_tmp;
+    led_tmp = c.led.scenes[LED_SCENE_WIFI_CONFIRM].mode; get_i32(h, NVS_KEY_LED_CONFIRM_MODE, &led_tmp); c.led.scenes[LED_SCENE_WIFI_CONFIRM].mode = (uint8_t)led_tmp;
+    led_tmp = c.led.scenes[LED_SCENE_WIFI_CONFIRM].color; get_i32(h, NVS_KEY_LED_CONFIRM_COLOR, &led_tmp); c.led.scenes[LED_SCENE_WIFI_CONFIRM].color = (uint8_t)led_tmp;
+    led_tmp = c.led.scenes[LED_SCENE_ERROR].mode; get_i32(h, NVS_KEY_LED_ERROR_MODE, &led_tmp); c.led.scenes[LED_SCENE_ERROR].mode = (uint8_t)led_tmp;
+    led_tmp = c.led.scenes[LED_SCENE_ERROR].color; get_i32(h, NVS_KEY_LED_ERROR_COLOR, &led_tmp); c.led.scenes[LED_SCENE_ERROR].color = (uint8_t)led_tmp;
     size_t dn_len = sizeof(c.device_name);
     esp_err_t dn_err = nvs_get_str(h, NVS_KEY_DEVICE_NAME, c.device_name, &dn_len);
     if (dn_err != ESP_OK && dn_err != ESP_ERR_NVS_NOT_FOUND) {
@@ -219,6 +233,17 @@ bool nvs_store_save(power_engine_t *e)
     SET_I32(NVS_KEY_RIDE_TYPE, c.ride_type);
     SET_I32(NVS_KEY_CUSTOM_WKG_LO, c.custom_wkg_low);
     SET_I32(NVS_KEY_CUSTOM_WKG_HI, c.custom_wkg_high);
+    SET_I32(NVS_KEY_LED_SILENT, c.led.silent);
+    SET_I32(NVS_KEY_LED_WAIT_MODE, c.led.scenes[LED_SCENE_WAIT_CONN].mode);
+    SET_I32(NVS_KEY_LED_WAIT_COLOR, c.led.scenes[LED_SCENE_WAIT_CONN].color);
+    SET_I32(NVS_KEY_LED_CONN_MODE, c.led.scenes[LED_SCENE_CONNECTED].mode);
+    SET_I32(NVS_KEY_LED_CONN_COLOR, c.led.scenes[LED_SCENE_CONNECTED].color);
+    SET_I32(NVS_KEY_LED_WIFI_MODE, c.led.scenes[LED_SCENE_WIFI_CONFIG].mode);
+    SET_I32(NVS_KEY_LED_WIFI_COLOR, c.led.scenes[LED_SCENE_WIFI_CONFIG].color);
+    SET_I32(NVS_KEY_LED_CONFIRM_MODE, c.led.scenes[LED_SCENE_WIFI_CONFIRM].mode);
+    SET_I32(NVS_KEY_LED_CONFIRM_COLOR, c.led.scenes[LED_SCENE_WIFI_CONFIRM].color);
+    SET_I32(NVS_KEY_LED_ERROR_MODE, c.led.scenes[LED_SCENE_ERROR].mode);
+    SET_I32(NVS_KEY_LED_ERROR_COLOR, c.led.scenes[LED_SCENE_ERROR].color);
 #undef SET_I32
 
     err = nvs_set_str(h, NVS_KEY_DEVICE_NAME, c.device_name);

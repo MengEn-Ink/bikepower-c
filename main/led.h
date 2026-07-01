@@ -7,19 +7,7 @@
 #pragma once
 
 #include "esp_err.h"
-
-/**
- * LED 显示模式。
- * 表示状态机希望 LED 呈现的四种基础灯效。
- * 无参数。
- * 无返回值。
- */
-typedef enum {
-    LED_OFF,        // 熄灭（WiFi 配网模式）
-    LED_SLOW,       // 慢闪 1s（BLE 广播中，等待连接）
-    LED_SOLID,      // 常亮（BLE 已连接）
-    LED_FAST,       // 快闪 200ms（等待二次确认）
-} led_pattern_t;
+#include "led_pattern.h"
 
 /**
  * 初始化 LED 模块。
@@ -31,10 +19,10 @@ typedef enum {
 esp_err_t led_init(void);
 
 /**
- * 切换 LED 显示模式。
- * 更新后台 LED 任务要呈现的目标灯效。
- * pattern：目标灯效模式。
+ * 按场景和用户配置切换 LED 灯效。
+ * scene：设备当前场景。
+ * config：LED 场景配置。
  * 返回值：无。
  * 特殊行为：仅修改共享状态，真正的 GPIO 输出会在 led_task 下一个周期生效。
  */
-void led_set_pattern(led_pattern_t pattern);
+void led_apply_scene(led_scene_t scene, const led_config_t *config);

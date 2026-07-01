@@ -2,7 +2,7 @@
  * LED 状态指示任务
  * 通用板：GPIO12 高电平有效普通 LED。
  * M5Stamp C3：GPIO2 SK6812 RGB LED（RMT 驱动），按状态映射颜色。
- * 由 app_state 状态机通过 led_set_pattern 驱动，任务内部按节拍刷新。
+ * 由 app_state 状态机通过 led_apply_scene 驱动，任务内部按节拍刷新。
  */
 #include "led.h"
 #include "freertos/FreeRTOS.h"
@@ -17,7 +17,8 @@
 
 static const char *TAG = "LED";
 
-static volatile led_pattern_t s_pattern = LED_SLOW;
+static volatile uint8_t s_mode = LED_MODE_SLOW;
+static volatile uint8_t s_color = LED_COLOR_BLUE;
 static led_drv_t s_led_drv;
 
 // ===== SK6812 RGB LED 驱动（M5Stamp C3） =====
@@ -128,39 +129,40 @@ static void led_write_gpio(int level)
 // ===== 统一 LED 输出 =====
 
 /**
- * 根据板型输出 LED 状态。
- * on=1 时亮灯（通用板高电平 / M5Stamp C3 对应颜色），on=0 时灭灯。
- * pattern：当前灯效模式，用于 M5Stamp C3 颜色映射。
- * on：亮灭标志。
+ * 根据板型输出 LED 强度。
+ * 通用板只使用 scale>0 的亮灭；RGB 板按 color 和 scale 缩放全局亮度。
  */
-static void led_output(led_pattern_t pattern, int on)
+static void led_output(uint8_t color, uint8_t scale)
 {
     if (s_led_drv == LED_DRV_SK6812) {
-        if (on) {
+        if (scale > 0) {
             uint8_t rgb[3];
-            led_pattern_to_rgb((led_pattern_logic_t)pattern, SK6812_BRIGHTNESS, rgb);
+            uint8_t brightness = (uint8_t)((uint32_t)SK6812_BRIGHTNESS * scale / 255u);
+            led_color_to_rgb((led_color_t)color, brightness, rgb);
             sk6812_send(rgb);
         } else {
             sk6812_send(s_color_off);
         }
     } else {
-        led_write_gpio(on);
+        led_write_gpio(scale > 0 ? 1 : 0);
     }
 }
 
 // ===== 公开接口 =====
 
-void led_set_pattern(led_pattern_t pattern)
+void led_apply_scene(led_scene_t scene, const led_config_t *config)
 {
-    s_pattern = pattern;
+    led_effect_t effect = led_resolve(scene, config, s_led_drv == LED_DRV_SK6812);
+    s_mode = effect.mode;
+    s_color = effect.color;
 }
 
 static void led_task(void *arg)
 {
     (void)arg;
-    int elapsed = 0;
-    int on = 0;
-    led_pattern_t last = LED_SLOW;
+    uint32_t elapsed = 0;
+    uint8_t last_mode = LED_MODE_SLOW;
+    uint8_t last_color = LED_COLOR_BLUE;
 
     esp_err_t wdt_err = esp_task_wdt_add(NULL);
     if (wdt_err != ESP_OK) {
@@ -168,19 +170,18 @@ static void led_task(void *arg)
     }
 
     while (1) {
-        led_pattern_t p = s_pattern;
-        if (p != last) {
-            last = p;
-            elapsed = 0;
-            on = led_pattern_initial_on((led_pattern_logic_t)p);
-        }
-
-        if (led_blink_should_toggle((led_pattern_logic_t)p, (uint32_t)elapsed, LED_BLINK_SLOW_MS, LED_BLINK_FAST_MS)) {
-            on = !on;
+        uint8_t mode = s_mode;
+        uint8_t color = s_color;
+        if (mode != last_mode || color != last_color) {
+            last_mode = mode;
+            last_color = color;
             elapsed = 0;
         }
 
-        led_output(p, on);
+        uint32_t period = led_mode_period_ms((led_mode_t)mode, LED_BLINK_SLOW_MS, LED_BLINK_FAST_MS);
+        uint32_t phase = period > 0 ? elapsed % period : 0;
+        uint8_t scale = led_mode_scale((led_mode_t)mode, phase, LED_BLINK_SLOW_MS, LED_BLINK_FAST_MS);
+        led_output(color, scale);
         elapsed += LED_TICK_MS;
         esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(LED_TICK_MS));

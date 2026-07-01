@@ -51,6 +51,14 @@ void app_state_handle_event(const app_evt_t *e);
 void app_state_tick(void);
 
 /**
+ * 按当前状态和连接状态重新应用 LED 灯效。
+ * 用于网页保存 LED 配置后立即刷新当前场景。
+ * 无参数。
+ * 返回值：无。
+ */
+void app_state_refresh_led(void);
+
+/**
  * 注册进入 WiFi 配网的触发回调。
  * 在用户完成二次确认后由状态机调用该回调，交给射频控制模块执行 BLE->WiFi 切换。
  * cb：配网触发回调，可为 NULL。

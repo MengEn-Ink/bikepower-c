@@ -29,6 +29,7 @@
 #include "radio_ctrl.h"
 #include "nvs_store.h"
 #include "ble_bikepower.h"
+#include "app_state.h"
 #include "bikepower_config.h"
 #include "profile.h"
 #include "json_miniparse.h"
@@ -256,6 +257,25 @@ static void apply_json_fields(power_engine_t *e, const char *body)
     if (json_get_str(body, "profile_ride_type", val, sizeof(val)) && val[0]) {
         profile_set_ride_type_str(&e->profile, val);
     }
+
+    if (json_has_key(body, "led_silent")) {
+        e->led.silent = (uint8_t)json_get_int(body, "led_silent");
+    }
+#define APPLY_LED_SCENE(prefix, scene_id) do { \
+        if (json_has_key(body, prefix "_mode")) { \
+            e->led.scenes[(scene_id)].mode = (uint8_t)json_get_int(body, prefix "_mode"); \
+        } \
+        if (json_has_key(body, prefix "_color")) { \
+            e->led.scenes[(scene_id)].color = (uint8_t)json_get_int(body, prefix "_color"); \
+        } \
+    } while (0)
+    APPLY_LED_SCENE("led_wait", LED_SCENE_WAIT_CONN);
+    APPLY_LED_SCENE("led_conn", LED_SCENE_CONNECTED);
+    APPLY_LED_SCENE("led_wifi", LED_SCENE_WIFI_CONFIG);
+    APPLY_LED_SCENE("led_confirm", LED_SCENE_WIFI_CONFIRM);
+    APPLY_LED_SCENE("led_error", LED_SCENE_ERROR);
+#undef APPLY_LED_SCENE
+    led_config_validate(&e->led);
 }
 
 // ============================ 静态首页 ============================
@@ -292,7 +312,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
     int ride_type_idx = (e->profile.ride_type >= 0 && e->profile.ride_type < RIDE_TYPE_COUNT)
                         ? e->profile.ride_type : 0;
 
-    char buf[1536];
+    char buf[2304];
     int off = snprintf(buf, sizeof(buf),
         "{\"device_name\":\"%s\",\"firmware_version\":\"%s\","
         "\"power\":%d,\"cadence\":%d,\"heartrate\":%d,\"mode\":\"%s\","
@@ -301,6 +321,12 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"profile_weight\":%d,\"profile_ftp\":%d,\"profile_thr_hr\":%d,"
         "\"profile_ride_type\":\"%s\","
         "\"custom_wkg_low\":%d,\"custom_wkg_high\":%d,"
+        "\"led_silent\":%d,"
+        "\"led_wait_mode\":%d,\"led_wait_color\":%d,"
+        "\"led_conn_mode\":%d,\"led_conn_color\":%d,"
+        "\"led_wifi_mode\":%d,\"led_wifi_color\":%d,"
+        "\"led_confirm_mode\":%d,\"led_confirm_color\":%d,"
+        "\"led_error_mode\":%d,\"led_error_color\":%d,"
         "\"remaining_sec\":%d,\"closing\":%s,"
         "\"hr_locked\":%s,"
         "\"pacers\":[",
@@ -311,6 +337,12 @@ static esp_err_t h_api_state(httpd_req_t *req)
         e->profile.weight, e->profile.ftp, e->profile.thr_hr,
         PROFILE_RIDE_TYPE_OPTIONS[ride_type_idx],
         e->profile.custom_wkg_low, e->profile.custom_wkg_high,
+        e->led.silent,
+        e->led.scenes[LED_SCENE_WAIT_CONN].mode, e->led.scenes[LED_SCENE_WAIT_CONN].color,
+        e->led.scenes[LED_SCENE_CONNECTED].mode, e->led.scenes[LED_SCENE_CONNECTED].color,
+        e->led.scenes[LED_SCENE_WIFI_CONFIG].mode, e->led.scenes[LED_SCENE_WIFI_CONFIG].color,
+        e->led.scenes[LED_SCENE_WIFI_CONFIRM].mode, e->led.scenes[LED_SCENE_WIFI_CONFIRM].color,
+        e->led.scenes[LED_SCENE_ERROR].mode, e->led.scenes[LED_SCENE_ERROR].color,
         remaining_seconds(), s_closing ? "true" : "false",
         e->has_user_hr ? "true" : "false");
 
@@ -372,6 +404,7 @@ static esp_err_t h_api_config(httpd_req_t *req)
         memcpy(s_engine, &next, sizeof(power_engine_t));
         power_engine_clear_dirty(s_engine);
         if (name_changed) ble_bikepower_refresh_device_name();
+        app_state_refresh_led();
         ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d name=%s",
                  s_engine->base_power, s_engine->cadence_base,
                  (int)s_engine->mode, s_engine->device_name);
@@ -417,6 +450,7 @@ static esp_err_t h_api_close_wifi(httpd_req_t *req)
         memcpy(s_engine, &next, sizeof(power_engine_t));
         power_engine_clear_dirty(s_engine);
         if (name_changed) ble_bikepower_refresh_device_name();
+        app_state_refresh_led();
         ESP_LOGI(TAG, "配置已保存并准备关闭 WiFi p=%dW c=%dRPM mode=%d name=%s",
                  s_engine->base_power, s_engine->cadence_base,
                  (int)s_engine->mode, s_engine->device_name);

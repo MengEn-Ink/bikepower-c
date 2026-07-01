@@ -82,6 +82,17 @@ typedef enum {
 #define NVS_KEY_CUSTOM_WKG_LO  "cwkglo"
 #define NVS_KEY_CUSTOM_WKG_HI  "cwkghi"
 #define NVS_KEY_DEVICE_NAME    "devname"
+#define NVS_KEY_LED_SILENT     "ledsil"
+#define NVS_KEY_LED_WAIT_MODE  "ledwm"
+#define NVS_KEY_LED_WAIT_COLOR "ledwc"
+#define NVS_KEY_LED_CONN_MODE  "ledconm"
+#define NVS_KEY_LED_CONN_COLOR "ledconc"
+#define NVS_KEY_LED_WIFI_MODE  "ledwifim"
+#define NVS_KEY_LED_WIFI_COLOR "ledwific"
+#define NVS_KEY_LED_CONFIRM_MODE  "ledcfm"
+#define NVS_KEY_LED_CONFIRM_COLOR "ledcfc"
+#define NVS_KEY_LED_ERROR_MODE    "lederrm"
+#define NVS_KEY_LED_ERROR_COLOR   "lederrc"
 
 // ===== BLE 连接与广播 =====
 #define BLE_ADVERTISING_INTERVAL_MS  500    // 广播间隔
