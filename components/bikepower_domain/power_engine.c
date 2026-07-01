@@ -251,6 +251,21 @@ bool power_engine_set_heartrate(power_engine_t *e, int value)
 }
 
 /*
+ * 清除固定用户心率，恢复心率随功率联动。
+ * 参数：e 为功率引擎对象。
+ * 返回值：无。
+ * 特殊行为：清空 has_user_hr 标记并重置 HRV 累加器，使后续快照按 FTP 分区重新推导目标心率。
+ */
+void power_engine_clear_user_hr(power_engine_t *e)
+{
+    if (!e->has_user_hr) return;
+    e->has_user_hr = false;
+    e->user_heartrate = 0;
+    hr_model_reset_variation(&e->hr);
+    e->dirty = true;
+}
+
+/*
  * 切换骑行模式。
  * 参数：e 为功率引擎对象；mode 为目标模式。
  * 返回值：模式实际发生变化时返回 true，否则返回 false。

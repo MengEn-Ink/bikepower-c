@@ -39,6 +39,10 @@
       <h2>心率</h2>
       <div class="val"><input type="number" inputmode="numeric" id="home-hr" value="0"><span class="unit">bpm</span></div>
       <div class="lbl"><span>目标心率</span><span class="zone" id="zone-hr"><span class="dot"></span>Z?</span></div>
+      <div class="hr-lock-row">
+        <label class="radio-line"><input type="radio" name="hr-lock" value="0" onchange="onHrLockChange()" checked><span>联动：心率随功率变化（按 FTP 分区匹配）</span></label>
+        <label class="radio-line"><input type="radio" name="hr-lock" value="1" onchange="onHrLockChange()"><span>锁死：心率恒定按填写值</span></label>
+      </div>
     </div>
 
     <div class="note">ERG 模式为默认能力：骑行 App 下发 ERG 目标功率时设备自动切换，无需手动选择。修改参数后请点击保存。</div>

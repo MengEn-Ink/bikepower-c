@@ -227,7 +227,16 @@ static void apply_json_fields(power_engine_t *e, const char *body)
     /* 手动三项：setter 内部仅 STEADY 生效，非 STEADY 自动拒绝 */
     power_engine_set_power(e, json_get_int_def(body, "power", e->base_power));
     power_engine_set_cadence(e, json_get_int_def(body, "cadence", e->cadence_base));
-    power_engine_set_heartrate(e, json_get_int_def(body, "heartrate", e->last_heartrate));
+    /* 心率锁定：hr_lock=1 锁定到 heartrate 值，hr_lock=0 解锁随功率联动 */
+    if (json_has_key(body, "hr_lock")) {
+        if (json_get_int(body, "hr_lock")) {
+            power_engine_set_heartrate(e, json_get_int_def(body, "heartrate", e->last_heartrate));
+        } else {
+            power_engine_clear_user_hr(e);
+        }
+    } else if (json_has_key(body, "heartrate")) {
+        power_engine_set_heartrate(e, json_get_int_def(body, "heartrate", e->last_heartrate));
+    }
 
     profile_set_weight(&e->profile, json_get_int_def(body, "profile_weight", e->profile.weight));
     profile_set_ftp(&e->profile, json_get_int_def(body, "profile_ftp", e->profile.ftp));
@@ -278,12 +287,14 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"profile_weight\":%d,\"profile_ftp\":%d,\"profile_thr_hr\":%d,"
         "\"profile_ride_type\":\"%s\","
         "\"remaining_sec\":%d,\"closing\":%s,"
+        "\"hr_locked\":%s,"
         "\"pacers\":[",
         dn_esc, FIRMWARE_VERSION,
         e->base_power, e->cadence_base, e->last_heartrate, mode_to_id((int)e->mode),
         e->profile.weight, e->profile.ftp, e->profile.thr_hr,
         PROFILE_RIDE_TYPE_OPTIONS[ride_type_idx],
-        remaining_seconds(), s_closing ? "true" : "false");
+        remaining_seconds(), s_closing ? "true" : "false",
+        e->has_user_hr ? "true" : "false");
 
     for (int i = 0; i < PACER_COUNT && off < (int)sizeof(buf) - 96; i++) {
         off += snprintf(buf + off, sizeof(buf) - off,

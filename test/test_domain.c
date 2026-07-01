@@ -232,6 +232,19 @@ static void test_setters_edge(void)
     CHECK(e.has_user_hr && e.user_heartrate == 160, "切到ERG后固定心率字段保留");
     power_engine_set_mode(&e, RIDE_MODE_STEADY);
     CHECK(e.has_user_hr && e.user_heartrate == 160, "切回STEADY后固定心率字段保留，可直接使用");
+
+    // clear_user_hr：解锁后恢复按 FTP 分区映射心率
+    power_engine_clear_user_hr(&e);
+    CHECK(!e.has_user_hr && e.user_heartrate == 0, "解锁后 has_user_hr 清零且 user_heartrate 归零");
+    // 重复解锁幂等
+    power_engine_clear_user_hr(&e);
+    CHECK(!e.has_user_hr, "重复解锁幂等无副作用");
+    // 重新锁定后再解锁，快照心率应恢复按 FTP 分区推导
+    CHECK(power_engine_set_heartrate(&e, 170) == true, "重新锁定心率成功");
+    CHECK(e.has_user_hr, "重新锁定后 has_user_hr 置位");
+    power_engine_clear_user_hr(&e);
+    power_engine_snapshot(&e);
+    CHECK(!e.has_user_hr, "解锁后快照不触发重新锁定");
 }
 
 static void test_hr_variation_steady(void)

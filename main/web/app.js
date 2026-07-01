@@ -10,7 +10,8 @@ var STATE = {
   profile_weight: 0, profile_ftp: 0, profile_thr_hr: 0, profile_ride_type: "coco",
   pacers: [],
   remaining_sec: 180,
-  closing: false
+  closing: false,
+  hr_locked: false
 };
 
 /* ============ 工具函数 ============ */
@@ -121,7 +122,27 @@ function renderHome() {
   $("home-power").value = STATE.power;
   $("home-cadence").value = STATE.cadence;
   $("home-hr").value = STATE.heartrate;
+  applyHrLockState();
   updateZoneBadges();
+}
+function applyHrLockState() {
+  var radios = document.getElementsByName("hr-lock");
+  for (var i = 0; i < radios.length; i++) {
+    radios[i].checked = (radios[i].value === "1") === STATE.hr_locked;
+  }
+  var hrInput = $("home-hr");
+  if (hrInput) hrInput.disabled = !STATE.hr_locked;
+}
+function onHrLockChange() {
+  var radios = document.getElementsByName("hr-lock");
+  for (var i = 0; i < radios.length; i++) {
+    if (radios[i].checked) {
+      STATE.hr_locked = (radios[i].value === "1");
+      break;
+    }
+  }
+  var hrInput = $("home-hr");
+  if (hrInput) hrInput.disabled = !STATE.hr_locked;
 }
 function updateZoneBadges() {
   var pwr = parseInt($("home-power").value, 10) || 0;
@@ -167,6 +188,7 @@ function collectConfig() {
     power: clamp(parseInt($("home-power").value, 10) || 0, 0, 2000),
     cadence: clamp(parseInt($("home-cadence").value, 10) || 0, 20, 120),
     heartrate: clamp(parseInt($("home-hr").value, 10) || 0, 60, 200),
+    hr_lock: STATE.hr_locked ? 1 : 0,
     profile_weight: STATE.profile_weight,
     profile_ftp: STATE.profile_ftp,
     profile_thr_hr: STATE.profile_thr_hr,
@@ -187,9 +209,26 @@ function onSave() {
     }
   });
 }
+var s_closeArmed = false;
+var s_closeTimer = null;
 function onCloseWifi() {
-  if (!confirm("将保存当前配置并关闭 WiFi，确认？")) return;
   var btn = $("home-close");
+  /* iOS Captive Portal WebView 不支持 confirm()，改用二次点击确认 */
+  if (!s_closeArmed) {
+    s_closeArmed = true;
+    btn.textContent = "⚠️ 再次点击确认关闭 WiFi";
+    btn.classList.add("warn");
+    if (s_closeTimer) clearTimeout(s_closeTimer);
+    s_closeTimer = setTimeout(function () {
+      s_closeArmed = false;
+      btn.textContent = "保存并关闭 WiFi";
+      btn.classList.remove("warn");
+    }, 3000);
+    return;
+  }
+  if (s_closeTimer) { clearTimeout(s_closeTimer); s_closeTimer = null; }
+  s_closeArmed = false;
+  btn.classList.remove("warn");
   btn.disabled = true;
   btn.textContent = "保存中…";
   api("/api/close-wifi", "POST", collectConfig(), function (status, data) {
@@ -350,6 +389,7 @@ function init() {
       STATE.pacers = data.pacers || [];
       STATE.remaining_sec = data.remaining_sec != null ? data.remaining_sec : 180;
       STATE.closing = !!data.closing;
+      STATE.hr_locked = !!data.hr_locked;
       startTimePoll();
       route();
     } else {

@@ -65,6 +65,8 @@ int power_engine_adjust_cadence(power_engine_t *e, int delta);
 bool power_engine_set_cadence(power_engine_t *e, int value);
 /* 设置 steady 模式下固定用户心率。 */
 bool power_engine_set_heartrate(power_engine_t *e, int value);
+/* 清除固定用户心率，恢复心率随功率联动（按 FTP 分区映射）。 */
+void power_engine_clear_user_hr(power_engine_t *e);
 /* 切换骑行模式，并在模式变化后重置内部状态。 */
 bool power_engine_set_mode(power_engine_t *e, ride_mode_t mode);
 /* 读取当前 profile 选择的配速机器人索引。 */
