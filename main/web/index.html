@@ -87,6 +87,10 @@
         <div class="info-row"><span class="k">当前功体比</span><span class="v" id="pacer-wkg">—</span></div>
         <div class="info-row"><span class="k">预计功率区间</span><span class="v" id="pacer-watt">—</span></div>
         <div id="custom-wkg-box" style="display:none">
+          <div class="field custom-name-field">
+            <label>自定义机器人昵称</label>
+            <input type="text" id="custom-pacer-name" maxlength="31" placeholder="自定义" oninput="onCustomNameInput()">
+          </div>
           <div class="float-row">
             <span class="float-lbl">W/kg 下限</span>
             <button class="fbtn" onclick="onCustomWkgAdj('low',-1)">−</button>
@@ -145,32 +149,49 @@
     <div class="settings-panel" id="settings-device">
       <div class="card">
         <h2>设备信息</h2>
-        <div class="field">
-          <label>设备名称</label>
-          <input type="text" id="settings-device-name" maxlength="20" placeholder="BikePower">
+        <div class="device-name-card">
+          <div class="device-name-main" id="device-name-view-row">
+            <div>
+              <div class="mini-label">设备名称</div>
+              <div class="device-name-display" id="device-name-display">BikePower</div>
+            </div>
+            <button class="icon-btn" id="device-name-edit" onclick="onDeviceNameEdit()" aria-label="编辑设备名称">✎</button>
+          </div>
+          <div class="device-name-edit-row" id="device-name-edit-row" style="display:none">
+            <input type="text" id="settings-device-name" maxlength="20" placeholder="BikePower">
+            <button class="icon-btn confirm" id="device-name-confirm" onclick="onDeviceNameConfirm()" aria-label="确认设备名称">✓</button>
+            <button class="icon-btn cancel" id="device-name-cancel" onclick="onDeviceNameCancel()" aria-label="取消编辑">×</button>
+          </div>
         </div>
         <div class="info-row"><span class="k">固件版本</span><span class="v" id="settings-version"></span></div>
         <div class="note">设备名称会作为 BLE 广播名显示在骑行 App 中，建议保持简短易识别。</div>
       </div>
 
-      <div class="card">
-        <h2>物理按钮</h2>
-        <div class="float-row">
-          <span class="float-lbl">调功步进</span>
-          <button class="fbtn" onclick="onFloatAdj('pstep',-1)">−</button>
-          <span class="float-val"><span id="float-pstep">20</span> W</span>
-          <button class="fbtn" onclick="onFloatAdj('pstep',1)">+</button>
+      <div class="card collapsible-card collapsed" id="settings-button-card">
+        <button class="collapse-head" onclick="toggleCollapse('settings-button-card')" aria-label="展开或收起物理按钮配置">
+          <span><span class="collapse-ico">●</span>物理按钮</span><span class="chev">⌄</span>
+        </button>
+        <div class="collapse-body">
+          <div class="float-row">
+            <span class="float-lbl">调功步进</span>
+            <button class="fbtn" onclick="onFloatAdj('pstep',-1)">−</button>
+            <span class="float-val"><span id="float-pstep">20</span> W</span>
+            <button class="fbtn" onclick="onFloatAdj('pstep',1)">+</button>
+          </div>
+          <div class="note">短按降低目标功率，长按连续升高；该步进只影响固定模式。</div>
         </div>
-        <div class="note">短按降低目标功率，长按连续升高；该步进只影响固定模式。</div>
       </div>
 
-      <div class="card" id="settings-led-card">
-        <h2>LED 指示灯</h2>
-        <label class="check-line">
-          <input type="checkbox" id="settings-led-silent">
-          <span>静默模式：除异常外关闭指示灯</span>
-        </label>
-        <div class="led-list">
+      <div class="card collapsible-card collapsed" id="settings-led-card">
+        <button class="collapse-head" onclick="toggleCollapse('settings-led-card')" aria-label="展开或收起 LED 指示灯配置">
+          <span><span class="collapse-ico led"></span>LED 指示灯</span><span class="chev">⌄</span>
+        </button>
+        <div class="collapse-body">
+          <label class="check-line">
+            <input type="checkbox" id="settings-led-silent">
+            <span>静默模式：除异常外关闭指示灯</span>
+          </label>
+          <div class="led-list">
           <div class="led-row">
             <span class="led-name">待连接</span>
             <select id="settings-led-wait-mode">
@@ -271,8 +292,9 @@
               <option value="6">白</option>
             </select>
           </div>
+          </div>
+          <div class="note">普通单色 LED 仅使用亮灭节奏；RGB 板会同时应用颜色与呼吸效果。</div>
         </div>
-        <div class="note">普通单色 LED 仅使用亮灭节奏；RGB 板会同时应用颜色与呼吸效果。</div>
       </div>
     </div>
 

@@ -11,6 +11,7 @@ var STATE = {
   power_step: 20,
   profile_weight: 0, profile_ftp: 0, profile_thr_hr: 0, profile_ride_type: "coco",
   custom_wkg_low: 25, custom_wkg_high: 30,
+  custom_pacer_name: "自定义",
   led_silent: 0,
   led_wait_mode: 2, led_wait_color: 2,
   led_conn_mode: 1, led_conn_color: 1,
@@ -21,7 +22,8 @@ var STATE = {
   remaining_sec: 180,
   closing: false,
   hr_locked: false,
-  settings_panel: "profile"
+  settings_panel: "profile",
+  device_name_editing: false
 };
 
 /* 浮动幅度/步进范围（与 domain_config.h 一致；step 为单次加减量，默认 1） */
@@ -90,6 +92,32 @@ function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function escapeHtml(s) {
   if (s == null) return "";
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function customPacerDisplayName() {
+  var name = (STATE.custom_pacer_name || "").trim();
+  return name || "自定义";
+}
+function syncCustomPacerOption() {
+  var found = false;
+  for (var i = 0; i < STATE.pacers.length; i++) {
+    if (STATE.pacers[i].id === "custom") {
+      STATE.pacers[i].name = customPacerDisplayName();
+      STATE.pacers[i].wkg_low = STATE.custom_wkg_low / 10;
+      STATE.pacers[i].wkg_high = STATE.custom_wkg_high / 10;
+      STATE.pacers[i].custom = true;
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    STATE.pacers.push({
+      id: "custom",
+      name: customPacerDisplayName(),
+      wkg_low: STATE.custom_wkg_low / 10,
+      wkg_high: STATE.custom_wkg_high / 10,
+      custom: true
+    });
+  }
 }
 function intOr(v, fallback) {
   var n = parseInt(v, 10);
@@ -188,11 +216,9 @@ function captureDraft() {
     var weight = $("settings-weight");
     var ftp = $("settings-ftp");
     var thr = $("settings-thr");
-    var name = $("settings-device-name");
     if (weight) STATE.profile_weight = parseInt(weight.value, 10) || 0;
     if (ftp) STATE.profile_ftp = parseInt(ftp.value, 10) || 0;
     if (thr) STATE.profile_thr_hr = parseInt(thr.value, 10) || 0;
-    if (name) STATE.device_name = (name.value || "").trim();
     readLedControls();
     return;
   }
@@ -250,6 +276,7 @@ function onFloatAdj(kind, delta) {
 function renderPacerSel() {
   var sel = $("home-pacer");
   if (!sel) return;
+  syncCustomPacerOption();
   sel.innerHTML = "";
   for (var i = 0; i < STATE.pacers.length; i++) {
     var p = STATE.pacers[i];
@@ -276,6 +303,16 @@ function onCustomWkgAdj(which, delta) {
   }
   STATE.custom_wkg_low = lo;
   STATE.custom_wkg_high = hi;
+  syncCustomPacerOption();
+  renderPacerSel();
+  updatePacerInfo();
+}
+function onCustomNameInput() {
+  var inp = $("custom-pacer-name");
+  if (!inp) return;
+  STATE.custom_pacer_name = (inp.value || "").trim();
+  syncCustomPacerOption();
+  renderPacerSel();
   updatePacerInfo();
 }
 function updatePacerInfo() {
@@ -289,6 +326,8 @@ function updatePacerInfo() {
     var loEl = $("cwkg-low"), hiEl = $("cwkg-high");
     if (loEl) loEl.textContent = (STATE.custom_wkg_low / 10).toFixed(1);
     if (hiEl) hiEl.textContent = (STATE.custom_wkg_high / 10).toFixed(1);
+    var nameEl = $("custom-pacer-name");
+    if (nameEl && document.activeElement !== nameEl) nameEl.value = customPacerDisplayName();
   }
   if (!wkgEl || !wattEl) return;
   var lo10, hi10;
@@ -383,7 +422,8 @@ function collectConfig() {
     profile_thr_hr: STATE.profile_thr_hr,
     profile_ride_type: STATE.profile_ride_type,
     custom_wkg_low: STATE.custom_wkg_low,
-    custom_wkg_high: STATE.custom_wkg_high
+    custom_wkg_high: STATE.custom_wkg_high,
+    custom_pacer_name: customPacerDisplayName()
   });
 }
 function onSave() {
@@ -434,12 +474,59 @@ function renderSettings() {
   $("settings-weight").value = STATE.profile_weight;
   $("settings-ftp").value = STATE.profile_ftp;
   $("settings-thr").value = STATE.profile_thr_hr;
-  $("settings-device-name").value = STATE.device_name;
+  applyDeviceNameView();
   $("settings-version").textContent = "v" + STATE.firmware_version;
   var ps = $("float-pstep");
   if (ps) ps.textContent = STATE.power_step;
   renderLedControls();
   applySettingsPanel();
+}
+function applyDeviceNameView() {
+  var display = $("device-name-display");
+  var viewRow = $("device-name-view-row");
+  var editRow = $("device-name-edit-row");
+  var input = $("settings-device-name");
+  var name = STATE.device_name || "BikePower";
+  if (display) display.textContent = name;
+  if (input && !STATE.device_name_editing) input.value = name;
+  if (viewRow) viewRow.style.display = STATE.device_name_editing ? "none" : "flex";
+  if (editRow) editRow.style.display = STATE.device_name_editing ? "flex" : "none";
+}
+function onDeviceNameEdit() {
+  STATE.device_name_editing = true;
+  applyDeviceNameView();
+  var input = $("settings-device-name");
+  if (input) {
+    input.value = STATE.device_name || "BikePower";
+    input.focus();
+    input.select();
+  }
+}
+function onDeviceNameConfirm() {
+  var input = $("settings-device-name");
+  var name = input ? (input.value || "").trim() : "";
+  if (!name) {
+    toast("设备名称不能为空");
+    return false;
+  }
+  if (name.length > 20) {
+    toast("设备名称最多 20 字符");
+    return false;
+  }
+  STATE.device_name = name;
+  STATE.device_name_editing = false;
+  applyDeviceNameView();
+  toast("设备名称已确认，保存后生效");
+  return true;
+}
+function onDeviceNameCancel() {
+  STATE.device_name_editing = false;
+  applyDeviceNameView();
+}
+function toggleCollapse(id) {
+  var card = $(id);
+  if (!card) return;
+  card.classList.toggle("collapsed");
 }
 function onSettingsPanel(panel) {
   captureDraft();
@@ -467,7 +554,14 @@ function onSettingsSave() {
   STATE.profile_ftp = clamp(parseInt($("settings-ftp").value, 10) || 0, 50, 500);
   STATE.profile_thr_hr = clamp(parseInt($("settings-thr").value, 10) || 0, 100, 220);
   readLedControls();
-  var name = ($("settings-device-name").value || "").trim();
+  if (STATE.device_name_editing) {
+    var confirmed = onDeviceNameConfirm();
+    if (confirmed === false) {
+      btn.disabled = false;
+      return;
+    }
+  }
+  var name = (STATE.device_name || "").trim();
   if (!name) {
     btn.disabled = false;
     toast("设备名称不能为空");
@@ -481,6 +575,7 @@ function onSettingsSave() {
     return;
   }
   STATE.device_name = name;
+  applyDeviceNameView();
   var body = collectConfigBase();
   api("/api/config", "POST", body, function (status, data) {
     btn.disabled = false;
@@ -509,7 +604,8 @@ function collectConfigBase() {
     profile_thr_hr: STATE.profile_thr_hr,
     profile_ride_type: STATE.profile_ride_type,
     custom_wkg_low: STATE.custom_wkg_low,
-    custom_wkg_high: STATE.custom_wkg_high
+    custom_wkg_high: STATE.custom_wkg_high,
+    custom_pacer_name: customPacerDisplayName()
   });
 }
 
@@ -598,6 +694,7 @@ function init() {
       STATE.profile_ride_type = data.profile_ride_type || "coco";
       STATE.custom_wkg_low = data.custom_wkg_low != null ? data.custom_wkg_low : 25;
       STATE.custom_wkg_high = data.custom_wkg_high != null ? data.custom_wkg_high : 30;
+      STATE.custom_pacer_name = data.custom_pacer_name || "自定义";
       STATE.led_silent = data.led_silent != null ? data.led_silent : 0;
       STATE.led_wait_mode = data.led_wait_mode != null ? data.led_wait_mode : 2;
       STATE.led_wait_color = data.led_wait_color != null ? data.led_wait_color : 2;
@@ -610,6 +707,7 @@ function init() {
       STATE.led_error_mode = data.led_error_mode != null ? data.led_error_mode : 3;
       STATE.led_error_color = data.led_error_color != null ? data.led_error_color : 0;
       STATE.pacers = data.pacers || [];
+      syncCustomPacerOption();
       STATE.remaining_sec = data.remaining_sec != null ? data.remaining_sec : 180;
       STATE.closing = !!data.closing;
       STATE.hr_locked = !!data.hr_locked;

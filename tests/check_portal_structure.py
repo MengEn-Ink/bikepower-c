@@ -128,6 +128,11 @@ def main():
     check('id="settings-device"' in html, "设置页缺少设备信息分区")
     check('id="settings-about"' in html, "设置页缺少关于分区")
     check('id="settings-device-name"' in html, "设备名称输入必须挪入设置页")
+    check('id="device-name-display"' in html, "设备名称必须默认以文本形式展示")
+    check('id="device-name-edit"' in html, "设备名称必须提供右侧编辑按钮")
+    check('id="device-name-confirm"' in html, "设备名称编辑必须提供对勾确认按钮")
+    check('onDeviceNameEdit' in js and 'onDeviceNameConfirm' in js, "app.js 缺少设备名称编辑/确认交互")
+    check('id="custom-pacer-name"' in html, "自定义配速机器人昵称输入缺失")
     check('id="about-dev"' not in html, "设备名称不应继续留在关于页")
     check('pager-track' not in html and 'pager-track' not in css, "关于内容不应继续使用横向分页")
     check('"/settings": renderSettings' in js, "app.js 路由缺少 /settings -> renderSettings")
@@ -136,9 +141,13 @@ def main():
     profile_pos = html.find('id="settings-profile"')
     device_pos = html.find('id="settings-device"')
     about_pos = html.find('id="settings-about"')
-    button_pos = html.find("<h2>物理按钮</h2>")
+    button_pos = html.find("物理按钮")
     check(device_pos < button_pos < about_pos, "物理按钮卡片必须位于设备信息分区")
     check(not (profile_pos < button_pos < device_pos), "物理按钮不应留在用户资料分区")
+    check('id="settings-button-card"' in html, "物理按钮配置卡片必须有独立折叠容器")
+    check(bool(re.search(r'<div\b[^>]*class="[^"]*collapsed[^"]*"[^>]*id="settings-button-card"', html)), "物理按钮配置卡片必须默认收起")
+    check(bool(re.search(r'<div\b[^>]*class="[^"]*collapsed[^"]*"[^>]*id="settings-led-card"', html)), "LED 配置卡片必须默认收起")
+    check('toggleCollapse' in js, "app.js 缺少折叠卡片切换逻辑")
 
     led_control_ids = [
         "settings-led-card", "settings-led-silent",
@@ -159,6 +168,8 @@ def main():
         "led_error_mode", "led_error_color",
     ]:
         check(key in js, f"app.js 缺少 LED 配置字段 {key}")
+    for key in ["custom_pacer_name", "syncCustomPacerOption", "customPacerDisplayName"]:
+        check(key in js, f"app.js 缺少自定义配速昵称/下拉刷新逻辑 {key}")
 
     # 总结
     print(f"\n{TAG} 结果: {g_pass} 通过, {g_fail} 失败")
