@@ -4,8 +4,6 @@
 /* ============ 全局状态 ============ */
 var STATE = {
   device_name: "",
-  device_name_draft: null,
-  device_name_editing: false,
   firmware_version: "",
   power: 0, cadence: 0, heartrate: 0,
   mode: "steady",
@@ -13,10 +11,17 @@ var STATE = {
   power_step: 20,
   profile_weight: 0, profile_ftp: 0, profile_thr_hr: 0, profile_ride_type: "coco",
   custom_wkg_low: 25, custom_wkg_high: 30,
+  led_silent: 0,
+  led_wait_mode: 2, led_wait_color: 2,
+  led_conn_mode: 1, led_conn_color: 1,
+  led_wifi_mode: 2, led_wifi_color: 4,
+  led_confirm_mode: 3, led_confirm_color: 3,
+  led_error_mode: 3, led_error_color: 0,
   pacers: [],
   remaining_sec: 180,
   closing: false,
-  hr_locked: false
+  hr_locked: false,
+  settings_panel: "profile"
 };
 
 /* 浮动幅度/步进范围（与 domain_config.h 一致；step 为单次加减量，默认 1） */
@@ -26,6 +31,14 @@ var FLOAT_RANGE = {
   hr: { min: 0, max: 20, key: "hr_float" },
   pstep: { min: 5, max: 50, key: "power_step", step: 5 }
 };
+
+var LED_FIELDS = [
+  { id: "wait", modeKey: "led_wait_mode", colorKey: "led_wait_color", modeDefault: 2, colorDefault: 2 },
+  { id: "conn", modeKey: "led_conn_mode", colorKey: "led_conn_color", modeDefault: 1, colorDefault: 1 },
+  { id: "wifi", modeKey: "led_wifi_mode", colorKey: "led_wifi_color", modeDefault: 2, colorDefault: 4 },
+  { id: "confirm", modeKey: "led_confirm_mode", colorKey: "led_confirm_color", modeDefault: 3, colorDefault: 3 },
+  { id: "error", modeKey: "led_error_mode", colorKey: "led_error_color", modeDefault: 3, colorDefault: 0 }
+];
 
 /* ============ 工具函数 ============ */
 function $(id) { return document.getElementById(id); }
@@ -78,18 +91,61 @@ function escapeHtml(s) {
   if (s == null) return "";
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
+function intOr(v, fallback) {
+  var n = parseInt(v, 10);
+  return isNaN(n) ? fallback : n;
+}
+function setSelect(id, value) {
+  var e = $(id);
+  if (e) e.value = String(value);
+}
+function readLedControls() {
+  var silent = $("settings-led-silent");
+  if (silent) STATE.led_silent = silent.checked ? 1 : 0;
+  for (var i = 0; i < LED_FIELDS.length; i++) {
+    var f = LED_FIELDS[i];
+    var mode = $("settings-led-" + f.id + "-mode");
+    var color = $("settings-led-" + f.id + "-color");
+    if (mode) STATE[f.modeKey] = clamp(intOr(mode.value, f.modeDefault), 0, 5);
+    if (color) STATE[f.colorKey] = clamp(intOr(color.value, f.colorDefault), 0, 6);
+  }
+}
+function renderLedControls() {
+  var silent = $("settings-led-silent");
+  if (silent) silent.checked = !!STATE.led_silent;
+  for (var i = 0; i < LED_FIELDS.length; i++) {
+    var f = LED_FIELDS[i];
+    STATE[f.modeKey] = clamp(intOr(STATE[f.modeKey], f.modeDefault), 0, 5);
+    STATE[f.colorKey] = clamp(intOr(STATE[f.colorKey], f.colorDefault), 0, 6);
+    setSelect("settings-led-" + f.id + "-mode", STATE[f.modeKey]);
+    setSelect("settings-led-" + f.id + "-color", STATE[f.colorKey]);
+  }
+}
+function withLedConfig(body) {
+  body.led_silent = STATE.led_silent ? 1 : 0;
+  for (var i = 0; i < LED_FIELDS.length; i++) {
+    var f = LED_FIELDS[i];
+    body[f.modeKey] = STATE[f.modeKey];
+    body[f.colorKey] = STATE[f.colorKey];
+  }
+  return body;
+}
 
 /* ============ 路由 ============ */
 var ROUTES = {
   "/home": renderHome,
-  "/more": renderMore,
-  "/about": renderAbout,
+  "/settings": renderSettings,
   "/closing": renderClosing,
   "/success": renderSuccess
 };
+function normalizeRoute(hash) {
+  if (hash === "/more" || hash === "/about") return "/settings";
+  return hash;
+}
 function go(hash) {
   if (hash.charAt(0) === "#") hash = hash.slice(1);
   if (hash.charAt(0) !== "/") hash = "/" + hash;
+  hash = normalizeRoute(hash);
   if (!ROUTES[hash]) hash = "/home";
   location.hash = hash;
   route();
@@ -98,6 +154,12 @@ function route() {
   captureDraft();
   var hash = location.hash.replace(/^#/, "");
   if (hash.charAt(0) !== "/") hash = "/" + hash;
+  var normalized = normalizeRoute(hash);
+  if (normalized !== hash) {
+    location.hash = normalized;
+    return;
+  }
+  hash = normalized;
   if (!ROUTES[hash]) hash = "/home";
   var views = document.querySelectorAll(".view");
   for (var i = 0; i < views.length; i++) views[i].classList.remove("active");
@@ -121,19 +183,18 @@ function captureDraft() {
     if (psel && psel.value) STATE.profile_ride_type = psel.value;
     return;
   }
-  var more = $("view-more");
-  if (more && more.classList.contains("active")) {
-    STATE.profile_weight = parseInt($("more-weight").value, 10) || 0;
-    STATE.profile_ftp = parseInt($("more-ftp").value, 10) || 0;
-    STATE.profile_thr_hr = parseInt($("more-thr").value, 10) || 0;
+  var settings = $("view-settings");
+  if (settings && settings.classList.contains("active")) {
+    var weight = $("settings-weight");
+    var ftp = $("settings-ftp");
+    var thr = $("settings-thr");
+    var name = $("settings-device-name");
+    if (weight) STATE.profile_weight = parseInt(weight.value, 10) || 0;
+    if (ftp) STATE.profile_ftp = parseInt(ftp.value, 10) || 0;
+    if (thr) STATE.profile_thr_hr = parseInt(thr.value, 10) || 0;
+    if (name) STATE.device_name = (name.value || "").trim();
+    readLedControls();
     return;
-  }
-  var about = $("view-about");
-  if (about && about.classList.contains("active")) {
-    if (STATE.device_name_editing) {
-      var inp = $("about-dev-input");
-      if (inp) STATE.device_name_draft = inp.value;
-    }
   }
 }
 
@@ -306,7 +367,7 @@ function setZone(id, z) {
   if (dot) dot.style.background = z.color;
 }
 function collectConfig() {
-  return {
+  return withLedConfig({
     device_name: STATE.device_name,
     mode: STATE.mode,
     power: clamp(parseInt($("home-power").value, 10) || 0, 0, 2000),
@@ -323,7 +384,7 @@ function collectConfig() {
     profile_ride_type: STATE.profile_ride_type,
     custom_wkg_low: STATE.custom_wkg_low,
     custom_wkg_high: STATE.custom_wkg_high
-  };
+  });
 }
 function onSave() {
   var btn = $("home-save");
@@ -367,34 +428,72 @@ function onCloseWifi() {
   });
 }
 
-/* ============ 更多配置 ============ */
-function renderMore() {
-  $("more-weight").value = STATE.profile_weight;
-  $("more-ftp").value = STATE.profile_ftp;
-  $("more-thr").value = STATE.profile_thr_hr;
+/* ============ 设置 ============ */
+function renderSettings() {
+  $("home-ver").textContent = "v" + STATE.firmware_version;
+  $("settings-weight").value = STATE.profile_weight;
+  $("settings-ftp").value = STATE.profile_ftp;
+  $("settings-thr").value = STATE.profile_thr_hr;
+  $("settings-device-name").value = STATE.device_name;
+  $("settings-version").textContent = "v" + STATE.firmware_version;
   var ps = $("float-pstep");
   if (ps) ps.textContent = STATE.power_step;
+  renderLedControls();
+  applySettingsPanel();
 }
-function onMoreSave() {
-  var btn = $("more-save");
+function onSettingsPanel(panel) {
+  captureDraft();
+  if (panel !== "profile" && panel !== "device" && panel !== "about") panel = "profile";
+  STATE.settings_panel = panel;
+  applySettingsPanel();
+}
+function applySettingsPanel() {
+  var tabs = document.querySelectorAll(".settings-tab");
+  for (var i = 0; i < tabs.length; i++) {
+    var p = tabs[i].getAttribute("data-panel");
+    tabs[i].classList.toggle("on", p === STATE.settings_panel);
+  }
+  var panels = document.querySelectorAll(".settings-panel");
+  for (var j = 0; j < panels.length; j++) {
+    panels[j].classList.toggle("on", panels[j].id === "settings-" + STATE.settings_panel);
+  }
+  var save = $("settings-save");
+  if (save) save.style.display = STATE.settings_panel === "about" ? "none" : "block";
+}
+function onSettingsSave() {
+  var btn = $("settings-save");
   btn.disabled = true;
-  STATE.profile_weight = clamp(parseInt($("more-weight").value, 10) || 0, 40, 150);
-  STATE.profile_ftp = clamp(parseInt($("more-ftp").value, 10) || 0, 50, 500);
-  STATE.profile_thr_hr = clamp(parseInt($("more-thr").value, 10) || 0, 100, 220);
+  STATE.profile_weight = clamp(parseInt($("settings-weight").value, 10) || 0, 40, 150);
+  STATE.profile_ftp = clamp(parseInt($("settings-ftp").value, 10) || 0, 50, 500);
+  STATE.profile_thr_hr = clamp(parseInt($("settings-thr").value, 10) || 0, 100, 220);
+  readLedControls();
+  var name = ($("settings-device-name").value || "").trim();
+  if (!name) {
+    btn.disabled = false;
+    toast("设备名称不能为空");
+    onSettingsPanel("device");
+    return;
+  }
+  if (name.length > 20) {
+    btn.disabled = false;
+    toast("设备名称最多 20 字符");
+    onSettingsPanel("device");
+    return;
+  }
+  STATE.device_name = name;
   var body = collectConfigBase();
   api("/api/config", "POST", body, function (status, data) {
     btn.disabled = false;
     if (status === 200 && data && data.ok) {
-      toast("已保存");
-      go("/home");
+      toast("设置已保存");
     } else {
       toast("保存失败: " + ((data && data.error) || status));
     }
   });
 }
-/* 更多页保存用：不依赖首页 DOM，取当前 STATE 全量字段 */
+/* 设置页保存用：不依赖首页 DOM，取当前 STATE 全量字段 */
 function collectConfigBase() {
-  return {
+  return withLedConfig({
     device_name: STATE.device_name,
     mode: STATE.mode,
     power: STATE.power,
@@ -411,106 +510,7 @@ function collectConfigBase() {
     profile_ride_type: STATE.profile_ride_type,
     custom_wkg_low: STATE.custom_wkg_low,
     custom_wkg_high: STATE.custom_wkg_high
-  };
-}
-
-/* ============ 关于 ============ */
-function renderAbout() {
-  $("about-ver").textContent = "v" + STATE.firmware_version;
-  var dev = $("about-dev");
-  var display = $("about-dev-wrap");
-  var wrap = $("name-edit-wrap");
-  var inp = $("about-dev-input");
-  if (STATE.device_name_editing) {
-    /* 编辑模式：显示输入框，隐藏铅笔 */
-    if (dev) dev.textContent = STATE.device_name;
-    if (display) display.style.display = "none";
-    if (wrap) wrap.style.display = "flex";
-    if (inp) {
-      inp.value = STATE.device_name_draft != null ? STATE.device_name_draft : STATE.device_name;
-    }
-  } else {
-    /* 显示模式：显示名称 + 铅笔，隐藏输入框 */
-    if (dev) dev.textContent = STATE.device_name_draft != null ? STATE.device_name_draft : STATE.device_name;
-    if (display) display.style.display = "flex";
-    if (wrap) wrap.style.display = "none";
-  }
-  setupAboutPager();
-}
-function onEditDeviceName() {
-  STATE.device_name_editing = true;
-  var inp = $("about-dev-input");
-  if (inp) inp.value = STATE.device_name_draft != null ? STATE.device_name_draft : STATE.device_name;
-  var wrap = $("name-edit-wrap");
-  if (wrap) wrap.style.display = "flex";
-  var display = $("about-dev-wrap");
-  if (display) display.style.display = "none";
-  if (inp) {
-    inp.focus();
-    /* 选中现有名称便于修改 */
-    try { inp.select(); } catch (e) { /* ignore */ }
-  }
-}
-function onSaveDeviceName() {
-  var inp = $("about-dev-input");
-  if (!inp) return;
-  var name = (inp.value || "").trim();
-  if (!name) { toast("名称不能为空"); return; }
-  if (name.length > 20) { toast("名称过长（最多 20 字符）"); return; }
-  /* 保留当前其他配置，仅更新 device_name */
-  var body = collectConfig();
-  body.device_name = name;
-  api("/api/config", "POST", body, function (status, data) {
-    if (status === 200 && data && data.ok) {
-      STATE.device_name = name;
-      STATE.device_name_draft = null;
-      STATE.device_name_editing = false;
-      var dev = $("about-dev");
-      if (dev) dev.textContent = name;
-      var wrap = $("name-edit-wrap");
-      if (wrap) wrap.style.display = "none";
-      var display = $("about-dev-wrap");
-      if (display) display.style.display = "flex";
-      toast("设备名称已保存");
-    } else {
-      toast("保存失败: " + ((data && data.error) || status));
-    }
   });
-}
-
-/* ============ 关于页分页滑动 ============ */
-var s_pagerBound = false;
-function setupAboutPager() {
-  var pager = $("about-pager");
-  if (!pager) return;
-  var dotsBox = $("about-pager-dots");
-  if (!dotsBox) return;
-  var pages = pager.querySelectorAll(".page");
-  /* 初始化小圆点（只在首次渲染时创建） */
-  if (dotsBox.children.length !== pages.length) {
-    dotsBox.innerHTML = "";
-    for (var i = 0; i < pages.length; i++) {
-      var d = el("div", { class: "pager-dot" + (i === 0 ? " on" : "") });
-      d.setAttribute("data-idx", String(i));
-      d.onclick = (function (idx) {
-        return function () {
-          pager.scrollTo({ left: idx * pager.clientWidth, behavior: "smooth" });
-        };
-      })(i);
-      dotsBox.appendChild(d);
-    }
-  }
-  /* 绑定滚动监听（只绑定一次） */
-  if (!s_pagerBound) {
-    s_pagerBound = true;
-    pager.addEventListener("scroll", function () {
-      var idx = Math.round(pager.scrollLeft / pager.clientWidth);
-      var dots = dotsBox.querySelectorAll(".pager-dot");
-      for (var j = 0; j < dots.length; j++) {
-        dots[j].classList.toggle("on", j === idx);
-      }
-    }, { passive: true });
-  }
 }
 
 /* ============ 关闭提示 ============ */
@@ -598,6 +598,17 @@ function init() {
       STATE.profile_ride_type = data.profile_ride_type || "coco";
       STATE.custom_wkg_low = data.custom_wkg_low != null ? data.custom_wkg_low : 25;
       STATE.custom_wkg_high = data.custom_wkg_high != null ? data.custom_wkg_high : 30;
+      STATE.led_silent = data.led_silent != null ? data.led_silent : 0;
+      STATE.led_wait_mode = data.led_wait_mode != null ? data.led_wait_mode : 2;
+      STATE.led_wait_color = data.led_wait_color != null ? data.led_wait_color : 2;
+      STATE.led_conn_mode = data.led_conn_mode != null ? data.led_conn_mode : 1;
+      STATE.led_conn_color = data.led_conn_color != null ? data.led_conn_color : 1;
+      STATE.led_wifi_mode = data.led_wifi_mode != null ? data.led_wifi_mode : 2;
+      STATE.led_wifi_color = data.led_wifi_color != null ? data.led_wifi_color : 4;
+      STATE.led_confirm_mode = data.led_confirm_mode != null ? data.led_confirm_mode : 3;
+      STATE.led_confirm_color = data.led_confirm_color != null ? data.led_confirm_color : 3;
+      STATE.led_error_mode = data.led_error_mode != null ? data.led_error_mode : 3;
+      STATE.led_error_color = data.led_error_color != null ? data.led_error_color : 0;
       STATE.pacers = data.pacers || [];
       STATE.remaining_sec = data.remaining_sec != null ? data.remaining_sec : 180;
       STATE.closing = !!data.closing;
@@ -623,9 +634,9 @@ function init() {
   bindInputRange("home-power", 0, 2000);
   bindInputRange("home-cadence", 20, 120);
   bindInputRange("home-hr", 60, 200);
-  bindInputRange("more-weight", 40, 150);
-  bindInputRange("more-ftp", 50, 500);
-  bindInputRange("more-thr", 100, 220);
+  bindInputRange("settings-weight", 40, 150);
+  bindInputRange("settings-ftp", 50, 500);
+  bindInputRange("settings-thr", 100, 220);
 }
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init);

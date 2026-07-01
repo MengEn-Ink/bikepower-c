@@ -35,8 +35,7 @@
 
     <!-- ---- 固定模式区 ---- -->
     <div id="home-steady">
-      <div class="card">
-        <h2>目标功率</h2>
+      <div class="card home-card">
         <div class="val"><input type="number" inputmode="numeric" id="home-power" value="0"><span class="unit">W</span></div>
         <div class="lbl"><span>固定功率</span><span class="zone" id="zone-pwr"><span class="dot"></span>Z?</span></div>
         <div class="float-row">
@@ -47,8 +46,7 @@
         </div>
       </div>
 
-      <div class="card">
-        <h2>踏频</h2>
+      <div class="card home-card">
         <div class="val"><input type="number" inputmode="numeric" id="home-cadence" value="0"><span class="unit">rpm</span></div>
         <div class="lbl"><span>固定踏频</span></div>
         <div class="float-row">
@@ -59,8 +57,7 @@
         </div>
       </div>
 
-      <div class="card">
-        <h2>心率</h2>
+      <div class="card home-card">
         <div class="val"><input type="number" inputmode="numeric" id="home-hr" value="0"><span class="unit">bpm</span></div>
         <div class="lbl"><span>目标心率</span><span class="zone" id="zone-hr"><span class="dot"></span>Z?</span></div>
         <div class="hr-lock-row">
@@ -81,7 +78,7 @@
     <!-- ---- 配速机器人区 ---- -->
     <div id="home-road" style="display:none">
       <div class="note">🤖 机器人配速已启用：设备按所选档位的功体比（W/kg × 体重）自动输出功率，模拟跟随虚拟骑手骑行，无需骑行 App 干预。功率、心率自动生成，此模式下不使用固定功率。</div>
-      <div class="card">
+      <div class="card home-card">
         <h2>配速机器人档位</h2>
         <div class="field">
           <label>选择配速机器人</label>
@@ -113,120 +110,199 @@
     </div>
   </div>
 
-  <!-- ============ 更多配置 ============ -->
-  <div class="view" id="view-more">
-    <div class="hero">
-      <h1>更多配置</h1>
-      <div class="sub">用户档案影响功率区间、配速机器人功率与心率分区计算。</div>
+  <!-- ============ 设置 ============ -->
+  <div class="view" id="view-settings">
+    <div class="settings-head">
+      <h1>设置</h1>
+      <div class="sub">管理用户资料、设备信息与使用说明。</div>
     </div>
 
-    <div class="card">
-      <h2>用户档案</h2>
-      <div class="field">
-        <label>体重 (kg, 40-150)</label>
-        <input type="number" id="more-weight" inputmode="numeric">
-      </div>
-      <div class="field">
-        <label>FTP (W, 50-500)</label>
-        <input type="number" id="more-ftp" inputmode="numeric">
-      </div>
-      <div class="field">
-        <label>阈值心率 (bpm, 100-220)</label>
-        <input type="number" id="more-thr" inputmode="numeric">
-      </div>
-      <div class="note">体重 × 配速机器人功体比 = 机器人模式输出功率；FTP 决定功率分区；阈值心率决定心率分区映射。</div>
+    <div class="settings-nav" role="tablist">
+      <button class="settings-tab on" data-panel="profile" onclick="onSettingsPanel('profile')">用户资料</button>
+      <button class="settings-tab" data-panel="device" onclick="onSettingsPanel('device')">设备信息</button>
+      <button class="settings-tab" data-panel="about" onclick="onSettingsPanel('about')">关于</button>
     </div>
 
-    <div class="card">
-      <h2>物理按钮</h2>
-      <div class="float-row">
-        <span class="float-lbl">调功步进</span>
-        <button class="fbtn" onclick="onFloatAdj('pstep',-1)">−</button>
-        <span class="float-val"><span id="float-pstep">20</span> W</span>
-        <button class="fbtn" onclick="onFloatAdj('pstep',1)">+</button>
+    <div class="settings-panel on" id="settings-profile">
+      <div class="card">
+        <h2>用户资料</h2>
+        <div class="field">
+          <label>体重 kg，40-150</label>
+          <input type="number" id="settings-weight" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>FTP W，50-500</label>
+          <input type="number" id="settings-ftp" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>阈值心率 bpm，100-220</label>
+          <input type="number" id="settings-thr" inputmode="numeric">
+        </div>
+        <div class="note">体重用于换算配速机器人输出功率；FTP 用于判断功率强度；阈值心率用于生成心率分区。</div>
       </div>
-      <div class="note">设备实体按钮短按 −步进、长按连续 +步进 调整固定模式功率。范围 5~50 W，默认 20 W。</div>
     </div>
 
-    <div class="btn-row">
-      <button class="btn" id="more-save" onclick="onMoreSave()">保存配置</button>
-      <button class="btn alt" onclick="go('/home')">返回</button>
-    </div>
-  </div>
+    <div class="settings-panel" id="settings-device">
+      <div class="card">
+        <h2>设备信息</h2>
+        <div class="field">
+          <label>设备名称</label>
+          <input type="text" id="settings-device-name" maxlength="20" placeholder="BikePower">
+        </div>
+        <div class="info-row"><span class="k">固件版本</span><span class="v" id="settings-version"></span></div>
+        <div class="note">设备名称会作为 BLE 广播名显示在骑行 App 中，建议保持简短易识别。</div>
+      </div>
 
-  <!-- ============ 关于 ============ -->
-  <div class="view" id="view-about">
-    <div class="pager" id="about-pager">
-      <div class="pager-track">
+      <div class="card">
+        <h2>物理按钮</h2>
+        <div class="float-row">
+          <span class="float-lbl">调功步进</span>
+          <button class="fbtn" onclick="onFloatAdj('pstep',-1)">−</button>
+          <span class="float-val"><span id="float-pstep">20</span> W</span>
+          <button class="fbtn" onclick="onFloatAdj('pstep',1)">+</button>
+        </div>
+        <div class="note">短按降低目标功率，长按连续升高；该步进只影响固定模式。</div>
+      </div>
 
-        <!-- Page 1: 设备信息 -->
-        <div class="page">
-          <div class="card">
-            <h2>设备信息</h2>
-            <div class="info-row"><span class="k">固件版本</span><span class="v" id="about-ver"></span></div>
-            <div class="info-row dev-name-row">
-              <span class="k">设备名称</span>
-              <span class="v name-display" id="about-dev-wrap">
-                <span id="about-dev"></span>
-                <span class="name-edit-icon" onclick="onEditDeviceName()">✎</span>
-              </span>
-            </div>
-            <div class="name-edit-wrap" id="name-edit-wrap" style="display:none">
-              <input type="text" id="about-dev-input" maxlength="20" placeholder="输入新名称">
-              <span class="name-ok-icon" onclick="onSaveDeviceName()">✓</span>
-            </div>
+      <div class="card" id="settings-led-card">
+        <h2>LED 指示灯</h2>
+        <label class="check-line">
+          <input type="checkbox" id="settings-led-silent">
+          <span>静默模式：除异常外关闭指示灯</span>
+        </label>
+        <div class="led-list">
+          <div class="led-row">
+            <span class="led-name">待连接</span>
+            <select id="settings-led-wait-mode">
+              <option value="0">关闭</option>
+              <option value="1">常亮</option>
+              <option value="2">慢闪</option>
+              <option value="3">快闪</option>
+              <option value="4">双闪</option>
+              <option value="5">呼吸</option>
+            </select>
+            <select id="settings-led-wait-color">
+              <option value="0">红</option>
+              <option value="1">绿</option>
+              <option value="2">蓝</option>
+              <option value="3">黄</option>
+              <option value="4">青</option>
+              <option value="5">品红</option>
+              <option value="6">白</option>
+            </select>
           </div>
-          <div class="card">
-            <h2>三种骑行模式</h2>
-            <p><b>固定模式</b>：功率/踏频/心率按你设定的基准值输出，可各自设置浮动范围模拟真实骑行的自然波动。</p>
-            <p><b>配速机器人</b>：按所选档位功体比自动输出功率，模拟跟随虚拟骑手，无需骑行 App。</p>
-            <p><b>ERG 模式</b>：骑行 App 下发目标功率时自动进入，设备锁定到 App 指定功率。</p>
+          <div class="led-row">
+            <span class="led-name">已连接</span>
+            <select id="settings-led-conn-mode">
+              <option value="0">关闭</option>
+              <option value="1">常亮</option>
+              <option value="2">慢闪</option>
+              <option value="3">快闪</option>
+              <option value="4">双闪</option>
+              <option value="5">呼吸</option>
+            </select>
+            <select id="settings-led-conn-color">
+              <option value="0">红</option>
+              <option value="1">绿</option>
+              <option value="2">蓝</option>
+              <option value="3">黄</option>
+              <option value="4">青</option>
+              <option value="5">品红</option>
+              <option value="6">白</option>
+            </select>
+          </div>
+          <div class="led-row">
+            <span class="led-name">配网中</span>
+            <select id="settings-led-wifi-mode">
+              <option value="0">关闭</option>
+              <option value="1">常亮</option>
+              <option value="2">慢闪</option>
+              <option value="3">快闪</option>
+              <option value="4">双闪</option>
+              <option value="5">呼吸</option>
+            </select>
+            <select id="settings-led-wifi-color">
+              <option value="0">红</option>
+              <option value="1">绿</option>
+              <option value="2">蓝</option>
+              <option value="3">黄</option>
+              <option value="4">青</option>
+              <option value="5">品红</option>
+              <option value="6">白</option>
+            </select>
+          </div>
+          <div class="led-row">
+            <span class="led-name">二次确认</span>
+            <select id="settings-led-confirm-mode">
+              <option value="0">关闭</option>
+              <option value="1">常亮</option>
+              <option value="2">慢闪</option>
+              <option value="3">快闪</option>
+              <option value="4">双闪</option>
+              <option value="5">呼吸</option>
+            </select>
+            <select id="settings-led-confirm-color">
+              <option value="0">红</option>
+              <option value="1">绿</option>
+              <option value="2">蓝</option>
+              <option value="3">黄</option>
+              <option value="4">青</option>
+              <option value="5">品红</option>
+              <option value="6">白</option>
+            </select>
+          </div>
+          <div class="led-row">
+            <span class="led-name">异常</span>
+            <select id="settings-led-error-mode">
+              <option value="0">关闭</option>
+              <option value="1">常亮</option>
+              <option value="2">慢闪</option>
+              <option value="3">快闪</option>
+              <option value="4">双闪</option>
+              <option value="5">呼吸</option>
+            </select>
+            <select id="settings-led-error-color">
+              <option value="0">红</option>
+              <option value="1">绿</option>
+              <option value="2">蓝</option>
+              <option value="3">黄</option>
+              <option value="4">青</option>
+              <option value="5">品红</option>
+              <option value="6">白</option>
+            </select>
           </div>
         </div>
-
-        <!-- Page 2: 功率与心率的关联 -->
-        <div class="page">
-          <div class="card">
-            <h2>功率 → 心率 关联</h2>
-            <p>真实骑行中心率随功率上升而上升，但存在<b>滞后</b>与<b>惯性</b>。本设备用生理模型还原这一关系，而非简单线性映射。</p>
-            <p><b>① 功率分区</b>：以你的 <b>FTP</b> 为基准，把当前功率换算成强度百分比（%FTP），落入恢复/耐力/节奏/阈值/无氧等区间。</p>
-            <p><b>② 分区映射心率</b>：每个功率区间对应一段 <b>%阈值心率</b>，再乘以你的阈值心率得到目标心率。功率越高，目标心率越高。</p>
-            <p><b>③ 一阶平滑</b>：心率不会瞬间跳变，按时间常数逐步逼近目标（上升快、下降慢，贴近真实生理）。</p>
-          </div>
-        </div>
-
-        <!-- Page 3: 算法细节 -->
-        <div class="page">
-          <div class="card">
-            <h2>算法逻辑说明</h2>
-            <p><b>心率动力学</b>：HR(t) = HR + α·(目标 − HR)，α = 1 − e^(−dt/τ)。上升 τ≈30s，下降 τ≈60s，还原心率惯性。</p>
-            <p><b>心率变异 HRV</b>：叠加呼吸性窦性心律不齐（RSA）、Mayer 波与缓慢漂移，让静息心率也有自然抖动。</p>
-            <p><b>浮动平滑游走</b>：固定模式下功率/踏频/心率在 [基准±浮动] 带内做<b>有界随机游走</b>——周期性在带内取新目标再平滑逼近，因此平稳变化、绝不越界、不逐拍乱跳。</p>
-            <p><b>参数持久化</b>：所有设置写入 NVS，断电重启后自动恢复。</p>
-          </div>
-        </div>
-
-        <!-- Page 4: 使用与注意 -->
-        <div class="page">
-          <div class="card">
-            <h2>使用说明</h2>
-            <p><b>1. 连接骑行 App</b>：在 Zwift、TrainerRoad 等 App 搜索并连接 BikePower BLE 设备。</p>
-            <p><b>2. 选择模式</b>：首页顶部切换「固定模式 / 配速机器人」，二选一。</p>
-            <p><b>3. 调整参数</b>：输入基准值并用 ± 微调浮动范围，点击保存生效。</p>
-            <p><b>4. 配网窗口</b>：默认 180 秒，剩余不足时点「续期配网」。</p>
-            <p><b>5. 重新配网</b>：长按设备按钮 2 秒重新进入配网模式。</p>
-          </div>
-          <div class="card">
-            <h2>注意事项</h2>
-            <p><b>· 保存生效</b>：修改后需点「保存配置」才会持久化。</p>
-            <p><b>· 关闭 WiFi</b>：点「保存并关闭 WiFi」返回骑行模式，BLE 持续在线。</p>
-            <p><b>· 固件升级</b>：暂不支持 OTA，请通过烧录工具更新。</p>
-          </div>
-        </div>
-
+        <div class="note">普通单色 LED 仅使用亮灭节奏；RGB 板会同时应用颜色与呼吸效果。</div>
       </div>
     </div>
-    <div class="pager-dots" id="about-pager-dots"></div>
+
+    <div class="settings-panel" id="settings-about">
+      <div class="card">
+        <h2>BikePower 是什么</h2>
+        <p>BikePower 是一台 BLE 骑行数据模拟设备，可向 Zwift、TrainerRoad 等 App 广播功率、踏频和心率。</p>
+      </div>
+      <div class="card">
+        <h2>三种骑行模式</h2>
+        <p><b>固定模式</b>：按你设置的功率、踏频、心率输出，并在浮动范围内平滑变化。</p>
+        <p><b>配速机器人</b>：按体重和所选功体比自动生成目标功率，模拟跟随虚拟骑手。</p>
+        <p><b>ERG 模式</b>：骑行 App 下发目标功率时自动进入，设备跟随 App 的目标功率输出。</p>
+      </div>
+      <div class="card">
+        <h2>功率与心率</h2>
+        <p>设备会先按 FTP 判断当前功率强度，再映射到阈值心率区间，并用平滑模型模拟心率上升和下降的惯性。</p>
+      </div>
+      <div class="card">
+        <h2>使用提醒</h2>
+        <p><b>保存生效</b>：修改后需点「保存设置」才会持久化。</p>
+        <p><b>关闭 WiFi</b>：点「保存并关闭 WiFi」返回骑行模式，BLE 持续在线。</p>
+        <p><b>重新配网</b>：长按设备按钮 2 秒，并在确认窗口内再按一次。</p>
+      </div>
+    </div>
+
+    <div class="btn-row settings-actions">
+      <button class="btn" id="settings-save" onclick="onSettingsSave()">保存设置</button>
+      <button class="btn alt" onclick="go('/home')">返回首页</button>
+    </div>
   </div>
 
   <!-- ============ 关闭提示 ============ -->
@@ -256,8 +332,7 @@
 <!-- 底部导航 -->
 <div class="navbar">
   <a class="nav-item" data-h="/home"><span class="nav-ico">🏠</span><span class="nav-tx">首页</span></a>
-  <a class="nav-item" data-h="/more"><span class="nav-ico">⚙️</span><span class="nav-tx">更多</span></a>
-  <a class="nav-item" data-h="/about"><span class="nav-ico">ℹ️</span><span class="nav-tx">关于</span></a>
+  <a class="nav-item" data-h="/settings"><span class="nav-ico">⚙️</span><span class="nav-tx">设置</span></a>
 </div>
 
 <!-- INLINE_JS -->

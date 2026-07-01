@@ -1,11 +1,11 @@
 /* BikePower 配网门户统一样式表（v3.2.1 紧凑布局） */
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
-body{background:#f5f5f7;padding:10px;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;color:#1d1d1f;padding-bottom:62px!important;overflow-y:auto}
+body{background:#f5f5f7;padding:8px;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;color:#1d1d1f;padding-bottom:58px!important;overflow-y:auto}
 .box{max-width:420px;margin:0 auto}
 .bar,.brand,.status,.card .val{display:flex;align-items:center}
-.bar,.status{justify-content:space-between;margin:0 0 8px}
-.brand{gap:6px;font-size:20px;font-weight:800}
+.bar,.status{justify-content:space-between;margin:0 0 6px}
+.brand{gap:6px;font-size:19px;font-weight:800}
 .brand small{font-size:10px;font-weight:600;color:#86868b}
 .status{font-size:12px}
 .status .ble{color:#007aff;font-weight:800}
@@ -14,74 +14,76 @@ body{background:#f5f5f7;padding:10px;font-family:-apple-system,BlinkMacSystemFon
 .badge.warn{background:#fff3e0;color:#b45309;border-color:#ffd59a}
 .note{font-size:11px;line-height:1.4;color:#3f3f46;background:#fff;border:1px solid #0001;border-radius:14px;padding:8px 10px;margin:0 0 8px}
 .note.warn{background:#fff3e0;color:#92400e;border-color:#ffd59a}
-.renew-btn{display:none;width:100%;padding:11px;border:0;border-radius:14px;background:#ff9500;color:#fff;font-size:14px;font-weight:800;margin:0 0 8px;animation:pulse 1s infinite}
+.renew-btn{display:none;width:100%;padding:10px;border:0;border-radius:12px;background:#ff9500;color:#fff;font-size:13px;font-weight:800;margin:0 0 6px;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
-.hero{background:#fff;border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 2px 12px rgba(0,0,0,.04)}
-.hero h1{font-size:18px;margin:0 0 3px;letter-spacing:-.03em;font-weight:700}
-.hero .sub{font-size:11px;color:#86868b;line-height:1.45}
-.card{background:#fff;border:1px solid #0001;border-radius:16px;padding:11px 13px;margin:0 0 8px}
+.settings-head{background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:6px;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+.settings-head h1{font-size:18px;margin:0 0 2px;letter-spacing:-.03em;font-weight:700}
+.settings-head .sub{font-size:11px;color:#86868b;line-height:1.4}
+.card{background:#fff;border:1px solid #0001;border-radius:12px;padding:9px 11px;margin:0 0 6px}
 .card h2{font-size:13px;margin-bottom:5px;letter-spacing:-.02em;color:#1d1d1f}
 .card p{font-size:12px;line-height:1.5;color:#3f3f46;margin-bottom:6px}
 .card p:last-child{margin-bottom:0}
 .card p b{color:#1d1d1f;font-weight:700}
 .card .val{display:flex;align-items:baseline;gap:6px}
-.card .val input{width:100%;border:0;background:transparent;color:#111;font-size:30px;font-weight:800;padding:0}
+.card .val input{width:100%;border:0;background:transparent;color:#111;font-size:28px;font-weight:800;padding:0}
 .card .val input.out-of-range{color:#ef4444}
 .card .unit{color:#86868b;font-size:13px}
 .card .lbl{display:flex;justify-content:space-between;align-items:center;color:#666;font-size:12px;margin-top:2px}
 .zone{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:800;color:#666}
 .zone .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
-.btn{display:block;width:100%;padding:11px;border:0;border-radius:12px;background:#007aff;color:#fff;font-size:14px;font-weight:700;letter-spacing:.02em;text-align:center;text-decoration:none}
+.btn{display:block;width:100%;padding:10px;border:0;border-radius:11px;background:#007aff;color:#fff;font-size:14px;font-weight:700;letter-spacing:.02em;text-align:center;text-decoration:none}
 .btn:active{opacity:.85;transform:scale(.99)}
 .btn:disabled{opacity:.4}
 .btn.alt{background:#fff;color:#007aff;border:1px solid rgba(0,122,255,.18)}
 .btn.green{background:#34c759}
 .btn.danger{background:#ff3b30}
 .btn.warn{background:#f59e0b}
-.btn-row{display:flex;gap:8px;margin-top:8px}
+.btn-row{display:flex;gap:8px;margin-top:6px}
 .btn-row .btn{flex:1;margin-top:0}
 .hr-lock-row{margin-top:6px;display:flex;flex-direction:column;gap:5px}
 /* 模式二选一分段控件 */
-.seg{display:flex;background:#e9e9eb;border-radius:12px;padding:3px;margin:0 0 8px;gap:3px}
-.seg-item{flex:1;border:0;background:transparent;color:#6e6e73;font-size:13px;font-weight:700;padding:8px 0;border-radius:9px;cursor:pointer;transition:all .15s}
+.seg{display:flex;background:#e9e9eb;border-radius:12px;padding:3px;margin:0 0 6px;gap:3px}
+.seg-item{flex:1;border:0;background:transparent;color:#6e6e73;font-size:13px;font-weight:700;padding:7px 0;border-radius:9px;cursor:pointer;transition:all .15s}
 .seg-item.on{background:#fff;color:#007aff;box-shadow:0 1px 4px rgba(0,0,0,.12)}
 /* 卡片内联浮动步进器 */
-.float-row{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,.05)}
+.float-row{display:flex;align-items:center;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,.05)}
 .float-lbl{font-size:11px;color:#86868b;font-weight:600;flex:1}
 .float-val{font-size:12px;font-weight:800;color:#1d1d1f;min-width:54px;text-align:center}
-.fbtn{width:30px;height:30px;border:0;border-radius:9px;background:#007aff;color:#fff;font-size:18px;font-weight:800;line-height:1;cursor:pointer;flex:0 0 auto}
+.fbtn{width:28px;height:28px;border:0;border-radius:9px;background:#007aff;color:#fff;font-size:18px;font-weight:800;line-height:1;cursor:pointer;flex:0 0 auto}
 .fbtn:active{opacity:.8;transform:scale(.95)}
 .radio-line{display:flex;align-items:center;gap:7px;font-size:11px;color:#3f3f46;background:#fff;border:1px solid #0001;border-radius:11px;padding:6px 10px}
 .radio-line input{margin:0;flex:0 0 auto}
 .radio-line span{flex:1 1 auto;line-height:1.35}
+.check-line{display:flex;align-items:center;gap:8px;font-size:12px;color:#3f3f46;background:#f5f5f7;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:8px 10px;margin:6px 0}
+.check-line input{margin:0;flex:0 0 auto}
+.check-line span{line-height:1.35}
 .field{margin:6px 0}
 .field label{display:block;font-size:11px;font-weight:600;color:#6e6e73;margin:0 0 3px}
-.field input,.field select{width:100%;padding:9px;border:1px solid rgba(0,0,0,.06);border-radius:10px;font-size:13px;background:#f5f5f7;color:#1d1d1f;font-weight:600}
+.field input,.field select{width:100%;padding:8px;border:1px solid rgba(0,0,0,.06);border-radius:10px;font-size:13px;background:#f5f5f7;color:#1d1d1f;font-weight:600}
+.led-list{display:flex;flex-direction:column;gap:6px;margin:6px 0 8px}
+.led-row{display:grid;grid-template-columns:64px 1fr 1fr;gap:6px;align-items:center}
+.led-name{font-size:12px;color:#6e6e73;font-weight:700}
+.led-row select{min-width:0;width:100%;padding:8px 6px;border:1px solid rgba(0,0,0,.06);border-radius:10px;font-size:12px;background:#f5f5f7;color:#1d1d1f;font-weight:700}
 .warn{margin-top:8px;font-size:12px;color:#856404;background:#fff3cd;border:1px solid #ffeaa7;border-radius:10px;padding:10px;line-height:1.5}
 .busy{opacity:.55;pointer-events:none}
 .info-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:12px}
 .info-row:last-child{border-bottom:0}
 .info-row .k{color:#86868b;font-weight:600}
 .info-row .v{color:#1d1d1f;font-weight:700}
-/* 设备名称铅笔编辑 */
-.dev-name-row{flex-wrap:wrap}
-.name-display{display:flex;align-items:center;gap:6px;cursor:pointer}
-.name-edit-icon{color:#007aff;font-size:13px;cursor:pointer;font-weight:700;padding:2px 4px;border-radius:6px}
-.name-edit-icon:active{background:rgba(0,122,255,.1)}
-.name-edit-wrap{display:flex;gap:8px;align-items:center;width:100%;margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,.05)}
-.name-edit-wrap input{flex:1;padding:8px 10px;border:1px solid rgba(0,122,255,.3);border-radius:10px;font-size:13px;background:#f5f5f7;color:#1d1d1f;font-weight:600;min-width:0}
-.name-ok-icon{color:#34c759;font-size:22px;cursor:pointer;font-weight:800;padding:2px 6px;border-radius:8px;flex:0 0 auto}
-.name-ok-icon:active{background:rgba(52,199,89,.12)}
-/* 横向滑动分页（关于页填充满屏，圆点固定底部） */
-#view-about.active{display:flex;flex-direction:column;min-height:calc(100vh - 62px - 44px)}
-#view-about .pager{flex:1 1 auto}
-.pager{overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 -2px;padding:0 2px}
-.pager::-webkit-scrollbar{display:none;height:0;width:0}
-.pager-track{display:flex;gap:0;height:100%}
-.page{flex:0 0 100%;scroll-snap-align:start;min-width:0;display:flex;flex-direction:column;justify-content:flex-start}
-.pager-dots{display:flex;justify-content:center;gap:6px;margin-top:12px;padding:6px 0}
-.pager-dot{width:6px;height:6px;border-radius:50%;background:#c7c7cc;transition:all .2s}
-.pager-dot.on{background:#007aff;width:18px}
+.home-card{padding:8px 10px}
+.home-card h2{font-size:12px;margin-bottom:2px}
+.home-card .val input{font-size:25px;line-height:1}
+.home-card .lbl{font-size:11px;margin-top:0}
+.home-card .float-row{margin-top:5px;padding-top:5px}
+.home-card .hr-lock-row{gap:4px;margin-top:5px}
+.home-card .radio-line{padding:5px 8px}
+.settings-nav{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;background:#e9e9eb;border-radius:12px;padding:3px;margin:0 0 6px}
+.settings-tab{border:0;background:transparent;color:#6e6e73;font-size:13px;font-weight:700;padding:7px 0;border-radius:9px;cursor:pointer}
+.settings-tab.on{background:#fff;color:#007aff;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.settings-panel{display:none}
+.settings-panel.on{display:block}
+#view-settings{padding-bottom:58px}
+.settings-actions{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);width:calc(100% - 16px);max-width:420px;background:#f5f5f7;padding:6px 0 4px;margin:0;z-index:20}
 .countdown{background:#fff;color:#007aff;font-size:38px;font-weight:800;border-radius:50%;width:74px;height:74px;display:flex;justify-content:center;align-items:center;margin:14px auto;border:1px solid rgba(0,122,255,.2);box-shadow:0 8px 20px rgba(0,122,255,.14)}
 .result-card{max-width:360px;width:100%;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:24px;padding:24px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.08);margin:20px auto}
 .result-card .icon{width:58px;height:58px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800}
@@ -100,23 +102,24 @@ body{background:#f5f5f7;padding:10px;font-family:-apple-system,BlinkMacSystemFon
 .view.active{display:block}
 @media(prefers-color-scheme:dark){
   body{background:#1c1c1e;color:#f5f5f7}
-  .hero,.card,.note,.result-card{background:#2c2c2e;border-color:#3a3a3c}
+  .settings-head,.card,.note,.result-card{background:#2c2c2e;border-color:#3a3a3c}
   .card .val input{color:#f5f5f7}
   .card p b{color:#f5f5f7}
   .badge{background:#2c2c2e;border-color:#3a3a3c;color:#f5f5f7}
   .renew-btn{background:#ff9f0a}
   .btn{background:#0a84ff}
   .field input,.field select{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}
-  .name-edit-wrap input{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}
+  .check-line{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}
+  .led-row select{background:#3a3a3c;color:#f5f5f7;border-color:#48484a}
   .navbar{background:#1c1c1e;border-color:#3a3a3c}
   .nav-item{color:#8e8e93}
   .nav-item.on{color:#0a84ff}
   .info-row{border-color:#3a3a3c}
   .info-row .v{color:#f5f5f7}
-  .pager-dot{background:#3a3a3c}
-  .seg{background:#2c2c2e}
-  .seg-item{color:#8e8e93}
-  .seg-item.on{background:#3a3a3c;color:#0a84ff}
+  .seg,.settings-nav{background:#2c2c2e}
+  .seg-item,.settings-tab{color:#8e8e93}
+  .seg-item.on,.settings-tab.on{background:#3a3a3c;color:#0a84ff}
+  .settings-actions{background:#1c1c1e}
   .float-val{color:#f5f5f7}
   .fbtn{background:#0a84ff}
 }
