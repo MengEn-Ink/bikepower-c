@@ -1,7 +1,7 @@
 # 测试脚本使用说明
 
 > BikePower C 设备测试脚本集合
-> 更新日期：2026-06-29（v3.2.0 前后端分离重构后梳理）
+> 更新日期：2026-07-01（v4.0.0 契约校准：已移除在线 OTA 与家庭网络配置）
 
 ---
 
@@ -95,7 +95,7 @@ python3 tests/mock_server.py
 # 浏览器访问 http://127.0.0.1:8080/ 调试前端
 ```
 
-### E. 串口日志工具
+### D. 串口日志工具
 
 | 脚本 | 用途 | 运行模式 |
 |------|------|----------|
@@ -111,7 +111,7 @@ nohup python3 tests/serial_daemon.py > /tmp/serial_daemon.out 2>&1 &
 nohup python3 tests/serial_daemon.py -p /dev/cu.usbmodem101 > /tmp/serial_daemon.out 2>&1 &
 ```
 
-> 守护进程异步写入 `tests/logs/serial_<YYYYMMDD>.log`（按日滚动，已被 `.gitignore` 忽略），烧录时自动让出串口、烧完自动重连，跨 Linux/macOS。停止：`pkill -f serial_daemon.py`。
+> 守护进程异步写入 `tests/logs/device_<YYYYMMDD_HHMMSS>.log`（保留最近 5 个，已被 `.gitignore` 忽略），烧录时自动让出串口、烧完自动重连，跨 Linux/macOS。停止：`pkill -f serial_daemon.py`。
 
 > v4.0.0 起已移除在线 OTA 与家庭网络配置，固件升级走全量重新烧录（分区表变更需 `erase_flash`）。
 
@@ -163,7 +163,7 @@ done
 make -C test && ./test/test_domain    # host 单测，不在本目录
 ```
 
-### 场景 4：完整真机回归（v3.2.0 发版前）
+### 场景 4：完整真机回归（v4.0.0 交付前）
 
 ```bash
 # 1. 烧正式固件

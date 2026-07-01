@@ -169,22 +169,25 @@ bikepower-c/
 │   ├── ble_bikepower.c
 │   ├── radio_ctrl.c
 │   ├── wifi_portal.c
+│   ├── captive_portal.c
 │   ├── web/                      # 前端三件套（v3.2.0 起独立，编译时内联到固件）
 │   │   ├── index.html
 │   │   ├── app.css
 │   │   └── app.js
 │   └── bikepower_config.h
 ├── components/
-│   └── bikepower_domain/
+│   └── bikepower_domain/          # 纯 C 领域层，host 单测覆盖
+├── scripts/                       # 构建、烧录、静态资源内联和串口守护入口
 ├── docs/
 │   ├── INDEX.md
 │   ├── user/        # 产品使用说明（快速上手/手册/硬件）
 │   ├── dev/         # 开发与技术（技术参考/固件安全/测试覆盖）
 │   ├── archive/     # 历史归档（仅供追溯）
 │   └── images/
-├── tests/
-├── test/
-│   └── test_domain
+├── tests/                         # 设备测试、静态门禁、mock 和串口工具
+├── test/                          # 领域层 host 单测
+│   ├── Makefile
+│   └── test_domain.c
 ├── partitions.csv
 └── sdkconfig.defaults
 ```

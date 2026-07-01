@@ -12,7 +12,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 
 - BikePower 从 MicroPython（仓库 esp32-power）**完全重写**为 C + ESP-IDF + NimBLE。
 - 用户授权"全程你来设计开发"，分阶段（0-6）推进，每阶段编译 → 烧录 → 真机验证后提交推送。
-- 项目位置 `/home/mengen1014/work/bikepower-c`，ESP-IDF v5.5.4 本地工具链，当前固件 v3.1.8。
+- 项目位置 `/home/mengen1014/work/bikepower-c`，ESP-IDF v5.5.4 本地工具链，当前固件 v4.0.0。
 - MicroPython 专有约束（mpremote/gc/_thread/const/.mpy/部署 .py）**不适用**本项目。
 
 ---
@@ -68,7 +68,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 | 按钮中断驱动 | ISR 仅 `xSemaphoreGiveFromISR`，去抖/计时在 button_task | 2026-06-12 |
 | 事件总线 | app_queue（Queue）+ button wake（二值信号量） | 2026-06-12 |
 | 状态机 | 7 态：BOOTING/BLE_ACTIVE/WIFI_CONFIRM/WIFI_CONFIG/SAVING/REBOOTING/ERROR_RECOVERY | 2026-06-12 |
-| WiFi 射频共用 | 配网默认 coex 共存（BLE 不停、不重启）；仅 OTA 独占 STA 或共存初始化失败时由 radio_ctrl 停 BLE 兜底 | 2026-06-28 |
+| WiFi 射频共用 | 配网默认 coex 共存（BLE 不停、不重启）；v4.0.0 已移除在线 OTA 与家庭网络配置，仅共存初始化失败时由 radio_ctrl 停 BLE 兜底 | 2026-06-28 |
 
 ---
 
@@ -91,10 +91,10 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 - [CRITICAL] [2026-06-12] BLE 通知/GATT 回调、ISR 中禁止重分配大缓冲或阻塞。
 
 ### WiFi / RF
-- [CRITICAL] [2026-06-28] WiFi 与 BLE 共用射频；配网默认 coex 共存且 BLE 不停，所有 WiFi/APSTA/STA 切换必须经 radio_ctrl；仅 OTA 独占 STA 或共存失败兜底时由 radio_ctrl 停 BLE。
+- [CRITICAL] [2026-06-28] WiFi 与 BLE 共用射频；配网默认 coex 共存且 BLE 不停，所有 WiFi/SoftAP 启停必须经 radio_ctrl；v4.0.0 已移除在线 OTA 与家庭网络配置，仅共存失败兜底时由 radio_ctrl 停 BLE。
 - [CRITICAL] [2026-06-12] 禁止开机自动启 WiFi，否则无限重启风险。
 - [WARNING] [2026-06-26] 配网页面必须设置 `Cache-Control: no-store`，否则浏览器缓存导致用户从"更多配置"返回首页时显示旧数据，表单值丢失。
-- [WARNING] [2026-06-26] 多页表单的每个页面隐藏表单必须包含全部可变字段（mode/power/cadence/heartrate/profile_*），否则提交到 `/draft` 时丢失未包含的字段值，最终 `/config` 保存到 NVS 的是错误默认值。
+- [WARNING] [2026-06-26] 历史多页表单的每个页面隐藏表单必须包含全部可变字段，否则提交到 `/draft` 时会丢字段；v3.2.0 起门户为 SPA，当前保存入口统一收敛到 `/api/config`。
 
 ### 中断 / FreeRTOS
 - [CRITICAL] [2026-06-12] ISR 内只用 `*FromISR` API，禁止日志/BLE/阻塞调用。

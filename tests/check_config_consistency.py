@@ -246,11 +246,11 @@ print(f"\n{TAG} [S4e] 文档索引阶段范围一致性")
 
 check("阶段 0-9 完成情况" not in doc_index_src,
       "docs/INDEX.md 不含过时阶段 0-9 项目进度描述")
-check("阶段 0-10 完成情况" in doc_index_src,
-      "docs/INDEX.md 含阶段 0-10 项目进度描述")
-if "| 10 |" in progress_src:
-    check("阶段 0-10" in doc_index_src,
-          "PROGRESS.md 含阶段 10 时 docs/INDEX.md 同步到阶段 0-10")
+check("阶段 0-13 完成情况" in doc_index_src,
+      "docs/INDEX.md 含阶段 0-13 项目进度描述")
+if "| 13 |" in progress_src:
+    check("阶段 0-13" in doc_index_src,
+          "PROGRESS.md 含阶段 13 时 docs/INDEX.md 同步到阶段 0-13")
 
 
 # ============================ 5. BLE 通知间隔一致性 ============================

@@ -49,7 +49,7 @@
 
 | 层 | 入口 | 覆盖对象 | 状态 |
 |----|------|---------|------|
-| TC-1 host 单测 | `test/test_domain` | 领域层 9 个文件 | ✅ 全绿（1168 断言，含浮动幅度 setter/游走/固定心率浮动） |
+| TC-1 host 单测 | `test/test_domain` | 领域层 9 个文件 | ✅ 全绿（1312 断言，含浮动幅度 setter/游走/固定心率浮动、按钮去抖与 LED 灯效配置） |
 | TC-3a JS 静态 | `tests/check_portal_js.py` | `main/web/app.js` node --check | ✅ |
 | TC-3c 常量一致性 | `tests/check_config_consistency.py` | config 头文件 ↔ 文档 | ✅ |
 | TC-3d 门户结构 | `tests/check_portal_structure.py` | 路由表/HTML/前端 API 调用 | ✅ |

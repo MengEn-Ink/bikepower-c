@@ -66,20 +66,31 @@ bikepower-c/
 ├── components/bikepower_domain/   — 纯 C 领域层（可 host 单测）
 │   ├── power_engine.c        — 功率/踏频数据引擎
 │   ├── hr_model.c            — 心率模型
-│   ├── profile.c            — 用户配置 + 范围校验
-│   ├── config_store.c       — 配置 schema（defaults/validate/migrate）
-│   ├── domain_rng.c         — 随机数
-│   └── include/             — 头文件 + domain_config.h
+│   ├── profile.c             — 用户配置 + 范围校验
+│   ├── config_store.c        — 配置 schema（defaults/validate/migrate/serialize）
+│   ├── json_miniparse.c      — 轻量 JSON 字段提取
+│   ├── button_logic.c        — 按钮语义纯逻辑
+│   ├── button_debounce.c     — 去抖与长按节拍纯逻辑
+│   ├── led_pattern.c         — LED 模式/颜色映射纯逻辑
+│   ├── domain_rng.c          — 随机数
+│   └── include/              — 头文件 + domain_config.h
 ├── scripts/
 │   ├── inline_static.py      — 编译时把 web/app.css + web/app.js 内联到 web/index.html，生成 main/web_index_html.h
-│   └── flash_latest.sh       — 自动探测 ESP-IDF 路径与串口，编译并烧录最新正式固件
+│   ├── flash_latest.sh       — 自动探测 ESP-IDF 路径与串口，编译并烧录最新正式固件
+│   ├── build_all.sh          — 双板型 release 产物构建（merged bin + manifest）
+│   ├── log_daemon.sh         — 串口日志守护包装脚本
+│   ├── tools/                — 质量门禁 / 设备监控工具
+│   └── platform/             — 平台相关构建入口
 ├── tests/
 │   ├── ble_selftest.py       — bleak 五服务 + FTMS ERG 自测
 │   ├── stage3_conn_test.py   — 连接事件驱动状态机验证
 │   ├── stage5_portal_test.py — 配网门户 /api/xxx JSON 路由自测
 │   ├── check_portal_js.py    — TC-3a：对 main/web/app.js 跑 node --check
 │   ├── check_portal_structure.py — TC-3d：校验 index.html 结构 + 路由表一致性 + 前端 API 调用
-│   ├── check_config_consistency.py — TC-7c：常量一致性校验
+│   ├── check_config_consistency.py — TC-3c：常量一致性校验
+│   ├── check_nvs_schema.py   — TC-3e：NVS key/schema 静态一致性
+│   ├── check_board_desc.py   — TC-3f：板型描述表静态一致性
+│   ├── check_tasks_wdt.py    — TC-3g：任务/队列/WDT 静态完整性
 │   ├── mock_server.py        — v3.2.0 起本地 mock /api/xxx 接口，前端不烧设备调试
 │   ├── serial_capture.py     — 串口日志抓取工具
 │   ├── serial_daemon.py      — 串口守护进程
@@ -126,7 +137,7 @@ button.c  led.c  app_state.c  ble_bikepower.c  nvs_store.c  radio_ctrl.c→wifi_
    │        │        │         │          (board_detect.c 供 button/led 取引脚)
    └────────┴───→ app_queue (Queue)
                     │
-            components/bikepower_domain (power_engine/hr_model/profile/config_store)
+            components/bikepower_domain (power_engine/hr_model/profile/config_store/button_logic/led_pattern)
 ```
 
 ## 运行时数据流
@@ -157,6 +168,8 @@ power_engine.snapshot → ble_bikepower_set_data → BLE 通知
 | 5 | WiFi 配网（radio_ctrl + AP + HTTP） | ✅ 代码完成（配网真机流程待人工确认） |
 | 6 | 稳定性与发版（WDT/coredump/老化/tag） | ✅ v3.0.0 已发版 |
 | 7 | M5Stamp C3 适配（板型检测/SK6812/配网页修复） | ✅ v3.1.0 已发版 |
+| 8-12 | WiFi/BLE 共存、Captive Portal、前后端分离、文档/测试梳理 | ✅ 已完成 |
+| 13 | 移除 OTA + 家庭网络 + 网页端精简 | ✅ v4.0.0 代码完成（真机待确认项见 PROGRESS.md） |
 
 ## 发布流程
 - 分支：GitHub Flow（main + feature/hotfix）。

@@ -18,13 +18,15 @@
 - `hr_model.c`
 - `power_engine.c`
 - `config_store.c`
-- `ota_version.c`（OTA 语义版本比较，防降级核心）
-- `json_miniparse.c`（latest.json 解析，OTA 版本检查核心）
-- 当前断言规模：`946` 条
+- `json_miniparse.c`（配网请求体 JSON 字段提取）
+- `button_logic.c`
+- `button_debounce.c`
+- `led_pattern.c`
+- 当前断言规模：`1312` 条
 - 适用改动：
 - `components/bikepower_domain/` 下的逻辑变更
 - 配置 schema、范围校验、模式计算、心率模型变更
-- OTA 版本比较 / JSON 解析逻辑变更
+- JSON 解析、按钮语义、LED 映射等纯逻辑变更
 
 ### `TC-2`：BLE 自测
 
@@ -47,10 +49,11 @@
 - 入口：`tests/stage5_portal_test.py`
 - 覆盖内容：
 - 访问首页
-- 读取倒计时
-- 校验配网页面关键内容
-- 校验续期接口
-- 校验配置提交后的行为
+- 读取 `/api/state`
+- 读取 `/api/time`
+- 校验 `/api/mem_stats`
+- 校验 `/favicon.ico`
+- 可选通过 `POST /api/renew` 校验续期接口
 - 适用改动：
 - `main/wifi_portal.c`
 - `main/radio_ctrl.c`
@@ -66,29 +69,22 @@
 - 适用改动：
 - `main/web/app.js` 任何改动
 - `main/web/index.html` 或 `main/web/app.css` 改动后建议同步跑
-- 历史教训：v3.1.6 `/ota` 页 `pollStatus` 结尾 `}}}` 多一个 `}`，导致 `setInterval(function(){...},2000)` 的 `)` 失配，整个 script 块报 `missing ) after argument list`，"检查更新"按钮点击完全无反应。v3.2.0 起 JS 独立成文件，此类问题由 `node --check` 直接拦截。
+- 历史教训：v3.1.6 `/ota` 页 `pollStatus` 结尾 `}}}` 多一个 `}`，导致 `setInterval(function(){...},2000)` 的 `)` 失配，整个 script 块报 `missing ) after argument list`。v3.2.0 起 JS 独立成文件，此类问题由 `node --check` 直接拦截；v4.0.0 已移除在线 OTA，但 JS 静态门禁继续保留。
 
-### `TC-3b`：OTA 全流程自测
+### `TC-3d`：门户结构静态检查
 
-- 目标：验证 OTA 检查/升级链路的 HTTP 路由、状态机、JS 语法
-- 入口：`tests/ota_flow_test.py`
-- 覆盖内容（v3.2.0 重构后）：
-- **静态部分（无需设备）**：
-  - 校验 `wifi_portal.c` 中 `/api/ota/check`、`/api/ota/status`、`/api/ota/upgrade` 三个路由 handler 已注册
-  - 校验 `main/web/index.html` 含 OTA 视图 `#view-ota` 与按钮 `#ota-check-btn`
-  - 校验 `main/web/app.js` 定义 `otaCheck`/`otaPollStatus`/`otaStartUpgrade` 三个函数
-  - 校验 `app.js` 中调用的 `/api/ota/check|status|upgrade` 与后端路由一致
-  - `node --check` 验证 `app.js` 语法
-- **动态部分（需设备进入配网态）**：
-  - `GET /api/ota/status` 返回 200 且含 `status` 字段
-  - `POST /api/ota/check` 未配 WiFi 时返回 `started/running/done/error`（任一）
-  - 配好家庭 WiFi 后 `POST /api/ota/check` 进入 `running`
-  - 轮询 `/api/ota/status` 直到 `done`/`error`，验证字段完整
+- 目标：在烧录前校验门户信息架构、HTML 占位符、前后端 API 字符串和后端路由表一致
+- 入口：`tests/check_portal_structure.py`
+- 覆盖内容：
+- `main/web/index.html` 含 HTML 基础结构与 `<!-- INLINE_CSS -->` / `<!-- INLINE_JS -->`
+- `main/wifi_portal.c` 注册前端调用的核心 `/api/xxx` 路由
+- `main/web/app.js` 调用 `/api/state`、`/api/time`、`/api/renew`、`/api/config`、`/api/close-wifi`
+- 底部导航保持首页/设置两 Tab，旧更多/关于视图并入设置页
 - 适用改动：
-- `main/wifi_portal.c` 中 OTA 相关 handler
-- `main/web/app.js` 中 OTA 相关函数
-- `main/ota_update.c`、`main/ota_downloader.c` 版本检查/下载逻辑
-- `main/radio_ctrl.c` 的 `radio_ctrl_sta_connect`/`radio_ctrl_enter_sta_exclusive`
+- `main/wifi_portal.c` 路由表改动
+- `main/web/index.html`
+- `main/web/app.js`
+- `main/web/app.css`
 
 ## 选择规则
 
@@ -97,7 +93,6 @@
 - `TC-6`：BLE 行为改动至少跑 `tests/ble_selftest.py`，涉及设备行为时再走完整真机流程。
 - `TC-7`：配网改动至少跑 `tests/stage5_portal_test.py`，并复核 BLE/WiFi 射频互斥链路。
 - `TC-7a`：**任何 `main/wifi_portal.c` 改动必须先跑 `tests/check_portal_js.py`，JS 语法全绿才能继续**。这是硬性前置门，避免 `}}}` 类低级 bug 烧录后才发现。
-- `TC-7b`：OTA 相关改动必须跑 `tests/ota_flow_test.py --static`（静态部分），动态部分按真机条件执行。
 - `TC-7c`：**常量一致性检查（每次改动必跑）**：跑 `tests/check_config_consistency.py`，验证 `bikepower_config.h` / `domain_config.h` / `README.md` / `docs/` 之间的常量值（版本号、引脚、阈值、超时、栈大小）一致，防止文档与代码漂移。
 - `TC-8`：跨层改动按最高等级执行，不能只挑便宜测试。
 
@@ -106,11 +101,10 @@
 - `TC-8a`：修改任何文件前，必须列出：
   1. 直接修改的文件
   2. 间接影响的模块（include 该文件、调用该函数、引用该常量的模块）
-  3. 受影响的测试层（TC-1/TC-2/TC-3/TC-3a/TC-3b）
+  3. 受影响的测试层（TC-1/TC-2/TC-3/TC-3a/TC-3c/TC-3d）
   4. 需要同步更新的文档（对照 best-practices.md「代码→文档映射表」）
 - `TC-8b`：修改 `main/wifi_portal.c` 时必须评估：
   - 是否改 HTTP 路由 → 跑 TC-3 + TC-3d（`check_portal_structure.py`）
-  - 是否改 OTA handler → 跑 TC-3b
   - 是否改 BLE 通知 → 跑 TC-2
 - `TC-8b-2`：修改 `main/web/` 下任何文件时必须评估：
   - `app.js` 改动 → 跑 TC-3a（`check_portal_js.py`）
@@ -134,8 +128,8 @@
 
 - **可自动化覆盖率** = （host 单测覆盖行 + 静态脚本覆盖行）/（领域层行 + main/ 纯逻辑行 + main/ 静态可校验行）
 - 不计入分母：纯硬件交互代码（BLE 通知回调、ISR、GPIO、WiFi 连接、HTTP 响应），这些走真机测试（DT 系列）。
-- 当前现状：约 `40%`（领域层 100% + OTA 纯逻辑 100% + wifi_portal 静态部分）
-- 目标：`90%`，缺口通过持续抽取纯逻辑到领域层 + 扩充静态脚本填补。
+- 当前重点：领域层生产纯逻辑保持 100% host 可测；`main/` 的硬件/网络路径通过静态门禁 + 真机脚本兜底。
+- 目标：不为覆盖率抽取生产代码不用的并行实现；只抽取 `main/` 会真正调用的纯逻辑。
 
 ### Loop 模式测试建立流程（每次改动必走）
 
@@ -143,7 +137,7 @@
 2. **抽取到领域层**：把纯逻辑移到 `components/bikepower_domain/`，main/ 改为 include 调用。
 3. **补 host 单测**：在 `test/test_domain.c` 加测试函数，覆盖正常 / 边界 / 异常路径。
 4. **跑 TC-1**：`make -C test && ./test/test_domain`，断言全绿。
-5. **跑 TC-3a/3b/3c**：涉及 wifi_portal / OTA / 常量时跑对应静态脚本。
+5. **跑 TC-3a/3c/3d**：涉及 wifi_portal / 前端 / 常量时跑对应静态脚本。
 6. **跑 TC-2/3**：涉及 BLE / 配网行为时跑真机脚本。
 7. **更新本文件断言数 + docs/dev/03-test-coverage-analysis.md 矩阵**。
 8. **提交前全绿**：TC-9a 硬性门。
