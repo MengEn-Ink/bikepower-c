@@ -106,13 +106,6 @@ static int target_heartrate(power_engine_t *e, int power)
     return hr_model_ftp_zone(&e->hr, power, e->profile.ftp, e->profile.thr_hr);
 }
 
-static const road_pacer_t *road_pacer(power_engine_t *e)
-{
-    int idx = e->profile.ride_type;
-    if (idx < 0 || idx >= PACER_COUNT) idx = PACER_INDEX_DEFAULT;
-    return &ROAD_PACERS[idx];
-}
-
 /*
  * 按当前模式重置内部功率、踏频和心率变异状态。
  * 参数：e 为功率引擎对象。
@@ -418,7 +411,7 @@ bool power_engine_set_pacer_index(power_engine_t *e, int pacer_index)
 const char *power_engine_get_current_pacer(power_engine_t *e)
 {
     int idx = power_engine_get_pacer_index(e);
-    if (PACER_INDEX_IS_CUSTOM(idx)) return "Custom";
+    if (PACER_INDEX_IS_CUSTOM(idx)) return e->profile.custom_pacer_name;
     return ROAD_PACERS[idx].name;
 }
 

@@ -232,6 +232,10 @@ static void apply_json_fields(power_engine_t *e, const char *body)
         ESP_LOGI(TAG, "  device_name: %s → %s", e->device_name, val);
         power_engine_set_device_name(e, val);
     }
+    if (json_get_str(body, "custom_pacer_name", val, sizeof(val))) {
+        ESP_LOGI(TAG, "  custom_pacer_name: %s → %s", e->profile.custom_pacer_name, val);
+        profile_set_custom_name(&e->profile, val);
+    }
     /* 手动三项：setter 内部仅 STEADY 生效，非 STEADY 自动拒绝 */
     old_val = e->base_power;
     new_val = json_get_int_def(body, "power", old_val);
@@ -373,6 +377,8 @@ static esp_err_t h_api_state(httpd_req_t *req)
 
     char dn_esc[DEVICE_NAME_MAX * 2 + 1] = {0};
     json_escape(e->device_name, dn_esc, sizeof(dn_esc));
+    char custom_name_esc[CUSTOM_PACER_NAME_MAX * 2 + 1] = {0};
+    json_escape(e->profile.custom_pacer_name, custom_name_esc, sizeof(custom_name_esc));
 
     int ride_type_idx = (e->profile.ride_type >= 0 && e->profile.ride_type < RIDE_TYPE_COUNT)
                         ? e->profile.ride_type : 0;
@@ -385,7 +391,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"power_step\":%d,"
         "\"profile_weight\":%d,\"profile_ftp\":%d,\"profile_thr_hr\":%d,"
         "\"profile_ride_type\":\"%s\","
-        "\"custom_wkg_low\":%d,\"custom_wkg_high\":%d,"
+        "\"custom_wkg_low\":%d,\"custom_wkg_high\":%d,\"custom_pacer_name\":\"%s\","
         "\"led_silent\":%d,"
         "\"led_wait_mode\":%d,\"led_wait_color\":%d,"
         "\"led_conn_mode\":%d,\"led_conn_color\":%d,"
@@ -401,7 +407,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         e->power_step,
         e->profile.weight, e->profile.ftp, e->profile.thr_hr,
         PROFILE_RIDE_TYPE_OPTIONS[ride_type_idx],
-        e->profile.custom_wkg_low, e->profile.custom_wkg_high,
+        e->profile.custom_wkg_low, e->profile.custom_wkg_high, custom_name_esc,
         e->led.silent,
         e->led.scenes[LED_SCENE_WAIT_CONN].mode, e->led.scenes[LED_SCENE_WAIT_CONN].color,
         e->led.scenes[LED_SCENE_CONNECTED].mode, e->led.scenes[LED_SCENE_CONNECTED].color,
@@ -419,11 +425,12 @@ static esp_err_t h_api_state(httpd_req_t *req)
             ROAD_PACERS[i].wkg_low / 10, ROAD_PACERS[i].wkg_low % 10,
             ROAD_PACERS[i].wkg_high / 10, ROAD_PACERS[i].wkg_high % 10);
     }
-    /* 追加自定义档（id=custom），W/kg 范围取自 profile，供前端下拉与编辑 */
+    /* 追加自定义档（id=custom），昵称和 W/kg 范围取自 profile，供前端下拉与编辑 */
     if (off < (int)sizeof(buf) - 96) {
         off += snprintf(buf + off, sizeof(buf) - off,
-            ",{\"id\":\"%s\",\"name\":\"自定义\",\"wkg_low\":%d.%d,\"wkg_high\":%d.%d,\"custom\":true}",
+            ",{\"id\":\"%s\",\"name\":\"%s\",\"wkg_low\":%d.%d,\"wkg_high\":%d.%d,\"custom\":true}",
             PROFILE_RIDE_TYPE_OPTIONS[PACER_INDEX_CUSTOM],
+            custom_name_esc,
             e->profile.custom_wkg_low / 10, e->profile.custom_wkg_low % 10,
             e->profile.custom_wkg_high / 10, e->profile.custom_wkg_high % 10);
     }

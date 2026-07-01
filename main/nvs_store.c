@@ -43,6 +43,8 @@ static void engine_to_config(power_engine_t *e, config_data_t *c)
     c->ride_type = e->profile.ride_type;
     c->custom_wkg_low = e->profile.custom_wkg_low;
     c->custom_wkg_high = e->profile.custom_wkg_high;
+    strncpy(c->custom_pacer_name, e->profile.custom_pacer_name, CUSTOM_PACER_NAME_MAX - 1);
+    c->custom_pacer_name[CUSTOM_PACER_NAME_MAX - 1] = '\0';
     c->led = e->led;
     strncpy(c->device_name, e->device_name, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
@@ -72,6 +74,7 @@ static void config_to_engine(const config_data_t *c, power_engine_t *e)
     profile_set_ftp(&e->profile, c->ftp);
     profile_set_thr_hr(&e->profile, c->thr_hr);
     profile_set_custom_wkg(&e->profile, c->custom_wkg_low, c->custom_wkg_high);
+    profile_set_custom_name(&e->profile, c->custom_pacer_name);
     profile_set_ride_type(&e->profile, c->ride_type);
     e->led = c->led;
     power_engine_set_device_name(e, c->device_name);
@@ -142,6 +145,11 @@ void nvs_store_load(power_engine_t *e)
     get_i32(h, NVS_KEY_RIDE_TYPE, &c.ride_type);
     get_i32(h, NVS_KEY_CUSTOM_WKG_LO, &c.custom_wkg_low);
     get_i32(h, NVS_KEY_CUSTOM_WKG_HI, &c.custom_wkg_high);
+    size_t cn_len = sizeof(c.custom_pacer_name);
+    esp_err_t cn_err = nvs_get_str(h, NVS_KEY_CUSTOM_NAME, c.custom_pacer_name, &cn_len);
+    if (cn_err != ESP_OK && cn_err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "读取自定义配速昵称失败(%s)，保留默认昵称", esp_err_to_name(cn_err));
+    }
     int led_tmp;
     led_tmp = c.led.silent; get_i32(h, NVS_KEY_LED_SILENT, &led_tmp); c.led.silent = (uint8_t)led_tmp;
     led_tmp = c.led.scenes[LED_SCENE_WAIT_CONN].mode; get_i32(h, NVS_KEY_LED_WAIT_MODE, &led_tmp); c.led.scenes[LED_SCENE_WAIT_CONN].mode = (uint8_t)led_tmp;
@@ -166,9 +174,10 @@ void nvs_store_load(power_engine_t *e)
     bool fixed = config_store_validate(&c);
     config_to_engine(&c, e);
 
-    ESP_LOGI(TAG, "配置加载完成 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d kg ftp=%dW thr=%dBPM ride=%d pf=%d cf=%d hf=%d step=%d dn=%s%s%s",
+    ESP_LOGI(TAG, "配置加载完成 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d kg ftp=%dW thr=%dBPM ride=%d custom=%s pf=%d cf=%d hf=%d step=%d dn=%s%s%s",
              c.power, c.cadence, c.mode, c.heartrate, c.has_user_hr,
              c.weight, c.ftp, c.thr_hr, c.ride_type,
+             c.custom_pacer_name,
              c.power_float, c.cadence_float, c.hr_float, c.power_step,
              c.device_name,
              migrated ? " [migrated]" : "", fixed ? " [clamped]" : "");
@@ -248,6 +257,12 @@ bool nvs_store_save(power_engine_t *e)
     SET_I32(NVS_KEY_LED_ERROR_COLOR, c.led.scenes[LED_SCENE_ERROR].color);
 #undef SET_I32
 
+    err = nvs_set_str(h, NVS_KEY_CUSTOM_NAME, c.custom_pacer_name);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "nvs_set_str %s 失败(%s)", NVS_KEY_CUSTOM_NAME, esp_err_to_name(err));
+        ok = false;
+    }
+
     err = nvs_set_str(h, NVS_KEY_DEVICE_NAME, c.device_name);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "nvs_set_str %s 失败(%s)", NVS_KEY_DEVICE_NAME, esp_err_to_name(err));
@@ -266,9 +281,10 @@ bool nvs_store_save(power_engine_t *e)
     xSemaphoreGive(s_save_mutex);
 
     if (ok) {
-        ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d ftp=%d thr=%d ride=%d pf=%d cf=%d hf=%d step=%d dn=%s",
+        ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d ftp=%d thr=%d ride=%d custom=%s pf=%d cf=%d hf=%d step=%d dn=%s",
                  c.power, c.cadence, c.mode, c.heartrate, c.has_user_hr,
                  c.weight, c.ftp, c.thr_hr, c.ride_type,
+                 c.custom_pacer_name,
                  c.power_float, c.cadence_float, c.hr_float, c.power_step,
                  c.device_name);
     }

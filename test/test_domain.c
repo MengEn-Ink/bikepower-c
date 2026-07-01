@@ -296,7 +296,11 @@ static void test_road_pacer(void)
     // 自定义档：切到 custom，设范围 3.0~3.5 W/kg，功率应落在 weight*wkg 区间
     CHECK(power_engine_set_pacer_index(&e, PACER_INDEX_CUSTOM), "可切换到自定义档");
     CHECK(power_engine_get_pacer_index(&e) == PACER_INDEX_CUSTOM, "自定义档索引=5");
-    CHECK(strcmp(power_engine_get_current_pacer(&e), "Custom") == 0, "自定义档名称=Custom");
+    CHECK(strcmp(power_engine_get_current_pacer(&e), CUSTOM_PACER_NAME_DEFAULT) == 0, "自定义档名称=默认昵称");
+    CHECK(profile_set_custom_name(&e.profile, "兔子车手"), "可设置自定义机器人昵称");
+    CHECK(strcmp(power_engine_get_current_pacer(&e), "兔子车手") == 0, "自定义档名称使用用户昵称");
+    CHECK(!profile_set_custom_name(&e.profile, "兔子车手"), "重复设置自定义昵称返回false");
+    CHECK(!profile_set_custom_name(&e.profile, ""), "空自定义昵称拒绝");
     CHECK(profile_set_custom_wkg(&e.profile, 30, 35), "设自定义 W/kg 3.0~3.5");
     power_engine_set_mode(&e, RIDE_MODE_STEADY);
     power_engine_set_mode(&e, RIDE_MODE_ROAD);  // 重置模式状态按新范围
@@ -457,6 +461,7 @@ static void test_config_store(void)
     CHECK(c.ftp == PROFILE_FTP_DEFAULT, "默认FTP");
     CHECK(c.thr_hr == PROFILE_THR_HR_DEFAULT, "默认阈值心率");
     CHECK(c.ride_type == PACER_INDEX_DEFAULT, "默认配速机器人");
+    CHECK(strcmp(c.custom_pacer_name, CUSTOM_PACER_NAME_DEFAULT) == 0, "默认自定义配速昵称");
     CHECK(strcmp(c.device_name, DEVICE_NAME_DEFAULT) == 0, "默认设备名");
     CHECK(c.led.scenes[LED_SCENE_WAIT_CONN].mode == LED_MODE_SLOW, "默认待连接慢闪");
     CHECK(c.led.scenes[LED_SCENE_CONNECTED].color == LED_COLOR_GREEN, "默认已连接绿色");
@@ -469,15 +474,19 @@ static void test_config_store(void)
     config_data_t d;
     config_store_defaults(&d);
     d.device_name[0] = '\0';
+    d.custom_pacer_name[0] = '\0';
     CHECK(config_store_validate(&d), "空设备名被修正");
     CHECK(strcmp(d.device_name, DEVICE_NAME_DEFAULT) == 0, "空设备名回退默认");
+    CHECK(strcmp(d.custom_pacer_name, CUSTOM_PACER_NAME_DEFAULT) == 0, "空自定义配速昵称回退默认");
 
     // 自定义设备名保留
     config_data_t n;
     config_store_defaults(&n);
     strcpy(n.device_name, "MyBike");
+    strcpy(n.custom_pacer_name, "兔子车手");
     CHECK(!config_store_validate(&n), "自定义设备名合法不修正");
     CHECK(strcmp(n.device_name, "MyBike") == 0, "自定义设备名保留");
+    CHECK(strcmp(n.custom_pacer_name, "兔子车手") == 0, "自定义配速昵称保留");
 
     // 越界字段夹紧
     config_data_t b;
@@ -542,6 +551,7 @@ static void test_config_store(void)
     src.cadence_float = 7;
     src.hr_float = 9;
     src.power_step = 25;
+    strcpy(src.custom_pacer_name, "兔子\"车手");
     src.led.silent = 1;
     src.led.scenes[LED_SCENE_CONNECTED].mode = LED_MODE_BREATH;
     src.led.scenes[LED_SCENE_CONNECTED].color = LED_COLOR_MAGENTA;
@@ -554,6 +564,7 @@ static void test_config_store(void)
     CHECK(strstr(js, "\"power\":222") != NULL, "serialize 含 power=222");
     CHECK(strstr(js, "\"power_float\":12") != NULL, "serialize 含 power_float=12");
     CHECK(strstr(js, "\"power_step\":25") != NULL, "serialize 含 power_step=25");
+    CHECK(strstr(js, "\"custom_pacer_name\":\"兔子\\\"车手\"") != NULL, "serialize 含转义后的自定义配速昵称");
     CHECK(strstr(js, "\"led_silent\":1") != NULL, "serialize 含 led_silent=1");
     CHECK(strstr(js, "\"led_conn_mode\":5") != NULL, "serialize 含已连接 LED 模式");
     CHECK(strstr(js, "\"led_confirm_mode\":4") != NULL, "serialize 含确认 LED 模式");
@@ -564,6 +575,7 @@ static void test_config_store(void)
     CHECK(dst.power == 222 && dst.cadence == 88 && dst.ftp == 250, "往返整数字段一致");
     CHECK(dst.power_float == 12 && dst.cadence_float == 7 && dst.hr_float == 9, "往返浮动字段一致");
     CHECK(dst.power_step == 25, "往返调功步进一致");
+    CHECK(strcmp(dst.custom_pacer_name, "兔子\"车手") == 0, "往返自定义配速昵称一致");
     CHECK(dst.led.silent == 1, "往返 LED 静默一致");
     CHECK(dst.led.scenes[LED_SCENE_CONNECTED].mode == LED_MODE_BREATH, "往返已连接 LED 模式一致");
     CHECK(dst.led.scenes[LED_SCENE_CONNECTED].color == LED_COLOR_MAGENTA, "往返已连接 LED 颜色一致");
@@ -577,6 +589,7 @@ static void test_config_store(void)
           "部分键 JSON deserialize 成功");
     CHECK(partial.power == 300, "出现的 power 被覆盖");
     CHECK(partial.cadence == DEFAULT_CADENCE, "缺失的 cadence 保持默认");
+    CHECK(strcmp(partial.custom_pacer_name, CUSTOM_PACER_NAME_DEFAULT) == 0, "缺失自定义配速昵称保持默认");
     CHECK(partial.led.scenes[LED_SCENE_CONNECTED].mode == LED_MODE_SOLID, "缺失 LED 保持默认");
     CHECK(strcmp(partial.device_name, DEVICE_NAME_DEFAULT) == 0, "缺失设备名保持默认");
 

@@ -81,6 +81,7 @@ typedef enum {
 #define NVS_KEY_RIDE_TYPE      "ride"
 #define NVS_KEY_CUSTOM_WKG_LO  "cwkglo"
 #define NVS_KEY_CUSTOM_WKG_HI  "cwkghi"
+#define NVS_KEY_CUSTOM_NAME    "cname"
 #define NVS_KEY_DEVICE_NAME    "devname"
 #define NVS_KEY_LED_SILENT     "ledsil"
 #define NVS_KEY_LED_WAIT_MODE  "ledwm"

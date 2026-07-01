@@ -60,6 +60,21 @@ bool profile_set_custom_wkg(profile_t *p, int low, int high)
 }
 
 /*
+ * 设置自定义配速机器人显示昵称。
+ * 参数：p 为用户档案对象；name 为目标昵称。
+ * 返回值：实际更新成功返回 true，否则返回 false。
+ * 特殊行为：空指针和空字符串拒绝；超长字符串截断到 CUSTOM_PACER_NAME_MAX-1。
+ */
+bool profile_set_custom_name(profile_t *p, const char *name)
+{
+    if (name == NULL || name[0] == '\0') return false;
+    if (strncmp(p->custom_pacer_name, name, CUSTOM_PACER_NAME_MAX) == 0) return false;
+    strncpy(p->custom_pacer_name, name, CUSTOM_PACER_NAME_MAX - 1);
+    p->custom_pacer_name[CUSTOM_PACER_NAME_MAX - 1] = '\0';
+    return true;
+}
+
+/*
  * 初始化用户档案默认值。
  * 参数：p 为待初始化的用户档案对象。
  * 返回值：无。
@@ -73,6 +88,8 @@ void profile_init(profile_t *p)
     p->ride_type = PROFILE_RIDE_TYPE_DEFAULT;
     p->custom_wkg_low = CUSTOM_WKG_LOW_DEFAULT;
     p->custom_wkg_high = CUSTOM_WKG_HIGH_DEFAULT;
+    strncpy(p->custom_pacer_name, CUSTOM_PACER_NAME_DEFAULT, CUSTOM_PACER_NAME_MAX - 1);
+    p->custom_pacer_name[CUSTOM_PACER_NAME_MAX - 1] = '\0';
 }
 
 /*

@@ -110,7 +110,9 @@ def main():
             try:
                 d = json.loads(body)
                 ok = ("device_name" in d and "firmware_version" in d
-                      and "pacers" in d and "remaining_sec" in d)
+                      and "pacers" in d and "remaining_sec" in d
+                      and "custom_pacer_name" in d
+                      and any(p.get("id") == "custom" and p.get("name") == d.get("custom_pacer_name") for p in d.get("pacers", [])))
                 detail += f" dev={d.get('device_name')} ver={d.get('firmware_version')}"
             except Exception as e:
                 detail += f" JSON 解析失败: {e}"

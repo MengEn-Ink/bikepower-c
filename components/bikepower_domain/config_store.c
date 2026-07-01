@@ -38,6 +38,8 @@ void config_store_defaults(config_data_t *c)
     c->ride_type = PACER_INDEX_DEFAULT;
     c->custom_wkg_low = CUSTOM_WKG_LOW_DEFAULT;
     c->custom_wkg_high = CUSTOM_WKG_HIGH_DEFAULT;
+    strncpy(c->custom_pacer_name, CUSTOM_PACER_NAME_DEFAULT, CUSTOM_PACER_NAME_MAX - 1);
+    c->custom_pacer_name[CUSTOM_PACER_NAME_MAX - 1] = '\0';
     led_config_defaults(&c->led);
     strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
@@ -69,6 +71,10 @@ bool config_store_validate(config_data_t *c)
     c->custom_wkg_low = clamp_int(c->custom_wkg_low, CUSTOM_WKG_MIN, CUSTOM_WKG_MAX);
     c->custom_wkg_high = clamp_int(c->custom_wkg_high, CUSTOM_WKG_MIN, CUSTOM_WKG_MAX);
     if (c->custom_wkg_low > c->custom_wkg_high) c->custom_wkg_high = c->custom_wkg_low;
+    c->custom_pacer_name[CUSTOM_PACER_NAME_MAX - 1] = '\0';
+    if (c->custom_pacer_name[0] == '\0') {
+        strncpy(c->custom_pacer_name, CUSTOM_PACER_NAME_DEFAULT, CUSTOM_PACER_NAME_MAX - 1);
+    }
     led_config_validate(&c->led);
 
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
@@ -91,6 +97,7 @@ bool config_store_validate(config_data_t *c)
         || in.ride_type != c->ride_type
         || in.custom_wkg_low != c->custom_wkg_low
         || in.custom_wkg_high != c->custom_wkg_high
+        || strncmp(in.custom_pacer_name, c->custom_pacer_name, CUSTOM_PACER_NAME_MAX) != 0
         || memcmp(&in.led, &c->led, sizeof(c->led)) != 0
         || strncmp(in.device_name, c->device_name, DEVICE_NAME_MAX) != 0;
 }
@@ -189,12 +196,14 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
 {
     if (c == NULL || out == NULL || out_sz == 0) return 0;
 
-    /* device_name 转义后最大膨胀 6 倍（\u00XX），按 DEVICE_NAME_MAX 预留 */
+    /* 字符串转义后最大膨胀 6 倍（\u00XX），分别按缓冲区大小预留 */
+    char custom_esc[CUSTOM_PACER_NAME_MAX * 6];
+    if (json_escape(c->custom_pacer_name, custom_esc, sizeof(custom_esc)) == (size_t)-1) return 0;
     char esc[DEVICE_NAME_MAX * 6];
     if (json_escape(c->device_name, esc, sizeof(esc)) == (size_t)-1) return 0;
 
     /* 先写入栈缓冲，确认总长后再拷贝出参，避免向 out 写截断内容 */
-    char buf[768];
+    char buf[1024];
     int n = snprintf(buf, sizeof(buf),
         "{\"schema_ver\":%d,\"power\":%d,\"cadence\":%d,\"mode\":%d,"
         "\"heartrate\":%d,\"has_user_hr\":%d,"
@@ -203,6 +212,7 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         "\"weight\":%d,\"ftp\":%d,"
         "\"thr_hr\":%d,\"ride_type\":%d,"
         "\"custom_wkg_low\":%d,\"custom_wkg_high\":%d,"
+        "\"custom_pacer_name\":\"%s\","
         "\"led_silent\":%d,"
         "\"led_wait_mode\":%d,\"led_wait_color\":%d,"
         "\"led_conn_mode\":%d,\"led_conn_color\":%d,"
@@ -217,6 +227,7 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         c->weight, c->ftp,
         c->thr_hr, c->ride_type,
         c->custom_wkg_low, c->custom_wkg_high,
+        custom_esc,
         c->led.silent,
         c->led.scenes[LED_SCENE_WAIT_CONN].mode, c->led.scenes[LED_SCENE_WAIT_CONN].color,
         c->led.scenes[LED_SCENE_CONNECTED].mode, c->led.scenes[LED_SCENE_CONNECTED].color,
@@ -280,6 +291,12 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         if (strstr(json, pat)) {
             *led_keys[i].field = (uint8_t)json_get_int(json, led_keys[i].key);
         }
+    }
+
+    const char *cp = strstr(json, "\"custom_pacer_name\":\"");
+    if (cp) {
+        cp += strlen("\"custom_pacer_name\":\"");
+        json_unescape(cp, tmp.custom_pacer_name, CUSTOM_PACER_NAME_MAX);
     }
 
     /* device_name：定位值起点后做反转义（json_get_str 不处理转义） */

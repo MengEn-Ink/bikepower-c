@@ -18,6 +18,7 @@ typedef struct {
     int ride_type;  // 配速机器人索引 0-5（5=自定义）
     int custom_wkg_low;   // 自定义档 W/kg 下限（×10），仅 ride_type==PACER_INDEX_CUSTOM 生效
     int custom_wkg_high;  // 自定义档 W/kg 上限（×10）
+    char custom_pacer_name[CUSTOM_PACER_NAME_MAX];  // 自定义档显示昵称
 } profile_t;
 
 /* 配速机器人 ID 字符串表（含自定义档 "custom"），用于配置存储和 Web 参数映射。 */
@@ -28,6 +29,8 @@ extern const char *const PROFILE_RIDE_TYPE_OPTIONS[];
 void profile_effective_wkg(const profile_t *p, int *out_low, int *out_high);
 /* 设置自定义档 W/kg 范围（×10），越界夹紧并保证 low<=high。 */
 bool profile_set_custom_wkg(profile_t *p, int low, int high);
+/* 设置自定义配速机器人昵称，空字符串拒绝，超长截断。 */
+bool profile_set_custom_name(profile_t *p, const char *name);
 
 /* 初始化用户档案到默认值。 */
 void profile_init(profile_t *p);

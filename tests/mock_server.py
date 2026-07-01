@@ -45,6 +45,7 @@ MOCK_STATE = {
     "profile_ride_type": "coco",
     "custom_wkg_low": 25,
     "custom_wkg_high": 30,
+    "custom_pacer_name": "自定义",
     "led_silent": 0,
     "led_wait_mode": 2,
     "led_wait_color": 2,
@@ -169,7 +170,7 @@ class Handler(BaseHTTPRequestHandler):
                           "power_step",
                           "profile_weight", "profile_ftp",
                           "profile_thr_hr", "profile_ride_type",
-                          "custom_wkg_low", "custom_wkg_high",
+                          "custom_wkg_low", "custom_wkg_high", "custom_pacer_name",
                           "led_silent",
                           "led_wait_mode", "led_wait_color",
                           "led_conn_mode", "led_conn_color",
@@ -178,6 +179,11 @@ class Handler(BaseHTTPRequestHandler):
                           "led_error_mode", "led_error_color"):
                     if k in data:
                         MOCK_STATE[k] = data[k]
+                for p in MOCK_STATE["pacers"]:
+                    if p.get("id") == "custom":
+                        p["name"] = MOCK_STATE.get("custom_pacer_name") or "自定义"
+                        p["wkg_low"] = MOCK_STATE.get("custom_wkg_low", 25) / 10
+                        p["wkg_high"] = MOCK_STATE.get("custom_wkg_high", 30) / 10
                 if "hr_lock" in data:
                     MOCK_STATE["hr_locked"] = bool(data["hr_lock"])
             self._send_json({"ok": True})

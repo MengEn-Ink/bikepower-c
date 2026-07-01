@@ -117,6 +117,8 @@ typedef enum {
 #define CUSTOM_WKG_MAX          70      // 7.0 W/kg
 #define CUSTOM_WKG_LOW_DEFAULT  25      // 2.5 W/kg
 #define CUSTOM_WKG_HIGH_DEFAULT 30      // 3.0 W/kg
+#define CUSTOM_PACER_NAME_MAX   32      // 自定义配速机器人昵称缓冲区（含结尾 \0）
+#define CUSTOM_PACER_NAME_DEFAULT "自定义"
 
 typedef struct {
     const char *name;
