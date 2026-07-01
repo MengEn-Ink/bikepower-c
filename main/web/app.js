@@ -9,11 +9,19 @@ var STATE = {
   firmware_version: "",
   power: 0, cadence: 0, heartrate: 0,
   mode: "steady",
+  power_float: 5, cadence_float: 2, hr_float: 2,
   profile_weight: 0, profile_ftp: 0, profile_thr_hr: 0, profile_ride_type: "coco",
   pacers: [],
   remaining_sec: 180,
   closing: false,
   hr_locked: false
+};
+
+/* 浮动幅度范围（与 domain_config.h 一致） */
+var FLOAT_RANGE = {
+  power: { min: 0, max: 100, key: "power_float" },
+  cadence: { min: 0, max: 20, key: "cadence_float" },
+  hr: { min: 0, max: 20, key: "hr_float" }
 };
 
 /* ============ 工具函数 ============ */
@@ -106,6 +114,8 @@ function captureDraft() {
     STATE.power = parseInt($("home-power").value, 10) || 0;
     STATE.cadence = parseInt($("home-cadence").value, 10) || 0;
     STATE.heartrate = parseInt($("home-hr").value, 10) || 0;
+    var psel = $("home-pacer");
+    if (psel && psel.value) STATE.profile_ride_type = psel.value;
     return;
   }
   var more = $("view-more");
@@ -113,8 +123,6 @@ function captureDraft() {
     STATE.profile_weight = parseInt($("more-weight").value, 10) || 0;
     STATE.profile_ftp = parseInt($("more-ftp").value, 10) || 0;
     STATE.profile_thr_hr = parseInt($("more-thr").value, 10) || 0;
-    var sel = $("more-pacer");
-    if (sel) STATE.profile_ride_type = sel.value;
     return;
   }
   var about = $("view-about");
@@ -132,8 +140,77 @@ function renderHome() {
   $("home-power").value = STATE.power;
   $("home-cadence").value = STATE.cadence;
   $("home-hr").value = STATE.heartrate;
+  $("float-power").textContent = STATE.power_float;
+  $("float-cadence").textContent = STATE.cadence_float;
+  $("float-hr").textContent = STATE.hr_float;
   applyHrLockState();
   updateZoneBadges();
+  renderPacerSel();
+  applyModeView();
+}
+/* 按当前 mode 显示固定/机器人区块与分段选中态 */
+function applyModeView() {
+  var isRoad = STATE.mode === "road";
+  var isErg = STATE.mode === "erg";
+  var steady = $("home-steady");
+  var road = $("home-road");
+  if (steady) steady.style.display = isRoad ? "none" : "block";
+  if (road) road.style.display = isRoad ? "block" : "none";
+  var ergNote = $("erg-note");
+  if (ergNote) ergNote.style.display = isErg ? "block" : "none";
+  /* 分段选中：erg 归到固定模式一侧高亮（steady），因为 erg 由 App 驱动 */
+  var items = document.querySelectorAll("#mode-seg .seg-item");
+  for (var i = 0; i < items.length; i++) {
+    var m = items[i].getAttribute("data-mode");
+    var on = (m === "road") ? isRoad : !isRoad;
+    items[i].classList.toggle("on", on);
+  }
+  updatePacerInfo();
+}
+/* 用户点击分段切换模式（仅改本地 STATE，保存时才落盘） */
+function onModeSwitch(mode) {
+  captureDraft();
+  STATE.mode = mode;
+  applyModeView();
+}
+function onFloatAdj(kind, delta) {
+  var r = FLOAT_RANGE[kind];
+  if (!r) return;
+  var cur = STATE[r.key] || 0;
+  var next = clamp(cur + delta, r.min, r.max);
+  STATE[r.key] = next;
+  var lbl = $("float-" + kind);
+  if (lbl) lbl.textContent = next;
+}
+function renderPacerSel() {
+  var sel = $("home-pacer");
+  if (!sel) return;
+  sel.innerHTML = "";
+  for (var i = 0; i < STATE.pacers.length; i++) {
+    var p = STATE.pacers[i];
+    var o = el("option", { value: p.id },
+      p.name + " (" + p.wkg_low.toFixed(1) + "-" + p.wkg_high.toFixed(1) + " W/kg)");
+    if (p.id === STATE.profile_ride_type) o.selected = true;
+    sel.appendChild(o);
+  }
+}
+function onPacerChange() {
+  var sel = $("home-pacer");
+  if (sel && sel.value) STATE.profile_ride_type = sel.value;
+  updatePacerInfo();
+}
+function updatePacerInfo() {
+  var wkgEl = $("pacer-wkg");
+  var wattEl = $("pacer-watt");
+  if (!wkgEl || !wattEl) return;
+  var p = null;
+  for (var i = 0; i < STATE.pacers.length; i++) {
+    if (STATE.pacers[i].id === STATE.profile_ride_type) { p = STATE.pacers[i]; break; }
+  }
+  if (!p) { wkgEl.textContent = "—"; wattEl.textContent = "—"; return; }
+  var w = STATE.profile_weight || 70;
+  wkgEl.textContent = p.wkg_low.toFixed(1) + " - " + p.wkg_high.toFixed(1) + " W/kg";
+  wattEl.textContent = Math.round(p.wkg_low * w) + " - " + Math.round(p.wkg_high * w) + " W";
 }
 function applyHrLockState() {
   var radios = document.getElementsByName("hr-lock");
@@ -142,6 +219,8 @@ function applyHrLockState() {
   }
   var hrInput = $("home-hr");
   if (hrInput) hrInput.disabled = !STATE.hr_locked;
+  var hrFloatRow = $("hr-float-row");
+  if (hrFloatRow) hrFloatRow.style.display = STATE.hr_locked ? "flex" : "none";
 }
 function onHrLockChange() {
   var radios = document.getElementsByName("hr-lock");
@@ -153,6 +232,8 @@ function onHrLockChange() {
   }
   var hrInput = $("home-hr");
   if (hrInput) hrInput.disabled = !STATE.hr_locked;
+  var hrFloatRow = $("hr-float-row");
+  if (hrFloatRow) hrFloatRow.style.display = STATE.hr_locked ? "flex" : "none";
 }
 function updateZoneBadges() {
   var pwr = parseInt($("home-power").value, 10) || 0;
@@ -199,6 +280,9 @@ function collectConfig() {
     cadence: clamp(parseInt($("home-cadence").value, 10) || 0, 20, 120),
     heartrate: clamp(parseInt($("home-hr").value, 10) || 0, 60, 200),
     hr_lock: STATE.hr_locked ? 1 : 0,
+    power_float: STATE.power_float,
+    cadence_float: STATE.cadence_float,
+    hr_float: STATE.hr_float,
     profile_weight: STATE.profile_weight,
     profile_ftp: STATE.profile_ftp,
     profile_thr_hr: STATE.profile_thr_hr,
@@ -252,47 +336,41 @@ function renderMore() {
   $("more-weight").value = STATE.profile_weight;
   $("more-ftp").value = STATE.profile_ftp;
   $("more-thr").value = STATE.profile_thr_hr;
-  renderPacerSel();
-}
-function renderPacerSel() {
-  var sel = $("more-pacer");
-  if (!sel) return;
-  sel.innerHTML = "";
-  for (var i = 0; i < STATE.pacers.length; i++) {
-    var p = STATE.pacers[i];
-    var o = el("option", { value: p.id },
-      p.name + " (" + p.wkg_low.toFixed(1) + "-" + p.wkg_high.toFixed(1) + " W/kg)");
-    if (p.id === STATE.profile_ride_type) o.selected = true;
-    sel.appendChild(o);
-  }
 }
 function onMoreSave() {
   var btn = $("more-save");
   btn.disabled = true;
-  var body = {
-    device_name: STATE.device_name,
-    mode: STATE.mode,
-    power: STATE.power,
-    cadence: STATE.cadence,
-    heartrate: STATE.heartrate,
-    profile_weight: clamp(parseInt($("more-weight").value, 10) || 0, 40, 150),
-    profile_ftp: clamp(parseInt($("more-ftp").value, 10) || 0, 50, 500),
-    profile_thr_hr: clamp(parseInt($("more-thr").value, 10) || 0, 100, 220),
-    profile_ride_type: $("more-pacer").value
-  };
+  STATE.profile_weight = clamp(parseInt($("more-weight").value, 10) || 0, 40, 150);
+  STATE.profile_ftp = clamp(parseInt($("more-ftp").value, 10) || 0, 50, 500);
+  STATE.profile_thr_hr = clamp(parseInt($("more-thr").value, 10) || 0, 100, 220);
+  var body = collectConfigBase();
   api("/api/config", "POST", body, function (status, data) {
     btn.disabled = false;
     if (status === 200 && data && data.ok) {
-      STATE.profile_weight = body.profile_weight;
-      STATE.profile_ftp = body.profile_ftp;
-      STATE.profile_thr_hr = body.profile_thr_hr;
-      STATE.profile_ride_type = body.profile_ride_type;
       toast("已保存");
       go("/home");
     } else {
       toast("保存失败: " + ((data && data.error) || status));
     }
   });
+}
+/* 更多页保存用：不依赖首页 DOM，取当前 STATE 全量字段 */
+function collectConfigBase() {
+  return {
+    device_name: STATE.device_name,
+    mode: STATE.mode,
+    power: STATE.power,
+    cadence: STATE.cadence,
+    heartrate: STATE.heartrate,
+    hr_lock: STATE.hr_locked ? 1 : 0,
+    power_float: STATE.power_float,
+    cadence_float: STATE.cadence_float,
+    hr_float: STATE.hr_float,
+    profile_weight: STATE.profile_weight,
+    profile_ftp: STATE.profile_ftp,
+    profile_thr_hr: STATE.profile_thr_hr,
+    profile_ride_type: STATE.profile_ride_type
+  };
 }
 
 /* ============ 关于 ============ */
@@ -469,6 +547,9 @@ function init() {
       STATE.cadence = data.cadence || 0;
       STATE.heartrate = data.heartrate || 0;
       STATE.mode = data.mode || "steady";
+      STATE.power_float = data.power_float != null ? data.power_float : 5;
+      STATE.cadence_float = data.cadence_float != null ? data.cadence_float : 2;
+      STATE.hr_float = data.hr_float != null ? data.hr_float : 2;
       STATE.profile_weight = data.profile_weight || 70;
       STATE.profile_ftp = data.profile_ftp || 200;
       STATE.profile_thr_hr = data.profile_thr_hr || 180;

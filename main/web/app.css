@@ -41,6 +41,16 @@ body{background:#f5f5f7;padding:10px;font-family:-apple-system,BlinkMacSystemFon
 .btn-row{display:flex;gap:8px;margin-top:8px}
 .btn-row .btn{flex:1;margin-top:0}
 .hr-lock-row{margin-top:6px;display:flex;flex-direction:column;gap:5px}
+/* 模式二选一分段控件 */
+.seg{display:flex;background:#e9e9eb;border-radius:12px;padding:3px;margin:0 0 8px;gap:3px}
+.seg-item{flex:1;border:0;background:transparent;color:#6e6e73;font-size:13px;font-weight:700;padding:8px 0;border-radius:9px;cursor:pointer;transition:all .15s}
+.seg-item.on{background:#fff;color:#007aff;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+/* 卡片内联浮动步进器 */
+.float-row{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,.05)}
+.float-lbl{font-size:11px;color:#86868b;font-weight:600;flex:1}
+.float-val{font-size:12px;font-weight:800;color:#1d1d1f;min-width:54px;text-align:center}
+.fbtn{width:30px;height:30px;border:0;border-radius:9px;background:#007aff;color:#fff;font-size:18px;font-weight:800;line-height:1;cursor:pointer;flex:0 0 auto}
+.fbtn:active{opacity:.8;transform:scale(.95)}
 .radio-line{display:flex;align-items:center;gap:7px;font-size:11px;color:#3f3f46;background:#fff;border:1px solid #0001;border-radius:11px;padding:6px 10px}
 .radio-line input{margin:0;flex:0 0 auto}
 .radio-line span{flex:1 1 auto;line-height:1.35}
@@ -62,12 +72,14 @@ body{background:#f5f5f7;padding:10px;font-family:-apple-system,BlinkMacSystemFon
 .name-edit-wrap input{flex:1;padding:8px 10px;border:1px solid rgba(0,122,255,.3);border-radius:10px;font-size:13px;background:#f5f5f7;color:#1d1d1f;font-weight:600;min-width:0}
 .name-ok-icon{color:#34c759;font-size:22px;cursor:pointer;font-weight:800;padding:2px 6px;border-radius:8px;flex:0 0 auto}
 .name-ok-icon:active{background:rgba(52,199,89,.12)}
-/* 横向滑动分页 */
+/* 横向滑动分页（关于页填充满屏，圆点固定底部） */
+#view-about.active{display:flex;flex-direction:column;min-height:calc(100vh - 62px - 44px)}
+#view-about .pager{flex:1 1 auto}
 .pager{overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 -2px;padding:0 2px}
 .pager::-webkit-scrollbar{display:none;height:0;width:0}
-.pager-track{display:flex;gap:0}
-.page{flex:0 0 100%;scroll-snap-align:start;min-width:0}
-.pager-dots{display:flex;justify-content:center;gap:6px;margin-top:10px}
+.pager-track{display:flex;gap:0;height:100%}
+.page{flex:0 0 100%;scroll-snap-align:start;min-width:0;display:flex;flex-direction:column;justify-content:flex-start}
+.pager-dots{display:flex;justify-content:center;gap:6px;margin-top:12px;padding:6px 0}
 .pager-dot{width:6px;height:6px;border-radius:50%;background:#c7c7cc;transition:all .2s}
 .pager-dot.on{background:#007aff;width:18px}
 .countdown{background:#fff;color:#007aff;font-size:38px;font-weight:800;border-radius:50%;width:74px;height:74px;display:flex;justify-content:center;align-items:center;margin:14px auto;border:1px solid rgba(0,122,255,.2);box-shadow:0 8px 20px rgba(0,122,255,.14)}
@@ -102,4 +114,9 @@ body{background:#f5f5f7;padding:10px;font-family:-apple-system,BlinkMacSystemFon
   .info-row{border-color:#3a3a3c}
   .info-row .v{color:#f5f5f7}
   .pager-dot{background:#3a3a3c}
+  .seg{background:#2c2c2e}
+  .seg-item{color:#8e8e93}
+  .seg-item.on{background:#3a3a3c;color:#0a84ff}
+  .float-val{color:#f5f5f7}
+  .fbtn{background:#0a84ff}
 }

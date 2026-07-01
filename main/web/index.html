@@ -23,29 +23,74 @@
 
   <!-- ============ 首页 ============ -->
   <div class="view" id="view-home">
-    <div class="card">
-      <h2>骑行参数</h2>
-      <div class="val"><input type="number" inputmode="numeric" id="home-power" value="0"><span class="unit">W</span></div>
-      <div class="lbl"><span>目标功率</span><span class="zone" id="zone-pwr"><span class="dot"></span>Z?</span></div>
+
+    <!-- 模式二选一分段控件 -->
+    <div class="seg" id="mode-seg">
+      <button class="seg-item" data-mode="steady" onclick="onModeSwitch('steady')">固定模式</button>
+      <button class="seg-item" data-mode="road" onclick="onModeSwitch('road')">配速机器人</button>
     </div>
 
-    <div class="card">
-      <h2>踏频</h2>
-      <div class="val"><input type="number" inputmode="numeric" id="home-cadence" value="0"><span class="unit">rpm</span></div>
-      <div class="lbl"><span>目标踏频</span></div>
+    <!-- ERG 提示（仅骑行 App 下发 ERG 时显示） -->
+    <div class="note warn" id="erg-note" style="display:none">⚡ 骑行 App 正在通过 ERG 控制目标功率，手动功率暂不生效；如需手动设置，请切到固定模式并保存。</div>
+
+    <!-- ---- 固定模式区 ---- -->
+    <div id="home-steady">
+      <div class="card">
+        <h2>目标功率</h2>
+        <div class="val"><input type="number" inputmode="numeric" id="home-power" value="0"><span class="unit">W</span></div>
+        <div class="lbl"><span>固定功率</span><span class="zone" id="zone-pwr"><span class="dot"></span>Z?</span></div>
+        <div class="float-row">
+          <span class="float-lbl">浮动范围</span>
+          <button class="fbtn" onclick="onFloatAdj('power',-1)">−</button>
+          <span class="float-val">±<span id="float-power">5</span> W</span>
+          <button class="fbtn" onclick="onFloatAdj('power',1)">+</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>踏频</h2>
+        <div class="val"><input type="number" inputmode="numeric" id="home-cadence" value="0"><span class="unit">rpm</span></div>
+        <div class="lbl"><span>固定踏频</span></div>
+        <div class="float-row">
+          <span class="float-lbl">浮动范围</span>
+          <button class="fbtn" onclick="onFloatAdj('cadence',-1)">−</button>
+          <span class="float-val">±<span id="float-cadence">2</span> rpm</span>
+          <button class="fbtn" onclick="onFloatAdj('cadence',1)">+</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>心率</h2>
+        <div class="val"><input type="number" inputmode="numeric" id="home-hr" value="0"><span class="unit">bpm</span></div>
+        <div class="lbl"><span>目标心率</span><span class="zone" id="zone-hr"><span class="dot"></span>Z?</span></div>
+        <div class="hr-lock-row">
+          <label class="radio-line"><input type="radio" name="hr-lock" value="0" onchange="onHrLockChange()" checked><span>联动：心率随功率变化（按 FTP 分区匹配）</span></label>
+          <label class="radio-line"><input type="radio" name="hr-lock" value="1" onchange="onHrLockChange()"><span>锁死：心率恒定按填写值</span></label>
+        </div>
+        <div class="float-row" id="hr-float-row">
+          <span class="float-lbl">浮动范围</span>
+          <button class="fbtn" onclick="onFloatAdj('hr',-1)">−</button>
+          <span class="float-val">±<span id="float-hr">2</span> bpm</span>
+          <button class="fbtn" onclick="onFloatAdj('hr',1)">+</button>
+        </div>
+      </div>
+
+      <div class="note">浮动范围为基准值的上下限半幅，设备在 [基准−浮动, 基准+浮动] 内平稳变化（非随机跳变）。浮动设为 0 则恒定输出。</div>
     </div>
 
-    <div class="card">
-      <h2>心率</h2>
-      <div class="val"><input type="number" inputmode="numeric" id="home-hr" value="0"><span class="unit">bpm</span></div>
-      <div class="lbl"><span>目标心率</span><span class="zone" id="zone-hr"><span class="dot"></span>Z?</span></div>
-      <div class="hr-lock-row">
-        <label class="radio-line"><input type="radio" name="hr-lock" value="0" onchange="onHrLockChange()" checked><span>联动：心率随功率变化（按 FTP 分区匹配）</span></label>
-        <label class="radio-line"><input type="radio" name="hr-lock" value="1" onchange="onHrLockChange()"><span>锁死：心率恒定按填写值</span></label>
+    <!-- ---- 配速机器人区 ---- -->
+    <div id="home-road" style="display:none">
+      <div class="note">🤖 机器人配速已启用：设备按所选档位的功体比（W/kg × 体重）自动输出功率，模拟跟随虚拟骑手骑行，无需骑行 App 干预。功率、心率自动生成，此模式下不使用固定功率。</div>
+      <div class="card">
+        <h2>配速机器人档位</h2>
+        <div class="field">
+          <label>选择配速机器人</label>
+          <select id="home-pacer" onchange="onPacerChange()"></select>
+        </div>
+        <div class="info-row"><span class="k">当前功体比</span><span class="v" id="pacer-wkg">—</span></div>
+        <div class="info-row"><span class="k">预计功率区间</span><span class="v" id="pacer-watt">—</span></div>
       </div>
     </div>
-
-    <div class="note">ERG 模式为默认能力：骑行 App 下发 ERG 目标功率时设备自动切换。修改参数后请点击保存。</div>
 
     <div class="btn-row">
       <button class="btn" id="home-save" onclick="onSave()">保存配置</button>
@@ -57,7 +102,7 @@
   <div class="view" id="view-more">
     <div class="hero">
       <h1>更多配置</h1>
-      <div class="sub">用户档案影响功率区间与心率分区计算。</div>
+      <div class="sub">用户档案影响功率区间、配速机器人功率与心率分区计算。</div>
     </div>
 
     <div class="card">
@@ -74,11 +119,7 @@
         <label>阈值心率 (bpm, 100-220)</label>
         <input type="number" id="more-thr" inputmode="numeric">
       </div>
-      <div class="field">
-        <label>配速机器人</label>
-        <select id="more-pacer"></select>
-      </div>
-      <div class="note">机器人模式：开启后设备按所选档位自动输出功率，模拟跟随虚拟骑手骑行，无需骑行 App 干预。</div>
+      <div class="note">体重 × 配速机器人功体比 = 机器人模式输出功率；FTP 决定功率分区；阈值心率决定心率分区映射。</div>
     </div>
 
     <div class="btn-row">
@@ -89,11 +130,6 @@
 
   <!-- ============ 关于 ============ -->
   <div class="view" id="view-about">
-    <div class="hero">
-      <h1>关于</h1>
-      <div class="sub">左右滑动查看设备信息 / 使用说明 / 注意事项</div>
-    </div>
-
     <div class="pager" id="about-pager">
       <div class="pager-track">
 
@@ -114,29 +150,51 @@
               <span class="name-ok-icon" onclick="onSaveDeviceName()">✓</span>
             </div>
           </div>
-        </div>
-
-        <!-- Page 2: 使用说明 -->
-        <div class="page">
           <div class="card">
-            <h2>使用说明</h2>
-            <p><b>1. 连接骑行 App</b>：在 Zwift、TrainerRoad 等骑行 App 中搜索并连接 BikePower BLE 设备即可输出功率。</p>
-            <p><b>2. ERG 模式</b>：骑行 App 下发 ERG 目标功率时设备自动切换，无需手动选择。</p>
-            <p><b>3. 调整目标值</b>：在首页输入目标功率/踏频/心率，点击保存即生效。</p>
-            <p><b>4. 配网窗口</b>：默认 180 秒，剩余时间不足时点击"续期配网"延长。</p>
-            <p><b>5. 重新进入配网</b>：长按设备按钮 2 秒可重新进入配网模式。</p>
+            <h2>三种骑行模式</h2>
+            <p><b>固定模式</b>：功率/踏频/心率按你设定的基准值输出，可各自设置浮动范围模拟真实骑行的自然波动。</p>
+            <p><b>配速机器人</b>：按所选档位功体比自动输出功率，模拟跟随虚拟骑手，无需骑行 App。</p>
+            <p><b>ERG 模式</b>：骑行 App 下发目标功率时自动进入，设备锁定到 App 指定功率。</p>
           </div>
         </div>
 
-        <!-- Page 3: 注意事项 -->
+        <!-- Page 2: 功率与心率的关联 -->
         <div class="page">
           <div class="card">
+            <h2>功率 → 心率 关联</h2>
+            <p>真实骑行中心率随功率上升而上升，但存在<b>滞后</b>与<b>惯性</b>。本设备用生理模型还原这一关系，而非简单线性映射。</p>
+            <p><b>① 功率分区</b>：以你的 <b>FTP</b> 为基准，把当前功率换算成强度百分比（%FTP），落入恢复/耐力/节奏/阈值/无氧等区间。</p>
+            <p><b>② 分区映射心率</b>：每个功率区间对应一段 <b>%阈值心率</b>，再乘以你的阈值心率得到目标心率。功率越高，目标心率越高。</p>
+            <p><b>③ 一阶平滑</b>：心率不会瞬间跳变，按时间常数逐步逼近目标（上升快、下降慢，贴近真实生理）。</p>
+          </div>
+        </div>
+
+        <!-- Page 3: 算法细节 -->
+        <div class="page">
+          <div class="card">
+            <h2>算法逻辑说明</h2>
+            <p><b>心率动力学</b>：HR(t) = HR + α·(目标 − HR)，α = 1 − e^(−dt/τ)。上升 τ≈30s，下降 τ≈60s，还原心率惯性。</p>
+            <p><b>心率变异 HRV</b>：叠加呼吸性窦性心律不齐（RSA）、Mayer 波与缓慢漂移，让静息心率也有自然抖动。</p>
+            <p><b>浮动平滑游走</b>：固定模式下功率/踏频/心率在 [基准±浮动] 带内做<b>有界随机游走</b>——周期性在带内取新目标再平滑逼近，因此平稳变化、绝不越界、不逐拍乱跳。</p>
+            <p><b>参数持久化</b>：所有设置写入 NVS，断电重启后自动恢复。</p>
+          </div>
+        </div>
+
+        <!-- Page 4: 使用与注意 -->
+        <div class="page">
+          <div class="card">
+            <h2>使用说明</h2>
+            <p><b>1. 连接骑行 App</b>：在 Zwift、TrainerRoad 等 App 搜索并连接 BikePower BLE 设备。</p>
+            <p><b>2. 选择模式</b>：首页顶部切换「固定模式 / 配速机器人」，二选一。</p>
+            <p><b>3. 调整参数</b>：输入基准值并用 ± 微调浮动范围，点击保存生效。</p>
+            <p><b>4. 配网窗口</b>：默认 180 秒，剩余不足时点「续期配网」。</p>
+            <p><b>5. 重新配网</b>：长按设备按钮 2 秒重新进入配网模式。</p>
+          </div>
+          <div class="card">
             <h2>注意事项</h2>
-            <p><b>· 保存生效</b>：修改参数后请点击"保存配置"才会持久化到设备。</p>
-            <p><b>· 关闭 WiFi</b>：点击"保存并关闭 WiFi"后设备返回骑行模式，BLE 持续在线。</p>
-            <p><b>· 心率联动</b>：联动模式心率随功率自动调整；锁死模式心率恒定为填写值。</p>
-            <p><b>· 配网超时</b>：长时间无操作 WiFi 自动关闭，需长按按钮重新进入。</p>
-            <p><b>· 固件升级</b>：暂不支持 OTA，请通过烧录工具更新固件。</p>
+            <p><b>· 保存生效</b>：修改后需点「保存配置」才会持久化。</p>
+            <p><b>· 关闭 WiFi</b>：点「保存并关闭 WiFi」返回骑行模式，BLE 持续在线。</p>
+            <p><b>· 固件升级</b>：暂不支持 OTA，请通过烧录工具更新。</p>
           </div>
         </div>
 

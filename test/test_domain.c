@@ -259,12 +259,18 @@ static void test_hr_variation_steady(void)
     CHECK(last <= HRV_RSA_AMPLITUDE + HRV_MAYER_AMPLITUDE + HRV_DRIFT_CAP_BPM + 0.01f,
           "HRV 总波动受 drift cap 限制");
 
-    // steady_user：输出始终在 base ± 波动区间内
+    // steady_user：输出始终在 base ± 浮动幅度区间内
     hr_model_init(&st, 150);
     for (int i = 0; i < 300; i++) {
-        int hr = hr_model_steady_user(&st, 150);
-        CHECK(hr >= 150 + STEADY_USER_HR_FLUCT_LO && hr <= 150 + STEADY_USER_HR_FLUCT_HI,
+        int hr = hr_model_steady_user(&st, 150, HR_FLOAT_DEFAULT);
+        CHECK(hr >= 150 - HR_FLOAT_DEFAULT && hr <= 150 + HR_FLOAT_DEFAULT,
               "steady_user 在区间内");
+    }
+    // amp=0 恒定输出
+    hr_model_init(&st, 150);
+    for (int i = 0; i < 20; i++) {
+        int hr = hr_model_steady_user(&st, 155, 0);
+        CHECK(hr == 155, "steady_user amp=0 恒定");
     }
 }
 
@@ -294,18 +300,53 @@ static void test_road_pacer(void)
 
 static void test_steady_snapshot(void)
 {
-    printf("[test] steady 快照功率波动范围\n");
+    printf("[test] steady 快照功率浮动范围\n");
     power_engine_t e;
     power_engine_init(&e);
     e.base_power = 200;
     domain_rng_seed(99);
     for (int i = 0; i < 100; i++) {
         snapshot_t s = power_engine_snapshot(&e);
-        CHECK(s.power >= 200 + STEADY_POWER_FLUCT_LO && s.power <= 200 + STEADY_POWER_FLUCT_HI,
-              "steady 功率在base±5内");
+        CHECK(s.power >= 200 - e.power_float && s.power <= 200 + e.power_float,
+              "steady 功率在 base±浮动内");
         CHECK(s.heartrate >= HR_MIN && s.heartrate <= HR_MAX, "心率合法范围");
         CHECK(s.cadence >= CADENCE_MIN && s.cadence <= CADENCE_MAX, "踏频合法范围");
     }
+    // 浮动幅度=0 时功率恒定为基准值
+    power_engine_init(&e);
+    e.base_power = 180;
+    power_engine_set_power_float(&e, 0);
+    power_engine_set_cadence_float(&e, 0);
+    for (int i = 0; i < 50; i++) {
+        snapshot_t s = power_engine_snapshot(&e);
+        CHECK(s.power == 180, "浮动=0 功率恒定");
+        CHECK(s.cadence == e.cadence_base, "浮动=0 踏频恒定");
+    }
+}
+
+static void test_float_setters(void)
+{
+    printf("[test] 浮动幅度 setter 边界\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    CHECK(e.power_float == POWER_FLOAT_DEFAULT, "默认功率浮动");
+    CHECK(e.cadence_float == CADENCE_FLOAT_DEFAULT, "默认踏频浮动");
+    CHECK(e.hr_float == HR_FLOAT_DEFAULT, "默认心率浮动");
+    // 越界夹紧
+    power_engine_set_power_float(&e, 99999);
+    CHECK(e.power_float == POWER_FLOAT_MAX, "功率浮动夹上限");
+    power_engine_set_power_float(&e, -5);
+    CHECK(e.power_float == POWER_FLOAT_MIN, "功率浮动夹下限");
+    // 同值不置 dirty
+    power_engine_set_power_float(&e, 0);
+    power_engine_clear_dirty(&e);
+    CHECK(power_engine_set_power_float(&e, 0) == false, "功率浮动同值拒绝");
+    CHECK(!power_engine_is_dirty(&e), "功率浮动同值不置 dirty");
+    // 合法设置置 dirty
+    CHECK(power_engine_set_cadence_float(&e, 10) == true, "踏频浮动合法设置");
+    CHECK(e.cadence_float == 10 && power_engine_is_dirty(&e), "踏频浮动生效并置 dirty");
+    CHECK(power_engine_set_hr_float(&e, 15) == true, "心率浮动合法设置");
+    CHECK(e.hr_float == 15, "心率浮动生效");
 }
 
 static void test_engine_blindspots(void)
@@ -462,16 +503,21 @@ static void test_config_store(void)
     src.power = 222;
     src.cadence = 88;
     src.ftp = 250;
+    src.power_float = 12;
+    src.cadence_float = 7;
+    src.hr_float = 9;
     strcpy(src.device_name, "MyBike");
     size_t wlen = config_store_serialize(&src, js, sizeof(js));
     CHECK(wlen > 0 && wlen < sizeof(js), "serialize 返回合法长度");
     CHECK(js[wlen] == '\0' && strlen(js) == wlen, "serialize 以 '\\0' 结尾且长度一致");
     CHECK(strstr(js, "\"power\":222") != NULL, "serialize 含 power=222");
+    CHECK(strstr(js, "\"power_float\":12") != NULL, "serialize 含 power_float=12");
     CHECK(strstr(js, "\"device_name\":\"MyBike\"") != NULL, "serialize 含设备名");
 
     config_data_t dst;
     CHECK(config_store_deserialize(js, &dst), "deserialize 成功");
     CHECK(dst.power == 222 && dst.cadence == 88 && dst.ftp == 250, "往返整数字段一致");
+    CHECK(dst.power_float == 12 && dst.cadence_float == 7 && dst.hr_float == 9, "往返浮动字段一致");
     CHECK(strcmp(dst.device_name, "MyBike") == 0, "往返设备名一致");
     CHECK(dst.schema_ver == src.schema_ver && dst.mode == src.mode, "往返其余字段一致");
 
@@ -934,6 +980,7 @@ int main(void)
     test_hr_variation_steady();
     test_road_pacer();
     test_steady_snapshot();
+    test_float_setters();
     test_engine_blindspots();
     test_config_store();
     test_json_miniparse();

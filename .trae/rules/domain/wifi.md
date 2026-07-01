@@ -54,17 +54,21 @@
 
 - `WIFI-18`：门户表单字段必须与领域层和 NVS 字段一一对应。
 - `WIFI-19`：当前配置提交涉及以下字段（v3.2.0 起前端 SPA 通过 `XMLHttpRequest` POST JSON，字段名即 JSON key）：
-- `mode`
+- `mode`（`steady` / `road` / `erg`；前端首页分段控件在 `steady`/`road` 间切换，`erg` 由骑行 App 下发自动进入）
 - `device_name`
 - `power`
 - `cadence`
 - `heartrate`
+- `hr_lock`（0=心率随功率联动，1=锁定固定心率）
+- `power_float`（功率浮动幅度 ±W，0-100）
+- `cadence_float`（踏频浮动幅度 ±RPM，0-20）
+- `hr_float`（固定心率浮动幅度 ±BPM，0-20）
 - `profile_weight`
 - `profile_ftp`
 - `profile_thr_hr`
 - `profile_ride_type`
-- `WIFI-20`：其中 `power`、`cadence`、`heartrate` 仅在 `steady` 模式下应用；其他模式提交时忽略这三项的手动值。
-- `WIFI-21`：新增配置项时，必须同步修改 `bikepower_config.h` 或领域层常量、`wifi_portal.c` JSON 解析、`main/web/app.js` 表单字段、`tests/mock_server.py`、自测脚本和技术文档。
+- `WIFI-20`：其中 `power`、`cadence`、`heartrate` 仅在 `steady` 模式下应用；其他模式提交时忽略这三项的手动值。浮动幅度 `power_float`/`cadence_float`/`hr_float` 任意模式接受写入，仅在 `steady` 模式（心率浮动还需锁定心率）实际生效。
+- `WIFI-21`：新增配置项时，必须同步修改 `bikepower_config.h` 或领域层常量、`wifi_portal.c` JSON 解析（`apply_json_fields`）与 `/api/state` 输出、`main/web/app.js` 表单字段、`tests/mock_server.py`、自测脚本和技术文档。
 - `WIFI-28`：所有 `/api/xxx` JSON 响应和 `GET /` 内联 HTML 必须设置 `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`，防止浏览器缓存导致页面回退时显示旧数据（v3.2.0 起由 `set_no_store_headers()` 统一注入）。
 - `WIFI-29`：v3.2.0 起前端为 SPA 单页面，无多页隐藏表单；`/api/config` 接收的 JSON 必须包含 `WIFI-19` 列出的全部可变字段，前端 `app.js` 提交时统一构造完整 payload。
 

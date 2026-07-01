@@ -35,16 +35,22 @@ MOCK_STATE = {
     "cadence": 80,
     "heartrate": 130,
     "mode": "steady",
+    "power_float": 5,
+    "cadence_float": 2,
+    "hr_float": 2,
     "profile_weight": 70,
     "profile_ftp": 200,
     "profile_thr_hr": 170,
     "profile_ride_type": "coco",
     "remaining_sec": 180,
     "closing": False,
+    "hr_locked": False,
     "pacers": [
-        {"id": "coco", "name": "Coco", "wkg_low": 1.5, "wkg_high": 2.0},
-        {"id": "flat", "name": "Flat Road", "wkg_low": 2.5, "wkg_high": 3.0},
-        {"id": "hill", "name": "Hill", "wkg_low": 3.5, "wkg_high": 4.5},
+        {"id": "coco", "name": "Coco", "wkg_low": 2.4, "wkg_high": 2.8},
+        {"id": "yumi", "name": "Yumi", "wkg_low": 2.7, "wkg_high": 3.1},
+        {"id": "jacques", "name": "Jacques", "wkg_low": 3.0, "wkg_high": 3.5},
+        {"id": "genie", "name": "Genie", "wkg_low": 3.5, "wkg_high": 3.9},
+        {"id": "constance", "name": "Constance", "wkg_low": 4.0, "wkg_high": 4.4},
     ],
 }
 
@@ -149,10 +155,13 @@ class Handler(BaseHTTPRequestHandler):
                 data = {}
             with LOCK:
                 for k in ("device_name", "mode", "power", "cadence",
-                          "heartrate", "profile_weight", "profile_ftp",
+                          "heartrate", "power_float", "cadence_float", "hr_float",
+                          "profile_weight", "profile_ftp",
                           "profile_thr_hr", "profile_ride_type"):
                     if k in data:
                         MOCK_STATE[k] = data[k]
+                if "hr_lock" in data:
+                    MOCK_STATE["hr_locked"] = bool(data["hr_lock"])
             self._send_json({"ok": True})
             return
         if path == "/api/close-wifi":

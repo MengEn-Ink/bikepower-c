@@ -2,6 +2,28 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
+## [未发布]
+
+### 修复
+- 修复配速机器人（road 模式）在网页端完全不生效的缺陷：此前「更多」页的机器人下拉框只写 `profile_ride_type`，而该字段仅在 `mode==road` 时被 `build_road` 使用，但前端无任何切换 `mode` 的入口（`STATE.mode` 恒为 `/api/state` 回显值），导致选择任何档位都不改变输出。现首页顶部新增「固定模式 / 配速机器人」分段控件，真正驱动引擎 `mode`。
+
+### 新增（固定模式浮动幅度，可配网调整并持久化）
+- `components/bikepower_domain/power_engine.c/.h`：新增 `power_float` / `cadence_float` / `hr_float` 三个浮动幅度字段与 `power_engine_set_power_float/set_cadence_float/set_hr_float` setter；新增 `fluct_walk_t` 有界平滑随机游走状态。
+- `build_steady` 改用有界平滑随机游走替代逐拍随机：每 `FLUCT_WALK_HOLD_LOOPS` 拍在 `[-amp,+amp]` 带内重采样目标，再一阶指数逼近（`FLUCT_WALK_TAU`），输出恒在 `[基准−浮动, 基准+浮动]` 内平稳变化，`amp=0` 时恒定。
+- `hr_model_steady_user` 增加 `amp` 参数，固定心率按浮动幅度平稳波动，`amp=0` 恒定。
+- `components/bikepower_domain/include/domain_config.h`：新增 `POWER_FLOAT_*` / `CADENCE_FLOAT_*` / `HR_FLOAT_*` 范围与默认、`FLUCT_WALK_TAU/HOLD_LOOPS`，移除旧 `STEADY_USER_HR_FLUCT_LO/HI`。
+- `config_store.c/.h`：`config_data_t` 增加三浮动字段，`defaults/validate/serialize/deserialize` 同步（serialize 栈缓冲 256→320）；`CONFIG_VERSION` 保持 5（additive，旧配置缺键回落默认不重置）。
+- `main/nvs_store.c` + `main/bikepower_config.h`：新增 `NVS_KEY_POWER_FLOAT/CADENCE_FLOAT/HR_FLOAT`（均 ≤15 字符）与 engine↔config 双向映射。
+
+### 网页端
+- `main/wifi_portal.c`：`/api/state` 输出 `power_float/cadence_float/hr_float`；`apply_json_fields` 解析三浮动字段（任意模式接受、setter 内夹紧）。
+- `main/web/index.html + app.css + app.js`：首页「固定/机器人」分段切换；每卡片内联「浮动 ± N [−][+]」步进器（心率浮动仅锁定心率时显示）；road 模式显示配速档位选择 + 实时功体比/预计功率区间；ERG 模式显示只读提示。
+- 关于页重写为 4 页：设备信息+三种模式 / 功率→心率关联 / 算法逻辑说明 / 使用与注意；内容填充满屏，分页圆点固定在底部导航栏上方。
+- `tests/mock_server.py`：同步三浮动字段、`hr_locked`、真实五档位机器人，`/api/config` 接受 `mode/hr_lock/*_float`。
+
+### 测试
+- `test/test_domain.c`：新增 `test_float_setters`，更新 `hr_model_steady_user` 新签名调用、steady 快照浮动断言、config 往返浮动字段断言。host 单测 1265 通过 0 失败；门户结构/JS/配置一致性静态门禁全绿。
+
 ## [4.0.0] - 2026-06-30
 
 ### 移除（不向后兼容）

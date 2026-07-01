@@ -426,13 +426,16 @@ DIS 读取内容来自编译期常量：
 - `e->snapshot`
 - `e->snapshot_count++`
 
-### 6.4 Steady 模式
+### 6.4 Steady 模式（固定模式）
 
 `build_steady()` 的特点：
 
-- 功率在 `base_power` 上叠加 `[-5, +5]` 波动
-- 踏频在 `cadence_base` 上叠加 `[-2, +2]` 波动
-- 如果 `has_user_hr` 为真，则走 `hr_model_steady_user()`
+- 功率在 `base_power` 上叠加 `[-power_float, +power_float]` 的有界平滑随机游走偏移
+- 踏频在 `cadence_base` 上叠加 `[-cadence_float, +cadence_float]` 的有界平滑随机游走偏移
+- 浮动幅度 `power_float` / `cadence_float` / `hr_float` 可在配网页调整并持久化（默认 ±5 W / ±2 rpm / ±2 bpm，范围见 `domain_config.h` 的 `*_FLOAT_MIN/MAX`）
+- 浮动为 0 时对应量恒定输出基准值
+- 平滑游走（`fluct_walk_step`）：每 `FLUCT_WALK_HOLD_LOOPS`（默认 60 拍≈3s）在浮动带内重采样一个目标偏移，再按时间常数 `FLUCT_WALK_TAU` 一阶指数逼近，输出始终限制在带内，因此平稳变化、不逐拍随机跳变
+- 如果 `has_user_hr` 为真，则走 `hr_model_steady_user(st, user_hr, hr_float)`（心率按 `hr_float` 幅度平稳波动，`hr_float=0` 恒定）
 - 否则按 FTP 区间推导目标心率，再走平滑和 HRV
 
 ### 6.5 Road 模式
