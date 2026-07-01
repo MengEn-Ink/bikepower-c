@@ -26,8 +26,9 @@ static const char *TAG = "CAPTIVE";
 #define DNS_BUF_LEN 512
 // DNS 任务栈：lwip socket + 512 字节缓冲 + 解析逻辑
 #define DNS_TASK_STACK   3072
-// DNS Answer TTL（秒）：短 TTL 避免客户端缓存太久，断网后能重新触发探测
-#define DNS_ANSWER_TTL   60
+// DNS Answer TTL（秒）：短 TTL 避免客户端缓存太久，断网后能重新触发探测；
+// 10s 平衡 DNS 查询频率与探测触发速度，过短（0）会导致每次请求都查增加负担
+#define DNS_ANSWER_TTL   10
 
 // SoftAP 网关 IP（esp_netif_create_default_wifi_ap 默认 192.168.4.1）
 #define AP_IP_ADDR0  192
@@ -117,6 +118,13 @@ esp_err_t captive_portal_start_dns(void)
         return ESP_FAIL;
     }
 
+    // SO_REUSEADDR：配网反复进出时，53 端口可能处于 TIME_WAIT，
+    // 不加此选项会导致 bind 失败，DNS 劫持无法启动，手机无法自动弹出配网页
+    int reuse = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        ESP_LOGW(TAG, "DNS SO_REUSEADDR 设置失败 errno=%d（继续尝试 bind）", errno);
+    }
+
     struct sockaddr_in addr = { 0 };
     addr.sin_family = AF_INET;
     addr.sin_port = htons(53);
@@ -157,6 +165,10 @@ void captive_portal_stop_dns(void)
 esp_err_t captive_portal_detect_handler(httpd_req_t *req)
 {
     // 302 重定向到配网首页，触发手机系统弹出 Captive Portal 窗口
+    // Connection: close 必须：探测请求高频且无 body，keep-alive 累积会耗尽 socket fd，
+    // 导致后续 /api/* 请求失败前端黑屏（project_memory 教训：EMFILE 错误）
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate");
     httpd_resp_set_status(req, "302 Found");
     httpd_resp_set_hdr(req, "Location", "http://" CAPTIVE_PORTAL_HOST "/");
     httpd_resp_send(req, NULL, 0);
