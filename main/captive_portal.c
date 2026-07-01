@@ -153,11 +153,18 @@ void captive_portal_stop_dns(void)
     if (s_dns_sock >= 0) {
         int sock = s_dns_sock;
         s_dns_sock = -1;  // 先置 -1 让 dns_task 退出循环
-        close(sock);
+        close(sock);      // 唤醒阻塞在 recvfrom 的 dns_task
     }
     // dns_task 检测到 s_dns_sock<0 后自行 vTaskDelete，s_dns_task 置 NULL
+    // 用循环等待确保旧任务真正退出，防止下次 start_dns 时任务泄漏导致
+    // 重新进入配网后 DNS 劫持服务异常（手机无法自动弹出配网页）
     if (s_dns_task) {
-        vTaskDelay(pdMS_TO_TICKS(50));  // 给任务退出时间
+        for (int i = 0; i < 20 && s_dns_task != NULL; i++) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+        if (s_dns_task != NULL) {
+            ESP_LOGW(TAG, "DNS 任务退出超时（200ms），可能泄漏");
+        }
     }
     ESP_LOGI(TAG, "DNS 劫持服务器已停止");
 }
