@@ -89,6 +89,21 @@
         </div>
         <div class="info-row"><span class="k">当前功体比</span><span class="v" id="pacer-wkg">—</span></div>
         <div class="info-row"><span class="k">预计功率区间</span><span class="v" id="pacer-watt">—</span></div>
+        <div id="custom-wkg-box" style="display:none">
+          <div class="float-row">
+            <span class="float-lbl">W/kg 下限</span>
+            <button class="fbtn" onclick="onCustomWkgAdj('low',-1)">−</button>
+            <span class="float-val"><span id="cwkg-low">2.5</span></span>
+            <button class="fbtn" onclick="onCustomWkgAdj('low',1)">+</button>
+          </div>
+          <div class="float-row">
+            <span class="float-lbl">W/kg 上限</span>
+            <button class="fbtn" onclick="onCustomWkgAdj('high',-1)">−</button>
+            <span class="float-val"><span id="cwkg-high">3.0</span></span>
+            <button class="fbtn" onclick="onCustomWkgAdj('high',1)">+</button>
+          </div>
+          <div class="note">自定义功体比范围 1.0~7.0 W/kg，每档 0.1；输出功率 = W/kg × 体重，在下限与上限间随机波动。</div>
+        </div>
       </div>
     </div>
 

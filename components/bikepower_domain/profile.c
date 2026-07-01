@@ -6,7 +6,7 @@
 #include "profile.h"
 
 const char *const PROFILE_RIDE_TYPE_OPTIONS[] = {
-    "coco", "yumi", "jacques", "genie", "constance",
+    "coco", "yumi", "jacques", "genie", "constance", "custom",
 };
 
 const road_pacer_t ROAD_PACERS[] = {
@@ -16,6 +16,48 @@ const road_pacer_t ROAD_PACERS[] = {
     { "Genie", 35, 39 },
     { "Constance", 40, 44 },
 };
+
+static int clamp_wkg(int v)
+{
+    if (v < CUSTOM_WKG_MIN) return CUSTOM_WKG_MIN;
+    if (v > CUSTOM_WKG_MAX) return CUSTOM_WKG_MAX;
+    return v;
+}
+
+/*
+ * 解析当前档位的有效 W/kg 范围。
+ * 预设档（0-4）读 ROAD_PACERS；自定义档（5）读 profile.custom_wkg_*。
+ */
+void profile_effective_wkg(const profile_t *p, int *out_low, int *out_high)
+{
+    int low, high;
+    if (PACER_INDEX_IS_CUSTOM(p->ride_type)) {
+        low = p->custom_wkg_low;
+        high = p->custom_wkg_high;
+    } else {
+        int idx = (p->ride_type >= 0 && p->ride_type < PACER_COUNT) ? p->ride_type : PACER_INDEX_DEFAULT;
+        low = ROAD_PACERS[idx].wkg_low;
+        high = ROAD_PACERS[idx].wkg_high;
+    }
+    if (out_low) *out_low = low;
+    if (out_high) *out_high = high;
+}
+
+/*
+ * 设置自定义档 W/kg 范围（×10）。
+ * 越界夹紧到 [CUSTOM_WKG_MIN, CUSTOM_WKG_MAX]，并保证 low<=high。
+ * 返回值：范围实际变化返回 true，否则 false。
+ */
+bool profile_set_custom_wkg(profile_t *p, int low, int high)
+{
+    low = clamp_wkg(low);
+    high = clamp_wkg(high);
+    if (low > high) high = low;
+    if (p->custom_wkg_low == low && p->custom_wkg_high == high) return false;
+    p->custom_wkg_low = low;
+    p->custom_wkg_high = high;
+    return true;
+}
 
 /*
  * 初始化用户档案默认值。
@@ -29,6 +71,8 @@ void profile_init(profile_t *p)
     p->ftp = PROFILE_FTP_DEFAULT;
     p->thr_hr = PROFILE_THR_HR_DEFAULT;
     p->ride_type = PROFILE_RIDE_TYPE_DEFAULT;
+    p->custom_wkg_low = CUSTOM_WKG_LOW_DEFAULT;
+    p->custom_wkg_high = CUSTOM_WKG_HIGH_DEFAULT;
 }
 
 /*
@@ -96,7 +140,7 @@ bool profile_set_ride_type(profile_t *p, int ride_type)
 int profile_ride_type_index(const char *id)
 {
     if (!id) return PACER_INDEX_DEFAULT;
-    for (int i = 0; i < PACER_COUNT; i++) {
+    for (int i = 0; i < RIDE_TYPE_COUNT; i++) {
         if (strcmp(PROFILE_RIDE_TYPE_OPTIONS[i], id) == 0) return i;
     }
     return PACER_INDEX_DEFAULT;
@@ -112,7 +156,7 @@ bool profile_set_ride_type_str(profile_t *p, const char *id)
 {
     if (!id || !id[0]) return false;
     int idx = -1;
-    for (int i = 0; i < PACER_COUNT; i++) {
+    for (int i = 0; i < RIDE_TYPE_COUNT; i++) {
         if (strcmp(PROFILE_RIDE_TYPE_OPTIONS[i], id) == 0) { idx = i; break; }
     }
     if (idx < 0) return false;

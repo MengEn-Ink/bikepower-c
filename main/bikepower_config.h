@@ -79,6 +79,8 @@ typedef enum {
 #define NVS_KEY_FTP            "ftp"
 #define NVS_KEY_THR_HR         "thr_hr"
 #define NVS_KEY_RIDE_TYPE      "ride"
+#define NVS_KEY_CUSTOM_WKG_LO  "cwkglo"
+#define NVS_KEY_CUSTOM_WKG_HI  "cwkghi"
 #define NVS_KEY_DEVICE_NAME    "devname"
 
 // ===== BLE 连接与广播 =====

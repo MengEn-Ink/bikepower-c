@@ -4,6 +4,15 @@
 
 ## [未发布]
 
+### 新增（自定义配速档位）
+- 在 5 个预设配速机器人（coco/yumi/jacques/genie/constance）外新增第 6 档「自定义」（id=custom，index=5）：用户可自填 W/kg 下限+上限（1.0~7.0，每档 0.1），road 模式按 `weight × 自定义W/kg` 输出功率。
+- `components/bikepower_domain/`：`domain_config.h` 新增 `PACER_INDEX_CUSTOM/RIDE_TYPE_COUNT/CUSTOM_WKG_*`；`profile_t` 增 `custom_wkg_low/high` 字段与 `profile_set_custom_wkg`/`profile_effective_wkg`；`profile_ride_type_index`/`set_ride_type_str` 循环改 `RIDE_TYPE_COUNT`（含 custom）；`build_road`/`reset_mode_state` 改用 `profile_effective_wkg`；`get_current_pacer` 自定义档返回 "Custom"。
+- `config_store.c/.h`：`config_data_t` 增 `custom_wkg_low/high`，defaults/validate（夹紧 + low≤high）/serialize（栈缓冲 352→416）/deserialize 同步。
+- `main/nvs_store.c` + `main/bikepower_config.h`：新增 `NVS_KEY_CUSTOM_WKG_LO/HI`（"cwkglo"/"cwkghi"）与双向映射。
+- `main/wifi_portal.c`：`/api/state` 顶层输出 `custom_wkg_low/high`，pacers 数组追加 custom 档；`apply_json_fields` 先于 ride_type 解析自定义范围。
+- `main/web/`：road 页配速档位下拉新增「自定义」，选中后展开「W/kg 下限/上限 ±[−][+]」步进器（0.1 一档），实时显示功体比与预计功率区间。
+- `tests/mock_server.py` 同步 custom 档与字段；`test/test_domain.c` 新增自定义档切换/功率范围/越界夹紧断言（host 单测 1284 通过）。
+
 ### 新增（调功步进可配置，可配网调整并持久化）
 - `components/bikepower_domain/`：新增 `power_step` 引擎字段与 `power_engine_set_power_step` setter（越界夹紧 `[POWER_STEP_MIN, POWER_STEP_MAX]` = 5~50W，默认 20W）；`domain_config.h` 新增 `POWER_STEP_MIN/MAX/DEFAULT`；`config_store` 三处（defaults/validate/serialize/deserialize）同步，serialize 栈缓冲 320→352。
 - `main/app_state.c`：物理按钮短按 −步进、长按连续 +步进 改用 `s_engine->power_step`（原硬编码 `POWER_STEP_W`）。

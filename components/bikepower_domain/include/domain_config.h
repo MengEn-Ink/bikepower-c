@@ -103,11 +103,20 @@ typedef enum {
 #define PROFILE_THR_HR_DEFAULT  190
 
 // ===== 配速机器人 =====
-// 索引 0-4 对应 coco/yumi/jacques/genie/constance
-#define PACER_COUNT             5
+// 预设索引 0-4 对应 coco/yumi/jacques/genie/constance；索引 5 为用户自定义档（W/kg 范围存于 profile）。
+#define PACER_COUNT             5       // 预设配速机器人数量（ROAD_PACERS 数组大小）
+#define PACER_INDEX_CUSTOM      5       // 自定义档索引
+#define RIDE_TYPE_COUNT         6       // 可选档位总数（5 预设 + 1 自定义）
 #define PACER_INDEX_DEFAULT     0
 #define PROFILE_RIDE_TYPE_DEFAULT  PACER_INDEX_DEFAULT
-#define PACER_INDEX_IS_VALID(idx)  ((idx) >= 0 && (idx) < PACER_COUNT)
+#define PACER_INDEX_IS_VALID(idx)  ((idx) >= 0 && (idx) < RIDE_TYPE_COUNT)
+#define PACER_INDEX_IS_CUSTOM(idx) ((idx) == PACER_INDEX_CUSTOM)
+
+// 自定义档 W/kg 范围（存储为 W/kg * 10 的整数）
+#define CUSTOM_WKG_MIN          10      // 1.0 W/kg
+#define CUSTOM_WKG_MAX          70      // 7.0 W/kg
+#define CUSTOM_WKG_LOW_DEFAULT  25      // 2.5 W/kg
+#define CUSTOM_WKG_HIGH_DEFAULT 30      // 3.0 W/kg
 
 typedef struct {
     const char *name;

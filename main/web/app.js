@@ -12,6 +12,7 @@ var STATE = {
   power_float: 5, cadence_float: 2, hr_float: 2,
   power_step: 20,
   profile_weight: 0, profile_ftp: 0, profile_thr_hr: 0, profile_ride_type: "coco",
+  custom_wkg_low: 25, custom_wkg_high: 30,
   pacers: [],
   remaining_sec: 180,
   closing: false,
@@ -202,18 +203,47 @@ function onPacerChange() {
   if (sel && sel.value) STATE.profile_ride_type = sel.value;
   updatePacerInfo();
 }
+/* 自定义档 W/kg 加减（步进 0.1 W/kg = ×10 的 1） */
+function onCustomWkgAdj(which, delta) {
+  var lo = STATE.custom_wkg_low, hi = STATE.custom_wkg_high;
+  if (which === "low") {
+    lo = clamp(lo + delta, 10, 70);
+    if (lo > hi) hi = lo;
+  } else {
+    hi = clamp(hi + delta, 10, 70);
+    if (hi < lo) lo = hi;
+  }
+  STATE.custom_wkg_low = lo;
+  STATE.custom_wkg_high = hi;
+  updatePacerInfo();
+}
 function updatePacerInfo() {
   var wkgEl = $("pacer-wkg");
   var wattEl = $("pacer-watt");
-  if (!wkgEl || !wattEl) return;
-  var p = null;
-  for (var i = 0; i < STATE.pacers.length; i++) {
-    if (STATE.pacers[i].id === STATE.profile_ride_type) { p = STATE.pacers[i]; break; }
+  var isCustom = STATE.profile_ride_type === "custom";
+  /* 自定义档编辑区显隐 */
+  var box = $("custom-wkg-box");
+  if (box) box.style.display = isCustom ? "block" : "none";
+  if (isCustom) {
+    var loEl = $("cwkg-low"), hiEl = $("cwkg-high");
+    if (loEl) loEl.textContent = (STATE.custom_wkg_low / 10).toFixed(1);
+    if (hiEl) hiEl.textContent = (STATE.custom_wkg_high / 10).toFixed(1);
   }
-  if (!p) { wkgEl.textContent = "—"; wattEl.textContent = "—"; return; }
+  if (!wkgEl || !wattEl) return;
+  var lo10, hi10;
+  if (isCustom) {
+    lo10 = STATE.custom_wkg_low; hi10 = STATE.custom_wkg_high;
+  } else {
+    var p = null;
+    for (var i = 0; i < STATE.pacers.length; i++) {
+      if (STATE.pacers[i].id === STATE.profile_ride_type) { p = STATE.pacers[i]; break; }
+    }
+    if (!p) { wkgEl.textContent = "—"; wattEl.textContent = "—"; return; }
+    lo10 = Math.round(p.wkg_low * 10); hi10 = Math.round(p.wkg_high * 10);
+  }
   var w = STATE.profile_weight || 70;
-  wkgEl.textContent = p.wkg_low.toFixed(1) + " - " + p.wkg_high.toFixed(1) + " W/kg";
-  wattEl.textContent = Math.round(p.wkg_low * w) + " - " + Math.round(p.wkg_high * w) + " W";
+  wkgEl.textContent = (lo10 / 10).toFixed(1) + " - " + (hi10 / 10).toFixed(1) + " W/kg";
+  wattEl.textContent = Math.round(lo10 * w / 10) + " - " + Math.round(hi10 * w / 10) + " W";
 }
 function applyHrLockState() {
   var radios = document.getElementsByName("hr-lock");
@@ -290,7 +320,9 @@ function collectConfig() {
     profile_weight: STATE.profile_weight,
     profile_ftp: STATE.profile_ftp,
     profile_thr_hr: STATE.profile_thr_hr,
-    profile_ride_type: STATE.profile_ride_type
+    profile_ride_type: STATE.profile_ride_type,
+    custom_wkg_low: STATE.custom_wkg_low,
+    custom_wkg_high: STATE.custom_wkg_high
   };
 }
 function onSave() {
@@ -376,7 +408,9 @@ function collectConfigBase() {
     profile_weight: STATE.profile_weight,
     profile_ftp: STATE.profile_ftp,
     profile_thr_hr: STATE.profile_thr_hr,
-    profile_ride_type: STATE.profile_ride_type
+    profile_ride_type: STATE.profile_ride_type,
+    custom_wkg_low: STATE.custom_wkg_low,
+    custom_wkg_high: STATE.custom_wkg_high
   };
 }
 
@@ -562,6 +596,8 @@ function init() {
       STATE.profile_ftp = data.profile_ftp || 200;
       STATE.profile_thr_hr = data.profile_thr_hr || 180;
       STATE.profile_ride_type = data.profile_ride_type || "coco";
+      STATE.custom_wkg_low = data.custom_wkg_low != null ? data.custom_wkg_low : 25;
+      STATE.custom_wkg_high = data.custom_wkg_high != null ? data.custom_wkg_high : 30;
       STATE.pacers = data.pacers || [];
       STATE.remaining_sec = data.remaining_sec != null ? data.remaining_sec : 180;
       STATE.closing = !!data.closing;

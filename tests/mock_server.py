@@ -43,6 +43,8 @@ MOCK_STATE = {
     "profile_ftp": 200,
     "profile_thr_hr": 170,
     "profile_ride_type": "coco",
+    "custom_wkg_low": 25,
+    "custom_wkg_high": 30,
     "remaining_sec": 180,
     "closing": False,
     "hr_locked": False,
@@ -52,6 +54,7 @@ MOCK_STATE = {
         {"id": "jacques", "name": "Jacques", "wkg_low": 3.0, "wkg_high": 3.5},
         {"id": "genie", "name": "Genie", "wkg_low": 3.5, "wkg_high": 3.9},
         {"id": "constance", "name": "Constance", "wkg_low": 4.0, "wkg_high": 4.4},
+        {"id": "custom", "name": "自定义", "wkg_low": 2.5, "wkg_high": 3.0, "custom": True},
     ],
 }
 
@@ -159,7 +162,8 @@ class Handler(BaseHTTPRequestHandler):
                           "heartrate", "power_float", "cadence_float", "hr_float",
                           "power_step",
                           "profile_weight", "profile_ftp",
-                          "profile_thr_hr", "profile_ride_type"):
+                          "profile_thr_hr", "profile_ride_type",
+                          "custom_wkg_low", "custom_wkg_high"):
                     if k in data:
                         MOCK_STATE[k] = data[k]
                 if "hr_lock" in data:

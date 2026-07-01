@@ -281,7 +281,7 @@ static void test_road_pacer(void)
     CHECK(power_engine_get_pacer_index(&e) == 2, "Jacques 索引=2");
     CHECK(strcmp(power_engine_get_current_pacer(&e), "Jacques") == 0, "当前机器人名称已更新");
     CHECK(!power_engine_set_pacer_index(&e, 2), "重复设置返回false");
-    CHECK(!power_engine_set_pacer_index(&e, PACER_COUNT), "非法机器人索引拒绝");
+    CHECK(!power_engine_set_pacer_index(&e, RIDE_TYPE_COUNT), "非法机器人索引拒绝");
     profile_set_weight(&e.profile, 70);
     CHECK(power_engine_set_pacer_index(&e, PACER_INDEX_DEFAULT), "切回 Coco");
     power_engine_set_mode(&e, RIDE_MODE_ROAD);
@@ -292,6 +292,25 @@ static void test_road_pacer(void)
         snapshot_t s = power_engine_snapshot(&e);
         CHECK(s.power >= lo && s.power <= hi, "coco 功率在功体比范围内");
     }
+
+    // 自定义档：切到 custom，设范围 3.0~3.5 W/kg，功率应落在 weight*wkg 区间
+    CHECK(power_engine_set_pacer_index(&e, PACER_INDEX_CUSTOM), "可切换到自定义档");
+    CHECK(power_engine_get_pacer_index(&e) == PACER_INDEX_CUSTOM, "自定义档索引=5");
+    CHECK(strcmp(power_engine_get_current_pacer(&e), "Custom") == 0, "自定义档名称=Custom");
+    CHECK(profile_set_custom_wkg(&e.profile, 30, 35), "设自定义 W/kg 3.0~3.5");
+    power_engine_set_mode(&e, RIDE_MODE_STEADY);
+    power_engine_set_mode(&e, RIDE_MODE_ROAD);  // 重置模式状态按新范围
+    domain_rng_seed(11);
+    int clo = 70 * 30 / 10; // 210
+    int chi = 70 * 35 / 10; // 245
+    for (int i = 0; i < 100; i++) {
+        snapshot_t s = power_engine_snapshot(&e);
+        CHECK(s.power >= clo && s.power <= chi, "自定义档功率在 3.0~3.5 W/kg 范围内");
+    }
+    // 自定义档范围越界夹紧 + low<=high
+    CHECK(profile_set_custom_wkg(&e.profile, 999, 5), "超界范围可设置（会夹紧）");
+    CHECK(e.profile.custom_wkg_low == CUSTOM_WKG_MAX, "下限夹到上限值 CUSTOM_WKG_MAX");
+    CHECK(e.profile.custom_wkg_high == CUSTOM_WKG_MAX, "上限被抬到不低于下限");
 }
 
 static void test_steady_snapshot(void)

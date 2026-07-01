@@ -108,7 +108,7 @@ static int target_heartrate(power_engine_t *e, int power)
 static const road_pacer_t *road_pacer(power_engine_t *e)
 {
     int idx = e->profile.ride_type;
-    if (!PACER_INDEX_IS_VALID(idx)) idx = PACER_INDEX_DEFAULT;
+    if (idx < 0 || idx >= PACER_COUNT) idx = PACER_INDEX_DEFAULT;
     return &ROAD_PACERS[idx];
 }
 
@@ -121,8 +121,10 @@ static const road_pacer_t *road_pacer(power_engine_t *e)
 void power_engine_reset_mode_state(power_engine_t *e)
 {
     if (e->mode == RIDE_MODE_ROAD) {
-        const road_pacer_t *p = road_pacer(e);
-        e->last_power = e->profile.weight * p->wkg_low / 10;
+        int wkg_low, wkg_high;
+        profile_effective_wkg(&e->profile, &wkg_low, &wkg_high);
+        (void)wkg_high;
+        e->last_power = e->profile.weight * wkg_low / 10;
         e->last_cadence = e->cadence_base;
     } else if (e->mode == RIDE_MODE_ERG) {
         e->last_power = e->has_erg_target ? e->erg_active_target : e->base_power;
@@ -183,8 +185,9 @@ static void build_steady(power_engine_t *e, int *po, int *co, int *ho)
  */
 static void build_road(power_engine_t *e, int *po, int *co, int *ho)
 {
-    const road_pacer_t *p = road_pacer(e);
-    int wkg = domain_rng_range(p->wkg_low, p->wkg_high);
+    int wkg_low, wkg_high;
+    profile_effective_wkg(&e->profile, &wkg_low, &wkg_high);
+    int wkg = domain_rng_range(wkg_low, wkg_high);
     int raw_power = e->profile.weight * wkg / 10;
     int power = clamp_power(raw_power);
     int cadence = clamp_cadence(e->cadence_base + domain_rng_range(STEADY_CADENCE_FLUCT_LO, STEADY_CADENCE_FLUCT_HI));
@@ -413,7 +416,9 @@ bool power_engine_set_pacer_index(power_engine_t *e, int pacer_index)
 
 const char *power_engine_get_current_pacer(power_engine_t *e)
 {
-    return ROAD_PACERS[power_engine_get_pacer_index(e)].name;
+    int idx = power_engine_get_pacer_index(e);
+    if (PACER_INDEX_IS_CUSTOM(idx)) return "Custom";
+    return ROAD_PACERS[idx].name;
 }
 
 /*

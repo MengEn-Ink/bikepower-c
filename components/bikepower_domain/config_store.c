@@ -36,6 +36,8 @@ void config_store_defaults(config_data_t *c)
     c->ftp = PROFILE_FTP_DEFAULT;
     c->thr_hr = PROFILE_THR_HR_DEFAULT;
     c->ride_type = PACER_INDEX_DEFAULT;
+    c->custom_wkg_low = CUSTOM_WKG_LOW_DEFAULT;
+    c->custom_wkg_high = CUSTOM_WKG_HIGH_DEFAULT;
     strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
@@ -63,6 +65,9 @@ bool config_store_validate(config_data_t *c)
     c->ftp = clamp_int(c->ftp, PROFILE_FTP_MIN, PROFILE_FTP_MAX);
     c->thr_hr = clamp_int(c->thr_hr, PROFILE_THR_HR_MIN, PROFILE_THR_HR_MAX);
     if (!PACER_INDEX_IS_VALID(c->ride_type)) c->ride_type = PACER_INDEX_DEFAULT;
+    c->custom_wkg_low = clamp_int(c->custom_wkg_low, CUSTOM_WKG_MIN, CUSTOM_WKG_MAX);
+    c->custom_wkg_high = clamp_int(c->custom_wkg_high, CUSTOM_WKG_MIN, CUSTOM_WKG_MAX);
+    if (c->custom_wkg_low > c->custom_wkg_high) c->custom_wkg_high = c->custom_wkg_low;
 
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
     if (c->device_name[0] == '\0') {
@@ -82,6 +87,8 @@ bool config_store_validate(config_data_t *c)
         || in.ftp != c->ftp
         || in.thr_hr != c->thr_hr
         || in.ride_type != c->ride_type
+        || in.custom_wkg_low != c->custom_wkg_low
+        || in.custom_wkg_high != c->custom_wkg_high
         || strncmp(in.device_name, c->device_name, DEVICE_NAME_MAX) != 0;
 }
 
@@ -184,20 +191,24 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
     if (json_escape(c->device_name, esc, sizeof(esc)) == (size_t)-1) return 0;
 
     /* 先写入栈缓冲，确认总长后再拷贝出参，避免向 out 写截断内容 */
-    char buf[352];
+    char buf[416];
     int n = snprintf(buf, sizeof(buf),
         "{\"schema_ver\":%d,\"power\":%d,\"cadence\":%d,\"mode\":%d,"
         "\"heartrate\":%d,\"has_user_hr\":%d,"
         "\"power_float\":%d,\"cadence_float\":%d,\"hr_float\":%d,"
         "\"power_step\":%d,"
         "\"weight\":%d,\"ftp\":%d,"
-        "\"thr_hr\":%d,\"ride_type\":%d,\"device_name\":\"%s\"}",
+        "\"thr_hr\":%d,\"ride_type\":%d,"
+        "\"custom_wkg_low\":%d,\"custom_wkg_high\":%d,"
+        "\"device_name\":\"%s\"}",
         c->schema_ver, c->power, c->cadence, c->mode,
         c->heartrate, c->has_user_hr,
         c->power_float, c->cadence_float, c->hr_float,
         c->power_step,
         c->weight, c->ftp,
-        c->thr_hr, c->ride_type, esc);
+        c->thr_hr, c->ride_type,
+        c->custom_wkg_low, c->custom_wkg_high,
+        esc);
 
     if (n < 0 || (size_t)n >= sizeof(buf)) return 0;  /* 编码错误或内部缓冲不足 */
     if ((size_t)n >= out_sz) return 0;                /* 出参缓冲不足，不溢出 */
@@ -225,6 +236,7 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         {"power_step", &tmp.power_step},
         {"weight", &tmp.weight}, {"ftp", &tmp.ftp},
         {"thr_hr", &tmp.thr_hr}, {"ride_type", &tmp.ride_type},
+        {"custom_wkg_low", &tmp.custom_wkg_low}, {"custom_wkg_high", &tmp.custom_wkg_high},
     };
     for (size_t i = 0; i < sizeof(int_keys) / sizeof(int_keys[0]); i++) {
         char pat[40];

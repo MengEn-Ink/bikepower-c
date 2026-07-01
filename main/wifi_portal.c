@@ -247,6 +247,12 @@ static void apply_json_fields(power_engine_t *e, const char *body)
     profile_set_weight(&e->profile, json_get_int_def(body, "profile_weight", e->profile.weight));
     profile_set_ftp(&e->profile, json_get_int_def(body, "profile_ftp", e->profile.ftp));
     profile_set_thr_hr(&e->profile, json_get_int_def(body, "profile_thr_hr", e->profile.thr_hr));
+    /* 自定义档 W/kg 范围：先于 ride_type 设置，保证切到自定义档时范围已就绪 */
+    if (json_has_key(body, "custom_wkg_low") || json_has_key(body, "custom_wkg_high")) {
+        profile_set_custom_wkg(&e->profile,
+            json_get_int_def(body, "custom_wkg_low", e->profile.custom_wkg_low),
+            json_get_int_def(body, "custom_wkg_high", e->profile.custom_wkg_high));
+    }
     if (json_get_str(body, "profile_ride_type", val, sizeof(val)) && val[0]) {
         profile_set_ride_type_str(&e->profile, val);
     }
@@ -283,7 +289,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
     char dn_esc[DEVICE_NAME_MAX * 2 + 1] = {0};
     json_escape(e->device_name, dn_esc, sizeof(dn_esc));
 
-    int ride_type_idx = (e->profile.ride_type >= 0 && e->profile.ride_type < PACER_COUNT)
+    int ride_type_idx = (e->profile.ride_type >= 0 && e->profile.ride_type < RIDE_TYPE_COUNT)
                         ? e->profile.ride_type : 0;
 
     char buf[1536];
@@ -294,6 +300,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"power_step\":%d,"
         "\"profile_weight\":%d,\"profile_ftp\":%d,\"profile_thr_hr\":%d,"
         "\"profile_ride_type\":\"%s\","
+        "\"custom_wkg_low\":%d,\"custom_wkg_high\":%d,"
         "\"remaining_sec\":%d,\"closing\":%s,"
         "\"hr_locked\":%s,"
         "\"pacers\":[",
@@ -303,6 +310,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         e->power_step,
         e->profile.weight, e->profile.ftp, e->profile.thr_hr,
         PROFILE_RIDE_TYPE_OPTIONS[ride_type_idx],
+        e->profile.custom_wkg_low, e->profile.custom_wkg_high,
         remaining_seconds(), s_closing ? "true" : "false",
         e->has_user_hr ? "true" : "false");
 
@@ -313,6 +321,14 @@ static esp_err_t h_api_state(httpd_req_t *req)
             PROFILE_RIDE_TYPE_OPTIONS[i], ROAD_PACERS[i].name,
             ROAD_PACERS[i].wkg_low / 10, ROAD_PACERS[i].wkg_low % 10,
             ROAD_PACERS[i].wkg_high / 10, ROAD_PACERS[i].wkg_high % 10);
+    }
+    /* 追加自定义档（id=custom），W/kg 范围取自 profile，供前端下拉与编辑 */
+    if (off < (int)sizeof(buf) - 96) {
+        off += snprintf(buf + off, sizeof(buf) - off,
+            ",{\"id\":\"%s\",\"name\":\"自定义\",\"wkg_low\":%d.%d,\"wkg_high\":%d.%d,\"custom\":true}",
+            PROFILE_RIDE_TYPE_OPTIONS[PACER_INDEX_CUSTOM],
+            e->profile.custom_wkg_low / 10, e->profile.custom_wkg_low % 10,
+            e->profile.custom_wkg_high / 10, e->profile.custom_wkg_high % 10);
     }
     off += snprintf(buf + off, sizeof(buf) - off, "]}");
 
