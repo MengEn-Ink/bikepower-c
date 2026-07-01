@@ -181,10 +181,10 @@ static void trigger_wifi(void)
     }
 }
 
-#ifdef OTA_TEST_AUTO_CONFIG
+#ifdef PORTAL_TEST_AUTO_CONFIG
 void app_state_enter_wifi_config_for_test(void)
 {
-    ESP_LOGW(TAG, "[OTA测试] 自动触发配网（OTA_TEST_AUTO_CONFIG）");
+    ESP_LOGW(TAG, "[配网测试] 自动触发配网（PORTAL_TEST_AUTO_CONFIG）");
     trigger_wifi();
 }
 #endif

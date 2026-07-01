@@ -45,8 +45,8 @@ target_include_directories(${COMPONENT_LIB} PRIVATE ${GENERATED_WEB_DIR})
 # 让 COMPONENT_LIB 依赖生成步骤（保证编译前先生成头文件）
 add_dependencies(${COMPONENT_LIB} web_index_html)
 
-option(OTA_TEST_AUTO_CONFIG "测试用：启动自动触发配网（正式发版保持 OFF）" OFF)
-if(OTA_TEST_AUTO_CONFIG)
-    target_compile_definitions(${COMPONENT_LIB} PRIVATE OTA_TEST_AUTO_CONFIG)
-    message(STATUS "OTA_TEST_AUTO_CONFIG=ON（测试固件，启动自动配网）")
+option(PORTAL_TEST_AUTO_CONFIG "测试用：启动自动触发配网（正式发版保持 OFF）" OFF)
+if(PORTAL_TEST_AUTO_CONFIG)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE PORTAL_TEST_AUTO_CONFIG)
+    message(STATUS "PORTAL_TEST_AUTO_CONFIG=ON（测试固件，启动自动配网）")
 endif()

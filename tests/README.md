@@ -173,10 +173,10 @@ python3 tests/serial_capture.py --port /dev/ttyACM0 --duration 12
 # 3. BLE 五服务 + ERG
 python3 tests/ble_selftest.py
 # 4. 烧测试固件进配网态，跑门户自测
-idf.py reconfigure -DOTA_TEST_AUTO_CONFIG=ON && idf.py build && idf.py -p /dev/ttyACM0 flash
+idf.py reconfigure -DPORTAL_TEST_AUTO_CONFIG=ON && idf.py build && idf.py -p /dev/ttyACM0 flash
 python3 tests/stage5_portal_test.py --ip 192.168.4.1
 # 5. 烧回正式固件
-idf.py reconfigure -DOTA_TEST_AUTO_CONFIG=OFF && idf.py build && idf.py -p /dev/ttyACM0 flash
+idf.py reconfigure -DPORTAL_TEST_AUTO_CONFIG=OFF && idf.py build && idf.py -p /dev/ttyACM0 flash
 ```
 
 ---
@@ -193,11 +193,11 @@ idf.py build
 ### 测试固件（带自动配网，用于配网门户自动化测试）
 
 ```bash
-idf.py build -DOTA_TEST_AUTO_CONFIG=ON
+idf.py build -DPORTAL_TEST_AUTO_CONFIG=ON
 # 启动后 BLE 就绪 3s 自动触发配网，便于 stage5_portal_test.py 等脚本全自动验证
 ```
 
-> `OTA_TEST_AUTO_CONFIG` 是 CMake option，默认 OFF。正式发版编译不带此选项，测试编译传 `-DOTA_TEST_AUTO_CONFIG=ON`。两者代码一致，仅测试固件多一个启动自动配网钩子。
+> `PORTAL_TEST_AUTO_CONFIG` 是 CMake option，默认 OFF。正式发版编译不带此选项，测试编译传 `-DPORTAL_TEST_AUTO_CONFIG=ON`。两者代码一致，仅测试固件多一个启动自动配网钩子。
 
 > 切换 option 后必须 `idf.py reconfigure` 或删 `build/CMakeCache.txt`，否则缓存不刷新。
 
@@ -226,11 +226,11 @@ sudo usermod -aG dialout $USER
 
 ### Q3：测试固件不自动开配网
 
-确认编译时传了 `-DOTA_TEST_AUTO_CONFIG=ON`。若之前编译过正式版，需清除 CMake 缓存：
+确认编译时传了 `-DPORTAL_TEST_AUTO_CONFIG=ON`。若之前编译过正式版，需清除 CMake 缓存：
 
 ```bash
 rm -f build/CMakeCache.txt
-idf.py reconfigure -DOTA_TEST_AUTO_CONFIG=ON
+idf.py reconfigure -DPORTAL_TEST_AUTO_CONFIG=ON
 idf.py build
 ```
 

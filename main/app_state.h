@@ -95,9 +95,9 @@ void app_state_set_error(void);
  */
 void app_state_clear_error(void);
 
-#ifdef OTA_TEST_AUTO_CONFIG
+#ifdef PORTAL_TEST_AUTO_CONFIG
 /**
- * 测试用：自动进入 WiFi 配网（OTA_TEST_AUTO_CONFIG）。
+ * 测试用：自动进入 WiFi 配网（PORTAL_TEST_AUTO_CONFIG）。
  * 仅测试固件编译，正式发版不编译。等价于按钮二次确认后的触发，跳过确认窗口直接进配网。
  * 无参数。返回值：无。
  */

@@ -29,7 +29,7 @@ usage() {
       --monitor               烧录后进入 idf.py monitor
       --no-capture            烧录后不抓取启动串口日志
       --capture-seconds N     烧录后抓取 N 秒启动日志，默认 15
-      --ota-test-auto-config  编译 OTA 自动配网测试固件；默认刷正式固件
+      --portal-test-auto-config  编译配网自动触发测试固件；默认刷正式固件
       --keep-daemon           不自动停止 tests/serial_daemon.py
   -h, --help                  显示帮助
 
@@ -90,7 +90,7 @@ while [ $# -gt 0 ]; do
             CAPTURE_SECONDS="${1#*=}"
             shift
             ;;
-        --ota-test-auto-config)
+        --portal-test-auto-config)
             TEST_AUTO_CONFIG=ON
             shift
             ;;
@@ -273,8 +273,8 @@ else
 fi
 
 if [ "$DO_BUILD" -eq 1 ]; then
-    log "编译固件（OTA_TEST_AUTO_CONFIG=$TEST_AUTO_CONFIG）"
-    idf.py -DOTA_TEST_AUTO_CONFIG="$TEST_AUTO_CONFIG" build
+    log "编译固件（PORTAL_TEST_AUTO_CONFIG=$TEST_AUTO_CONFIG）"
+    idf.py -DPORTAL_TEST_AUTO_CONFIG="$TEST_AUTO_CONFIG" build
 else
     log "跳过显式编译"
 fi
