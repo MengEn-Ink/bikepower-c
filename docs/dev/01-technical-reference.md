@@ -4,7 +4,7 @@
 内容基于当前仓库实现撰写，重点对应 `main/`、`components/bikepower_domain/`、`tests/` 和 `docs/images/`。
 阅读顺序建议配合 [architecture.png](../images/architecture.png)、[main-loop-flow.png](../images/main-loop-flow.png)、[button-led-state.png](../images/button-led-state.png) 和 [rf-wifi-flow.png](../images/rf-wifi-flow.png) 一起看。
 
-当前固件版本为 `v3.1.8`。
+当前固件版本为 `v4.0.0`。
 运行环境为 `ESP-IDF v5.5.4 + NimBLE + FreeRTOS`，目标芯片为 `ESP32-C3`。
 
 ## 第一章：项目架构
@@ -42,6 +42,11 @@
 - `hr_model.c`：心率分区、平滑、HRV、对外限速
 - `profile.c`：体重、FTP、阈值心率、配速机器人
 - `config_store.c`：配置 schema、默认值、校验、迁移
+- `json_miniparse.c`：轻量 JSON 字段提取
+- `button_logic.c`：按钮按压语义纯逻辑
+- `button_debounce.c`：去抖与长按节拍纯逻辑
+- `led_pattern.c`：LED 模式、颜色与闪烁节拍映射
+- `domain_rng.c`：领域层随机数
 - `include/domain_config.h`：领域层常量中心
 
 这层的价值是把“骑行模拟逻辑”和“设备运行逻辑”分开。
@@ -262,7 +267,7 @@ DIS 读取内容来自编译期常量：
 
 - `DEVICE_MANUFACTURER = "BikePower"`
 - `DEVICE_MODEL = "ESP32-C3"`
-- `FIRMWARE_VERSION = "3.1.8"`
+- `FIRMWARE_VERSION = "4.0.0"`
 
 测试脚本 `tests/ble_selftest.py` 也会校验这三项。
 
@@ -580,7 +585,7 @@ DIS 读取内容来自编译期常量：
 ## 第八章：WiFi 配网
 
 WiFi 配网链路分布在 `app_state.c`、`radio_ctrl.c`、`wifi_portal.c`。
-当前配网默认使用 ESP-IDF coex 共存模式：BLE 保持在线继续通知，WiFi SoftAP 负责本地门户；仅 OTA 下载升级进入独占 STA，或共存初始化失败兜底时才主动停 BLE。
+当前配网默认使用 ESP-IDF coex 共存模式：BLE 保持在线继续通知，WiFi SoftAP 负责本地门户；仅共存初始化失败兜底时才主动停 BLE。
 
 ![WiFi/BLE 射频共用流程](../images/rf-wifi-flow.png)
 
@@ -596,7 +601,7 @@ WiFi 配网链路分布在 `app_state.c`、`radio_ctrl.c`、`wifi_portal.c`。
 5. 保存并关闭或 180s 超时后，`wifi_portal` 投递 `APP_EVT_WIFI_DONE`
 6. 状态机调用 `radio_ctrl_exit_wifi()`，关闭 HTTP/DNS/SoftAP，原地回到 BLE 工作态
 
-失败兜底也集中在 `radio_ctrl`：只有共存 SoftAP 初始化失败时，才调用 `ble_bikepower_stop()` 释放 BLE 并重试；主循环通过 `radio_ctrl_ble_suspended()` 区分主动停 BLE 与 BLE 故障，避免在独占 WiFi/OTA 期间自动重启 BLE。
+失败兜底也集中在 `radio_ctrl`：只有共存 SoftAP 初始化失败时，才调用 `ble_bikepower_stop()` 释放 BLE 并重试；主循环通过 `radio_ctrl_ble_suspended()` 区分主动停 BLE 与 BLE 故障，避免在兜底配网期间自动重启 BLE。
 
 ### 8.2 SoftAP 启动
 
@@ -625,34 +630,25 @@ v3.2.0 起配网门户前后端分离：
 
 - `cfg.server_port = WIFI_PORT`
 - `cfg.lru_purge_enable = true`
-- `cfg.max_uri_handlers = HTTP_MAX_URI_HANDLERS`（当前 32）
+- `cfg.max_uri_handlers = HTTP_MAX_URI_HANDLERS`（当前 20）
 - `cfg.stack_size = 8192`
 - `cfg.keep_alive_enable = false`
 
-已注册业务路由 15 个，另有 10 个 Captive Portal 探测路由：
+已注册业务路由 8 个，另有 10 个 Captive Portal 探测路由：
 
 - `GET /`（返回内联 HTML 整页）
 - `GET /favicon.ico`（204）
-- `GET /api/state`（设备全状态：device_name/firmware_version/power/cadence/heartrate/mode/profile_*/pacers/remaining_sec/closing/home_wifi_ssid）
+- `GET /api/state`（设备全状态：device_name/firmware_version/power/cadence/heartrate/mode/profile_*/pacers/LED 配置/remaining_sec/closing）
 - `GET /api/time`（纯数字剩余秒数）
 - `POST /api/renew`（续期，返回新的剩余秒数）
 - `GET /api/mem_stats`（`{"free":..,"min_free":..}`）
 - `POST /api/config`（保存配置，返回 `{"ok":true}`）
 - `POST /api/close-wifi`（保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE）
-- `POST /api/ota/check`（异步触发版本检查，返回 `{"status":"started"|"running"|"error"}`）
-- `GET /api/ota/status`（轮询检查状态：`status` ∈ `idle/running/done/error`，done 时附 `has_update/version/size/changelog`）
-- `POST /api/ota/upgrade`（触发在线升级，返回 `{"ok":true}`）
-- `POST /api/wifi/scan`（异步触发扫描，返回 `{"status":"started"}`）
-- `GET /api/wifi/scan/status`（轮询扫描状态，done 时附 `count/networks`）
-- `POST /api/wifi/save`（保存 SSID/PSK 并异步测试连接，返回 `{"status":"started"}`）
-- `GET /api/wifi/connect/status`（轮询连接状态，done 时附 `connected/ssid/ip`）
 
 其中：
 
 - `/api/config`：保存配置并实时生效到 BLE 通知
 - `/api/close-wifi`：保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE
-- `/api/ota/check`：异步连接家庭 WiFi，拉取 `latest.json`
-- `/api/ota/upgrade`：进入独占 STA，下载固件并写入 OTA 分区，完成后重启
 - `/api/time`：返回剩余秒数
 - `/api/renew`：续期
 - `/api/mem_stats`：返回 `free` 和 `min_free`
@@ -676,13 +672,13 @@ v3.2.0 起配网门户前后端分离：
 5. `portal_done()` 通过 done 回调投递 `APP_EVT_WIFI_DONE`
 6. 状态机在 app_main 上下文调用 `radio_ctrl_exit_wifi()`
 
-所以当前版本的配网退出不重启设备；BLE 在普通配网期间保持在线。OTA 升级是例外：升级任务会关闭 AP 和 BLE，切到 STA 独占模式下载固件，最终通过 `esp_restart()` 进入新固件或回到 BLE。
+所以当前版本的配网退出不重启设备；BLE 在普通配网期间保持在线。v4.0.0 已移除在线 OTA 与家庭网络配置，固件升级走全量重新烧录。
 
 ### 8.5 前端反馈与 JSON 安全
 
-配网首页的 `/config` 采用 PRG 流程，保存成功后 302 回 `/?saved=1`，首页显示“已保存到设备”的强反馈；`/close-wifi` 仍用于保存并进入 5 秒收尾窗口。`/more` 下的个人信息表单在前端校验体重、FTP、阈值心率等范围，非法值会阻止提交并给出字段级提示。
+配网门户是单页 SPA。首页与设置页通过 `location.hash` 切换，保存入口统一为 `POST /api/config`，保存并关闭 WiFi 入口为 `POST /api/close-wifi`。前端提交完整 JSON payload，保存成功后页面显示即时反馈；字段级校验覆盖功率、踏频、心率、体重、FTP、阈值心率、调功步进、浮动幅度、自定义 W/kg 与 LED 配置。
 
-WiFi 扫描、家庭网络保存、OTA 检查和 OTA 升级状态都返回 JSON。`wifi_portal.c` 使用 `json_escape()` 转义字符串字段，避免 SSID、错误信息或远端 changelog 破坏 JSON；OTA 页面渲染远端更新说明时做 HTML 转义，测试脚本 `tests/ota_local_mock.py --self-test` 覆盖升级进度轮询和 XSS 回归。
+`wifi_portal.c` 使用 `json_escape()` 转义字符串字段，避免设备名等用户可控内容破坏 JSON；前端渲染动态文本时使用 HTML 转义。`tests/check_portal_js.py` 与 `tests/check_portal_structure.py` 分别覆盖 JS 语法和前后端路由/视图契约。
 
 ## 第九章：配置持久化
 
@@ -701,17 +697,28 @@ namespace 固定为：
 - `NVS_KEY_MODE = "mode"`
 - `NVS_KEY_HEARTRATE = "hr"`
 - `NVS_KEY_HAS_USER_HR = "hashr"`
+- `NVS_KEY_POWER_FLOAT = "pfloat"`
+- `NVS_KEY_CADENCE_FLOAT = "cfloat"`
+- `NVS_KEY_HR_FLOAT = "hrfloat"`
+- `NVS_KEY_POWER_STEP = "pstep"`
 - `NVS_KEY_WEIGHT = "weight"`
 - `NVS_KEY_FTP = "ftp"`
 - `NVS_KEY_THR_HR = "thr_hr"`
 - `NVS_KEY_RIDE_TYPE = "ride"`
+- `NVS_KEY_CUSTOM_WKG_LO = "cwkglo"`
+- `NVS_KEY_CUSTOM_WKG_HI = "cwkghi"`
 - `NVS_KEY_DEVICE_NAME = "devname"`
-
-家庭 WiFi 凭证使用独立 namespace，避免和骑行配置混在一起：
-
-- `NVS_NAMESPACE_WIFI = "wifica"`
-- `NVS_KEY_HOME_SSID = "ssid"`
-- `NVS_KEY_HOME_PSK = "psk"`
+- `NVS_KEY_LED_SILENT = "ledsil"`
+- `NVS_KEY_LED_WAIT_MODE = "ledwm"`
+- `NVS_KEY_LED_WAIT_COLOR = "ledwc"`
+- `NVS_KEY_LED_CONN_MODE = "ledconm"`
+- `NVS_KEY_LED_CONN_COLOR = "ledconc"`
+- `NVS_KEY_LED_WIFI_MODE = "ledwifim"`
+- `NVS_KEY_LED_WIFI_COLOR = "ledwific"`
+- `NVS_KEY_LED_CONFIRM_MODE = "ledcfm"`
+- `NVS_KEY_LED_CONFIRM_COLOR = "ledcfc"`
+- `NVS_KEY_LED_ERROR_MODE = "lederrm"`
+- `NVS_KEY_LED_ERROR_COLOR = "lederrc"`
 
 ### 9.2 schema 版本
 
@@ -815,7 +822,7 @@ FTMS 控制点收到写请求后只做最少逻辑：
 
 - 禁止开机自启 WiFi
 - 禁止绕过 `radio_ctrl` 直接调用 `esp_wifi_*`
-- OTA 独占 STA 或共存失败兜底时，必须由 `radio_ctrl` 负责停 BLE 并设置 `radio_ctrl_ble_suspended()`
+- 共存失败兜底时，必须由 `radio_ctrl` 负责停 BLE 并设置 `radio_ctrl_ble_suspended()`
 - 普通配网结束后关闭 WiFi 原地回 BLE，不通过重启恢复
 
 ### 11.2 中断上下文安全
@@ -918,14 +925,12 @@ LED 物理变化仍需人工肉眼确认。
 默认会检查：
 
 - `/`
-- `/more`
-- `/ui/module?name=device`
-- `/time`
-- `/mem_stats`
+- `/api/state`
+- `/api/time`
+- `/api/mem_stats`
 - `/favicon.ico`
-- `/success` 直访守卫
 
-可选使用 `--renew` 额外验证 `/renew`。
+可选使用 `--renew` 额外验证 `POST /api/renew`。
 
 ### 12.6 建议的维护顺序
 
@@ -938,8 +943,7 @@ LED 物理变化仍需人工肉眼确认。
 5. 看串口启动日志
 6. 跑 `tests/ble_selftest.py`
 7. 涉及配网时再跑 `tests/stage5_portal_test.py`
-8. 涉及 OTA 页面时跑 `python3 tests/ota_local_mock.py --self-test`
-9. 涉及按钮和 LED 时做人工真机操作确认
+8. 涉及按钮和 LED 时做人工真机操作确认
 
 ## 结语
 
@@ -949,6 +953,6 @@ LED 物理变化仍需人工肉眼确认。
 - 破坏了主循环节拍
 - 绕过了 `radio_ctrl`
 - 在错误线程里直接改引擎或发 BLE
-- 忽略了 NVS 脏标记、配网收尾和 OTA 重启路径
+- 忽略了 NVS 脏标记、配网收尾和射频兜底路径
 
 只要守住这几个边界，后续继续迭代会比较稳。

@@ -3,10 +3,10 @@
 
 连上 BikePower 热点后验证 HTTP 路由与行为。v3.2.0 起：
   - 前端走 SPA 单页面，C 侧只暴露 /api/xxx JSON 接口
-  - 草稿 / 配置 / 关 WiFi 全部 POST JSON，不再返回 302
+  - 配置 / 关 WiFi 全部 POST JSON，不再返回 302
   - 倒计时与续期返回纯数字（保留旧契约，前端直接 parseInt）
 
-默认不提交 /api/config（会重启），但提交一次 /api/draft 草稿（仅内存生效）。
+默认只读校验，不提交 /api/config 或 /api/close-wifi；传 --renew 时额外 POST /api/renew。
 
 用法:
   python3 tests/stage5_portal_test.py                      # 默认 192.168.4.1，只读校验
@@ -151,11 +151,11 @@ def main():
 
     if args.renew:
         def renew():
-            body, status, _ = http_get(f"{base}/api/renew")
+            body, status, _ = http_post_json(f"{base}/api/renew", {})
             secs = int(body.strip())
             ok = status == 200 and secs >= 170
             return ok, f"续期后剩余={secs}s"
-        results.append(_try("续期 GET /api/renew", renew))
+        results.append(_try("续期 POST /api/renew", renew))
 
     print("--- 结果 ---")
     passed = sum(1 for r in results if r)

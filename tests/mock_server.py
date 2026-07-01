@@ -14,7 +14,7 @@
   - GET /favicon.ico      204
   - GET /api/state        JSON 设备状态
   - GET /api/time         纯数字倒计时（每请求自减，最低 0）
-  - GET /api/renew        重置倒计时为 180
+  - POST /api/renew       重置倒计时为 180
   - GET /api/mem_stats    JSON 假内存数据
   - POST /api/config      {"ok":true}（保存到运行时状态）
   - POST /api/close-wifi  {"ok":true}
@@ -140,11 +140,6 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/time":
             sec = _tick_remaining()
             self._send_text(str(sec))
-            return
-        if path == "/api/renew":
-            with LOCK:
-                REMAINING_SEC[0] = 180
-            self._send_text("180")
             return
         if path == "/api/mem_stats":
             self._send_json({"free": 120000, "min_free": 98000})

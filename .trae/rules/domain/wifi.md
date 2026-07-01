@@ -35,7 +35,7 @@
 - `GET /favicon.ico`（204）
 - `GET /api/state`（设备全状态：device_name/firmware_version/power/cadence/heartrate/mode/profile_*/pacers/remaining_sec/closing）
 - `GET /api/time`（纯数字剩余秒数）
-- `GET /api/renew`（续期，返回新的剩余秒数）
+- `POST /api/renew`（续期，返回新的剩余秒数）
 - `GET /api/mem_stats`（`{"free":..,"min_free":..}`）
 - `POST /api/config`（保存配置并实时生效，返回 `{"ok":true}`）
 - `POST /api/close-wifi`（保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE）
