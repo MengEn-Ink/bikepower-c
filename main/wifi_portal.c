@@ -227,6 +227,10 @@ static void apply_json_fields(power_engine_t *e, const char *body)
     /* 手动三项：setter 内部仅 STEADY 生效，非 STEADY 自动拒绝 */
     power_engine_set_power(e, json_get_int_def(body, "power", e->base_power));
     power_engine_set_cadence(e, json_get_int_def(body, "cadence", e->cadence_base));
+    /* 浮动幅度三项：任意模式接受设置（仅固定模式生效），setter 内部夹紧范围 */
+    power_engine_set_power_float(e, json_get_int_def(body, "power_float", e->power_float));
+    power_engine_set_cadence_float(e, json_get_int_def(body, "cadence_float", e->cadence_float));
+    power_engine_set_hr_float(e, json_get_int_def(body, "hr_float", e->hr_float));
     /* 心率锁定：hr_lock=1 锁定到 heartrate 值，hr_lock=0 解锁随功率联动 */
     if (json_has_key(body, "hr_lock")) {
         if (json_get_int(body, "hr_lock")) {
@@ -284,6 +288,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
     int off = snprintf(buf, sizeof(buf),
         "{\"device_name\":\"%s\",\"firmware_version\":\"%s\","
         "\"power\":%d,\"cadence\":%d,\"heartrate\":%d,\"mode\":\"%s\","
+        "\"power_float\":%d,\"cadence_float\":%d,\"hr_float\":%d,"
         "\"profile_weight\":%d,\"profile_ftp\":%d,\"profile_thr_hr\":%d,"
         "\"profile_ride_type\":\"%s\","
         "\"remaining_sec\":%d,\"closing\":%s,"
@@ -291,6 +296,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"pacers\":[",
         dn_esc, FIRMWARE_VERSION,
         e->base_power, e->cadence_base, e->last_heartrate, mode_to_id((int)e->mode),
+        e->power_float, e->cadence_float, e->hr_float,
         e->profile.weight, e->profile.ftp, e->profile.thr_hr,
         PROFILE_RIDE_TYPE_OPTIONS[ride_type_idx],
         remaining_seconds(), s_closing ? "true" : "false",

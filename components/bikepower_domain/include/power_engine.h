@@ -27,6 +27,18 @@ typedef struct {
 } snapshot_t;
 
 /*
+ * 有界平滑随机游走状态。
+ * 用途：为固定模式下的功率/踏频提供在 [-amp, +amp] 内平稳变化的偏移量，
+ *       周期性在带内重采样目标后一阶指数逼近，输出始终限制在带内（非逐拍随机）。
+ */
+typedef struct {
+    float value;   // 当前连续偏移量（相对基准值）
+    int target;    // 当前目标偏移量
+    int hold;      // 目标剩余保持拍数
+    bool init;     // 是否已初始化
+} fluct_walk_t;
+
+/*
  * 功率引擎运行时状态。
  * 用途：保存当前基准配置、模式状态、用户档案、心率模型和最近一次输出快照。
  */
@@ -36,6 +48,11 @@ typedef struct {
     int last_heartrate;
     int user_heartrate;       // 有效仅当 has_user_hr
     bool has_user_hr;
+    int power_float;          // 功率浮动幅度（±W，仅固定模式生效）
+    int cadence_float;        // 踏频浮动幅度（±RPM，仅固定模式生效）
+    int hr_float;             // 固定心率浮动幅度（±BPM，仅固定模式+锁定心率生效）
+    fluct_walk_t power_walk;  // 功率平滑游走状态
+    fluct_walk_t cadence_walk;// 踏频平滑游走状态
     ride_mode_t mode;
     int erg_active_target;    // 有效仅当 has_erg_target
     bool has_erg_target;
@@ -67,6 +84,12 @@ bool power_engine_set_cadence(power_engine_t *e, int value);
 bool power_engine_set_heartrate(power_engine_t *e, int value);
 /* 清除固定用户心率，恢复心率随功率联动（按 FTP 分区映射）。 */
 void power_engine_clear_user_hr(power_engine_t *e);
+/* 设置功率浮动幅度（±W），越界夹紧，仅影响固定模式输出。 */
+bool power_engine_set_power_float(power_engine_t *e, int amp);
+/* 设置踏频浮动幅度（±RPM），越界夹紧，仅影响固定模式输出。 */
+bool power_engine_set_cadence_float(power_engine_t *e, int amp);
+/* 设置固定心率浮动幅度（±BPM），越界夹紧，仅影响固定模式锁定心率输出。 */
+bool power_engine_set_hr_float(power_engine_t *e, int amp);
 /* 切换骑行模式，并在模式变化后重置内部状态。 */
 bool power_engine_set_mode(power_engine_t *e, ride_mode_t mode);
 /* 读取当前 profile 选择的配速机器人索引。 */

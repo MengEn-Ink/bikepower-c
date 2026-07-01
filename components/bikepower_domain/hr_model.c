@@ -196,21 +196,28 @@ int hr_model_emit(hr_state_t *st, int raw)
 
 /*
  * 在固定用户心率模式下生成带小幅波动的平滑心率。
- * 参数：st 为心率状态对象；user_hr 为用户设置的基准心率。
+ * 参数：st 为心率状态对象；user_hr 为用户设置的基准心率；amp 为 ± 浮动幅度（0 表示恒定）。
  * 返回值：返回钳制后的整数心率值。
- * 特殊行为：目标心率会在小范围内周期性重采样并平滑逼近，结果始终限制在基准值附近的允许波动区间内。
+ * 特殊行为：amp=0 时直接输出基准值；否则目标心率在 [base-amp, base+amp] 内周期性重采样并平滑逼近，
+ *           结果始终限制在该允许波动区间内。
  */
-int hr_model_steady_user(hr_state_t *st, int user_hr)
+int hr_model_steady_user(hr_state_t *st, int user_hr, int amp)
 {
     int base = hr_clamp(user_hr);
-    int low = hr_clamp(base + STEADY_USER_HR_FLUCT_LO);
-    int high = hr_clamp(base + STEADY_USER_HR_FLUCT_HI);
+    if (amp <= 0) {
+        st->user_hr_float = (float)base;
+        st->user_hr_float_init = true;
+        st->hr_float = (float)base;
+        return base;
+    }
+    int low = hr_clamp(base - amp);
+    int high = hr_clamp(base + amp);
     if (!st->user_hr_float_init || st->user_hr_float < low || st->user_hr_float > high) {
         st->user_hr_float = (float)base;
         st->user_hr_float_init = true;
     }
     if (!st->user_hr_target_init || st->user_hr_hold <= 0) {
-        st->user_hr_target = hr_clamp(base + domain_rng_range(STEADY_USER_HR_FLUCT_LO, STEADY_USER_HR_FLUCT_HI));
+        st->user_hr_target = hr_clamp(base + domain_rng_range(-amp, amp));
         st->user_hr_hold = STEADY_USER_HR_TARGET_HOLD_LOOPS;
         st->user_hr_target_init = true;
     } else {

@@ -33,6 +33,9 @@ static void engine_to_config(power_engine_t *e, config_data_t *c)
     c->mode = (int)e->mode;
     c->heartrate = e->has_user_hr ? e->user_heartrate : DEFAULT_HEARTRATE;
     c->has_user_hr = e->has_user_hr ? 1 : 0;
+    c->power_float = e->power_float;
+    c->cadence_float = e->cadence_float;
+    c->hr_float = e->hr_float;
     c->weight = e->profile.weight;
     c->ftp = e->profile.ftp;
     c->thr_hr = e->profile.thr_hr;
@@ -53,6 +56,9 @@ static void config_to_engine(const config_data_t *c, power_engine_t *e)
 {
     power_engine_set_power(e, c->power);
     power_engine_set_cadence(e, c->cadence);
+    power_engine_set_power_float(e, c->power_float);
+    power_engine_set_cadence_float(e, c->cadence_float);
+    power_engine_set_hr_float(e, c->hr_float);
     // 先恢复固定心率：初始化时engine默认mode为STEADY，set_heartrate可正常生效；
     // 后续set_mode切换到ROAD/ERG不会清除has_user_hr/user_heartrate字段，切回STEADY时可自动恢复使用
     if (c->has_user_hr) power_engine_set_heartrate(e, c->heartrate);
@@ -119,6 +125,9 @@ void nvs_store_load(power_engine_t *e)
     get_i32(h, NVS_KEY_MODE, &c.mode);
     get_i32(h, NVS_KEY_HEARTRATE, &c.heartrate);
     get_i32(h, NVS_KEY_HAS_USER_HR, &c.has_user_hr);
+    get_i32(h, NVS_KEY_POWER_FLOAT, &c.power_float);
+    get_i32(h, NVS_KEY_CADENCE_FLOAT, &c.cadence_float);
+    get_i32(h, NVS_KEY_HR_FLOAT, &c.hr_float);
     get_i32(h, NVS_KEY_WEIGHT, &c.weight);
     get_i32(h, NVS_KEY_FTP, &c.ftp);
     get_i32(h, NVS_KEY_THR_HR, &c.thr_hr);
@@ -192,6 +201,9 @@ bool nvs_store_save(power_engine_t *e)
     SET_I32(NVS_KEY_MODE, c.mode);
     SET_I32(NVS_KEY_HEARTRATE, c.heartrate);
     SET_I32(NVS_KEY_HAS_USER_HR, c.has_user_hr);
+    SET_I32(NVS_KEY_POWER_FLOAT, c.power_float);
+    SET_I32(NVS_KEY_CADENCE_FLOAT, c.cadence_float);
+    SET_I32(NVS_KEY_HR_FLOAT, c.hr_float);
     SET_I32(NVS_KEY_WEIGHT, c.weight);
     SET_I32(NVS_KEY_FTP, c.ftp);
     SET_I32(NVS_KEY_THR_HR, c.thr_hr);

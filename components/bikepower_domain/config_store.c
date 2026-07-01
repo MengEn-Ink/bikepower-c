@@ -28,6 +28,9 @@ void config_store_defaults(config_data_t *c)
     c->mode = DEFAULT_RIDE_MODE;
     c->heartrate = DEFAULT_HEARTRATE;
     c->has_user_hr = 0;
+    c->power_float = POWER_FLOAT_DEFAULT;
+    c->cadence_float = CADENCE_FLOAT_DEFAULT;
+    c->hr_float = HR_FLOAT_DEFAULT;
     c->weight = PROFILE_WEIGHT_DEFAULT;
     c->ftp = PROFILE_FTP_DEFAULT;
     c->thr_hr = PROFILE_THR_HR_DEFAULT;
@@ -51,6 +54,9 @@ bool config_store_validate(config_data_t *c)
     if (c->mode < 0 || c->mode >= RIDE_MODE_COUNT) c->mode = DEFAULT_RIDE_MODE;
     c->heartrate = clamp_int(c->heartrate, HR_MIN, HR_MAX);
     c->has_user_hr = c->has_user_hr ? 1 : 0;
+    c->power_float = clamp_int(c->power_float, POWER_FLOAT_MIN, POWER_FLOAT_MAX);
+    c->cadence_float = clamp_int(c->cadence_float, CADENCE_FLOAT_MIN, CADENCE_FLOAT_MAX);
+    c->hr_float = clamp_int(c->hr_float, HR_FLOAT_MIN, HR_FLOAT_MAX);
     c->weight = clamp_int(c->weight, PROFILE_WEIGHT_MIN, PROFILE_WEIGHT_MAX);
     c->ftp = clamp_int(c->ftp, PROFILE_FTP_MIN, PROFILE_FTP_MAX);
     c->thr_hr = clamp_int(c->thr_hr, PROFILE_THR_HR_MIN, PROFILE_THR_HR_MAX);
@@ -66,6 +72,9 @@ bool config_store_validate(config_data_t *c)
         || in.mode != c->mode
         || in.heartrate != c->heartrate
         || in.has_user_hr != c->has_user_hr
+        || in.power_float != c->power_float
+        || in.cadence_float != c->cadence_float
+        || in.hr_float != c->hr_float
         || in.weight != c->weight
         || in.ftp != c->ftp
         || in.thr_hr != c->thr_hr
@@ -172,13 +181,17 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
     if (json_escape(c->device_name, esc, sizeof(esc)) == (size_t)-1) return 0;
 
     /* 先写入栈缓冲，确认总长后再拷贝出参，避免向 out 写截断内容 */
-    char buf[256];
+    char buf[320];
     int n = snprintf(buf, sizeof(buf),
         "{\"schema_ver\":%d,\"power\":%d,\"cadence\":%d,\"mode\":%d,"
-        "\"heartrate\":%d,\"has_user_hr\":%d,\"weight\":%d,\"ftp\":%d,"
+        "\"heartrate\":%d,\"has_user_hr\":%d,"
+        "\"power_float\":%d,\"cadence_float\":%d,\"hr_float\":%d,"
+        "\"weight\":%d,\"ftp\":%d,"
         "\"thr_hr\":%d,\"ride_type\":%d,\"device_name\":\"%s\"}",
         c->schema_ver, c->power, c->cadence, c->mode,
-        c->heartrate, c->has_user_hr, c->weight, c->ftp,
+        c->heartrate, c->has_user_hr,
+        c->power_float, c->cadence_float, c->hr_float,
+        c->weight, c->ftp,
         c->thr_hr, c->ride_type, esc);
 
     if (n < 0 || (size_t)n >= sizeof(buf)) return 0;  /* 编码错误或内部缓冲不足 */
@@ -202,6 +215,8 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         {"schema_ver", &tmp.schema_ver}, {"power", &tmp.power},
         {"cadence", &tmp.cadence}, {"mode", &tmp.mode},
         {"heartrate", &tmp.heartrate}, {"has_user_hr", &tmp.has_user_hr},
+        {"power_float", &tmp.power_float}, {"cadence_float", &tmp.cadence_float},
+        {"hr_float", &tmp.hr_float},
         {"weight", &tmp.weight}, {"ftp", &tmp.ftp},
         {"thr_hr", &tmp.thr_hr}, {"ride_type", &tmp.ride_type},
     };

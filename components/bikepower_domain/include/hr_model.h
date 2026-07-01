@@ -62,8 +62,8 @@ float hr_model_variation(hr_state_t *st);
 /* 对外输出心率时做台阶保持与限速，降低过快跳变。 */
 int hr_model_emit(hr_state_t *st, int raw);
 
-/* 在固定用户心率模式下生成带小幅波动的平滑心率值。 */
-int hr_model_steady_user(hr_state_t *st, int user_hr);
+/* 在固定用户心率模式下生成带小幅波动的平滑心率值（amp 为 ± 浮动幅度）。 */
+int hr_model_steady_user(hr_state_t *st, int user_hr, int amp);
 
 /* 钳制心率到领域层允许范围内。 */
 int hr_clamp(int v);

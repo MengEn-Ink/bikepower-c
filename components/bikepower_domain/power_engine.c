@@ -4,6 +4,7 @@
 #include "domain_config.h"
 #include "domain_rng.h"
 #include "power_engine.h"
+#include <math.h>
 #include <string.h>
 
 static int clampi(int v, int lo, int hi)
@@ -15,6 +16,49 @@ static int clampi(int v, int lo, int hi)
 
 static int clamp_power(int v)   { return clampi(v, POWER_MIN, POWER_MAX); }
 static int clamp_cadence(int v) { return clampi(v, CADENCE_MIN, CADENCE_MAX); }
+
+/*
+ * 在浮动带内推进一次有界平滑随机游走，返回相对基准值的整数偏移。
+ * 参数：w 为游走状态；amp 为 ± 浮动幅度（<=0 表示恒定，偏移恒为 0）。
+ * 返回值：当前偏移量（四舍五入到整数），始终落在 [-amp, +amp] 内。
+ * 特殊行为：每 FLUCT_WALK_HOLD_LOOPS 拍在带内重采样目标，再一阶指数逼近，
+ *           保证输出平稳变化而非逐拍随机跳变；amp 变化导致越界时会重置到带内。
+ */
+static int fluct_walk_step(fluct_walk_t *w, int amp)
+{
+    if (amp <= 0) {
+        w->value = 0.0f;
+        w->target = 0;
+        w->hold = 0;
+        w->init = true;
+        return 0;
+    }
+    if (!w->init || w->value < (float)(-amp) || w->value > (float)amp) {
+        w->value = 0.0f;
+        w->hold = 0;
+        w->init = true;
+    }
+    if (w->hold <= 0) {
+        w->target = domain_rng_range(-amp, amp);
+        w->hold = FLUCT_WALK_HOLD_LOOPS;
+    } else {
+        w->hold--;
+    }
+    float dt = (float)HR_LOOP_INTERVAL_MS / 1000.0f;
+    float alpha = 1.0f - expf(-dt / (float)FLUCT_WALK_TAU);
+    w->value = w->value + alpha * ((float)w->target - w->value);
+    if (w->value < (float)(-amp)) w->value = (float)(-amp);
+    else if (w->value > (float)amp) w->value = (float)amp;
+    return (int)(w->value >= 0 ? w->value + 0.5f : w->value - 0.5f);
+}
+
+static void fluct_walk_reset(fluct_walk_t *w)
+{
+    w->value = 0.0f;
+    w->target = 0;
+    w->hold = 0;
+    w->init = false;
+}
 
 /*
  * 初始化功率引擎的全部运行时状态和默认配置。
@@ -29,6 +73,11 @@ void power_engine_init(power_engine_t *e)
     e->last_heartrate = DEFAULT_HEARTRATE;
     e->user_heartrate = 0;
     e->has_user_hr = false;
+    e->power_float = POWER_FLOAT_DEFAULT;
+    e->cadence_float = CADENCE_FLOAT_DEFAULT;
+    e->hr_float = HR_FLOAT_DEFAULT;
+    fluct_walk_reset(&e->power_walk);
+    fluct_walk_reset(&e->cadence_walk);
     e->mode = DEFAULT_RIDE_MODE;
     e->erg_active_target = 0;
     e->has_erg_target = false;
@@ -81,6 +130,8 @@ void power_engine_reset_mode_state(power_engine_t *e)
         e->last_power = e->base_power;
         e->last_cadence = e->cadence_base;
     }
+    fluct_walk_reset(&e->power_walk);
+    fluct_walk_reset(&e->cadence_walk);
     hr_model_reset_variation(&e->hr);
 }
 
@@ -105,15 +156,16 @@ static void build_erg(power_engine_t *e, int *po, int *co, int *ho)
  * 为 steady 模式生成一次功率、踏频和心率输出。
  * 参数：e 为功率引擎对象；po、co、ho 分别返回功率、踏频和心率结果。
  * 返回值：无。
- * 特殊行为：若已设置固定用户心率，则直接走固定心率平滑路径，不再按 FTP 分区推导目标心率。
+ * 特殊行为：功率与踏频在各自浮动带内做有界平滑随机游走（非逐拍随机）；
+ *           若已设置固定用户心率，则走固定心率平滑路径并应用心率浮动幅度，不再按 FTP 分区推导目标心率。
  */
 static void build_steady(power_engine_t *e, int *po, int *co, int *ho)
 {
-    int power = clamp_power(e->base_power + domain_rng_range(STEADY_POWER_FLUCT_LO, STEADY_POWER_FLUCT_HI));
-    int cadence = clamp_cadence(e->cadence_base + domain_rng_range(STEADY_CADENCE_FLUCT_LO, STEADY_CADENCE_FLUCT_HI));
+    int power = clamp_power(e->base_power + fluct_walk_step(&e->power_walk, e->power_float));
+    int cadence = clamp_cadence(e->cadence_base + fluct_walk_step(&e->cadence_walk, e->cadence_float));
     if (e->has_user_hr) {
         *po = power; *co = cadence;
-        *ho = hr_model_steady_user(&e->hr, e->user_heartrate);
+        *ho = hr_model_steady_user(&e->hr, e->user_heartrate, e->hr_float);
         return;
     }
     int target_hr = target_heartrate(e, power);
@@ -263,6 +315,53 @@ void power_engine_clear_user_hr(power_engine_t *e)
     e->user_heartrate = 0;
     hr_model_reset_variation(&e->hr);
     e->dirty = true;
+}
+
+/*
+ * 设置功率浮动幅度（±W）。
+ * 参数：e 为功率引擎对象；amp 为目标浮动幅度。
+ * 返回值：数值实际变化返回 true，否则返回 false。
+ * 特殊行为：越界值夹紧到 [POWER_FLOAT_MIN, POWER_FLOAT_MAX]；变化后重置游走状态并置 dirty；对所有模式接受设置（仅固定模式生效）。
+ */
+bool power_engine_set_power_float(power_engine_t *e, int amp)
+{
+    amp = clampi(amp, POWER_FLOAT_MIN, POWER_FLOAT_MAX);
+    if (e->power_float == amp) return false;
+    e->power_float = amp;
+    fluct_walk_reset(&e->power_walk);
+    e->dirty = true;
+    return true;
+}
+
+/*
+ * 设置踏频浮动幅度（±RPM）。
+ * 参数：e 为功率引擎对象；amp 为目标浮动幅度。
+ * 返回值：数值实际变化返回 true，否则返回 false。
+ * 特殊行为：越界值夹紧到 [CADENCE_FLOAT_MIN, CADENCE_FLOAT_MAX]；变化后重置游走状态并置 dirty。
+ */
+bool power_engine_set_cadence_float(power_engine_t *e, int amp)
+{
+    amp = clampi(amp, CADENCE_FLOAT_MIN, CADENCE_FLOAT_MAX);
+    if (e->cadence_float == amp) return false;
+    e->cadence_float = amp;
+    fluct_walk_reset(&e->cadence_walk);
+    e->dirty = true;
+    return true;
+}
+
+/*
+ * 设置固定心率浮动幅度（±BPM）。
+ * 参数：e 为功率引擎对象；amp 为目标浮动幅度。
+ * 返回值：数值实际变化返回 true，否则返回 false。
+ * 特殊行为：越界值夹紧到 [HR_FLOAT_MIN, HR_FLOAT_MAX]；变化后置 dirty；仅固定模式锁定心率时生效。
+ */
+bool power_engine_set_hr_float(power_engine_t *e, int amp)
+{
+    amp = clampi(amp, HR_FLOAT_MIN, HR_FLOAT_MAX);
+    if (e->hr_float == amp) return false;
+    e->hr_float = amp;
+    e->dirty = true;
+    return true;
 }
 
 /*

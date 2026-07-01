@@ -41,15 +41,31 @@ typedef enum {
 #define RIDE_MODE_COUNT       3
 #define DEFAULT_RIDE_MODE     RIDE_MODE_STEADY
 
-// ===== 固定功率模式波动 =====
+// ===== ERG / road 模式实时抖动（训练 App 驱动，非用户可配） =====
 #define STEADY_POWER_FLUCT_LO    (-5)
 #define STEADY_POWER_FLUCT_HI    5
 #define STEADY_CADENCE_FLUCT_LO  (-2)
 #define STEADY_CADENCE_FLUCT_HI  2
-#define STEADY_USER_HR_FLUCT_LO  (-2)
-#define STEADY_USER_HR_FLUCT_HI  2
 #define STEADY_USER_HR_TAU       8
 #define STEADY_USER_HR_TARGET_HOLD_LOOPS  100
+
+// ===== 固定模式浮动幅度（±，可配网调整并持久化） =====
+// 浮动值为固定基准值的上下限半幅：实际输出在 [base-amp, base+amp] 内平滑游走。
+// amp=0 时输出恒定为基准值。
+#define POWER_FLOAT_MIN          0
+#define POWER_FLOAT_MAX          100
+#define POWER_FLOAT_DEFAULT      5
+#define CADENCE_FLOAT_MIN        0
+#define CADENCE_FLOAT_MAX        20
+#define CADENCE_FLOAT_DEFAULT    2
+#define HR_FLOAT_MIN             0
+#define HR_FLOAT_MAX             20
+#define HR_FLOAT_DEFAULT         2
+
+// ===== 平滑随机游走参数（有界游走，非逐拍随机） =====
+// 每 FLUCT_WALK_HOLD_LOOPS 拍在浮动带内重采样一个目标，再用一阶指数逼近，输出恒在带内。
+#define FLUCT_WALK_TAU           3      // 逼近时间常数（秒）
+#define FLUCT_WALK_HOLD_LOOPS    60     // 目标保持循环数（60*50ms=3s）后重采样
 
 // ===== 心率动力学（一阶指数逼近） =====
 #define HR_TAU_RISE           30

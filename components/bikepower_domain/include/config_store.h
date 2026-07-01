@@ -20,6 +20,9 @@ typedef struct {
     int mode;           // ride_mode_t
     int heartrate;      // 固定用户心率（仅 has_user_hr 时有效）
     int has_user_hr;    // 是否启用固定用户心率（0/1）
+    int power_float;    // 功率浮动幅度（±W）
+    int cadence_float;  // 踏频浮动幅度（±RPM）
+    int hr_float;       // 固定心率浮动幅度（±BPM）
     int weight;         // profile.weight
     int ftp;            // profile.ftp
     int thr_hr;         // profile.thr_hr
