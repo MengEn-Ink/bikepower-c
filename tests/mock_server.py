@@ -45,6 +45,17 @@ MOCK_STATE = {
     "profile_ride_type": "coco",
     "custom_wkg_low": 25,
     "custom_wkg_high": 30,
+    "led_silent": 0,
+    "led_wait_mode": 2,
+    "led_wait_color": 2,
+    "led_conn_mode": 1,
+    "led_conn_color": 1,
+    "led_wifi_mode": 2,
+    "led_wifi_color": 4,
+    "led_confirm_mode": 3,
+    "led_confirm_color": 3,
+    "led_error_mode": 3,
+    "led_error_color": 0,
     "remaining_sec": 180,
     "closing": False,
     "hr_locked": False,
@@ -163,12 +174,23 @@ class Handler(BaseHTTPRequestHandler):
                           "power_step",
                           "profile_weight", "profile_ftp",
                           "profile_thr_hr", "profile_ride_type",
-                          "custom_wkg_low", "custom_wkg_high"):
+                          "custom_wkg_low", "custom_wkg_high",
+                          "led_silent",
+                          "led_wait_mode", "led_wait_color",
+                          "led_conn_mode", "led_conn_color",
+                          "led_wifi_mode", "led_wifi_color",
+                          "led_confirm_mode", "led_confirm_color",
+                          "led_error_mode", "led_error_color"):
                     if k in data:
                         MOCK_STATE[k] = data[k]
                 if "hr_lock" in data:
                     MOCK_STATE["hr_locked"] = bool(data["hr_lock"])
             self._send_json({"ok": True})
+            return
+        if path == "/api/renew":
+            with LOCK:
+                REMAINING_SEC[0] = 180
+            self._send_text("180")
             return
         if path == "/api/close-wifi":
             with LOCK:

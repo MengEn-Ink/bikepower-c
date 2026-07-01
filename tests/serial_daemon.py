@@ -8,12 +8,15 @@
   - 日志按日滚动：tests/logs/serial_<YYYYMMDD>.log
   - 关键字实时高亮（WiFi 扫描/连接/OTA/错误等）
   - 支持 SIGTERM/SIGINT 优雅退出
+  - 跨平台：端口不传则自动探测（Linux /dev/ttyACM*、macOS /dev/cu.usbmodem*）
 
 用法：
-  # 前台运行
-  python3 tests/serial_daemon.py -p /dev/ttyACM0
+  # 前台运行（自动探测串口）
+  python3 tests/serial_daemon.py
+  # 指定端口
+  python3 tests/serial_daemon.py -p /dev/cu.usbmodem101
   # 后台守护
-  nohup python3 tests/serial_daemon.py -p /dev/ttyACM0 > /tmp/serial_daemon.out 2>&1 &
+  nohup python3 tests/serial_daemon.py > /tmp/serial_daemon.out 2>&1 &
   # 停止
   pkill -f serial_daemon.py
 """
@@ -28,6 +31,7 @@ from datetime import datetime
 
 try:
     import serial
+    from serial.tools import list_ports
 except ImportError:
     print("ERROR: 需要 pyserial: pip install pyserial", file=sys.stderr)
     sys.exit(1)
@@ -65,11 +69,24 @@ def signal_handler(sig, frame):
 
 def parse_args():
     p = argparse.ArgumentParser(description="串口日志守护进程")
-    p.add_argument("-p", "--port", default="/dev/ttyACM0", help="串口端口")
+    p.add_argument("-p", "--port", default=None, help="串口端口，不传则自动探测")
     p.add_argument("-b", "--baud", type=int, default=115200, help="波特率")
     p.add_argument("--no-color", action="store_true", help="禁用颜色")
     p.add_argument("--quiet", action="store_true", help="不实时打印，只写文件")
     return p.parse_args()
+
+
+def detect_port():
+    """自动探测 ESP32-C3 串口。优先匹配乐鑫 USB-JTAG VID/PID，再回退按设备名匹配。"""
+    ports = list(list_ports.comports())
+    for p in ports:
+        if p.vid == 0x303A and p.pid == 0x1001:
+            return p.device
+    for p in ports:
+        dev = p.device
+        if "ttyACM" in dev or "ttyUSB" in dev or "usbmodem" in dev or "usbserial" in dev:
+            return dev
+    return None
 
 def is_port_available(port):
     """检测串口是否被其他进程占用（烧录时 esptool 会独占）"""
@@ -89,33 +106,34 @@ def is_port_available(port):
 
 
 def is_flash_in_progress(port):
-    """检测是否有 esptool/idf.py 烧录进程在运行（针对本串口）
+    """检测是否有 esptool/idf.py 烧录进程在运行（针对本串口）。
 
     烧录时 esptool 需要独占串口，守护进程必须主动让出。
-    通过扫描 /proc/<pid>/cmdline 查找 esptool.py 且命令行含本端口。
+    跨平台实现：用 `ps -axo pid=,command=` 列出全部进程命令行（Linux/macOS 通用），
+    匹配 esptool 或 idf.py flash 且命令行包含本端口。
     """
     my_pid = os.getpid()
-    port_basenames = [os.path.basename(port), port]
+    base = os.path.basename(port)
+    port_names = [port, base]
     try:
-        for entry in os.listdir("/proc"):
-            if not entry.isdigit():
-                continue
-            pid = int(entry)
-            if pid == my_pid:
-                continue
-            try:
-                with open(f"/proc/{pid}/cmdline", "rb") as f:
-                    cmd = f.read().replace(b"\x00", b" ").decode("utf-8", "replace")
-            except (IOError, OSError):
-                continue
-            # 匹配 esptool.py 或 idf.py flash，且命令行包含本串口端口
-            if ("esptool" in cmd or "idf.py" in cmd) and any(p in cmd for p in port_basenames):
-                return True
-            # esptool 被 idf.py 调用，命令行可能不含端口但 idf.py -p /dev/ttyACM0 flash 含
-            if "idf.py" in cmd and "flash" in cmd and any(p in cmd for p in port_basenames):
-                return True
+        out = subprocess.run(
+            ["ps", "-axo", "pid=,command="],
+            capture_output=True, text=True, timeout=3,
+        ).stdout
     except Exception:
-        pass
+        return False
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        head, _, cmd = line.partition(" ")
+        if not head.isdigit() or int(head) == my_pid:
+            continue
+        # 匹配烧录进程：esptool / idf.py flash，且命令行含本端口
+        if ("esptool" in cmd or "idf.py" in cmd) and any(p in cmd for p in port_names):
+            return True
+        if "idf.py" in cmd and "flash" in cmd and any(p in cmd for p in port_names):
+            return True
     return False
 
 def highlight(line, use_color):
@@ -143,8 +161,12 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
+    # 端口：显式指定则固定；否则启动时探测，未插设备时循环内持续重试探测
+    fixed_port = args.port
+    port = fixed_port or detect_port()
+
     print(f"{C.GREEN}=== 串口守护进程启动 ==={C.RESET}" if use_color else "=== 串口守护进程启动 ===")
-    print(f"端口: {args.port}  波特: {args.baud}")
+    print(f"端口: {port or '未探测到，等待设备接入'}{'（自动探测）' if not fixed_port else ''}  波特: {args.baud}")
     print(f"日志目录: {logs_dir}")
     print(f"模式: {'静默写文件' if args.quiet else '实时高亮+写文件'}")
     print(f"串口被占用时自动退让，5 秒后重试")
@@ -157,6 +179,14 @@ def main():
     reconnect_delay = 5
 
     while running:
+        # 自动探测模式下设备未接入时持续重试探测
+        if port is None:
+            port = detect_port()
+            if port is None:
+                time.sleep(reconnect_delay)
+                continue
+            print(f"探测到串口: {port}")
+
         # 按日切换日志文件
         today = datetime.now().strftime("%Y%m%d")
         if log_date != today:
@@ -167,17 +197,17 @@ def main():
 
         # 尝试打开串口（被占用则退让）
         if ser is None:
-            if is_flash_in_progress(args.port):
+            if is_flash_in_progress(port):
                 # 烧录进行中，主动等待让出串口
                 time.sleep(1)
                 continue
-            if not is_port_available(args.port):
+            if not is_port_available(port):
                 time.sleep(reconnect_delay)
                 continue
             try:
-                ser = serial.Serial(args.port, args.baud, timeout=0.5)
+                ser = serial.Serial(port, args.baud, timeout=0.5)
                 ts = datetime.now().strftime("%H:%M:%S")
-                msg = f"[{ts}] [DAEMON] 串口已连接 {args.port}"
+                msg = f"[{ts}] [DAEMON] 串口已连接 {port}"
                 print(msg)
                 f_log.write((msg + "\n").encode("utf-8"))
                 f_log.flush()
@@ -187,11 +217,13 @@ def main():
                 print(msg, file=sys.stderr)
                 f_log.write((msg + "\n").encode("utf-8"))
                 f_log.flush()
+                if not fixed_port:
+                    port = None  # 自动探测模式下重新探测
                 time.sleep(reconnect_delay)
                 continue
 
         # 持有串口期间检测烧录需求，主动让出
-        if ser is not None and is_flash_in_progress(args.port):
+        if ser is not None and is_flash_in_progress(port):
             ts = datetime.now().strftime("%H:%M:%S")
             msg = f"[{ts}] [DAEMON] 检测到烧录进程，主动让出串口"
             print(msg)
@@ -222,6 +254,8 @@ def main():
             except Exception:
                 pass
             ser = None
+            if not fixed_port:
+                port = None  # 自动探测模式下设备可能换了节点，重新探测
             time.sleep(2)
             continue
 

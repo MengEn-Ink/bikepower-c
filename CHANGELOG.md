@@ -4,6 +4,12 @@
 
 ## [未发布]
 
+### 网页端
+- `main/web/`：底部导航由“首页 / 更多 / 关于”重构为“首页 / 设置”两 Tab；原“更多”和“关于”并入设置页，设置页内分为“用户资料 / 设备信息 / 关于”三级内容入口。
+- 设备名称编辑从关于页挪入“设置 → 设备信息”，与固件版本同组展示；“用户资料”保留体重、FTP、阈值心率和物理按钮调功步进。
+- 首页进一步压缩卡片、输入、步进器和分段控件高度，减少固定模式首屏滚动压力。
+- `tests/check_portal_structure.py` 增加前端信息架构静态检查，锁定 2 Tab 和设置页三分区结构。
+
 ### 新增（自定义配速档位）
 - 在 5 个预设配速机器人（coco/yumi/jacques/genie/constance）外新增第 6 档「自定义」（id=custom，index=5）：用户可自填 W/kg 下限+上限（1.0~7.0，每档 0.1），road 模式按 `weight × 自定义W/kg` 输出功率。
 - `components/bikepower_domain/`：`domain_config.h` 新增 `PACER_INDEX_CUSTOM/RIDE_TYPE_COUNT/CUSTOM_WKG_*`；`profile_t` 增 `custom_wkg_low/high` 字段与 `profile_set_custom_wkg`/`profile_effective_wkg`；`profile_ride_type_index`/`set_ride_type_str` 循环改 `RIDE_TYPE_COUNT`（含 custom）；`build_road`/`reset_mode_state` 改用 `profile_effective_wkg`；`get_current_pacer` 自定义档返回 "Custom"。
