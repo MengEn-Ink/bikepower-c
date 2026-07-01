@@ -31,15 +31,31 @@ import subprocess
 import sys
 import time
 import traceback
+from collections import deque
 
 PID_FILE = "/tmp/bikepower_log_daemon.pid"
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 DAEMON_LOG_FILE = os.path.join(LOG_DIR, "daemon.log")
 MAX_LOG_FILES = 5
+CRASH_CONTEXT_LINES = 40
 SCAN_INTERVAL = 5
 SERIAL_BAUD = 115200
 SERIAL_TIMEOUT = 2
 BUFFER_SIZE = 8192
+REBOOT_PATTERNS = [
+    r"ESP-ROM:",
+    r"\brst:0x[0-9a-fA-F]+",
+    r"BikePower C 启动",
+]
+CRASH_PATTERNS = [
+    r"panic",
+    r"abort",
+    r"Backtrace",
+    r"Guru Meditation",
+    r"task_wdt",
+    r"watchdog",
+    r"WDT",
+]
 
 try:
     import serial
@@ -99,6 +115,12 @@ def get_log_filepath():
     return os.path.join(LOG_DIR, "device_%s.log" % ts)
 
 
+def get_crash_snapshot_filepath():
+    """故障快照文件：crash_YYYYMMDD_HHMMSS.log"""
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return os.path.join(LOG_DIR, "crash_%s.log" % ts)
+
+
 def daemon_log(msg):
     """守护进程自身日志：输出到 stdout + daemon.log"""
     line = "[%s] [DAEMON] %s" % (timestamp(), msg)
@@ -126,6 +148,71 @@ def rotate_logs():
             os.remove(full)
         except OSError:
             pass
+
+
+def is_reboot_line(line):
+    return any(re.search(pat, line) for pat in REBOOT_PATTERNS)
+
+
+def is_crash_line(line):
+    return any(re.search(pat, line, re.IGNORECASE) for pat in CRASH_PATTERNS)
+
+
+def append_plain_line(filepath, line):
+    try:
+        with open(filepath, "a") as f:
+            f.write(line + "\n")
+    except OSError:
+        pass
+
+
+def append_reboot_separator(filepath):
+    line = "[%s] ----- DEVICE REBOOT / BOOT BANNER -----" % timestamp()
+    append_plain_line(filepath, line)
+
+
+def write_crash_snapshot(trigger_line, recent_lines):
+    ensure_log_dir()
+    snapshot = get_crash_snapshot_filepath()
+    try:
+        with open(snapshot, "w") as f:
+            f.write("CRASH SNAPSHOT %s\n" % timestamp())
+            f.write("TRIGGER: %s\n" % trigger_line)
+            f.write("--- recent context ---\n")
+            for item in recent_lines:
+                f.write(item + "\n")
+            f.write(trigger_line + "\n")
+        daemon_log("故障快照已保存: %s" % snapshot)
+    except OSError as e:
+        daemon_log("故障快照写入失败: %s" % e)
+
+
+def process_serial_line(log_path, line, use_color=True, quiet=False,
+                        recent_lines=None, crash_keys=None, split_on_reboot=False,
+                        crash_snapshot=True):
+    """处理单行串口日志，必要时插入重启分隔线、切文件并生成故障快照。"""
+    if recent_lines is None:
+        recent_lines = deque(maxlen=CRASH_CONTEXT_LINES)
+    if crash_keys is None:
+        crash_keys = set()
+
+    if is_reboot_line(line):
+        append_reboot_separator(log_path)
+        if split_on_reboot:
+            log_path = get_log_filepath()
+            ensure_log_dir()
+            append_reboot_separator(log_path)
+            rotate_logs()
+            daemon_log("检测到设备重启，切换日志文件: %s" % log_path)
+
+    log_line(log_path, line, use_color, quiet)
+
+    if crash_snapshot and is_crash_line(line) and line not in crash_keys:
+        crash_keys.add(line)
+        write_crash_snapshot(line, list(recent_lines))
+
+    recent_lines.append(line)
+    return log_path
 
 
 def write_pid():
@@ -272,7 +359,9 @@ def log_line(filepath, line, use_color=True, quiet=False):
             print("[%s] %s" % (ts, line), flush=True)
 
 
-def read_serial(ser, log_path, use_color=True, quiet=False):
+def read_serial(ser, log_path, use_color=True, quiet=False,
+                recent_lines=None, crash_keys=None, split_on_reboot=False,
+                crash_snapshot=True):
     """非阻塞读取串口缓冲区并写入日志（参考 esp32-power 稳定模式）"""
     try:
         waiting = ser.in_waiting or 0
@@ -282,25 +371,33 @@ def read_serial(ser, log_path, use_color=True, quiet=False):
             for line in text.split("\n"):
                 line = line.strip()
                 if line:
-                    log_line(log_path, line, use_color, quiet)
+                    log_path = process_serial_line(
+                        log_path, line, use_color, quiet, recent_lines, crash_keys,
+                        split_on_reboot, crash_snapshot,
+                    )
             try:
                 ser.reset_input_buffer()
             except Exception:
                 pass
+        return log_path
     except (OSError, Exception) as e:
         msg = str(e)
         if "EIO" in msg or "device disconnected" in msg.lower():
             raise
         daemon_log("读取错误: %s" % e)
+        return log_path
 
 
-def run_loop(port_prefer=None, use_color=True, quiet=False):
+def run_loop(port_prefer=None, use_color=True, quiet=False,
+             split_on_reboot=False, crash_snapshot=True):
     """主循环：扫描串口 → 连接 → 采集日志 → 断开后重试"""
     global _running
     current_port = port_prefer
     ser = None
     reconnect_delay = SCAN_INTERVAL
     log_path = get_log_filepath()
+    recent_lines = deque(maxlen=CRASH_CONTEXT_LINES)
+    crash_keys = set()
     last_port_check = 0
     flash_backoff_until = 0
     last_flash_logged = False
@@ -388,7 +485,10 @@ def run_loop(port_prefer=None, use_color=True, quiet=False):
         # 读取串口数据
         if ser is not None:
             try:
-                read_serial(ser, log_path, use_color, quiet)
+                log_path = read_serial(
+                    ser, log_path, use_color, quiet, recent_lines, crash_keys,
+                    split_on_reboot, crash_snapshot,
+                )
             except (OSError, Exception) as e:
                 msg = str(e)
                 if "EIO" in msg or "disconnected" in msg.lower():
@@ -435,6 +535,8 @@ def parse_args():
     p.add_argument("-b", "--baud", type=int, default=SERIAL_BAUD, help="波特率（默认 %d）" % SERIAL_BAUD)
     p.add_argument("--no-color", action="store_true", help="禁用 ANSI 颜色")
     p.add_argument("--quiet", action="store_true", help="不实时打印，只写文件")
+    p.add_argument("--split-on-reboot", action="store_true", help="检测到设备启动 banner 时切换到新的 device_*.log")
+    p.add_argument("--no-crash-snapshot", action="store_true", help="禁用 panic/WDT/Backtrace 故障上下文快照")
     return p.parse_args()
 
 
@@ -453,7 +555,13 @@ def main():
     use_color = not args.no_color and sys.stdout.isatty()
 
     try:
-        run_loop(port_prefer=args.port, use_color=use_color, quiet=args.quiet)
+        run_loop(
+            port_prefer=args.port,
+            use_color=use_color,
+            quiet=args.quiet,
+            split_on_reboot=args.split_on_reboot,
+            crash_snapshot=not args.no_crash_snapshot,
+        )
     except KeyboardInterrupt:
         print("[%s] 收到 KeyboardInterrupt，正在退出..." % timestamp(), flush=True)
     except Exception as e:

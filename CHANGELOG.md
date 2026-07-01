@@ -4,6 +4,13 @@
 
 ## [未发布]
 
+### 日志体系
+- `tests/serial_daemon.py`：新增设备重启 banner 识别，默认插入 `DEVICE REBOOT / BOOT BANNER` 分隔线；新增 `--split-on-reboot` 支持按重启切新 `device_*.log`；新增 panic/WDT/Backtrace/Guru Meditation 等关键字故障快照 `crash_*.log`，并支持 `--no-crash-snapshot` 关闭。
+- `tests/test_serial_daemon.py`：新增串口日志守护单测，覆盖重启分隔线、按重启切文件、故障快照生成。
+- `scripts/flash_latest.sh`：修复 `set -u` 下 `PORTAL_TEST_AUTO_CONFIG=$TEST_AUTO_CONFIG` 变量名边界解析问题，确保烧录脚本可完成编译、烧录和启动日志抓取。
+- `.trae/rules/coding-style.md`、`docs/dev/01-technical-reference.md`、`tests/README.md`：补充固件端日志级别语义、TAG/限频/禁区、主机端日志命名、重启切分、删除保留和故障证据规则。
+- 验证：`python3 -m unittest tests/test_serial_daemon.py`、`python3 -m py_compile tests/serial_daemon.py tests/test_serial_daemon.py`、`bash -n scripts/log_daemon.sh scripts/flash_latest.sh`、`git diff --check`、`bash scripts/flash_latest.sh` 通过；真机启动日志 `tests/logs/flash_latest_20260701_204055.log` 无 ERROR/WARN/panic/WDT/Backtrace。
+
 ### 网页端
 - `main/web/`：底部导航由“首页 / 更多 / 关于”重构为“首页 / 设置”两 Tab；原“更多”和“关于”并入设置页，设置页内分为“用户资料 / 设备信息 / 关于”三级内容入口。
 - 设备名称编辑从关于页挪入“设置 → 设备信息”，与固件版本同组展示；“用户资料”保留体重、FTP、阈值心率和物理按钮调功步进。

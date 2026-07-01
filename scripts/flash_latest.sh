@@ -273,8 +273,8 @@ else
 fi
 
 if [ "$DO_BUILD" -eq 1 ]; then
-    log "编译固件（PORTAL_TEST_AUTO_CONFIG=$TEST_AUTO_CONFIG）"
-    idf.py -DPORTAL_TEST_AUTO_CONFIG="$TEST_AUTO_CONFIG" build
+    log "编译固件（PORTAL_TEST_AUTO_CONFIG=${TEST_AUTO_CONFIG}）"
+    idf.py -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" build
 else
     log "跳过显式编译"
 fi

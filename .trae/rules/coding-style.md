@@ -37,7 +37,11 @@
 
 ## 日志
 - 统一 `ESP_LOGI/W/E/D`，禁止 `printf` 调试残留。
-- TAG 用模块大写简称。
+- TAG 用模块大写简称，且每个 `.c` 文件固定一个 `static const char *TAG`，便于按模块过滤。
+- 日志级别语义：`ESP_LOGE` 用于不可恢复、功能降级或需要人工介入；`ESP_LOGW` 用于自动恢复、低水位、配置夹紧、队列重试；`ESP_LOGI` 用于启动里程碑、状态切换、用户触发动作和低频遥测；`ESP_LOGD/V` 仅用于局部调试，不作为发版默认输出。
+- 高频路径必须限频：主循环心跳保持 `MAIN_HEARTBEAT_INTERVAL_TICKS` 控制，socket/BLE 通知/GATT 回调/按钮循环不得逐包刷 INFO。
+- 受限上下文禁止普通日志：ISR 内禁止日志；flash cache 不可用或极早期启动场景如确需日志，必须明确使用 ESP-IDF 对应 early/DRAM 日志能力并说明原因。
+- 发版默认日志级别保持 WARN；临时提升 INFO/DEBUG 只能用于诊断，提交前必须确认不会造成串口刷屏或固件字符串膨胀。
 
 ## 内存与中断安全
 | 项 | 要求 |

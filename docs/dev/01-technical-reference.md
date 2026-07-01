@@ -812,6 +812,32 @@ FTMS 控制点收到写请求后只做最少逻辑：
 
 应用层再通过事件队列串行化处理，避免跨线程重逻辑。
 
+### 10.5 日志体系
+
+固件端日志统一使用 ESP-IDF `ESP_LOGI/W/E/D`，每个 C 模块固定一个大写简称 TAG。
+日志级别语义如下：
+
+- `ERROR`：不可恢复错误、功能降级、需要人工介入的问题。
+- `WARN`：自动恢复、低水位、配置夹紧、队列投递重试、外设暂不可用。
+- `INFO`：启动里程碑、状态切换、用户动作、低频遥测。
+- `DEBUG/VERBOSE`：局部诊断使用，不能作为发版默认输出。
+
+高频路径必须限频。
+主循环遥测当前由 `MAIN_HEARTBEAT_INTERVAL_TICKS` 控制为约 10 秒一次，BLE 通知/GATT 回调、WiFi socket 循环、按钮任务循环不得逐包刷 INFO。
+ISR 内禁止日志。
+
+主机端串口日志由 `tests/serial_daemon.py` 和 `scripts/log_daemon.sh` 管理。
+设备日志写入 `tests/logs/device_YYYYMMDD_HHMMSS.log`，每行格式为 `[YYYY-MM-DD HH:MM:SS] <固件原始日志>`。
+文件名中的时间是主机创建该串口采集会话的时间。
+默认按“串口连接会话”切文件：守护进程启动、串口断开后重连会创建新文件；如果设备软重启但 USB 串口未断开，则继续写入同一文件，并插入 `DEVICE REBOOT / BOOT BANNER` 分隔线。
+需要每次设备启动 banner 都切新文件时，可启动 `tests/serial_daemon.py --split-on-reboot`。
+
+日志保留策略：默认只保留最近 5 个 `device_*.log`，多余文件按修改时间从旧到新删除；`daemon.log` 和 `daemon_restart.log` 由 `scripts/log_daemon.sh cleanup` 清理 1 天前文件。
+一次性烧录抓取由 `scripts/flash_latest.sh` 生成 `tests/logs/flash_latest_YYYYMMDD_HHMMSS.log`。
+
+故障证据规则：守护进程检测到 `panic`、`abort`、`Backtrace`、`Guru Meditation`、`task_wdt`、`watchdog`、`WDT` 等关键字时，会生成 `tests/logs/crash_YYYYMMDD_HHMMSS.log`，保存触发行和最近上下文，避免关键故障被普通日志轮转覆盖。
+如需关闭该行为，可使用 `tests/serial_daemon.py --no-crash-snapshot`。
+
 ## 第十一章：硬件约束
 
 ### 11.1 WiFi/BLE 射频共用

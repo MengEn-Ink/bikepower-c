@@ -100,7 +100,7 @@ python3 tests/mock_server.py
 | 脚本 | 用途 | 运行模式 |
 |------|------|----------|
 | `serial_capture.py` | 一次性抓取串口日志（指定时长） | 前台阻塞，超时退出 |
-| `serial_daemon.py` | 串口日志守护进程（后台常驻，自动让出烧录串口） | 后台 nohup |
+| `serial_daemon.py` | 串口日志守护进程（后台常驻，自动让出烧录串口，识别重启与故障快照） | 后台 nohup |
 
 ```bash
 # 一次性抓 30 秒
@@ -109,9 +109,13 @@ python3 tests/serial_capture.py --port /dev/ttyACM0 --duration 30
 nohup python3 tests/serial_daemon.py > /tmp/serial_daemon.out 2>&1 &
 # 也可显式指定端口
 nohup python3 tests/serial_daemon.py -p /dev/cu.usbmodem101 > /tmp/serial_daemon.out 2>&1 &
+# 检测到 ESP-ROM/rst/BikePower C 启动时自动切新文件
+python3 tests/serial_daemon.py --split-on-reboot
+# 关闭 panic/WDT/Backtrace 故障快照
+python3 tests/serial_daemon.py --no-crash-snapshot
 ```
 
-> 守护进程异步写入 `tests/logs/device_<YYYYMMDD_HHMMSS>.log`（保留最近 5 个，已被 `.gitignore` 忽略），烧录时自动让出串口、烧完自动重连，跨 Linux/macOS。停止：`pkill -f serial_daemon.py`。
+> 守护进程异步写入 `tests/logs/device_<YYYYMMDD_HHMMSS>.log`（保留最近 5 个，已被 `.gitignore` 忽略），烧录时自动让出串口、烧完自动重连，跨 Linux/macOS。默认按串口连接会话切文件；设备软重启但串口未断开时，会在当前日志中插入 `DEVICE REBOOT / BOOT BANNER` 分隔线。`--split-on-reboot` 可改为每次启动 banner 切新文件。检测到 `panic` / `WDT` / `Backtrace` 等关键字时，会生成 `tests/logs/crash_<YYYYMMDD_HHMMSS>.log` 保存最近上下文。停止：`pkill -f serial_daemon.py`。
 
 > v4.0.0 起已移除在线 OTA 与家庭网络配置，固件升级走全量重新烧录（分区表变更需 `erase_flash`）。
 
