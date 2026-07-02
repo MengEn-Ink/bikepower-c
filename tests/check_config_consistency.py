@@ -26,6 +26,7 @@ NIMBLE_REWRITE = ROOT / "docs" / "archive" / "01-cidf-nimble-rewrite.md"
 MPY_COMPARISON = ROOT / "docs" / "archive" / "02-micropython-vs-c-comparison.md"
 REVIEW_CHECKLIST = ROOT / "docs" / "archive" / "03-review-checklist.md"
 HW_CONSTRAINTS = ROOT / ".trae" / "rules" / "hardware-constraints.md"
+BUILD_ALL = ROOT / "scripts" / "build_all.sh"
 
 TAG = "[TC-3c]"
 g_pass = 0
@@ -101,6 +102,7 @@ nimble_rewrite_src = read(NIMBLE_REWRITE)
 mpy_comparison_src = read(MPY_COMPARISON)
 review_checklist_src = read(REVIEW_CHECKLIST)
 hw_src = read(HW_CONSTRAINTS) if HW_CONSTRAINTS.exists() else ""
+build_all_src = read(BUILD_ALL)
 
 
 # ============================ 1. 固件版本一致性 ============================
@@ -137,6 +139,12 @@ check(device_name_cfg == device_name_domain,
       f"DEVICE_NAME({device_name_cfg}) == DEVICE_NAME_DEFAULT({device_name_domain})")
 check("BIKEPOWER_GIT_SHA" in config_src or "BIKEPOWER_GIT_SHA" in read(CONFIG_H.parent / "CMakeLists.txt"),
       "构建系统必须注入 BIKEPOWER_GIT_SHA")
+check("FIRMWARE_STABLE_VERSION" in build_all_src and "FIRMWARE_FIX_VERSION" in build_all_src,
+      "Release 构建脚本必须读取稳定版和修复版")
+check("git -C \"$PROJECT_DIR\" rev-parse --short HEAD" in build_all_src,
+      "Release 构建脚本必须读取最后 Git 短提交 ID")
+check("bikepower-c-%s-v%s-stable%s-fix%s-g%s.bin" in build_all_src,
+      "Release 合并固件文件名必须包含板型、版本、稳定版、修复版和 Git ID")
 
 # WIFI_SSID 与 DEVICE_NAME 关系（AP 名沿用设备名前缀）
 wifi_ssid = extract_define(config_src, "WIFI_SSID")

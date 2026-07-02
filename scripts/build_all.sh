@@ -1,7 +1,7 @@
 #!/bin/bash
 # BikePower C — 双板型构建脚本
 # 分别编译通用 ESP32-C3 和 M5Stamp C3 固件，
-# 输出合并后的单文件固件包，包名包含板型名称和版本号。
+# 输出合并后的单文件固件包，包名包含板型、版本、稳定版、修复版和 Git ID。
 #
 # 用法：
 #   ./scripts/build_all.sh              # 编译两种板型
@@ -34,9 +34,10 @@ usage() {
   -h, --help      显示本帮助
 
 输出物（写入 build/release/）:
-  bikepower-c-<版本>-<板型>.bin         合并单文件固件（bootloader+分区表+app）
-  bikepower-c-<版本>-<板型>.bin.sha256  对应 SHA256 校验文件
-  manifest.txt                          产物清单（文件名/大小/SHA256/版本）
+  bikepower-c-<板型>-v<版本>-stable<稳定版>-fix<修复版>-g<GitID>.bin
+                                        合并单文件固件（bootloader+分区表+app）
+  *.bin.sha256                         对应 SHA256 校验文件
+  manifest.txt                         产物清单（文件名/大小/SHA256/版本）
 
 说明:
   - 本脚本仅在本地生成产物，不会打 git tag、不会创建 Gitee Release。
@@ -89,12 +90,32 @@ board_name_of() {
     esac
 }
 
-# 读取固件版本（dry-run 与正常路径共用）
-VERSION="$(grep 'FIRMWARE_VERSION' "$PROJECT_DIR/main/bikepower_config.h" | head -1 | sed 's/.*"\(.*\)".*/\1/')"
-if [ -z "$VERSION" ]; then
-    echo "错误：无法从 main/bikepower_config.h 提取 FIRMWARE_VERSION"
+# 读取固件版本元信息（dry-run 与正常路径共用）
+extract_define() {
+    local name="$1"
+    local value
+    value="$(awk -v name="$name" '$1 == "#define" && $2 == name {print $0; exit}' "$PROJECT_DIR/main/bikepower_config.h" | sed 's/^[^"]*"\([^"]*\)".*$/\1/')"
+    printf '%s\n' "$value"
+}
+
+VERSION="$(extract_define FIRMWARE_VERSION)"
+STABLE_VERSION="$(extract_define FIRMWARE_STABLE_VERSION)"
+FIX_VERSION="$(extract_define FIRMWARE_FIX_VERSION)"
+GIT_SHA="$(git -C "$PROJECT_DIR" rev-parse --short HEAD 2>/dev/null || true)"
+if [ -z "$GIT_SHA" ]; then
+    GIT_SHA="nogit"
+fi
+
+if [ -z "$VERSION" ] || [ -z "$STABLE_VERSION" ] || [ -z "$FIX_VERSION" ]; then
+    echo "错误：无法从 main/bikepower_config.h 提取完整固件版本元信息"
     exit 1
 fi
+
+firmware_file_name() {
+    local board_name="$1"
+    printf 'bikepower-c-%s-v%s-stable%s-fix%s-g%s.bin\n' \
+        "$board_name" "$VERSION" "$STABLE_VERSION" "$FIX_VERSION" "$GIT_SHA"
+}
 
 # 计算 SHA256（兼容 macOS shasum 与 Linux sha256sum）
 sha256_of() {
@@ -109,12 +130,15 @@ sha256_of() {
 if [ "$DRY_RUN" -eq 1 ]; then
     echo "=== [dry-run] BikePower C Release 标准化预览 v${VERSION} ==="
     echo "不会编译、不会写文件、不会打 tag、不会创建 Release。"
+    echo "稳定版: ${STABLE_VERSION}"
+    echo "修复版: ${FIX_VERSION}"
+    echo "Git ID: ${GIT_SHA}"
     echo "板型: ${TARGETS[*]}"
     echo "输出目录: $RELEASE_DIR/"
     echo "将生成的产物:"
     for target in "${TARGETS[@]}"; do
         bn="$(board_name_of "$target")"
-        fw="bikepower-c-${VERSION}-${bn}.bin"
+        fw="$(firmware_file_name "$bn")"
         echo "  - $fw            （合并单文件固件）"
         echo "  - ${fw}.sha256   （SHA256 校验）"
     done
@@ -133,7 +157,7 @@ source "$IDF_PATH/export.sh" > /dev/null
 
 cd "$PROJECT_DIR"
 
-echo "=== BikePower C 双板型构建 v${VERSION} ==="
+echo "=== BikePower C 双板型构建 v${VERSION} stable${STABLE_VERSION} fix${FIX_VERSION} g${GIT_SHA} ==="
 
 mkdir -p "$RELEASE_DIR"
 
@@ -161,7 +185,7 @@ for target in "${TARGETS[@]}"; do
     idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.board.tmp" build
 
     # 合并固件为单文件
-    FW_NAME="bikepower-c-${VERSION}-${board_name}.bin"
+    FW_NAME="$(firmware_file_name "$board_name")"
     python3 "$IDF_PATH/components/esptool_py/esptool/esptool.py" \
         --chip esp32c3 merge_bin \
         -o "$RELEASE_DIR/$FW_NAME" \
@@ -187,6 +211,9 @@ MANIFEST="$RELEASE_DIR/manifest.txt"
 {
     echo "# BikePower C Release 产物清单"
     echo "# 版本: v${VERSION}"
+    echo "# 稳定版: ${STABLE_VERSION}"
+    echo "# 修复版: ${FIX_VERSION}"
+    echo "# Git ID: ${GIT_SHA}"
     echo "# 生成时间: $(date '+%Y-%m-%d %H:%M:%S')"
     echo "# 字段: 文件名  大小(字节)  SHA256"
 } > "$MANIFEST"
@@ -201,11 +228,11 @@ for fw in "${PRODUCED_BINS[@]}"; do
     echo "  SHA256: $fw -> ${sum:0:16}..."
 done
 
-# 版本号一致性校验：产物文件名必须含当前 FIRMWARE_VERSION
+# 版本号一致性校验：产物文件名必须含当前固件版本元信息
 for fw in "${PRODUCED_BINS[@]}"; do
     case "$fw" in
-        *"-${VERSION}-"*) ;;
-        *) echo "错误：产物名 '$fw' 与版本 v${VERSION} 不一致"; exit 1 ;;
+        *"-v${VERSION}-stable${STABLE_VERSION}-fix${FIX_VERSION}-g${GIT_SHA}.bin") ;;
+        *) echo "错误：产物名 '$fw' 与版本元信息不一致"; exit 1 ;;
     esac
 done
 
