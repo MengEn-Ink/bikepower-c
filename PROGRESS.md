@@ -33,7 +33,7 @@
 
 ### 就绪交付物
 
-- [x] 固件版本统一为 `v4.0.0`，DIS 固件字段来自 `FIRMWARE_VERSION = "4.0.0"`，`tests/ble_selftest.py` 会校验厂商/型号/固件三字段。
+- [x] 固件版本统一为 `v4.0.0`，DIS 固件字段与门户展示包含板型、版本号、稳定版、修复版和最后 Git 短提交 ID，`tests/ble_selftest.py` 会校验厂商/型号/固件三字段。
 - [x] 普通配网链路走 `radio_ctrl` + coex 共存：长按二次确认进入配网，BLE 默认不停，保存或超时后关闭 WiFi 原地回 `ST_BLE_ACTIVE`。
 - [x] 配网门户路由与前端校验已具备自动化覆盖：`tests/stage5_portal_test.py`、`tests/check_portal_structure.py`、`tests/check_portal_js.py`。
 - [x] Captive Portal DNS 与 10 个系统探测端点已实现：Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 探测路由统一 303 到首页，并注册 404 兜底覆盖未知探测路径。

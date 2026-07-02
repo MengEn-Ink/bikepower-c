@@ -32,9 +32,20 @@ def get_expected_fw_version():
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             content = f.read()
-        match = re.search(r'#define\s+FIRMWARE_VERSION\s+"([^"]+)"', content)
-        if match:
-            return match.group(1)
+        version = re.search(r'#define\s+FIRMWARE_VERSION\s+"([^"]+)"', content)
+        stable = re.search(r'#define\s+FIRMWARE_STABLE_VERSION\s+"([^"]+)"', content)
+        fix = re.search(r'#define\s+FIRMWARE_FIX_VERSION\s+"([^"]+)"', content)
+        if version and stable and fix:
+            board = os.environ.get("BIKEPOWER_EXPECT_BOARD", "generic-c3")
+            git_sha = os.environ.get("BIKEPOWER_EXPECT_GIT_SHA", "")
+            if not git_sha:
+                try:
+                    import subprocess
+                    repo_root = os.path.dirname(os.path.dirname(__file__))
+                    git_sha = subprocess.check_output(["git", "-C", repo_root, "rev-parse", "--short", "HEAD"], text=True).strip()
+                except Exception:
+                    git_sha = "nogit"
+            return "%s-v%s-stable%s-fix%s-g%s" % (board, version.group(1), stable.group(1), fix.group(1), git_sha)
     except Exception:
         pass
     return "3.1.1"  # fallback默认值

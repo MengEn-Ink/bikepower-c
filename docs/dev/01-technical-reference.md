@@ -268,6 +268,10 @@ DIS 读取内容来自编译期常量：
 - `DEVICE_MANUFACTURER = "BikePower"`
 - `DEVICE_MODEL = "ESP32-C3"`
 - `FIRMWARE_VERSION = "4.0.0"`
+- `FIRMWARE_STABLE_VERSION = "4.0.0"`
+- `FIRMWARE_FIX_VERSION = "4.0.0"`
+- `BIKEPOWER_GIT_SHA` 由 `main/CMakeLists.txt` 在构建时注入最后一次 Git 短提交 ID
+- DIS 固件字段与门户完整版本名使用 `board_firmware_name()` 生成，格式为 `板型-v版本-stable稳定版-fix修复版-gGitID`，例如 `generic-c3-v4.0.0-stable4.0.0-fix4.0.0-g6e90860`
 
 测试脚本 `tests/ble_selftest.py` 也会校验这三项。
 
@@ -643,7 +647,7 @@ v3.2.0 起配网门户前后端分离：
 - `GET /`（返回内联 HTML 整页）
 - `GET /favicon.ico`（204）
 - `GET /.well-known/captive-portal`（RFC 8910 Captive Portal API，返回 `application/captive+json`）
-- `GET /api/state`（设备全状态：device_name/firmware_version/power/cadence/heartrate/mode/profile_*/pacers/LED 配置/remaining_sec/closing）
+- `GET /api/state`（设备全状态：device_name/firmware_version/firmware_name/board/stable_version/fix_version/git_sha/power/cadence/heartrate/mode/profile_*/pacers/LED 配置/remaining_sec/closing）
 - `GET /api/time`（纯数字剩余秒数）
 - `POST /api/renew`（续期，返回新的剩余秒数）
 - `GET /api/mem_stats`（`{"free":..,"min_free":..}`）

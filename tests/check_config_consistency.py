@@ -110,6 +110,14 @@ fw_ver = extract_define(config_src, "FIRMWARE_VERSION")
 check(fw_ver is not None, "FIRMWARE_VERSION 已定义")
 print(f"{TAG}   FIRMWARE_VERSION = {fw_ver}")
 
+stable_ver = extract_define(config_src, "FIRMWARE_STABLE_VERSION")
+fix_ver = extract_define(config_src, "FIRMWARE_FIX_VERSION")
+check(stable_ver is not None and re.match(r'\d+\.\d+\.\d+', stable_ver),
+      f"FIRMWARE_STABLE_VERSION 已定义为语义版本 (实际={stable_ver})")
+check(fix_ver is not None and re.match(r'\d+\.\d+\.\d+', fix_ver),
+      f"FIRMWARE_FIX_VERSION 已定义为语义版本 (实际={fix_ver})")
+check(fw_ver == stable_ver, f"FIRMWARE_VERSION({fw_ver}) 与稳定版({stable_ver}) 对齐")
+
 latest_released = extract_changelog_latest_version(changelog_src)
 print(f"{TAG}   CHANGELOG 最新已发布版本 = {latest_released}")
 
@@ -127,6 +135,8 @@ device_name_cfg = extract_define(config_src, "DEVICE_NAME")
 device_name_domain = extract_define(domain_src, "DEVICE_NAME_DEFAULT")
 check(device_name_cfg == device_name_domain,
       f"DEVICE_NAME({device_name_cfg}) == DEVICE_NAME_DEFAULT({device_name_domain})")
+check("BIKEPOWER_GIT_SHA" in config_src or "BIKEPOWER_GIT_SHA" in read(CONFIG_H.parent / "CMakeLists.txt"),
+      "构建系统必须注入 BIKEPOWER_GIT_SHA")
 
 # WIFI_SSID 与 DEVICE_NAME 关系（AP 名沿用设备名前缀）
 wifi_ssid = extract_define(config_src, "WIFI_SSID")

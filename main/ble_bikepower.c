@@ -25,6 +25,7 @@
 #include "bikepower_config.h"
 #include "domain_config.h"
 #include "ble_bikepower.h"
+#include "board_detect.h"
 
 static const char *TAG = "BLE";
 
@@ -333,8 +334,11 @@ static int dis_model_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
 static int dis_fw_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR)
-        return chr_read_buf(ctxt, (const uint8_t *)FIRMWARE_VERSION, strlen(FIRMWARE_VERSION));
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        char fw_name[96];
+        board_firmware_name(fw_name, sizeof(fw_name));
+        return chr_read_buf(ctxt, (const uint8_t *)fw_name, strlen(fw_name));
+    }
     return BLE_ATT_ERR_UNLIKELY;
 }
 

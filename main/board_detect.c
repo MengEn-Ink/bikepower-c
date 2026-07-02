@@ -10,6 +10,7 @@
  * 检测完成后恢复 GPIO3，避免影响后续按钮初始化。
  */
 #include "board_detect.h"
+#include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
@@ -75,6 +76,17 @@ board_type_t board_get_type(void)
 const board_desc_t *board_get_desc(void)
 {
     return &s_board_desc[s_board];
+}
+
+void board_firmware_name(char *out, size_t out_sz)
+{
+    if (!out || out_sz == 0) return;
+    snprintf(out, out_sz, "%s-v%s-stable%s-fix%s-g%s",
+             s_board_desc[s_board].name,
+             FIRMWARE_VERSION,
+             FIRMWARE_STABLE_VERSION,
+             FIRMWARE_FIX_VERSION,
+             BIKEPOWER_GIT_SHA);
 }
 
 int board_btn_pin(void)

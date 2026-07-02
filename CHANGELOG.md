@@ -4,6 +4,14 @@
 
 ## [未发布]
 
+### 固件版本标识
+- `main/CMakeLists.txt`：构建时注入 `BIKEPOWER_GIT_SHA`，固件显示信息可追溯到最后一次 Git 提交短 ID。
+- `main/bikepower_config.h`、`main/board_detect.c/.h`：新增稳定版 `FIRMWARE_STABLE_VERSION`、修复版 `FIRMWARE_FIX_VERSION` 与 `board_firmware_name()`，统一生成 `板型-v版本-stable稳定版-fix修复版-gGitID` 格式。
+- `main/wifi_portal.c`、`main/web/`、`tests/mock_server.py`：`/api/state` 新增 `firmware_name/board/stable_version/fix_version/git_sha`，首页与设置页优先展示完整固件名称，设置页支持长版本名换行。
+- `main/ble_bikepower.c`：DIS 固件版本字段改为完整固件名称，方便 BLE 自测与手机工具直接看到板型、版本和 Git ID。
+- `tests/check_config_consistency.py`、`tests/check_portal_structure.py`：新增版本元信息和前端展示契约检查。
+- 验证：`check_portal_structure.py` 104 通过 0 失败；`check_portal_js.py`、`check_config_consistency.py`、`check_nvs_schema.py`、`python3 -m py_compile tests/mock_server.py tests/ble_selftest.py` 通过；`make -C test && test/test_domain` 1369 通过 0 失败；`stage5_portal_test.py --ip 127.0.0.1 --port 18083` mock 自测 8/8 通过；`idf.py fullclean && idf.py build` 通过，app 分区剩余 73%。
+
 ### BLE 设备信息模板库
 - `main/ble_scanner.c/.h`：新增模板库专用 BLE Central/Observer 能力，支持用户触发的限时扫描、扫描结果缓存、临时连接外部设备并读取 GAP Device Name 与 DIS 厂商/型号/固件/硬件/软件字段，完成后主动断开。
 - `main/wifi_portal.c`：接入 `/api/ble-scan/start|stop|results|read`，扫描结果和读取结果以 JSON 返回给前端；模板保存仍走独立 `ble_tpl` NVS namespace。

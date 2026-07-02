@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <stddef.h>
 #include "bikepower_config.h"
 
 /**
@@ -40,6 +41,13 @@ board_type_t board_get_type(void);
  * 返回值：指向当前板型描述表项的只读指针。
  */
 const board_desc_t *board_get_desc(void);
+
+/**
+ * 生成含板型、版本号、稳定版、修复版和 Git ID 的固件显示名称。
+ * out：输出缓冲区。
+ * out_sz：输出缓冲区大小。
+ */
+void board_firmware_name(char *out, size_t out_sz);
 
 /**
  * 获取当前板型的按钮引脚。

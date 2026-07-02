@@ -5,6 +5,7 @@
 var STATE = {
   device_name: "",
   firmware_version: "",
+  firmware_name: "",
   power: 0, cadence: 0, heartrate: 0,
   mode: "steady",
   power_float: 5, cadence_float: 2, hr_float: 2,
@@ -232,8 +233,11 @@ function captureDraft() {
 }
 
 /* ============ 首页 ============ */
+function firmwareLabel() {
+  return STATE.firmware_name || ("v" + STATE.firmware_version);
+}
 function renderHome() {
-  $("home-ver").textContent = "v" + STATE.firmware_version;
+  $("home-ver").textContent = firmwareLabel();
   $("home-power").value = STATE.power;
   $("home-cadence").value = STATE.cadence;
   $("home-hr").value = STATE.heartrate;
@@ -477,12 +481,12 @@ function onCloseWifi() {
 
 /* ============ 设置 ============ */
 function renderSettings() {
-  $("home-ver").textContent = "v" + STATE.firmware_version;
+  $("home-ver").textContent = firmwareLabel();
   $("settings-weight").value = STATE.profile_weight;
   $("settings-ftp").value = STATE.profile_ftp;
   $("settings-thr").value = STATE.profile_thr_hr;
   applyDeviceNameView();
-  $("settings-version").textContent = "v" + STATE.firmware_version;
+  $("settings-version").textContent = firmwareLabel();
   var ps = $("float-pstep");
   if (ps) ps.textContent = STATE.power_step;
   renderLedControls();
@@ -923,6 +927,7 @@ function init() {
     if (status === 200 && data) {
       STATE.device_name = data.device_name || "BikePower";
       STATE.firmware_version = data.firmware_version || "";
+      STATE.firmware_name = data.firmware_name || "";
       STATE.power = data.power || 0;
       STATE.cadence = data.cadence || 0;
       STATE.heartrate = data.heartrate || 0;

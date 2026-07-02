@@ -6,7 +6,7 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
 .bar,.brand,.status,.card .val{display:flex;align-items:center}
 .bar,.status{justify-content:space-between;margin:0 0 6px}
 .brand{gap:6px;font-size:19px;font-weight:800}
-.brand small{font-size:10px;font-weight:600;color:#86868b}
+.brand small{font-size:10px;font-weight:600;color:#86868b;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .status{font-size:12px}
 .status .ble{color:#007aff;font-weight:800}
 .badge{background:#fff;border:1px solid #0001;color:#111;border-radius:16px;padding:5px 10px;font-weight:800;font-size:11px;cursor:pointer}
@@ -113,6 +113,8 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
 .info-row:last-child{border-bottom:0}
 .info-row .k{color:#86868b;font-weight:600}
 .info-row .v{color:#1d1d1f;font-weight:700}
+.version-row{align-items:flex-start;gap:10px}
+.version-full{text-align:right;word-break:break-all;line-height:1.35}
 .home-card{padding:8px 10px}
 .home-card h2{font-size:12px;margin-bottom:2px}
 .home-card .val input{font-size:25px;line-height:1}

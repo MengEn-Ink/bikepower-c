@@ -126,6 +126,9 @@ void app_main(void)
     }
 
     board_detect();
+    char fw_name[96];
+    board_firmware_name(fw_name, sizeof(fw_name));
+    ESP_LOGI(TAG, "固件名称：%s", fw_name);
 
     ret = led_init();
     if (ret != ESP_OK) {

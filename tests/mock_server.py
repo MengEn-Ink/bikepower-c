@@ -32,6 +32,11 @@ WEB_DIR = os.path.join(REPO_ROOT, "main", "web")
 MOCK_STATE = {
     "device_name": "BikePower-Mock",
     "firmware_version": "4.0.0-mock",
+    "firmware_name": "generic-c3-v4.0.0-stable4.0.0-fix4.0.0-g6e90860",
+    "board": "generic-c3",
+    "stable_version": "4.0.0",
+    "fix_version": "4.0.0",
+    "git_sha": "6e90860",
     "power": 150,
     "cadence": 80,
     "heartrate": 130,

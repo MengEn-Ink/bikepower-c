@@ -26,6 +26,7 @@
 #include "wifi_portal.h"
 #include "web_index_html.h"   /* scripts/inline_static.py 自动生成 */
 #include "captive_portal.h"
+#include "board_detect.h"
 #include "radio_ctrl.h"
 #include "nvs_store.h"
 #include "device_template_store.h"
@@ -392,13 +393,18 @@ static esp_err_t h_api_state(httpd_req_t *req)
     json_escape(e->device_name, dn_esc, sizeof(dn_esc));
     char custom_name_esc[CUSTOM_PACER_NAME_MAX * 2 + 1] = {0};
     json_escape(e->profile.custom_pacer_name, custom_name_esc, sizeof(custom_name_esc));
+    char fw_name[96];
+    char fw_name_esc[192] = {0};
+    board_firmware_name(fw_name, sizeof(fw_name));
+    json_escape(fw_name, fw_name_esc, sizeof(fw_name_esc));
 
     int ride_type_idx = (e->profile.ride_type >= 0 && e->profile.ride_type < RIDE_TYPE_COUNT)
                         ? e->profile.ride_type : 0;
 
     char buf[2304];
     int off = snprintf(buf, sizeof(buf),
-        "{\"device_name\":\"%s\",\"firmware_version\":\"%s\","
+        "{\"device_name\":\"%s\",\"firmware_version\":\"%s\",\"firmware_name\":\"%s\","
+        "\"board\":\"%s\",\"stable_version\":\"%s\",\"fix_version\":\"%s\",\"git_sha\":\"%s\","
         "\"power\":%d,\"cadence\":%d,\"heartrate\":%d,\"mode\":\"%s\","
         "\"power_float\":%d,\"cadence_float\":%d,\"hr_float\":%d,"
         "\"power_step\":%d,"
@@ -414,7 +420,8 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"remaining_sec\":%d,\"closing\":%s,"
         "\"hr_locked\":%s,"
         "\"pacers\":[",
-        dn_esc, FIRMWARE_VERSION,
+        dn_esc, FIRMWARE_VERSION, fw_name_esc,
+        board_get_desc()->name, FIRMWARE_STABLE_VERSION, FIRMWARE_FIX_VERSION, BIKEPOWER_GIT_SHA,
         e->base_power, e->cadence_base, e->last_heartrate, mode_to_id((int)e->mode),
         e->power_float, e->cadence_float, e->hr_float,
         e->power_step,
