@@ -8,9 +8,9 @@
 
 ## 角色与范围
 
-- `BLE-1`：BikePower C 只实现 NimBLE `peripheral` 模式。
-- `BLE-2`：禁止实现扫描、中心角色、后台扫描协程或与业务无关的 GAP 搜索逻辑。
-- `BLE-3`：BLE 是设备主工作模式；仅在进入 WiFi 配网时由 `radio_ctrl` 停止 BLE。
+- `BLE-1`：BikePower C 主工作角色是 NimBLE `peripheral`，对码表/骑行 App 暴露 CPS/HRS/CSC/FTMS/DIS 五服务。
+- `BLE-2`：仅允许为“设备信息模板库”和后续功率桥接实现受控 `central/observer` 能力；扫描必须由用户在配网页主动触发，限时运行，不允许开机后台扫描或与业务无关的 GAP 搜索逻辑。
+- `BLE-3`：BLE 是设备主工作模式；普通配网期间 peripheral 保持在线。外部设备读取使用临时 central 连接，完成或超时后必须主动断开。
 
 ## 服务清单
 

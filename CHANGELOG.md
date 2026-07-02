@@ -4,6 +4,14 @@
 
 ## [未发布]
 
+### BLE 设备信息模板库
+- `main/ble_scanner.c/.h`：新增模板库专用 BLE Central/Observer 能力，支持用户触发的限时扫描、扫描结果缓存、临时连接外部设备并读取 GAP Device Name 与 DIS 厂商/型号/固件/硬件/软件字段，完成后主动断开。
+- `main/wifi_portal.c`：接入 `/api/ble-scan/start|stop|results|read`，扫描结果和读取结果以 JSON 返回给前端；模板保存仍走独立 `ble_tpl` NVS namespace。
+- `main/web/`：模板库扫描按钮接入真实扫描，前端轮询扫描结果，点击设备后读取基础信息并要求确认别名再保存；保留应用模板与二次确认删除交互。
+- `components/bikepower_domain/device_template.c/.h`：新增 BLE 地址格式化和标准服务 UUID 到模板服务标记的映射辅助函数。
+- `sdkconfig.defaults` / `sdkconfig`：启用 NimBLE Central/Observer 角色，并把连接数提升到 2，为“本设备作为 Peripheral + 临时连接外部设备”预留连接资源。
+- 验证：`make -C test && test/test_domain` 1364 通过 0 失败；`python3 tests/check_portal_js.py`、`python3 tests/check_portal_structure.py`、`python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 -m py_compile tests/mock_server.py` 通过；`idf.py build` 通过，app 分区剩余 73%。
+
 ### 日志体系
 - `tests/serial_daemon.py`：新增设备重启 banner 识别，默认插入 `DEVICE REBOOT / BOOT BANNER` 分隔线；新增 `--split-on-reboot` 支持按重启切新 `device_*.log`；新增 panic/WDT/Backtrace/Guru Meditation 等关键字故障快照 `crash_*.log`，并支持 `--no-crash-snapshot` 关闭。
 - `tests/test_serial_daemon.py`：新增串口日志守护单测，覆盖重启分隔线、按重启切文件、故障快照生成。

@@ -636,7 +636,7 @@ v3.2.0 起配网门户前后端分离：
 - `cfg.stack_size = 8192`
 - `cfg.keep_alive_enable = false`
 
-已注册业务路由 15 个，另有 10 个 Captive Portal 探测路由：
+已注册业务路由 16 个，另有 10 个 Captive Portal 探测路由：
 
 - `GET /`（返回内联 HTML 整页）
 - `GET /favicon.ico`（204）
@@ -650,9 +650,10 @@ v3.2.0 起配网门户前后端分离：
 - `POST /api/device-templates/save`（保存一个设备信息模板，模板满时返回错误）
 - `POST /api/device-templates/delete`（删除指定模板）
 - `POST /api/device-templates/apply`（把模板设备名应用为本设备 BLE 名称并持久化）
-- `POST /api/ble-scan/start`（预留 BLE 扫描入口，当前阶段返回尚未接入真实扫描）
-- `POST /api/ble-scan/stop`（预留停止扫描入口）
-- `GET /api/ble-scan/results`（预留扫描结果入口，当前返回空列表）
+- `POST /api/ble-scan/start`（启动 8 秒 BLE active scan，结果缓存在内存中）
+- `POST /api/ble-scan/stop`（停止当前扫描）
+- `GET /api/ble-scan/results`（返回扫描状态和最多 12 个附近设备摘要）
+- `POST /api/ble-scan/read`（临时连接指定设备，读取 GAP Device Name 与 DIS 厂商/型号/版本字段后断开）
 
 其中：
 
@@ -662,6 +663,7 @@ v3.2.0 起配网门户前后端分离：
 - `/api/renew`：续期
 - `/api/mem_stats`：返回 `free` 和 `min_free`
 - `/api/device-templates*`：管理设备信息模板库，模板内容独立存入 NVS namespace `ble_tpl`
+- `/api/ble-scan*`：模板库专用 BLE Central/Observer 入口，仅用户点击扫描或读取时运行；读取完成、失败或超时都会断开外部设备连接
 
 ### 8.4 超时恢复
 
@@ -686,7 +688,7 @@ v3.2.0 起配网门户前后端分离：
 
 ### 8.5 前端反馈与 JSON 安全
 
-配网门户是单页 SPA。首页与设置页通过 `location.hash` 切换，保存入口统一为 `POST /api/config`，保存并关闭 WiFi 入口为 `POST /api/close-wifi`。前端提交完整 JSON payload，保存成功后页面显示即时反馈；字段级校验覆盖功率、踏频、心率、体重、FTP、阈值心率、设备名称、调功步进、浮动幅度、自定义 W/kg 与 LED 配置。设备名称在设置页默认文本展示，点击右侧编辑按钮后进入输入态，点对勾确认后再随“保存设置”持久化；设备信息页提供“设备信息模板库”折叠卡片，最多显示 5 个模板，支持应用模板设备名和二次确认删除；物理按钮和 LED 配置卡片默认收起，仅用户主动展开时显示编辑控件。
+配网门户是单页 SPA。首页与设置页通过 `location.hash` 切换，保存入口统一为 `POST /api/config`，保存并关闭 WiFi 入口为 `POST /api/close-wifi`。前端提交完整 JSON payload，保存成功后页面显示即时反馈；字段级校验覆盖功率、踏频、心率、体重、FTP、阈值心率、设备名称、调功步进、浮动幅度、自定义 W/kg 与 LED 配置。设备名称在设置页默认文本展示，点击右侧编辑按钮后进入输入态，点对勾确认后再随“保存设置”持久化；设备信息页提供“设备信息模板库”折叠卡片，最多保存 5 个模板，支持扫描附近 BLE 设备、连接读取设备基础信息、确认别名后保存、应用模板设备名和二次确认删除；物理按钮和 LED 配置卡片默认收起，仅用户主动展开时显示编辑控件。
 
 `wifi_portal.c` 使用 `json_escape()` 转义字符串字段，避免设备名等用户可控内容破坏 JSON；前端渲染动态文本时使用 HTML 转义。`tests/check_portal_js.py` 与 `tests/check_portal_structure.py` 分别覆盖 JS 语法和前后端路由/视图契约。
 

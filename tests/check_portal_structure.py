@@ -68,9 +68,13 @@ REQUIRED_FRONTEND_APIS = [
     "/api/config",
     "/api/close-wifi",
     "/api/device-templates",
+    "/api/device-templates/save",
     "/api/device-templates/delete",
     "/api/device-templates/apply",
     "/api/ble-scan/start",
+    "/api/ble-scan/stop",
+    "/api/ble-scan/results",
+    "/api/ble-scan/read",
 ]
 
 # wifi_portal.c 必须注册的核心路由（防止改坏路由表）
@@ -140,6 +144,8 @@ def main():
     check('id="template-list"' in html, "设备信息模板库缺少列表容器")
     check('id="template-scan-btn"' in html, "设备信息模板库缺少扫描入口按钮")
     check('loadTemplates' in js and 'renderTemplates' in js, "app.js 缺少模板加载/渲染逻辑")
+    check('pollScanResults' in js and 'onTemplateReadDevice' in js, "app.js 缺少 BLE 扫描轮询/读取逻辑")
+    check('onTemplateSavePending' in js and 'onTemplateCancelPending' in js, "app.js 缺少扫描读取后保存/取消逻辑")
     check('onTemplateApply' in js and 'onTemplateDelete' in js, "app.js 缺少模板应用/删除逻辑")
     check('id="custom-pacer-name"' in html, "自定义配速机器人昵称输入缺失")
     check('id="about-dev"' not in html, "设备名称不应继续留在关于页")

@@ -27,7 +27,10 @@ var STATE = {
   templates: [],
   templates_max: 5,
   template_delete_arm: -1,
-  scanning: false
+  scanning: false,
+  scan_devices: [],
+  scan_timer: null,
+  pending_template: null
 };
 
 /* 浮动幅度/步进范围（与 domain_config.h 一致；step 为单次加减量，默认 1） */
@@ -522,11 +525,34 @@ function renderTemplates() {
   if (count) count.textContent = String(STATE.templates.length) + "/" + String(STATE.templates_max || 5);
   var box = $("template-list");
   if (!box) return;
+  var html = "";
+  if (STATE.pending_template) {
+    var p = STATE.pending_template;
+    html += '<div class="template-item scan-pending"><div class="template-title">确认保存设备信息</div>';
+    html += '<div class="template-sub">' + escapeHtml(templateSubtitle(p)) + '</div>';
+    html += '<div class="template-meta">地址 ' + escapeHtml(p.addr || "—") + ' · RSSI ' + escapeHtml(p.last_rssi != null ? String(p.last_rssi) : "—") + ' dBm</div>';
+    html += '<div class="field"><label>模板别名</label><input id="template-alias-input" maxlength="23" value="' + escapeHtml(templateTitle(p)) + '"></div>';
+    html += '<div class="template-actions"><button class="mini-btn primary" onclick="onTemplateSavePending()">保存模板</button>';
+    html += '<button class="mini-btn" onclick="onTemplateCancelPending()">取消</button></div></div>';
+  }
+  if (STATE.scan_devices && STATE.scan_devices.length > 0) {
+    html += '<div class="template-section-title">扫描结果</div>';
+    for (var s = 0; s < STATE.scan_devices.length; s++) {
+      var d = STATE.scan_devices[s];
+      html += '<div class="template-item scan-result">';
+      html += '<div class="template-main"><div class="template-title">' + escapeHtml(templateTitle(d)) + '</div>';
+      html += '<div class="template-sub">' + escapeHtml(serviceSummary(d.service_flags)) + '</div>';
+      html += '<div class="template-meta">地址 ' + escapeHtml(d.addr || "—") + ' · RSSI ' + escapeHtml(d.last_rssi != null ? String(d.last_rssi) : "—") + ' dBm</div></div>';
+      html += '<div class="template-actions"><button class="mini-btn primary" onclick="onTemplateReadDevice(' + s + ')">读取信息</button></div>';
+      html += '</div>';
+    }
+  }
   if (!STATE.templates || STATE.templates.length === 0) {
-    box.innerHTML = '<div class="template-empty">暂无模板。后续可通过扫描附近蓝牙设备读取并保存。</div>';
+    if (!html) html = '<div class="template-empty">暂无模板。点击上方按钮扫描附近蓝牙设备，读取设备信息后保存。</div>';
+    box.innerHTML = html;
     return;
   }
-  var html = "";
+  if (html) html += '<div class="template-section-title">已保存模板</div>';
   for (var i = 0; i < STATE.templates.length; i++) {
     var t = STATE.templates[i];
     html += '<div class="template-item">';
@@ -539,15 +565,105 @@ function renderTemplates() {
   }
   box.innerHTML = html;
 }
+function serviceSummary(flags) {
+  var parts = [];
+  flags = flags || 0;
+  if (flags & 1) parts.push("设备信息");
+  if (flags & 2) parts.push("电量");
+  if (flags & 4) parts.push("功率");
+  if (flags & 8) parts.push("心率");
+  if (flags & 16) parts.push("踏频");
+  if (flags & 32) parts.push("FTMS");
+  return parts.length ? ("服务：" + parts.join(" / ")) : "未识别标准服务，仍可尝试读取设备信息";
+}
+function stopScanPoll() {
+  if (STATE.scan_timer) {
+    clearInterval(STATE.scan_timer);
+    STATE.scan_timer = null;
+  }
+}
+function pollScanResults() {
+  api("/api/ble-scan/results", "GET", null, function (status, data) {
+    if (status !== 200 || !data) return;
+    STATE.scanning = !!data.scanning;
+    STATE.scan_devices = data.devices || [];
+    renderTemplates();
+    var note = $("template-scan-note");
+    if (note) {
+      note.style.display = "block";
+      note.textContent = STATE.scanning ? ("扫描中，已发现 " + STATE.scan_devices.length + " 个设备…") : ("扫描完成，发现 " + STATE.scan_devices.length + " 个设备。点击“读取信息”连接设备并读取基础信息。");
+    }
+    if (!STATE.scanning) stopScanPoll();
+  });
+}
 function onTemplateScan() {
   var note = $("template-scan-note");
   if (note) {
     note.style.display = "block";
-    note.textContent = "蓝牙扫描入口已预留；本阶段先完成模板库保存/删除/应用，下一阶段接入真实扫描和读取设备详情。";
+    note.textContent = "正在扫描附近蓝牙设备…";
   }
+  STATE.pending_template = null;
+  STATE.scan_devices = [];
+  stopScanPoll();
   api("/api/ble-scan/start", "POST", {}, function (status, data) {
-    toast((data && data.error) || (status === 200 ? "扫描入口已预留" : "扫描启动失败"));
+    if (status === 200 && data && data.ok) {
+      STATE.scanning = true;
+      toast("已开始扫描");
+      pollScanResults();
+      STATE.scan_timer = setInterval(pollScanResults, 1000);
+      setTimeout(function () { if (STATE.scanning) onTemplateStopScan(); }, 9000);
+    } else {
+      toast("扫描启动失败: " + ((data && data.error) || status));
+    }
   });
+}
+function onTemplateStopScan() {
+  api("/api/ble-scan/stop", "POST", {}, function (status, data) {
+    STATE.scanning = false;
+    stopScanPoll();
+    pollScanResults();
+    toast((status === 200 && data && data.ok) ? "已停止扫描" : "停止扫描失败");
+  });
+}
+function onTemplateReadDevice(index) {
+  var d = STATE.scan_devices[index];
+  if (!d) return;
+  toast("正在连接并读取设备信息…");
+  api("/api/ble-scan/read", "POST", { addr: d.addr, addr_type: d.addr_type || 0 }, function (status, data) {
+    if (status === 200 && data && data.ok && data.template) {
+      STATE.pending_template = data.template;
+      if (!STATE.pending_template.adv_name) STATE.pending_template.adv_name = d.adv_name || "";
+      if (!STATE.pending_template.last_rssi) STATE.pending_template.last_rssi = d.last_rssi || 0;
+      STATE.pending_template.service_flags = (STATE.pending_template.service_flags || 0) | (d.service_flags || 0);
+      renderTemplates();
+      toast("已读取设备信息，请确认别名后保存");
+    } else {
+      toast("读取失败: " + ((data && data.error) || status));
+    }
+  });
+}
+function onTemplateSavePending() {
+  if (!STATE.pending_template) return;
+  var alias = $("template-alias-input");
+  var tpl = STATE.pending_template;
+  tpl.alias = alias ? alias.value.trim() : templateTitle(tpl);
+  if (!tpl.alias) {
+    toast("模板别名不能为空");
+    return;
+  }
+  api("/api/device-templates/save", "POST", tpl, function (status, data) {
+    if (status === 200 && data && data.ok) {
+      STATE.pending_template = null;
+      toast("模板已保存");
+      loadTemplates();
+    } else {
+      toast("保存失败: " + ((data && data.error) || status));
+    }
+  });
+}
+function onTemplateCancelPending() {
+  STATE.pending_template = null;
+  renderTemplates();
 }
 function onTemplateApply(id) {
   api("/api/device-templates/apply", "POST", { id: id }, function (status, data) {

@@ -30,6 +30,7 @@
 #include "nvs_store.h"
 #include "device_template_store.h"
 #include "ble_bikepower.h"
+#include "ble_scanner.h"
 #include "app_state.h"
 #include "bikepower_config.h"
 #include "profile.h"
@@ -187,13 +188,6 @@ static void send_text(httpd_req_t *req, const char *body)
     httpd_resp_set_type(req, "text/plain");
     set_no_store_headers(req);
     httpd_resp_sendstr(req, body);
-}
-
-static void send_unsupported_json(httpd_req_t *req, const char *feature)
-{
-    char buf[160];
-    snprintf(buf, sizeof(buf), "{\"ok\":false,\"error\":\"%s 将在下一阶段接入真实 BLE 扫描\"}", feature);
-    send_json(req, buf);
 }
 
 // ============================ 模式映射 ============================
@@ -726,13 +720,16 @@ static esp_err_t h_api_device_template_apply(httpd_req_t *req)
 static esp_err_t h_api_ble_scan_start(httpd_req_t *req)
 {
     arm_deadline();
-    send_unsupported_json(req, "蓝牙扫描");
+    esp_err_t rc = ble_scanner_start(BLE_SCAN_DEFAULT_MS);
+    if (rc == ESP_OK) send_json(req, "{\"ok\":true,\"scanning\":true}");
+    else send_json(req, "{\"ok\":false,\"error\":\"蓝牙扫描启动失败\"}");
     return ESP_OK;
 }
 
 static esp_err_t h_api_ble_scan_stop(httpd_req_t *req)
 {
     arm_deadline();
+    ble_scanner_stop();
     send_json(req, "{\"ok\":true,\"scanning\":false}");
     return ESP_OK;
 }
@@ -740,7 +737,50 @@ static esp_err_t h_api_ble_scan_stop(httpd_req_t *req)
 static esp_err_t h_api_ble_scan_results(httpd_req_t *req)
 {
     arm_deadline();
-    send_json(req, "{\"scanning\":false,\"devices\":[]}");
+    char buf[4096];
+    if (ble_scanner_serialize_results(buf, sizeof(buf)) == 0) {
+        send_json(req, "{\"scanning\":false,\"devices\":[]}");
+        return ESP_OK;
+    }
+    send_json(req, buf);
+    return ESP_OK;
+}
+
+static esp_err_t h_api_ble_scan_read(httpd_req_t *req)
+{
+    if (s_closing) {
+        send_json(req, "{\"ok\":false,\"error\":\"配网收尾中\"}");
+        return ESP_OK;
+    }
+    arm_deadline();
+    char *body = NULL;
+    int len = recv_body(req, &body);
+    if (len == -2) {
+        httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE, "request body too large");
+        return ESP_FAIL;
+    }
+    if (len < 0) {
+        send_json(req, "{\"ok\":false,\"error\":\"读取请求体失败\"}");
+        return ESP_OK;
+    }
+    char addr[DEVICE_TEMPLATE_ADDR_MAX];
+    json_get_str_def(body, "addr", addr, sizeof(addr));
+    uint8_t addr_type = (uint8_t)json_get_int_def(body, "addr_type", 0);
+    free(body);
+    device_template_t tpl;
+    esp_err_t rc = ble_scanner_read_template(addr, addr_type, BLE_SCAN_READ_TIMEOUT_MS, &tpl);
+    if (rc != ESP_OK) {
+        send_json(req, "{\"ok\":false,\"error\":\"连接或读取设备信息失败\"}");
+        return ESP_OK;
+    }
+    char item[1024];
+    if (device_template_serialize_json(&tpl, item, sizeof(item)) == 0) {
+        send_json(req, "{\"ok\":false,\"error\":\"设备信息序列化失败\"}");
+        return ESP_OK;
+    }
+    char resp[1100];
+    snprintf(resp, sizeof(resp), "{\"ok\":true,\"template\":%s}", item);
+    send_json(req, resp);
     return ESP_OK;
 }
 
@@ -791,6 +831,7 @@ static esp_err_t start_httpd(void)
         { .uri = "/api/ble-scan/start",          .method = HTTP_POST, .handler = h_api_ble_scan_start },
         { .uri = "/api/ble-scan/stop",           .method = HTTP_POST, .handler = h_api_ble_scan_stop },
         { .uri = "/api/ble-scan/results",        .method = HTTP_GET,  .handler = h_api_ble_scan_results },
+        { .uri = "/api/ble-scan/read",           .method = HTTP_POST, .handler = h_api_ble_scan_read },
         /* Captive Portal 探测端点：各 OS 连通性检测，统一 302 重定向到配网首页触发自动弹窗 */
         { .uri = "/generate_204",               .method = HTTP_GET, .handler = captive_portal_detect_handler },
         { .uri = "/gen_204",                    .method = HTTP_GET, .handler = captive_portal_detect_handler },

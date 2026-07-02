@@ -737,6 +737,17 @@ static void test_device_templates(void)
     CHECK(bad.alias[DEVICE_TEMPLATE_ALIAS_MAX - 1] == '\0', "别名保证结尾");
     CHECK(bad.device_name[DEVICE_TEMPLATE_NAME_MAX - 1] == '\0', "设备名保证结尾");
 
+    device_template_t scanned;
+    device_template_defaults(&scanned);
+    uint8_t addr[6] = {0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa};
+    CHECK(device_template_set_addr(&scanned, addr, 1), "扫描地址写入成功");
+    CHECK(strcmp(scanned.addr, "AA:BB:CC:DD:EE:FF") == 0, "BLE 地址按常见大端展示");
+    CHECK(scanned.addr_type == 1, "地址类型写入成功");
+    CHECK(device_template_note_service(&scanned, 0x180A), "记录 DIS 服务成功");
+    CHECK(device_template_note_service(&scanned, 0x1818), "记录 CPS 服务成功");
+    CHECK(!device_template_note_service(&scanned, 0xFFFF), "未知服务不改变模板");
+    CHECK(scanned.service_flags == (DEVICE_TEMPLATE_SVC_DIS | DEVICE_TEMPLATE_SVC_CPS), "服务 UUID 映射为模板标记");
+
     char json[2048];
     size_t n = device_template_list_serialize_json(&list, json, sizeof(json));
     CHECK(n > 0 && n < sizeof(json), "模板列表 JSON 序列化成功");

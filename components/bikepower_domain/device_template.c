@@ -102,6 +102,32 @@ bool device_template_validate(device_template_t *tpl)
         || before.service_flags != tpl->service_flags;
 }
 
+bool device_template_set_addr(device_template_t *tpl, const uint8_t addr[6], uint8_t addr_type)
+{
+    if (!tpl || !addr) return false;
+    snprintf(tpl->addr, sizeof(tpl->addr), "%02X:%02X:%02X:%02X:%02X:%02X",
+             addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
+    tpl->addr_type = addr_type > 1 ? 0 : addr_type;
+    return true;
+}
+
+bool device_template_note_service(device_template_t *tpl, uint16_t uuid16)
+{
+    if (!tpl) return false;
+    uint16_t flag = 0;
+    switch (uuid16) {
+    case 0x180A: flag = DEVICE_TEMPLATE_SVC_DIS; break;
+    case 0x180F: flag = DEVICE_TEMPLATE_SVC_BAS; break;
+    case 0x1818: flag = DEVICE_TEMPLATE_SVC_CPS; break;
+    case 0x180D: flag = DEVICE_TEMPLATE_SVC_HRS; break;
+    case 0x1816: flag = DEVICE_TEMPLATE_SVC_CSC; break;
+    case 0x1826: flag = DEVICE_TEMPLATE_SVC_FTMS; break;
+    default: return false;
+    }
+    tpl->service_flags |= flag;
+    return true;
+}
+
 void device_template_list_recount(device_template_list_t *list)
 {
     if (!list) return;

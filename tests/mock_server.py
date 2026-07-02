@@ -18,6 +18,7 @@
   - GET /api/mem_stats    JSON 假内存数据
   - POST /api/config      {"ok":true}（保存到运行时状态）
   - POST /api/close-wifi  {"ok":true}
+  - /api/device-templates* 和 /api/ble-scan* 模拟设备信息模板库与 BLE 扫描
 """
 import argparse
 import json
@@ -72,6 +73,40 @@ MOCK_STATE = {
 
 LOCK = threading.Lock()
 REMAINING_SEC = [180]
+TEMPLATES = []
+SCAN_DEVICES = [
+    {
+        "id": 0,
+        "alias": "",
+        "adv_name": "Magene P325",
+        "device_name": "",
+        "manufacturer": "",
+        "model": "",
+        "firmware": "",
+        "hardware": "",
+        "software": "",
+        "addr": "AA:BB:CC:DD:EE:FF",
+        "addr_type": 1,
+        "last_rssi": -54,
+        "service_flags": 5,
+    },
+    {
+        "id": 1,
+        "alias": "",
+        "adv_name": "Zwift Hub",
+        "device_name": "",
+        "manufacturer": "",
+        "model": "",
+        "firmware": "",
+        "hardware": "",
+        "software": "",
+        "addr": "12:34:56:78:9A:BC",
+        "addr_type": 0,
+        "last_rssi": -68,
+        "service_flags": 37,
+    },
+]
+SCANNING = [False]
 
 
 def _inline_html():
@@ -145,6 +180,13 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/mem_stats":
             self._send_json({"free": 120000, "min_free": 98000})
             return
+        if path == "/api/device-templates":
+            self._send_json({"max": 5, "count": len(TEMPLATES), "items": TEMPLATES})
+            return
+        if path == "/api/ble-scan/results":
+            self._send_json({"scanning": SCANNING[0], "devices": SCAN_DEVICES})
+            SCANNING[0] = False
+            return
         # Captive Portal 检测端点：302 回首页
         if path in ("/generate_204", "/gen_204", "/hotspot-detect.html",
                     "/library/test/success.html", "/ncsi.txt",
@@ -197,6 +239,74 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 MOCK_STATE["closing"] = True
             self._send_json({"ok": True})
+            return
+        if path == "/api/device-templates/save":
+            try:
+                data = json.loads(body) if body else {}
+            except Exception:
+                data = {}
+            if len(TEMPLATES) >= 5:
+                self._send_json({"ok": False, "error": "模板已满，请先删除旧模板"})
+                return
+            tpl = dict(data)
+            tpl["id"] = len(TEMPLATES)
+            if not tpl.get("alias"):
+                tpl["alias"] = tpl.get("device_name") or tpl.get("adv_name") or tpl.get("addr") or "未命名设备"
+            TEMPLATES.append(tpl)
+            self._send_json({"ok": True, "id": tpl["id"]})
+            return
+        if path == "/api/device-templates/delete":
+            try:
+                data = json.loads(body) if body else {}
+            except Exception:
+                data = {}
+            tid = int(data.get("id", -1))
+            if 0 <= tid < len(TEMPLATES):
+                TEMPLATES.pop(tid)
+                for i, tpl in enumerate(TEMPLATES):
+                    tpl["id"] = i
+                self._send_json({"ok": True})
+            else:
+                self._send_json({"ok": False, "error": "模板不存在"})
+            return
+        if path == "/api/device-templates/apply":
+            try:
+                data = json.loads(body) if body else {}
+            except Exception:
+                data = {}
+            tid = int(data.get("id", -1))
+            if 0 <= tid < len(TEMPLATES):
+                MOCK_STATE["device_name"] = TEMPLATES[tid].get("device_name") or TEMPLATES[tid].get("adv_name") or MOCK_STATE["device_name"]
+                self._send_json({"ok": True})
+            else:
+                self._send_json({"ok": False, "error": "模板不存在"})
+            return
+        if path == "/api/ble-scan/start":
+            SCANNING[0] = True
+            self._send_json({"ok": True, "scanning": True})
+            return
+        if path == "/api/ble-scan/stop":
+            SCANNING[0] = False
+            self._send_json({"ok": True, "scanning": False})
+            return
+        if path == "/api/ble-scan/read":
+            try:
+                data = json.loads(body) if body else {}
+            except Exception:
+                data = {}
+            dev = next((d for d in SCAN_DEVICES if d["addr"] == data.get("addr")), SCAN_DEVICES[0])
+            tpl = dict(dev)
+            tpl.update({
+                "alias": tpl.get("adv_name") or "外部设备",
+                "device_name": tpl.get("adv_name") or "ExternalPower",
+                "manufacturer": "MockPower",
+                "model": "PWR-1",
+                "firmware": "1.2.3",
+                "hardware": "A1",
+                "software": "BLE",
+                "service_flags": tpl.get("service_flags", 0) | 1,
+            })
+            self._send_json({"ok": True, "template": tpl})
             return
         self._send_text("Not Found", 404)
 

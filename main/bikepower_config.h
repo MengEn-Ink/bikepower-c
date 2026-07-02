@@ -102,6 +102,9 @@ typedef enum {
 #define BLE_NOTIFY_INTERVAL_MS       1000   // 通知间隔
 #define BLE_RETRY_TICKS              100    // BLE 启动失败重试节拍数（每拍50ms → 5s）
 #define BLE_NOTIFY_LOCK_WAIT_MS      10     // 通知互斥锁短等待上限：锁持有为微秒级，避免阻塞 NimBLE 任务
+#define BLE_SCAN_DEFAULT_MS          8000   // 模板库扫描附近 BLE 设备的默认时长
+#define BLE_SCAN_MAX_RESULTS         12     // 扫描结果缓存上限，避免配网态占用过多内存
+#define BLE_SCAN_READ_TIMEOUT_MS     10000  // 连接外部设备读取 DIS 的最长等待时间
 // 广播包名字 AD 字段最大字符数。31 字节预算 - flags(3) - 完整16位UUID列表(6) = 22 字节给名字 AD，
 // 减去 AD 头(2) 得 20 个字符；超出部分完整名走 scan response。
 #define BLE_ADV_NAME_MAX_LEN         20
