@@ -6,6 +6,7 @@ idf_component_register(
          "led.c"
          "board_detect.c"
          "nvs_store.c"
+         "device_template_store.c"
          "radio_ctrl.c"
          "wifi_portal.c"
          "captive_portal.c"

@@ -4,6 +4,7 @@ idf_component_register(
          "hr_model.c"
          "power_engine.c"
          "config_store.c"
+         "device_template.c"
          "json_miniparse.c"
          "button_logic.c"
          "led_pattern.c"

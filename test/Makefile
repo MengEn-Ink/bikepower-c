@@ -9,6 +9,7 @@ SRCS := test_domain.c \
         $(DOMAIN)/hr_model.c \
         $(DOMAIN)/power_engine.c \
         $(DOMAIN)/config_store.c \
+        $(DOMAIN)/device_template.c \
         $(DOMAIN)/json_miniparse.c \
         $(DOMAIN)/button_logic.c \
         $(DOMAIN)/led_pattern.c \

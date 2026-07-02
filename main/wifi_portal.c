@@ -28,6 +28,7 @@
 #include "captive_portal.h"
 #include "radio_ctrl.h"
 #include "nvs_store.h"
+#include "device_template_store.h"
 #include "ble_bikepower.h"
 #include "app_state.h"
 #include "bikepower_config.h"
@@ -186,6 +187,13 @@ static void send_text(httpd_req_t *req, const char *body)
     httpd_resp_set_type(req, "text/plain");
     set_no_store_headers(req);
     httpd_resp_sendstr(req, body);
+}
+
+static void send_unsupported_json(httpd_req_t *req, const char *feature)
+{
+    char buf[160];
+    snprintf(buf, sizeof(buf), "{\"ok\":false,\"error\":\"%s 将在下一阶段接入真实 BLE 扫描\"}", feature);
+    send_json(req, buf);
 }
 
 // ============================ 模式映射 ============================
@@ -573,6 +581,169 @@ static esp_err_t h_api_mem_stats(httpd_req_t *req)
     return ESP_OK;
 }
 
+// ============================ /api/device-templates ============================
+
+static esp_err_t h_api_device_templates(httpd_req_t *req)
+{
+    arm_deadline();
+    device_template_list_t list;
+    device_template_store_load(&list);
+    char buf[2048];
+    if (device_template_list_serialize_json(&list, buf, sizeof(buf)) == 0) {
+        send_json(req, "{\"max\":5,\"count\":0,\"items\":[]}");
+        return ESP_OK;
+    }
+    send_json(req, buf);
+    return ESP_OK;
+}
+
+static void json_get_str_def(const char *json, const char *key, char *out, size_t out_sz)
+{
+    if (out_sz == 0) return;
+    if (!json_get_str(json, key, out, out_sz)) out[0] = '\0';
+}
+
+static esp_err_t h_api_device_template_save(httpd_req_t *req)
+{
+    if (s_closing) {
+        send_json(req, "{\"ok\":false,\"error\":\"配网收尾中\"}");
+        return ESP_OK;
+    }
+    arm_deadline();
+    char *body = NULL;
+    int len = recv_body(req, &body);
+    if (len == -2) {
+        httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE, "request body too large");
+        return ESP_FAIL;
+    }
+    if (len < 0) {
+        send_json(req, "{\"ok\":false,\"error\":\"读取请求体失败\"}");
+        return ESP_OK;
+    }
+    device_template_t tpl;
+    device_template_defaults(&tpl);
+    tpl.used = true;
+    json_get_str_def(body, "alias", tpl.alias, sizeof(tpl.alias));
+    json_get_str_def(body, "adv_name", tpl.adv_name, sizeof(tpl.adv_name));
+    json_get_str_def(body, "device_name", tpl.device_name, sizeof(tpl.device_name));
+    json_get_str_def(body, "manufacturer", tpl.manufacturer, sizeof(tpl.manufacturer));
+    json_get_str_def(body, "model", tpl.model, sizeof(tpl.model));
+    json_get_str_def(body, "firmware", tpl.firmware, sizeof(tpl.firmware));
+    json_get_str_def(body, "hardware", tpl.hardware, sizeof(tpl.hardware));
+    json_get_str_def(body, "software", tpl.software, sizeof(tpl.software));
+    json_get_str_def(body, "addr", tpl.addr, sizeof(tpl.addr));
+    tpl.addr_type = (uint8_t)json_get_int_def(body, "addr_type", 0);
+    tpl.last_rssi = (int8_t)json_get_int_def(body, "last_rssi", 0);
+    tpl.service_flags = (uint16_t)json_get_int_def(body, "service_flags", 0);
+    free(body);
+    if (tpl.alias[0] == '\0' && tpl.device_name[0] == '\0' && tpl.adv_name[0] == '\0') {
+        send_json(req, "{\"ok\":false,\"error\":\"模板名称不能为空\"}");
+        return ESP_OK;
+    }
+    if (tpl.device_name[0] == '\0' && tpl.adv_name[0] != '\0') {
+        strncpy(tpl.device_name, tpl.adv_name, sizeof(tpl.device_name) - 1);
+        tpl.device_name[sizeof(tpl.device_name) - 1] = '\0';
+    }
+    if (tpl.alias[0] == '\0') {
+        strncpy(tpl.alias, tpl.device_name[0] ? tpl.device_name : tpl.adv_name, sizeof(tpl.alias) - 1);
+        tpl.alias[sizeof(tpl.alias) - 1] = '\0';
+    }
+    int slot = -1;
+    if (!device_template_store_add(&tpl, &slot)) {
+        send_json(req, "{\"ok\":false,\"error\":\"模板已满，请先删除旧模板\"}");
+        return ESP_OK;
+    }
+    char resp[48];
+    snprintf(resp, sizeof(resp), "{\"ok\":true,\"id\":%d}", slot);
+    send_json(req, resp);
+    return ESP_OK;
+}
+
+static esp_err_t h_api_device_template_delete(httpd_req_t *req)
+{
+    if (s_closing) {
+        send_json(req, "{\"ok\":false,\"error\":\"配网收尾中\"}");
+        return ESP_OK;
+    }
+    arm_deadline();
+    char *body = NULL;
+    int len = recv_body(req, &body);
+    if (len < 0) {
+        send_json(req, "{\"ok\":false,\"error\":\"读取请求体失败\"}");
+        return ESP_OK;
+    }
+    int id = json_get_int_def(body, "id", -1);
+    free(body);
+    if (id < 0 || id >= DEVICE_TEMPLATE_MAX || !device_template_store_delete((uint8_t)id)) {
+        send_json(req, "{\"ok\":false,\"error\":\"模板不存在\"}");
+        return ESP_OK;
+    }
+    send_json(req, "{\"ok\":true}");
+    return ESP_OK;
+}
+
+static esp_err_t h_api_device_template_apply(httpd_req_t *req)
+{
+    if (s_closing) {
+        send_json(req, "{\"ok\":false,\"error\":\"配网收尾中\"}");
+        return ESP_OK;
+    }
+    arm_deadline();
+    char *body = NULL;
+    int len = recv_body(req, &body);
+    if (len < 0) {
+        send_json(req, "{\"ok\":false,\"error\":\"读取请求体失败\"}");
+        return ESP_OK;
+    }
+    int id = json_get_int_def(body, "id", -1);
+    free(body);
+    device_template_list_t list;
+    device_template_store_load(&list);
+    if (id < 0 || id >= DEVICE_TEMPLATE_MAX || !list.items[id].used) {
+        send_json(req, "{\"ok\":false,\"error\":\"模板不存在\"}");
+        return ESP_OK;
+    }
+    const char *name = list.items[id].device_name[0] ? list.items[id].device_name : list.items[id].adv_name;
+    if (!name || !name[0]) {
+        send_json(req, "{\"ok\":false,\"error\":\"模板缺少设备名\"}");
+        return ESP_OK;
+    }
+    power_engine_t next;
+    memcpy(&next, s_engine, sizeof(power_engine_t));
+    power_engine_set_device_name(&next, name);
+    if (nvs_store_save(&next)) {
+        bool name_changed = strcmp(s_engine->device_name, next.device_name) != 0;
+        memcpy(s_engine, &next, sizeof(power_engine_t));
+        power_engine_clear_dirty(s_engine);
+        if (name_changed) ble_bikepower_refresh_device_name();
+        send_json(req, "{\"ok\":true}");
+    } else {
+        send_json(req, "{\"ok\":false,\"error\":\"NVS 保存失败\"}");
+    }
+    return ESP_OK;
+}
+
+static esp_err_t h_api_ble_scan_start(httpd_req_t *req)
+{
+    arm_deadline();
+    send_unsupported_json(req, "蓝牙扫描");
+    return ESP_OK;
+}
+
+static esp_err_t h_api_ble_scan_stop(httpd_req_t *req)
+{
+    arm_deadline();
+    send_json(req, "{\"ok\":true,\"scanning\":false}");
+    return ESP_OK;
+}
+
+static esp_err_t h_api_ble_scan_results(httpd_req_t *req)
+{
+    arm_deadline();
+    send_json(req, "{\"scanning\":false,\"devices\":[]}");
+    return ESP_OK;
+}
+
 // ============================ favicon ============================
 
 static esp_err_t h_favicon(httpd_req_t *req)
@@ -612,6 +783,14 @@ static esp_err_t start_httpd(void)
         /* 配置 */
         { .uri = "/api/config",      .method = HTTP_POST, .handler = h_api_config },
         { .uri = "/api/close-wifi",  .method = HTTP_POST, .handler = h_api_close_wifi },
+        /* 设备信息模板 */
+        { .uri = "/api/device-templates",        .method = HTTP_GET,  .handler = h_api_device_templates },
+        { .uri = "/api/device-templates/save",   .method = HTTP_POST, .handler = h_api_device_template_save },
+        { .uri = "/api/device-templates/delete", .method = HTTP_POST, .handler = h_api_device_template_delete },
+        { .uri = "/api/device-templates/apply",  .method = HTTP_POST, .handler = h_api_device_template_apply },
+        { .uri = "/api/ble-scan/start",          .method = HTTP_POST, .handler = h_api_ble_scan_start },
+        { .uri = "/api/ble-scan/stop",           .method = HTTP_POST, .handler = h_api_ble_scan_stop },
+        { .uri = "/api/ble-scan/results",        .method = HTTP_GET,  .handler = h_api_ble_scan_results },
         /* Captive Portal 探测端点：各 OS 连通性检测，统一 302 重定向到配网首页触发自动弹窗 */
         { .uri = "/generate_204",               .method = HTTP_GET, .handler = captive_portal_detect_handler },
         { .uri = "/gen_204",                    .method = HTTP_GET, .handler = captive_portal_detect_handler },

@@ -94,6 +94,8 @@ typedef enum {
 #define NVS_KEY_LED_CONFIRM_COLOR "ledcfc"
 #define NVS_KEY_LED_ERROR_MODE    "lederrm"
 #define NVS_KEY_LED_ERROR_COLOR   "lederrc"
+#define NVS_TEMPLATE_NAMESPACE    "ble_tpl"
+#define NVS_TEMPLATE_KEY_PREFIX   "tpl"
 
 // ===== BLE 连接与广播 =====
 #define BLE_ADVERTISING_INTERVAL_MS  500    // 广播间隔
@@ -154,7 +156,7 @@ typedef enum {
 #define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 保存并关闭 WiFi 前的收尾等待时间（历史命名保留）
 #define WIFI_MAX_STA_CONN      2        // SoftAP最大连接客户端数
 #define HTTP_MAX_BODY_LEN      4096     // HTTP请求体最大长度（字节）
-#define HTTP_MAX_URI_HANDLERS  20       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + 配置接口）
+#define HTTP_MAX_URI_HANDLERS  28       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + 配置接口）
 
 // ===== Captive Portal =====
 #define CAPTIVE_PORTAL_HOST    "192.168.4.1"  // SoftAP 网关 IP，DNS 劫持目标 + 重定向 Location 主机

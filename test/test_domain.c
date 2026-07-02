@@ -16,6 +16,7 @@
 #include "button_logic.h"
 #include "led_pattern.h"
 #include "button_debounce.h"
+#include "device_template.h"
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -672,6 +673,81 @@ static void test_json_miniparse(void)
     CHECK(json_get_int(neg, "x") == -42, "负数解析");
 }
 
+static void test_device_templates(void)
+{
+    printf("[test] 设备信息模板 默认/保存/删除/序列化\n");
+    device_template_list_t list;
+    device_template_list_defaults(&list);
+    CHECK(list.count == 0, "默认模板数量为0");
+    for (int i = 0; i < DEVICE_TEMPLATE_MAX; i++) {
+        CHECK(list.items[i].used == false, "默认模板槽位未使用");
+    }
+
+    device_template_t tpl;
+    device_template_defaults(&tpl);
+    tpl.used = true;
+    tpl.id = 9;
+    strcpy(tpl.alias, "迈金功率计");
+    strcpy(tpl.adv_name, "Magene P325");
+    strcpy(tpl.device_name, "P325");
+    strcpy(tpl.manufacturer, "Magene");
+    strcpy(tpl.model, "P325-CS");
+    strcpy(tpl.firmware, "1.2.8");
+    strcpy(tpl.addr, "AA:BB:CC:DD:EE:FF");
+    tpl.addr_type = 1;
+    tpl.last_rssi = -58;
+    tpl.service_flags = DEVICE_TEMPLATE_SVC_CPS | DEVICE_TEMPLATE_SVC_DIS;
+
+    CHECK(device_template_list_add(&list, &tpl) == 0, "新增模板写入第0槽");
+    CHECK(list.count == 1, "新增后模板数量=1");
+    CHECK(list.items[0].used == true, "第0槽已使用");
+    CHECK(list.items[0].id == 0, "新增时重编号为槽位ID");
+    CHECK(strcmp(list.items[0].alias, "迈金功率计") == 0, "模板别名保留");
+    CHECK(strcmp(list.items[0].device_name, "P325") == 0, "模板设备名保留");
+    CHECK(list.items[0].service_flags == (DEVICE_TEMPLATE_SVC_CPS | DEVICE_TEMPLATE_SVC_DIS), "服务标记保留");
+
+    for (int i = 1; i < DEVICE_TEMPLATE_MAX; i++) {
+        device_template_t extra;
+        device_template_defaults(&extra);
+        extra.used = true;
+        snprintf(extra.alias, sizeof(extra.alias), "模板%d", i);
+        snprintf(extra.device_name, sizeof(extra.device_name), "Bike%d", i);
+        CHECK(device_template_list_add(&list, &extra) == i, "模板追加到下一个空槽");
+    }
+    CHECK(list.count == DEVICE_TEMPLATE_MAX, "模板数量达到上限5");
+    CHECK(device_template_list_add(&list, &tpl) == -1, "超过5个模板拒绝保存");
+
+    CHECK(device_template_list_delete(&list, 2), "删除第2槽成功");
+    CHECK(list.count == DEVICE_TEMPLATE_MAX - 1, "删除后数量减少");
+    CHECK(list.items[2].used == false, "删除后槽位清空");
+    CHECK(!device_template_list_delete(&list, 9), "非法ID删除失败");
+
+    device_template_t bad;
+    device_template_defaults(&bad);
+    bad.used = true;
+    bad.addr_type = 99;
+    bad.last_rssi = 30;
+    memset(bad.alias, 'A', sizeof(bad.alias));
+    memset(bad.device_name, 'B', sizeof(bad.device_name));
+    bad.alias[sizeof(bad.alias) - 1] = '\0';
+    bad.device_name[sizeof(bad.device_name) - 1] = '\0';
+    CHECK(device_template_validate(&bad), "非法地址类型/RSSI 被修正");
+    CHECK(bad.addr_type == 0, "非法地址类型回退0");
+    CHECK(bad.last_rssi == 0, "正RSSI回退0");
+    CHECK(bad.alias[DEVICE_TEMPLATE_ALIAS_MAX - 1] == '\0', "别名保证结尾");
+    CHECK(bad.device_name[DEVICE_TEMPLATE_NAME_MAX - 1] == '\0', "设备名保证结尾");
+
+    char json[2048];
+    size_t n = device_template_list_serialize_json(&list, json, sizeof(json));
+    CHECK(n > 0 && n < sizeof(json), "模板列表 JSON 序列化成功");
+    CHECK(strstr(json, "\"max\":5") != NULL, "JSON 含 max=5");
+    CHECK(strstr(json, "\"count\":4") != NULL, "JSON 含 count=4");
+    CHECK(strstr(json, "\"alias\":\"迈金功率计\"") != NULL, "JSON 含中文别名");
+    CHECK(strstr(json, "\"manufacturer\":\"Magene\"") != NULL, "JSON 含厂商");
+    CHECK(strstr(json, "\"service_flags\":5") != NULL, "JSON 含服务标记");
+    CHECK(device_template_list_serialize_json(&list, json, 8) == 0, "JSON 缓冲不足返回0");
+}
+
 static void test_button_logic(void)
 {
     printf("[test] 按钮按压时长分类\n");
@@ -808,6 +884,7 @@ int main(void)
     test_engine_blindspots();
     test_config_store();
     test_json_miniparse();
+    test_device_templates();
     test_button_logic();
     test_led_pattern();
     test_button_debounce();

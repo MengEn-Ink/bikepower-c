@@ -167,6 +167,18 @@
         <div class="note">设备名称会作为 BLE 广播名显示在骑行 App 中，建议保持简短易识别。</div>
       </div>
 
+      <div class="card collapsible-card" id="settings-template-card">
+        <button class="collapse-head" onclick="toggleCollapse('settings-template-card')" aria-label="展开或收起设备信息模板库">
+          <span><span class="collapse-ico tpl"></span>设备信息模板库 <small id="template-count">0/5</small></span><span class="chev">⌄</span>
+        </button>
+        <div class="collapse-body">
+          <div class="note">保存附近蓝牙设备的名称、厂商、型号和版本；后续可一键应用为本设备身份。</div>
+          <button class="btn alt" id="template-scan-btn" onclick="onTemplateScan()">扫描附近蓝牙设备</button>
+          <div class="note warn" id="template-scan-note" style="display:none"></div>
+          <div class="template-list" id="template-list"></div>
+        </div>
+      </div>
+
       <div class="card collapsible-card collapsed" id="settings-button-card">
         <button class="collapse-head" onclick="toggleCollapse('settings-button-card')" aria-label="展开或收起物理按钮配置">
           <span><span class="collapse-ico">●</span>物理按钮</span><span class="chev">⌄</span>

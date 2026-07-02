@@ -67,6 +67,10 @@ REQUIRED_FRONTEND_APIS = [
     "/api/renew",
     "/api/config",
     "/api/close-wifi",
+    "/api/device-templates",
+    "/api/device-templates/delete",
+    "/api/device-templates/apply",
+    "/api/ble-scan/start",
 ]
 
 # wifi_portal.c 必须注册的核心路由（防止改坏路由表）
@@ -132,6 +136,11 @@ def main():
     check('id="device-name-edit"' in html, "设备名称必须提供右侧编辑按钮")
     check('id="device-name-confirm"' in html, "设备名称编辑必须提供对勾确认按钮")
     check('onDeviceNameEdit' in js and 'onDeviceNameConfirm' in js, "app.js 缺少设备名称编辑/确认交互")
+    check('id="settings-template-card"' in html, "设备信息页缺少设备信息模板库卡片")
+    check('id="template-list"' in html, "设备信息模板库缺少列表容器")
+    check('id="template-scan-btn"' in html, "设备信息模板库缺少扫描入口按钮")
+    check('loadTemplates' in js and 'renderTemplates' in js, "app.js 缺少模板加载/渲染逻辑")
+    check('onTemplateApply' in js and 'onTemplateDelete' in js, "app.js 缺少模板应用/删除逻辑")
     check('id="custom-pacer-name"' in html, "自定义配速机器人昵称输入缺失")
     check('id="about-dev"' not in html, "设备名称不应继续留在关于页")
     check('pager-track' not in html and 'pager-track' not in css, "关于内容不应继续使用横向分页")

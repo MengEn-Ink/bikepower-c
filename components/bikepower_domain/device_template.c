@@ -1,0 +1,202 @@
+/**
+ * BLE 设备信息模板纯逻辑实现。
+ */
+#include "device_template.h"
+#include <stdio.h>
+#include <string.h>
+
+static void str_terminate(char *s, size_t sz)
+{
+    if (sz == 0) return;
+    s[sz - 1] = '\0';
+}
+
+static bool str_changed(const char *before, const char *after, size_t sz)
+{
+    return strncmp(before, after, sz) != 0;
+}
+
+static size_t json_escape(const char *src, char *dst, size_t dst_sz)
+{
+    if (!src || !dst || dst_sz == 0) return (size_t)-1;
+    size_t n = 0;
+    for (const char *p = src; *p; p++) {
+        unsigned char ch = (unsigned char)*p;
+        const char *seg = NULL;
+        char tmp[8];
+        size_t seg_len = 0;
+        switch (ch) {
+        case '"': seg = "\\\""; seg_len = 2; break;
+        case '\\': seg = "\\\\"; seg_len = 2; break;
+        case '\b': seg = "\\b"; seg_len = 2; break;
+        case '\f': seg = "\\f"; seg_len = 2; break;
+        case '\n': seg = "\\n"; seg_len = 2; break;
+        case '\r': seg = "\\r"; seg_len = 2; break;
+        case '\t': seg = "\\t"; seg_len = 2; break;
+        default:
+            if (ch < 0x20) {
+                snprintf(tmp, sizeof(tmp), "\\u%04x", ch);
+                seg = tmp;
+                seg_len = 6;
+            } else {
+                tmp[0] = (char)ch;
+                tmp[1] = '\0';
+                seg = tmp;
+                seg_len = 1;
+            }
+            break;
+        }
+        if (n + seg_len >= dst_sz) return (size_t)-1;
+        memcpy(dst + n, seg, seg_len);
+        n += seg_len;
+    }
+    if (n >= dst_sz) return (size_t)-1;
+    dst[n] = '\0';
+    return n;
+}
+
+void device_template_defaults(device_template_t *tpl)
+{
+    if (!tpl) return;
+    memset(tpl, 0, sizeof(*tpl));
+}
+
+void device_template_list_defaults(device_template_list_t *list)
+{
+    if (!list) return;
+    memset(list, 0, sizeof(*list));
+    for (int i = 0; i < DEVICE_TEMPLATE_MAX; i++) {
+        list->items[i].id = (uint8_t)i;
+    }
+}
+
+bool device_template_validate(device_template_t *tpl)
+{
+    if (!tpl) return false;
+    device_template_t before = *tpl;
+    str_terminate(tpl->alias, sizeof(tpl->alias));
+    str_terminate(tpl->adv_name, sizeof(tpl->adv_name));
+    str_terminate(tpl->device_name, sizeof(tpl->device_name));
+    str_terminate(tpl->manufacturer, sizeof(tpl->manufacturer));
+    str_terminate(tpl->model, sizeof(tpl->model));
+    str_terminate(tpl->firmware, sizeof(tpl->firmware));
+    str_terminate(tpl->hardware, sizeof(tpl->hardware));
+    str_terminate(tpl->software, sizeof(tpl->software));
+    str_terminate(tpl->addr, sizeof(tpl->addr));
+    if (tpl->id >= DEVICE_TEMPLATE_MAX) tpl->id = 0;
+    if (tpl->addr_type > 1) tpl->addr_type = 0;
+    if (tpl->last_rssi > 0) tpl->last_rssi = 0;
+    return before.used != tpl->used
+        || before.id != tpl->id
+        || str_changed(before.alias, tpl->alias, sizeof(tpl->alias))
+        || str_changed(before.adv_name, tpl->adv_name, sizeof(tpl->adv_name))
+        || str_changed(before.device_name, tpl->device_name, sizeof(tpl->device_name))
+        || str_changed(before.manufacturer, tpl->manufacturer, sizeof(tpl->manufacturer))
+        || str_changed(before.model, tpl->model, sizeof(tpl->model))
+        || str_changed(before.firmware, tpl->firmware, sizeof(tpl->firmware))
+        || str_changed(before.hardware, tpl->hardware, sizeof(tpl->hardware))
+        || str_changed(before.software, tpl->software, sizeof(tpl->software))
+        || str_changed(before.addr, tpl->addr, sizeof(tpl->addr))
+        || before.addr_type != tpl->addr_type
+        || before.last_rssi != tpl->last_rssi
+        || before.service_flags != tpl->service_flags;
+}
+
+void device_template_list_recount(device_template_list_t *list)
+{
+    if (!list) return;
+    uint8_t count = 0;
+    for (int i = 0; i < DEVICE_TEMPLATE_MAX; i++) {
+        list->items[i].id = (uint8_t)i;
+        device_template_validate(&list->items[i]);
+        if (list->items[i].used) count++;
+    }
+    list->count = count;
+}
+
+int device_template_list_add(device_template_list_t *list, const device_template_t *tpl)
+{
+    if (!list || !tpl) return -1;
+    device_template_list_recount(list);
+    for (int i = 0; i < DEVICE_TEMPLATE_MAX; i++) {
+        if (!list->items[i].used) {
+            list->items[i] = *tpl;
+            list->items[i].used = true;
+            list->items[i].id = (uint8_t)i;
+            device_template_validate(&list->items[i]);
+            device_template_list_recount(list);
+            return i;
+        }
+    }
+    return -1;
+}
+
+bool device_template_list_delete(device_template_list_t *list, uint8_t id)
+{
+    if (!list || id >= DEVICE_TEMPLATE_MAX || !list->items[id].used) return false;
+    device_template_defaults(&list->items[id]);
+    list->items[id].id = id;
+    device_template_list_recount(list);
+    return true;
+}
+
+size_t device_template_serialize_json(const device_template_t *tpl, char *out, size_t out_sz)
+{
+    if (!tpl || !out || out_sz == 0) return 0;
+    char alias[DEVICE_TEMPLATE_ALIAS_MAX * 6];
+    char adv_name[DEVICE_TEMPLATE_NAME_MAX * 6];
+    char device_name[DEVICE_TEMPLATE_NAME_MAX * 6];
+    char manufacturer[DEVICE_TEMPLATE_TEXT_MAX * 6];
+    char model[DEVICE_TEMPLATE_TEXT_MAX * 6];
+    char firmware[DEVICE_TEMPLATE_VERSION_MAX * 6];
+    char hardware[DEVICE_TEMPLATE_VERSION_MAX * 6];
+    char software[DEVICE_TEMPLATE_VERSION_MAX * 6];
+    char addr[DEVICE_TEMPLATE_ADDR_MAX * 6];
+    if (json_escape(tpl->alias, alias, sizeof(alias)) == (size_t)-1) return 0;
+    if (json_escape(tpl->adv_name, adv_name, sizeof(adv_name)) == (size_t)-1) return 0;
+    if (json_escape(tpl->device_name, device_name, sizeof(device_name)) == (size_t)-1) return 0;
+    if (json_escape(tpl->manufacturer, manufacturer, sizeof(manufacturer)) == (size_t)-1) return 0;
+    if (json_escape(tpl->model, model, sizeof(model)) == (size_t)-1) return 0;
+    if (json_escape(tpl->firmware, firmware, sizeof(firmware)) == (size_t)-1) return 0;
+    if (json_escape(tpl->hardware, hardware, sizeof(hardware)) == (size_t)-1) return 0;
+    if (json_escape(tpl->software, software, sizeof(software)) == (size_t)-1) return 0;
+    if (json_escape(tpl->addr, addr, sizeof(addr)) == (size_t)-1) return 0;
+    int n = snprintf(out, out_sz,
+        "{\"id\":%u,\"alias\":\"%s\",\"adv_name\":\"%s\","
+        "\"device_name\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\","
+        "\"firmware\":\"%s\",\"hardware\":\"%s\",\"software\":\"%s\","
+        "\"addr\":\"%s\",\"addr_type\":%u,\"last_rssi\":%d,\"service_flags\":%u}",
+        (unsigned)tpl->id, alias, adv_name, device_name, manufacturer, model,
+        firmware, hardware, software, addr, (unsigned)tpl->addr_type,
+        (int)tpl->last_rssi, (unsigned)tpl->service_flags);
+    if (n < 0 || (size_t)n >= out_sz) return 0;
+    return (size_t)n;
+}
+
+size_t device_template_list_serialize_json(const device_template_list_t *list, char *out, size_t out_sz)
+{
+    if (!list || !out || out_sz == 0) return 0;
+    size_t off = 0;
+    int n = snprintf(out + off, out_sz - off, "{\"max\":%d,\"count\":%u,\"items\":[",
+                     DEVICE_TEMPLATE_MAX, (unsigned)list->count);
+    if (n < 0 || (size_t)n >= out_sz - off) return 0;
+    off += (size_t)n;
+    bool first = true;
+    for (int i = 0; i < DEVICE_TEMPLATE_MAX; i++) {
+        if (!list->items[i].used) continue;
+        if (!first) {
+            if (off + 1 >= out_sz) return 0;
+            out[off++] = ',';
+            out[off] = '\0';
+        }
+        size_t wrote = device_template_serialize_json(&list->items[i], out + off, out_sz - off);
+        if (wrote == 0) return 0;
+        off += wrote;
+        first = false;
+    }
+    if (off + 3 > out_sz) return 0;
+    out[off++] = ']';
+    out[off++] = '}';
+    out[off] = '\0';
+    return off;
+}

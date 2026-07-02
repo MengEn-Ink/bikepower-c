@@ -23,7 +23,11 @@ var STATE = {
   closing: false,
   hr_locked: false,
   settings_panel: "profile",
-  device_name_editing: false
+  device_name_editing: false,
+  templates: [],
+  templates_max: 5,
+  template_delete_arm: -1,
+  scanning: false
 };
 
 /* 浮动幅度/步进范围（与 domain_config.h 一致；step 为单次加减量，默认 1） */
@@ -479,6 +483,8 @@ function renderSettings() {
   var ps = $("float-pstep");
   if (ps) ps.textContent = STATE.power_step;
   renderLedControls();
+  if (STATE.settings_panel === "device") loadTemplates();
+  else renderTemplates();
   applySettingsPanel();
 }
 function applyDeviceNameView() {
@@ -491,6 +497,95 @@ function applyDeviceNameView() {
   if (input && !STATE.device_name_editing) input.value = name;
   if (viewRow) viewRow.style.display = STATE.device_name_editing ? "none" : "flex";
   if (editRow) editRow.style.display = STATE.device_name_editing ? "flex" : "none";
+}
+function loadTemplates() {
+  api("/api/device-templates", "GET", null, function (status, data) {
+    if (status === 200 && data) {
+      STATE.templates = data.items || [];
+      STATE.templates_max = data.max || 5;
+      renderTemplates();
+    }
+  });
+}
+function templateTitle(t) {
+  return (t.alias || t.device_name || t.adv_name || "未命名设备").trim();
+}
+function templateSubtitle(t) {
+  var parts = [];
+  if (t.manufacturer) parts.push(t.manufacturer);
+  if (t.model) parts.push(t.model);
+  if (t.firmware) parts.push("固件 " + t.firmware);
+  return parts.length ? parts.join(" · ") : "暂无厂商/型号/版本信息";
+}
+function renderTemplates() {
+  var count = $("template-count");
+  if (count) count.textContent = String(STATE.templates.length) + "/" + String(STATE.templates_max || 5);
+  var box = $("template-list");
+  if (!box) return;
+  if (!STATE.templates || STATE.templates.length === 0) {
+    box.innerHTML = '<div class="template-empty">暂无模板。后续可通过扫描附近蓝牙设备读取并保存。</div>';
+    return;
+  }
+  var html = "";
+  for (var i = 0; i < STATE.templates.length; i++) {
+    var t = STATE.templates[i];
+    html += '<div class="template-item">';
+    html += '<div class="template-main"><div class="template-title">' + escapeHtml(templateTitle(t)) + '</div>';
+    html += '<div class="template-sub">' + escapeHtml(templateSubtitle(t)) + '</div>';
+    html += '<div class="template-meta">地址 ' + escapeHtml(t.addr || "—") + ' · RSSI ' + escapeHtml(t.last_rssi != null ? String(t.last_rssi) : "—") + ' dBm</div></div>';
+    html += '<div class="template-actions"><button class="mini-btn primary" onclick="onTemplateApply(' + t.id + ')">应用到本设备</button>';
+    html += '<button class="mini-btn danger" onclick="onTemplateDelete(' + t.id + ')">' + (STATE.template_delete_arm === t.id ? '确认删除' : '删除') + '</button></div>';
+    html += '</div>';
+  }
+  box.innerHTML = html;
+}
+function onTemplateScan() {
+  var note = $("template-scan-note");
+  if (note) {
+    note.style.display = "block";
+    note.textContent = "蓝牙扫描入口已预留；本阶段先完成模板库保存/删除/应用，下一阶段接入真实扫描和读取设备详情。";
+  }
+  api("/api/ble-scan/start", "POST", {}, function (status, data) {
+    toast((data && data.error) || (status === 200 ? "扫描入口已预留" : "扫描启动失败"));
+  });
+}
+function onTemplateApply(id) {
+  api("/api/device-templates/apply", "POST", { id: id }, function (status, data) {
+    if (status === 200 && data && data.ok) {
+      toast("模板已应用，设备名称已更新");
+      api("/api/state", "GET", null, function (s, st) {
+        if (s === 200 && st) {
+          STATE.device_name = st.device_name || STATE.device_name;
+          applyDeviceNameView();
+        }
+      });
+    } else {
+      toast("应用失败: " + ((data && data.error) || status));
+    }
+  });
+}
+function onTemplateDelete(id) {
+  if (STATE.template_delete_arm !== id) {
+    STATE.template_delete_arm = id;
+    renderTemplates();
+    toast("再次点击确认删除模板");
+    setTimeout(function () {
+      if (STATE.template_delete_arm === id) {
+        STATE.template_delete_arm = -1;
+        renderTemplates();
+      }
+    }, 3000);
+    return;
+  }
+  STATE.template_delete_arm = -1;
+  api("/api/device-templates/delete", "POST", { id: id }, function (status, data) {
+    if (status === 200 && data && data.ok) {
+      toast("模板已删除");
+      loadTemplates();
+    } else {
+      toast("删除失败: " + ((data && data.error) || status));
+    }
+  });
 }
 function onDeviceNameEdit() {
   STATE.device_name_editing = true;
@@ -711,6 +806,7 @@ function init() {
       STATE.remaining_sec = data.remaining_sec != null ? data.remaining_sec : 180;
       STATE.closing = !!data.closing;
       STATE.hr_locked = !!data.hr_locked;
+      loadTemplates();
       startTimePoll();
       route();
     } else {
