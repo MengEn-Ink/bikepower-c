@@ -31,6 +31,7 @@ APP_JS = ROOT / "main" / "web" / "app.js"
 APP_CSS = ROOT / "main" / "web" / "app.css"
 PORTAL_C = ROOT / "main" / "wifi_portal.c"
 BLE_SCANNER_C = ROOT / "main" / "ble_scanner.c"
+CAPTIVE_PORTAL_C = ROOT / "main" / "captive_portal.c"
 
 TAG = "[TC-3d]"
 g_pass = 0
@@ -98,18 +99,23 @@ def main():
     if not BLE_SCANNER_C.is_file():
         print(f"{TAG} FAIL: 文件不存在 {BLE_SCANNER_C}", file=sys.stderr)
         return 1
+    if not CAPTIVE_PORTAL_C.is_file():
+        print(f"{TAG} FAIL: 文件不存在 {CAPTIVE_PORTAL_C}", file=sys.stderr)
+        return 1
 
     html = INDEX_HTML.read_text(encoding="utf-8")
     js = APP_JS.read_text(encoding="utf-8")
     css = APP_CSS.read_text(encoding="utf-8")
     csrc = PORTAL_C.read_text(encoding="utf-8")
     scanner_src = BLE_SCANNER_C.read_text(encoding="utf-8")
+    captive_src = CAPTIVE_PORTAL_C.read_text(encoding="utf-8")
 
     print(f"{TAG} 检查 index.html: {len(html)} 字节")
     print(f"{TAG} 检查 app.js: {len(js)} 字节")
     print(f"{TAG} 检查 app.css: {len(css)} 字节")
     print(f"{TAG} 检查 wifi_portal.c: {len(csrc)} 字节")
     print(f"{TAG} 检查 ble_scanner.c: {len(scanner_src)} 字节")
+    print(f"{TAG} 检查 captive_portal.c: {len(captive_src)} 字节")
 
     # 1. HTML 基础结构
     print(f"\n{TAG} [1/4] HTML 基础结构")
@@ -153,6 +159,10 @@ def main():
     check('pollScanResults' in js and 'onTemplateReadDevice' in js, "app.js 缺少 BLE 扫描轮询/读取逻辑")
     check('filterNamedDevices' in js and 'hasDeviceName' in js, "app.js 必须过滤未命名 BLE 扫描设备")
     check('scan_item_has_name' in scanner_src and 'continue;' in scanner_src, "ble_scanner.c 必须在序列化扫描结果时排除未命名设备")
+    check('httpd_register_err_handler' in csrc and 'HTTPD_404_NOT_FOUND' in csrc, "wifi_portal.c 必须注册 404 兜底重定向以覆盖新系统探测路径")
+    check('303 See Other' in captive_src, "Captive Portal 探测响应必须使用 303 See Other")
+    check('Redirect to the captive portal' in captive_src, "Captive Portal 重定向响应必须带短 body 兼容 iOS CNA")
+    check('shutdown(sock, 0)' in captive_src, "DNS 停止时必须 shutdown socket 以稳定唤醒 recvfrom")
     check('onTemplateSavePending' in js and 'onTemplateCancelPending' in js, "app.js 缺少扫描读取后保存/取消逻辑")
     check('onTemplateApply' in js and 'onTemplateDelete' in js, "app.js 缺少模板应用/删除逻辑")
     check('id="custom-pacer-name"' in html, "自定义配速机器人昵称输入缺失")

@@ -153,6 +153,7 @@ void captive_portal_stop_dns(void)
     if (s_dns_sock >= 0) {
         int sock = s_dns_sock;
         s_dns_sock = -1;  // 先置 -1 让 dns_task 退出循环
+        shutdown(sock, 0);
         close(sock);      // 唤醒阻塞在 recvfrom 的 dns_task
     }
     // dns_task 检测到 s_dns_sock<0 后自行 vTaskDelete，s_dns_task 置 NULL
@@ -171,13 +172,11 @@ void captive_portal_stop_dns(void)
 
 esp_err_t captive_portal_detect_handler(httpd_req_t *req)
 {
-    // 302 重定向到配网首页，触发手机系统弹出 Captive Portal 窗口
-    // Connection: close 必须：探测请求高频且无 body，keep-alive 累积会耗尽 socket fd，
-    // 导致后续 /api/* 请求失败前端黑屏（project_memory 教训：EMFILE 错误）
     httpd_resp_set_hdr(req, "Connection", "close");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate");
-    httpd_resp_set_status(req, "302 Found");
-    httpd_resp_set_hdr(req, "Location", "http://" CAPTIVE_PORTAL_HOST "/");
-    httpd_resp_send(req, NULL, 0);
+    httpd_resp_set_status(req, "303 See Other");
+    httpd_resp_set_hdr(req, "Location", "/");
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    httpd_resp_sendstr(req, "Redirect to the captive portal");
     return ESP_OK;
 }

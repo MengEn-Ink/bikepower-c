@@ -31,6 +31,7 @@ static bool s_wifi_inited = false;     // esp_wifi_init 已调用且未 deinit
 static bool s_event_loop_created = false;  // 自建默认事件循环（与 BLE 共用时不重复创建）
 static bool s_netif_inited = false;    // 本模块调 esp_netif_init 成功（INVALID_STATE 表示别人已 init，不能 deinit）
 static volatile bool s_ble_suspended = false;  // 独占 WiFi 兜底主动停 BLE，主循环需暂停 BLE 自动重试
+static const char s_portal_uri[] = "http://" CAPTIVE_PORTAL_HOST "/";
 
 // 前向声明：stop_wifi_ap 在 start_wifi_ap 失败时被复用做统一回滚
 void radio_ctrl_stop_wifi_ap(void);
@@ -58,16 +59,15 @@ static void configure_captive_portal_dhcp(void)
         ESP_LOGW(TAG, "DHCP DNS 地址配置失败 ret=%d", ret);
     }
 
-    const char *portal_uri = "http://" CAPTIVE_PORTAL_HOST "/";
     ret = esp_netif_dhcps_option(s_ap_netif,
                                  ESP_NETIF_OP_SET,
                                  ESP_NETIF_CAPTIVEPORTAL_URI,
-                                 (void *)portal_uri,
-                                 strlen(portal_uri));
+                                 (void *)s_portal_uri,
+                                 strlen(s_portal_uri));
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "DHCP Captive Portal URI 配置失败 ret=%d", ret);
     } else {
-        ESP_LOGI(TAG, "DHCP 已下发 Captive Portal DNS/URI: %s", portal_uri);
+        ESP_LOGI(TAG, "DHCP 已下发 Captive Portal DNS/URI: %s", s_portal_uri);
     }
 
     // 显式启动 DHCP server，防止 WiFi 反复启停后 lwip 不自动启动

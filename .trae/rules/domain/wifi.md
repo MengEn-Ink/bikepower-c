@@ -29,7 +29,7 @@
 ## HTTP 服务与路由
 
 - `WIFI-12`：配网门户使用 `esp_http_server`。
-- `WIFI-13`：当前 HTTP 服务注册 8 个业务路由 + 10 个 Captive Portal 探测路由，新增或删除路由都必须同步更新规则、自测脚本和技术文档。
+- `WIFI-13`：当前 HTTP 服务注册 16 个业务路由 + 10 个 Captive Portal 探测路由，并注册 404 兜底重定向处理未知系统探测路径；新增或删除路由都必须同步更新规则、自测脚本和技术文档。
 - v4.0.0 起路由契约（前后端分离，全部走 `/api/xxx` JSON；已移除 OTA 与家庭网络路由）：
 - `GET /`（返回内联 HTML 整页，CSS/JS 由 `scripts/inline_static.py` 在编译时内联到 `index.html`）
 - `GET /favicon.ico`（204）
@@ -44,6 +44,8 @@
 - `WIFI-30`：前端三件套 `main/web/index.html + app.css + app.js` 由 `scripts/inline_static.py` 在编译时内联为 `main/web_index_html.h`，C 侧 `GET /` 直接吐出整页。修改前端后无需手写头文件，构建系统自动重新生成。
 - `WIFI-31`：新增/修改 `/api/xxx` 路由时必须同步更新 `tests/check_portal_structure.py` 的 `REQUIRED_BACKEND_ROUTES` 与 `REQUIRED_FRONTEND_APIS` 列表，以及 `tests/mock_server.py` 的对应 handler。
 - `WIFI-32`：iOS Captive Portal WebView 不加载外部 `.css/.js` 资源，必须采用内联方案，禁止改回外部链接。
+- `WIFI-33`：Captive Portal 探测端点和 404 兜底必须返回 `303 See Other` + `Location: /` + 短文本 body，避免 iOS CNA 对空 302 兼容性差，并覆盖 Chrome/Chromium 等新增探测路径。
+- `WIFI-34`：DHCP Captive Portal URI（Option 114）必须使用静态存储期字符串，不能传栈上临时 buffer；DNS 停止必须先 `shutdown()` 再 `close()` 唤醒阻塞 `recvfrom()`。
 
 ## 超时与恢复
 

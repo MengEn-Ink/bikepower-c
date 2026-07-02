@@ -794,6 +794,12 @@ static esp_err_t h_favicon(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t h_captive_not_found(httpd_req_t *req, httpd_err_code_t err)
+{
+    (void)err;
+    return captive_portal_detect_handler(req);
+}
+
 // ============================ 启动 ============================
 
 static esp_err_t start_httpd(void)
@@ -832,7 +838,7 @@ static esp_err_t start_httpd(void)
         { .uri = "/api/ble-scan/stop",           .method = HTTP_POST, .handler = h_api_ble_scan_stop },
         { .uri = "/api/ble-scan/results",        .method = HTTP_GET,  .handler = h_api_ble_scan_results },
         { .uri = "/api/ble-scan/read",           .method = HTTP_POST, .handler = h_api_ble_scan_read },
-        /* Captive Portal 探测端点：各 OS 连通性检测，统一 302 重定向到配网首页触发自动弹窗 */
+        /* Captive Portal 探测端点：各 OS 连通性检测，统一 303 重定向到配网首页触发自动弹窗 */
         { .uri = "/generate_204",               .method = HTTP_GET, .handler = captive_portal_detect_handler },
         { .uri = "/gen_204",                    .method = HTTP_GET, .handler = captive_portal_detect_handler },
         { .uri = "/hotspot-detect.html",        .method = HTTP_GET, .handler = captive_portal_detect_handler },
@@ -852,6 +858,13 @@ static esp_err_t start_httpd(void)
             s_httpd = NULL;
             return ret;
         }
+    }
+    ret = httpd_register_err_handler(s_httpd, HTTPD_404_NOT_FOUND, h_captive_not_found);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Captive Portal 404 兜底注册失败 ret=%d", ret);
+        httpd_stop(s_httpd);
+        s_httpd = NULL;
+        return ret;
     }
     ESP_LOGI(TAG, "HTTP 配网服务就绪 端口=%d 路由数=%zu", WIFI_PORT,
              sizeof(routes) / sizeof(routes[0]));

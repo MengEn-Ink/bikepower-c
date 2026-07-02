@@ -151,6 +151,20 @@ def main():
         return ok, f"status={status}"
     results.append(_try("favicon /favicon.ico(204)", favicon))
 
+    def captive_known_probe():
+        body, status, headers = http_get(f"{base}/generate_204")
+        loc = headers.get("Location") or headers.get("location") or ""
+        ok = status == 303 and len(body) > 0 and (loc == "/" or loc.startswith("http://"))
+        return ok, f"status={status} location={loc!r} body_len={len(body)}"
+    results.append(_try("Captive 已知探测端点 /generate_204", captive_known_probe))
+
+    def captive_unknown_probe():
+        body, status, headers = http_get(f"{base}/browsernetworktime/time/1/current?foo=bar")
+        loc = headers.get("Location") or headers.get("location") or ""
+        ok = status == 303 and len(body) > 0 and (loc == "/" or loc.startswith("http://"))
+        return ok, f"status={status} location={loc!r} body_len={len(body)}"
+    results.append(_try("Captive 未知探测路径兜底重定向", captive_unknown_probe))
+
     if args.renew:
         def renew():
             body, status, _ = http_post_json(f"{base}/api/renew", {})

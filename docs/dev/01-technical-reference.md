@@ -603,6 +603,8 @@ WiFi 配网链路分布在 `app_state.c`、`radio_ctrl.c`、`wifi_portal.c`。
 5. 保存并关闭或 180s 超时后，`wifi_portal` 投递 `APP_EVT_WIFI_DONE`
 6. 状态机调用 `radio_ctrl_exit_wifi()`，关闭 HTTP/DNS/SoftAP，原地回到 BLE 工作态
 
+SoftAP 启动时还会通过 DHCP 下发 `Domain-Name-Server = 192.168.4.1` 和 Captive Portal URI（DHCP Option 114 / RFC 8910，`http://192.168.4.1/`）。Portal URI 使用静态存储期字符串，满足 ESP-IDF DHCP Server 对指针生命周期的要求，避免多次进入配网或长时间运行后 DHCP 报文引用失效。
+
 失败兜底也集中在 `radio_ctrl`：只有共存 SoftAP 初始化失败时，才调用 `ble_bikepower_stop()` 释放 BLE 并重试；主循环通过 `radio_ctrl_ble_suspended()` 区分主动停 BLE 与 BLE 故障，避免在兜底配网期间自动重启 BLE。
 
 ### 8.2 SoftAP 启动
@@ -654,6 +656,8 @@ v3.2.0 起配网门户前后端分离：
 - `POST /api/ble-scan/stop`（停止当前扫描）
 - `GET /api/ble-scan/results`（返回扫描状态和最多 12 个附近设备摘要）
 - `POST /api/ble-scan/read`（临时连接指定设备，读取 GAP Device Name 与 DIS 厂商/型号/版本字段后断开）
+
+Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Location: /` 和短文本 body `Redirect to the captive portal`。这与 ESP-IDF captive_portal 示例保持一致：iOS Captive Network Assistant 对“只有空 302”的响应兼容性较差，带 body 的 303 更稳；404 兜底则用于覆盖 Chrome/Chromium `browsernetworktime/*` 等新增或变化的系统探测路径。
 
 其中：
 

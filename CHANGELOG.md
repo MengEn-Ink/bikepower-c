@@ -13,6 +13,13 @@
 - `sdkconfig.defaults` / `sdkconfig`：启用 NimBLE Central/Observer 角色，并把连接数提升到 2，为“本设备作为 Peripheral + 临时连接外部设备”预留连接资源。
 - 验证：`make -C test && test/test_domain` 1364 通过 0 失败；`python3 tests/check_portal_js.py`、`python3 tests/check_portal_structure.py`、`python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 -m py_compile tests/mock_server.py` 通过；`idf.py build` 通过，app 分区剩余 73%；mock 本地服务返回 3 个扫描项（含 1 个未命名），网页端仅展示 2 个有名称设备。
 
+### Captive Portal 自动弹窗
+- `main/wifi_portal.c`：注册 HTTP 404 兜底 handler，未知系统探测路径统一重定向到首页，覆盖 Chrome/Chromium 等新路径和系统探测路径变化，避免只注册固定 10 个 URI 导致多次连接后不弹窗。
+- `main/captive_portal.c`：探测重定向改为 `303 See Other` + `Location: /` + 短 body，参考 ESP-IDF captive portal 示例补强 iOS Captive Network Assistant 对“仅空 302”的兼容性；停止 DNS 时先 `shutdown()` 再 `close()`，更稳定唤醒阻塞的 `recvfrom()`。
+- `main/radio_ctrl.c`：DHCP Option 114 的 Portal URI 改为静态存储期字符串，满足 ESP-IDF 要求“应用需在 DHCP Server 生命周期内保持 URI 指针有效”。
+- `tests/stage5_portal_test.py` / `tests/mock_server.py`：新增已知探测端点和未知探测路径兜底重定向验证；mock server 同步 303 + body 行为。
+- 验证：`python3 tests/stage5_portal_test.py --ip 127.0.0.1 --port 18081` 在修复前 5/7 失败于空 body 与未知路径 404，修复后 7/7 通过。
+
 ### 日志体系
 - `tests/serial_daemon.py`：新增设备重启 banner 识别，默认插入 `DEVICE REBOOT / BOOT BANNER` 分隔线；新增 `--split-on-reboot` 支持按重启切新 `device_*.log`；新增 panic/WDT/Backtrace/Guru Meditation 等关键字故障快照 `crash_*.log`，并支持 `--no-crash-snapshot` 关闭。
 - `tests/test_serial_daemon.py`：新增串口日志守护单测，覆盖重启分隔线、按重启切文件、故障快照生成。

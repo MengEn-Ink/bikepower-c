@@ -36,7 +36,7 @@
 - [x] 固件版本统一为 `v4.0.0`，DIS 固件字段来自 `FIRMWARE_VERSION = "4.0.0"`，`tests/ble_selftest.py` 会校验厂商/型号/固件三字段。
 - [x] 普通配网链路走 `radio_ctrl` + coex 共存：长按二次确认进入配网，BLE 默认不停，保存或超时后关闭 WiFi 原地回 `ST_BLE_ACTIVE`。
 - [x] 配网门户路由与前端校验已具备自动化覆盖：`tests/stage5_portal_test.py`、`tests/check_portal_structure.py`、`tests/check_portal_js.py`。
-- [x] Captive Portal DNS 与 10 个系统探测端点已实现：Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 探测路由统一 302 到首页。
+- [x] Captive Portal DNS 与 10 个系统探测端点已实现：Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 探测路由统一 303 到首页，并注册 404 兜底覆盖未知探测路径。
 - [x] 核心数值可配置已就绪：固定/配速机器人模式分段切换、功率/踏频/心率浮动幅度（有界平滑游走）、心率锁定/联动，均经 `/api/config` 持久化到 NVS。
 - [x] 配网入口交互已补强：设备名铅笔编辑、保存成功强反馈、不关闭 WiFi 时可继续修改。
 - [x] 配置导入/导出基础能力已落到领域层：`config_store_serialize` / `config_store_deserialize` 支持 JSON 往返、缺字段默认值和范围夹紧。

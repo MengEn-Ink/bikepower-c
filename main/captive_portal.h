@@ -3,7 +3,7 @@
  *
  * 职责边界：
  *   - 本模块只负责 DNS 服务器（UDP 53 劫持所有 A 查询返回 SoftAP IP）和
- *     OS captive 探测端点的 HTTP handler（302 重定向到配网首页）。
+ *     OS captive 探测端点的 HTTP handler（303 重定向到配网首页）。
  *   - SoftAP 启停由 radio_ctrl 统一管理；HTTP 路由注册由 wifi_portal 负责。
  *   - 本模块不触碰 BLE、不读写业务配置。
  *
@@ -40,7 +40,7 @@ void captive_portal_stop_dns(void);
 
 /**
  * Captive Portal 探测端点统一 HTTP handler。
- * 对各 OS 的连通性探测请求统一返回 302 重定向到配网首页 http://192.168.4.1/，
+ * 对各 OS 的连通性探测请求统一返回 303 重定向到配网首页 http://192.168.4.1/，
  * 触发手机系统弹出 Captive Portal 登录窗口。
  * req：HTTP 请求对象。
  * 返回值：ESP_OK。

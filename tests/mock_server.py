@@ -202,15 +202,15 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"scanning": SCANNING[0], "devices": SCAN_DEVICES})
             SCANNING[0] = False
             return
-        # Captive Portal 检测端点：302 回首页
+        # Captive Portal 检测端点：303 回首页，带短 body 兼容 iOS CNA
         if path in ("/generate_204", "/gen_204", "/hotspot-detect.html",
                     "/library/test/success.html", "/ncsi.txt",
                     "/connecttest.txt", "/canonical.html",
                     "/success.txt", "/redirect",
                     "/kindle-wifi/wifistub.html"):
-            self._send(302, b"", "text/html", {"Location": "/"})
+            self._send(303, b"Redirect to the captive portal", "text/plain; charset=utf-8", {"Location": "/"})
             return
-        self._send_text("Not Found", 404)
+        self._send(303, b"Redirect to the captive portal", "text/plain; charset=utf-8", {"Location": "/"})
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
