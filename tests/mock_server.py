@@ -105,6 +105,21 @@ SCAN_DEVICES = [
         "last_rssi": -68,
         "service_flags": 37,
     },
+    {
+        "id": 2,
+        "alias": "",
+        "adv_name": "",
+        "device_name": "",
+        "manufacturer": "",
+        "model": "",
+        "firmware": "",
+        "hardware": "",
+        "software": "",
+        "addr": "66:55:44:33:22:11",
+        "addr_type": 0,
+        "last_rssi": -48,
+        "service_flags": 0,
+    },
 ]
 SCANNING = [False]
 

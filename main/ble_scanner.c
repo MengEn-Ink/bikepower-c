@@ -96,6 +96,11 @@ static int find_free_or_weakest(void)
     return weakest;
 }
 
+static bool scan_item_has_name(const device_template_t *tpl)
+{
+    return tpl && (tpl->alias[0] != '\0' || tpl->device_name[0] != '\0' || tpl->adv_name[0] != '\0');
+}
+
 static void parse_adv(device_template_t *tpl, const uint8_t *data, uint8_t len)
 {
     struct ble_hs_adv_fields fields;
@@ -217,6 +222,7 @@ size_t ble_scanner_serialize_results(char *out, size_t out_sz)
     bool first = true;
     for (int i = 0; i < BLE_SCAN_MAX_RESULTS; i++) {
         if (!s_scan.items[i].used) continue;
+        if (!scan_item_has_name(&s_scan.items[i].tpl)) continue;
         if (!first) {
             if (off + 1 >= out_sz) { xSemaphoreGive(s_scan.lock); return 0; }
             out[off++] = ',';

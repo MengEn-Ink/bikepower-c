@@ -513,6 +513,17 @@ function loadTemplates() {
 function templateTitle(t) {
   return (t.alias || t.device_name || t.adv_name || "未命名设备").trim();
 }
+function hasDeviceName(t) {
+  return !!(t && ((t.alias && t.alias.trim()) || (t.device_name && t.device_name.trim()) || (t.adv_name && t.adv_name.trim())));
+}
+function filterNamedDevices(items) {
+  var out = [];
+  items = items || [];
+  for (var i = 0; i < items.length; i++) {
+    if (hasDeviceName(items[i])) out.push(items[i]);
+  }
+  return out;
+}
 function templateSubtitle(t) {
   var parts = [];
   if (t.manufacturer) parts.push(t.manufacturer);
@@ -586,7 +597,7 @@ function pollScanResults() {
   api("/api/ble-scan/results", "GET", null, function (status, data) {
     if (status !== 200 || !data) return;
     STATE.scanning = !!data.scanning;
-    STATE.scan_devices = data.devices || [];
+    STATE.scan_devices = filterNamedDevices(data.devices);
     renderTemplates();
     var note = $("template-scan-note");
     if (note) {
