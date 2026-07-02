@@ -382,7 +382,10 @@ def read_serial(ser, log_path, use_color=True, quiet=False,
         return log_path
     except (OSError, Exception) as e:
         msg = str(e)
-        if "EIO" in msg or "device disconnected" in msg.lower():
+        if (getattr(e, "errno", None) in (5, 6)
+                or "EIO" in msg
+                or "Device not configured" in msg
+                or "device disconnected" in msg.lower()):
             raise
         daemon_log("读取错误: %s" % e)
         return log_path

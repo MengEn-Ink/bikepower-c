@@ -165,6 +165,17 @@ def main():
         return ok, f"status={status} location={loc!r} body_len={len(body)}"
     results.append(_try("Captive 未知探测路径兜底重定向", captive_unknown_probe))
 
+    def captive_portal_api():
+        body, status, headers = http_get(f"{base}/.well-known/captive-portal")
+        ctype = headers.get("Content-Type") or headers.get("content-type") or ""
+        text = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else body
+        ok = (status == 200
+              and "application/captive+json" in ctype
+              and '"captive":true' in text.replace(" ", "")
+              and '"user-portal-url"' in text)
+        return ok, f"status={status} content-type={ctype!r} body={text[:120]!r}"
+    results.append(_try("Captive Portal API /.well-known/captive-portal", captive_portal_api))
+
     if args.renew:
         def renew():
             body, status, _ = http_post_json(f"{base}/api/renew", {})

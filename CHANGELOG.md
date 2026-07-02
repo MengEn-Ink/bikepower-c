@@ -9,16 +9,20 @@
 - `main/wifi_portal.c`：接入 `/api/ble-scan/start|stop|results|read`，扫描结果和读取结果以 JSON 返回给前端；模板保存仍走独立 `ble_tpl` NVS namespace。
 - `main/web/`：模板库扫描按钮接入真实扫描，前端轮询扫描结果，点击设备后读取基础信息并要求确认别名再保存；保留应用模板与二次确认删除交互。
 - `main/ble_scanner.c`、`main/web/app.js`：扫描结果排除未命名 BLE 设备，只展示带 alias/device_name/adv_name 的设备，避免用户误点不可识别广播。
+- `components/bikepower_domain/device_template.c/.h`、`main/ble_scanner.c`、`main/web/app.js`：扫描结果进一步限定为包含 CPS 功率、CSC 踏频、HRS 心率或 FTMS 智能骑行台服务的设备；前端保留同样过滤兜底。
+- `main/web/app.js`、`main/web/app.css`：扫描结果名称行右侧新增功率/踏频/心率/FTMS 小型圆角图标标签，单设备多服务时并排显示多个标签。
 - `components/bikepower_domain/device_template.c/.h`：新增 BLE 地址格式化和标准服务 UUID 到模板服务标记的映射辅助函数。
 - `sdkconfig.defaults` / `sdkconfig`：启用 NimBLE Central/Observer 角色，并把连接数提升到 2，为“本设备作为 Peripheral + 临时连接外部设备”预留连接资源。
-- 验证：`make -C test && test/test_domain` 1364 通过 0 失败；`python3 tests/check_portal_js.py`、`python3 tests/check_portal_structure.py`、`python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 -m py_compile tests/mock_server.py` 通过；`idf.py build` 通过，app 分区剩余 73%；mock 本地服务返回 3 个扫描项（含 1 个未命名），网页端仅展示 2 个有名称设备。
+- 验证：`make -C test && test/test_domain` 1369 通过 0 失败；`python3 tests/check_portal_js.py`、`python3 tests/check_portal_structure.py`、`python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 -m py_compile tests/mock_server.py` 通过；`python3 tests/stage5_portal_test.py --ip 127.0.0.1 --port 18082` mock 自测 8/8 通过；`idf.py build` 通过，app 分区剩余 72%；mock 本地服务返回 4 个扫描项（含 1 个非骑行服务设备），网页端仅展示 3 个骑行服务设备。
 
 ### Captive Portal 自动弹窗
 - `main/wifi_portal.c`：注册 HTTP 404 兜底 handler，未知系统探测路径统一重定向到首页，覆盖 Chrome/Chromium 等新路径和系统探测路径变化，避免只注册固定 10 个 URI 导致多次连接后不弹窗。
 - `main/captive_portal.c`：探测重定向改为 `303 See Other` + `Location: /` + 短 body，参考 ESP-IDF captive portal 示例补强 iOS Captive Network Assistant 对“仅空 302”的兼容性；停止 DNS 时先 `shutdown()` 再 `close()`，更稳定唤醒阻塞的 `recvfrom()`。
 - `main/radio_ctrl.c`：DHCP Option 114 的 Portal URI 改为静态存储期字符串，满足 ESP-IDF 要求“应用需在 DHCP Server 生命周期内保持 URI 指针有效”。
+- `main/wifi_portal.c` / `main/radio_ctrl.c`：新增 `/.well-known/captive-portal` RFC 8910 API，返回 `application/captive+json`，并将 DHCP Option 114 指向该 API；`user-portal-url` 指向 HTML 首页，兼容把 Option 114 当 JSON API 解析的新系统。
 - `tests/stage5_portal_test.py` / `tests/mock_server.py`：新增已知探测端点和未知探测路径兜底重定向验证；mock server 同步 303 + body 行为。
-- 验证：`python3 tests/stage5_portal_test.py --ip 127.0.0.1 --port 18081` 在修复前 5/7 失败于空 body 与未知路径 404，修复后 7/7 通过。
+- `tests/serial_daemon.py`：macOS 串口返回 `Device not configured` 时主动断开重连，避免守护日志持续刷错但设备日志不再实时写入。
+- 验证：`python3 tests/stage5_portal_test.py --ip 127.0.0.1 --port 18081` 在修复前 5/7 失败于空 body 与未知路径 404；补充 Captive Portal API 后 mock 自测 8/8 通过；`check_portal_js.py`、`check_portal_structure.py`、`check_config_consistency.py`、`check_nvs_schema.py` 通过；`make -C test && test/test_domain` 1369 通过 0 失败；`idf.py build` 通过，app 分区剩余 72%。
 
 ### 日志体系
 - `tests/serial_daemon.py`：新增设备重启 banner 识别，默认插入 `DEVICE REBOOT / BOOT BANNER` 分隔线；新增 `--split-on-reboot` 支持按重启切新 `device_*.log`；新增 panic/WDT/Backtrace/Guru Meditation 等关键字故障快照 `crash_*.log`，并支持 `--no-crash-snapshot` 关闭。

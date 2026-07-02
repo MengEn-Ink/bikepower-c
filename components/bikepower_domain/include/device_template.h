@@ -49,6 +49,7 @@ void device_template_list_defaults(device_template_list_t *list);
 bool device_template_validate(device_template_t *tpl);
 bool device_template_set_addr(device_template_t *tpl, const uint8_t addr[6], uint8_t addr_type);
 bool device_template_note_service(device_template_t *tpl, uint16_t uuid16);
+bool device_template_has_ride_service(uint16_t service_flags);
 void device_template_list_recount(device_template_list_t *list);
 int device_template_list_add(device_template_list_t *list, const device_template_t *tpl);
 bool device_template_list_delete(device_template_list_t *list, uint8_t id);

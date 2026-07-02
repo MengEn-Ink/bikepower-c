@@ -101,6 +101,11 @@ static bool scan_item_has_name(const device_template_t *tpl)
     return tpl && (tpl->alias[0] != '\0' || tpl->device_name[0] != '\0' || tpl->adv_name[0] != '\0');
 }
 
+static bool scan_item_is_visible(const device_template_t *tpl)
+{
+    return scan_item_has_name(tpl) && device_template_has_ride_service(tpl->service_flags);
+}
+
 static void parse_adv(device_template_t *tpl, const uint8_t *data, uint8_t len)
 {
     struct ble_hs_adv_fields fields;
@@ -121,6 +126,10 @@ static void on_disc(const struct ble_gap_disc_desc *desc)
     parse_adv(&tpl, desc->data, desc->length_data);
     xSemaphoreTake(s_scan.lock, portMAX_DELAY);
     int idx = find_item_by_addr(tpl.addr, tpl.addr_type);
+    if (idx < 0 && !scan_item_is_visible(&tpl)) {
+        xSemaphoreGive(s_scan.lock);
+        return;
+    }
     if (idx < 0) idx = find_free_or_weakest();
     bool was_free = !s_scan.items[idx].used;
     if (!was_free && tpl.last_rssi < s_scan.items[idx].tpl.last_rssi && s_scan.count >= BLE_SCAN_MAX_RESULTS) {
@@ -222,7 +231,7 @@ size_t ble_scanner_serialize_results(char *out, size_t out_sz)
     bool first = true;
     for (int i = 0; i < BLE_SCAN_MAX_RESULTS; i++) {
         if (!s_scan.items[i].used) continue;
-        if (!scan_item_has_name(&s_scan.items[i].tpl)) continue;
+        if (!scan_item_is_visible(&s_scan.items[i].tpl)) continue;
         if (!first) {
             if (off + 1 >= out_sz) { xSemaphoreGive(s_scan.lock); return 0; }
             out[off++] = ',';

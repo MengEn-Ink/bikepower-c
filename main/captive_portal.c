@@ -172,6 +172,7 @@ void captive_portal_stop_dns(void)
 
 esp_err_t captive_portal_detect_handler(httpd_req_t *req)
 {
+    ESP_LOGI(TAG, "Captive 探测重定向 uri=%s", req && req->uri ? req->uri : "?");
     httpd_resp_set_hdr(req, "Connection", "close");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate");
     httpd_resp_set_status(req, "303 See Other");

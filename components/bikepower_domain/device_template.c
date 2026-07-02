@@ -128,6 +128,14 @@ bool device_template_note_service(device_template_t *tpl, uint16_t uuid16)
     return true;
 }
 
+bool device_template_has_ride_service(uint16_t service_flags)
+{
+    return (service_flags & (DEVICE_TEMPLATE_SVC_CPS
+                           | DEVICE_TEMPLATE_SVC_HRS
+                           | DEVICE_TEMPLATE_SVC_CSC
+                           | DEVICE_TEMPLATE_SVC_FTMS)) != 0;
+}
+
 void device_template_list_recount(device_template_list_t *list)
 {
     if (!list) return;

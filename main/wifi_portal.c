@@ -366,6 +366,17 @@ static esp_err_t h_home(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t h_captive_portal_api(httpd_req_t *req)
+{
+    const char body[] = "{\"captive\":true,\"user-portal-url\":\"http://" CAPTIVE_PORTAL_HOST "/\"}";
+    ESP_LOGI(TAG, "Captive Portal API 请求 uri=%s", req && req->uri ? req->uri : "?");
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_type(req, "application/captive+json");
+    set_no_store_headers(req);
+    httpd_resp_send(req, body, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
 // ============================ /api/state ============================
 
 /**
@@ -797,6 +808,7 @@ static esp_err_t h_favicon(httpd_req_t *req)
 static esp_err_t h_captive_not_found(httpd_req_t *req, httpd_err_code_t err)
 {
     (void)err;
+    ESP_LOGI(TAG, "Captive 404 兜底重定向 uri=%s", req && req->uri ? req->uri : "?");
     return captive_portal_detect_handler(req);
 }
 
@@ -821,6 +833,7 @@ static esp_err_t start_httpd(void)
         /* 静态首页 */
         { .uri = "/",                .method = HTTP_GET,  .handler = h_home },
         { .uri = "/favicon.ico",     .method = HTTP_GET,  .handler = h_favicon },
+        { .uri = CAPTIVE_PORTAL_API_PATH, .method = HTTP_GET, .handler = h_captive_portal_api },
         /* 状态与计时 */
         { .uri = "/api/state",       .method = HTTP_GET,  .handler = h_api_state },
         { .uri = "/api/time",        .method = HTTP_GET,  .handler = h_api_time },

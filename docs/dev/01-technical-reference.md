@@ -603,7 +603,7 @@ WiFi 配网链路分布在 `app_state.c`、`radio_ctrl.c`、`wifi_portal.c`。
 5. 保存并关闭或 180s 超时后，`wifi_portal` 投递 `APP_EVT_WIFI_DONE`
 6. 状态机调用 `radio_ctrl_exit_wifi()`，关闭 HTTP/DNS/SoftAP，原地回到 BLE 工作态
 
-SoftAP 启动时还会通过 DHCP 下发 `Domain-Name-Server = 192.168.4.1` 和 Captive Portal URI（DHCP Option 114 / RFC 8910，`http://192.168.4.1/`）。Portal URI 使用静态存储期字符串，满足 ESP-IDF DHCP Server 对指针生命周期的要求，避免多次进入配网或长时间运行后 DHCP 报文引用失效。
+SoftAP 启动时还会通过 DHCP 下发 `Domain-Name-Server = 192.168.4.1` 和 Captive Portal URI（DHCP Option 114 / RFC 8910，`http://192.168.4.1/.well-known/captive-portal`）。Portal URI 使用静态存储期字符串，满足 ESP-IDF DHCP Server 对指针生命周期的要求，避免多次进入配网或长时间运行后 DHCP 报文引用失效；该 URI 返回 `application/captive+json`，其中 `user-portal-url` 指向真正的 HTML 首页 `http://192.168.4.1/`。
 
 失败兜底也集中在 `radio_ctrl`：只有共存 SoftAP 初始化失败时，才调用 `ble_bikepower_stop()` 释放 BLE 并重试；主循环通过 `radio_ctrl_ble_suspended()` 区分主动停 BLE 与 BLE 故障，避免在兜底配网期间自动重启 BLE。
 
@@ -634,14 +634,15 @@ v3.2.0 起配网门户前后端分离：
 
 - `cfg.server_port = WIFI_PORT`
 - `cfg.lru_purge_enable = true`
-- `cfg.max_uri_handlers = HTTP_MAX_URI_HANDLERS`（当前 28）
+- `cfg.max_uri_handlers = HTTP_MAX_URI_HANDLERS`（当前 29）
 - `cfg.stack_size = 8192`
 - `cfg.keep_alive_enable = false`
 
-已注册业务路由 16 个，另有 10 个 Captive Portal 探测路由：
+已注册业务路由 17 个，另有 10 个 Captive Portal 探测路由：
 
 - `GET /`（返回内联 HTML 整页）
 - `GET /favicon.ico`（204）
+- `GET /.well-known/captive-portal`（RFC 8910 Captive Portal API，返回 `application/captive+json`）
 - `GET /api/state`（设备全状态：device_name/firmware_version/power/cadence/heartrate/mode/profile_*/pacers/LED 配置/remaining_sec/closing）
 - `GET /api/time`（纯数字剩余秒数）
 - `POST /api/renew`（续期，返回新的剩余秒数）
@@ -654,10 +655,10 @@ v3.2.0 起配网门户前后端分离：
 - `POST /api/device-templates/apply`（把模板设备名应用为本设备 BLE 名称并持久化）
 - `POST /api/ble-scan/start`（启动 8 秒 BLE active scan，结果缓存在内存中）
 - `POST /api/ble-scan/stop`（停止当前扫描）
-- `GET /api/ble-scan/results`（返回扫描状态和最多 12 个附近设备摘要）
+- `GET /api/ble-scan/results`（返回扫描状态和最多 12 个附近设备摘要；仅包含有名称且广播服务命中 CPS/CSC/HRS/FTMS 任意一种的设备）
 - `POST /api/ble-scan/read`（临时连接指定设备，读取 GAP Device Name 与 DIS 厂商/型号/版本字段后断开）
 
-Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Location: /` 和短文本 body `Redirect to the captive portal`。这与 ESP-IDF captive_portal 示例保持一致：iOS Captive Network Assistant 对“只有空 302”的响应兼容性较差，带 body 的 303 更稳；404 兜底则用于覆盖 Chrome/Chromium `browsernetworktime/*` 等新增或变化的系统探测路径。
+Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Location: /` 和短文本 body `Redirect to the captive portal`。这与 ESP-IDF captive_portal 示例保持一致：iOS Captive Network Assistant 对“只有空 302”的响应兼容性较差，带 body 的 303 更稳；404 兜底则用于覆盖 Chrome/Chromium `browsernetworktime/*` 等新增或变化的系统探测路径。DHCP Option 114 走 `/.well-known/captive-portal` JSON API，避免新系统把 HTML 首页当作 Captive Portal API 解析失败而不弹窗。
 
 其中：
 
@@ -692,7 +693,7 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 
 ### 8.5 前端反馈与 JSON 安全
 
-配网门户是单页 SPA。首页与设置页通过 `location.hash` 切换，保存入口统一为 `POST /api/config`，保存并关闭 WiFi 入口为 `POST /api/close-wifi`。前端提交完整 JSON payload，保存成功后页面显示即时反馈；字段级校验覆盖功率、踏频、心率、体重、FTP、阈值心率、设备名称、调功步进、浮动幅度、自定义 W/kg 与 LED 配置。设备名称在设置页默认文本展示，点击右侧编辑按钮后进入输入态，点对勾确认后再随“保存设置”持久化；设备信息页提供“设备信息模板库”折叠卡片，最多保存 5 个模板，支持扫描附近 BLE 设备、连接读取设备基础信息、确认别名后保存、应用模板设备名和二次确认删除；物理按钮和 LED 配置卡片默认收起，仅用户主动展开时显示编辑控件。
+配网门户是单页 SPA。首页与设置页通过 `location.hash` 切换，保存入口统一为 `POST /api/config`，保存并关闭 WiFi 入口为 `POST /api/close-wifi`。前端提交完整 JSON payload，保存成功后页面显示即时反馈；字段级校验覆盖功率、踏频、心率、体重、FTP、阈值心率、设备名称、调功步进、浮动幅度、自定义 W/kg 与 LED 配置。设备名称在设置页默认文本展示，点击右侧编辑按钮后进入输入态，点对勾确认后再随“保存设置”持久化；设备信息页提供“设备信息模板库”折叠卡片，最多保存 5 个模板，支持扫描附近 BLE 设备、连接读取设备基础信息、确认别名后保存、应用模板设备名和二次确认删除。扫描结果只展示包含 CPS/CSC/HRS/FTMS 任意骑行服务的有名称设备，并在设备名称行右侧以小型圆角标签显示功率、踏频、心率、FTMS 能力；同一设备包含多个服务时并排显示多个标签。物理按钮和 LED 配置卡片默认收起，仅用户主动展开时显示编辑控件。
 
 `wifi_portal.c` 使用 `json_escape()` 转义字符串字段，避免设备名等用户可控内容破坏 JSON；前端渲染动态文本时使用 HTML 转义。`tests/check_portal_js.py` 与 `tests/check_portal_structure.py` 分别覆盖 JS 语法和前后端路由/视图契约。
 

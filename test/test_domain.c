@@ -747,6 +747,11 @@ static void test_device_templates(void)
     CHECK(device_template_note_service(&scanned, 0x1818), "记录 CPS 服务成功");
     CHECK(!device_template_note_service(&scanned, 0xFFFF), "未知服务不改变模板");
     CHECK(scanned.service_flags == (DEVICE_TEMPLATE_SVC_DIS | DEVICE_TEMPLATE_SVC_CPS), "服务 UUID 映射为模板标记");
+    CHECK(device_template_has_ride_service(DEVICE_TEMPLATE_SVC_CPS), "CPS 识别为骑行服务");
+    CHECK(device_template_has_ride_service(DEVICE_TEMPLATE_SVC_CSC), "CSC 识别为骑行服务");
+    CHECK(device_template_has_ride_service(DEVICE_TEMPLATE_SVC_HRS), "HRS 识别为骑行服务");
+    CHECK(device_template_has_ride_service(DEVICE_TEMPLATE_SVC_FTMS), "FTMS 识别为骑行服务");
+    CHECK(device_template_has_ride_service(DEVICE_TEMPLATE_SVC_DIS | DEVICE_TEMPLATE_SVC_BAS) == false, "仅设备信息/电量不算骑行服务");
 
     char json[2048];
     size_t n = device_template_list_serialize_json(&list, json, sizeof(json));

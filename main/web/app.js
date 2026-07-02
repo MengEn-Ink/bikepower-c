@@ -516,6 +516,10 @@ function templateTitle(t) {
 function hasDeviceName(t) {
   return !!(t && ((t.alias && t.alias.trim()) || (t.device_name && t.device_name.trim()) || (t.adv_name && t.adv_name.trim())));
 }
+function hasRideService(flags) {
+  flags = flags || 0;
+  return !!(flags & (4 | 8 | 16 | 32));
+}
 function filterNamedDevices(items) {
   var out = [];
   items = items || [];
@@ -523,6 +527,23 @@ function filterNamedDevices(items) {
     if (hasDeviceName(items[i])) out.push(items[i]);
   }
   return out;
+}
+function filterRideDevices(items) {
+  var out = [];
+  items = filterNamedDevices(items);
+  for (var i = 0; i < items.length; i++) {
+    if (hasRideService(items[i].service_flags)) out.push(items[i]);
+  }
+  return out;
+}
+function serviceBadges(flags) {
+  var html = "";
+  flags = flags || 0;
+  if (flags & 4) html += '<span class="svc-badge svc-power" title="功率">⚡</span>';
+  if (flags & 16) html += '<span class="svc-badge svc-cadence" title="踏频">↻</span>';
+  if (flags & 8) html += '<span class="svc-badge svc-hr" title="心率">♥</span>';
+  if (flags & 32) html += '<span class="svc-badge svc-ftms" title="智能骑行台">FT</span>';
+  return html;
 }
 function templateSubtitle(t) {
   var parts = [];
@@ -551,7 +572,7 @@ function renderTemplates() {
     for (var s = 0; s < STATE.scan_devices.length; s++) {
       var d = STATE.scan_devices[s];
       html += '<div class="template-item scan-result">';
-      html += '<div class="template-main"><div class="template-title">' + escapeHtml(templateTitle(d)) + '</div>';
+      html += '<div class="template-main"><div class="template-title-row"><div class="template-title">' + escapeHtml(templateTitle(d)) + '</div><div class="svc-badges">' + serviceBadges(d.service_flags) + '</div></div>';
       html += '<div class="template-sub">' + escapeHtml(serviceSummary(d.service_flags)) + '</div>';
       html += '<div class="template-meta">地址 ' + escapeHtml(d.addr || "—") + ' · RSSI ' + escapeHtml(d.last_rssi != null ? String(d.last_rssi) : "—") + ' dBm</div></div>';
       html += '<div class="template-actions"><button class="mini-btn primary" onclick="onTemplateReadDevice(' + s + ')">读取信息</button></div>';
@@ -597,7 +618,7 @@ function pollScanResults() {
   api("/api/ble-scan/results", "GET", null, function (status, data) {
     if (status !== 200 || !data) return;
     STATE.scanning = !!data.scanning;
-    STATE.scan_devices = filterNamedDevices(data.devices);
+    STATE.scan_devices = filterRideDevices(data.devices);
     renderTemplates();
     var note = $("template-scan-note");
     if (note) {

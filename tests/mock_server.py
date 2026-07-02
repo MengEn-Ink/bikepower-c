@@ -108,7 +108,7 @@ SCAN_DEVICES = [
     {
         "id": 2,
         "alias": "",
-        "adv_name": "",
+        "adv_name": "Office Keyboard",
         "device_name": "",
         "manufacturer": "",
         "model": "",
@@ -119,6 +119,21 @@ SCAN_DEVICES = [
         "addr_type": 0,
         "last_rssi": -48,
         "service_flags": 0,
+    },
+    {
+        "id": 3,
+        "alias": "",
+        "adv_name": "Polar H10",
+        "device_name": "",
+        "manufacturer": "",
+        "model": "",
+        "firmware": "",
+        "hardware": "",
+        "software": "",
+        "addr": "20:21:22:23:24:25",
+        "addr_type": 0,
+        "last_rssi": -61,
+        "service_flags": 8,
     },
 ]
 SCANNING = [False]
@@ -201,6 +216,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/ble-scan/results":
             self._send_json({"scanning": SCANNING[0], "devices": SCAN_DEVICES})
             SCANNING[0] = False
+            return
+        if path == "/.well-known/captive-portal":
+            self._send(200, b'{"captive":true,"user-portal-url":"http://192.168.4.1/"}',
+                       "application/captive+json", {})
             return
         # Captive Portal 检测端点：303 回首页，带短 body 兼容 iOS CNA
         if path in ("/generate_204", "/gen_204", "/hotspot-detect.html",
