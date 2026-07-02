@@ -143,8 +143,10 @@ check("FIRMWARE_STABLE_VERSION" in build_all_src and "FIRMWARE_FIX_VERSION" in b
       "Release 构建脚本必须读取稳定版和修复版")
 check("git -C \"$PROJECT_DIR\" rev-parse --short HEAD" in build_all_src,
       "Release 构建脚本必须读取最后 Git 短提交 ID")
-check("bikepower-c-%s-v%s-stable%s-fix%s-g%s.bin" in build_all_src,
-      "Release 合并固件文件名必须包含板型、版本、稳定版、修复版和 Git ID")
+check("bikepower-c-%s-v%s-stable-fix-g%s.bin" in build_all_src,
+      "Release 合并固件文件名必须包含板型、单一版本号、stable/fix 标识和 Git ID")
+check("stable%s-fix%s" not in build_all_src,
+      "Release 合并固件文件名不得重复拼接稳定版/修复版版本号")
 
 # WIFI_SSID 与 DEVICE_NAME 关系（AP 名沿用设备名前缀）
 wifi_ssid = extract_define(config_src, "WIFI_SSID")

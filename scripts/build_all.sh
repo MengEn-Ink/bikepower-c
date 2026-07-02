@@ -1,7 +1,7 @@
 #!/bin/bash
 # BikePower C — 双板型构建脚本
 # 分别编译通用 ESP32-C3 和 M5Stamp C3 固件，
-# 输出合并后的单文件固件包，包名包含板型、版本、稳定版、修复版和 Git ID。
+# 输出合并后的单文件固件包，包名包含板型、单一版本号、stable/fix 标识和 Git ID。
 #
 # 用法：
 #   ./scripts/build_all.sh              # 编译两种板型
@@ -34,7 +34,7 @@ usage() {
   -h, --help      显示本帮助
 
 输出物（写入 build/release/）:
-  bikepower-c-<板型>-v<版本>-stable<稳定版>-fix<修复版>-g<GitID>.bin
+  bikepower-c-<板型>-v<版本>-stable-fix-g<GitID>.bin
                                         合并单文件固件（bootloader+分区表+app）
   *.bin.sha256                         对应 SHA256 校验文件
   manifest.txt                         产物清单（文件名/大小/SHA256/版本）
@@ -113,8 +113,8 @@ fi
 
 firmware_file_name() {
     local board_name="$1"
-    printf 'bikepower-c-%s-v%s-stable%s-fix%s-g%s.bin\n' \
-        "$board_name" "$VERSION" "$STABLE_VERSION" "$FIX_VERSION" "$GIT_SHA"
+    printf 'bikepower-c-%s-v%s-stable-fix-g%s.bin\n' \
+        "$board_name" "$VERSION" "$GIT_SHA"
 }
 
 # 计算 SHA256（兼容 macOS shasum 与 Linux sha256sum）
@@ -228,10 +228,10 @@ for fw in "${PRODUCED_BINS[@]}"; do
     echo "  SHA256: $fw -> ${sum:0:16}..."
 done
 
-# 版本号一致性校验：产物文件名必须含当前固件版本元信息
+# 版本号一致性校验：产物文件名必须含当前固件版本与标识信息，且版本号只出现一次
 for fw in "${PRODUCED_BINS[@]}"; do
     case "$fw" in
-        *"-v${VERSION}-stable${STABLE_VERSION}-fix${FIX_VERSION}-g${GIT_SHA}.bin") ;;
+        *"-v${VERSION}-stable-fix-g${GIT_SHA}.bin") ;;
         *) echo "错误：产物名 '$fw' 与版本元信息不一致"; exit 1 ;;
     esac
 done

@@ -40,7 +40,7 @@
 - [x] 核心数值可配置已就绪：固定/配速机器人模式分段切换、功率/踏频/心率浮动幅度（有界平滑游走）、心率锁定/联动，均经 `/api/config` 持久化到 NVS。
 - [x] 配网入口交互已补强：设备名铅笔编辑、保存成功强反馈、不关闭 WiFi 时可继续修改。
 - [x] 配置导入/导出基础能力已落到领域层：`config_store_serialize` / `config_store_deserialize` 支持 JSON 往返、缺字段默认值和范围夹紧。
-- [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、版本、稳定版、修复版和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 Gitee Release。
+- [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、单一版本号、stable/fix 标识和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 Gitee Release。
 - [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合。
 
 ### 待人工确认（P0）

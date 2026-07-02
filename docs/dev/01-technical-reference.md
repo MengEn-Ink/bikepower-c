@@ -935,7 +935,7 @@ idf.py build
 
 根据项目规则，C 代码改动后 `idf.py build` 必须通过。
 
-发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建，正式运行会为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256 与 manifest；脚本不会打 git tag，也不会创建 Gitee Release。合并固件文件名格式为 `bikepower-c-板型-v版本-stable稳定版-fix修复版-gGitID.bin`，例如 `bikepower-c-generic-c3-v4.0.0-stable4.0.0-fix4.0.0-g8bd1e2d.bin`。
+发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建，正式运行会为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256 与 manifest；脚本不会打 git tag，也不会创建 Gitee Release。合并固件文件名格式为 `bikepower-c-板型-v版本-stable-fix-gGitID.bin`，例如 `bikepower-c-generic-c3-v4.0.0-stable-fix-g39c0ee5.bin`，版本号只出现一次。
 
 ### 12.2 领域层 host 单测
 
