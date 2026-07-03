@@ -55,6 +55,54 @@ static size_t json_escape(const char *src, char *dst, size_t dst_sz)
     return n;
 }
 
+static bool text_present(const char *s)
+{
+    return s && s[0] != '\0';
+}
+
+static void copy_if_present(char *dst, size_t dst_sz, const char *src)
+{
+    if (!dst || dst_sz == 0 || !text_present(src)) return;
+    strncpy(dst, src, dst_sz - 1);
+    dst[dst_sz - 1] = '\0';
+}
+
+static bool same_template_identity(const device_template_t *a, const device_template_t *b)
+{
+    if (!a || !b) return false;
+    if (text_present(a->addr) && text_present(b->addr)
+        && a->addr_type == b->addr_type
+        && strcmp(a->addr, b->addr) == 0) {
+        return true;
+    }
+    if (text_present(a->device_name) && text_present(b->device_name)
+        && strcmp(a->device_name, b->device_name) == 0) {
+        return true;
+    }
+    return false;
+}
+
+static void merge_template(device_template_t *dst, const device_template_t *src, uint8_t id)
+{
+    if (!dst || !src) return;
+    uint16_t service_flags = dst->service_flags | src->service_flags;
+    copy_if_present(dst->alias, sizeof(dst->alias), src->alias);
+    copy_if_present(dst->adv_name, sizeof(dst->adv_name), src->adv_name);
+    copy_if_present(dst->device_name, sizeof(dst->device_name), src->device_name);
+    copy_if_present(dst->manufacturer, sizeof(dst->manufacturer), src->manufacturer);
+    copy_if_present(dst->model, sizeof(dst->model), src->model);
+    copy_if_present(dst->firmware, sizeof(dst->firmware), src->firmware);
+    copy_if_present(dst->hardware, sizeof(dst->hardware), src->hardware);
+    copy_if_present(dst->software, sizeof(dst->software), src->software);
+    copy_if_present(dst->addr, sizeof(dst->addr), src->addr);
+    dst->addr_type = src->addr_type <= 1 ? src->addr_type : dst->addr_type;
+    if (src->last_rssi <= 0) dst->last_rssi = src->last_rssi;
+    dst->service_flags = service_flags;
+    dst->used = true;
+    dst->id = id;
+    device_template_validate(dst);
+}
+
 void device_template_defaults(device_template_t *tpl)
 {
     if (!tpl) return;
@@ -152,6 +200,13 @@ int device_template_list_add(device_template_list_t *list, const device_template
 {
     if (!list || !tpl) return -1;
     device_template_list_recount(list);
+    for (int i = 0; i < DEVICE_TEMPLATE_MAX; i++) {
+        if (list->items[i].used && same_template_identity(&list->items[i], tpl)) {
+            merge_template(&list->items[i], tpl, (uint8_t)i);
+            device_template_list_recount(list);
+            return i;
+        }
+    }
     for (int i = 0; i < DEVICE_TEMPLATE_MAX; i++) {
         if (!list->items[i].used) {
             list->items[i] = *tpl;

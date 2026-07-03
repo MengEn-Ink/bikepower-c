@@ -66,6 +66,12 @@ async def main():
     print("扫描设备...")
     dev = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
     if not dev:
+        devices = await BleakScanner.discover(timeout=5)
+        for d in devices:
+            if d.name and d.name.startswith(DEVICE_NAME):
+                dev = d
+                break
+    if not dev:
         print("未发现设备")
         stop.set()
         return 1

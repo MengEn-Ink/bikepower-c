@@ -26,9 +26,31 @@ DIS_MANUF_UUID = "00002a29-0000-1000-8000-00805f9b34fb"
 DIS_MODEL_UUID = "00002a24-0000-1000-8000-00805f9b34fb"
 DIS_FW_UUID = "00002a26-0000-1000-8000-00805f9b34fb"
 
+def get_expected_board_name(repo_root):
+    env_board = os.environ.get("BIKEPOWER_EXPECT_BOARD", "")
+    if env_board:
+        return env_board
+    sdkconfig_path = os.path.join(repo_root, "sdkconfig")
+    config_path = os.path.join(repo_root, "main", "bikepower_config.h")
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        generic = re.search(r'#define\s+BOARD_NAME_GENERIC\s+"([^"]+)"', content)
+        m5stamp = re.search(r'#define\s+BOARD_NAME_M5STAMP\s+"([^"]+)"', content)
+        with open(sdkconfig_path, "r", encoding="utf-8") as f:
+            sdkconfig = f.read()
+        if "CONFIG_BOARD_M5STAMP_C3=y" in sdkconfig and m5stamp:
+            return m5stamp.group(1)
+        if "CONFIG_BOARD_GENERIC_C3=y" in sdkconfig and generic:
+            return generic.group(1)
+    except Exception:
+        pass
+    return "generic-c3"
+
 def get_expected_fw_version():
     """从bikepower_config.h自动解析固件版本，保持单一事实源"""
-    config_path = os.path.join(os.path.dirname(__file__), "..", "main", "bikepower_config.h")
+    repo_root = os.path.dirname(os.path.dirname(__file__))
+    config_path = os.path.join(repo_root, "main", "bikepower_config.h")
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -36,12 +58,11 @@ def get_expected_fw_version():
         stable = re.search(r'#define\s+FIRMWARE_STABLE_VERSION\s+"([^"]+)"', content)
         fix = re.search(r'#define\s+FIRMWARE_FIX_VERSION\s+"([^"]+)"', content)
         if version and stable and fix:
-            board = os.environ.get("BIKEPOWER_EXPECT_BOARD", "generic-c3")
+            board = get_expected_board_name(repo_root)
             git_sha = os.environ.get("BIKEPOWER_EXPECT_GIT_SHA", "")
             if not git_sha:
                 try:
                     import subprocess
-                    repo_root = os.path.dirname(os.path.dirname(__file__))
                     git_sha = subprocess.check_output(["git", "-C", repo_root, "rev-parse", "--short", "HEAD"], text=True).strip()
                 except Exception:
                     git_sha = "nogit"

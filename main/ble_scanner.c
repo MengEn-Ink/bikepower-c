@@ -74,12 +74,43 @@ static bool parse_addr_text(const char *addr, uint8_t out[6])
     return true;
 }
 
-static int find_item_by_addr(const char *addr, uint8_t addr_type)
+static bool text_present(const char *s)
 {
+    return s && s[0] != '\0';
+}
+
+static bool same_name(const device_template_t *a, const device_template_t *b)
+{
+    if (!a || !b) return false;
+    const char *names_a[] = { a->device_name, a->adv_name, a->alias };
+    const char *names_b[] = { b->device_name, b->adv_name, b->alias };
+    for (size_t i = 0; i < sizeof(names_a) / sizeof(names_a[0]); i++) {
+        if (!text_present(names_a[i])) continue;
+        for (size_t j = 0; j < sizeof(names_b) / sizeof(names_b[0]); j++) {
+            if (text_present(names_b[j]) && strcmp(names_a[i], names_b[j]) == 0) return true;
+        }
+    }
+    return false;
+}
+
+static void keep_text(char *dst, size_t dst_sz, const char *src)
+{
+    if (!dst || dst_sz == 0 || text_present(dst) || !text_present(src)) return;
+    strncpy(dst, src, dst_sz - 1);
+    dst[dst_sz - 1] = '\0';
+}
+
+static int find_item_by_identity(const device_template_t *tpl)
+{
+    if (!tpl) return -1;
     for (int i = 0; i < BLE_SCAN_MAX_RESULTS; i++) {
-        if (s_scan.items[i].used
-            && s_scan.items[i].tpl.addr_type == addr_type
-            && strcmp(s_scan.items[i].tpl.addr, addr) == 0) {
+        if (!s_scan.items[i].used) continue;
+        if (text_present(tpl->addr)
+            && s_scan.items[i].tpl.addr_type == tpl->addr_type
+            && strcmp(s_scan.items[i].tpl.addr, tpl->addr) == 0) {
+            return i;
+        }
+        if (same_name(&s_scan.items[i].tpl, tpl)) {
             return i;
         }
     }
@@ -106,6 +137,27 @@ static bool scan_item_is_visible(const device_template_t *tpl)
     return scan_item_has_name(tpl) && device_template_has_ride_service(tpl->service_flags);
 }
 
+static void merge_scan_item(device_template_t *dst, const device_template_t *src, uint8_t id)
+{
+    if (!dst || !src) return;
+    uint16_t flags = dst->service_flags | src->service_flags;
+    if (text_present(src->alias)) strncpy(dst->alias, src->alias, sizeof(dst->alias) - 1);
+    if (text_present(src->adv_name)) strncpy(dst->adv_name, src->adv_name, sizeof(dst->adv_name) - 1);
+    if (text_present(src->device_name)) strncpy(dst->device_name, src->device_name, sizeof(dst->device_name) - 1);
+    keep_text(dst->manufacturer, sizeof(dst->manufacturer), src->manufacturer);
+    keep_text(dst->model, sizeof(dst->model), src->model);
+    keep_text(dst->firmware, sizeof(dst->firmware), src->firmware);
+    keep_text(dst->hardware, sizeof(dst->hardware), src->hardware);
+    keep_text(dst->software, sizeof(dst->software), src->software);
+    if (text_present(src->addr)) strncpy(dst->addr, src->addr, sizeof(dst->addr) - 1);
+    dst->addr_type = src->addr_type <= 1 ? src->addr_type : dst->addr_type;
+    if (src->last_rssi <= 0) dst->last_rssi = src->last_rssi;
+    dst->service_flags = flags;
+    dst->id = id;
+    dst->used = true;
+    device_template_validate(dst);
+}
+
 static void parse_adv(device_template_t *tpl, const uint8_t *data, uint8_t len)
 {
     struct ble_hs_adv_fields fields;
@@ -125,24 +177,21 @@ static void on_disc(const struct ble_gap_disc_desc *desc)
     tpl.last_rssi = desc->rssi == 127 ? 0 : desc->rssi;
     parse_adv(&tpl, desc->data, desc->length_data);
     xSemaphoreTake(s_scan.lock, portMAX_DELAY);
-    int idx = find_item_by_addr(tpl.addr, tpl.addr_type);
+    int idx = find_item_by_identity(&tpl);
+    bool matched_existing = idx >= 0;
     if (idx < 0 && !scan_item_is_visible(&tpl)) {
         xSemaphoreGive(s_scan.lock);
         return;
     }
     if (idx < 0) idx = find_free_or_weakest();
     bool was_free = !s_scan.items[idx].used;
-    if (!was_free && tpl.last_rssi < s_scan.items[idx].tpl.last_rssi && s_scan.count >= BLE_SCAN_MAX_RESULTS) {
+    if (!matched_existing && !was_free && tpl.last_rssi < s_scan.items[idx].tpl.last_rssi && s_scan.count >= BLE_SCAN_MAX_RESULTS) {
         xSemaphoreGive(s_scan.lock);
         return;
     }
-    if (!was_free && s_scan.items[idx].tpl.adv_name[0] != '\0' && tpl.adv_name[0] == '\0') {
-        strncpy(tpl.adv_name, s_scan.items[idx].tpl.adv_name, sizeof(tpl.adv_name) - 1);
-    }
-    tpl.service_flags |= s_scan.items[idx].tpl.service_flags;
-    tpl.id = (uint8_t)idx;
+    if (!matched_existing) device_template_defaults(&s_scan.items[idx].tpl);
     s_scan.items[idx].used = true;
-    s_scan.items[idx].tpl = tpl;
+    merge_scan_item(&s_scan.items[idx].tpl, &tpl, (uint8_t)idx);
     if (was_free && s_scan.count < BLE_SCAN_MAX_RESULTS) s_scan.count++;
     xSemaphoreGive(s_scan.lock);
 }

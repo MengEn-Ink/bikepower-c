@@ -706,6 +706,33 @@ static void test_device_templates(void)
     CHECK(strcmp(list.items[0].device_name, "P325") == 0, "模板设备名保留");
     CHECK(list.items[0].service_flags == (DEVICE_TEMPLATE_SVC_CPS | DEVICE_TEMPLATE_SVC_DIS), "服务标记保留");
 
+    device_template_t tpl_same_addr;
+    device_template_defaults(&tpl_same_addr);
+    tpl_same_addr.used = true;
+    strcpy(tpl_same_addr.alias, "更新别名");
+    strcpy(tpl_same_addr.device_name, "P325");
+    strcpy(tpl_same_addr.addr, "AA:BB:CC:DD:EE:FF");
+    tpl_same_addr.addr_type = 1;
+    strcpy(tpl_same_addr.firmware, "1.2.9");
+    tpl_same_addr.service_flags = DEVICE_TEMPLATE_SVC_CSC;
+    CHECK(device_template_list_add(&list, &tpl_same_addr) == 0, "相同 MAC 地址模板更新原槽位");
+    CHECK(list.count == 1, "相同 MAC 地址不新增重复模板");
+    CHECK(strcmp(list.items[0].alias, "更新别名") == 0, "相同 MAC 地址保存时更新别名");
+    CHECK(strcmp(list.items[0].firmware, "1.2.9") == 0, "相同 MAC 地址保存时更新版本信息");
+    CHECK(list.items[0].service_flags == (DEVICE_TEMPLATE_SVC_CPS | DEVICE_TEMPLATE_SVC_DIS | DEVICE_TEMPLATE_SVC_CSC), "相同 MAC 地址合并服务标记");
+
+    device_template_t tpl_same_name;
+    device_template_defaults(&tpl_same_name);
+    tpl_same_name.used = true;
+    strcpy(tpl_same_name.alias, "同名功率计");
+    strcpy(tpl_same_name.device_name, "P325");
+    strcpy(tpl_same_name.addr, "10:20:30:40:50:60");
+    tpl_same_name.addr_type = 0;
+    strcpy(tpl_same_name.manufacturer, "MagenePlus");
+    CHECK(device_template_list_add(&list, &tpl_same_name) == 0, "相同设备名称模板更新原槽位");
+    CHECK(list.count == 1, "相同设备名称不新增重复模板");
+    CHECK(strcmp(list.items[0].manufacturer, "MagenePlus") == 0, "相同设备名称保存时更新厂商信息");
+
     for (int i = 1; i < DEVICE_TEMPLATE_MAX; i++) {
         device_template_t extra;
         device_template_defaults(&extra);
@@ -715,7 +742,13 @@ static void test_device_templates(void)
         CHECK(device_template_list_add(&list, &extra) == i, "模板追加到下一个空槽");
     }
     CHECK(list.count == DEVICE_TEMPLATE_MAX, "模板数量达到上限5");
-    CHECK(device_template_list_add(&list, &tpl) == -1, "超过5个模板拒绝保存");
+    device_template_t overflow;
+    device_template_defaults(&overflow);
+    overflow.used = true;
+    strcpy(overflow.alias, "溢出模板");
+    strcpy(overflow.device_name, "OverflowBike");
+    strcpy(overflow.addr, "66:55:44:33:22:11");
+    CHECK(device_template_list_add(&list, &overflow) == -1, "超过5个模板拒绝保存");
 
     CHECK(device_template_list_delete(&list, 2), "删除第2槽成功");
     CHECK(list.count == DEVICE_TEMPLATE_MAX - 1, "删除后数量减少");
@@ -758,9 +791,9 @@ static void test_device_templates(void)
     CHECK(n > 0 && n < sizeof(json), "模板列表 JSON 序列化成功");
     CHECK(strstr(json, "\"max\":5") != NULL, "JSON 含 max=5");
     CHECK(strstr(json, "\"count\":4") != NULL, "JSON 含 count=4");
-    CHECK(strstr(json, "\"alias\":\"迈金功率计\"") != NULL, "JSON 含中文别名");
-    CHECK(strstr(json, "\"manufacturer\":\"Magene\"") != NULL, "JSON 含厂商");
-    CHECK(strstr(json, "\"service_flags\":5") != NULL, "JSON 含服务标记");
+    CHECK(strstr(json, "\"alias\":\"同名功率计\"") != NULL, "JSON 含更新后的中文别名");
+    CHECK(strstr(json, "\"manufacturer\":\"MagenePlus\"") != NULL, "JSON 含更新后的厂商");
+    CHECK(strstr(json, "\"service_flags\":21") != NULL, "JSON 含合并后的服务标记");
     CHECK(device_template_list_serialize_json(&list, json, 8) == 0, "JSON 缓冲不足返回0");
 }
 
