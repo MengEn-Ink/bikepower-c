@@ -32,6 +32,9 @@ APP_CSS = ROOT / "main" / "web" / "app.css"
 PORTAL_C = ROOT / "main" / "wifi_portal.c"
 BLE_SCANNER_C = ROOT / "main" / "ble_scanner.c"
 CAPTIVE_PORTAL_C = ROOT / "main" / "captive_portal.c"
+PORTAL_CONFIG_SAVE_TEST = ROOT / "tests" / "test_portal_config_save.py"
+CORE_FLOW_ENDURANCE_TEST = ROOT / "tests" / "test_core_flow_endurance.py"
+TEST_RUNNER = ROOT / "tests" / "test_runner.sh"
 
 TAG = "[TC-3d]"
 g_pass = 0
@@ -102,6 +105,15 @@ def main():
     if not CAPTIVE_PORTAL_C.is_file():
         print(f"{TAG} FAIL: 文件不存在 {CAPTIVE_PORTAL_C}", file=sys.stderr)
         return 1
+    if not PORTAL_CONFIG_SAVE_TEST.is_file():
+        print(f"{TAG} FAIL: 文件不存在 {PORTAL_CONFIG_SAVE_TEST}", file=sys.stderr)
+        return 1
+    if not CORE_FLOW_ENDURANCE_TEST.is_file():
+        print(f"{TAG} FAIL: 文件不存在 {CORE_FLOW_ENDURANCE_TEST}", file=sys.stderr)
+        return 1
+    if not TEST_RUNNER.is_file():
+        print(f"{TAG} FAIL: 文件不存在 {TEST_RUNNER}", file=sys.stderr)
+        return 1
 
     html = INDEX_HTML.read_text(encoding="utf-8")
     js = APP_JS.read_text(encoding="utf-8")
@@ -109,6 +121,9 @@ def main():
     csrc = PORTAL_C.read_text(encoding="utf-8")
     scanner_src = BLE_SCANNER_C.read_text(encoding="utf-8")
     captive_src = CAPTIVE_PORTAL_C.read_text(encoding="utf-8")
+    portal_config_save_src = PORTAL_CONFIG_SAVE_TEST.read_text(encoding="utf-8")
+    core_flow_endurance_src = CORE_FLOW_ENDURANCE_TEST.read_text(encoding="utf-8")
+    test_runner_src = TEST_RUNNER.read_text(encoding="utf-8")
 
     print(f"{TAG} 检查 index.html: {len(html)} 字节")
     print(f"{TAG} 检查 app.js: {len(js)} 字节")
@@ -116,6 +131,8 @@ def main():
     print(f"{TAG} 检查 wifi_portal.c: {len(csrc)} 字节")
     print(f"{TAG} 检查 ble_scanner.c: {len(scanner_src)} 字节")
     print(f"{TAG} 检查 captive_portal.c: {len(captive_src)} 字节")
+    print(f"{TAG} 检查 test_portal_config_save.py: {len(portal_config_save_src)} 字节")
+    print(f"{TAG} 检查 test_core_flow_endurance.py: {len(core_flow_endurance_src)} 字节")
 
     # 1. HTML 基础结构
     print(f"\n{TAG} [1/4] HTML 基础结构")
@@ -208,6 +225,14 @@ def main():
     check('id="settings-button-card"' not in html, "物理按钮不应继续使用折叠卡片")
     check('id="settings-led-card"' not in html, "LED 不应继续使用折叠卡片")
     check('toggleCollapse' not in js, "设置子页面改造后不应保留折叠卡片切换逻辑")
+    legacy_collapsible_selectors = [
+        ".collapsible-card",
+        ".collapse-head",
+        ".collapse-ico",
+        ".collapse-body",
+    ]
+    for selector in legacy_collapsible_selectors:
+        check(selector not in css, f"app.css 不应保留旧折叠卡片样式 {selector}")
 
     led_control_ids = [
         "settings-led-silent",
@@ -219,6 +244,23 @@ def main():
     ]
     for ctl in led_control_ids:
         check(f'id="{ctl}"' in html, f"LED 自定义配置控件 {ctl} 缺失")
+    check('id="settings-led-options"' in html, "LED 静默模式必须有可隐藏的模式/颜色选项容器")
+    check('syncLedSilentVisibility' in js, "app.js 必须同步 LED 静默模式下的选项显隐")
+    check('settings-led-silent' in js and 'change' in js, "LED 静默模式 checkbox 必须绑定 change 事件")
+    check('POST' in portal_config_save_src and '/api/config' in portal_config_save_src and '/api/state' in portal_config_save_src,
+          "test_portal_config_save.py 必须覆盖网页端保存后状态回显")
+    check('DEFAULT_MINUTES = 10' in core_flow_endurance_src,
+          "test_core_flow_endurance.py 必须默认执行 10 分钟核心流程耐久测试")
+    check('simulate_button_flow' in core_flow_endurance_src and 'exercise_hr_following' in core_flow_endurance_src,
+          "test_core_flow_endurance.py 必须覆盖模拟按钮与心率随动流程")
+    check('exercise_web_edits' in core_flow_endurance_src and 'exercise_template_flow' in core_flow_endurance_src,
+          "test_core_flow_endurance.py 必须覆盖网页编辑与设备模板流程")
+    check('run_mock_portal_test' in test_runner_src and 'test_portal_config_save.py' in test_runner_src,
+          "test_runner.sh 必须提供 mock 配网页保存测试入口")
+    check('run_endurance_test' in test_runner_src and 'test_core_flow_endurance.py' in test_runner_src,
+          "test_runner.sh 必须提供 10 分钟核心流程耐久测试入口")
+    check('run_portal_test' in test_runner_src and 'stage5_portal_test.py' in test_runner_src,
+          "test_runner.sh 必须提供配网门户 HTTP 自测入口")
     for key in [
         "led_silent",
         "led_wait_mode", "led_wait_color",

@@ -38,6 +38,13 @@ usage() {
                                         合并单文件固件（bootloader+分区表+app）
   *.bin.sha256                         对应 SHA256 校验文件
   manifest.txt                         产物清单（文件名/大小/SHA256/版本）
+  test-report.md                       本次固件测试报告
+  core-flow-endurance.md               10 分钟核心流程耐久测试明细
+  user-manual.md                       随固件分发的用户文档副本
+  images/                              用户文档引用的截图与示意图
+  bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip
+                                      双板型固件、报告、手册、截图的总包
+  *.zip.sha256                         总包 SHA256 校验文件
 
 说明:
   - 本脚本仅在本地生成产物，不会打 git tag、不会创建 Gitee Release。
@@ -143,6 +150,12 @@ if [ "$DRY_RUN" -eq 1 ]; then
         echo "  - ${fw}.sha256   （SHA256 校验）"
     done
     echo "  - manifest.txt     （产物清单：文件名/大小/SHA256/版本）"
+    echo "  - test-report.md   （测试报告）"
+    echo "  - core-flow-endurance.md （10 分钟核心流程耐久测试明细）"
+    echo "  - user-manual.md   （用户文档副本）"
+    echo "  - images/          （用户文档截图与示意图）"
+    echo "  - bikepower-c-release-v${VERSION}-stable-fix-g${GIT_SHA}.zip （release 总包）"
+    echo "  - bikepower-c-release-v${VERSION}-stable-fix-g${GIT_SHA}.zip.sha256"
     exit 0
 fi
 
@@ -160,6 +173,29 @@ cd "$PROJECT_DIR"
 echo "=== BikePower C 双板型构建 v${VERSION} stable${STABLE_VERSION} fix${FIX_VERSION} g${GIT_SHA} ==="
 
 mkdir -p "$RELEASE_DIR"
+rm -f "$RELEASE_DIR"/bikepower-c-*.bin \
+      "$RELEASE_DIR"/bikepower-c-*.bin.sha256 \
+      "$RELEASE_DIR"/manifest.txt \
+      "$RELEASE_DIR"/test-report.md \
+      "$RELEASE_DIR"/core-flow-endurance.md \
+      "$RELEASE_DIR"/user-manual.md \
+      "$RELEASE_DIR"/bikepower-c-release-*.zip \
+      "$RELEASE_DIR"/bikepower-c-release-*.zip.sha256
+
+echo ""
+echo "=== 构建前测试门禁：host / mock / static ==="
+make -C test
+./test/test_domain
+python3 tests/test_portal_config_save.py
+python3 tests/test_core_flow_endurance.py \
+    --minutes "${CORE_FLOW_MINUTES:-10}" \
+    --report "$RELEASE_DIR/core-flow-endurance.md"
+python3 tests/check_config_consistency.py
+python3 tests/check_portal_js.py
+python3 tests/check_portal_structure.py
+python3 tests/check_nvs_schema.py
+python3 tests/check_tasks_wdt.py
+python3 tests/check_board_desc.py
 
 # 记录本次生成的固件产物（用于后续 SHA256 / manifest / latest.json）
 PRODUCED_BINS=()
@@ -225,8 +261,34 @@ for fw in "${PRODUCED_BINS[@]}"; do
     # SHA256 旁文件（格式兼容 sha256sum -c）
     echo "${sum}  ${fw}" > "${fw_path}.sha256"
     echo "${fw}  ${size}  ${sum}" >> "$MANIFEST"
+    sha_file="${fw}.sha256"
+    sha_path="$RELEASE_DIR/$sha_file"
+    sha_sum="$(sha256_of "$sha_path")"
+    sha_size="$(wc -c < "$sha_path" | tr -d ' ')"
+    echo "${sha_file}  ${sha_size}  ${sha_sum}" >> "$MANIFEST"
     echo "  SHA256: $fw -> ${sum:0:16}..."
 done
+
+TEST_SUMMARY="构建前门禁已通过：make -C test && ./test/test_domain；python3 tests/test_portal_config_save.py；python3 tests/test_core_flow_endurance.py --minutes ${CORE_FLOW_MINUTES:-10}；check_config_consistency.py；check_portal_js.py；check_portal_structure.py；check_nvs_schema.py；check_tasks_wdt.py；check_board_desc.py。真机烧录、BLE 自测、配网自测和物理按钮/LED 验证需按测试报告补充执行记录。"
+python3 "$PROJECT_DIR/scripts/tools/generate_release_docs.py" \
+    --release-dir "$RELEASE_DIR" \
+    --test-summary "$TEST_SUMMARY" \
+    --notes "build_all.sh 生成的是离线 release 产物；正式发版前必须补齐真机验证结果。"
+
+for doc in test-report.md core-flow-endurance.md user-manual.md; do
+    doc_path="$RELEASE_DIR/$doc"
+    sum="$(sha256_of "$doc_path")"
+    size="$(wc -c < "$doc_path" | tr -d ' ')"
+    echo "${doc}  ${size}  ${sum}" >> "$MANIFEST"
+done
+if [ -d "$RELEASE_DIR/images" ]; then
+    while IFS= read -r img; do
+        rel="${img#$RELEASE_DIR/}"
+        sum="$(sha256_of "$img")"
+        size="$(wc -c < "$img" | tr -d ' ')"
+        echo "${rel}  ${size}  ${sum}" >> "$MANIFEST"
+    done < <(find "$RELEASE_DIR/images" -type f | sort)
+fi
 
 # 版本号一致性校验：产物文件名必须含当前固件版本与标识信息，且版本号只出现一次
 for fw in "${PRODUCED_BINS[@]}"; do
@@ -237,11 +299,40 @@ for fw in "${PRODUCED_BINS[@]}"; do
 done
 
 echo ""
+echo "=== Release 打包：固件 + 报告 + 手册 ==="
+if ! command -v zip >/dev/null 2>&1; then
+    echo "错误：未找到 zip 命令，无法生成 release 总包"
+    exit 1
+fi
+PACKAGE_NAME="bikepower-c-release-v${VERSION}-stable-fix-g${GIT_SHA}.zip"
+PACKAGE_ITEMS=("${PRODUCED_BINS[@]}")
+for fw in "${PRODUCED_BINS[@]}"; do
+    PACKAGE_ITEMS+=("${fw}.sha256")
+done
+PACKAGE_ITEMS+=("manifest.txt" "test-report.md" "core-flow-endurance.md" "user-manual.md")
+if [ -d "$RELEASE_DIR/images" ]; then
+    PACKAGE_ITEMS+=("images")
+fi
+
+rm -f "$RELEASE_DIR/$PACKAGE_NAME" "$RELEASE_DIR/${PACKAGE_NAME}.sha256"
+(cd "$RELEASE_DIR" && zip -qr "$PACKAGE_NAME" "${PACKAGE_ITEMS[@]}")
+package_sum="$(sha256_of "$RELEASE_DIR/$PACKAGE_NAME")"
+package_size="$(wc -c < "$RELEASE_DIR/$PACKAGE_NAME" | tr -d ' ')"
+echo "${package_sum}  ${PACKAGE_NAME}" > "$RELEASE_DIR/${PACKAGE_NAME}.sha256"
+package_sha_sum="$(sha256_of "$RELEASE_DIR/${PACKAGE_NAME}.sha256")"
+package_sha_size="$(wc -c < "$RELEASE_DIR/${PACKAGE_NAME}.sha256" | tr -d ' ')"
+echo "${PACKAGE_NAME}  ${package_size}  ${package_sum}" >> "$MANIFEST"
+echo "${PACKAGE_NAME}.sha256  ${package_sha_size}  ${package_sha_sum}" >> "$MANIFEST"
+echo "  总包: $RELEASE_DIR/$PACKAGE_NAME"
+ls -lh "$RELEASE_DIR/$PACKAGE_NAME" | awk '{print "  大小: "$5}'
+
+echo ""
 echo "=== 构建完成，产物在 $RELEASE_DIR/ ==="
 ls -lh "$RELEASE_DIR/"
 echo ""
 echo "⚠️  发布前人工步骤（本脚本不自动执行）："
 echo "   1. 校验各产物 SHA256 与 manifest.txt 一致"
-echo "   2. 打 git tag、创建 Gitee Release 并上传 merged bin + manifest"
+echo "   2. 补齐真机验证记录，更新 test-report.md"
+echo "   3. 打 git tag、创建 Gitee Release 并上传 release 总包、merged bin、manifest、test-report.md、core-flow-endurance.md、user-manual.md"
 echo "   本脚本不会打 git tag、不会创建 Gitee Release。"
 echo "   已移除在线 OTA：升级走全量重新烧录（分区表变更需 erase_flash）。"

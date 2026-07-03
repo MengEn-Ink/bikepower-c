@@ -151,6 +151,19 @@ function readLedControls() {
     if (color) STATE[f.colorKey] = clamp(intOr(color.value, f.colorDefault), 0, 6);
   }
 }
+function syncLedSilentVisibility() {
+  var silent = $("settings-led-silent");
+  var options = $("settings-led-options");
+  var isSilent = silent ? silent.checked : !!STATE.led_silent;
+  if (options) options.hidden = isSilent;
+  for (var i = 0; i < LED_FIELDS.length; i++) {
+    var f = LED_FIELDS[i];
+    var mode = $("settings-led-" + f.id + "-mode");
+    var color = $("settings-led-" + f.id + "-color");
+    if (mode) mode.disabled = isSilent;
+    if (color) color.disabled = isSilent;
+  }
+}
 function renderLedControls() {
   var silent = $("settings-led-silent");
   if (silent) silent.checked = !!STATE.led_silent;
@@ -161,6 +174,7 @@ function renderLedControls() {
     setSelect("settings-led-" + f.id + "-mode", STATE[f.modeKey]);
     setSelect("settings-led-" + f.id + "-color", STATE[f.colorKey]);
   }
+  syncLedSilentVisibility();
 }
 function withLedConfig(body) {
   body.led_silent = STATE.led_silent ? 1 : 0;
@@ -950,6 +964,7 @@ function applySettingsPanel() {
   var actions = document.querySelector(".settings-actions");
   if (actions) actions.style.display = active === "templates" ? "none" : "flex";
   if (save) save.style.display = active === "about" || active === "templates" ? "none" : "block";
+  if (active === "led") syncLedSilentVisibility();
 }
 function onSettingsSave() {
   var btn = $("settings-save");
@@ -1143,6 +1158,13 @@ function init() {
   bindInputRange("settings-weight", 40, 150);
   bindInputRange("settings-ftp", 50, 500);
   bindInputRange("settings-thr", 100, 220);
+  var ledSilent = $("settings-led-silent");
+  if (ledSilent) {
+    ledSilent.addEventListener("change", function () {
+      STATE.led_silent = ledSilent.checked ? 1 : 0;
+      syncLedSilentVisibility();
+    });
+  }
 }
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init);

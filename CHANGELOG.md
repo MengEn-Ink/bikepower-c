@@ -4,6 +4,30 @@
 
 ## [未发布]
 
+### 固件产物测试报告与用户手册
+- `scripts/build_all.sh`：分发固件生成流程改为“构建前门禁 → 双板型合并固件 → SHA256/manifest → 测试报告 → 用户手册 → release 总包”，`build/release/` 必须同时包含 generic-c3 与 m5stamp-c3 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip`。
+- `scripts/tools/generate_release_docs.py`：新增 release 随附文档生成脚本，从固件版本、Git ID、release 产物和 `docs/user/` 生成 `test-report.md` 与 `user-manual.md`。
+- `scripts/tools/publish_gitee_release.py`：新增 Gitee Release 发布脚本，从 `.env` 读取 `GITEE_TOKEN`，支持 `--dry-run` 检查 tag、目标提交和待上传附件，正式发布时创建 Release 并上传总包、双板型固件、校验文件和随附文档。
+- `docs/user/02-user-manual.md`、`docs/images/web-ui/`：用户手册改为侧重使用说明和操作步骤，新增当前网页端首页、用户资料、设备信息、物理按钮、LED 指示、LED 静默模式、设备模板截图；release 手册会同步携带 `images/` 图片目录，避免离线分发断图。
+- `.trae/rules/workflows/device-testing.md`、`.trae/rules/workflows/test-coverage.md`、`.trae/skills/real-device-test/SKILL.md`、`.trae/skills/release/SKILL.md`、`.trae/memory/project-context.md`：固化“每次生成可分发固件必须同步测试验证并输出报告/用户手册”的规则；未执行的真机或人工项必须写明原因，不能默认为通过。
+- `README.md`、`docs/dev/01-technical-reference.md`、`docs/dev/03-test-coverage-analysis.md`、`docs/INDEX.md`、`tests/README.md`：同步标准 release 产物、测试报告、用户手册和总包生成说明。
+- `scripts/tools/quality_gate.py`：新增 release 文档生成脚本、Gitee Release 发布脚本和 mock 配网页保存测试为必备资产检查项。
+
+### 测试用例体系
+- `test/test_domain.c`：新增场景级 host 单测，覆盖模拟按钮短按/长按重复调功后功率、踏频、心率输出；随机功率变化下心率随动趋势；固定模式功率/踏频/心率浮动启停效果；网页端保存配置后的序列化、反序列化与引擎恢复链路。
+- `tests/test_portal_config_save.py`：新增无需真机的 mock HTTP 测试，自动启动 `tests/mock_server.py`，模拟网页端 POST `/api/config` 后读取 `/api/state`，验证功率、踏频、心率锁定、浮动幅度、按钮步进、用户资料、自定义配速档和 LED 配置即时回显。
+- `tests/test_core_flow_endurance.py`：新增默认 10 分钟核心流程耐久测试，循环模拟按钮短按/长按调功、功率变化心率随动、网页端首页和设置页编辑、LED 静默模式、设备模板扫描/读取/保存/应用/删除、配网续期与关闭 WiFi，并输出 markdown 明细报告。
+- `tests/test_runner.sh`、`tests/README.md`：新增 `-m` mock 配网页保存测试入口、`-e` 核心流程耐久测试入口和 `-w` 配网门户 HTTP 自测入口，修正测试运行器文档与脚本能力不一致。
+- `tests/check_portal_structure.py`：新增测试资产守护检查，确保 mock 保存测试、核心流程耐久测试和统一测试入口不会漂移。
+- 验证：`make -C test && ./test/test_domain` 5282 通过 0 失败；`python3 tests/test_portal_config_save.py` 通过；`python3 tests/test_core_flow_endurance.py` 默认 10 分钟通过，20 轮循环，报告见 `tests/reports/core_flow_endurance_20260703_170719.md`；`python3 tests/test_core_flow_endurance.py --cycles 1 --skip-host --interval 0` 快速回归通过；`bash tests/test_runner.sh -d`、`bash tests/test_runner.sh -m` 通过；`check_config_consistency.py` 112 通过 0 失败；`check_portal_structure.py` 132 通过 0 失败；`check_portal_js.py`、`check_nvs_schema.py`、`check_tasks_wdt.py`、`check_board_desc.py` 通过；`python3 -m py_compile tests/test_core_flow_endurance.py tests/test_portal_config_save.py tests/mock_server.py tests/check_portal_structure.py scripts/tools/quality_gate.py scripts/tools/generate_release_docs.py scripts/tools/publish_gitee_release.py` 与 `bash -n tests/test_runner.sh scripts/build_all.sh` 通过；`scripts/build_all.sh --dry-run` 产物预览包含双板型固件和 release 总包；`scripts/build_all.sh` 通过，生成 generic-c3 与 m5stamp-c3 merged bin、SHA256、manifest、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 release 总包，`shasum -a 256 -c` 校验 generic、m5stamp、release zip 均 OK；`python3 scripts/tools/publish_gitee_release.py --dry-run` 通过，确认 Gitee Release 待上传附件清单完整。
+
+### Captive Portal 热点名与首屏优化
+- `main/radio_ctrl.c`、`main/bikepower_config.h`：SoftAP 从固定 `BikePower` 改为 `BikePower-XXXXXX`，后缀取 AP MAC 后 3 字节，降低手机对同名 Captive Portal 的缓存/探测抑制概率；启动日志打印实际热点名。
+- `main/web/app.css`：删除已无 DOM/JS 引用的旧折叠卡片样式，减少内联首页资源体积。
+- `tests/check_config_consistency.py`、`tests/check_portal_structure.py`：新增热点名前缀 + MAC 后缀规则检查，以及旧折叠样式不可回归检查。
+- `README.md`、`docs/user/`、`docs/dev/`、`tests/README.md`：同步配网热点名说明为 `BikePower-XXXXXX`。
+- 验证：`check_config_consistency.py` 109 通过 0 失败；`check_portal_structure.py` 125 通过 0 失败；`check_portal_js.py`、`check_tasks_wdt.py`、`check_nvs_schema.py`、`check_board_desc.py` 通过；`idf.py build` 通过，app 分区剩余 72%；`scripts/flash_latest.sh --no-checks --no-build --capture-seconds 20` 烧录正式固件到 `/dev/cu.usbmodem101` 通过，启动日志无 panic/WDT/Backtrace。
+
 ### 固件版本标识
 - `main/CMakeLists.txt`：构建时注入 `BIKEPOWER_GIT_SHA`，固件显示信息可追溯到最后一次 Git 提交短 ID。
 - `main/bikepower_config.h`、`main/board_detect.c/.h`：新增稳定版 `FIRMWARE_STABLE_VERSION`、修复版 `FIRMWARE_FIX_VERSION` 与 `board_firmware_name()`，统一生成 `板型-v版本-stable稳定版-fix修复版-gGitID` 格式。

@@ -15,6 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_H = ROOT / "main" / "bikepower_config.h"
+RADIO_CTRL = ROOT / "main" / "radio_ctrl.c"
 DOMAIN_H = ROOT / "components" / "bikepower_domain" / "include" / "domain_config.h"
 README = ROOT / "README.md"
 PROGRESS = ROOT / "PROGRESS.md"
@@ -91,6 +92,7 @@ def extract_changelog_unreleased_has_version_bump(changelog: str, target_ver: st
 
 # ============================ 读取文件 ============================
 config_src = read(CONFIG_H)
+radio_ctrl_src = read(RADIO_CTRL)
 domain_src = read(DOMAIN_H)
 readme_src = read(README)
 progress_src = read(PROGRESS)
@@ -118,18 +120,21 @@ check(stable_ver is not None and re.match(r'\d+\.\d+\.\d+', stable_ver),
       f"FIRMWARE_STABLE_VERSION 已定义为语义版本 (实际={stable_ver})")
 check(fix_ver is not None and re.match(r'\d+\.\d+\.\d+', fix_ver),
       f"FIRMWARE_FIX_VERSION 已定义为语义版本 (实际={fix_ver})")
-check(fw_ver == stable_ver, f"FIRMWARE_VERSION({fw_ver}) 与稳定版({stable_ver}) 对齐")
+def parse_semver(s):
+    m = re.match(r'(\d+)\.(\d+)\.(\d+)', s or "")
+    return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
+
+check(fw_ver == fix_ver, f"FIRMWARE_VERSION({fw_ver}) 与修复版({fix_ver}) 对齐")
+check(parse_semver(stable_ver) <= parse_semver(fw_ver),
+      f"稳定版({stable_ver}) 不高于当前固件版本({fw_ver})")
 
 latest_released = extract_changelog_latest_version(changelog_src)
 print(f"{TAG}   CHANGELOG 最新已发布版本 = {latest_released}")
 
 # 当前版本必须 > CHANGELOG 最新已发布版本（发版前未发布段含新版本）
 if latest_released:
-    def parse_ver(s):
-        m = re.match(r'(\d+)\.(\d+)\.(\d+)', s)
-        return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
-    cur = parse_ver(fw_ver)
-    rel = parse_ver(latest_released)
+    cur = parse_semver(fw_ver)
+    rel = parse_semver(latest_released)
     check(cur >= rel, f"固件版本 {fw_ver} >= CHANGELOG 最新发布 {latest_released}")
 
 # DEVICE_NAME 一致性
@@ -145,13 +150,29 @@ check("git -C \"$PROJECT_DIR\" rev-parse --short HEAD" in build_all_src,
       "Release 构建脚本必须读取最后 Git 短提交 ID")
 check("bikepower-c-%s-v%s-stable-fix-g%s.bin" in build_all_src,
       "Release 合并固件文件名必须包含板型、单一版本号、stable/fix 标识和 Git ID")
+check("bikepower-c-release-v${VERSION}-stable-fix-g${GIT_SHA}.zip" in build_all_src,
+      "Release 构建脚本必须生成包含双板型固件、测试报告和用户手册的总包")
+check("zip -qr \"$PACKAGE_NAME\"" in build_all_src,
+      "Release 构建脚本必须使用 zip 生成可直接分发的总包")
 check("stable%s-fix%s" not in build_all_src,
       "Release 合并固件文件名不得重复拼接稳定版/修复版版本号")
 
-# WIFI_SSID 与 DEVICE_NAME 关系（AP 名沿用设备名前缀）
-wifi_ssid = extract_define(config_src, "WIFI_SSID")
-check(wifi_ssid is not None and "BikePower" in wifi_ssid,
-      f"WIFI_SSID 含 BikePower 前缀 (实际={wifi_ssid})")
+# WIFI_SSID_PREFIX 与 DEVICE_NAME 关系（AP 名沿用设备名前缀，运行时追加 MAC 后缀）
+wifi_ssid_prefix = extract_define(config_src, "WIFI_SSID_PREFIX")
+check(wifi_ssid_prefix == "BikePower",
+      f"WIFI_SSID_PREFIX = BikePower (实际={wifi_ssid_prefix})")
+check(extract_define(config_src, "WIFI_SSID") is None,
+      "不再定义固定 WIFI_SSID，避免手机 Captive Portal 缓存同名热点")
+check("esp_wifi_get_mac(WIFI_IF_AP" in radio_ctrl_src,
+      "radio_ctrl.c 使用 SoftAP MAC 生成热点后缀")
+check('"%s-%02X%02X%02X"' in radio_ctrl_src,
+      "radio_ctrl.c 按 BikePower-XXXXXX 规则格式化热点名")
+check("WIFI_SSID_PREFIX" in radio_ctrl_src and "ap_ssid" in radio_ctrl_src,
+      "radio_ctrl.c 使用 WIFI_SSID_PREFIX 生成实际 SSID")
+check("ap_cfg.ap.ssid_len = strlen(ap_ssid)" in radio_ctrl_src,
+      "radio_ctrl.c 的 ssid_len 使用实际 SSID 长度")
+check("ssid=%s" in radio_ctrl_src and "ap_ssid" in radio_ctrl_src,
+      "SoftAP 启动日志打印实际热点名")
 
 
 # ============================ 2. 按钮时间阈值 ↔ README ============================

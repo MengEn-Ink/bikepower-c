@@ -149,7 +149,7 @@ typedef enum {
 #define LED_TICK_MS            20     // LED 任务节拍，累加判断闪烁相位
 
 // ===== WiFi AP 热点 =====
-#define WIFI_SSID              "BikePower"
+#define WIFI_SSID_PREFIX       "BikePower"
 #define WIFI_PASSWORD          "12345678"
 #define WIFI_AP_CHANNEL        1
 #define WIFI_PORT              80
@@ -179,9 +179,9 @@ typedef enum {
 #define DEVICE_NAME          "BikePower"
 #define DEVICE_MANUFACTURER  "BikePower"
 #define DEVICE_MODEL         "ESP32-C3"
-#define FIRMWARE_VERSION     "4.0.0"
+#define FIRMWARE_VERSION     "4.0.1"
 #define FIRMWARE_STABLE_VERSION "4.0.0"
-#define FIRMWARE_FIX_VERSION    "4.0.0"
+#define FIRMWARE_FIX_VERSION    "4.0.1"
 
 #ifndef BIKEPOWER_GIT_SHA
 #define BIKEPOWER_GIT_SHA "nogit"

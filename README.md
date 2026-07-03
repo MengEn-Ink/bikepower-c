@@ -90,10 +90,10 @@ WiFi 配网的射频共用流程可参考（v3.1.3 起为共存模式，BLE 不�
 ```bash
 ./scripts/flash_latest.sh --port /dev/ttyACM0 --monitor
 ./scripts/flash_latest.sh --erase
-./scripts/flash_latest.sh --ota-test-auto-config
+./scripts/flash_latest.sh --portal-test-auto-config
 ```
 
-其中 `--erase` 在从旧的双 OTA 分区布局切换到当前 4MB 单 factory 布局时必须使用（分区表变更需全量擦写）；`--ota-test-auto-config` 会刷启动后自动进入配网的测试固件，正式使用不要加。
+其中 `--erase` 在从旧的双 OTA 分区布局切换到当前 4MB 单 factory 布局时必须使用（分区表变更需全量擦写）；`--portal-test-auto-config` 会刷启动后自动进入配网的测试固件，正式使用不要加。
 
 也可以手动准备 ESP-IDF 环境，再在项目根目录执行：
 
@@ -106,12 +106,14 @@ idf.py -p <port> monitor
 
 `<port>` 请替换为你的实际串口，例如 macOS 下常见 `/dev/cu.usbmodem*`，Linux 下常见 `/dev/ttyUSB0` 或 `/dev/ttyACM0`。
 
-发版构建使用 `scripts/build_all.sh`。该脚本可编译 generic-c3 / m5stamp-c3 产物，生成 merged bin、SHA256 与 manifest；`--dry-run` 只预览，不编译、不写文件、不打 tag、不创建 Release。
+发版构建使用 `scripts/build_all.sh`。该脚本可编译 generic-c3 / m5stamp-c3 双板型产物，先运行 host、mock、10 分钟核心流程耐久和静态门禁，再生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip；`--dry-run` 只预览，不编译、不写文件、不打 tag、不创建 Release。
 
 ```bash
 ./scripts/build_all.sh --dry-run
 ./scripts/build_all.sh
 ```
+
+每次生成可分发固件时，`build/release/` 必须同时包含两个板型 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip` 总包。测试报告记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行项必须写明原因。
 
 提交前推荐先跑聚合门禁：
 
@@ -135,7 +137,7 @@ python3 scripts/tools/quality_gate.py
 
 1. 长按按钮至少 `2s`，松开后看到 LED 进入确认提示
 2. 在确认时间内再按一次按钮
-3. 手机连接设备发出的 WiFi AP：`BikePower`
+3. 手机连接设备发出的 WiFi AP：`BikePower-XXXXXX`（后 6 位因设备而异）
 4. 打开浏览器访问 `192.168.4.1`
 5. 修改需要的配置参数
 6. 点击保存，页面会显示“已保存到设备”，配置实时生效到 BLE 通知，骑行 App 立即看到新值

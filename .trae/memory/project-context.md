@@ -12,7 +12,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 
 - BikePower 从 MicroPython（仓库 esp32-power）**完全重写**为 C + ESP-IDF + NimBLE。
 - 用户授权"全程你来设计开发"，分阶段（0-6）推进，每阶段编译 → 烧录 → 真机验证后提交推送。
-- 项目位置 `/home/mengen1014/work/bikepower-c`，ESP-IDF v5.5.4 本地工具链，当前固件 v4.0.0。
+- 项目位置 `/home/mengen1014/work/bikepower-c`，ESP-IDF v5.5.4 本地工具链，当前固件 v4.0.1。
 - MicroPython 专有约束（mpremote/gc/_thread/const/.mpy/部署 .py）**不适用**本项目。
 
 ---
@@ -24,6 +24,9 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 3. **串口地址不写死**：自动扫描 ESP32-C3（USB VID/PID 智能识别）。
 4. **跨平台**：macOS / Linux / Windows，注意 macOS 无 `timeout` 命令。
 5. **部署后必须测试**：每阶段烧录后真机验证并记录结果。
+6. **固件产物必须带文档和总包**：每次生成可分发固件时，`build/release/` 必须同时包含双板型 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 release 总包 zip。
+7. **测试报告必须真实**：报告需列出编译、host、mock、10 分钟核心流程耐久、静态门禁、真机、人工项结果；未执行项必须写明原因，不得默认通过。
+8. **用户手册随固件更新**：功能或使用流程变化时先更新 `docs/user/`，再由 `scripts/tools/generate_release_docs.py` 生成随附 `user-manual.md`。
 
 ---
 

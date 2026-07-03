@@ -127,7 +127,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 1. 长按按钮至少 `2` 秒后松开
 2. 看到 LED 进入确认提示后，再按一次按钮
-3. 手机连接 WiFi 热点 `BikePower`，密码 `12345678`
+3. 手机连接 WiFi 热点 `BikePower-XXXXXX`（后 6 位因设备而异），密码 `12345678`
 4. 打开浏览器，访问 `192.168.4.1`，按页面提示修改并保存
 
 配网是临时状态，不是开机默认状态；当前固件 WiFi/BLE 共存，普通配网不会断开 BLE，也不重启。字段说明、保存流程、模式选择等完整内容见 [用户手册](02-user-manual.md)。
@@ -135,5 +135,5 @@ idf.py -p /dev/ttyUSB0 flash monitor
 ## 5. 下一步
 
 - 完整按钮操作、LED 灯效、配网字段、骑行模式与 FAQ：见 [用户手册](02-user-manual.md)
-- 固件在线升级（OTA）：见 [OTA 固件升级操作手册](04-ota-user-guide.md)
+- 固件升级：当前 v4.0.0 已移除在线 OTA，升级走全量重新烧录；从旧分区布局升级时需先执行 `erase_flash`
 - 硬件接线、供电与排障：见 [硬件指南](03-hardware.md)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """阶段5 配网门户自测（v3.2.0 前后端分离重构版）
 
-连上 BikePower 热点后验证 HTTP 路由与行为。v3.2.0 起：
+连上 BikePower-XXXXXX 热点后验证 HTTP 路由与行为。v3.2.0 起：
   - 前端走 SPA 单页面，C 侧只暴露 /api/xxx JSON 接口
   - 配置 / 关 WiFi 全部 POST JSON，不再返回 302
   - 倒计时与续期返回纯数字（保留旧契约，前端直接 parseInt）

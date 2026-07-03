@@ -31,11 +31,11 @@ WEB_DIR = os.path.join(REPO_ROOT, "main", "web")
 
 MOCK_STATE = {
     "device_name": "BikePower-Mock",
-    "firmware_version": "4.0.0-mock",
-    "firmware_name": "generic-c3-v4.0.0-stable4.0.0-fix4.0.0-g6e90860",
+    "firmware_version": "4.0.1-mock",
+    "firmware_name": "generic-c3-v4.0.1-stable4.0.0-fix4.0.1-g6e90860",
     "board": "generic-c3",
     "stable_version": "4.0.0",
-    "fix_version": "4.0.0",
+    "fix_version": "4.0.1",
     "git_sha": "6e90860",
     "power": 150,
     "cadence": 80,
@@ -257,7 +257,8 @@ class Handler(BaseHTTPRequestHandler):
                           "led_conn_mode", "led_conn_color",
                           "led_wifi_mode", "led_wifi_color",
                           "led_confirm_mode", "led_confirm_color",
-                          "led_error_mode", "led_error_color"):
+                          "led_error_mode", "led_error_color",
+                          "closing"):
                     if k in data:
                         MOCK_STATE[k] = data[k]
                 for p in MOCK_STATE["pacers"]:

@@ -22,7 +22,7 @@
 - `button_logic.c`
 - `button_debounce.c`
 - `led_pattern.c`
-- 当前断言规模：`1322` 条
+- 当前断言规模：`5282` 条
 - 适用改动：
 - `components/bikepower_domain/` 下的逻辑变更
 - 配置 schema、范围校验、模式计算、心率模型变更
@@ -86,6 +86,36 @@
 - `main/web/app.js`
 - `main/web/app.css`
 
+### `TC-3h`：配网页保存 mock 测试
+
+- 目标：无需真机验证网页端保存配置后 `/api/state` 即时回显
+- 入口：`tests/test_portal_config_save.py`
+- 覆盖内容：
+- 自动启动 `tests/mock_server.py`
+- `POST /api/config` 保存功率、踏频、心率锁定、浮动幅度、按钮步进、用户资料、自定义配速档、LED 配置
+- `GET /api/state` 验证保存字段与 custom pacer 展示同步
+- 适用改动：
+- `main/web/app.js`
+- `main/wifi_portal.c`
+- `tests/mock_server.py`
+- 配置字段、用户资料、LED 配置、配速档字段变更
+
+### `TC-3i`：核心流程耐久测试
+
+- 目标：无需真机连续验证核心业务流程，默认运行 10 分钟
+- 入口：`tests/test_core_flow_endurance.py`
+- 覆盖内容：
+- 自动启动 `tests/mock_server.py`
+- 循环模拟按钮短按减功率、长按连续加功率
+- 改变功率数值并观测心率随动趋势
+- 网页端首页参数、用户资料、设备名称、按钮步进、自定义配速、LED 灯效和静默模式保存
+- 设备模板扫描、读取、保存、应用、删除
+- 配网续期、倒计时、保存并关闭 WiFi
+- 输出 `tests/reports/core_flow_endurance_*.md`；固件生成时输出 `build/release/core-flow-endurance.md`
+- 适用改动：
+- 固件生成前强制执行
+- `main/web/`、`tests/mock_server.py`、按钮/心率/配置字段相关改动
+
 ## 选择规则
 
 - `TC-4`：纯治理文档或规则改动可不跑测试，但要做一致性复核。
@@ -94,6 +124,8 @@
 - `TC-7`：配网改动至少跑 `tests/stage5_portal_test.py`，并复核 BLE/WiFi 射频互斥链路。
 - `TC-7a`：**任何 `main/wifi_portal.c` 改动必须先跑 `tests/check_portal_js.py`，JS 语法全绿才能继续**。这是硬性前置门，避免 `}}}` 类低级 bug 烧录后才发现。
 - `TC-7c`：**常量一致性检查（每次改动必跑）**：跑 `tests/check_config_consistency.py`，验证 `bikepower_config.h` / `domain_config.h` / `README.md` / `docs/` 之间的常量值（版本号、引脚、阈值、超时、栈大小）一致，防止文档与代码漂移。
+- `TC-7d`：**配网页保存字段改动必须跑 `tests/test_portal_config_save.py`**，确保 mock 保存、状态回显和 custom pacer 展示不漂移。
+- `TC-7e`：**固件生成前必须跑 `tests/test_core_flow_endurance.py`**，默认 10 分钟；如果因时间原因仅快速验证，必须显式写明 `--cycles` 结果不能替代正式固件生成门禁。
 - `TC-8`：跨层改动按最高等级执行，不能只挑便宜测试。
 
 ## 影响范围评估（**每次代码修改前必做**）
@@ -118,6 +150,7 @@
 - `TC-9a`：**"功能完成"的定义 = 所有相关测试层全绿**，不是"代码写完了"。任一测试未跑或未通过，不得视为完成，不得提交，不得烧录分发。
 - `TC-9b`：测试失败时必须定位根因并修复，禁止跳过、注释、或用 `--ignore` 绕过。
 - `TC-9c`：测试因硬件条件无法执行时，必须在提交说明中明确写出"未执行"+原因，并标记为 pending，不得默认通过。
+- `TC-9d`：每次生成可分发固件，必须同步生成 `build/release/test-report.md`、`build/release/core-flow-endurance.md`、`build/release/user-manual.md` 和 release 总包 zip；测试报告必须列出已执行、未执行和原因。
 - `TC-10`：如果规则、文档或提交说明引用断言数、脚本名、服务数、路由数，必须与当前仓库保持一致。
 
 ## 覆盖率目标与现状（目标 90%）
@@ -138,6 +171,8 @@
 3. **补 host 单测**：在 `test/test_domain.c` 加测试函数，覆盖正常 / 边界 / 异常路径。
 4. **跑 TC-1**：`make -C test && ./test/test_domain`，断言全绿。
 5. **跑 TC-3a/3c/3d**：涉及 wifi_portal / 前端 / 常量时跑对应静态脚本。
-6. **跑 TC-2/3**：涉及 BLE / 配网行为时跑真机脚本。
-7. **更新本文件断言数 + docs/dev/03-test-coverage-analysis.md 矩阵**。
-8. **提交前全绿**：TC-9a 硬性门。
+6. **跑 TC-3h**：涉及网页保存字段时跑 mock 保存回显测试。
+7. **跑 TC-2/3**：涉及 BLE / 配网行为时跑真机脚本。
+8. **生成固件随附文档**：每次生成 release 固件时同步产出测试报告和用户手册。
+9. **更新本文件断言数 + docs/dev/03-test-coverage-analysis.md 矩阵**。
+10. **提交前全绿**：TC-9a 硬性门。

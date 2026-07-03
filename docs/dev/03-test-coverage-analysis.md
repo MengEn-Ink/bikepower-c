@@ -2,7 +2,7 @@
 
 > 配套规则：[`.trae/rules/workflows/test-coverage.md`](../../.trae/rules/workflows/test-coverage.md)
 > 维护要求：每次抽取纯逻辑到领域层 / 新增测试脚本后，更新本矩阵。
-> 版本：v4.0.0（已移除在线 OTA + 家庭网络；不再保留"为覆盖率抽取但生产代码未采用"的并行实现）。
+> 版本：v4.0.1（已移除在线 OTA + 家庭网络；不再保留"为覆盖率抽取但生产代码未采用"的并行实现）。
 
 ## 一、项目模块清单与代码规模
 
@@ -49,13 +49,15 @@
 
 | 层 | 入口 | 覆盖对象 | 状态 |
 |----|------|---------|------|
-| TC-1 host 单测 | `test/test_domain` | 领域层 9 个文件 | ✅ 全绿（1322 断言，含自定义配速昵称、浮动幅度 setter/游走/固定心率浮动、按钮去抖与 LED 灯效配置） |
+| TC-1 host 单测 | `test/test_domain` | 领域层 9 个文件 | ✅ 全绿（5282 断言，含按钮操作场景、随机功率心率随动、浮动启停、网页保存持久化链路） |
 | TC-3a JS 静态 | `tests/check_portal_js.py` | `main/web/app.js` node --check | ✅ |
 | TC-3c 常量一致性 | `tests/check_config_consistency.py` | config 头文件 ↔ 文档 | ✅ |
 | TC-3d 门户结构 | `tests/check_portal_structure.py` | 路由表/HTML/前端 API 调用 | ✅ |
 | TC-3e NVS schema | `tests/check_nvs_schema.py` | NVS key 定义 vs 使用 | ✅ |
 | TC-3f 板型描述表 | `tests/check_board_desc.py` | 板型枚举/引脚/名称一致性 | ✅ |
 | TC-3g 任务/WDT | `tests/check_tasks_wdt.py` | xTaskCreate/WDT/队列 | ✅ |
+| TC-3h mock 保存 | `tests/test_portal_config_save.py` | `/api/config` 保存后 `/api/state` 回显 | ✅ |
+| TC-3i 核心流程耐久 | `tests/test_core_flow_endurance.py` | 10 分钟循环覆盖按钮调功、功率/心率随动、网页编辑、LED 静默、设备模板、关闭 WiFi | ✅ |
 
 ### 真机测试（需 ESP32-C3 + 串口 + 手机）
 
@@ -70,6 +72,8 @@
 | 脚本 | 用途 |
 |------|------|
 | `tests/mock_server.py` | 本地复刻全部 /api/xxx，浏览器调试 `main/web/` 前端不烧设备 |
+| `tests/test_portal_config_save.py` | 自动启动 mock server，验证配网页保存字段即时回显 |
+| `tests/test_core_flow_endurance.py` | 自动启动 mock server，默认 10 分钟循环验证核心流程并输出 markdown 报告 |
 | `tests/serial_daemon.py` | 串口日志持续抓取 + 自动重连 |
 | `tests/serial_capture.py` | 单次抓取 |
 
@@ -99,11 +103,17 @@
   ↓
 6. 涉及常量 → TC-3c；涉及 NVS → TC-3e；涉及任务 → TC-3g；涉及板型 → TC-3f
   ↓
-7. 涉及 BLE/配网行为 → 跑 TC-2 / TC-3 真机
+7. 涉及网页保存字段 → 跑 TC-3h mock 保存回显
   ↓
-8. 更新本矩阵 + test-coverage.md 断言规模
+8. 生成固件前 → 跑 TC-3i 10 分钟核心流程耐久测试
   ↓
-9. 全静态门禁绿 → 提交
+9. 涉及 BLE/配网行为 → 跑 TC-2 / TC-3 真机
+  ↓
+10. 生成固件产物 → 同步生成 test-report.md + core-flow-endurance.md + user-manual.md + release 总包 zip
+  ↓
+11. 更新本矩阵 + test-coverage.md 断言规模
+  ↓
+12. 全静态门禁绿 → 提交
 ```
 
 ## 五、不可自动化部分（明确边界，走真机测试）

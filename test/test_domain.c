@@ -380,6 +380,214 @@ static void test_float_setters(void)
     CHECK(e.power_step == 30 && power_engine_is_dirty(&e), "调功步进生效并置 dirty");
 }
 
+static void test_button_operation_scenario(void)
+{
+    printf("[test] 模拟按钮操作后功率/踏频/心率输出\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    domain_rng_seed(20260703);
+    CHECK(power_engine_set_power(&e, 200), "初始功率设为200W");
+    CHECK(e.cadence_base == 90, "初始踏频为90RPM");
+    CHECK(power_engine_set_power_step(&e, 25), "按钮步进设为25W");
+    power_engine_set_power_float(&e, 0);
+    power_engine_set_cadence_float(&e, 0);
+    power_engine_clear_dirty(&e);
+
+    const uint32_t short_ms = 500;
+    const uint32_t hold_ms = 2000;
+    if (button_classify_release(120, short_ms, hold_ms) == BTN_RELEASE_SHORT) {
+        power_engine_adjust_power(&e, -e.power_step);
+    }
+    CHECK(e.base_power == 175, "短按模拟后功率按步进-25W");
+    CHECK(power_engine_is_dirty(&e), "短按调功置 dirty");
+    power_engine_clear_dirty(&e);
+
+    uint32_t repeat_points[] = {500, 700, 900, 1100, 1900, 2000, 2200};
+    int expected = e.base_power;
+    for (size_t i = 0; i < sizeof(repeat_points) / sizeof(repeat_points[0]); i++) {
+        if (button_repeat_should_adjust(repeat_points[i], hold_ms)) {
+            expected += e.power_step;
+            power_engine_adjust_power(&e, e.power_step);
+        }
+    }
+    CHECK(e.base_power == expected, "长按自动重复只在进入配网确认前调功");
+    CHECK(e.base_power == 300, "500~1900ms 五次重复调功后功率=300W");
+
+    snapshot_t s = power_engine_snapshot(&e);
+    CHECK(s.power == e.base_power, "功率浮动0时快照功率等于按钮调功结果");
+    CHECK(s.cadence == 90, "踏频浮动0时按钮调功不改变踏频");
+    CHECK(s.heartrate >= HR_MIN && s.heartrate <= HR_MAX, "按钮调功后心率保持合法范围");
+
+    CHECK(button_classify_release(2200, short_ms, hold_ms) == BTN_RELEASE_LONG,
+          "长按释放进入配网确认动作");
+    int before_long_release = e.base_power;
+    CHECK(button_repeat_should_adjust(2200, hold_ms) == false,
+          "长按确认区间不再继续调功");
+    CHECK(e.base_power == before_long_release, "长按确认区间不额外改变功率");
+}
+
+static int settle_hr_for_power(power_engine_t *e, int power, int loops)
+{
+    CHECK(power_engine_set_power(e, power), "随机功率阶段设置功率成功");
+    snapshot_t s = { 0 };
+    for (int i = 0; i < loops; i++) {
+        s = power_engine_snapshot(e);
+    }
+    return s.heartrate;
+}
+
+static void test_random_power_hr_following_scenario(void)
+{
+    printf("[test] 随机变化功率时心率随动趋势\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    domain_rng_seed(314159);
+    profile_set_ftp(&e.profile, 250);
+    profile_set_thr_hr(&e.profile, 185);
+    power_engine_set_power_float(&e, 0);
+    power_engine_set_cadence_float(&e, 0);
+    power_engine_clear_user_hr(&e);
+
+    int low_hr = settle_hr_for_power(&e, 80, 320);
+    int high_hr = settle_hr_for_power(&e, 420, 520);
+    int recovery_hr = settle_hr_for_power(&e, 120, 520);
+
+    CHECK(high_hr > low_hr + 20, "高功率阶段心率显著高于低功率阶段");
+    CHECK(recovery_hr < high_hr - 8, "功率回落后心率随动下降");
+    CHECK(low_hr >= HR_MIN && high_hr <= HR_MAX && recovery_hr >= HR_MIN,
+          "随机功率随动阶段心率均在合法范围");
+
+    int sequence[] = {160, 310, 190, 460, 130, 390};
+    int min_hr = HR_MAX;
+    int max_hr = HR_MIN;
+    for (size_t i = 0; i < sizeof(sequence) / sizeof(sequence[0]); i++) {
+        int hr = settle_hr_for_power(&e, sequence[i], 260);
+        if (hr < min_hr) min_hr = hr;
+        if (hr > max_hr) max_hr = hr;
+    }
+    CHECK(max_hr - min_hr >= 15, "多段随机功率变化产生可观察心率区间");
+}
+
+static void test_float_effect_scenario(void)
+{
+    printf("[test] 浮动数值启停效果\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    domain_rng_seed(271828);
+    CHECK(power_engine_set_power(&e, 210), "浮动测试功率设为210W");
+    CHECK(power_engine_set_cadence(&e, 88), "浮动测试踏频设为88RPM");
+    power_engine_set_heartrate(&e, 150);
+    power_engine_set_power_float(&e, 0);
+    power_engine_set_cadence_float(&e, 0);
+    power_engine_set_hr_float(&e, 0);
+
+    for (int i = 0; i < 80; i++) {
+        snapshot_t s = power_engine_snapshot(&e);
+        CHECK(s.power == 210, "功率浮动0时恒定");
+        CHECK(s.cadence == 88, "踏频浮动0时恒定");
+        CHECK(s.heartrate == 150, "固定心率浮动0时恒定");
+    }
+
+    power_engine_set_power_float(&e, 30);
+    power_engine_set_cadence_float(&e, 10);
+    power_engine_set_hr_float(&e, 8);
+    power_engine_reset_mode_state(&e);
+    int min_power = POWER_MAX, max_power = POWER_MIN;
+    int min_cadence = CADENCE_MAX, max_cadence = CADENCE_MIN;
+    int min_hr = HR_MAX, max_hr = HR_MIN;
+    for (int i = 0; i < 1200; i++) {
+        snapshot_t s = power_engine_snapshot(&e);
+        CHECK(s.power >= 180 && s.power <= 240, "功率浮动30W时落在210±30");
+        CHECK(s.cadence >= 78 && s.cadence <= 98, "踏频浮动10RPM时落在88±10");
+        CHECK(s.heartrate >= 142 && s.heartrate <= 158, "心率浮动8BPM时落在150±8");
+        if (s.power < min_power) min_power = s.power;
+        if (s.power > max_power) max_power = s.power;
+        if (s.cadence < min_cadence) min_cadence = s.cadence;
+        if (s.cadence > max_cadence) max_cadence = s.cadence;
+        if (s.heartrate < min_hr) min_hr = s.heartrate;
+        if (s.heartrate > max_hr) max_hr = s.heartrate;
+    }
+    CHECK(max_power > min_power, "功率浮动开启后输出不恒定");
+    CHECK(max_cadence > min_cadence, "踏频浮动开启后输出不恒定");
+    CHECK(max_hr > min_hr, "固定心率浮动开启后输出不恒定");
+}
+
+static void test_web_config_persistence_scenario(void)
+{
+    printf("[test] 模拟网页端保存配置并持久化往返\n");
+    config_data_t saved;
+    config_store_defaults(&saved);
+    saved.power = 345;
+    saved.cadence = 96;
+    saved.mode = RIDE_MODE_STEADY;
+    saved.heartrate = 166;
+    saved.has_user_hr = 1;
+    saved.power_float = 18;
+    saved.cadence_float = 9;
+    saved.hr_float = 7;
+    saved.power_step = 35;
+    saved.weight = 82;
+    saved.ftp = 280;
+    saved.thr_hr = 188;
+    saved.ride_type = PACER_INDEX_CUSTOM;
+    saved.custom_wkg_low = 31;
+    saved.custom_wkg_high = 37;
+    strcpy(saved.custom_pacer_name, "冲刺档");
+    strcpy(saved.device_name, "BikePower-Web");
+    saved.led.silent = 1;
+    saved.led.scenes[LED_SCENE_WIFI_CONFIG].mode = LED_MODE_BREATH;
+    saved.led.scenes[LED_SCENE_WIFI_CONFIG].color = LED_COLOR_CYAN;
+
+    char json[768];
+    size_t n = config_store_serialize(&saved, json, sizeof(json));
+    CHECK(n > 0, "网页保存配置可序列化");
+    CHECK(strstr(json, "\"power\":345") != NULL, "网页保存 JSON 含功率");
+    CHECK(strstr(json, "\"has_user_hr\":1") != NULL, "网页保存 JSON 含固定心率锁定");
+    CHECK(strstr(json, "\"custom_wkg_low\":31") != NULL, "网页保存 JSON 含自定义 W/kg 下限");
+    CHECK(strstr(json, "\"led_silent\":1") != NULL, "网页保存 JSON 含 LED 静默");
+
+    config_data_t loaded;
+    CHECK(config_store_deserialize(json, &loaded), "网页保存 JSON 可反序列化");
+    CHECK(loaded.power == 345 && loaded.cadence == 96, "网页保存后功率/踏频持久化一致");
+    CHECK(loaded.has_user_hr == 1 && loaded.heartrate == 166, "网页保存后固定心率持久化一致");
+    CHECK(loaded.power_float == 18 && loaded.cadence_float == 9 && loaded.hr_float == 7,
+          "网页保存后浮动幅度持久化一致");
+    CHECK(loaded.power_step == 35, "网页保存后按钮步进持久化一致");
+    CHECK(loaded.weight == 82 && loaded.ftp == 280 && loaded.thr_hr == 188,
+          "网页保存后用户资料持久化一致");
+    CHECK(loaded.ride_type == PACER_INDEX_CUSTOM && loaded.custom_wkg_low == 31 && loaded.custom_wkg_high == 37,
+          "网页保存后自定义配速档持久化一致");
+    CHECK(strcmp(loaded.custom_pacer_name, "冲刺档") == 0, "网页保存后自定义配速昵称持久化一致");
+    CHECK(strcmp(loaded.device_name, "BikePower-Web") == 0, "网页保存后设备名持久化一致");
+    CHECK(loaded.led.silent == 1, "网页保存后 LED 静默持久化一致");
+
+    power_engine_t e;
+    power_engine_init(&e);
+    CHECK(power_engine_set_power(&e, loaded.power), "持久化功率可恢复到引擎");
+    CHECK(power_engine_set_cadence(&e, loaded.cadence), "持久化踏频可恢复到引擎");
+    CHECK(power_engine_set_heartrate(&e, loaded.heartrate), "持久化固定心率可恢复到引擎");
+    CHECK(power_engine_set_power_float(&e, loaded.power_float), "持久化功率浮动可恢复到引擎");
+    CHECK(power_engine_set_cadence_float(&e, loaded.cadence_float), "持久化踏频浮动可恢复到引擎");
+    CHECK(power_engine_set_hr_float(&e, loaded.hr_float), "持久化心率浮动可恢复到引擎");
+    CHECK(power_engine_set_power_step(&e, loaded.power_step), "持久化按钮步进可恢复到引擎");
+    CHECK(profile_set_weight(&e.profile, loaded.weight), "持久化体重可恢复到引擎");
+    CHECK(profile_set_ftp(&e.profile, loaded.ftp), "持久化 FTP 可恢复到引擎");
+    CHECK(profile_set_thr_hr(&e.profile, loaded.thr_hr), "持久化阈值心率可恢复到引擎");
+    CHECK(power_engine_set_pacer_index(&e, loaded.ride_type), "持久化配速档可恢复到引擎");
+    CHECK(profile_set_custom_wkg(&e.profile, loaded.custom_wkg_low, loaded.custom_wkg_high),
+          "持久化自定义 W/kg 可恢复到引擎");
+    CHECK(profile_set_custom_name(&e.profile, loaded.custom_pacer_name),
+          "持久化自定义昵称可恢复到引擎");
+    CHECK(power_engine_set_device_name(&e, loaded.device_name), "持久化设备名可恢复到引擎");
+
+    CHECK(e.base_power == 345 && e.cadence_base == 96, "恢复后引擎功率/踏频生效");
+    CHECK(e.has_user_hr && e.user_heartrate == 166, "恢复后引擎固定心率生效");
+    CHECK(e.power_float == 18 && e.cadence_float == 9 && e.hr_float == 7,
+          "恢复后引擎浮动幅度生效");
+    CHECK(e.power_step == 35, "恢复后按钮步进生效");
+    CHECK(strcmp(power_engine_get_current_pacer(&e), "冲刺档") == 0, "恢复后自定义配速昵称生效");
+}
+
 static void test_engine_blindspots(void)
 {
     printf("[test] 引擎/档案 盲区补强\n");
@@ -930,6 +1138,10 @@ int main(void)
     test_road_pacer();
     test_steady_snapshot();
     test_float_setters();
+    test_button_operation_scenario();
+    test_random_power_hr_following_scenario();
+    test_float_effect_scenario();
+    test_web_config_persistence_scenario();
     test_engine_blindspots();
     test_config_store();
     test_json_miniparse();

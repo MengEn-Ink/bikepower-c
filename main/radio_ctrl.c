@@ -19,6 +19,7 @@
 #include "lwip/ip4_addr.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <stdio.h>
 #include <string.h>
 
 static const char *TAG = "RADIO";
@@ -35,6 +36,29 @@ static const char s_portal_uri[] = "http://" CAPTIVE_PORTAL_HOST CAPTIVE_PORTAL_
 
 // 前向声明：stop_wifi_ap 在 start_wifi_ap 失败时被复用做统一回滚
 void radio_ctrl_stop_wifi_ap(void);
+
+static esp_err_t build_softap_ssid(char *ap_ssid, size_t ap_ssid_size)
+{
+    uint8_t mac[6] = { 0 };
+    esp_err_t ret = esp_wifi_get_mac(WIFI_IF_AP, mac);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "读取 SoftAP MAC 失败 ret=%d", ret);
+        return ret;
+    }
+
+    int written = snprintf(ap_ssid,
+                           ap_ssid_size,
+                           "%s-%02X%02X%02X",
+                           WIFI_SSID_PREFIX,
+                           mac[3],
+                           mac[4],
+                           mac[5]);
+    if (written < 0 || (size_t)written >= ap_ssid_size) {
+        ESP_LOGE(TAG, "生成 SoftAP SSID 失败 len=%d cap=%u", written, (unsigned)ap_ssid_size);
+        return ESP_ERR_INVALID_SIZE;
+    }
+    return ESP_OK;
+}
 
 static void configure_captive_portal_dhcp(void)
 {
@@ -139,19 +163,25 @@ esp_err_t radio_ctrl_start_wifi_ap(void)
     }
     s_wifi_inited = true;
 
-    wifi_config_t ap_cfg = { 0 };
-    strncpy((char *)ap_cfg.ap.ssid, WIFI_SSID, sizeof(ap_cfg.ap.ssid));
-    ap_cfg.ap.ssid_len = strlen(WIFI_SSID);
-    strncpy((char *)ap_cfg.ap.password, WIFI_PASSWORD, sizeof(ap_cfg.ap.password));
-    ap_cfg.ap.channel = WIFI_AP_CHANNEL;
-    ap_cfg.ap.max_connection = WIFI_MAX_STA_CONN;
-    ap_cfg.ap.authmode = WIFI_AUTH_WPA2_PSK;
-
     ret = esp_wifi_set_mode(WIFI_MODE_AP);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_wifi_set_mode 失败 ret=%d", ret);
         goto fail;
     }
+
+    wifi_config_t ap_cfg = { 0 };
+    char ap_ssid[sizeof(ap_cfg.ap.ssid)] = { 0 };
+    ret = build_softap_ssid(ap_ssid, sizeof(ap_ssid));
+    if (ret != ESP_OK) {
+        goto fail;
+    }
+
+    strncpy((char *)ap_cfg.ap.ssid, ap_ssid, sizeof(ap_cfg.ap.ssid));
+    ap_cfg.ap.ssid_len = strlen(ap_ssid);
+    strncpy((char *)ap_cfg.ap.password, WIFI_PASSWORD, sizeof(ap_cfg.ap.password));
+    ap_cfg.ap.channel = WIFI_AP_CHANNEL;
+    ap_cfg.ap.max_connection = WIFI_MAX_STA_CONN;
+    ap_cfg.ap.authmode = WIFI_AUTH_WPA2_PSK;
 
     ret = esp_wifi_set_config(WIFI_IF_AP, &ap_cfg);
     if (ret != ESP_OK) {
@@ -165,7 +195,7 @@ esp_err_t radio_ctrl_start_wifi_ap(void)
         goto fail;
     }
 
-    ESP_LOGI(TAG, "SoftAP 启动 ssid=%s ip=192.168.4.1（BLE 共存）堆=%lu", WIFI_SSID, (unsigned long)esp_get_free_heap_size());
+    ESP_LOGI(TAG, "SoftAP 启动 ssid=%s ip=192.168.4.1（BLE 共存）堆=%lu", ap_ssid, (unsigned long)esp_get_free_heap_size());
     return ESP_OK;
 
 fail:

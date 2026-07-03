@@ -142,6 +142,8 @@ required_assets = [
     "docs/dev/03-test-coverage-analysis.md",
     "docs/archive/01-cidf-nimble-rewrite.md",
     "docs/archive/02-micropython-vs-c-comparison.md",
+    "scripts/tools/generate_release_docs.py",
+    "scripts/tools/publish_gitee_release.py",
     "main/app_main.c",
     "main/ble_bikepower.c",
     "main/wifi_portal.c",
@@ -152,6 +154,8 @@ required_assets = [
     "tests/ble_selftest.py",
     "tests/stage3_conn_test.py",
     "tests/stage5_portal_test.py",
+    "tests/test_portal_config_save.py",
+    "tests/test_core_flow_endurance.py",
     "tests/serial_capture.py",
 ]
 for d in required_assets:
