@@ -163,27 +163,56 @@
             <button class="icon-btn cancel" id="device-name-cancel" onclick="onDeviceNameCancel()" aria-label="取消编辑">×</button>
           </div>
         </div>
-        <div class="info-row version-row"><span class="k">固件版本</span><span class="v version-full" id="settings-version"></span></div>
+        <div class="info-row version-row"><span class="k">固件版本</span><span class="v"><span class="version-short" id="settings-version"></span><span class="version-full" id="settings-version-full"></span></span></div>
         <div class="note">设备名称会作为 BLE 广播名显示在骑行 App 中，建议保持简短易识别。</div>
       </div>
 
-      <div class="card collapsible-card" id="settings-template-card">
-        <button class="collapse-head" onclick="toggleCollapse('settings-template-card')" aria-label="展开或收起设备信息模板库">
-          <span><span class="collapse-ico tpl"></span>设备信息模板库 <small id="template-count">0/5</small></span><span class="chev">⌄</span>
-        </button>
-        <div class="collapse-body">
-          <div class="note">保存附近蓝牙设备的名称、厂商、型号和版本；后续可一键应用为本设备身份。</div>
-          <button class="btn alt" id="template-scan-btn" onclick="onTemplateScan()">扫描附近蓝牙设备</button>
-          <div class="note warn" id="template-scan-note" style="display:none"></div>
-          <div class="template-list" id="template-list"></div>
-        </div>
-      </div>
+      <div class="card applied-template-card" id="settings-applied-template-card" style="display:none"></div>
 
-      <div class="card collapsible-card collapsed" id="settings-button-card">
-        <button class="collapse-head" onclick="toggleCollapse('settings-button-card')" aria-label="展开或收起物理按钮配置">
-          <span><span class="collapse-ico">●</span>物理按钮</span><span class="chev">⌄</span>
+      <div class="card settings-menu-card" id="settings-menu">
+        <h2>设备扩展设置</h2>
+        <button class="settings-menu-row" onclick="onSettingsPanel('templates')">
+          <span class="settings-menu-icon tpl">📋</span>
+          <span class="settings-menu-title">设备模板</span>
+          <span class="settings-menu-sub">扫描 / 复制</span>
+          <span class="settings-menu-arrow">›</span>
         </button>
-        <div class="collapse-body">
+        <button class="settings-menu-row" onclick="onSettingsPanel('button')">
+          <span class="settings-menu-icon btnico">●</span>
+          <span class="settings-menu-title">物理按钮</span>
+          <span class="settings-menu-sub">调功步进</span>
+          <span class="settings-menu-arrow">›</span>
+        </button>
+        <button class="settings-menu-row" onclick="onSettingsPanel('led')">
+          <span class="settings-menu-icon led">✦</span>
+          <span class="settings-menu-title">LED 指示</span>
+          <span class="settings-menu-sub">颜色 / 灯效</span>
+          <span class="settings-menu-arrow">›</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-panel settings-subpage" id="settings-templates">
+      <div class="subpage-head">
+        <button class="subpage-back" onclick="settingsSubpageBack()">‹</button>
+        <div><h2>设备模板</h2><div class="sub">扫描附近骑行设备，保存并复制完整设备信息。</div></div>
+      </div>
+      <div class="card">
+        <div class="template-page-title"><span>模板库</span><small id="template-count">0/5</small></div>
+        <div class="note">保存附近蓝牙设备的名称、厂商、型号和版本；后续可一键应用为本设备身份。</div>
+        <button class="btn alt" id="template-scan-btn" onclick="onTemplateScan()">扫描附近蓝牙设备</button>
+        <div class="note warn" id="template-scan-note" style="display:none"></div>
+        <div class="template-list" id="template-list"></div>
+      </div>
+    </div>
+
+    <div class="settings-panel settings-subpage" id="settings-button">
+      <div class="subpage-head">
+        <button class="subpage-back" onclick="settingsSubpageBack()">‹</button>
+        <div><h2>物理按钮</h2><div class="sub">设置设备按钮的单次调功幅度。</div></div>
+      </div>
+      <div class="card">
+        <h2>调功步进</h2>
           <div class="float-row">
             <span class="float-lbl">调功步进</span>
             <button class="fbtn" onclick="onFloatAdj('pstep',-1)">−</button>
@@ -191,14 +220,16 @@
             <button class="fbtn" onclick="onFloatAdj('pstep',1)">+</button>
           </div>
           <div class="note">短按降低目标功率，长按连续升高；该步进只影响固定模式。</div>
-        </div>
       </div>
+    </div>
 
-      <div class="card collapsible-card collapsed" id="settings-led-card">
-        <button class="collapse-head" onclick="toggleCollapse('settings-led-card')" aria-label="展开或收起 LED 指示灯配置">
-          <span><span class="collapse-ico led"></span>LED 指示灯</span><span class="chev">⌄</span>
-        </button>
-        <div class="collapse-body">
+    <div class="settings-panel settings-subpage" id="settings-led">
+      <div class="subpage-head">
+        <button class="subpage-back" onclick="settingsSubpageBack()">‹</button>
+        <div><h2>LED 指示</h2><div class="sub">设置不同运行状态下的灯效和颜色。</div></div>
+      </div>
+      <div class="card">
+        <h2>指示灯模式</h2>
           <label class="check-line">
             <input type="checkbox" id="settings-led-silent">
             <span>静默模式：除异常外关闭指示灯</span>
@@ -306,7 +337,6 @@
           </div>
           </div>
           <div class="note">普通单色 LED 仅使用亮灭节奏；RGB 板会同时应用颜色与呼吸效果。</div>
-        </div>
       </div>
     </div>
 

@@ -20,9 +20,11 @@
 - `main/ble_scanner.c`、`main/web/app.js`：扫描结果排除未命名 BLE 设备，只展示带 alias/device_name/adv_name 的设备，避免用户误点不可识别广播。
 - `components/bikepower_domain/device_template.c/.h`、`main/ble_scanner.c`、`main/web/app.js`：扫描结果进一步限定为包含 CPS 功率、CSC 踏频、HRS 心率或 FTMS 智能骑行台服务的设备；前端保留同样过滤兜底。
 - `main/web/app.js`、`main/web/app.css`：扫描结果名称行右侧新增功率/踏频/心率/FTMS 小型圆角图标标签，单设备多服务时并排显示多个标签。
+- `components/bikepower_domain/device_template.c`、`main/ble_scanner.c`、`main/web/app.js`：按 MAC 地址和设备名称合并重复模板/扫描广播，避免同一设备因广播包字段不完整产生重复项，并合并服务标记与版本信息。
+- `main/web/`：模板库改为设置页子页面，已保存模板与已复制设备信息默认紧凑收起，点击后展开厂商、型号、版本、地址和服务详情；复制后的设备信息只在设置页设备信息分区展示。
 - `components/bikepower_domain/device_template.c/.h`：新增 BLE 地址格式化和标准服务 UUID 到模板服务标记的映射辅助函数。
 - `sdkconfig.defaults` / `sdkconfig`：启用 NimBLE Central/Observer 角色，并把连接数提升到 2，为“本设备作为 Peripheral + 临时连接外部设备”预留连接资源。
-- 验证：`make -C test && test/test_domain` 1369 通过 0 失败；`python3 tests/check_portal_js.py`、`python3 tests/check_portal_structure.py`、`python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 -m py_compile tests/mock_server.py` 通过；`python3 tests/stage5_portal_test.py --ip 127.0.0.1 --port 18082` mock 自测 8/8 通过；`idf.py build` 通过，app 分区剩余 72%；mock 本地服务返回 4 个扫描项（含 1 个非骑行服务设备），网页端仅展示 3 个骑行服务设备。
+- 验证：`make -C test && test/test_domain` 1377 通过 0 失败；`python3 tests/check_portal_js.py`、`python3 tests/check_portal_structure.py`、`python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 tests/check_tasks_wdt.py`、`python3 tests/check_board_desc.py`、`python3 -m py_compile tests/mock_server.py tests/ble_selftest.py tests/stage3_conn_test.py` 通过；`python3 tests/stage5_portal_test.py --ip 127.0.0.1 --port 18084` mock 自测 8/8 通过；`idf.py build` 通过，app 分区剩余 72%；`scripts/flash_latest.sh --no-checks --capture-seconds 25` 烧录到 `/dev/cu.usbmodem101` 通过，启动日志无 panic/WDT/Backtrace；`python3 tests/ble_selftest.py` 真机通过；`python3 tests/stage3_conn_test.py` 真机通过。
 
 ### Captive Portal 自动弹窗
 - `main/wifi_portal.c`：注册 HTTP 404 兜底 handler，未知系统探测路径统一重定向到首页，覆盖 Chrome/Chromium 等新路径和系统探测路径变化，避免只注册固定 10 个 URI 导致多次连接后不弹窗。
@@ -53,6 +55,7 @@
 - 设备名称编辑从关于页挪入“设置 → 设备信息”，与固件版本同组展示；“用户资料”保留体重、FTP、阈值心率和物理按钮调功步进。
 - 首页进一步压缩卡片、输入、步进器和分段控件高度，减少固定模式首屏滚动压力。
 - `tests/check_portal_structure.py` 增加前端信息架构静态检查，锁定 2 Tab 和设置页三分区结构。
+- `main/web/`：设备扩展设置从折叠卡片改为菜单入口 + 子页面，物理按钮、LED 指示和设备模板独立进入，减少设备信息页首屏拥挤；设置页底部操作区加大留白避免遮挡子页面内容。
 
 ### 新增（自定义配速档位）
 - 在 5 个预设配速机器人（coco/yumi/jacques/genie/constance）外新增第 6 档「自定义」（id=custom，index=5）：用户可自填 W/kg 下限+上限（1.0~7.0，每档 0.1），road 模式按 `weight × 自定义W/kg` 输出功率。

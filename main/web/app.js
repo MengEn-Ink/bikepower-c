@@ -6,6 +6,8 @@ var STATE = {
   device_name: "",
   firmware_version: "",
   firmware_name: "",
+  board: "",
+  git_sha: "",
   power: 0, cadence: 0, heartrate: 0,
   mode: "steady",
   power_float: 5, cadence_float: 2, hr_float: 2,
@@ -28,10 +30,13 @@ var STATE = {
   templates: [],
   templates_max: 5,
   template_delete_arm: -1,
+  template_expanded: {},
   scanning: false,
   scan_devices: [],
   scan_timer: null,
-  pending_template: null
+  pending_template: null,
+  applied_template: null,
+  applied_template_expanded: false
 };
 
 /* 浮动幅度/步进范围（与 domain_config.h 一致；step 为单次加减量，默认 1） */
@@ -171,6 +176,12 @@ function withLedConfig(body) {
 var ROUTES = {
   "/home": renderHome,
   "/settings": renderSettings,
+  "/settings/profile": renderSettings,
+  "/settings/device": renderSettings,
+  "/settings/templates": renderSettings,
+  "/settings/button": renderSettings,
+  "/settings/led": renderSettings,
+  "/settings/about": renderSettings,
   "/closing": renderClosing,
   "/success": renderSuccess
 };
@@ -199,12 +210,12 @@ function route() {
   if (!ROUTES[hash]) hash = "/home";
   var views = document.querySelectorAll(".view");
   for (var i = 0; i < views.length; i++) views[i].classList.remove("active");
-  var v = $("view" + hash.replace("/", "-"));
+  var v = hash.indexOf("/settings") === 0 ? $("view-settings") : $("view" + hash.replace("/", "-"));
   if (v) v.classList.add("active");
   var items = document.querySelectorAll(".nav-item");
   for (var j = 0; j < items.length; j++) {
     var h = items[j].getAttribute("data-h");
-    items[j].classList.toggle("on", h === hash);
+    items[j].classList.toggle("on", h === hash || (h === "/settings" && hash.indexOf("/settings") === 0));
   }
   ROUTES[hash]();
   window.scrollTo(0, 0);
@@ -236,8 +247,34 @@ function captureDraft() {
 function firmwareLabel() {
   return STATE.firmware_name || ("v" + STATE.firmware_version);
 }
+function firmwareShortLabel() {
+  var full = firmwareLabel();
+  var board = STATE.board || "";
+  if (!board && full) {
+    var mBoard = full.match(/^([a-z0-9]+(?:-[a-z0-9]+)*?)-v\d/i);
+    if (mBoard) board = mBoard[1];
+  }
+  var ver = STATE.firmware_version ? ("v" + STATE.firmware_version.replace(/^v/, "")) : "";
+  if (!ver && full) {
+    var mVer = full.match(/v\d+\.\d+\.\d+/i);
+    if (mVer) ver = mVer[0];
+  }
+  var git = STATE.git_sha || "";
+  if (!git && full) {
+    var mGit = full.match(/-g([0-9a-f]{6,12})/i);
+    if (mGit) git = "g" + mGit[1];
+  } else if (git && git.charAt(0) !== "g") {
+    git = "g" + git;
+  }
+  var parts = [];
+  if (board) parts.push(board);
+  if (ver) parts.push(ver);
+  if (git) parts.push(git);
+  return parts.length ? parts.join(" · ") : full;
+}
 function renderHome() {
-  $("home-ver").textContent = firmwareLabel();
+  $("home-ver").textContent = firmwareShortLabel();
+  $("home-ver").title = firmwareLabel();
   $("home-power").value = STATE.power;
   $("home-cadence").value = STATE.cadence;
   $("home-hr").value = STATE.heartrate;
@@ -248,6 +285,68 @@ function renderHome() {
   updateZoneBadges();
   renderPacerSel();
   applyModeView();
+}
+function templateIdentityKey(t) {
+  if (!t) return "";
+  if (t.addr) return "addr:" + String(t.addr_type || 0) + ":" + String(t.addr).toUpperCase();
+  var name = t.device_name || t.adv_name || t.alias || "";
+  return name ? ("name:" + String(name).toLowerCase()) : "";
+}
+function findByTemplateIdentity(items, t) {
+  var key = templateIdentityKey(t);
+  if (!key) return -1;
+  for (var i = 0; i < items.length; i++) {
+    if (templateIdentityKey(items[i]) === key) return i;
+  }
+  return -1;
+}
+function filterUniqueDevices(items) {
+  var out = [];
+  items = items || [];
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var idx = findByTemplateIdentity(out, it);
+    if (idx < 0) {
+      out.push(it);
+    } else {
+      out[idx].service_flags = (out[idx].service_flags || 0) | (it.service_flags || 0);
+      if (!out[idx].adv_name && it.adv_name) out[idx].adv_name = it.adv_name;
+      if (!out[idx].device_name && it.device_name) out[idx].device_name = it.device_name;
+      if (!out[idx].alias && it.alias) out[idx].alias = it.alias;
+      if ((it.last_rssi || 0) > (out[idx].last_rssi || -127)) out[idx].last_rssi = it.last_rssi;
+    }
+  }
+  return out;
+}
+function copyTemplateToState(t) {
+  if (!t) return null;
+  var copy = {};
+  var keys = ["id", "alias", "adv_name", "device_name", "manufacturer", "model", "firmware", "hardware", "software", "addr", "addr_type", "last_rssi", "service_flags"];
+  for (var i = 0; i < keys.length; i++) copy[keys[i]] = t[keys[i]];
+  STATE.applied_template = copy;
+  STATE.applied_template_expanded = false;
+  STATE.device_name = copy.device_name || copy.adv_name || copy.alias || STATE.device_name;
+  return copy;
+}
+function renderAppliedTemplate() {
+  var box = $("settings-applied-template-card");
+  if (!box) return;
+  var t = STATE.applied_template;
+  if (!t) {
+    box.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+  var expanded = !!STATE.applied_template_expanded;
+  var html = '<button class="applied-compact-head" onclick="onAppliedTemplateToggle()"><div><div class="applied-label">已复制模板设备信息</div><div class="applied-name">' + escapeHtml(templateTitle(t)) + '</div></div><div class="svc-badges">' + serviceBadges(t.service_flags) + '</div><span class="chev">⌄</span></button>';
+  if (expanded) html += '<div class="template-detail-grid applied-detail-grid">' + templateDetailCells(t) + '</div>';
+  box.className = "card applied-template-card" + (expanded ? " applied-template-expanded" : " applied-template-collapsed");
+  box.innerHTML = html;
+  box.style.display = "block";
+}
+function onAppliedTemplateToggle() {
+  STATE.applied_template_expanded = !STATE.applied_template_expanded;
+  renderAppliedTemplate();
 }
 /* 按当前 mode 显示固定/机器人区块与分段选中态 */
 function applyModeView() {
@@ -481,16 +580,22 @@ function onCloseWifi() {
 
 /* ============ 设置 ============ */
 function renderSettings() {
-  $("home-ver").textContent = firmwareLabel();
+  syncSettingsPanelFromRoute();
+  $("home-ver").textContent = firmwareShortLabel();
+  $("home-ver").title = firmwareLabel();
   $("settings-weight").value = STATE.profile_weight;
   $("settings-ftp").value = STATE.profile_ftp;
   $("settings-thr").value = STATE.profile_thr_hr;
   applyDeviceNameView();
-  $("settings-version").textContent = firmwareLabel();
+  $("settings-version").textContent = firmwareShortLabel();
+  $("settings-version").title = firmwareLabel();
+  var fullVer = $("settings-version-full");
+  if (fullVer) fullVer.textContent = firmwareLabel();
   var ps = $("float-pstep");
   if (ps) ps.textContent = STATE.power_step;
   renderLedControls();
-  if (STATE.settings_panel === "device") loadTemplates();
+  renderAppliedTemplate();
+  if (STATE.settings_panel === "templates") loadTemplates();
   else renderTemplates();
   applySettingsPanel();
 }
@@ -538,7 +643,7 @@ function filterRideDevices(items) {
   for (var i = 0; i < items.length; i++) {
     if (hasRideService(items[i].service_flags)) out.push(items[i]);
   }
-  return out;
+  return filterUniqueDevices(out);
 }
 function serviceBadges(flags) {
   var html = "";
@@ -555,6 +660,25 @@ function templateSubtitle(t) {
   if (t.model) parts.push(t.model);
   if (t.firmware) parts.push("固件 " + t.firmware);
   return parts.length ? parts.join(" · ") : "暂无厂商/型号/版本信息";
+}
+function templateDetailCells(t) {
+  var rows = [
+    ["设备名", t.device_name || t.adv_name || "—"],
+    ["别名", t.alias || "—"],
+    ["MAC", t.addr || "—"],
+    ["厂商", t.manufacturer || "—"],
+    ["型号", t.model || "—"],
+    ["固件", t.firmware || "—"],
+    ["硬件", t.hardware || "—"],
+    ["软件", t.software || "—"],
+    ["服务", serviceSummary(t.service_flags).replace(/^服务：/, "")],
+    ["RSSI", (t.last_rssi != null ? String(t.last_rssi) + " dBm" : "—")]
+  ];
+  var html = "";
+  for (var i = 0; i < rows.length; i++) {
+    html += '<div class="template-detail-cell"><span>' + escapeHtml(rows[i][0]) + '</span><b>' + escapeHtml(rows[i][1]) + '</b></div>';
+  }
+  return html;
 }
 function renderTemplates() {
   var count = $("template-count");
@@ -591,15 +715,22 @@ function renderTemplates() {
   if (html) html += '<div class="template-section-title">已保存模板</div>';
   for (var i = 0; i < STATE.templates.length; i++) {
     var t = STATE.templates[i];
-    html += '<div class="template-item">';
-    html += '<div class="template-main"><div class="template-title">' + escapeHtml(templateTitle(t)) + '</div>';
-    html += '<div class="template-sub">' + escapeHtml(templateSubtitle(t)) + '</div>';
-    html += '<div class="template-meta">地址 ' + escapeHtml(t.addr || "—") + ' · RSSI ' + escapeHtml(t.last_rssi != null ? String(t.last_rssi) : "—") + ' dBm</div></div>';
-    html += '<div class="template-actions"><button class="mini-btn primary" onclick="onTemplateApply(' + t.id + ')">应用到本设备</button>';
-    html += '<button class="mini-btn danger" onclick="onTemplateDelete(' + t.id + ')">' + (STATE.template_delete_arm === t.id ? '确认删除' : '删除') + '</button></div>';
+    var expanded = !!STATE.template_expanded[t.id];
+    html += '<div class="template-item template-saved' + (expanded ? ' template-expanded' : '') + '">';
+    html += '<button class="template-compact-head" onclick="onTemplateToggle(' + t.id + ')"><div class="template-title-row"><div class="template-title">' + escapeHtml(templateTitle(t)) + '</div><div class="svc-badges">' + serviceBadges(t.service_flags) + '</div></div><span class="chev">⌄</span></button>';
+    if (expanded) {
+      html += '<div class="template-sub">' + escapeHtml(templateSubtitle(t)) + '</div>';
+      html += '<div class="template-detail-grid">' + templateDetailCells(t) + '</div>';
+      html += '<div class="template-actions"><button class="mini-btn primary" onclick="onTemplateApply(' + t.id + ')">复制到本设备</button>';
+      html += '<button class="mini-btn danger" onclick="onTemplateDelete(' + t.id + ')">' + (STATE.template_delete_arm === t.id ? '确认删除' : '删除') + '</button></div>';
+    }
     html += '</div>';
   }
   box.innerHTML = html;
+}
+function onTemplateToggle(id) {
+  STATE.template_expanded[id] = !STATE.template_expanded[id];
+  renderTemplates();
 }
 function serviceSummary(flags) {
   var parts = [];
@@ -702,13 +833,23 @@ function onTemplateCancelPending() {
   renderTemplates();
 }
 function onTemplateApply(id) {
+  var tpl = null;
+  for (var i = 0; i < STATE.templates.length; i++) {
+    if (STATE.templates[i].id === id) {
+      tpl = STATE.templates[i];
+      break;
+    }
+  }
   api("/api/device-templates/apply", "POST", { id: id }, function (status, data) {
     if (status === 200 && data && data.ok) {
-      toast("模板已应用，设备名称已更新");
+      copyTemplateToState(tpl);
+      renderAppliedTemplate();
+      toast("模板设备信息已复制");
       api("/api/state", "GET", null, function (s, st) {
         if (s === 200 && st) {
           STATE.device_name = st.device_name || STATE.device_name;
           applyDeviceNameView();
+          renderAppliedTemplate();
         }
       });
     } else {
@@ -770,29 +911,45 @@ function onDeviceNameCancel() {
   STATE.device_name_editing = false;
   applyDeviceNameView();
 }
-function toggleCollapse(id) {
-  var card = $(id);
-  if (!card) return;
-  card.classList.toggle("collapsed");
+function isSettingsPanel(panel) {
+  return panel === "profile" || panel === "device" || panel === "templates" || panel === "button" || panel === "led" || panel === "about";
+}
+function syncSettingsPanelFromRoute() {
+  var hash = location.hash.replace(/^#/, "");
+  if (hash.charAt(0) !== "/") hash = "/" + hash;
+  var prefix = "/settings/";
+  if (hash.indexOf(prefix) === 0) {
+    var panel = hash.slice(prefix.length);
+    if (isSettingsPanel(panel)) STATE.settings_panel = panel;
+  } else if (hash === "/settings" && !isSettingsPanel(STATE.settings_panel)) {
+    STATE.settings_panel = "profile";
+  }
+}
+function settingsSubpageBack() {
+  onSettingsPanel("device");
 }
 function onSettingsPanel(panel) {
   captureDraft();
-  if (panel !== "profile" && panel !== "device" && panel !== "about") panel = "profile";
+  if (!isSettingsPanel(panel)) panel = "profile";
   STATE.settings_panel = panel;
-  applySettingsPanel();
+  go(panel === "profile" ? "/settings" : ("/settings/" + panel));
 }
 function applySettingsPanel() {
+  var active = STATE.settings_panel;
+  var tabPanel = (active === "templates" || active === "button" || active === "led") ? "device" : active;
   var tabs = document.querySelectorAll(".settings-tab");
   for (var i = 0; i < tabs.length; i++) {
     var p = tabs[i].getAttribute("data-panel");
-    tabs[i].classList.toggle("on", p === STATE.settings_panel);
+    tabs[i].classList.toggle("on", p === tabPanel);
   }
   var panels = document.querySelectorAll(".settings-panel");
   for (var j = 0; j < panels.length; j++) {
-    panels[j].classList.toggle("on", panels[j].id === "settings-" + STATE.settings_panel);
+    panels[j].classList.toggle("on", panels[j].id === "settings-" + active);
   }
   var save = $("settings-save");
-  if (save) save.style.display = STATE.settings_panel === "about" ? "none" : "block";
+  var actions = document.querySelector(".settings-actions");
+  if (actions) actions.style.display = active === "templates" ? "none" : "flex";
+  if (save) save.style.display = active === "about" || active === "templates" ? "none" : "block";
 }
 function onSettingsSave() {
   var btn = $("settings-save");
@@ -928,6 +1085,8 @@ function init() {
       STATE.device_name = data.device_name || "BikePower";
       STATE.firmware_version = data.firmware_version || "";
       STATE.firmware_name = data.firmware_name || "";
+      STATE.board = data.board || "";
+      STATE.git_sha = data.git_sha || "";
       STATE.power = data.power || 0;
       STATE.cadence = data.cadence || 0;
       STATE.heartrate = data.heartrate || 0;
