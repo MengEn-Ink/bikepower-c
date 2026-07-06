@@ -35,6 +35,7 @@ typedef struct {
     led_config_t led;   // LED 场景灯效配置
     int sport_profile;  // sport_profile_t
     int run_speed_x100; // 跑步速度，km/h * 100
+    int run_pace_float_sec; // 跑步配速浮动，±秒/km
     int run_cadence;    // 跑步步频，steps/min
     int run_incline_x10;// 跑步坡度，% * 10
     char device_name[DEVICE_NAME_MAX];  // BLE 广播名

@@ -29,6 +29,9 @@
 #define RUN_SPEED_X100_MIN     300     // 3.00 km/h
 #define RUN_SPEED_X100_MAX     2500    // 25.00 km/h
 #define RUN_SPEED_X100_DEFAULT 1000    // 10.00 km/h
+#define RUN_PACE_FLOAT_SEC_MIN 0       // ±秒/km
+#define RUN_PACE_FLOAT_SEC_MAX 60
+#define RUN_PACE_FLOAT_SEC_DEFAULT 10
 #define RUN_CADENCE_MIN        120     // steps/min
 #define RUN_CADENCE_MAX        220
 #define RUN_CADENCE_DEFAULT    170
@@ -37,8 +40,8 @@
 #define RUN_INCLINE_X10_DEFAULT 0
 
 // ===== 配置格式版本 =====
-// v6：新增运动 profile 与跑步模式速度/步频/坡度持久化。
-#define CONFIG_VERSION        6
+// v7：新增跑步配速浮动秒数持久化。
+#define CONFIG_VERSION        7
 
 // ===== 设备名称（BLE 广播名，可配网修改并持久化） =====
 #define DEVICE_NAME_MAX       24

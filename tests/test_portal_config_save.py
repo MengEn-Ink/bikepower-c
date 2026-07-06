@@ -82,6 +82,7 @@ def main():
             "cadence_float": 9,
             "hr_float": 7,
             "power_step": 35,
+            "run_pace_float_sec": 15,
             "profile_weight": 82,
             "profile_ftp": 280,
             "profile_thr_hr": 188,

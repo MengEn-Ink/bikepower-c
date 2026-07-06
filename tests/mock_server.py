@@ -42,6 +42,7 @@ MOCK_STATE = {
     "cadence": 80,
     "heartrate": 130,
     "run_speed_x100": 1000,
+    "run_pace_float_sec": 10,
     "run_cadence": 170,
     "run_incline_x10": 0,
     "mode": "steady",
@@ -251,7 +252,8 @@ class Handler(BaseHTTPRequestHandler):
                 data = {}
             with LOCK:
                 for k in ("device_name", "sport_profile", "mode", "power", "cadence",
-                          "heartrate", "run_speed_x100", "run_cadence", "run_incline_x10",
+                          "heartrate", "run_speed_x100", "run_pace_float_sec",
+                          "run_cadence", "run_incline_x10",
                           "power_float", "cadence_float", "hr_float",
                           "power_step",
                           "profile_weight", "profile_ftp",

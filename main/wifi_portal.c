@@ -317,6 +317,12 @@ static bool apply_json_fields(power_engine_t *e, const char *body, bool allow_sp
     if (old_val != e->running.speed_x100_kmh)
         ESP_LOGI(TAG, "  run_speed_x100: %d → %d", old_val, e->running.speed_x100_kmh);
 
+    old_val = e->running.pace_float_sec;
+    new_val = json_get_int_def(body, "run_pace_float_sec", old_val);
+    power_engine_set_run_pace_float(e, new_val);
+    if (old_val != e->running.pace_float_sec)
+        ESP_LOGI(TAG, "  run_pace_float_sec: %d → %d", old_val, e->running.pace_float_sec);
+
     old_val = e->running.cadence_spm;
     new_val = json_get_int_def(body, "run_cadence", old_val);
     power_engine_set_run_cadence(e, new_val);
@@ -459,7 +465,8 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"board\":\"%s\",\"stable_version\":\"%s\",\"fix_version\":\"%s\",\"git_sha\":\"%s\","
         "\"sport_profile\":\"%s\","
         "\"power\":%d,\"cadence\":%d,\"heartrate\":%d,\"mode\":\"%s\","
-        "\"run_speed_x100\":%d,\"run_cadence\":%d,\"run_incline_x10\":%d,"
+        "\"run_speed_x100\":%d,\"run_pace_float_sec\":%d,"
+        "\"run_cadence\":%d,\"run_incline_x10\":%d,"
         "\"power_float\":%d,\"cadence_float\":%d,\"hr_float\":%d,"
         "\"power_step\":%d,"
         "\"profile_weight\":%d,\"profile_ftp\":%d,\"profile_thr_hr\":%d,"
@@ -478,7 +485,8 @@ static esp_err_t h_api_state(httpd_req_t *req)
         board_get_desc()->name, FIRMWARE_STABLE_VERSION, FIRMWARE_FIX_VERSION, BIKEPOWER_GIT_SHA,
         sport_to_id((int)e->sport_profile),
         e->base_power, e->cadence_base, e->last_heartrate, mode_to_id((int)e->mode),
-        e->running.speed_x100_kmh, e->running.cadence_spm, e->running.incline_x10,
+        e->running.speed_x100_kmh, e->running.pace_float_sec,
+        e->running.cadence_spm, e->running.incline_x10,
         e->power_float, e->cadence_float, e->hr_float,
         e->power_step,
         e->profile.weight, e->profile.ftp, e->profile.thr_hr,

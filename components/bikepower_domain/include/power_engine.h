@@ -113,6 +113,7 @@ bool power_engine_set_device_name(power_engine_t *e, const char *name);
 /* 设置当前运动 profile。 */
 bool power_engine_set_sport_profile(power_engine_t *e, sport_profile_t profile);
 bool power_engine_set_run_speed(power_engine_t *e, int speed_x100_kmh);
+bool power_engine_set_run_pace_float(power_engine_t *e, int seconds);
 bool power_engine_set_run_cadence(power_engine_t *e, int cadence_spm);
 bool power_engine_set_run_incline(power_engine_t *e, int incline_x10);
 

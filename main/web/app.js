@@ -11,7 +11,7 @@ var STATE = {
   sport_profile: "cycling",
   active_sport_profile: "cycling",
   power: 0, cadence: 0, heartrate: 0,
-  run_speed_x100: 1000, run_cadence: 170, run_incline_x10: 0,
+  run_speed_x100: 1000, run_pace_float_sec: 10, run_cadence: 170, run_incline_x10: 0,
   mode: "steady",
   power_float: 5, cadence_float: 2, hr_float: 2,
   power_step: 20,
@@ -47,6 +47,7 @@ var FLOAT_RANGE = {
   power: { min: 0, max: 100, key: "power_float" },
   cadence: { min: 0, max: 20, key: "cadence_float" },
   hr: { min: 0, max: 20, key: "hr_float" },
+  runpace: { min: 0, max: 60, key: "run_pace_float_sec", step: 5 },
   pstep: { min: 5, max: 50, key: "power_step", step: 5 }
 };
 
@@ -138,6 +139,55 @@ function syncCustomPacerOption() {
 function intOr(v, fallback) {
   var n = parseInt(v, 10);
   return isNaN(n) ? fallback : n;
+}
+function paceSecFromSpeedX100(speedX100) {
+  speedX100 = clamp(parseInt(speedX100, 10) || 1000, 300, 2500);
+  return Math.round(360000 / speedX100);
+}
+function speedX100FromPaceSec(paceSec) {
+  paceSec = clamp(parseInt(paceSec, 10) || 360, 144, 1200);
+  return clamp(Math.round(360000 / paceSec), 300, 2500);
+}
+function formatPaceSec(paceSec) {
+  paceSec = clamp(parseInt(paceSec, 10) || 360, 144, 1200);
+  var min = Math.floor(paceSec / 60);
+  var sec = paceSec % 60;
+  return min + ":" + (sec < 10 ? "0" : "") + sec;
+}
+function syncPaceFromSpeed() {
+  var speed = $("run-speed");
+  var minEl = $("run-pace-min");
+  var secEl = $("run-pace-sec");
+  var label = $("run-pace-speed");
+  if (!speed || !minEl || !secEl) return;
+  var speedX100 = clamp(Math.round((parseFloat(speed.value) || 0) * 100), 300, 2500);
+  STATE.run_speed_x100 = speedX100;
+  var paceSec = paceSecFromSpeedX100(speedX100);
+  minEl.value = Math.floor(paceSec / 60);
+  secEl.value = paceSec % 60 < 10 ? "0" + (paceSec % 60) : String(paceSec % 60);
+  if (label) label.textContent = (speedX100 / 100).toFixed(2) + " km/h";
+}
+function syncSpeedFromPace() {
+  var speed = $("run-speed");
+  var minEl = $("run-pace-min");
+  var secEl = $("run-pace-sec");
+  var label = $("run-pace-speed");
+  if (!speed || !minEl || !secEl) return;
+  var paceSec = clamp((parseInt(minEl.value, 10) || 0) * 60 + (parseInt(secEl.value, 10) || 0), 144, 1200);
+  var speedX100 = speedX100FromPaceSec(paceSec);
+  STATE.run_speed_x100 = speedX100;
+  speed.value = (speedX100 / 100).toFixed(2);
+  minEl.value = Math.floor(paceSec / 60);
+  secEl.value = paceSec % 60 < 10 ? "0" + (paceSec % 60) : String(paceSec % 60);
+  if (label) label.textContent = (speedX100 / 100).toFixed(2) + " km/h";
+}
+function onRunPacePreset(min, sec) {
+  var minEl = $("run-pace-min");
+  var secEl = $("run-pace-sec");
+  if (!minEl || !secEl) return;
+  minEl.value = min;
+  secEl.value = sec < 10 ? "0" + sec : String(sec);
+  syncSpeedFromPace();
 }
 function setSelect(id, value) {
   var e = $(id);
@@ -247,7 +297,11 @@ function captureDraft() {
     } else if ($("home-hr")) {
       STATE.heartrate = parseInt($("home-hr").value, 10) || 0;
     }
-    if ($("run-speed")) STATE.run_speed_x100 = Math.round((parseFloat($("run-speed").value) || 0) * 100);
+    if ($("run-pace-min") && $("run-pace-sec")) {
+      STATE.run_speed_x100 = speedX100FromPaceSec((parseInt($("run-pace-min").value, 10) || 0) * 60 + (parseInt($("run-pace-sec").value, 10) || 0));
+    } else if ($("run-speed")) {
+      STATE.run_speed_x100 = Math.round((parseFloat($("run-speed").value) || 0) * 100);
+    }
     if ($("run-cadence")) STATE.run_cadence = parseInt($("run-cadence").value, 10) || 0;
     if ($("run-incline")) STATE.run_incline_x10 = Math.round((parseFloat($("run-incline").value) || 0) * 10);
     var psel = $("home-pacer");
@@ -304,12 +358,14 @@ function renderHome() {
   $("home-hr").value = STATE.heartrate;
   $("run-hr").value = STATE.heartrate;
   $("run-speed").value = (STATE.run_speed_x100 / 100).toFixed(2);
+  syncPaceFromSpeed();
   $("run-cadence").value = STATE.run_cadence;
   $("run-incline").value = (STATE.run_incline_x10 / 10).toFixed(1);
   $("float-power").textContent = STATE.power_float;
   $("float-cadence").textContent = STATE.cadence_float;
   $("float-hr").textContent = STATE.hr_float;
   $("float-run-hr").textContent = STATE.hr_float;
+  $("float-run-pace").textContent = STATE.run_pace_float_sec;
   applyHrLockState();
   updateZoneBadges();
   renderPacerSel();
@@ -587,6 +643,7 @@ function setZone(id, z) {
   if (dot) dot.style.background = z.color;
 }
 function collectConfig() {
+  syncSpeedFromPace();
   return withLedConfig({
     device_name: STATE.device_name,
     sport_profile: STATE.sport_profile,
@@ -594,7 +651,8 @@ function collectConfig() {
     power: clamp(parseInt($("home-power").value, 10) || 0, 0, 2000),
     cadence: clamp(parseInt($("home-cadence").value, 10) || 0, 20, 120),
     heartrate: clamp(parseInt(STATE.sport_profile === "running" ? $("run-hr").value : $("home-hr").value, 10) || 0, 60, 200),
-    run_speed_x100: clamp(Math.round((parseFloat($("run-speed").value) || 0) * 100), 300, 2500),
+    run_speed_x100: STATE.run_speed_x100,
+    run_pace_float_sec: STATE.run_pace_float_sec,
     run_cadence: clamp(parseInt($("run-cadence").value, 10) || 0, 120, 220),
     run_incline_x10: clamp(Math.round((parseFloat($("run-incline").value) || 0) * 10), -50, 150),
     hr_lock: STATE.hr_locked ? 1 : 0,
@@ -1084,6 +1142,7 @@ function collectConfigBase() {
     cadence: STATE.cadence,
     heartrate: STATE.heartrate,
     run_speed_x100: STATE.run_speed_x100,
+    run_pace_float_sec: STATE.run_pace_float_sec,
     run_cadence: STATE.run_cadence,
     run_incline_x10: STATE.run_incline_x10,
     hr_lock: STATE.hr_locked ? 1 : 0,
@@ -1181,6 +1240,7 @@ function init() {
       STATE.cadence = data.cadence || 0;
       STATE.heartrate = data.heartrate || 0;
       STATE.run_speed_x100 = data.run_speed_x100 != null ? data.run_speed_x100 : 1000;
+      STATE.run_pace_float_sec = data.run_pace_float_sec != null ? data.run_pace_float_sec : 10;
       STATE.run_cadence = data.run_cadence != null ? data.run_cadence : 170;
       STATE.run_incline_x10 = data.run_incline_x10 != null ? data.run_incline_x10 : 0;
       STATE.mode = data.mode || "steady";
@@ -1235,6 +1295,12 @@ function init() {
   bindInputRange("home-hr", 60, 200);
   bindInputRange("run-hr", 60, 200);
   bindInputRange("run-speed", 3, 25);
+  var runSpeed = $("run-speed");
+  if (runSpeed) runSpeed.addEventListener("input", syncPaceFromSpeed);
+  var runPaceMin = $("run-pace-min");
+  if (runPaceMin) runPaceMin.addEventListener("input", syncSpeedFromPace);
+  var runPaceSec = $("run-pace-sec");
+  if (runPaceSec) runPaceSec.addEventListener("input", syncSpeedFromPace);
   bindInputRange("run-cadence", 120, 220);
   bindInputRange("run-incline", -5, 15);
   bindInputRange("settings-weight", 40, 150);

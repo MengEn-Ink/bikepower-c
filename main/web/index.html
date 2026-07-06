@@ -128,6 +128,26 @@
         <div class="lbl"><span>跑步速度</span></div>
       </div>
       <div class="card home-card">
+        <div class="pace-input-row">
+          <div class="val pace-val"><input type="number" inputmode="numeric" id="run-pace-min" value="5"><span class="unit">分</span></div>
+          <div class="val pace-val"><input type="number" inputmode="numeric" id="run-pace-sec" value="00"><span class="unit">秒/km</span></div>
+        </div>
+        <div class="lbl"><span>跑步配速</span><span id="run-pace-speed">12.00 km/h</span></div>
+        <div class="pace-preset-grid" id="run-pace-presets" aria-label="常用跑步配速">
+          <button class="pace-preset" onclick="onRunPacePreset(3,0)">3:00</button>
+          <button class="pace-preset" onclick="onRunPacePreset(4,0)">4:00</button>
+          <button class="pace-preset" onclick="onRunPacePreset(5,0)">5:00</button>
+          <button class="pace-preset" onclick="onRunPacePreset(6,0)">6:00</button>
+          <button class="pace-preset" onclick="onRunPacePreset(7,0)">7:00</button>
+        </div>
+        <div class="float-row" id="run-pace-float">
+          <span class="float-lbl">配速浮动</span>
+          <button class="fbtn" onclick="onFloatAdj('runpace',-1)">−</button>
+          <span class="float-val">±<span id="float-run-pace">10</span> 秒/km</span>
+          <button class="fbtn" onclick="onFloatAdj('runpace',1)">+</button>
+        </div>
+      </div>
+      <div class="card home-card">
         <div class="val"><input type="number" inputmode="numeric" id="run-cadence" value="170"><span class="unit">spm</span></div>
         <div class="lbl"><span>步频</span></div>
       </div>

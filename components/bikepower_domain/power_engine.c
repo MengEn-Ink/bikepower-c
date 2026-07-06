@@ -449,6 +449,13 @@ bool power_engine_set_run_speed(power_engine_t *e, int speed_x100_kmh)
     return changed;
 }
 
+bool power_engine_set_run_pace_float(power_engine_t *e, int seconds)
+{
+    bool changed = running_engine_set_pace_float(&e->running, seconds);
+    if (changed) e->dirty = true;
+    return changed;
+}
+
 bool power_engine_set_run_cadence(power_engine_t *e, int cadence_spm)
 {
     bool changed = running_engine_set_cadence(&e->running, cadence_spm);

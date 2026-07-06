@@ -208,6 +208,20 @@ def main():
     check('onTemplateSavePending' in js and 'onTemplateCancelPending' in js, "app.js 缺少扫描读取后保存/取消逻辑")
     check('onTemplateApply' in js and 'onTemplateDelete' in js, "app.js 缺少模板应用/删除逻辑")
     check('id="custom-pacer-name"' in html, "自定义配速机器人昵称输入缺失")
+    check('id="run-pace-min"' in html and 'id="run-pace-sec"' in html, "跑步页缺少配速分钟/秒输入")
+    check('id="run-pace-presets"' in html, "跑步页缺少常用配速小卡片容器")
+    check('id="run-pace-float"' in html and 'id="float-run-pace"' in html, "跑步页缺少配速浮动控件")
+    for pace in ["3:00", "4:00", "5:00", "6:00", "7:00"]:
+        check(f">{pace}<" in html, f"跑步页缺少 {pace}/km 配速小卡片")
+    for key in [
+        "paceSecFromSpeedX100",
+        "speedX100FromPaceSec",
+        "syncPaceFromSpeed",
+        "syncSpeedFromPace",
+        "onRunPacePreset",
+        "run_pace_float_sec",
+    ]:
+        check(key in js, f"app.js 缺少跑步配速换算/浮动逻辑 {key}")
     check('id="about-dev"' not in html, "设备名称不应继续留在关于页")
     check('pager-track' not in html and 'pager-track' not in css, "关于内容不应继续使用横向分页")
     check('"/settings": renderSettings' in js, "app.js 路由缺少 /settings -> renderSettings")
