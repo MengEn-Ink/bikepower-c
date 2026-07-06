@@ -25,7 +25,7 @@ usage() {
   -p, --port PORT             指定串口；默认自动识别 Espressif USB JTAG/serial
       --no-checks             跳过快速静态门禁
       --no-build              跳过显式 idf.py build，仅执行 flash
-      --erase                 烧录前执行 erase-flash（首次从 2MB 分区切到 4MB OTA 布局时使用）
+      --erase                 烧录前执行 erase-flash（首次从旧分区切到当前 4MB factory 布局时使用）
       --monitor               烧录后进入 idf.py monitor
       --no-capture            烧录后不抓取启动串口日志
       --capture-seconds N     烧录后抓取 N 秒启动日志，默认 15

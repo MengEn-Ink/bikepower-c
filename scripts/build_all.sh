@@ -225,7 +225,7 @@ for target in "${TARGETS[@]}"; do
     python3 "$IDF_PATH/components/esptool_py/esptool/esptool.py" \
         --chip esp32c3 merge_bin \
         -o "$RELEASE_DIR/$FW_NAME" \
-        --flash_mode dio --flash_freq 80m --flash_size 2MB \
+        --flash_mode dio --flash_freq 80m --flash_size 4MB \
         0x0 build/bootloader/bootloader.bin \
         0x8000 build/partition_table/partition-table.bin \
         0x10000 build/bikepower-c.bin

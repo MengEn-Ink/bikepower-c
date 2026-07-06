@@ -92,7 +92,7 @@ pip install esptool
 - Linux：`/dev/ttyUSB0`
 
 ```bash
-esptool.py --chip esp32c3 -p COM3 -b 460800 write_flash --flash_mode dio --flash_size 2MB --flash_freq 80m 0x0 bikepower-c-merged.bin
+esptool.py --chip esp32c3 -p COM3 -b 460800 write_flash --flash_mode dio --flash_size 4MB --flash_freq 80m 0x0 bikepower-c-merged.bin
 ```
 
 出现 `Hash of data verified` 表示烧录成功。如果设备没有自动重启，按一下 RST 键。

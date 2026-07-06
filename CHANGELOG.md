@@ -8,6 +8,7 @@
 
 ### 固件产物测试报告与用户手册
 - `scripts/build_all.sh`：分发固件生成流程改为“构建前门禁 → 双板型合并固件 → SHA256/manifest → 测试报告 → 用户手册 → release 总包”，`build/release/` 必须同时包含 generic-c3 与 m5stamp-c3 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip`。
+- `scripts/build_all.sh`、`scripts/tools/publish_gitee_release.py`、`docs/user/01-quickstart.md`：merged bin 生成与单文件烧录命令的 `flash_size` 从 `2MB` 修正为 `4MB`，与当前 `partitions.csv` 的 4MB single factory 布局一致，避免 bootloader 因 flash header 与分区表不一致而反复复位。
 - `scripts/tools/generate_release_docs.py`：新增 release 随附文档生成脚本，从固件版本、Git ID、release 产物和 `docs/user/` 生成 `test-report.md` 与 `user-manual.md`。
 - `scripts/tools/publish_gitee_release.py`：新增 Gitee Release 发布脚本，从 `.env` 读取 `GITEE_TOKEN`，支持 `--dry-run` 检查 tag、目标提交和待上传附件，正式发布时创建 Release 并上传总包、双板型固件、校验文件和随附文档。
 - `docs/user/02-user-manual.md`、`docs/images/web-ui/`：用户手册改为侧重使用说明和操作步骤，新增当前网页端首页、用户资料、设备信息、物理按钮、LED 指示、LED 静默模式、设备模板截图；release 手册会同步携带 `images/` 图片目录，避免离线分发断图。

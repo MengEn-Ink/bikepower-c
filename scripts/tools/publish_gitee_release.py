@@ -104,7 +104,7 @@ def release_body(version, git_sha, artifacts):
         "下载对应板型 merged bin 后，使用单文件烧录：",
         "",
         "```bash",
-        "esptool.py --chip esp32c3 -b 460800 write_flash --flash_mode dio --flash_size 2MB --flash_freq 80m 0x0 <merged-bin>",
+        "esptool.py --chip esp32c3 -b 460800 write_flash --flash_mode dio --flash_size 4MB --flash_freq 80m 0x0 <merged-bin>",
         "```",
         "",
         "## 测试说明",

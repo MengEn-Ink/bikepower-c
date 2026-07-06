@@ -60,7 +60,7 @@ description: "BikePower C 发版流程。用于准备版本发布、检查测试
 - 合并命令：
   ```bash
   esptool.py --chip esp32c3 merge_bin \
-    --flash_mode dio --flash_freq 80m --flash_size 2MB \
+    --flash_mode dio --flash_freq 80m --flash_size 4MB \
     --output bikepower-c-generic-c3-vX.Y.Z-stable-fix-gGitID.bin \
     0x0 build/bootloader/bootloader.bin \
     0x8000 build/partition_table/partition-table.bin \
@@ -68,7 +68,7 @@ description: "BikePower C 发版流程。用于准备版本发布、检查测试
   ```
 - 用户烧录命令（单文件）：
   ```bash
-  esptool.py --chip esp32c3 -b 460800 write_flash --flash_mode dio --flash_size 2MB --flash_freq 80m 0x0 bikepower-c-generic-c3-vX.Y.Z-stable-fix-gGitID.bin
+  esptool.py --chip esp32c3 -b 460800 write_flash --flash_mode dio --flash_size 4MB --flash_freq 80m 0x0 bikepower-c-generic-c3-vX.Y.Z-stable-fix-gGitID.bin
   ```
 - 总包命名：`bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip`，包内必须包含两个板型固件、校验文件、manifest、测试报告、10 分钟核心流程报告、用户手册和截图目录。
 14. **创建 Gitee Release**
