@@ -24,6 +24,8 @@ REQUIRED_IDS = [
     "OP-WEB-001",
     "OP-WEB-002",
     "OP-WEB-003",
+    "OP-BCAST-001",
+    "OP-BCAST-002",
     "OP-BLE-001",
     "OP-BLE-002",
     "OP-RUN-001",

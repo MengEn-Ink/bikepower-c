@@ -393,6 +393,38 @@ static void test_float_setters(void)
     CHECK(e.power_step == 30 && power_engine_is_dirty(&e), "调功步进生效并置 dirty");
 }
 
+static void test_broadcast_fields_and_button_target(void)
+{
+    printf("[test] 广播数据项开关与按钮目标选择\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    CHECK(e.broadcast_mask == BROADCAST_FIELD_ALL, "默认广播功率/踏频/心率全开");
+    CHECK(power_engine_broadcast_enabled(&e, BROADCAST_FIELD_POWER), "默认功率广播开启");
+    CHECK(power_engine_broadcast_enabled(&e, BROADCAST_FIELD_CADENCE), "默认踏频广播开启");
+    CHECK(power_engine_broadcast_enabled(&e, BROADCAST_FIELD_HEARTRATE), "默认心率广播开启");
+
+    power_engine_clear_dirty(&e);
+    CHECK(!power_engine_set_broadcast_mask(&e, 0), "拒绝关闭全部广播项");
+    CHECK(e.broadcast_mask == BROADCAST_FIELD_ALL, "全关被拒绝后保留原 mask");
+    CHECK(!power_engine_is_dirty(&e), "全关被拒绝不置 dirty");
+
+    CHECK(power_engine_set_broadcast_mask(&e, BROADCAST_FIELD_HEARTRATE), "可只保留心率广播");
+    CHECK(e.broadcast_mask == BROADCAST_FIELD_HEARTRATE, "只保留心率 mask 生效");
+    CHECK(power_engine_button_target(&e) == CONTROL_TARGET_HEARTRATE, "只剩心率时按钮目标为心率");
+
+    power_engine_set_sport_profile(&e, SPORT_PROFILE_RUNNING);
+    CHECK(power_engine_set_broadcast_mask(&e, BROADCAST_FIELD_CADENCE), "跑步可只保留步频配置项");
+    CHECK(power_engine_button_target(&e) == CONTROL_TARGET_RUN_CADENCE, "跑步只剩步频时按钮目标为跑步步频");
+    CHECK(power_engine_set_broadcast_mask(&e, BROADCAST_FIELD_POWER | BROADCAST_FIELD_HEARTRATE), "跑步配速+心率 mask 生效");
+    CHECK(power_engine_button_target(&e) == CONTROL_TARGET_RUN_SPEED, "跑步多项时优先配速/速度");
+
+    power_engine_set_sport_profile(&e, SPORT_PROFILE_CYCLING);
+    CHECK(power_engine_set_broadcast_mask(&e, BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_HEARTRATE), "骑行踏频+心率 mask 生效");
+    CHECK(power_engine_button_target(&e) == CONTROL_TARGET_CADENCE, "骑行功率关闭时按钮目标为踏频");
+    CHECK(power_engine_set_broadcast_mask(&e, BROADCAST_FIELD_POWER | BROADCAST_FIELD_HEARTRATE), "骑行功率+心率 mask 生效");
+    CHECK(power_engine_button_target(&e) == CONTROL_TARGET_POWER, "骑行多项时优先功率");
+}
+
 static void test_button_operation_scenario(void)
 {
     printf("[test] 模拟按钮操作后功率/踏频/心率输出\n");
@@ -690,6 +722,7 @@ static void test_config_store(void)
     CHECK(c.led.silent == 0, "默认 LED 非静默");
     CHECK(c.run_pace_float_sec == RUN_PACE_FLOAT_SEC_DEFAULT, "默认跑步配速浮动秒数");
     CHECK(c.run_cadence_float == RUN_CADENCE_FLOAT_DEFAULT, "默认跑步步频浮动");
+    CHECK(c.broadcast_mask == BROADCAST_FIELD_ALL, "默认广播项全开");
 
     // 合法数据不修正
     CHECK(!config_store_validate(&c), "默认值无需校验修正");
@@ -725,6 +758,7 @@ static void test_config_store(void)
     b.ride_type = 99;
     b.run_pace_float_sec = 999;
     b.run_cadence_float = 999;
+    b.broadcast_mask = 0;
     b.led.scenes[LED_SCENE_WAIT_CONN].mode = 99;
     b.led.scenes[LED_SCENE_CONNECTED].color = 99;
     b.led.silent = 9;
@@ -739,6 +773,7 @@ static void test_config_store(void)
     CHECK(b.ride_type == PACER_INDEX_DEFAULT, "非法配速机器人回默认");
     CHECK(b.run_pace_float_sec == RUN_PACE_FLOAT_SEC_MAX, "跑步配速浮动夹到上限");
     CHECK(b.run_cadence_float == RUN_CADENCE_FLOAT_MAX, "跑步步频浮动夹到上限");
+    CHECK(b.broadcast_mask == BROADCAST_FIELD_ALL, "广播项全关回默认全开");
     CHECK(b.led.scenes[LED_SCENE_WAIT_CONN].mode == LED_MODE_SLOW, "非法 LED 模式回默认慢闪");
     CHECK(b.led.scenes[LED_SCENE_CONNECTED].color == LED_COLOR_BLUE, "非法 LED 颜色回默认蓝色");
     CHECK(b.led.silent == 1, "LED 静默规范化为1");
@@ -776,6 +811,14 @@ static void test_config_store(void)
     CHECK(v7.power == 322 && v7.run_cadence == 176, "v7 迁移保留已有配置");
     CHECK(v7.run_cadence_float == RUN_CADENCE_FLOAT_DEFAULT, "v7 迁移补默认跑步步频浮动");
 
+    config_data_t v8;
+    config_store_defaults(&v8);
+    v8.schema_ver = 8;
+    v8.broadcast_mask = 0;
+    CHECK(config_store_migrate(&v8), "v8 配置迁移到 v9");
+    CHECK(v8.schema_ver == CONFIG_VERSION, "v8 迁移后版本=当前");
+    CHECK(v8.broadcast_mask == BROADCAST_FIELD_ALL, "v8 迁移补默认广播项");
+
     // 固定心率：启用并设合法值，validate 不修正、值保留（持久化往返关键）
     config_data_t hr;
     config_store_defaults(&hr);
@@ -802,6 +845,7 @@ static void test_config_store(void)
     src.hr_float = 9;
     src.run_pace_float_sec = 12;
     src.run_cadence_float = 6;
+    src.broadcast_mask = BROADCAST_FIELD_POWER | BROADCAST_FIELD_HEARTRATE;
     src.power_step = 25;
     strcpy(src.custom_pacer_name, "兔子\"车手");
     src.led.silent = 1;
@@ -817,6 +861,7 @@ static void test_config_store(void)
     CHECK(strstr(js, "\"power_float\":12") != NULL, "serialize 含 power_float=12");
     CHECK(strstr(js, "\"run_pace_float_sec\":12") != NULL, "serialize 含 run_pace_float_sec=12");
     CHECK(strstr(js, "\"run_cadence_float\":6") != NULL, "serialize 含 run_cadence_float=6");
+    CHECK(strstr(js, "\"broadcast_mask\":5") != NULL, "serialize 含 broadcast_mask=5");
     CHECK(strstr(js, "\"power_step\":25") != NULL, "serialize 含 power_step=25");
     CHECK(strstr(js, "\"custom_pacer_name\":\"兔子\\\"车手\"") != NULL, "serialize 含转义后的自定义配速昵称");
     CHECK(strstr(js, "\"led_silent\":1") != NULL, "serialize 含 led_silent=1");
@@ -830,6 +875,7 @@ static void test_config_store(void)
     CHECK(dst.power_float == 12 && dst.cadence_float == 7 && dst.hr_float == 9, "往返浮动字段一致");
     CHECK(dst.run_pace_float_sec == 12, "往返跑步配速浮动一致");
     CHECK(dst.run_cadence_float == 6, "往返跑步步频浮动一致");
+    CHECK(dst.broadcast_mask == (BROADCAST_FIELD_POWER | BROADCAST_FIELD_HEARTRATE), "往返广播项一致");
     CHECK(dst.power_step == 25, "往返调功步进一致");
     CHECK(strcmp(dst.custom_pacer_name, "兔子\"车手") == 0, "往返自定义配速昵称一致");
     CHECK(dst.led.silent == 1, "往返 LED 静默一致");
@@ -1216,6 +1262,7 @@ int main(void)
     test_road_pacer();
     test_steady_snapshot();
     test_float_setters();
+    test_broadcast_fields_and_button_target();
     test_button_operation_scenario();
     test_random_power_hr_following_scenario();
     test_float_effect_scenario();

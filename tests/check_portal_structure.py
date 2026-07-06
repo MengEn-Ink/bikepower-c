@@ -221,6 +221,15 @@ def main():
     check('ride-power-editor' in js and 'ride-power-float-row' in js,
           "app.js 必须在机器人模式隐藏重复的功率输入/浮动范围")
     check('id="home-road"' not in html, "骑行配速机器人不应再使用独立 home-road 窗口")
+    check('id="broadcast-toggle-bar"' in html, "首页顶部缺少广播数据多选项")
+    check('data-broadcast="power"' in html and 'data-broadcast="cadence"' in html and 'data-broadcast="heartrate"' in html,
+          "广播数据多选项必须包含功率/踏频/心率")
+    check('onBroadcastToggle' in html and 'onBroadcastToggle' in js,
+          "广播数据多选项必须绑定切换逻辑")
+    check('broadcast_mask' in js and 'broadcastEnabled' in js and 'applyBroadcastVisibility' in js,
+          "app.js 必须保存广播 mask 并按选择隐藏对应窗口")
+    check('broadcast-toggle-bar' in css and 'broadcast-toggle' in css,
+          "app.css 必须提供顶部广播多选项样式")
     check('id="ride-source-picker"' in html, "骑行页缺少固定功率/配速机器人胶囊条容器")
     check('id="ride-source-summary"' in html, "骑行页缺少当前骑行输出摘要")
     check('renderRideSourcePicker' in js and 'onRideSourceSelect' in js, "app.js 缺少骑行输出来源胶囊条渲染/切换逻辑")

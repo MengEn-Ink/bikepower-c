@@ -82,6 +82,7 @@ def main():
             "power_float": 18,
             "cadence_float": 9,
             "hr_float": 7,
+            "broadcast_mask": 5,
             "power_step": 35,
             "run_speed_x100": 1234,
             "run_pace_float_sec": 15,
@@ -135,6 +136,7 @@ def main():
             "custom_wkg_low": 70,
             "custom_wkg_high": 10,
             "led_wait_mode": 99,
+            "broadcast_mask": 0,
         }
         request_json(base + "/api/config", invalid_payload)
         after_invalid = request_json(base + "/api/state")
@@ -153,6 +155,8 @@ def main():
         check(after_invalid.get("custom_wkg_low") == 70 and after_invalid.get("custom_wkg_high") == 70,
               "自定义功体比上限自动抬到不低于下限", failures)
         check(after_invalid.get("led_wait_mode") == 5, "LED 模式越界夹到上限", failures)
+        check(after_invalid.get("broadcast_mask") == before_invalid.get("broadcast_mask"),
+              "广播项全关非法，保持旧值", failures)
     finally:
         proc.terminate()
         try:

@@ -38,6 +38,7 @@ MOCK_STATE = {
     "fix_version": "4.0.2",
     "git_sha": "6e90860",
     "sport_profile": "running",
+    "broadcast_mask": 7,
     "power": 150,
     "cadence": 80,
     "heartrate": 130,
@@ -205,6 +206,10 @@ def _apply_config_field(key, value):
         if isinstance(value, int):
             MOCK_STATE[key] = 1 if value else 0
         return
+    if key == "broadcast_mask":
+        if isinstance(value, int) and 1 <= (value & 7) <= 7:
+            MOCK_STATE[key] = value & 7
+        return
     if key == "hr_lock":
         MOCK_STATE["hr_locked"] = bool(value)
         return
@@ -316,6 +321,7 @@ class Handler(BaseHTTPRequestHandler):
                 for k in ("device_name", "sport_profile", "mode", "power", "cadence",
                           "heartrate", "run_speed_x100", "run_pace_float_sec",
                           "run_cadence", "run_cadence_float", "run_incline_x10",
+                          "broadcast_mask",
                           "power_float", "cadence_float", "hr_float",
                           "power_step",
                           "profile_weight", "profile_ftp",

@@ -29,6 +29,8 @@
 | `OP-WEB-001` | 网页保存回显与字段映射，不丢字段、不串字段 | `python3 tests/test_portal_config_save.py`、`python3 tests/check_portal_structure.py` | 手机浏览器保存流程人工确认 |
 | `OP-WEB-002` | 越界/非法输入保持旧值或夹紧，不写入危险配置 | `make -C test run`、`python3 tests/test_portal_config_save.py` | 手动输入异常值抽查 |
 | `OP-WEB-003` | 续期、倒计时、保存并关闭 WiFi、设备模板扫描/保存/应用/删除 | `python3 tests/test_core_flow_endurance.py`、`python3 tests/stage5_portal_test.py` | 手机连接 AP 后配网入口人工确认 |
+| `OP-BCAST-001` | 顶部功率/踏频/心率多选默认全开；取消项隐藏对应窗口且保存后停止对应 BLE 通知；至少保留一项 | `make -C test run`、`python3 tests/test_portal_config_save.py`、`python3 tests/check_portal_structure.py` | Zwift/MyWhoosh 中按开启项观察数据源 |
+| `OP-BCAST-002` | BOOT 按钮按启用项选择目标：单项启用时直接调该项，多项启用时骑行优先功率、跑步优先配速/速度；长按 WiFi 确认回滚本次调节 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮在不同开关组合下人工确认 |
 | `OP-BLE-001` | BLE 五服务、DIS、通知、FTMS 控制点响应 | `python3 tests/ble_selftest.py` | 第三方 App 扫描设备人工确认 |
 | `OP-BLE-002` | 连接/断开事件、断开后重广播、断开清 ERG | `python3 tests/stage3_conn_test.py`、`python3 tests/ble_selftest.py` | 训练 App 退出后重连人工确认 |
 | `OP-RUN-001` | 跑步 RSC 速度、步频、步幅、距离单位换算 | `make -C test run`、`python3 tests/ble_selftest.py --profile running` | Zwift/MyWhoosh 跑步数据人工确认 |
@@ -85,6 +87,7 @@ python3 tests/check_operation_coverage.py
 | 手机 Captive Portal | iOS/Android 能弹出或可手动访问 `192.168.4.1` | 记录手机系统和浏览器 |
 | Zwift/MyWhoosh 骑行 | fixed、配速机器人、ERG 课程进入/退出均可恢复调功 | 记录 App、平台、课程类型 |
 | Zwift/MyWhoosh 跑步 | RSC 速度/步频能被识别，配速浮动合理 | 记录 App、平台、速度/配速 |
+| 广播数据项开关 | 取消功率/踏频/心率后，对应窗口隐藏且客户端不再收到对应数据；至少一项保持开启 | 记录 App、开启组合、观察到的数据项 |
 
 如果人工项未执行，报告必须写明“未执行原因”。不能冒充自动通过。
 
