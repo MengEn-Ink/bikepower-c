@@ -115,6 +115,7 @@ bool power_engine_set_sport_profile(power_engine_t *e, sport_profile_t profile);
 bool power_engine_set_run_speed(power_engine_t *e, int speed_x100_kmh);
 bool power_engine_set_run_pace_float(power_engine_t *e, int seconds);
 bool power_engine_set_run_cadence(power_engine_t *e, int cadence_spm);
+bool power_engine_set_run_cadence_float(power_engine_t *e, int amp_spm);
 bool power_engine_set_run_incline(power_engine_t *e, int incline_x10);
 
 /* 处理 FTMS 下发的 ERG 目标功率，并在需要时自动切到 ERG 模式。

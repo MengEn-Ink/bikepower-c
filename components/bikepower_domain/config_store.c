@@ -45,6 +45,7 @@ void config_store_defaults(config_data_t *c)
     c->run_speed_x100 = RUN_SPEED_X100_DEFAULT;
     c->run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT;
     c->run_cadence = RUN_CADENCE_DEFAULT;
+    c->run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT;
     c->run_incline_x10 = RUN_INCLINE_X10_DEFAULT;
     strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
@@ -85,6 +86,7 @@ bool config_store_validate(config_data_t *c)
     c->run_speed_x100 = clamp_int(c->run_speed_x100, RUN_SPEED_X100_MIN, RUN_SPEED_X100_MAX);
     c->run_pace_float_sec = clamp_int(c->run_pace_float_sec, RUN_PACE_FLOAT_SEC_MIN, RUN_PACE_FLOAT_SEC_MAX);
     c->run_cadence = clamp_int(c->run_cadence, RUN_CADENCE_MIN, RUN_CADENCE_MAX);
+    c->run_cadence_float = clamp_int(c->run_cadence_float, RUN_CADENCE_FLOAT_MIN, RUN_CADENCE_FLOAT_MAX);
     c->run_incline_x10 = clamp_int(c->run_incline_x10, RUN_INCLINE_X10_MIN, RUN_INCLINE_X10_MAX);
 
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
@@ -113,6 +115,7 @@ bool config_store_validate(config_data_t *c)
         || in.run_speed_x100 != c->run_speed_x100
         || in.run_pace_float_sec != c->run_pace_float_sec
         || in.run_cadence != c->run_cadence
+        || in.run_cadence_float != c->run_cadence_float
         || in.run_incline_x10 != c->run_incline_x10
         || strncmp(in.device_name, c->device_name, DEVICE_NAME_MAX) != 0;
 }
@@ -129,8 +132,12 @@ bool config_store_migrate(config_data_t *c)
         return false;
     }
     if (c->schema_ver == 6) {
-        c->schema_ver = CONFIG_VERSION;
+        c->schema_ver = 7;
         c->run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT;
+    }
+    if (c->schema_ver == 7) {
+        c->schema_ver = CONFIG_VERSION;
+        c->run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT;
         config_store_validate(c);
         return true;
     }
@@ -242,7 +249,7 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         "\"led_error_mode\":%d,\"led_error_color\":%d,"
         "\"sport_profile\":%d,\"run_speed_x100\":%d,"
         "\"run_pace_float_sec\":%d,"
-        "\"run_cadence\":%d,\"run_incline_x10\":%d,"
+        "\"run_cadence\":%d,\"run_cadence_float\":%d,\"run_incline_x10\":%d,"
         "\"device_name\":\"%s\"}",
         c->schema_ver, c->power, c->cadence, c->mode,
         c->heartrate, c->has_user_hr,
@@ -260,7 +267,7 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         c->led.scenes[LED_SCENE_ERROR].mode, c->led.scenes[LED_SCENE_ERROR].color,
         c->sport_profile, c->run_speed_x100,
         c->run_pace_float_sec,
-        c->run_cadence, c->run_incline_x10,
+        c->run_cadence, c->run_cadence_float, c->run_incline_x10,
         esc);
 
     if (n < 0 || (size_t)n >= sizeof(buf)) return 0;  /* 编码错误或内部缓冲不足 */
@@ -294,6 +301,7 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         {"run_speed_x100", &tmp.run_speed_x100},
         {"run_pace_float_sec", &tmp.run_pace_float_sec},
         {"run_cadence", &tmp.run_cadence},
+        {"run_cadence_float", &tmp.run_cadence_float},
         {"run_incline_x10", &tmp.run_incline_x10},
     };
     for (size_t i = 0; i < sizeof(int_keys) / sizeof(int_keys[0]); i++) {

@@ -677,6 +677,7 @@ static void test_config_store(void)
     CHECK(c.led.scenes[LED_SCENE_CONNECTED].color == LED_COLOR_GREEN, "默认已连接绿色");
     CHECK(c.led.silent == 0, "默认 LED 非静默");
     CHECK(c.run_pace_float_sec == RUN_PACE_FLOAT_SEC_DEFAULT, "默认跑步配速浮动秒数");
+    CHECK(c.run_cadence_float == RUN_CADENCE_FLOAT_DEFAULT, "默认跑步步频浮动");
 
     // 合法数据不修正
     CHECK(!config_store_validate(&c), "默认值无需校验修正");
@@ -711,6 +712,7 @@ static void test_config_store(void)
     b.thr_hr = 0;
     b.ride_type = 99;
     b.run_pace_float_sec = 999;
+    b.run_cadence_float = 999;
     b.led.scenes[LED_SCENE_WAIT_CONN].mode = 99;
     b.led.scenes[LED_SCENE_CONNECTED].color = 99;
     b.led.silent = 9;
@@ -724,6 +726,7 @@ static void test_config_store(void)
     CHECK(b.thr_hr == PROFILE_THR_HR_MIN, "阈值心率夹下限");
     CHECK(b.ride_type == PACER_INDEX_DEFAULT, "非法配速机器人回默认");
     CHECK(b.run_pace_float_sec == RUN_PACE_FLOAT_SEC_MAX, "跑步配速浮动夹到上限");
+    CHECK(b.run_cadence_float == RUN_CADENCE_FLOAT_MAX, "跑步步频浮动夹到上限");
     CHECK(b.led.scenes[LED_SCENE_WAIT_CONN].mode == LED_MODE_SLOW, "非法 LED 模式回默认慢闪");
     CHECK(b.led.scenes[LED_SCENE_CONNECTED].color == LED_COLOR_BLUE, "非法 LED 颜色回默认蓝色");
     CHECK(b.led.silent == 1, "LED 静默规范化为1");
@@ -750,6 +753,17 @@ static void test_config_store(void)
     CHECK(v6.power == 321 && v6.run_speed_x100 == 1200, "v6 迁移保留已有配置");
     CHECK(v6.run_pace_float_sec == RUN_PACE_FLOAT_SEC_DEFAULT, "v6 迁移补默认跑步配速浮动");
 
+    config_data_t v7;
+    config_store_defaults(&v7);
+    v7.schema_ver = 7;
+    v7.power = 322;
+    v7.run_cadence = 176;
+    v7.run_cadence_float = 0;
+    CHECK(config_store_migrate(&v7), "v7 配置迁移到 v8");
+    CHECK(v7.schema_ver == CONFIG_VERSION, "v7 迁移后版本=当前");
+    CHECK(v7.power == 322 && v7.run_cadence == 176, "v7 迁移保留已有配置");
+    CHECK(v7.run_cadence_float == RUN_CADENCE_FLOAT_DEFAULT, "v7 迁移补默认跑步步频浮动");
+
     // 固定心率：启用并设合法值，validate 不修正、值保留（持久化往返关键）
     config_data_t hr;
     config_store_defaults(&hr);
@@ -775,6 +789,7 @@ static void test_config_store(void)
     src.cadence_float = 7;
     src.hr_float = 9;
     src.run_pace_float_sec = 12;
+    src.run_cadence_float = 6;
     src.power_step = 25;
     strcpy(src.custom_pacer_name, "兔子\"车手");
     src.led.silent = 1;
@@ -789,6 +804,7 @@ static void test_config_store(void)
     CHECK(strstr(js, "\"power\":222") != NULL, "serialize 含 power=222");
     CHECK(strstr(js, "\"power_float\":12") != NULL, "serialize 含 power_float=12");
     CHECK(strstr(js, "\"run_pace_float_sec\":12") != NULL, "serialize 含 run_pace_float_sec=12");
+    CHECK(strstr(js, "\"run_cadence_float\":6") != NULL, "serialize 含 run_cadence_float=6");
     CHECK(strstr(js, "\"power_step\":25") != NULL, "serialize 含 power_step=25");
     CHECK(strstr(js, "\"custom_pacer_name\":\"兔子\\\"车手\"") != NULL, "serialize 含转义后的自定义配速昵称");
     CHECK(strstr(js, "\"led_silent\":1") != NULL, "serialize 含 led_silent=1");
@@ -801,6 +817,7 @@ static void test_config_store(void)
     CHECK(dst.power == 222 && dst.cadence == 88 && dst.ftp == 250, "往返整数字段一致");
     CHECK(dst.power_float == 12 && dst.cadence_float == 7 && dst.hr_float == 9, "往返浮动字段一致");
     CHECK(dst.run_pace_float_sec == 12, "往返跑步配速浮动一致");
+    CHECK(dst.run_cadence_float == 6, "往返跑步步频浮动一致");
     CHECK(dst.power_step == 25, "往返调功步进一致");
     CHECK(strcmp(dst.custom_pacer_name, "兔子\"车手") == 0, "往返自定义配速昵称一致");
     CHECK(dst.led.silent == 1, "往返 LED 静默一致");

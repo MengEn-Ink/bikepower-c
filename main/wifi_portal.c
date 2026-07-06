@@ -329,6 +329,12 @@ static bool apply_json_fields(power_engine_t *e, const char *body, bool allow_sp
     if (old_val != e->running.cadence_spm)
         ESP_LOGI(TAG, "  run_cadence: %d → %d", old_val, e->running.cadence_spm);
 
+    old_val = e->running.cadence_float_spm;
+    new_val = json_get_int_def(body, "run_cadence_float", old_val);
+    power_engine_set_run_cadence_float(e, new_val);
+    if (old_val != e->running.cadence_float_spm)
+        ESP_LOGI(TAG, "  run_cadence_float: %d → %d", old_val, e->running.cadence_float_spm);
+
     old_val = e->running.incline_x10;
     new_val = json_get_int_def(body, "run_incline_x10", old_val);
     power_engine_set_run_incline(e, new_val);
@@ -466,7 +472,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"sport_profile\":\"%s\","
         "\"power\":%d,\"cadence\":%d,\"heartrate\":%d,\"mode\":\"%s\","
         "\"run_speed_x100\":%d,\"run_pace_float_sec\":%d,"
-        "\"run_cadence\":%d,\"run_incline_x10\":%d,"
+        "\"run_cadence\":%d,\"run_cadence_float\":%d,\"run_incline_x10\":%d,"
         "\"power_float\":%d,\"cadence_float\":%d,\"hr_float\":%d,"
         "\"power_step\":%d,"
         "\"profile_weight\":%d,\"profile_ftp\":%d,\"profile_thr_hr\":%d,"
@@ -486,7 +492,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         sport_to_id((int)e->sport_profile),
         e->base_power, e->cadence_base, e->last_heartrate, mode_to_id((int)e->mode),
         e->running.speed_x100_kmh, e->running.pace_float_sec,
-        e->running.cadence_spm, e->running.incline_x10,
+        e->running.cadence_spm, e->running.cadence_float_spm, e->running.incline_x10,
         e->power_float, e->cadence_float, e->hr_float,
         e->power_step,
         e->profile.weight, e->profile.ftp, e->profile.thr_hr,
@@ -561,7 +567,7 @@ static esp_err_t h_api_config(httpd_req_t *req)
         power_engine_clear_dirty(s_engine);
         if (name_changed) ble_bikepower_refresh_device_name();
         app_state_refresh_led();
-        ESP_LOGI(TAG, "配置已保存 sport=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d",
+        ESP_LOGI(TAG, "配置已保存 sport=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d/%d",
                  (int)s_engine->sport_profile,
                  s_engine->base_power, s_engine->cadence_base,
                  (int)s_engine->mode, s_engine->device_name,
@@ -569,7 +575,7 @@ static esp_err_t h_api_config(httpd_req_t *req)
                  s_engine->power_float, s_engine->cadence_float, s_engine->hr_float,
                  s_engine->profile.ride_type,
                  s_engine->running.speed_x100_kmh, s_engine->running.cadence_spm,
-                 s_engine->running.incline_x10);
+                 s_engine->running.cadence_float_spm, s_engine->running.incline_x10);
         send_json(req, "{\"ok\":true}");
     } else {
         ESP_LOGE(TAG, "配置保存失败，s_engine 保持原值");
@@ -616,7 +622,7 @@ static esp_err_t h_api_close_wifi(httpd_req_t *req)
         }
         if (name_changed) ble_bikepower_refresh_device_name();
         app_state_refresh_led();
-        ESP_LOGI(TAG, "配置已保存并准备关闭 WiFi sport=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d",
+        ESP_LOGI(TAG, "配置已保存并准备关闭 WiFi sport=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d/%d",
                  (int)s_engine->sport_profile,
                  s_engine->base_power, s_engine->cadence_base,
                  (int)s_engine->mode, s_engine->device_name,
@@ -624,7 +630,7 @@ static esp_err_t h_api_close_wifi(httpd_req_t *req)
                  s_engine->power_float, s_engine->cadence_float, s_engine->hr_float,
                  s_engine->profile.ride_type,
                  s_engine->running.speed_x100_kmh, s_engine->running.cadence_spm,
-                 s_engine->running.incline_x10);
+                 s_engine->running.cadence_float_spm, s_engine->running.incline_x10);
         /* 5s 收尾窗口：让前端切到 #/closing 页面后关闭 WiFi */
         s_closing = true;
         s_deadline_sec = now_sec() + WIFI_PORTAL_REBOOT_DELAY_SEC;

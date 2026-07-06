@@ -35,13 +35,16 @@
 #define RUN_CADENCE_MIN        120     // steps/min
 #define RUN_CADENCE_MAX        220
 #define RUN_CADENCE_DEFAULT    170
+#define RUN_CADENCE_FLOAT_MIN  0       // ±steps/min
+#define RUN_CADENCE_FLOAT_MAX  20
+#define RUN_CADENCE_FLOAT_DEFAULT 4
 #define RUN_INCLINE_X10_MIN    (-50)   // -5.0%
 #define RUN_INCLINE_X10_MAX    150     // 15.0%
 #define RUN_INCLINE_X10_DEFAULT 0
 
 // ===== 配置格式版本 =====
-// v7：新增跑步配速浮动秒数持久化。
-#define CONFIG_VERSION        7
+// v8：新增跑步步频浮动持久化。
+#define CONFIG_VERSION        8
 
 // ===== 设备名称（BLE 广播名，可配网修改并持久化） =====
 #define DEVICE_NAME_MAX       24

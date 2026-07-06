@@ -67,8 +67,10 @@ void running_engine_init(running_engine_t *e)
     e->speed_x100_kmh = RUN_SPEED_X100_DEFAULT;
     e->pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT;
     e->cadence_spm = RUN_CADENCE_DEFAULT;
+    e->cadence_float_spm = RUN_CADENCE_FLOAT_DEFAULT;
     e->incline_x10 = RUN_INCLINE_X10_DEFAULT;
     running_walk_reset(&e->pace_walk);
+    running_walk_reset(&e->cadence_walk);
     e->elapsed_ms = 0;
     e->distance_x1000_m = 0;
     e->snapshot = (running_snapshot_t){ 0 };
@@ -84,18 +86,20 @@ running_snapshot_t running_engine_snapshot(running_engine_t *e, uint32_t dt_ms)
     int slowest_pace = pace_sec_from_speed(RUN_SPEED_X100_MIN);
     pace_sec = clamp_int(pace_sec, fastest_pace, slowest_pace);
     int output_speed_x100 = speed_from_pace_sec(pace_sec);
+    int output_cadence_spm = clamp_int(e->cadence_spm + running_walk_step(&e->cadence_walk, e->cadence_float_spm),
+                                       RUN_CADENCE_MIN, RUN_CADENCE_MAX);
 
     uint32_t delta_x1000_m = (uint32_t)(((uint64_t)output_speed_x100 * 10000u * dt_ms) / 3600000u);
     e->distance_x1000_m += delta_x1000_m;
 
     uint16_t rsc_speed = (uint16_t)(((uint32_t)output_speed_x100 * 256u + 180u) / 360u);
     uint16_t stride_cm = 0;
-    if (e->cadence_spm > 0) {
-        stride_cm = (uint16_t)(((uint32_t)output_speed_x100 * 100u + (uint32_t)e->cadence_spm * 3u) / ((uint32_t)e->cadence_spm * 6u));
+    if (output_cadence_spm > 0) {
+        stride_cm = (uint16_t)(((uint32_t)output_speed_x100 * 100u + (uint32_t)output_cadence_spm * 3u) / ((uint32_t)output_cadence_spm * 6u));
     }
 
     e->snapshot.speed_x100_kmh = output_speed_x100;
-    e->snapshot.cadence_spm = e->cadence_spm;
+    e->snapshot.cadence_spm = output_cadence_spm;
     e->snapshot.incline_x10 = e->incline_x10;
     e->snapshot.total_distance_m = e->distance_x1000_m / 1000u;
     e->snapshot.elapsed_time_s = e->elapsed_ms / 1000u;
@@ -129,6 +133,16 @@ bool running_engine_set_cadence(running_engine_t *e, int cadence_spm)
     int clamped = clamp_int(cadence_spm, RUN_CADENCE_MIN, RUN_CADENCE_MAX);
     if (e->cadence_spm == clamped) return false;
     e->cadence_spm = clamped;
+    return true;
+}
+
+bool running_engine_set_cadence_float(running_engine_t *e, int amp_spm)
+{
+    if (!e) return false;
+    int clamped = clamp_int(amp_spm, RUN_CADENCE_FLOAT_MIN, RUN_CADENCE_FLOAT_MAX);
+    if (e->cadence_float_spm == clamped) return false;
+    e->cadence_float_spm = clamped;
+    running_walk_reset(&e->cadence_walk);
     return true;
 }
 

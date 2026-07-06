@@ -19,13 +19,19 @@ typedef enum {
     LED_DRV_SK6812,         // SK6812 RGB LED（RMT 驱动）
 } led_drv_t;
 
+// ===== 普通 GPIO LED 极性 =====
+typedef enum {
+    LED_ACTIVE_LOW = 0,      // GPIO 输出低电平点亮
+    LED_ACTIVE_HIGH = 1,     // GPIO 输出高电平点亮
+} led_active_level_t;
+
 // ===== 板型名称宏（用于固件包命名） =====
 #define BOARD_NAME_GENERIC    "generic-c3"
 #define BOARD_NAME_M5STAMP    "m5stamp-c3"
 
 // ===== 通用 ESP32-C3 开发板引脚 =====
 #define BTN_PIN_GENERIC       9      // BOOT 按钮，内置上拉，按下为低电平
-#define LED_PIN_GENERIC       12     // 板载 D4 LED，高电平有效
+#define LED_PIN_GENERIC       12     // 板载 D4 LED，低电平有效
 
 // ===== M5Stamp C3 引脚 =====
 #define BTN_PIN_M5STAMP       3      // 用户按钮 SW，内置上拉，按下为低电平
@@ -91,6 +97,7 @@ typedef enum {
 #define NVS_KEY_RUN_SPEED      "rspeed"
 #define NVS_KEY_RUN_PACE_FLOAT "rpacef"
 #define NVS_KEY_RUN_CADENCE    "rcad"
+#define NVS_KEY_RUN_CAD_FLOAT  "rcadf"
 #define NVS_KEY_RUN_INCLINE    "rincl"
 #define NVS_KEY_LED_SILENT     "ledsil"
 #define NVS_KEY_LED_WAIT_MODE  "ledwm"

@@ -463,6 +463,13 @@ bool power_engine_set_run_cadence(power_engine_t *e, int cadence_spm)
     return changed;
 }
 
+bool power_engine_set_run_cadence_float(power_engine_t *e, int amp_spm)
+{
+    bool changed = running_engine_set_cadence_float(&e->running, amp_spm);
+    if (changed) e->dirty = true;
+    return changed;
+}
+
 bool power_engine_set_run_incline(power_engine_t *e, int incline_x10)
 {
     bool changed = running_engine_set_incline(&e->running, incline_x10);
