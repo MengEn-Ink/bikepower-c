@@ -11,7 +11,7 @@ var STATE = {
   sport_profile: "cycling",
   active_sport_profile: "cycling",
   power: 0, cadence: 0, heartrate: 0,
-  run_speed_x100: 1000, run_pace_float_sec: 10, run_cadence: 170, run_incline_x10: 0,
+  run_speed_x100: 1000, run_pace_float_sec: 10, run_cadence: 170, run_cadence_float: 4, run_incline_x10: 0,
   mode: "steady",
   power_float: 5, cadence_float: 2, hr_float: 2,
   power_step: 20,
@@ -47,7 +47,8 @@ var FLOAT_RANGE = {
   power: { min: 0, max: 100, key: "power_float" },
   cadence: { min: 0, max: 20, key: "cadence_float" },
   hr: { min: 0, max: 20, key: "hr_float" },
-  runpace: { min: 0, max: 60, key: "run_pace_float_sec", step: 5 },
+  runpace: { min: 0, max: 60, key: "run_pace_float_sec", step: 5, labelId: "float-run-pace" },
+  runcadence: { min: 0, max: 20, key: "run_cadence_float", labelId: "float-run-cadence" },
   pstep: { min: 5, max: 50, key: "power_step", step: 5 }
 };
 
@@ -154,13 +155,12 @@ function formatPaceSec(paceSec) {
   var sec = paceSec % 60;
   return min + ":" + (sec < 10 ? "0" : "") + sec;
 }
-function syncPaceFromSpeed() {
-  var speed = $("run-speed");
+function renderPaceFromState() {
   var minEl = $("run-pace-min");
   var secEl = $("run-pace-sec");
   var label = $("run-pace-speed");
-  if (!speed || !minEl || !secEl) return;
-  var speedX100 = clamp(Math.round((parseFloat(speed.value) || 0) * 100), 300, 2500);
+  if (!minEl || !secEl) return;
+  var speedX100 = clamp(parseInt(STATE.run_speed_x100, 10) || 1000, 300, 2500);
   STATE.run_speed_x100 = speedX100;
   var paceSec = paceSecFromSpeedX100(speedX100);
   minEl.value = Math.floor(paceSec / 60);
@@ -168,15 +168,13 @@ function syncPaceFromSpeed() {
   if (label) label.textContent = (speedX100 / 100).toFixed(2) + " km/h";
 }
 function syncSpeedFromPace() {
-  var speed = $("run-speed");
   var minEl = $("run-pace-min");
   var secEl = $("run-pace-sec");
   var label = $("run-pace-speed");
-  if (!speed || !minEl || !secEl) return;
+  if (!minEl || !secEl) return;
   var paceSec = clamp((parseInt(minEl.value, 10) || 0) * 60 + (parseInt(secEl.value, 10) || 0), 144, 1200);
   var speedX100 = speedX100FromPaceSec(paceSec);
   STATE.run_speed_x100 = speedX100;
-  speed.value = (speedX100 / 100).toFixed(2);
   minEl.value = Math.floor(paceSec / 60);
   secEl.value = paceSec % 60 < 10 ? "0" + (paceSec % 60) : String(paceSec % 60);
   if (label) label.textContent = (speedX100 / 100).toFixed(2) + " km/h";
@@ -299,13 +297,9 @@ function captureDraft() {
     }
     if ($("run-pace-min") && $("run-pace-sec")) {
       STATE.run_speed_x100 = speedX100FromPaceSec((parseInt($("run-pace-min").value, 10) || 0) * 60 + (parseInt($("run-pace-sec").value, 10) || 0));
-    } else if ($("run-speed")) {
-      STATE.run_speed_x100 = Math.round((parseFloat($("run-speed").value) || 0) * 100);
     }
     if ($("run-cadence")) STATE.run_cadence = parseInt($("run-cadence").value, 10) || 0;
     if ($("run-incline")) STATE.run_incline_x10 = Math.round((parseFloat($("run-incline").value) || 0) * 10);
-    var psel = $("home-pacer");
-    if (psel && psel.value) STATE.profile_ride_type = psel.value;
     return;
   }
   var settings = $("view-settings");
@@ -357,8 +351,7 @@ function renderHome() {
   $("home-cadence").value = STATE.cadence;
   $("home-hr").value = STATE.heartrate;
   $("run-hr").value = STATE.heartrate;
-  $("run-speed").value = (STATE.run_speed_x100 / 100).toFixed(2);
-  syncPaceFromSpeed();
+  renderPaceFromState();
   $("run-cadence").value = STATE.run_cadence;
   $("run-incline").value = (STATE.run_incline_x10 / 10).toFixed(1);
   $("float-power").textContent = STATE.power_float;
@@ -366,9 +359,10 @@ function renderHome() {
   $("float-hr").textContent = STATE.hr_float;
   $("float-run-hr").textContent = STATE.hr_float;
   $("float-run-pace").textContent = STATE.run_pace_float_sec;
+  $("float-run-cadence").textContent = STATE.run_cadence_float;
   applyHrLockState();
   updateZoneBadges();
-  renderPacerSel();
+  renderRideSourcePicker();
   applySportView();
   applyModeView();
 }
@@ -434,31 +428,32 @@ function onAppliedTemplateToggle() {
   STATE.applied_template_expanded = !STATE.applied_template_expanded;
   renderAppliedTemplate();
 }
-/* 按当前 mode 显示固定/机器人区块与卡片选中态 */
+/* 按当前 mode 更新骑行输出来源与辅助文案 */
 function applyModeView() {
   var isRoad = STATE.mode === "road";
   var isErg = STATE.mode === "erg";
   var isRunning = STATE.sport_profile === "running";
   var steady = $("home-steady");
-  var road = $("home-road");
-  if (steady) steady.style.display = (!isRunning && !isRoad) ? "block" : "none";
-  if (road) road.style.display = (!isRunning && isRoad) ? "block" : "none";
+  if (steady) steady.style.display = isRunning ? "none" : "block";
   var ergNote = $("erg-note");
   if (ergNote) ergNote.style.display = (!isRunning && isErg) ? "block" : "none";
-  /* ERG 归到固定输出卡片高亮，因为 ERG 由 App 驱动，手动配置仍属于固定输出路径 */
-  var items = document.querySelectorAll("#mode-card-grid .mode-card");
+  var selectedSource = isRoad ? STATE.profile_ride_type : "steady";
+  var items = document.querySelectorAll("#ride-source-picker .ride-source-pill");
+  var selectedItem = null;
   for (var i = 0; i < items.length; i++) {
-    var m = items[i].getAttribute("data-mode");
-    var on = (m === "road") ? isRoad : !isRoad;
-    items[i].classList.toggle("selected", on);
+    var source = items[i].getAttribute("data-source");
+    var selected = source === selectedSource;
+    items[i].classList.toggle("selected", selected);
+    if (selected) selectedItem = items[i];
   }
+  if (selectedItem && selectedItem.scrollIntoView) selectedItem.scrollIntoView({ block: "nearest", inline: "center" });
   updatePacerInfo();
 }
 function applySportView() {
   var isRunning = STATE.sport_profile === "running";
-  var cyclingMode = $("cycling-mode-wrap");
+  var cycling = $("home-steady");
   var running = $("home-running");
-  if (cyclingMode) cyclingMode.style.display = isRunning ? "none" : "block";
+  if (cycling) cycling.style.display = isRunning ? "none" : "block";
   if (running) running.style.display = isRunning ? "block" : "none";
   var items = document.querySelectorAll("#sport-seg .seg-item");
   for (var i = 0; i < items.length; i++) {
@@ -478,6 +473,17 @@ function onModeSwitch(mode) {
   STATE.mode = mode;
   applyModeView();
 }
+function onRideSourceSelect(source) {
+  captureDraft();
+  if (source === "steady") {
+    STATE.mode = "steady";
+  } else {
+    STATE.mode = "road";
+    STATE.profile_ride_type = source || "custom";
+  }
+  renderRideSourcePicker();
+  applyModeView();
+}
 function onFloatAdj(kind, delta) {
   var r = FLOAT_RANGE[kind];
   if (!r) return;
@@ -485,26 +491,19 @@ function onFloatAdj(kind, delta) {
   var cur = STATE[r.key] || 0;
   var next = clamp(cur + delta * stepSize, r.min, r.max);
   STATE[r.key] = next;
-  var lbl = $("float-" + kind);
+  var lbl = $(r.labelId || ("float-" + kind));
   if (lbl) lbl.textContent = next;
 }
-function renderPacerSel() {
-  var sel = $("home-pacer");
-  if (!sel) return;
+function renderRideSourcePicker() {
+  var picker = $("ride-source-picker");
+  if (!picker) return;
   syncCustomPacerOption();
-  sel.innerHTML = "";
+  var html = '<button class="ride-source-pill" data-source="steady" onclick="onRideSourceSelect(\'steady\')">固定</button>';
   for (var i = 0; i < STATE.pacers.length; i++) {
     var p = STATE.pacers[i];
-    var o = el("option", { value: p.id },
-      p.name + " (" + p.wkg_low.toFixed(1) + "-" + p.wkg_high.toFixed(1) + " W/kg)");
-    if (p.id === STATE.profile_ride_type) o.selected = true;
-    sel.appendChild(o);
+    html += '<button class="ride-source-pill" data-source="' + escapeHtml(p.id) + '" onclick="onRideSourceSelect(\'' + escapeHtml(p.id) + '\')">' + escapeHtml(p.name) + '</button>';
   }
-}
-function onPacerChange() {
-  var sel = $("home-pacer");
-  if (sel && sel.value) STATE.profile_ride_type = sel.value;
-  updatePacerInfo();
+  picker.innerHTML = html;
 }
 /* 自定义档 W/kg 加减（步进 0.1 W/kg = ×10 的 1） */
 function onCustomWkgAdj(which, delta) {
@@ -519,7 +518,7 @@ function onCustomWkgAdj(which, delta) {
   STATE.custom_wkg_low = lo;
   STATE.custom_wkg_high = hi;
   syncCustomPacerOption();
-  renderPacerSel();
+  renderRideSourcePicker();
   updatePacerInfo();
 }
 function onCustomNameInput() {
@@ -527,13 +526,23 @@ function onCustomNameInput() {
   if (!inp) return;
   STATE.custom_pacer_name = (inp.value || "").trim();
   syncCustomPacerOption();
-  renderPacerSel();
+  renderRideSourcePicker();
   updatePacerInfo();
 }
 function updatePacerInfo() {
-  var wkgEl = $("pacer-wkg");
-  var wattEl = $("pacer-watt");
-  var isCustom = STATE.profile_ride_type === "custom";
+  var isRoad = STATE.mode === "road";
+  var isCustom = isRoad && STATE.profile_ride_type === "custom";
+  var powerInput = $("home-power");
+  var powerLabel = $("ride-power-label");
+  var powerEditor = $("ride-power-editor");
+  var powerFloatRow = $("ride-power-float-row");
+  var sourceSummary = $("ride-source-summary");
+  var robotNote = $("ride-robot-note");
+  if (powerInput) powerInput.disabled = isRoad;
+  if (powerLabel) powerLabel.textContent = isRoad ? "机器人功率" : "固定功率";
+  if (powerEditor) powerEditor.style.display = isRoad ? "none" : "block";
+  if (powerFloatRow) powerFloatRow.style.display = isRoad ? "none" : "flex";
+  if (robotNote) robotNote.style.display = isRoad ? "block" : "none";
   /* 自定义档编辑区显隐 */
   var box = $("custom-wkg-box");
   if (box) box.style.display = isCustom ? "block" : "none";
@@ -544,8 +553,12 @@ function updatePacerInfo() {
     var nameEl = $("custom-pacer-name");
     if (nameEl && document.activeElement !== nameEl) nameEl.value = customPacerDisplayName();
   }
-  if (!wkgEl || !wattEl) return;
+  if (!isRoad) {
+    if (sourceSummary) sourceSummary.innerHTML = '<span>已选固定功率</span><b>按填写功率输出</b>';
+    return;
+  }
   var lo10, hi10;
+  var sourceName = customPacerDisplayName();
   if (isCustom) {
     lo10 = STATE.custom_wkg_low; hi10 = STATE.custom_wkg_high;
   } else {
@@ -553,12 +566,24 @@ function updatePacerInfo() {
     for (var i = 0; i < STATE.pacers.length; i++) {
       if (STATE.pacers[i].id === STATE.profile_ride_type) { p = STATE.pacers[i]; break; }
     }
-    if (!p) { wkgEl.textContent = "—"; wattEl.textContent = "—"; return; }
+    if (!p) return;
+    sourceName = p.name;
     lo10 = Math.round(p.wkg_low * 10); hi10 = Math.round(p.wkg_high * 10);
   }
   var w = STATE.profile_weight || 70;
-  wkgEl.textContent = (lo10 / 10).toFixed(1) + " - " + (hi10 / 10).toFixed(1) + " W/kg";
-  wattEl.textContent = Math.round(lo10 * w / 10) + " - " + Math.round(hi10 * w / 10) + " W";
+  var wkgText = (lo10 / 10).toFixed(1) + " - " + (hi10 / 10).toFixed(1) + " W/kg";
+  var wattText = Math.round(lo10 * w / 10) + " - " + Math.round(hi10 * w / 10) + " W";
+  var mid = Math.round(((lo10 + hi10) / 2) * w / 10);
+  if (isCustom) {
+    var wkgRangeEl = $("custom-wkg-range"), wattRangeEl = $("custom-watt-range"), targetEl = $("custom-target-watt");
+    if (wkgRangeEl) wkgRangeEl.textContent = wkgText;
+    if (wattRangeEl) wattRangeEl.textContent = wattText;
+    if (targetEl) targetEl.textContent = mid;
+    if (sourceSummary) sourceSummary.innerHTML = '<span>已选' + escapeHtml(sourceName) + '</span><b>自定义范围</b>';
+  } else if (sourceSummary) {
+    sourceSummary.innerHTML = '<span>已选' + escapeHtml(sourceName) + '</span><b>' + escapeHtml(wkgText) + ' · ' + escapeHtml(wattText) + '</b>';
+  }
+  if (powerInput) powerInput.value = mid;
 }
 function applyHrLockState() {
   var radios = document.getElementsByName("hr-lock");
@@ -654,6 +679,7 @@ function collectConfig() {
     run_speed_x100: STATE.run_speed_x100,
     run_pace_float_sec: STATE.run_pace_float_sec,
     run_cadence: clamp(parseInt($("run-cadence").value, 10) || 0, 120, 220),
+    run_cadence_float: STATE.run_cadence_float,
     run_incline_x10: clamp(Math.round((parseFloat($("run-incline").value) || 0) * 10), -50, 150),
     hr_lock: STATE.hr_locked ? 1 : 0,
     power_float: STATE.power_float,
@@ -1144,6 +1170,7 @@ function collectConfigBase() {
     run_speed_x100: STATE.run_speed_x100,
     run_pace_float_sec: STATE.run_pace_float_sec,
     run_cadence: STATE.run_cadence,
+    run_cadence_float: STATE.run_cadence_float,
     run_incline_x10: STATE.run_incline_x10,
     hr_lock: STATE.hr_locked ? 1 : 0,
     power_float: STATE.power_float,
@@ -1242,6 +1269,7 @@ function init() {
       STATE.run_speed_x100 = data.run_speed_x100 != null ? data.run_speed_x100 : 1000;
       STATE.run_pace_float_sec = data.run_pace_float_sec != null ? data.run_pace_float_sec : 10;
       STATE.run_cadence = data.run_cadence != null ? data.run_cadence : 170;
+      STATE.run_cadence_float = data.run_cadence_float != null ? data.run_cadence_float : 4;
       STATE.run_incline_x10 = data.run_incline_x10 != null ? data.run_incline_x10 : 0;
       STATE.mode = data.mode || "steady";
       STATE.power_float = data.power_float != null ? data.power_float : 5;
@@ -1294,9 +1322,6 @@ function init() {
   bindInputRange("home-cadence", 20, 120);
   bindInputRange("home-hr", 60, 200);
   bindInputRange("run-hr", 60, 200);
-  bindInputRange("run-speed", 3, 25);
-  var runSpeed = $("run-speed");
-  if (runSpeed) runSpeed.addEventListener("input", syncPaceFromSpeed);
   var runPaceMin = $("run-pace-min");
   if (runPaceMin) runPaceMin.addEventListener("input", syncSpeedFromPace);
   var runPaceSec = $("run-pace-sec");

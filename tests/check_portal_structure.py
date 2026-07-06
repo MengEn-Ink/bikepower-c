@@ -208,18 +208,45 @@ def main():
     check('onTemplateSavePending' in js and 'onTemplateCancelPending' in js, "app.js 缺少扫描读取后保存/取消逻辑")
     check('onTemplateApply' in js and 'onTemplateDelete' in js, "app.js 缺少模板应用/删除逻辑")
     check('id="custom-pacer-name"' in html, "自定义配速机器人昵称输入缺失")
+    check('custom-pacer-panel' in html and 'id="custom-target-watt"' in html,
+          "自定义机器人必须使用紧凑窗口展示目标功率")
+    check('id="custom-wkg-range"' in html and 'id="custom-watt-range"' in html,
+          "自定义机器人窗口必须合并展示 W/kg 与功率区间")
+    check('custom-pacer-panel' in css and 'custom-wkg-controls' in css,
+          "app.css 缺少自定义机器人紧凑窗口样式")
+    check('id="pacer-wkg"' not in html and 'id="pacer-watt"' not in html,
+          "自定义机器人不应再用独立 info-row 显示功体比/功率区间")
+    check('id="ride-power-editor"' in html and 'id="ride-power-float-row"' in html,
+          "骑行固定功率输入和浮动范围必须有独立容器以便机器人模式隐藏")
+    check('ride-power-editor' in js and 'ride-power-float-row' in js,
+          "app.js 必须在机器人模式隐藏重复的功率输入/浮动范围")
+    check('id="home-road"' not in html, "骑行配速机器人不应再使用独立 home-road 窗口")
+    check('id="ride-source-picker"' in html, "骑行页缺少固定功率/配速机器人胶囊条容器")
+    check('id="ride-source-summary"' in html, "骑行页缺少当前骑行输出摘要")
+    check('renderRideSourcePicker' in js and 'onRideSourceSelect' in js, "app.js 缺少骑行输出来源胶囊条渲染/切换逻辑")
+    check('ride-source-pill' in css and 'ride-source-picker' in css and 'ride-source-summary' in css,
+          "app.css 缺少骑行输出来源胶囊条/摘要样式")
+    check('ride-source-card' not in css and 'ride-source-grid' not in css,
+          "骑行输出来源不应继续使用大卡片网格样式")
+    check('cycling-compact-card' in css and 'compact-hr-lock' in css,
+          "骑行页必须提供一页内高密度布局样式")
+    check('ride-inline-grid' not in html and 'ride-inline-field' not in html,
+          "踏频和心率必须保持独立卡片，不应合并为双列区域")
+    check('id="run-speed"' not in html, "跑步页不应保留独立跑步速度输入框")
     check('id="run-pace-min"' in html and 'id="run-pace-sec"' in html, "跑步页缺少配速分钟/秒输入")
     check('id="run-pace-presets"' in html, "跑步页缺少常用配速小卡片容器")
     check('id="run-pace-float"' in html and 'id="float-run-pace"' in html, "跑步页缺少配速浮动控件")
+    check('id="run-cadence-float"' in html and 'id="float-run-cadence"' in html, "跑步页缺少步频浮动控件")
     for pace in ["3:00", "4:00", "5:00", "6:00", "7:00"]:
         check(f">{pace}<" in html, f"跑步页缺少 {pace}/km 配速小卡片")
     for key in [
         "paceSecFromSpeedX100",
         "speedX100FromPaceSec",
-        "syncPaceFromSpeed",
+        "renderPaceFromState",
         "syncSpeedFromPace",
         "onRunPacePreset",
         "run_pace_float_sec",
+        "run_cadence_float",
     ]:
         check(key in js, f"app.js 缺少跑步配速换算/浮动逻辑 {key}")
     check('id="about-dev"' not in html, "设备名称不应继续留在关于页")
@@ -286,6 +313,10 @@ def main():
         check(key in js, f"app.js 缺少 LED 配置字段 {key}")
     for key in ["custom_pacer_name", "syncCustomPacerOption", "customPacerDisplayName"]:
         check(key in js, f"app.js 缺少自定义配速昵称/下拉刷新逻辑 {key}")
+    check('runpace:' in js and 'labelId: "float-run-pace"' in js,
+          "跑步配速浮动按钮必须映射到实际显示节点 float-run-pace")
+    check('runcadence:' in js and 'labelId: "float-run-cadence"' in js,
+          "跑步步频浮动按钮必须映射到实际显示节点 float-run-cadence")
 
     # 总结
     print(f"\n{TAG} 结果: {g_pass} 通过, {g_fail} 失败")

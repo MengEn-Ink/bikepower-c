@@ -29,104 +29,84 @@
       <button class="seg-item" data-sport="running" onclick="onSportSwitch('running')">跑步</button>
     </div>
 
-    <div id="cycling-mode-wrap">
-      <div class="mode-card-grid" id="mode-card-grid" aria-label="骑行模式">
-        <button class="mode-card" data-mode="steady" onclick="onModeSwitch('steady')">
-          <span class="mode-card-main">固定输出</span>
-          <span class="mode-card-sub">功率 / 踏频 / 心率</span>
-          <span class="mode-card-check">✓</span>
-        </button>
-        <button class="mode-card" data-mode="road" onclick="onModeSwitch('road')">
-          <span class="mode-card-main">配速机器人</span>
-          <span class="mode-card-sub">按 W/kg 自动输出</span>
-          <span class="mode-card-check">✓</span>
-        </button>
-      </div>
-    </div>
-
     <!-- ERG 提示（仅骑行 App 下发 ERG 时显示） -->
     <div class="note warn" id="erg-note" style="display:none">⚡ 骑行 App 正在通过 ERG 控制目标功率，手动功率暂不生效；如需手动设置，请切到固定模式并保存。</div>
 
     <!-- ---- 固定模式区 ---- -->
     <div id="home-steady">
       <div class="card home-card">
-        <div class="val"><input type="number" inputmode="numeric" id="home-power" value="0"><span class="unit">W</span></div>
-        <div class="lbl"><span>固定功率</span><span class="zone" id="zone-pwr"><span class="dot"></span>Z?</span></div>
-        <div class="float-row">
+        <h2>骑行输出</h2>
+        <div class="ride-source-picker" id="ride-source-picker" aria-label="骑行输出来源"></div>
+        <div class="ride-source-summary" id="ride-source-summary">
+          <span>已选固定功率</span><b>按填写功率输出</b>
+        </div>
+        <div class="ride-power-editor" id="ride-power-editor">
+          <div class="val"><input type="number" inputmode="numeric" id="home-power" value="0"><span class="unit">W</span></div>
+          <div class="lbl"><span id="ride-power-label">固定功率</span><span class="zone" id="zone-pwr"><span class="dot"></span>Z?</span></div>
+        </div>
+        <div class="float-row" id="ride-power-float-row">
           <span class="float-lbl">浮动范围</span>
           <button class="fbtn" onclick="onFloatAdj('power',-1)">−</button>
           <span class="float-val">±<span id="float-power">5</span> W</span>
           <button class="fbtn" onclick="onFloatAdj('power',1)">+</button>
         </div>
+        <div class="custom-pacer-panel" id="custom-wkg-box" style="display:none">
+          <div class="custom-pacer-head">
+            <input type="text" id="custom-pacer-name" maxlength="31" placeholder="自定义" oninput="onCustomNameInput()">
+            <div class="custom-pacer-target"><span id="custom-target-watt">—</span><small>目标 W</small></div>
+          </div>
+          <div class="custom-pacer-metrics">
+            <span id="custom-wkg-range">2.5 - 3.0 W/kg</span>
+            <b id="custom-watt-range">175 - 210 W</b>
+          </div>
+          <div class="custom-wkg-controls">
+            <div class="custom-wkg-step">
+              <span>下限</span>
+              <button class="fbtn" onclick="onCustomWkgAdj('low',-1)">−</button>
+              <b id="cwkg-low">2.5</b>
+              <button class="fbtn" onclick="onCustomWkgAdj('low',1)">+</button>
+            </div>
+            <div class="custom-wkg-step">
+              <span>上限</span>
+              <button class="fbtn" onclick="onCustomWkgAdj('high',-1)">−</button>
+              <b id="cwkg-high">3.0</b>
+              <button class="fbtn" onclick="onCustomWkgAdj('high',1)">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="note robot-note" id="ride-robot-note">选择固定功率时按填写值输出；选择机器人时按 W/kg × 体重自动生成目标功率。</div>
       </div>
 
-      <div class="card home-card">
+      <div class="card home-card cycling-compact-card">
         <div class="val"><input type="number" inputmode="numeric" id="home-cadence" value="0"><span class="unit">rpm</span></div>
         <div class="lbl"><span>固定踏频</span></div>
         <div class="float-row">
-          <span class="float-lbl">浮动范围</span>
+          <span class="float-lbl">踏频浮动</span>
           <button class="fbtn" onclick="onFloatAdj('cadence',-1)">−</button>
           <span class="float-val">±<span id="float-cadence">2</span> rpm</span>
           <button class="fbtn" onclick="onFloatAdj('cadence',1)">+</button>
         </div>
       </div>
 
-      <div class="card home-card">
+      <div class="card home-card cycling-compact-card">
         <div class="val"><input type="number" inputmode="numeric" id="home-hr" value="0"><span class="unit">bpm</span></div>
         <div class="lbl"><span>目标心率</span><span class="zone" id="zone-hr"><span class="dot"></span>Z?</span></div>
-        <div class="hr-lock-row">
-          <label class="radio-line"><input type="radio" name="hr-lock" value="0" onchange="onHrLockChange()" checked><span>联动：心率随功率变化（按 FTP 分区匹配）</span></label>
-          <label class="radio-line"><input type="radio" name="hr-lock" value="1" onchange="onHrLockChange()"><span>锁死：心率恒定按填写值</span></label>
+        <div class="hr-lock-row compact-hr-lock">
+          <label class="radio-line"><input type="radio" name="hr-lock" value="0" onchange="onHrLockChange()" checked><span>联动：心率随功率变化</span></label>
+          <label class="radio-line"><input type="radio" name="hr-lock" value="1" onchange="onHrLockChange()"><span>锁死：心率恒定</span></label>
         </div>
         <div class="float-row" id="hr-float-row">
-          <span class="float-lbl">浮动范围</span>
+          <span class="float-lbl">心率浮动</span>
           <button class="fbtn" onclick="onFloatAdj('hr',-1)">−</button>
           <span class="float-val">±<span id="float-hr">2</span> bpm</span>
           <button class="fbtn" onclick="onFloatAdj('hr',1)">+</button>
         </div>
       </div>
 
-      <div class="note">浮动范围为基准值的上下限半幅，设备在 [基准−浮动, 基准+浮动] 内平稳变化（非随机跳变）。浮动设为 0 则恒定输出。</div>
-    </div>
-
-    <!-- ---- 配速机器人区 ---- -->
-    <div id="home-road" style="display:none">
-      <div class="note">🤖 机器人配速已启用：设备按所选档位的功体比（W/kg × 体重）自动输出功率，模拟跟随虚拟骑手骑行，无需骑行 App 干预。功率、心率自动生成，此模式下不使用固定功率。</div>
-      <div class="card home-card">
-        <h2>配速机器人档位</h2>
-        <div class="field">
-          <label>选择配速机器人</label>
-          <select id="home-pacer" onchange="onPacerChange()"></select>
-        </div>
-        <div class="info-row"><span class="k">当前功体比</span><span class="v" id="pacer-wkg">—</span></div>
-        <div class="info-row"><span class="k">预计功率区间</span><span class="v" id="pacer-watt">—</span></div>
-        <div id="custom-wkg-box" style="display:none">
-          <div class="field custom-name-field">
-            <label>自定义机器人昵称</label>
-            <input type="text" id="custom-pacer-name" maxlength="31" placeholder="自定义" oninput="onCustomNameInput()">
-          </div>
-          <div class="float-row">
-            <span class="float-lbl">W/kg 下限</span>
-            <button class="fbtn" onclick="onCustomWkgAdj('low',-1)">−</button>
-            <span class="float-val"><span id="cwkg-low">2.5</span></span>
-            <button class="fbtn" onclick="onCustomWkgAdj('low',1)">+</button>
-          </div>
-          <div class="float-row">
-            <span class="float-lbl">W/kg 上限</span>
-            <button class="fbtn" onclick="onCustomWkgAdj('high',-1)">−</button>
-            <span class="float-val"><span id="cwkg-high">3.0</span></span>
-            <button class="fbtn" onclick="onCustomWkgAdj('high',1)">+</button>
-          </div>
-          <div class="note">自定义功体比范围 1.0~7.0 W/kg，每档 0.1；输出功率 = W/kg × 体重，在下限与上限间随机波动。</div>
-        </div>
-      </div>
+      <div class="note cycling-compact-note">浮动为上下限半幅；设为 0 则恒定输出。</div>
     </div>
 
     <div id="home-running" style="display:none">
-      <div class="card home-card">
-        <div class="val"><input type="number" inputmode="decimal" step="0.01" id="run-speed" value="10.00"><span class="unit">km/h</span></div>
-        <div class="lbl"><span>跑步速度</span></div>
-      </div>
       <div class="card home-card">
         <div class="pace-input-row">
           <div class="val pace-val"><input type="number" inputmode="numeric" id="run-pace-min" value="5"><span class="unit">分</span></div>
@@ -150,6 +130,12 @@
       <div class="card home-card">
         <div class="val"><input type="number" inputmode="numeric" id="run-cadence" value="170"><span class="unit">spm</span></div>
         <div class="lbl"><span>步频</span></div>
+        <div class="float-row" id="run-cadence-float">
+          <span class="float-lbl">步频浮动</span>
+          <button class="fbtn" onclick="onFloatAdj('runcadence',-1)">−</button>
+          <span class="float-val">±<span id="float-run-cadence">4</span> spm</span>
+          <button class="fbtn" onclick="onFloatAdj('runcadence',1)">+</button>
+        </div>
       </div>
       <div class="card home-card">
         <div class="val"><input type="number" inputmode="decimal" step="0.1" id="run-incline" value="0.0"><span class="unit">%</span></div>
