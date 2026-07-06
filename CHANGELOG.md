@@ -4,6 +4,8 @@
 
 ## [未发布]
 
+## [4.0.2] - 2026-07-06
+
 ### 固件产物测试报告与用户手册
 - `scripts/build_all.sh`：分发固件生成流程改为“构建前门禁 → 双板型合并固件 → SHA256/manifest → 测试报告 → 用户手册 → release 总包”，`build/release/` 必须同时包含 generic-c3 与 m5stamp-c3 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip`。
 - `scripts/tools/generate_release_docs.py`：新增 release 随附文档生成脚本，从固件版本、Git ID、release 产物和 `docs/user/` 生成 `test-report.md` 与 `user-manual.md`。

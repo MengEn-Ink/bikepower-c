@@ -31,11 +31,11 @@ WEB_DIR = os.path.join(REPO_ROOT, "main", "web")
 
 MOCK_STATE = {
     "device_name": "BikePower-Mock",
-    "firmware_version": "4.0.1-mock",
-    "firmware_name": "generic-c3-v4.0.1-stable4.0.0-fix4.0.1-g6e90860",
+    "firmware_version": "4.0.2-mock",
+    "firmware_name": "generic-c3-v4.0.2-stable4.0.0-fix4.0.2-g6e90860",
     "board": "generic-c3",
     "stable_version": "4.0.0",
-    "fix_version": "4.0.1",
+    "fix_version": "4.0.2",
     "git_sha": "6e90860",
     "sport_profile": "running",
     "power": 150,
