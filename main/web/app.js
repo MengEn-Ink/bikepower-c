@@ -10,6 +10,7 @@ var STATE = {
   git_sha: "",
   sport_profile: "cycling",
   active_sport_profile: "cycling",
+  broadcast_mask: 7,
   power: 0, cadence: 0, heartrate: 0,
   run_speed_x100: 1000, run_pace_float_sec: 10, run_cadence: 170, run_cadence_float: 4, run_incline_x10: 0,
   mode: "steady",
@@ -59,6 +60,8 @@ var LED_FIELDS = [
   { id: "confirm", modeKey: "led_confirm_mode", colorKey: "led_confirm_color", modeDefault: 3, colorDefault: 3 },
   { id: "error", modeKey: "led_error_mode", colorKey: "led_error_color", modeDefault: 3, colorDefault: 0 }
 ];
+
+var BROADCAST_BITS = { power: 1, cadence: 2, heartrate: 4 };
 
 /* ============ 工具函数 ============ */
 function $(id) { return document.getElementById(id); }
@@ -365,6 +368,7 @@ function renderHome() {
   renderRideSourcePicker();
   applySportView();
   applyModeView();
+  applyBroadcastVisibility();
 }
 function templateIdentityKey(t) {
   if (!t) return "";
@@ -448,6 +452,7 @@ function applyModeView() {
   }
   if (selectedItem && selectedItem.scrollIntoView) selectedItem.scrollIntoView({ block: "nearest", inline: "center" });
   updatePacerInfo();
+  applyBroadcastVisibility();
 }
 function applySportView() {
   var isRunning = STATE.sport_profile === "running";
@@ -460,12 +465,54 @@ function applySportView() {
     var s = items[i].getAttribute("data-sport");
     items[i].classList.toggle("on", s === STATE.sport_profile);
   }
+  applyBroadcastVisibility();
 }
 function onSportSwitch(sport) {
   captureDraft();
   STATE.sport_profile = sport === "running" ? "running" : "cycling";
   applySportView();
   applyModeView();
+}
+function broadcastEnabled(kind) {
+  return (STATE.broadcast_mask & (BROADCAST_BITS[kind] || 0)) !== 0;
+}
+function onBroadcastToggle(kind, checked) {
+  var bit = BROADCAST_BITS[kind] || 0;
+  if (!bit) return;
+  var next = checked ? (STATE.broadcast_mask | bit) : (STATE.broadcast_mask & ~bit);
+  if ((next & 7) === 0) {
+    toast("至少保留一个数据项");
+    var input = document.querySelector('#broadcast-toggle-bar [data-broadcast="' + kind + '"] input');
+    if (input) input.checked = true;
+    return;
+  }
+  STATE.broadcast_mask = next & 7;
+  applyBroadcastVisibility();
+}
+function showIf(id, visible) {
+  var el = $(id);
+  if (el) el.style.display = visible ? "" : "none";
+}
+function applyBroadcastVisibility() {
+  var powerLabel = $("broadcast-power-label");
+  var cadenceLabel = $("broadcast-cadence-label");
+  var isRunning = STATE.sport_profile === "running";
+  if (powerLabel) powerLabel.textContent = isRunning ? "配速" : "功率";
+  if (cadenceLabel) cadenceLabel.textContent = isRunning ? "步频" : "踏频";
+  var toggles = document.querySelectorAll("#broadcast-toggle-bar .broadcast-toggle");
+  for (var i = 0; i < toggles.length; i++) {
+    var kind = toggles[i].getAttribute("data-broadcast");
+    var input = toggles[i].querySelector("input");
+    var on = broadcastEnabled(kind);
+    toggles[i].classList.toggle("on", on);
+    if (input) input.checked = on;
+  }
+  showIf("cycling-power-card", !isRunning && broadcastEnabled("power"));
+  showIf("cycling-cadence-card", !isRunning && broadcastEnabled("cadence"));
+  showIf("cycling-hr-card", !isRunning && broadcastEnabled("heartrate"));
+  showIf("running-speed-card", isRunning && broadcastEnabled("power"));
+  showIf("running-cadence-card", isRunning && broadcastEnabled("cadence"));
+  showIf("running-hr-card", isRunning && broadcastEnabled("heartrate"));
 }
 /* 用户点击分段切换模式（仅改本地 STATE，保存时才落盘） */
 function onModeSwitch(mode) {
@@ -672,6 +719,7 @@ function collectConfig() {
   return withLedConfig({
     device_name: STATE.device_name,
     sport_profile: STATE.sport_profile,
+    broadcast_mask: STATE.broadcast_mask & 7,
     mode: STATE.mode,
     power: clamp(parseInt($("home-power").value, 10) || 0, 0, 2000),
     cadence: clamp(parseInt($("home-cadence").value, 10) || 0, 20, 120),
@@ -1263,6 +1311,8 @@ function init() {
       STATE.git_sha = data.git_sha || "";
       STATE.sport_profile = data.sport_profile || "cycling";
       STATE.active_sport_profile = STATE.sport_profile;
+      STATE.broadcast_mask = data.broadcast_mask != null ? (data.broadcast_mask & 7) : 7;
+      if (STATE.broadcast_mask === 0) STATE.broadcast_mask = 7;
       STATE.power = data.power || 0;
       STATE.cadence = data.cadence || 0;
       STATE.heartrate = data.heartrate || 0;

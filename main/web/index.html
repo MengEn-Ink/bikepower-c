@@ -29,12 +29,18 @@
       <button class="seg-item" data-sport="running" onclick="onSportSwitch('running')">跑步</button>
     </div>
 
+    <div class="broadcast-toggle-bar" id="broadcast-toggle-bar" aria-label="广播数据项">
+      <label class="broadcast-toggle" data-broadcast="power"><input type="checkbox" checked onchange="onBroadcastToggle('power',this.checked)"><span id="broadcast-power-label">功率</span></label>
+      <label class="broadcast-toggle" data-broadcast="cadence"><input type="checkbox" checked onchange="onBroadcastToggle('cadence',this.checked)"><span id="broadcast-cadence-label">踏频</span></label>
+      <label class="broadcast-toggle" data-broadcast="heartrate"><input type="checkbox" checked onchange="onBroadcastToggle('heartrate',this.checked)"><span>心率</span></label>
+    </div>
+
     <!-- ERG 提示（仅骑行 App 下发 ERG 时显示） -->
     <div class="note warn" id="erg-note" style="display:none">⚡ 骑行 App 正在通过 ERG 控制目标功率，手动功率暂不生效；如需手动设置，请切到固定模式并保存。</div>
 
     <!-- ---- 固定模式区 ---- -->
     <div id="home-steady">
-      <div class="card home-card">
+      <div class="card home-card" id="cycling-power-card">
         <h2>骑行输出</h2>
         <div class="ride-source-picker" id="ride-source-picker" aria-label="骑行输出来源"></div>
         <div class="ride-source-summary" id="ride-source-summary">
@@ -77,7 +83,7 @@
         <div class="note robot-note" id="ride-robot-note">选择固定功率时按填写值输出；选择机器人时按 W/kg × 体重自动生成目标功率。</div>
       </div>
 
-      <div class="card home-card cycling-compact-card">
+      <div class="card home-card cycling-compact-card" id="cycling-cadence-card">
         <div class="val"><input type="number" inputmode="numeric" id="home-cadence" value="0"><span class="unit">rpm</span></div>
         <div class="lbl"><span>固定踏频</span></div>
         <div class="float-row">
@@ -88,7 +94,7 @@
         </div>
       </div>
 
-      <div class="card home-card cycling-compact-card">
+      <div class="card home-card cycling-compact-card" id="cycling-hr-card">
         <div class="val"><input type="number" inputmode="numeric" id="home-hr" value="0"><span class="unit">bpm</span></div>
         <div class="lbl"><span>目标心率</span><span class="zone" id="zone-hr"><span class="dot"></span>Z?</span></div>
         <div class="hr-lock-row compact-hr-lock">
@@ -107,7 +113,7 @@
     </div>
 
     <div id="home-running" style="display:none">
-      <div class="card home-card">
+      <div class="card home-card" id="running-speed-card">
         <div class="pace-input-row">
           <div class="val pace-val"><input type="number" inputmode="numeric" id="run-pace-min" value="5"><span class="unit">分</span></div>
           <div class="val pace-val"><input type="number" inputmode="numeric" id="run-pace-sec" value="00"><span class="unit">秒/km</span></div>
@@ -127,7 +133,7 @@
           <button class="fbtn" onclick="onFloatAdj('runpace',1)">+</button>
         </div>
       </div>
-      <div class="card home-card">
+      <div class="card home-card" id="running-cadence-card">
         <div class="val"><input type="number" inputmode="numeric" id="run-cadence" value="170"><span class="unit">spm</span></div>
         <div class="lbl"><span>步频</span></div>
         <div class="float-row" id="run-cadence-float">
@@ -137,11 +143,11 @@
           <button class="fbtn" onclick="onFloatAdj('runcadence',1)">+</button>
         </div>
       </div>
-      <div class="card home-card">
+      <div class="card home-card" id="running-incline-card">
         <div class="val"><input type="number" inputmode="decimal" step="0.1" id="run-incline" value="0.0"><span class="unit">%</span></div>
         <div class="lbl"><span>坡度</span></div>
       </div>
-      <div class="card home-card">
+      <div class="card home-card" id="running-hr-card">
         <div class="val"><input type="number" inputmode="numeric" id="run-hr" value="0"><span class="unit">bpm</span></div>
         <div class="lbl"><span>目标心率</span><span class="zone" id="zone-run-hr"><span class="dot"></span>Z?</span></div>
         <div class="hr-lock-row">
