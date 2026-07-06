@@ -29,7 +29,7 @@
   <text x="336" y="207" text-anchor="middle" font-size="9" fill="#666">GPIO12</text>
   <line x1="285" y1="178" x2="307" y2="173" stroke="#666" stroke-width="1" marker-end="url(#arrow)"/>
 
-  <text x="220" y="272" text-anchor="middle" font-size="10" fill="#555">普通 LED：高电平点亮；按钮：内部上拉，按下接地</text>
+  <text x="220" y="272" text-anchor="middle" font-size="10" fill="#555">普通 LED：低电平点亮；按钮：内部上拉，按下接地</text>
 
   <rect x="480" y="90" width="320" height="220" rx="10" fill="#f3e5f5" stroke="#8e24aa" stroke-width="1.5" filter="url(#shadow)"/>
   <text x="640" y="120" text-anchor="middle" font-size="14" font-weight="bold" fill="#6a1b9a">M5Stamp C3</text>

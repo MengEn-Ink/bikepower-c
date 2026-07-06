@@ -12,7 +12,7 @@ BikePower C 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，�
 
 | 开发板 | LED | 按钮 | 检测方式 |
 |--------|-----|------|----------|
-| 通用 ESP32-C3 开发板 | GPIO12 普通 LED（高电平点亮） | GPIO9（内部上拉） | 默认板型 |
+| 通用 ESP32-C3 开发板 | GPIO12 普通 LED（低电平点亮） | GPIO9（内部上拉） | 默认板型 |
 | [M5Stamp C3](https://shop.m5stack.com/products/m5stamp-c3-mate-with-pin-headers) | GPIO2 SK6812 RGB LED | GPIO3（外部上拉） | GPIO3 按钮上拉自动识别 |
 
 **自动检测原理**：启动时将 GPIO3 配置为输入下拉，读取电平——通用板 GPIO3 悬空下拉读低，M5Stamp C3 的 GPIO3 接按钮（外部上拉到 3.3V）读高。检测完成后 GPIO3 恢复，后续按钮初始化重新配置。

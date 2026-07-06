@@ -21,8 +21,8 @@ static const char *TAG = "BOARD";
 
 // 板型描述表，下标与 board_type_t 枚举一一对应
 static const board_desc_t s_board_desc[BOARD_TYPE_COUNT] = {
-    [BOARD_GENERIC_C3] = { BTN_PIN_GENERIC, LED_PIN_GENERIC, LED_DRV_GPIO,   BOARD_NAME_GENERIC },
-    [BOARD_M5STAMP_C3] = { BTN_PIN_M5STAMP, LED_PIN_M5STAMP, LED_DRV_SK6812, BOARD_NAME_M5STAMP },
+    [BOARD_GENERIC_C3] = { BTN_PIN_GENERIC, LED_PIN_GENERIC, LED_DRV_GPIO,   LED_ACTIVE_LOW,  BOARD_NAME_GENERIC },
+    [BOARD_M5STAMP_C3] = { BTN_PIN_M5STAMP, LED_PIN_M5STAMP, LED_DRV_SK6812, LED_ACTIVE_HIGH, BOARD_NAME_M5STAMP },
 };
 
 static board_type_t s_board = BOARD_GENERIC_C3;
@@ -102,4 +102,9 @@ int board_led_pin(void)
 led_drv_t board_led_drv(void)
 {
     return s_board_desc[s_board].led_drv;
+}
+
+led_active_level_t board_led_active_level(void)
+{
+    return s_board_desc[s_board].led_active_level;
 }

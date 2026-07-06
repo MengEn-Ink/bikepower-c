@@ -58,9 +58,10 @@ def main():
     # 排除哨兵
     board_enums = [e for e in board_enums if e != "BOARD_TYPE_COUNT"]
 
-    # 2. 提取 config 中的引脚/名称宏定义（LED_DRV_* 是 enum 值，单独处理）
+    # 2. 提取 config 中的引脚/名称宏定义（LED_DRV_* / LED_ACTIVE_* 是 enum 值，单独处理）
     pin_macros = set(re.findall(r'#define\s+((?:BTN_PIN|LED_PIN|BOARD_NAME)_\w+)', config_src))
     led_drv_enums = set(re.findall(r'\b(LED_DRV_\w+)\b', config_src))
+    led_active_enums = set(re.findall(r'\b(LED_ACTIVE_\w+)\b', config_src))
 
     # 3. 提取描述表行
     desc_rows = re.findall(r'\[(BOARD_\w+_C3)\]\s*=\s*\{([^}]+)\}', board_src)
@@ -79,11 +80,14 @@ def main():
     for enum, body in desc_rows:
         check(enum in board_enums,
               f"描述表使用枚举 {enum} 未在 config 中定义")
-        # 提取行内使用的所有宏/枚举（BTN_PIN_*, LED_PIN_*, BOARD_NAME_* 是 #define；LED_DRV_* 是 enum）
-        used = re.findall(r'\b(BTN_PIN_\w+|LED_PIN_\w+|LED_DRV_\w+|BOARD_NAME_\w+)\b', body)
+        # 提取行内使用的所有宏/枚举（BTN_PIN_*, LED_PIN_*, BOARD_NAME_* 是 #define；LED_DRV_* / LED_ACTIVE_* 是 enum）
+        used = re.findall(r'\b(BTN_PIN_\w+|LED_PIN_\w+|LED_DRV_\w+|LED_ACTIVE_\w+|BOARD_NAME_\w+)\b', body)
         for u in used:
             if u.startswith("LED_DRV_"):
                 check(u in led_drv_enums,
+                      f"描述表 [{enum}] 使用枚举 {u} 未在 config 中定义")
+            elif u.startswith("LED_ACTIVE_"):
+                check(u in led_active_enums,
                       f"描述表 [{enum}] 使用枚举 {u} 未在 config 中定义")
             else:
                 check(u in pin_macros,

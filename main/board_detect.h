@@ -16,6 +16,7 @@ typedef struct {
     int btn_pin;            // 按钮 GPIO
     int led_pin;            // LED GPIO
     led_drv_t led_drv;      // LED 驱动类型
+    led_active_level_t led_active_level; // 普通 GPIO LED 的点亮电平；RGB 驱动忽略
     const char *name;       // 固件包名（如 "generic-c3"）
 } board_desc_t;
 
@@ -69,3 +70,10 @@ int board_led_pin(void);
  * 返回值：LED 驱动类型枚举。
  */
 led_drv_t board_led_drv(void);
+
+/**
+ * 获取普通 GPIO LED 的点亮电平。
+ * 无参数。
+ * 返回值：LED_ACTIVE_LOW 或 LED_ACTIVE_HIGH；RGB 板会返回描述表值但驱动忽略。
+ */
+led_active_level_t board_led_active_level(void);

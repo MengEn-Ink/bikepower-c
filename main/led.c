@@ -1,6 +1,6 @@
 /**
  * LED 状态指示任务
- * 通用板：GPIO12 高电平有效普通 LED。
+ * 通用板：GPIO12 低电平有效普通 LED。
  * M5Stamp C3：GPIO2 SK6812 RGB LED（RMT 驱动），按状态映射颜色。
  * 由 app_state 状态机通过 led_apply_scene 驱动，任务内部按节拍刷新。
  */
@@ -123,7 +123,8 @@ static esp_err_t sk6812_init(void)
  */
 static void led_write_gpio(int level)
 {
-    gpio_set_level(board_led_pin(), level);
+    int active_level = (board_led_active_level() == LED_ACTIVE_HIGH) ? 1 : 0;
+    gpio_set_level(board_led_pin(), level ? active_level : !active_level);
 }
 
 // ===== 统一 LED 输出 =====
@@ -210,8 +211,9 @@ esp_err_t led_init(void)
             ESP_LOGE(TAG, "gpio_config LED 失败 ret=%d", ret);
             return ret;
         }
-        gpio_set_level(board_led_pin(), 0);
-        ESP_LOGI(TAG, "LED GPIO 初始化完成 GPIO%d", board_led_pin());
+        led_write_gpio(0);
+        ESP_LOGI(TAG, "LED GPIO 初始化完成 GPIO%d active=%s",
+                 board_led_pin(), board_led_active_level() == LED_ACTIVE_HIGH ? "high" : "low");
     }
 
     BaseType_t fr = xTaskCreate(led_task, "led_task", TASK_STACK_LED, NULL, TASK_PRIO_LED, NULL);
