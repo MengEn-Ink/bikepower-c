@@ -14,6 +14,7 @@ ota/
 
 # Coredump / logs
 *.log
+tests/reports/
 dependencies.lock
 managed_components/
 
