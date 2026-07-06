@@ -24,6 +24,7 @@
 | [技术参考](dev/01-technical-reference.md) | 三层架构、启动流程、BLE 服务、配网链路、配置 JSON、测试门禁（基于当前实现） |
 | [固件防提取/防反编译](dev/02-firmware-security.md) | 编译层加固（已实现）+ Flash 加密/Secure Boot 方案与选型 |
 | [测试覆盖率分析](dev/03-test-coverage-analysis.md) | 领域层/应用层模块清单、覆盖矩阵、固件随附测试报告规则 |
+| [跑步模式兼容性调研与适配方案](dev/04-running-mode-compatibility.md) | Zwift/MyWhoosh 跑步模式 BLE 兼容口径、广播/GATT 数据需求、分阶段落地方案 |
 
 ## 🗄️ archive/ — 历史 / 归档（仅供追溯）
 
