@@ -94,6 +94,7 @@ typedef enum {
 #define NVS_KEY_CUSTOM_NAME    "cname"
 #define NVS_KEY_DEVICE_NAME    "devname"
 #define NVS_KEY_SPORT_PROFILE  "sport"
+#define NVS_KEY_BROADCAST_MASK "bmask"
 #define NVS_KEY_RUN_SPEED      "rspeed"
 #define NVS_KEY_RUN_PACE_FLOAT "rpacef"
 #define NVS_KEY_RUN_CADENCE    "rcad"

@@ -268,6 +268,13 @@ static bool apply_json_fields(power_engine_t *e, const char *body, bool allow_sp
             }
         }
     }
+    if (json_has_key(body, "broadcast_mask")) {
+        old_val = e->broadcast_mask;
+        new_val = json_get_int_def(body, "broadcast_mask", old_val);
+        power_engine_set_broadcast_mask(e, new_val);
+        if (old_val != e->broadcast_mask)
+            ESP_LOGI(TAG, "  broadcast_mask: %d → %d", old_val, e->broadcast_mask);
+    }
     if (json_get_str(body, "custom_pacer_name", val, sizeof(val))) {
         ESP_LOGI(TAG, "  custom_pacer_name: %s → %s", e->profile.custom_pacer_name, val);
         profile_set_custom_name(&e->profile, val);
@@ -469,7 +476,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
     int off = snprintf(buf, sizeof(buf),
         "{\"device_name\":\"%s\",\"firmware_version\":\"%s\",\"firmware_name\":\"%s\","
         "\"board\":\"%s\",\"stable_version\":\"%s\",\"fix_version\":\"%s\",\"git_sha\":\"%s\","
-        "\"sport_profile\":\"%s\","
+        "\"sport_profile\":\"%s\",\"broadcast_mask\":%d,"
         "\"power\":%d,\"cadence\":%d,\"heartrate\":%d,\"mode\":\"%s\","
         "\"run_speed_x100\":%d,\"run_pace_float_sec\":%d,"
         "\"run_cadence\":%d,\"run_cadence_float\":%d,\"run_incline_x10\":%d,"
@@ -489,7 +496,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"pacers\":[",
         dn_esc, FIRMWARE_VERSION, fw_name_esc,
         board_get_desc()->name, FIRMWARE_STABLE_VERSION, FIRMWARE_FIX_VERSION, BIKEPOWER_GIT_SHA,
-        sport_to_id((int)e->sport_profile),
+        sport_to_id((int)e->sport_profile), e->broadcast_mask,
         e->base_power, e->cadence_base, e->last_heartrate, mode_to_id((int)e->mode),
         e->running.speed_x100_kmh, e->running.pace_float_sec,
         e->running.cadence_spm, e->running.cadence_float_spm, e->running.incline_x10,
@@ -567,8 +574,9 @@ static esp_err_t h_api_config(httpd_req_t *req)
         power_engine_clear_dirty(s_engine);
         if (name_changed) ble_bikepower_refresh_device_name();
         app_state_refresh_led();
-        ESP_LOGI(TAG, "配置已保存 sport=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d/%d",
+        ESP_LOGI(TAG, "配置已保存 sport=%d bmask=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d/%d",
                  (int)s_engine->sport_profile,
+                 s_engine->broadcast_mask,
                  s_engine->base_power, s_engine->cadence_base,
                  (int)s_engine->mode, s_engine->device_name,
                  s_engine->power_step,
@@ -622,8 +630,9 @@ static esp_err_t h_api_close_wifi(httpd_req_t *req)
         }
         if (name_changed) ble_bikepower_refresh_device_name();
         app_state_refresh_led();
-        ESP_LOGI(TAG, "配置已保存并准备关闭 WiFi sport=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d/%d",
+        ESP_LOGI(TAG, "配置已保存并准备关闭 WiFi sport=%d bmask=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d/%d",
                  (int)s_engine->sport_profile,
+                 s_engine->broadcast_mask,
                  s_engine->base_power, s_engine->cadence_base,
                  (int)s_engine->mode, s_engine->device_name,
                  s_engine->power_step,

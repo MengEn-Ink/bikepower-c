@@ -42,6 +42,7 @@ void config_store_defaults(config_data_t *c)
     c->custom_pacer_name[CUSTOM_PACER_NAME_MAX - 1] = '\0';
     led_config_defaults(&c->led);
     c->sport_profile = DEFAULT_SPORT_PROFILE;
+    c->broadcast_mask = BROADCAST_FIELD_ALL;
     c->run_speed_x100 = RUN_SPEED_X100_DEFAULT;
     c->run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT;
     c->run_cadence = RUN_CADENCE_DEFAULT;
@@ -83,6 +84,8 @@ bool config_store_validate(config_data_t *c)
     }
     led_config_validate(&c->led);
     if (c->sport_profile < 0 || c->sport_profile >= SPORT_PROFILE_COUNT) c->sport_profile = DEFAULT_SPORT_PROFILE;
+    c->broadcast_mask &= BROADCAST_FIELD_ALL;
+    if (c->broadcast_mask == 0) c->broadcast_mask = BROADCAST_FIELD_ALL;
     c->run_speed_x100 = clamp_int(c->run_speed_x100, RUN_SPEED_X100_MIN, RUN_SPEED_X100_MAX);
     c->run_pace_float_sec = clamp_int(c->run_pace_float_sec, RUN_PACE_FLOAT_SEC_MIN, RUN_PACE_FLOAT_SEC_MAX);
     c->run_cadence = clamp_int(c->run_cadence, RUN_CADENCE_MIN, RUN_CADENCE_MAX);
@@ -112,6 +115,7 @@ bool config_store_validate(config_data_t *c)
         || strncmp(in.custom_pacer_name, c->custom_pacer_name, CUSTOM_PACER_NAME_MAX) != 0
         || memcmp(&in.led, &c->led, sizeof(c->led)) != 0
         || in.sport_profile != c->sport_profile
+        || in.broadcast_mask != c->broadcast_mask
         || in.run_speed_x100 != c->run_speed_x100
         || in.run_pace_float_sec != c->run_pace_float_sec
         || in.run_cadence != c->run_cadence
@@ -136,8 +140,12 @@ bool config_store_migrate(config_data_t *c)
         c->run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT;
     }
     if (c->schema_ver == 7) {
-        c->schema_ver = CONFIG_VERSION;
+        c->schema_ver = 8;
         c->run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT;
+    }
+    if (c->schema_ver == 8) {
+        c->schema_ver = CONFIG_VERSION;
+        c->broadcast_mask = BROADCAST_FIELD_ALL;
         config_store_validate(c);
         return true;
     }
@@ -247,7 +255,7 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         "\"led_wifi_mode\":%d,\"led_wifi_color\":%d,"
         "\"led_confirm_mode\":%d,\"led_confirm_color\":%d,"
         "\"led_error_mode\":%d,\"led_error_color\":%d,"
-        "\"sport_profile\":%d,\"run_speed_x100\":%d,"
+        "\"sport_profile\":%d,\"broadcast_mask\":%d,\"run_speed_x100\":%d,"
         "\"run_pace_float_sec\":%d,"
         "\"run_cadence\":%d,\"run_cadence_float\":%d,\"run_incline_x10\":%d,"
         "\"device_name\":\"%s\"}",
@@ -265,7 +273,7 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         c->led.scenes[LED_SCENE_WIFI_CONFIG].mode, c->led.scenes[LED_SCENE_WIFI_CONFIG].color,
         c->led.scenes[LED_SCENE_WIFI_CONFIRM].mode, c->led.scenes[LED_SCENE_WIFI_CONFIRM].color,
         c->led.scenes[LED_SCENE_ERROR].mode, c->led.scenes[LED_SCENE_ERROR].color,
-        c->sport_profile, c->run_speed_x100,
+        c->sport_profile, c->broadcast_mask, c->run_speed_x100,
         c->run_pace_float_sec,
         c->run_cadence, c->run_cadence_float, c->run_incline_x10,
         esc);
@@ -298,6 +306,7 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         {"thr_hr", &tmp.thr_hr}, {"ride_type", &tmp.ride_type},
         {"custom_wkg_low", &tmp.custom_wkg_low}, {"custom_wkg_high", &tmp.custom_wkg_high},
         {"sport_profile", &tmp.sport_profile},
+        {"broadcast_mask", &tmp.broadcast_mask},
         {"run_speed_x100", &tmp.run_speed_x100},
         {"run_pace_float_sec", &tmp.run_pace_float_sec},
         {"run_cadence", &tmp.run_cadence},

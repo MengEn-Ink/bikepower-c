@@ -177,6 +177,7 @@ void app_main(void)
     ble_bikepower_set_erg_callback(on_erg_target);
     ble_bikepower_set_erg_clear_callback(on_erg_clear);
     ble_bikepower_set_profile(s_engine.sport_profile);
+    ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
     ble_bikepower_set_device_name(s_engine.device_name);
     esp_err_t ble_ret = ble_bikepower_start();
     if (ble_ret != ESP_OK) {
@@ -284,6 +285,7 @@ void app_main(void)
         app_state_tick();
 
         snapshot_t s = power_engine_snapshot(&s_engine);
+        ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
         if (s_engine.sport_profile == SPORT_PROFILE_RUNNING) {
             running_snapshot_t rs = running_engine_snapshot(&s_engine.running, HR_LOOP_INTERVAL_MS);
             ble_bikepower_set_running_data(rs, (uint8_t)s.heartrate);

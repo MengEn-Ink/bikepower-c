@@ -88,6 +88,7 @@ void power_engine_init(power_engine_t *e)
     led_config_defaults(&e->led);
     hr_model_init(&e->hr, DEFAULT_HEARTRATE);
     e->sport_profile = DEFAULT_SPORT_PROFILE;
+    e->broadcast_mask = BROADCAST_FIELD_ALL;
     running_engine_init(&e->running);
     e->snapshot.power = DEFAULT_POWER;
     e->snapshot.cadence = DEFAULT_CADENCE;
@@ -479,6 +480,112 @@ bool power_engine_set_run_incline(power_engine_t *e, int incline_x10)
     bool changed = running_engine_set_incline(&e->running, incline_x10);
     if (changed) e->dirty = true;
     return changed;
+}
+
+bool power_engine_set_broadcast_mask(power_engine_t *e, int mask)
+{
+    int normalized = mask & BROADCAST_FIELD_ALL;
+    if (normalized == 0) return false;
+    if (e->broadcast_mask == normalized) return false;
+    e->broadcast_mask = normalized;
+    e->dirty = true;
+    return true;
+}
+
+bool power_engine_broadcast_enabled(const power_engine_t *e, int field)
+{
+    if (!e) return false;
+    return (e->broadcast_mask & field) != 0;
+}
+
+control_target_t power_engine_button_target(const power_engine_t *e)
+{
+    if (!e) return CONTROL_TARGET_NONE;
+    if (e->sport_profile == SPORT_PROFILE_RUNNING) {
+        if (e->broadcast_mask & BROADCAST_FIELD_POWER) return CONTROL_TARGET_RUN_SPEED;
+        if (e->broadcast_mask & BROADCAST_FIELD_CADENCE) return CONTROL_TARGET_RUN_CADENCE;
+        if (e->broadcast_mask & BROADCAST_FIELD_HEARTRATE) return CONTROL_TARGET_HEARTRATE;
+        return CONTROL_TARGET_NONE;
+    }
+    if (e->broadcast_mask & BROADCAST_FIELD_POWER) return CONTROL_TARGET_POWER;
+    if (e->broadcast_mask & BROADCAST_FIELD_CADENCE) return CONTROL_TARGET_CADENCE;
+    if (e->broadcast_mask & BROADCAST_FIELD_HEARTRATE) return CONTROL_TARGET_HEARTRATE;
+    return CONTROL_TARGET_NONE;
+}
+
+int power_engine_control_value(const power_engine_t *e, control_target_t target)
+{
+    if (!e) return 0;
+    switch (target) {
+    case CONTROL_TARGET_POWER:
+        return e->base_power;
+    case CONTROL_TARGET_CADENCE:
+        return e->cadence_base;
+    case CONTROL_TARGET_HEARTRATE:
+        return e->has_user_hr ? e->user_heartrate : e->last_heartrate;
+    case CONTROL_TARGET_RUN_SPEED:
+        return e->running.speed_x100_kmh;
+    case CONTROL_TARGET_RUN_CADENCE:
+        return e->running.cadence_spm;
+    default:
+        return 0;
+    }
+}
+
+bool power_engine_set_control_value(power_engine_t *e, control_target_t target, int value)
+{
+    if (!e) return false;
+    switch (target) {
+    case CONTROL_TARGET_POWER:
+        return power_engine_set_power(e, value);
+    case CONTROL_TARGET_CADENCE:
+        return power_engine_set_cadence(e, value);
+    case CONTROL_TARGET_HEARTRATE:
+        return power_engine_set_heartrate(e, value);
+    case CONTROL_TARGET_RUN_SPEED:
+        return power_engine_set_run_speed(e, value);
+    case CONTROL_TARGET_RUN_CADENCE:
+        return power_engine_set_run_cadence(e, value);
+    default:
+        return false;
+    }
+}
+
+int power_engine_adjust_control_target(power_engine_t *e, control_target_t target, int direction)
+{
+    if (!e) return 0;
+    int sign = direction < 0 ? -1 : 1;
+    switch (target) {
+    case CONTROL_TARGET_POWER:
+        return power_engine_adjust_power(e, sign * e->power_step);
+    case CONTROL_TARGET_CADENCE:
+        return power_engine_adjust_cadence(e, sign);
+    case CONTROL_TARGET_HEARTRATE: {
+        int base = e->has_user_hr ? e->user_heartrate : e->last_heartrate;
+        int next = clampi(base + sign, HR_MIN, HR_MAX);
+        power_engine_set_heartrate(e, next);
+        return e->has_user_hr ? e->user_heartrate : e->last_heartrate;
+    }
+    case CONTROL_TARGET_RUN_SPEED: {
+        int pace_sec = e->running.speed_x100_kmh > 0
+                     ? (360000 + e->running.speed_x100_kmh / 2) / e->running.speed_x100_kmh
+                     : 360;
+        pace_sec += direction < 0 ? 5 : -5;
+        int fastest = (360000 + RUN_SPEED_X100_MAX / 2) / RUN_SPEED_X100_MAX;
+        int slowest = (360000 + RUN_SPEED_X100_MIN / 2) / RUN_SPEED_X100_MIN;
+        pace_sec = clampi(pace_sec, fastest, slowest);
+        int next_speed = clampi((360000 + pace_sec / 2) / pace_sec, RUN_SPEED_X100_MIN, RUN_SPEED_X100_MAX);
+        power_engine_set_run_speed(e, next_speed);
+        return e->running.speed_x100_kmh;
+    }
+    case CONTROL_TARGET_RUN_CADENCE: {
+        int next = clampi(e->running.cadence_spm + sign, RUN_CADENCE_MIN, RUN_CADENCE_MAX);
+        power_engine_set_run_cadence(e, next);
+        return e->running.cadence_spm;
+    }
+    default:
+        return 0;
+    }
 }
 
 /*

@@ -65,12 +65,22 @@ typedef struct {
     led_config_t led;
     hr_state_t hr;
     sport_profile_t sport_profile;
+    int broadcast_mask;
     running_engine_t running;
     snapshot_t snapshot;
     long snapshot_count;
     bool dirty;
     char device_name[DEVICE_NAME_MAX];
 } power_engine_t;
+
+typedef enum {
+    CONTROL_TARGET_NONE = 0,
+    CONTROL_TARGET_POWER,
+    CONTROL_TARGET_CADENCE,
+    CONTROL_TARGET_HEARTRATE,
+    CONTROL_TARGET_RUN_SPEED,
+    CONTROL_TARGET_RUN_CADENCE,
+} control_target_t;
 
 /* 初始化功率引擎到领域层默认状态。 */
 void power_engine_init(power_engine_t *e);
@@ -117,6 +127,12 @@ bool power_engine_set_run_pace_float(power_engine_t *e, int seconds);
 bool power_engine_set_run_cadence(power_engine_t *e, int cadence_spm);
 bool power_engine_set_run_cadence_float(power_engine_t *e, int amp_spm);
 bool power_engine_set_run_incline(power_engine_t *e, int incline_x10);
+bool power_engine_set_broadcast_mask(power_engine_t *e, int mask);
+bool power_engine_broadcast_enabled(const power_engine_t *e, int field);
+control_target_t power_engine_button_target(const power_engine_t *e);
+int power_engine_adjust_control_target(power_engine_t *e, control_target_t target, int direction);
+int power_engine_control_value(const power_engine_t *e, control_target_t target);
+bool power_engine_set_control_value(power_engine_t *e, control_target_t target, int value);
 
 /* 处理 FTMS 下发的 ERG 目标功率，并在需要时自动切到 ERG 模式。
  * 返回 true 表示设置成功（范围有效并已应用），false 表示超出范围被拒绝。 */

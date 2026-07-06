@@ -47,6 +47,7 @@ static uint16_t g_ftms_status_handle;
 static volatile uint16_t g_power_w   = DEFAULT_POWER;
 static volatile uint8_t  g_hr_bpm    = DEFAULT_HEARTRATE;
 static volatile uint16_t g_cadence   = DEFAULT_CADENCE;
+static volatile uint8_t  g_broadcast_mask = BROADCAST_FIELD_ALL;
 static volatile uint16_t g_run_speed = 0;
 static volatile uint8_t  g_run_cadence = RUN_CADENCE_DEFAULT;
 static volatile uint16_t g_run_stride_cm = 0;
@@ -64,6 +65,7 @@ static uint8_t g_rsc_buf[10];
 static uint8_t g_rsc_feature_buf[4] = { 0x03, 0x00, 0x00, 0x00 };
 static uint8_t g_sensor_location = 0x05;
 static uint8_t g_ftms_bike_buf[8];
+static size_t g_ftms_bike_len = 8;
 static uint8_t g_ftms_resp_buf[3];
 
 // FTMS 静态特征值
@@ -544,14 +546,28 @@ static void pack_all(void)
     g_csc_buf[1] = rev & 0xFF;         g_csc_buf[2] = (rev >> 8) & 0xFF;
     g_csc_buf[3] = time_1024 & 0xFF;   g_csc_buf[4] = (time_1024 >> 8) & 0xFF;
 
-    // FTMS IndoorBike: flags=0x0044 + speed(cad*30) + cadence(cad*2) + power
-    uint16_t ftms_flags = 0x0044;
-    uint16_t speed = cadence * 30;
-    uint16_t ftms_cad = cadence * 2;
-    g_ftms_bike_buf[0] = ftms_flags & 0xFF;  g_ftms_bike_buf[1] = (ftms_flags >> 8) & 0xFF;
-    g_ftms_bike_buf[2] = speed & 0xFF;       g_ftms_bike_buf[3] = (speed >> 8) & 0xFF;
-    g_ftms_bike_buf[4] = ftms_cad & 0xFF;    g_ftms_bike_buf[5] = (ftms_cad >> 8) & 0xFF;
-    g_ftms_bike_buf[6] = power & 0xFF;       g_ftms_bike_buf[7] = (power >> 8) & 0xFF;
+    bool cadence_enabled = (g_broadcast_mask & BROADCAST_FIELD_CADENCE) != 0;
+    bool power_enabled = (g_broadcast_mask & BROADCAST_FIELD_POWER) != 0;
+    uint16_t ftms_flags = cadence_enabled ? 0x0000 : 0x0001; // More Data=1 omits instantaneous speed.
+    uint8_t off = 2;
+    if (cadence_enabled) {
+        ftms_flags |= 0x0004;
+        uint16_t speed = cadence * 30;
+        g_ftms_bike_buf[off++] = speed & 0xFF;
+        g_ftms_bike_buf[off++] = (speed >> 8) & 0xFF;
+        ftms_flags |= 0x0040;
+        uint16_t ftms_cad = cadence * 2;
+        g_ftms_bike_buf[off++] = ftms_cad & 0xFF;
+        g_ftms_bike_buf[off++] = (ftms_cad >> 8) & 0xFF;
+    }
+    if (power_enabled) {
+        ftms_flags |= 0x0040;
+        g_ftms_bike_buf[off++] = power & 0xFF;
+        g_ftms_bike_buf[off++] = (power >> 8) & 0xFF;
+    }
+    g_ftms_bike_buf[0] = ftms_flags & 0xFF;
+    g_ftms_bike_buf[1] = (ftms_flags >> 8) & 0xFF;
+    g_ftms_bike_len = off;
 }
 
 static void pack_running(void)
@@ -627,14 +643,16 @@ static void notify_tick(void *arg)
     }
     if (g_profile == SPORT_PROFILE_RUNNING) {
         pack_running();
-        notify_one_nolock(g_rsc_val_handle, g_rsc_buf, sizeof(g_rsc_buf));
-        notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
+        if ((g_broadcast_mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) == (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) {
+            notify_one_nolock(g_rsc_val_handle, g_rsc_buf, sizeof(g_rsc_buf));
+        }
+        if (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
     } else {
         pack_all();
-        notify_one_nolock(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
-        notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
-        notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
-        notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, sizeof(g_ftms_bike_buf));
+        if (g_broadcast_mask & BROADCAST_FIELD_POWER) notify_one_nolock(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
+        if (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
+        if (g_broadcast_mask & BROADCAST_FIELD_CADENCE) notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
+        if (g_broadcast_mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, g_ftms_bike_len);
     }
     xSemaphoreGive(g_notify_lock);
 }
@@ -846,6 +864,13 @@ void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t ca
     g_power_w = power_w;
     g_hr_bpm = heartrate_bpm;
     g_cadence = cadence_rpm;
+}
+
+void ble_bikepower_set_broadcast_mask(int mask)
+{
+    int normalized = mask & BROADCAST_FIELD_ALL;
+    if (normalized == 0) normalized = BROADCAST_FIELD_ALL;
+    g_broadcast_mask = (uint8_t)normalized;
 }
 
 void ble_bikepower_set_profile(sport_profile_t profile)

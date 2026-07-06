@@ -72,6 +72,7 @@ bool ble_bikepower_stop(void);
  * 特殊行为：这里只更新共享快照，不会立即主动发送通知。
  */
 void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm);
+void ble_bikepower_set_broadcast_mask(int mask);
 
 /**
  * 设置 BLE 运动 profile。

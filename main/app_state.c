@@ -3,8 +3,8 @@
  *
  * 消费按钮/连接事件，驱动调功、二次确认窗口与 LED。
  * 按钮语义：
- *   短按 <500ms        -> adjust_power(-power_step)
- *   长按 >=500ms       -> 每 BTN_AUTO_REPEAT_MS adjust_power(+power_step)（仅 steady 生效）
+ *   短按 <500ms        -> 按当前启用数据项调整主目标 -
+ *   长按 >=500ms       -> 每 BTN_AUTO_REPEAT_MS 调整主目标 +（仅 WiFi 确认阈值前）
  *   长按 >=2000ms 释放 -> 回滚本次自动调功，进入确认窗口（LED 按配置切换）
  *   确认窗口内再按      -> 触发 WiFi 配网（阶段5接入，经 wifi_trigger 回调）
  *   确认窗口 3s 超时    -> 取消，恢复 BLE_ACTIVE
@@ -22,7 +22,8 @@ static power_engine_t *s_engine;
 static app_state_t s_state = ST_BOOTING;
 static bool s_connected = false;
 
-static int s_power_before_press = 0;   // 本次按下前基准功率（用于长按回滚）
+static control_target_t s_press_target = CONTROL_TARGET_NONE;
+static int s_value_before_press = 0;   // 本次按下前目标值（用于长按回滚）
 static bool s_auto_adjusted = false;   // 本次按住是否发生自动调功
 static uint32_t s_confirm_start = 0;   // 确认窗口开始时间
 
@@ -164,13 +165,10 @@ void app_state_clear_error(void)
 static void enter_confirm_window(void)
 {
     if (s_auto_adjusted) {
-        // 长按过程中做过自动调功时，进入确认窗口前尝试恢复到按下前的基准值。
-        // set_power 仅 STEADY 模式生效：若长按期间被 ERG 目标切到非 STEADY 模式，
-        // 回滚会被拒绝，此处据返回值如实记录，避免谎报"已回滚"掩盖状态。
-        if (power_engine_set_power(s_engine, s_power_before_press)) {
-            ESP_LOGI(TAG, "长按结束，回滚功率到 %dW", s_power_before_press);
+        if (power_engine_set_control_value(s_engine, s_press_target, s_value_before_press)) {
+            ESP_LOGI(TAG, "长按结束，回滚按钮目标 %d 到 %d", (int)s_press_target, s_value_before_press);
         } else {
-            ESP_LOGW(TAG, "长按结束，因模式变更或值无效跳过回滚（目标 %dW）", s_power_before_press);
+            ESP_LOGW(TAG, "长按结束，按钮目标 %d 回滚被拒绝（目标 %d）", (int)s_press_target, s_value_before_press);
         }
     }
     s_state = ST_WIFI_CONFIRM;
@@ -254,15 +252,15 @@ void app_state_handle_event(const app_evt_t *e)
             trigger_wifi();
             break;
         }
-        s_power_before_press = s_engine->base_power;
+        s_press_target = power_engine_button_target(s_engine);
+        s_value_before_press = power_engine_control_value(s_engine, s_press_target);
         s_auto_adjusted = false;
         break;
 
     case APP_EVT_BTN_REPEAT:
         if (s_state != ST_BLE_ACTIVE) break;
         if (button_repeat_should_adjust((uint32_t)e->data, WIFI_BTN_HOLD_MS)) {
-            // 只有在进入 WiFi 长按阈值之前，长按重复事件才用于持续加功率。
-            power_engine_adjust_power(s_engine, s_engine->power_step);
+            power_engine_adjust_control_target(s_engine, s_press_target, 1);
             s_auto_adjusted = true;
         }
         break;
@@ -274,8 +272,8 @@ void app_state_handle_event(const app_evt_t *e)
         {
             btn_release_action_t act = button_classify_release((uint32_t)e->data, SHORT_PRESS_MS, WIFI_BTN_HOLD_MS);
             if (act == BTN_RELEASE_SHORT) {
-                int p = power_engine_adjust_power(s_engine, -s_engine->power_step);
-                ESP_LOGI(TAG, "短按 功率-%dW -> %dW", s_engine->power_step, p);
+                int v = power_engine_adjust_control_target(s_engine, s_press_target, -1);
+                ESP_LOGI(TAG, "短按 调整目标=%d -> %d", (int)s_press_target, v);
             } else if (act == BTN_RELEASE_LONG) {
                 enter_confirm_window();
             }

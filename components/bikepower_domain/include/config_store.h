@@ -34,6 +34,7 @@ typedef struct {
     char custom_pacer_name[CUSTOM_PACER_NAME_MAX]; // 自定义配速机器人昵称
     led_config_t led;   // LED 场景灯效配置
     int sport_profile;  // sport_profile_t
+    int broadcast_mask; // broadcast_field_t bitmask，至少保留一项
     int run_speed_x100; // 跑步速度，km/h * 100
     int run_pace_float_sec; // 跑步配速浮动，±秒/km
     int run_cadence;    // 跑步步频，steps/min

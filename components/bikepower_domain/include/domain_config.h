@@ -43,8 +43,8 @@
 #define RUN_INCLINE_X10_DEFAULT 0
 
 // ===== 配置格式版本 =====
-// v8：新增跑步步频浮动持久化。
-#define CONFIG_VERSION        8
+// v9：新增广播数据项开关持久化。
+#define CONFIG_VERSION        9
 
 // ===== 设备名称（BLE 广播名，可配网修改并持久化） =====
 #define DEVICE_NAME_MAX       24
@@ -58,6 +58,15 @@ typedef enum {
 
 #define SPORT_PROFILE_COUNT       2
 #define DEFAULT_SPORT_PROFILE     SPORT_PROFILE_CYCLING
+
+// ===== BLE 数据项启用开关 =====
+typedef enum {
+    BROADCAST_FIELD_POWER     = 1 << 0,
+    BROADCAST_FIELD_CADENCE   = 1 << 1,
+    BROADCAST_FIELD_HEARTRATE = 1 << 2,
+} broadcast_field_t;
+
+#define BROADCAST_FIELD_ALL (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_HEARTRATE)
 
 // ===== 骑行模式 ID =====
 /* 骑行模式枚举：决定功率、踏频和心率快照的生成策略。 */
