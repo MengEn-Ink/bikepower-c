@@ -45,6 +45,14 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
 .seg{display:flex;background:#e9e9eb;border-radius:12px;padding:3px;margin:0 0 6px;gap:3px}
 .seg-item{flex:1;border:0;background:transparent;color:#6e6e73;font-size:13px;font-weight:700;padding:7px 0;border-radius:9px;cursor:pointer;transition:all .15s}
 .seg-item.on{background:#fff;color:#007aff;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.mode-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:0 0 7px}
+.mode-card{position:relative;min-height:62px;border:1px solid rgba(0,0,0,.08);border-radius:12px;background:rgba(255,255,255,.9);padding:9px 28px 9px 10px;text-align:left;color:#1d1d1f;box-shadow:0 2px 10px rgba(0,0,0,.025);cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s,transform .15s}
+.mode-card:active{transform:scale(.98)}
+.mode-card.selected{border-color:rgba(0,122,255,.55);background:#f0f7ff;box-shadow:0 5px 16px rgba(0,122,255,.1)}
+.mode-card-main{display:block;font-size:13px;font-weight:900;line-height:1.2;letter-spacing:0}
+.mode-card-sub{display:block;margin-top:4px;font-size:10px;font-weight:700;color:#86868b;line-height:1.25}
+.mode-card-check{position:absolute;right:8px;top:8px;width:18px;height:18px;border-radius:50%;display:none;align-items:center;justify-content:center;background:#007aff;color:#fff;font-size:12px;font-weight:900;line-height:1}
+.mode-card.selected .mode-card-check{display:flex}
 /* 卡片内联浮动步进器 */
 .float-row{display:flex;align-items:center;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,.05)}
 .float-lbl{font-size:11px;color:#86868b;font-weight:600;flex:1}
@@ -220,6 +228,10 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
   .seg,.settings-nav{background:#2c2c2e}
   .seg-item,.settings-tab{color:#8e8e93}
   .seg-item.on,.settings-tab.on{background:#3a3a3c;color:#0a84ff}
+  .mode-card{background:#2c2c2e;border-color:#3a3a3c;color:#f5f5f7}
+  .mode-card.selected{background:#172b43;border-color:#0a84ff;box-shadow:0 5px 16px rgba(10,132,255,.12)}
+  .mode-card-sub{color:#8e8e93}
+  .mode-card-check{background:#0a84ff}
   .settings-actions{background:#1c1c1e}
   .float-val{color:#f5f5f7}
   .fbtn{background:#0a84ff}

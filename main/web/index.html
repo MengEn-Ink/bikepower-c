@@ -24,10 +24,24 @@
   <!-- ============ 首页 ============ -->
   <div class="view" id="view-home">
 
-    <!-- 模式二选一分段控件 -->
-    <div class="seg" id="mode-seg">
-      <button class="seg-item" data-mode="steady" onclick="onModeSwitch('steady')">固定模式</button>
-      <button class="seg-item" data-mode="road" onclick="onModeSwitch('road')">配速机器人</button>
+    <div class="seg" id="sport-seg">
+      <button class="seg-item" data-sport="cycling" onclick="onSportSwitch('cycling')">骑行</button>
+      <button class="seg-item" data-sport="running" onclick="onSportSwitch('running')">跑步</button>
+    </div>
+
+    <div id="cycling-mode-wrap">
+      <div class="mode-card-grid" id="mode-card-grid" aria-label="骑行模式">
+        <button class="mode-card" data-mode="steady" onclick="onModeSwitch('steady')">
+          <span class="mode-card-main">固定输出</span>
+          <span class="mode-card-sub">功率 / 踏频 / 心率</span>
+          <span class="mode-card-check">✓</span>
+        </button>
+        <button class="mode-card" data-mode="road" onclick="onModeSwitch('road')">
+          <span class="mode-card-main">配速机器人</span>
+          <span class="mode-card-sub">按 W/kg 自动输出</span>
+          <span class="mode-card-check">✓</span>
+        </button>
+      </div>
     </div>
 
     <!-- ERG 提示（仅骑行 App 下发 ERG 时显示） -->
@@ -106,6 +120,36 @@
           <div class="note">自定义功体比范围 1.0~7.0 W/kg，每档 0.1；输出功率 = W/kg × 体重，在下限与上限间随机波动。</div>
         </div>
       </div>
+    </div>
+
+    <div id="home-running" style="display:none">
+      <div class="card home-card">
+        <div class="val"><input type="number" inputmode="decimal" step="0.01" id="run-speed" value="10.00"><span class="unit">km/h</span></div>
+        <div class="lbl"><span>跑步速度</span></div>
+      </div>
+      <div class="card home-card">
+        <div class="val"><input type="number" inputmode="numeric" id="run-cadence" value="170"><span class="unit">spm</span></div>
+        <div class="lbl"><span>步频</span></div>
+      </div>
+      <div class="card home-card">
+        <div class="val"><input type="number" inputmode="decimal" step="0.1" id="run-incline" value="0.0"><span class="unit">%</span></div>
+        <div class="lbl"><span>坡度</span></div>
+      </div>
+      <div class="card home-card">
+        <div class="val"><input type="number" inputmode="numeric" id="run-hr" value="0"><span class="unit">bpm</span></div>
+        <div class="lbl"><span>目标心率</span><span class="zone" id="zone-run-hr"><span class="dot"></span>Z?</span></div>
+        <div class="hr-lock-row">
+          <label class="radio-line"><input type="radio" name="run-hr-lock" value="0" onchange="onRunHrLockChange()" checked><span>联动：心率随强度变化</span></label>
+          <label class="radio-line"><input type="radio" name="run-hr-lock" value="1" onchange="onRunHrLockChange()"><span>锁死：心率恒定按填写值</span></label>
+        </div>
+        <div class="float-row" id="run-hr-float-row">
+          <span class="float-lbl">浮动范围</span>
+          <button class="fbtn" onclick="onFloatAdj('hr',-1)">−</button>
+          <span class="float-val">±<span id="float-run-hr">2</span> bpm</span>
+          <button class="fbtn" onclick="onFloatAdj('hr',1)">+</button>
+        </div>
+      </div>
+      <div class="note warn">切换骑行/跑步会重建 BLE 服务表。修改运动类型后请使用「保存并关闭 WiFi」，设备会短暂重启 BLE 后按新模式广播。</div>
     </div>
 
     <div class="btn-row">

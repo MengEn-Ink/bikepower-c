@@ -5,7 +5,9 @@
 → 订阅 CPS/HR/CSC/FTMS 通知。
 再通过 FTMS 控制点(0x2AD9)下发 RequestControl + SetTargetPower(ERG)，
 校验控制点 indication 响应，并确认 CPS 功率收敛到目标值附近。
-用法: python tests/ble_selftest.py [秒数] [目标功率] [期望固件版本]
+用法:
+  python tests/ble_selftest.py [秒数] [目标功率] [期望固件版本]
+  python tests/ble_selftest.py --profile running [秒数] [期望固件版本]
   期望固件版本省略时自动从 main/bikepower_config.h 的 FIRMWARE_VERSION 解析。
 """
 import asyncio
@@ -22,6 +24,9 @@ HR_UUID = "00002a37-0000-1000-8000-00805f9b34fb"
 CSC_UUID = "00002a5b-0000-1000-8000-00805f9b34fb"
 FTMS_BIKE_UUID = "00002ad2-0000-1000-8000-00805f9b34fb"
 FTMS_CP_UUID = "00002ad9-0000-1000-8000-00805f9b34fb"
+RSC_UUID = "00002a53-0000-1000-8000-00805f9b34fb"
+RSC_FEATURE_UUID = "00002a54-0000-1000-8000-00805f9b34fb"
+SENSOR_LOCATION_UUID = "00002a5d-0000-1000-8000-00805f9b34fb"
 DIS_MANUF_UUID = "00002a29-0000-1000-8000-00805f9b34fb"
 DIS_MODEL_UUID = "00002a24-0000-1000-8000-00805f9b34fb"
 DIS_FW_UUID = "00002a26-0000-1000-8000-00805f9b34fb"
@@ -71,9 +76,21 @@ def get_expected_fw_version():
         pass
     return "3.1.1"  # fallback默认值
 
-DURATION = int(sys.argv[1]) if len(sys.argv) > 1 else 8
-TARGET_POWER = int(sys.argv[2]) if len(sys.argv) > 2 else 200
-EXPECTED_FW_VERSION = sys.argv[3] if len(sys.argv) > 3 else get_expected_fw_version()
+PROFILE = "cycling"
+args = sys.argv[1:]
+if args[:2] == ["--profile", "running"]:
+    PROFILE = "running"
+    args = args[2:]
+elif args[:2] == ["--profile", "cycling"]:
+    args = args[2:]
+
+DURATION = int(args[0]) if len(args) > 0 else 8
+TARGET_POWER = int(args[1]) if PROFILE == "cycling" and len(args) > 1 else 200
+EXPECTED_FW_VERSION = (
+    args[2] if PROFILE == "cycling" and len(args) > 2
+    else args[1] if PROFILE == "running" and len(args) > 1
+    else get_expected_fw_version()
+)
 
 DIS_EXPECT = {
     DIS_MANUF_UUID: ("厂商", "BikePower"),
@@ -95,6 +112,126 @@ def parse_cps(data: bytes):
     flags, power = struct.unpack_from("<HH", data, 0)
     return flags, power
 
+def parse_rsc(data: bytes):
+    b = bytes(data)
+    if len(b) < 4:
+        return None
+    flags = b[0]
+    speed = struct.unpack_from("<H", b, 1)[0]
+    cadence = b[3]
+    off = 4
+    stride = None
+    distance = None
+    if flags & 0x01 and len(b) >= off + 2:
+        stride = struct.unpack_from("<H", b, off)[0]
+        off += 2
+    if flags & 0x02 and len(b) >= off + 4:
+        distance = struct.unpack_from("<I", b, off)[0]
+    return {
+        "flags": flags,
+        "speed": speed,
+        "speed_kmh": speed * 3.6 / 256.0,
+        "cadence": cadence,
+        "stride": stride,
+        "distance": distance,
+        "running": bool(flags & 0x04),
+    }
+
+
+async def run_running_profile(client, found):
+    services = [
+        ("RSC", RSC_UUID),
+        ("RSC-Feature", RSC_FEATURE_UUID),
+        ("SensorLocation", SENSOR_LOCATION_UUID),
+        ("HR", HR_UUID),
+    ]
+    missing = []
+    for label, uuid in services:
+        present = uuid in found
+        print(f"  特征 {label}: {'有' if present else '无'}")
+        if not present:
+            missing.append(label)
+
+    dis_ok = await check_dis(client, found)
+    samples = []
+    hr_count = [0]
+
+    def cb_rsc(_, data):
+        parsed = parse_rsc(bytes(data))
+        if parsed:
+            samples.append(parsed)
+
+    def cb_hr(_, data):
+        hr_count[0] += 1
+
+    if RSC_UUID in found:
+        await client.start_notify(RSC_UUID, cb_rsc)
+    if HR_UUID in found:
+        await client.start_notify(HR_UUID, cb_hr)
+
+    print(f"采集 RSC/HRS 通知 {DURATION}s ...")
+    await asyncio.sleep(DURATION)
+
+    ok_notify = len(samples) > 0
+    ok_speed = False
+    ok_cadence = False
+    ok_distance = False
+    ok_flags = False
+    if samples:
+        first = samples[0]
+        last = samples[-1]
+        ok_speed = abs(last["speed_kmh"] - 10.0) <= 0.2
+        ok_cadence = 120 <= last["cadence"] <= 220
+        ok_distance = (
+            first["distance"] is not None
+            and last["distance"] is not None
+            and last["distance"] >= first["distance"]
+        )
+        ok_flags = bool(last["flags"] & 0x01) and bool(last["flags"] & 0x02) and last["running"]
+        print(
+            "RSC 最后样本: speed=%.2fkm/h cadence=%dspm stride=%s distance=%s flags=0x%02x"
+            % (
+                last["speed_kmh"],
+                last["cadence"],
+                str(last["stride"]),
+                str(last["distance"]),
+                last["flags"],
+            )
+        )
+    print(f"通知计数: RSC={len(samples)} HR={hr_count[0]}")
+
+    ok_services = not missing
+    ok = ok_services and dis_ok and ok_notify and ok_speed and ok_cadence and ok_distance and ok_flags
+    print("--- 结果 ---")
+    print(f"  跑步服务齐全: {'通过' if ok_services else '失败(' + ','.join(missing) + ')'}")
+    print(f"  DIS 设备信息: {'通过' if dis_ok else '失败'}")
+    print(f"  RSC 通知: {'通过' if ok_notify else '失败'}")
+    print(f"  RSC 速度: {'通过' if ok_speed else '失败'}")
+    print(f"  RSC 步频: {'通过' if ok_cadence else '失败'}")
+    print(f"  RSC 距离: {'通过' if ok_distance else '失败'}")
+    print(f"  RSC flags: {'通过' if ok_flags else '失败'}")
+    print("总判定:", "通过" if ok else "失败")
+    return 0 if ok else 1
+
+
+async def check_dis(client, found):
+    dis_ok = True
+    print("读取 DIS 设备信息 ...")
+    for uuid, (label, expect) in DIS_EXPECT.items():
+        if uuid not in found:
+            print(f"  DIS {label}: 无特征")
+            dis_ok = False
+            continue
+        try:
+            val = (await client.read_gatt_char(uuid)).decode("utf-8", "replace")
+            match = val == expect
+            print(f"  DIS {label}: '{val}' (期望 '{expect}') {'通过' if match else '失败'}")
+            dis_ok = dis_ok and match
+        except Exception as e:
+            print(f"  DIS {label}: 读取失败 {type(e).__name__}")
+            dis_ok = False
+    return dis_ok
+
 
 async def main():
     print(f"扫描 {DEVICE_NAME} ...")
@@ -113,6 +250,9 @@ async def main():
     async with BleakClient(dev) as client:
         print("已连接")
         found = {c.uuid for s in client.services for c in s.characteristics}
+        if PROFILE == "running":
+            return await run_running_profile(client, found)
+
         services = [
             ("CPS", CPS_UUID),
             ("HR", HR_UUID),
@@ -127,21 +267,7 @@ async def main():
             if not present:
                 missing.append(label)
 
-        dis_ok = True
-        print("读取 DIS 设备信息 ...")
-        for uuid, (label, expect) in DIS_EXPECT.items():
-            if uuid not in found:
-                print(f"  DIS {label}: 无特征")
-                dis_ok = False
-                continue
-            try:
-                val = (await client.read_gatt_char(uuid)).decode("utf-8", "replace")
-                match = val == expect
-                print(f"  DIS {label}: '{val}' (期望 '{expect}') {'通过' if match else '失败'}")
-                dis_ok = dis_ok and match
-            except Exception as e:
-                print(f"  DIS {label}: 读取失败 {type(e).__name__}")
-                dis_ok = False
+        dis_ok = await check_dis(client, found)
 
         counts = {"cps": 0, "hr": 0, "csc": 0, "ftms": 0}
         last_power = [0]

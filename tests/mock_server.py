@@ -37,9 +37,13 @@ MOCK_STATE = {
     "stable_version": "4.0.0",
     "fix_version": "4.0.1",
     "git_sha": "6e90860",
+    "sport_profile": "running",
     "power": 150,
     "cadence": 80,
     "heartrate": 130,
+    "run_speed_x100": 1000,
+    "run_cadence": 170,
+    "run_incline_x10": 0,
     "mode": "steady",
     "power_float": 5,
     "cadence_float": 2,
@@ -246,8 +250,9 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 data = {}
             with LOCK:
-                for k in ("device_name", "mode", "power", "cadence",
-                          "heartrate", "power_float", "cadence_float", "hr_float",
+                for k in ("device_name", "sport_profile", "mode", "power", "cadence",
+                          "heartrate", "run_speed_x100", "run_cadence", "run_incline_x10",
+                          "power_float", "cadence_float", "hr_float",
                           "power_step",
                           "profile_weight", "profile_ftp",
                           "profile_thr_hr", "profile_ride_type",
