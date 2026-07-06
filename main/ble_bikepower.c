@@ -24,6 +24,7 @@
 
 #include "bikepower_config.h"
 #include "domain_config.h"
+#include "running_engine.h"
 #include "ble_bikepower.h"
 #include "board_detect.h"
 
@@ -37,6 +38,7 @@ static volatile uint16_t g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 static uint16_t g_cps_val_handle;
 static uint16_t g_hr_val_handle;
 static uint16_t g_csc_val_handle;
+static uint16_t g_rsc_val_handle;
 static uint16_t g_ftms_bike_handle;
 static uint16_t g_ftms_cp_handle;
 static uint16_t g_ftms_status_handle;
@@ -45,6 +47,10 @@ static uint16_t g_ftms_status_handle;
 static volatile uint16_t g_power_w   = DEFAULT_POWER;
 static volatile uint8_t  g_hr_bpm    = DEFAULT_HEARTRATE;
 static volatile uint16_t g_cadence   = DEFAULT_CADENCE;
+static volatile uint16_t g_run_speed = 0;
+static volatile uint8_t  g_run_cadence = RUN_CADENCE_DEFAULT;
+static volatile uint16_t g_run_stride_cm = 0;
+static volatile uint32_t g_run_distance_m = 0;
 
 // 曲柄累计（CPS/CSC 共用）
 static uint16_t g_crank_rev = 0;
@@ -54,6 +60,9 @@ static uint32_t g_last_crank_ms = 0;
 static uint8_t g_cps_buf[8];
 static uint8_t g_hr_buf[2];
 static uint8_t g_csc_buf[5];
+static uint8_t g_rsc_buf[10];
+static uint8_t g_rsc_feature_buf[4] = { 0x03, 0x00, 0x00, 0x00 };
+static uint8_t g_sensor_location = 0x05;
 static uint8_t g_ftms_bike_buf[8];
 static uint8_t g_ftms_resp_buf[3];
 
@@ -62,6 +71,7 @@ static uint8_t g_ftms_feature_buf[8] = { 0x02, 0x40, 0x00, 0x00, 0x08, 0x00, 0x0
 static uint8_t g_ftms_status_buf[7]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 static ble_erg_cb_t g_erg_cb = NULL;
+static sport_profile_t g_profile = DEFAULT_SPORT_PROFILE;
 static char g_device_name[DEVICE_NAME_MAX] = DEVICE_NAME;
 static esp_timer_handle_t g_notify_timer = NULL;
 // 跨任务访问：app_main 写(start/stop)，esp_timer(notify_tick) 读，加 volatile 防缓存。
@@ -148,6 +158,27 @@ static int csc_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *
 {
     (void)ch; (void)ah; (void)arg;
     if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_csc_buf, sizeof(g_csc_buf));
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+static int rsc_measurement_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_rsc_buf, sizeof(g_rsc_buf));
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+static int rsc_feature_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_rsc_feature_buf, sizeof(g_rsc_feature_buf));
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+static int sensor_location_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, &g_sensor_location, sizeof(g_sensor_location));
     return BLE_ATT_ERR_UNLIKELY;
 }
 
@@ -344,7 +375,7 @@ static int dis_fw_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt
 
 // ============================ GATT 服务表 ============================
 
-static const struct ble_gatt_svc_def gatt_svcs[] = {
+static const struct ble_gatt_svc_def cycling_gatt_svcs[] = {
     {   // Cycling Power
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
         .uuid = BLE_UUID16_DECLARE(POWER_SERVICE_UUID),
@@ -416,6 +447,56 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {
     { 0 }
 };
 
+static const struct ble_gatt_svc_def running_gatt_svcs[] = {
+    {   // Running Speed and Cadence
+        .type = BLE_GATT_SVC_TYPE_PRIMARY,
+        .uuid = BLE_UUID16_DECLARE(RSC_SERVICE_UUID),
+        .characteristics = (struct ble_gatt_chr_def[]){
+            { .uuid = BLE_UUID16_DECLARE(RSC_MEASUREMENT_CHAR_UUID),
+              .access_cb = rsc_measurement_cb,
+              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .val_handle = &g_rsc_val_handle },
+            { .uuid = BLE_UUID16_DECLARE(RSC_FEATURE_CHAR_UUID),
+              .access_cb = rsc_feature_cb,
+              .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(SENSOR_LOCATION_CHAR_UUID),
+              .access_cb = sensor_location_cb,
+              .flags = BLE_GATT_CHR_F_READ },
+            { 0 }
+        }
+    },
+    {   // Heart Rate
+        .type = BLE_GATT_SVC_TYPE_PRIMARY,
+        .uuid = BLE_UUID16_DECLARE(HR_SERVICE_UUID),
+        .characteristics = (struct ble_gatt_chr_def[]){
+            { .uuid = BLE_UUID16_DECLARE(HR_CHAR_UUID),
+              .access_cb = hr_access_cb,
+              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .val_handle = &g_hr_val_handle },
+            { 0 }
+        }
+    },
+    {   // Device Information Service
+        .type = BLE_GATT_SVC_TYPE_PRIMARY,
+        .uuid = BLE_UUID16_DECLARE(DIS_SERVICE_UUID),
+        .characteristics = (struct ble_gatt_chr_def[]){
+            { .uuid = BLE_UUID16_DECLARE(DIS_MANUFACTURER_CHAR_UUID),
+              .access_cb = dis_manuf_cb, .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(DIS_MODEL_CHAR_UUID),
+              .access_cb = dis_model_cb, .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(DIS_FIRMWARE_CHAR_UUID),
+              .access_cb = dis_fw_cb, .flags = BLE_GATT_CHR_F_READ },
+            { 0 }
+        }
+    },
+    { 0 }
+};
+
+static const struct ble_gatt_svc_def *active_gatt_svcs(void)
+{
+    return g_profile == SPORT_PROFILE_RUNNING ? running_gatt_svcs : cycling_gatt_svcs;
+}
+
 // ============================ 数据打包 ============================
 
 /**
@@ -470,6 +551,27 @@ static void pack_all(void)
     g_ftms_bike_buf[6] = power & 0xFF;       g_ftms_bike_buf[7] = (power >> 8) & 0xFF;
 }
 
+static void pack_running(void)
+{
+    uint16_t speed = g_run_speed;
+    uint16_t stride = g_run_stride_cm;
+    uint32_t distance = g_run_distance_m;
+
+    g_hr_buf[0] = 0x00;
+    g_hr_buf[1] = g_hr_bpm;
+
+    g_rsc_buf[0] = 0x07;
+    g_rsc_buf[1] = speed & 0xFF;
+    g_rsc_buf[2] = (speed >> 8) & 0xFF;
+    g_rsc_buf[3] = g_run_cadence;
+    g_rsc_buf[4] = stride & 0xFF;
+    g_rsc_buf[5] = (stride >> 8) & 0xFF;
+    g_rsc_buf[6] = distance & 0xFF;
+    g_rsc_buf[7] = (distance >> 8) & 0xFF;
+    g_rsc_buf[8] = (distance >> 16) & 0xFF;
+    g_rsc_buf[9] = (distance >> 24) & 0xFF;
+}
+
 /**
  * 发送单个特征通知（已持锁版本）。
  * 调用者必须已持有g_notify_lock，直接将平面缓冲区转换为 mbuf 后发送通知。
@@ -520,11 +622,17 @@ static void notify_tick(void *arg)
         xSemaphoreGive(g_notify_lock);
         return;
     }
-    pack_all();
-    notify_one_nolock(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
-    notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
-    notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
-    notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, sizeof(g_ftms_bike_buf));
+    if (g_profile == SPORT_PROFILE_RUNNING) {
+        pack_running();
+        notify_one_nolock(g_rsc_val_handle, g_rsc_buf, sizeof(g_rsc_buf));
+        notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
+    } else {
+        pack_all();
+        notify_one_nolock(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
+        notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
+        notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
+        notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, sizeof(g_ftms_bike_buf));
+    }
     xSemaphoreGive(g_notify_lock);
 }
 
@@ -602,12 +710,16 @@ static int start_advertising(void)
 
     memset(&fields, 0, sizeof(fields));
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
-    static ble_uuid16_t adv_uuids[] = {
+    static ble_uuid16_t cycling_adv_uuids[] = {
         BLE_UUID16_INIT(POWER_SERVICE_UUID),
         BLE_UUID16_INIT(HR_SERVICE_UUID),
     };
+    static ble_uuid16_t running_adv_uuids[] = {
+        BLE_UUID16_INIT(RSC_SERVICE_UUID),
+        BLE_UUID16_INIT(HR_SERVICE_UUID),
+    };
     // 广播包空间有限，只放最关键的两个 16 位服务 UUID，完整服务能力由连接后 GATT 发现获取。
-    fields.uuids16 = adv_uuids;
+    fields.uuids16 = (g_profile == SPORT_PROFILE_RUNNING) ? running_adv_uuids : cycling_adv_uuids;
     fields.num_uuids16 = 2;
     fields.uuids16_is_complete = 1;
     // 31 字节广播包预算：flags(3) + 完整 16 位 UUID 列表(2+2×2=6) 占 9 字节，
@@ -646,7 +758,9 @@ static int start_advertising(void)
     rc = ble_gap_adv_start(g_own_addr_type, NULL, BLE_HS_FOREVER,
                            &adv_params, gap_event_cb, NULL);
     if (rc != 0) { ESP_LOGE(TAG, "广播启动失败 rc=%d", rc); return rc; }
-    ESP_LOGI(TAG, "开始广播 name=%s (间隔%dms)", g_device_name, BLE_ADVERTISING_INTERVAL_MS);
+    ESP_LOGI(TAG, "开始广播 profile=%s name=%s (间隔%dms)",
+             g_profile == SPORT_PROFILE_RUNNING ? "running" : "cycling",
+             g_device_name, BLE_ADVERTISING_INTERVAL_MS);
     return 0;
 }
 
@@ -677,7 +791,9 @@ static void on_sync(void)
     // 广播成功启动后才标记为就绪状态
     g_ready = true;
     g_start_failed = false;
-    ESP_LOGI(TAG, "BLE 就绪，五服务 CPS+HRS+CSC+FTMS+DIS 设备名=%s", g_device_name);
+    ESP_LOGI(TAG, "BLE 就绪，profile=%s 设备名=%s",
+             g_profile == SPORT_PROFILE_RUNNING ? "RSC+HRS+DIS" : "CPS+HRS+CSC+FTMS+DIS",
+             g_device_name);
 }
 
 /**
@@ -727,6 +843,21 @@ void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t ca
     g_power_w = power_w;
     g_hr_bpm = heartrate_bpm;
     g_cadence = cadence_rpm;
+}
+
+void ble_bikepower_set_profile(sport_profile_t profile)
+{
+    if (profile < 0 || profile >= SPORT_PROFILE_COUNT) return;
+    g_profile = profile;
+}
+
+void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartrate_bpm)
+{
+    g_run_speed = snapshot.rsc_speed_1_256_mps;
+    g_hr_bpm = heartrate_bpm;
+    g_run_cadence = (uint8_t)snapshot.cadence_spm;
+    g_run_stride_cm = snapshot.stride_cm;
+    g_run_distance_m = snapshot.total_distance_m;
 }
 
 /**
@@ -820,6 +951,7 @@ esp_err_t ble_bikepower_start(void)
     ble_svc_gap_init();
     ble_svc_gatt_init();
 
+    const struct ble_gatt_svc_def *gatt_svcs = active_gatt_svcs();
     int rc = ble_gatts_count_cfg(gatt_svcs);
     if (rc != 0) {
         ESP_LOGE(TAG, "gatts_count_cfg 失败 rc=%d", rc);

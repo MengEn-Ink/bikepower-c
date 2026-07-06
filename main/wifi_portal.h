@@ -38,3 +38,12 @@ void wifi_portal_stop(void);
  * 特殊行为：回调在 esp_timer 任务上下文执行，应仅做轻量操作（如投递事件队列），避免阻塞。
  */
 void wifi_portal_set_done_callback(void (*cb)(void));
+
+/**
+ * 消费一次 BLE 重启请求。
+ * 当配网页保存了需要重建 GATT 表的配置（例如运动 profile）时返回 true。
+ * 无参数。
+ * 返回值：true 表示调用方应在 WiFi 关闭后重启 BLE；false 表示无需处理。
+ * 特殊行为：读取后会清除内部标志，确保同一次配置只触发一次 BLE 重启。
+ */
+bool wifi_portal_consume_ble_restart_requested(void);

@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
+#include "domain_config.h"
+#include "running_engine.h"
 
 /**
  * ERG 目标功率回调类型。
@@ -61,6 +63,23 @@ bool ble_bikepower_stop(void);
  * 特殊行为：这里只更新共享快照，不会立即主动发送通知。
  */
 void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm);
+
+/**
+ * 设置 BLE 运动 profile。
+ * profile：cycling 时注册现有 CPS/HRS/CSC/FTMS/DIS；running 时注册 RSC/HRS/DIS。
+ * 返回值：无。
+ * 特殊行为：建议在 ble_bikepower_start() 前调用；运行中修改需重启 BLE 才能重建 GATT 表。
+ */
+void ble_bikepower_set_profile(sport_profile_t profile);
+
+/**
+ * 更新跑步 profile 下一轮 BLE 通知数据。
+ * snapshot：跑步引擎输出的速度、步频、步幅和距离快照。
+ * heartrate_bpm：心率，单位 BPM。
+ * 返回值：无。
+ * 特殊行为：只更新共享变量，不立即触发通知。
+ */
+void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartrate_bpm);
 
 /**
  * 注册 ERG 目标功率回调。

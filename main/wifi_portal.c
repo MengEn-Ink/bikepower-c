@@ -59,6 +59,7 @@ static volatile uint32_t s_deadline_sec = 0;
 static volatile bool s_closing = false;
 // done_cb 幂等标志：true 表示 portal_done 已调用过 done_cb，防止定时器重复触发投递多个事件。
 static volatile bool s_done_called = false;
+static volatile bool s_ble_restart_requested = false;
 // 配网结束回调：保存/超时后由 portal 调用，通知 app_main 投递 APP_EVT_WIFI_DONE 切换状态
 static void (*s_done_cb)(void) = NULL;
 
@@ -101,6 +102,13 @@ static void portal_done(void)
     ESP_LOGI(TAG, "portal_done 触发，调用 done_cb 投递 APP_EVT_WIFI_DONE");
     if (s_done_cb) s_done_cb();
     else ESP_LOGE(TAG, "s_done_cb 为 NULL，APP_EVT_WIFI_DONE 无法投递");
+}
+
+bool wifi_portal_consume_ble_restart_requested(void)
+{
+    bool requested = s_ble_restart_requested;
+    s_ble_restart_requested = false;
+    return requested;
 }
 
 // ============================ 工具函数 ============================
@@ -208,6 +216,19 @@ static const char *mode_to_id(int mode)
     return "steady";
 }
 
+static int sport_from_id(const char *id)
+{
+    if (strcmp(id, "running") == 0) return SPORT_PROFILE_RUNNING;
+    if (strcmp(id, "cycling") == 0) return SPORT_PROFILE_CYCLING;
+    return -1;
+}
+
+static const char *sport_to_id(int sport)
+{
+    if (sport == SPORT_PROFILE_RUNNING) return "running";
+    return "cycling";
+}
+
 // ============================ 配置应用 ============================
 
 /**
@@ -217,10 +238,11 @@ static const char *mode_to_id(int mode)
  * body：JSON 请求体（已 \0 终止）。
  * e：目标引擎实例。
  */
-static void apply_json_fields(power_engine_t *e, const char *body)
+static bool apply_json_fields(power_engine_t *e, const char *body, bool allow_sport_switch)
 {
     char val[64];
     int new_val, old_val;
+    bool sport_changed = false;
 
     if (json_get_str(body, "mode", val, sizeof(val))) {
         int m = mode_from_id(val);
@@ -234,6 +256,17 @@ static void apply_json_fields(power_engine_t *e, const char *body)
     if (json_get_str(body, "device_name", val, sizeof(val))) {
         ESP_LOGI(TAG, "  device_name: %s → %s", e->device_name, val);
         power_engine_set_device_name(e, val);
+    }
+    if (allow_sport_switch && json_get_str(body, "sport_profile", val, sizeof(val))) {
+        int sport = sport_from_id(val);
+        if (sport >= 0) {
+            sport_profile_t old_sport = e->sport_profile;
+            power_engine_set_sport_profile(e, (sport_profile_t)sport);
+            if (old_sport != e->sport_profile) {
+                sport_changed = true;
+                ESP_LOGI(TAG, "  sport: %s → %s", sport_to_id((int)old_sport), sport_to_id(sport));
+            }
+        }
     }
     if (json_get_str(body, "custom_pacer_name", val, sizeof(val))) {
         ESP_LOGI(TAG, "  custom_pacer_name: %s → %s", e->profile.custom_pacer_name, val);
@@ -277,6 +310,24 @@ static void apply_json_fields(power_engine_t *e, const char *body)
     power_engine_set_power_step(e, new_val);
     if (old_val != e->power_step)
         ESP_LOGI(TAG, "  power_step: %d → %d", old_val, e->power_step);
+
+    old_val = e->running.speed_x100_kmh;
+    new_val = json_get_int_def(body, "run_speed_x100", old_val);
+    power_engine_set_run_speed(e, new_val);
+    if (old_val != e->running.speed_x100_kmh)
+        ESP_LOGI(TAG, "  run_speed_x100: %d → %d", old_val, e->running.speed_x100_kmh);
+
+    old_val = e->running.cadence_spm;
+    new_val = json_get_int_def(body, "run_cadence", old_val);
+    power_engine_set_run_cadence(e, new_val);
+    if (old_val != e->running.cadence_spm)
+        ESP_LOGI(TAG, "  run_cadence: %d → %d", old_val, e->running.cadence_spm);
+
+    old_val = e->running.incline_x10;
+    new_val = json_get_int_def(body, "run_incline_x10", old_val);
+    power_engine_set_run_incline(e, new_val);
+    if (old_val != e->running.incline_x10)
+        ESP_LOGI(TAG, "  run_incline_x10: %d → %d", old_val, e->running.incline_x10);
 
     /* 心率锁定：hr_lock=1 锁定到 heartrate 值，hr_lock=0 解锁随功率联动 */
     if (json_has_key(body, "hr_lock")) {
@@ -348,6 +399,7 @@ static void apply_json_fields(power_engine_t *e, const char *body)
     APPLY_LED_SCENE("led_error", LED_SCENE_ERROR);
 #undef APPLY_LED_SCENE
     led_config_validate(&e->led);
+    return sport_changed;
 }
 
 // ============================ 静态首页 ============================
@@ -401,11 +453,13 @@ static esp_err_t h_api_state(httpd_req_t *req)
     int ride_type_idx = (e->profile.ride_type >= 0 && e->profile.ride_type < RIDE_TYPE_COUNT)
                         ? e->profile.ride_type : 0;
 
-    char buf[2304];
+    char buf[2432];
     int off = snprintf(buf, sizeof(buf),
         "{\"device_name\":\"%s\",\"firmware_version\":\"%s\",\"firmware_name\":\"%s\","
         "\"board\":\"%s\",\"stable_version\":\"%s\",\"fix_version\":\"%s\",\"git_sha\":\"%s\","
+        "\"sport_profile\":\"%s\","
         "\"power\":%d,\"cadence\":%d,\"heartrate\":%d,\"mode\":\"%s\","
+        "\"run_speed_x100\":%d,\"run_cadence\":%d,\"run_incline_x10\":%d,"
         "\"power_float\":%d,\"cadence_float\":%d,\"hr_float\":%d,"
         "\"power_step\":%d,"
         "\"profile_weight\":%d,\"profile_ftp\":%d,\"profile_thr_hr\":%d,"
@@ -422,7 +476,9 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"pacers\":[",
         dn_esc, FIRMWARE_VERSION, fw_name_esc,
         board_get_desc()->name, FIRMWARE_STABLE_VERSION, FIRMWARE_FIX_VERSION, BIKEPOWER_GIT_SHA,
+        sport_to_id((int)e->sport_profile),
         e->base_power, e->cadence_base, e->last_heartrate, mode_to_id((int)e->mode),
+        e->running.speed_x100_kmh, e->running.cadence_spm, e->running.incline_x10,
         e->power_float, e->cadence_float, e->hr_float,
         e->power_step,
         e->profile.weight, e->profile.ftp, e->profile.thr_hr,
@@ -488,7 +544,7 @@ static esp_err_t h_api_config(httpd_req_t *req)
     /* 写临时副本：NVS 失败时丢弃，s_engine 完全不变，BLE 不会读到中间值 */
     power_engine_t next;
     memcpy(&next, s_engine, sizeof(power_engine_t));
-    apply_json_fields(&next, body);
+    apply_json_fields(&next, body, false);
     free(body);
 
     if (nvs_store_save(&next)) {
@@ -497,12 +553,15 @@ static esp_err_t h_api_config(httpd_req_t *req)
         power_engine_clear_dirty(s_engine);
         if (name_changed) ble_bikepower_refresh_device_name();
         app_state_refresh_led();
-        ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d",
+        ESP_LOGI(TAG, "配置已保存 sport=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d",
+                 (int)s_engine->sport_profile,
                  s_engine->base_power, s_engine->cadence_base,
                  (int)s_engine->mode, s_engine->device_name,
                  s_engine->power_step,
                  s_engine->power_float, s_engine->cadence_float, s_engine->hr_float,
-                 s_engine->profile.ride_type);
+                 s_engine->profile.ride_type,
+                 s_engine->running.speed_x100_kmh, s_engine->running.cadence_spm,
+                 s_engine->running.incline_x10);
         send_json(req, "{\"ok\":true}");
     } else {
         ESP_LOGE(TAG, "配置保存失败，s_engine 保持原值");
@@ -537,21 +596,27 @@ static esp_err_t h_api_close_wifi(httpd_req_t *req)
 
     power_engine_t next;
     memcpy(&next, s_engine, sizeof(power_engine_t));
-    apply_json_fields(&next, body);
+    bool sport_changed = apply_json_fields(&next, body, true);
     free(body);
 
     if (nvs_store_save(&next)) {
         bool name_changed = strcmp(s_engine->device_name, next.device_name) != 0;
         memcpy(s_engine, &next, sizeof(power_engine_t));
         power_engine_clear_dirty(s_engine);
+        if (sport_changed) {
+            s_ble_restart_requested = true;
+        }
         if (name_changed) ble_bikepower_refresh_device_name();
         app_state_refresh_led();
-        ESP_LOGI(TAG, "配置已保存并准备关闭 WiFi p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d",
+        ESP_LOGI(TAG, "配置已保存并准备关闭 WiFi sport=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d",
+                 (int)s_engine->sport_profile,
                  s_engine->base_power, s_engine->cadence_base,
                  (int)s_engine->mode, s_engine->device_name,
                  s_engine->power_step,
                  s_engine->power_float, s_engine->cadence_float, s_engine->hr_float,
-                 s_engine->profile.ride_type);
+                 s_engine->profile.ride_type,
+                 s_engine->running.speed_x100_kmh, s_engine->running.cadence_spm,
+                 s_engine->running.incline_x10);
         /* 5s 收尾窗口：让前端切到 #/closing 页面后关闭 WiFi */
         s_closing = true;
         s_deadline_sec = now_sec() + WIFI_PORTAL_REBOOT_DELAY_SEC;

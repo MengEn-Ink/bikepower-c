@@ -48,6 +48,7 @@ typedef enum {
 #define POWER_SERVICE_UUID         0x1818
 #define HR_SERVICE_UUID            0x180D
 #define CSC_SERVICE_UUID           0x1816
+#define RSC_SERVICE_UUID           0x1814
 #define FTMS_SERVICE_UUID          0x1826
 #define DIS_SERVICE_UUID           0x180A
 
@@ -55,6 +56,9 @@ typedef enum {
 #define POWER_CHAR_UUID            0x2A63
 #define HR_CHAR_UUID               0x2A37
 #define CSC_CHAR_UUID              0x2A5B
+#define RSC_MEASUREMENT_CHAR_UUID  0x2A53
+#define RSC_FEATURE_CHAR_UUID      0x2A54
+#define SENSOR_LOCATION_CHAR_UUID  0x2A5D
 #define FTMS_FEATURE_CHAR_UUID     0x2ACC
 #define FTMS_CONTROL_POINT_CHAR_UUID 0x2AD9
 #define FTMS_POWER_CHAR_UUID       0x2AD2
@@ -83,6 +87,10 @@ typedef enum {
 #define NVS_KEY_CUSTOM_WKG_HI  "cwkghi"
 #define NVS_KEY_CUSTOM_NAME    "cname"
 #define NVS_KEY_DEVICE_NAME    "devname"
+#define NVS_KEY_SPORT_PROFILE  "sport"
+#define NVS_KEY_RUN_SPEED      "rspeed"
+#define NVS_KEY_RUN_CADENCE    "rcad"
+#define NVS_KEY_RUN_INCLINE    "rincl"
 #define NVS_KEY_LED_SILENT     "ledsil"
 #define NVS_KEY_LED_WAIT_MODE  "ledwm"
 #define NVS_KEY_LED_WAIT_COLOR "ledwc"
