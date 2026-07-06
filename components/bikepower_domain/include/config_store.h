@@ -33,6 +33,10 @@ typedef struct {
     int custom_wkg_high;// 自定义档 W/kg 上限（×10）
     char custom_pacer_name[CUSTOM_PACER_NAME_MAX]; // 自定义配速机器人昵称
     led_config_t led;   // LED 场景灯效配置
+    int sport_profile;  // sport_profile_t
+    int run_speed_x100; // 跑步速度，km/h * 100
+    int run_cadence;    // 跑步步频，steps/min
+    int run_incline_x10;// 跑步坡度，% * 10
     char device_name[DEVICE_NAME_MAX];  // BLE 广播名
 } config_data_t;
 

@@ -41,6 +41,10 @@ void config_store_defaults(config_data_t *c)
     strncpy(c->custom_pacer_name, CUSTOM_PACER_NAME_DEFAULT, CUSTOM_PACER_NAME_MAX - 1);
     c->custom_pacer_name[CUSTOM_PACER_NAME_MAX - 1] = '\0';
     led_config_defaults(&c->led);
+    c->sport_profile = DEFAULT_SPORT_PROFILE;
+    c->run_speed_x100 = RUN_SPEED_X100_DEFAULT;
+    c->run_cadence = RUN_CADENCE_DEFAULT;
+    c->run_incline_x10 = RUN_INCLINE_X10_DEFAULT;
     strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
@@ -76,6 +80,10 @@ bool config_store_validate(config_data_t *c)
         strncpy(c->custom_pacer_name, CUSTOM_PACER_NAME_DEFAULT, CUSTOM_PACER_NAME_MAX - 1);
     }
     led_config_validate(&c->led);
+    if (c->sport_profile < 0 || c->sport_profile >= SPORT_PROFILE_COUNT) c->sport_profile = DEFAULT_SPORT_PROFILE;
+    c->run_speed_x100 = clamp_int(c->run_speed_x100, RUN_SPEED_X100_MIN, RUN_SPEED_X100_MAX);
+    c->run_cadence = clamp_int(c->run_cadence, RUN_CADENCE_MIN, RUN_CADENCE_MAX);
+    c->run_incline_x10 = clamp_int(c->run_incline_x10, RUN_INCLINE_X10_MIN, RUN_INCLINE_X10_MAX);
 
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
     if (c->device_name[0] == '\0') {
@@ -99,6 +107,10 @@ bool config_store_validate(config_data_t *c)
         || in.custom_wkg_high != c->custom_wkg_high
         || strncmp(in.custom_pacer_name, c->custom_pacer_name, CUSTOM_PACER_NAME_MAX) != 0
         || memcmp(&in.led, &c->led, sizeof(c->led)) != 0
+        || in.sport_profile != c->sport_profile
+        || in.run_speed_x100 != c->run_speed_x100
+        || in.run_cadence != c->run_cadence
+        || in.run_incline_x10 != c->run_incline_x10
         || strncmp(in.device_name, c->device_name, DEVICE_NAME_MAX) != 0;
 }
 
@@ -219,6 +231,8 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         "\"led_wifi_mode\":%d,\"led_wifi_color\":%d,"
         "\"led_confirm_mode\":%d,\"led_confirm_color\":%d,"
         "\"led_error_mode\":%d,\"led_error_color\":%d,"
+        "\"sport_profile\":%d,\"run_speed_x100\":%d,"
+        "\"run_cadence\":%d,\"run_incline_x10\":%d,"
         "\"device_name\":\"%s\"}",
         c->schema_ver, c->power, c->cadence, c->mode,
         c->heartrate, c->has_user_hr,
@@ -234,6 +248,8 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         c->led.scenes[LED_SCENE_WIFI_CONFIG].mode, c->led.scenes[LED_SCENE_WIFI_CONFIG].color,
         c->led.scenes[LED_SCENE_WIFI_CONFIRM].mode, c->led.scenes[LED_SCENE_WIFI_CONFIRM].color,
         c->led.scenes[LED_SCENE_ERROR].mode, c->led.scenes[LED_SCENE_ERROR].color,
+        c->sport_profile, c->run_speed_x100,
+        c->run_cadence, c->run_incline_x10,
         esc);
 
     if (n < 0 || (size_t)n >= sizeof(buf)) return 0;  /* 编码错误或内部缓冲不足 */
@@ -263,6 +279,10 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         {"weight", &tmp.weight}, {"ftp", &tmp.ftp},
         {"thr_hr", &tmp.thr_hr}, {"ride_type", &tmp.ride_type},
         {"custom_wkg_low", &tmp.custom_wkg_low}, {"custom_wkg_high", &tmp.custom_wkg_high},
+        {"sport_profile", &tmp.sport_profile},
+        {"run_speed_x100", &tmp.run_speed_x100},
+        {"run_cadence", &tmp.run_cadence},
+        {"run_incline_x10", &tmp.run_incline_x10},
     };
     for (size_t i = 0; i < sizeof(int_keys) / sizeof(int_keys[0]); i++) {
         char pat[40];

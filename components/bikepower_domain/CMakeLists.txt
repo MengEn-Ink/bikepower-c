@@ -3,6 +3,7 @@ idf_component_register(
          "domain_rng.c"
          "hr_model.c"
          "power_engine.c"
+         "running_engine.c"
          "config_store.c"
          "device_template.c"
          "json_miniparse.c"

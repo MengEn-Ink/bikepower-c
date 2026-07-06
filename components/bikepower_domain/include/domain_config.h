@@ -25,13 +25,33 @@
 #define DEFAULT_CADENCE       90
 #define DEFAULT_HEARTRATE     150
 
+// ===== 跑步模式范围与默认值 =====
+#define RUN_SPEED_X100_MIN     300     // 3.00 km/h
+#define RUN_SPEED_X100_MAX     2500    // 25.00 km/h
+#define RUN_SPEED_X100_DEFAULT 1000    // 10.00 km/h
+#define RUN_CADENCE_MIN        120     // steps/min
+#define RUN_CADENCE_MAX        220
+#define RUN_CADENCE_DEFAULT    170
+#define RUN_INCLINE_X10_MIN    (-50)   // -5.0%
+#define RUN_INCLINE_X10_MAX    150     // 15.0%
+#define RUN_INCLINE_X10_DEFAULT 0
+
 // ===== 配置格式版本 =====
-// v5：移除 road 模式无效的 tune_road 字段，新增固定心率持久化（heartrate + has_user_hr）。
-#define CONFIG_VERSION        5
+// v6：新增运动 profile 与跑步模式速度/步频/坡度持久化。
+#define CONFIG_VERSION        6
 
 // ===== 设备名称（BLE 广播名，可配网修改并持久化） =====
 #define DEVICE_NAME_MAX       24
 #define DEVICE_NAME_DEFAULT   "BikePower"
+
+// ===== 运动 Profile =====
+typedef enum {
+    SPORT_PROFILE_CYCLING = 0,
+    SPORT_PROFILE_RUNNING = 1,
+} sport_profile_t;
+
+#define SPORT_PROFILE_COUNT       2
+#define DEFAULT_SPORT_PROFILE     SPORT_PROFILE_CYCLING
 
 // ===== 骑行模式 ID =====
 /* 骑行模式枚举：决定功率、踏频和心率快照的生成策略。 */

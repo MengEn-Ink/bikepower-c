@@ -17,6 +17,7 @@
 #include "led_pattern.h"
 #include "button_debounce.h"
 #include "device_template.h"
+#include "running_engine.h"
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -1125,6 +1126,24 @@ static void test_button_debounce(void)
     CHECK(button_release_is_real(true) == false, "去抖后仍按下 -> 抖动");
 }
 
+static void test_running_engine_defaults(void)
+{
+    printf("[test] 跑步模式默认快照与 RSC 单位换算\n");
+    running_engine_t e;
+    running_engine_init(&e);
+
+    running_snapshot_t first = running_engine_snapshot(&e, 1000);
+    CHECK(first.speed_x100_kmh == RUN_SPEED_X100_DEFAULT, "默认跑步速度=10.0km/h");
+    CHECK(first.cadence_spm == RUN_CADENCE_DEFAULT, "默认跑步步频=170spm");
+    CHECK(first.rsc_speed_1_256_mps == 711, "RSC速度单位=1/256m/s");
+    CHECK(first.stride_cm == 98, "默认步幅约98cm");
+    CHECK(first.total_distance_m == 2, "1秒后累计距离整数米=2");
+
+    running_snapshot_t second = running_engine_snapshot(&e, 1000);
+    CHECK(second.total_distance_m == 5, "2秒后累计距离整数米=5");
+    CHECK(second.elapsed_time_s == 2, "2秒后用时=2s");
+}
+
 int main(void)
 {
     test_profile();
@@ -1149,6 +1168,7 @@ int main(void)
     test_button_logic();
     test_led_pattern();
     test_button_debounce();
+    test_running_engine_defaults();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

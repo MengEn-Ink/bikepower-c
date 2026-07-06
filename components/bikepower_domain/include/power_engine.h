@@ -11,6 +11,7 @@
 #include "profile.h"
 #include "hr_model.h"
 #include "led_pattern.h"
+#include "running_engine.h"
 
 /*
  * 单次领域层输出快照。
@@ -63,6 +64,8 @@ typedef struct {
     profile_t profile;
     led_config_t led;
     hr_state_t hr;
+    sport_profile_t sport_profile;
+    running_engine_t running;
     snapshot_t snapshot;
     long snapshot_count;
     bool dirty;
@@ -106,6 +109,12 @@ const char *power_engine_get_current_pacer(power_engine_t *e);
 
 /* 设置 BLE 设备名，超长时截断到 DEVICE_NAME_MAX-1。 */
 bool power_engine_set_device_name(power_engine_t *e, const char *name);
+
+/* 设置当前运动 profile。 */
+bool power_engine_set_sport_profile(power_engine_t *e, sport_profile_t profile);
+bool power_engine_set_run_speed(power_engine_t *e, int speed_x100_kmh);
+bool power_engine_set_run_cadence(power_engine_t *e, int cadence_spm);
+bool power_engine_set_run_incline(power_engine_t *e, int incline_x10);
 
 /* 处理 FTMS 下发的 ERG 目标功率，并在需要时自动切到 ERG 模式。
  * 返回 true 表示设置成功（范围有效并已应用），false 表示超出范围被拒绝。 */

@@ -87,6 +87,8 @@ void power_engine_init(power_engine_t *e)
     profile_init(&e->profile);
     led_config_defaults(&e->led);
     hr_model_init(&e->hr, DEFAULT_HEARTRATE);
+    e->sport_profile = DEFAULT_SPORT_PROFILE;
+    running_engine_init(&e->running);
     e->snapshot.power = DEFAULT_POWER;
     e->snapshot.cadence = DEFAULT_CADENCE;
     e->snapshot.heartrate = DEFAULT_HEARTRATE;
@@ -429,6 +431,36 @@ bool power_engine_set_device_name(power_engine_t *e, const char *name)
     e->device_name[DEVICE_NAME_MAX - 1] = '\0';
     e->dirty = true;
     return true;
+}
+
+bool power_engine_set_sport_profile(power_engine_t *e, sport_profile_t profile)
+{
+    if (profile < 0 || profile >= SPORT_PROFILE_COUNT) return false;
+    if (e->sport_profile == profile) return false;
+    e->sport_profile = profile;
+    e->dirty = true;
+    return true;
+}
+
+bool power_engine_set_run_speed(power_engine_t *e, int speed_x100_kmh)
+{
+    bool changed = running_engine_set_speed(&e->running, speed_x100_kmh);
+    if (changed) e->dirty = true;
+    return changed;
+}
+
+bool power_engine_set_run_cadence(power_engine_t *e, int cadence_spm)
+{
+    bool changed = running_engine_set_cadence(&e->running, cadence_spm);
+    if (changed) e->dirty = true;
+    return changed;
+}
+
+bool power_engine_set_run_incline(power_engine_t *e, int incline_x10)
+{
+    bool changed = running_engine_set_incline(&e->running, incline_x10);
+    if (changed) e->dirty = true;
+    return changed;
 }
 
 /*
