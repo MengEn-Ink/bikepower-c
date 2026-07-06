@@ -69,7 +69,7 @@
 - 适用改动：
 - `main/web/app.js` 任何改动
 - `main/web/index.html` 或 `main/web/app.css` 改动后建议同步跑
-- 历史教训：v3.1.6 `/ota` 页 `pollStatus` 结尾 `}}}` 多一个 `}`，导致 `setInterval(function(){...},2000)` 的 `)` 失配，整个 script 块报 `missing ) after argument list`。v3.2.0 起 JS 独立成文件，此类问题由 `node --check` 直接拦截；v4.0.0 已移除在线 OTA，但 JS 静态门禁继续保留。
+- 历史教训：v3.1.6 `/ota` 页 `pollStatus` 结尾 `}}}` 多一个 `}`，导致 `setInterval(function(){...},2000)` 的 `)` 失配，整个 script 块报 `missing ) after argument list`。v3.2.0 起 JS 独立成文件，此类问题由 `node --check` 直接拦截；v4.0.0 已永久放弃设备内 OTA，但 JS 静态门禁继续保留。
 
 ### `TC-3d`：门户结构静态检查
 
@@ -102,7 +102,7 @@
 
 ### `TC-3i`：核心流程耐久测试
 
-- 目标：无需真机连续验证核心业务流程，默认运行 10 分钟
+- 目标：无需真机连续验证核心业务流程，默认运行 3 分钟
 - 入口：`tests/test_core_flow_endurance.py`
 - 覆盖内容：
 - 自动启动 `tests/mock_server.py`
@@ -125,7 +125,7 @@
 - `TC-7a`：**任何 `main/wifi_portal.c` 改动必须先跑 `tests/check_portal_js.py`，JS 语法全绿才能继续**。这是硬性前置门，避免 `}}}` 类低级 bug 烧录后才发现。
 - `TC-7c`：**常量一致性检查（每次改动必跑）**：跑 `tests/check_config_consistency.py`，验证 `bikepower_config.h` / `domain_config.h` / `README.md` / `docs/` 之间的常量值（版本号、引脚、阈值、超时、栈大小）一致，防止文档与代码漂移。
 - `TC-7d`：**配网页保存字段改动必须跑 `tests/test_portal_config_save.py`**，确保 mock 保存、状态回显和 custom pacer 展示不漂移。
-- `TC-7e`：**固件生成前必须跑 `tests/test_core_flow_endurance.py`**，默认 10 分钟；如果因时间原因仅快速验证，必须显式写明 `--cycles` 结果不能替代正式固件生成门禁。
+- `TC-7e`：**固件生成前必须跑 `tests/test_core_flow_endurance.py`**，默认 3 分钟；如果因时间原因仅快速验证，必须显式写明 `--cycles` 结果不能替代正式固件生成门禁。
 - `TC-8`：跨层改动按最高等级执行，不能只挑便宜测试。
 
 ## 影响范围评估（**每次代码修改前必做**）

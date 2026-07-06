@@ -89,14 +89,14 @@ done
 |------|------|------|
 | `mock_server.py` | 复刻设备全部 /api/xxx JSON 接口 + 首页静态资源，本地调试 `main/web/` 前端 | 默认 8080 |
 | `test_portal_config_save.py` | 自动启动 mock server，模拟网页端 POST `/api/config` 保存并检查 `/api/state` 回显 | 随机空闲端口 |
-| `test_core_flow_endurance.py` | 10 分钟核心流程耐久测试：循环模拟按钮调功、功率变化心率随动、网页端各类编辑、LED 静默、设备模板和关闭 WiFi | 随机空闲端口 |
+| `test_core_flow_endurance.py` | 3 分钟核心流程耐久测试：循环模拟按钮调功、功率变化心率随动、网页端各类编辑、LED 静默、设备模板和关闭 WiFi | 随机空闲端口 |
 
 ```bash
 # 完整 mock（覆盖全部 /api/xxx）
 python3 tests/mock_server.py
 # 浏览器访问 http://127.0.0.1:8080/ 调试前端
 python3 tests/test_portal_config_save.py  # 自动化验证保存回显，无需真机
-python3 tests/test_core_flow_endurance.py # 默认跑 10 分钟核心流程耐久测试
+python3 tests/test_core_flow_endurance.py # 默认跑 3 分钟核心流程耐久测试
 python3 tests/test_core_flow_endurance.py --minutes 90 # 需要长时间老化时手动加长
 ```
 
@@ -122,7 +122,7 @@ python3 tests/serial_daemon.py --no-crash-snapshot
 
 > 守护进程异步写入 `tests/logs/device_<YYYYMMDD_HHMMSS>.log`（保留最近 5 个，已被 `.gitignore` 忽略），烧录时自动让出串口、烧完自动重连，跨 Linux/macOS。默认按串口连接会话切文件；设备软重启但串口未断开时，会在当前日志中插入 `DEVICE REBOOT / BOOT BANNER` 分隔线。`--split-on-reboot` 可改为每次启动 banner 切新文件。检测到 `panic` / `WDT` / `Backtrace` 等关键字时，会生成 `tests/logs/crash_<YYYYMMDD_HHMMSS>.log` 保存最近上下文。停止：`pkill -f serial_daemon.py`。
 
-> v4.0.0 起已移除在线 OTA 与家庭网络配置，固件升级走全量重新烧录（分区表变更需 `erase_flash`）。
+> v4.0.0 起永久放弃设备内 OTA 与家庭网络配置；普通用户升级统一走网页端在线烧录，入口见 README 和用户手册。
 
 ### F. 压力测试
 
@@ -139,7 +139,7 @@ python3 tests/serial_daemon.py --no-crash-snapshot
 ```bash
 bash tests/test_runner.sh -d    # 仅 host 单测
 bash tests/test_runner.sh -m    # mock 配网页保存测试（无需真机）
-bash tests/test_runner.sh -e    # 10 分钟核心流程耐久测试（无需真机）
+bash tests/test_runner.sh -e    # 3 分钟核心流程耐久测试（无需真机）
 bash tests/test_runner.sh -b    # BLE 自测（需真机）
 bash tests/test_runner.sh -w    # 配网自测（需真机配网态）
 bash tests/test_runner.sh -a    # 全部
@@ -178,13 +178,13 @@ python3 tests/test_portal_config_save.py  # 如涉及配网页保存字段，同
 python3 tests/test_core_flow_endurance.py --cycles 1  # 如涉及按钮/心率/网页核心流程，先快速验证
 ```
 
-### 场景 4：固件生成前的 10 分钟核心流程测试
+### 场景 4：固件生成前的 3 分钟核心流程测试
 
 ```bash
 python3 tests/test_core_flow_endurance.py
 ```
 
-默认跑 10 分钟并生成 `tests/reports/core_flow_endurance_<时间>.md`，覆盖模拟按钮短按/长按调功、功率变化心率随动、网页端首页与设置页编辑、LED 静默模式、设备模板、续期和关闭 WiFi。快速开发验证可用 `--cycles 1`，正式固件生成时由 `scripts/build_all.sh` 自动执行；如需半小时或 90 分钟老化，可传 `--minutes 30` 或 `--minutes 90`。
+默认跑 3 分钟并生成 `tests/reports/core_flow_endurance_<时间>.md`，覆盖模拟按钮短按/长按调功、功率变化心率随动、网页端首页与设置页编辑、LED 静默模式、设备模板、续期和关闭 WiFi。快速开发验证可用 `--cycles 1`，正式固件生成时由 `scripts/build_all.sh` 自动执行；如需半小时或 90 分钟老化，可传 `--minutes 30` 或 `--minutes 90`。
 
 ### 场景 5：完整真机回归（v4.0.0 交付前）
 
@@ -220,7 +220,7 @@ idf.py build
 ./scripts/build_all.sh generic  # 仅编译通用版
 ```
 
-`scripts/build_all.sh` 是分发固件的标准入口。脚本会先运行 host 单测、mock 配网页保存测试、10 分钟核心流程耐久测试和静态门禁，再生成 `build/release/` 下的双板型合并固件、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 与 release 总包 zip。
+`scripts/build_all.sh` 是分发固件的标准入口。脚本会先运行 host 单测、mock 配网页保存测试、3 分钟核心流程耐久测试和静态门禁，再生成 `build/release/` 下的双板型合并固件、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 与 release 总包 zip。
 
 `test-report.md` 必须如实记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行的烧录、BLE、配网、按钮或 LED 验证必须写明原因，不能按通过处理。`user-manual.md` 由 `docs/user/` 生成，更新固件交互时必须先同步源文档。总包命名为 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip`，用于一次性分发两个板型固件和随附文档。
 

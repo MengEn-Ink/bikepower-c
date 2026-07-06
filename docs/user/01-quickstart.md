@@ -14,102 +14,22 @@
 
 > 如果你的开发板已经预装了 BikePower 固件，可以跳过此步骤，直接进入第 3 节。
 
-### 2.1 下载固件
+普通用户统一使用网页端在线烧录，不需要下载固件文件，也不需要安装 esptool、ESP-IDF 或乐鑫 Flash Download Tool。
 
-从项目的 [Release 页面](https://gitee.com/mengen4jv/bikepower-c/releases) 下载最新版本的 `bikepower-c-merged.bin` 文件。
+BikePower C 已永久放弃设备内 OTA 升级。后续升级、重刷或恢复固件，都按本节网页端在线烧录流程操作。
 
-这是合并固件，包含了引导加载器、分区表和应用程序，一个文件即可完成烧录。
+1. 使用 Chrome 或 Edge 浏览器打开：[https://easyhey.com/?firmware=MOD220](https://easyhey.com/?firmware=MOD220)。
+2. 用支持数据传输的 USB 线把开发板连接到电脑。
+3. 点击网页里的连接或烧录按钮，浏览器会弹出串口选择窗口。
+4. 选择名称类似 `USB JTAG/serial debug unit` 的端口；macOS 上通常会显示为 `USB JTAG/serial debug unit (cu.usbmodem101)`，Windows 上通常显示为 `COMx`。
+5. 按网页提示开始烧录，等待进度完成。
+6. 烧录完成后重新上电或按一下开发板的 RST 复位键，设备启动。
 
-下载后建议校验文件完整性，校验值以对应 Release 页面公布的 SHA-256 为准：
+![网页端选择串口](../images/web-flash-serial-port.jpg)
 
-- **Windows**（PowerShell）：`CertUtil -hashfile bikepower-c-merged.bin SHA256`
-- **macOS / Linux**：`sha256sum bikepower-c-merged.bin`
+如果列表里看不到开发板，先确认 USB 线不是纯充电线，再重新插拔开发板并刷新网页。少数开发板需要按住 BOOT 键再点击连接或开始烧录，进度开始后即可松开。
 
-输出与 Release 页面公布值一致即下载完整。
-
-### 2.2 查找串口
-
-ESP32-C3 内置 USB-Serial/JTAG，用 USB 线连接电脑后即可识别，无需额外安装驱动。
-
-- **Windows**：打开"设备管理器" → "端口(COM 和 LPT)"，找到新增的 COM 口（如 `COM3`）
-- **macOS**：终端运行 `ls /dev/tty.usb*`，找到类似 `/dev/tty.usbmodem-xxxx` 的设备
-- **Linux**：终端运行 `ls /dev/ttyUSB*` 或 `ls /dev/ttyACM*`，找到对应设备
-
-如果找不到串口，通常是 USB 线只支持充电，换一根数据线即可。
-
-### 2.3 方法一：Windows 图形界面烧录（推荐新手）
-
-使用乐鑫官方的 **Flash Download Tool**，无需命令行操作。
-
-**第一步：下载工具**
-
-从乐鑫官网下载 [Flash Download Tool](https://www.espressif.com/zh-hans/support/download/other-tools)（选择最新版本），解压后运行 `flash_download_tool_x.x.x.exe`。
-
-**第二步：选择芯片类型**
-
-- ChipType 选择 `ESP32-C3`
-- WorkMode 选择 `Develop`
-- 点击 OK 进入主界面
-
-**第三步：配置烧录参数**
-
-1. 第一行勾选框打勾，点击右侧 `...` 选择下载的 `bikepower-c-merged.bin` 文件
-2. 地址栏填写 `0x0`（合并固件起始地址，必须为 0x0）
-3. 下方参数设置：
-   - SPI SPEED：`40MHz`
-   - SPI MODE：`DIO`
-   - COM：选择你的串口号（如 COM3）
-   - BAUD：`460800`（烧录失败可降低为 `115200`）
-
-**第四步：开始烧录**
-
-1. 按住开发板上的 **BOOT** 键不要松开
-2. 点击软件右下角的 **START** 按钮
-3. 等待进度条出现并开始走，此时可以松开 BOOT 键
-4. 显示 **FINISH** 即表示烧录成功
-5. 按一下开发板上的 **RST**（复位）键，设备启动
-
-> 如果 START 后进度条不动或报错，检查：COM 口是否正确、BOOT 键是否按住、USB 线是否支持数据传输。
-
-### 2.4 方法二：命令行烧录（Windows / macOS / Linux）
-
-适合有命令行经验的用户，跨平台通用。
-
-**安装 esptool**
-
-```bash
-pip install esptool
-```
-
-> 如果没有 Python 环境，先从 [python.org](https://www.python.org/downloads/) 安装 Python 3。
-
-**烧录固件**
-
-将下面的串口号替换为你自己的（参见 2.2 节的查找方法）：
-
-- Windows：`COM3`
-- macOS：`/dev/tty.usbmodem-xxxx`
-- Linux：`/dev/ttyUSB0`
-
-```bash
-esptool.py --chip esp32c3 -p COM3 -b 460800 write_flash --flash_mode dio --flash_size 4MB --flash_freq 80m 0x0 bikepower-c-merged.bin
-```
-
-出现 `Hash of data verified` 表示烧录成功。如果设备没有自动重启，按一下 RST 键。
-
-> 如果报错 `Failed to connect to ESP32-C3`，按住 BOOT 键再运行命令，连接成功后松开。
-
-### 2.5 方法三：ESP-IDF 烧录（适合开发者）
-
-如果你已经安装了 ESP-IDF 开发环境：
-
-```bash
-git clone https://gitee.com/mengen4jv/bikepower-c.git
-cd bikepower-c
-idf.py -p /dev/ttyUSB0 flash monitor
-```
-
-此方法会从源码编译固件并烧录，适合需要修改代码的用户。
+开发者仍可使用仓库脚本或 ESP-IDF 从源码编译烧录；这些方式只面向开发和测试，不作为普通用户手册路径。
 
 ## 3. 第一次使用步骤
 
@@ -135,5 +55,5 @@ idf.py -p /dev/ttyUSB0 flash monitor
 ## 5. 下一步
 
 - 完整按钮操作、LED 灯效、配网字段、骑行模式与 FAQ：见 [用户手册](02-user-manual.md)
-- 固件升级：当前 v4.0.0 已移除在线 OTA，升级走全量重新烧录；从旧分区布局升级时需先执行 `erase_flash`
+- 固件升级：当前 v4.0.0 已永久放弃设备内 OTA，普通用户升级统一走 [网页端在线烧录](https://easyhey.com/?firmware=MOD220)
 - 硬件接线、供电与排障：见 [硬件指南](03-hardware.md)

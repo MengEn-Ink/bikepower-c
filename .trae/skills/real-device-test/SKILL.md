@@ -26,7 +26,7 @@ description: "ESP32-C3 ESP-IDF 固件真机测试流程。变更分类智能跳�
 
 - `test/test_domain`：领域层 host 单测
 - `tests/test_portal_config_save.py`：mock 配网页保存回显测试
-- `tests/test_core_flow_endurance.py`：10 分钟核心流程耐久测试（按钮/心率/网页编辑/模板/关闭 WiFi）
+- `tests/test_core_flow_endurance.py`：3 分钟核心流程耐久测试（按钮/心率/网页编辑/模板/关闭 WiFi）
 - `tests/serial_capture.py`：串口日志抓取
 - `tests/ble_selftest.py`：BLE 五服务 + FTMS ERG 自测
 - `tests/stage3_conn_test.py`：连接事件驱动状态机验证

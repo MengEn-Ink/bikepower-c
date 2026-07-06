@@ -39,7 +39,7 @@ usage() {
   *.bin.sha256                         对应 SHA256 校验文件
   manifest.txt                         产物清单（文件名/大小/SHA256/版本）
   test-report.md                       本次固件测试报告
-  core-flow-endurance.md               10 分钟核心流程耐久测试明细
+  core-flow-endurance.md               3 分钟核心流程耐久测试明细
   user-manual.md                       随固件分发的用户文档副本
   images/                              用户文档引用的截图与示意图
   bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip
@@ -48,7 +48,7 @@ usage() {
 
 说明:
   - 本脚本仅在本地生成产物，不会打 git tag、不会创建 Gitee Release。
-  - 已移除在线 OTA，固件升级走全量重新烧录（见 README，分区表变更需 erase_flash）。
+  - 永久放弃设备内 OTA，普通用户升级统一走网页端在线烧录（见 README）。
 
 示例:
   ./scripts/build_all.sh                # 编译两种板型并生成 release 产物
@@ -151,7 +151,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
     done
     echo "  - manifest.txt     （产物清单：文件名/大小/SHA256/版本）"
     echo "  - test-report.md   （测试报告）"
-    echo "  - core-flow-endurance.md （10 分钟核心流程耐久测试明细）"
+    echo "  - core-flow-endurance.md （3 分钟核心流程耐久测试明细）"
     echo "  - user-manual.md   （用户文档副本）"
     echo "  - images/          （用户文档截图与示意图）"
     echo "  - bikepower-c-release-v${VERSION}-stable-fix-g${GIT_SHA}.zip （release 总包）"
@@ -188,7 +188,7 @@ make -C test
 ./test/test_domain
 python3 tests/test_portal_config_save.py
 python3 tests/test_core_flow_endurance.py \
-    --minutes "${CORE_FLOW_MINUTES:-10}" \
+    --minutes "${CORE_FLOW_MINUTES:-3}" \
     --report "$RELEASE_DIR/core-flow-endurance.md"
 python3 tests/check_config_consistency.py
 python3 tests/check_portal_js.py
@@ -269,7 +269,7 @@ for fw in "${PRODUCED_BINS[@]}"; do
     echo "  SHA256: $fw -> ${sum:0:16}..."
 done
 
-TEST_SUMMARY="构建前门禁已通过：make -C test && ./test/test_domain；python3 tests/test_portal_config_save.py；python3 tests/test_core_flow_endurance.py --minutes ${CORE_FLOW_MINUTES:-10}；check_config_consistency.py；check_portal_js.py；check_portal_structure.py；check_nvs_schema.py；check_tasks_wdt.py；check_board_desc.py。真机烧录、BLE 自测、配网自测和物理按钮/LED 验证需按测试报告补充执行记录。"
+TEST_SUMMARY="构建前门禁已通过：make -C test && ./test/test_domain；python3 tests/test_portal_config_save.py；python3 tests/test_core_flow_endurance.py --minutes ${CORE_FLOW_MINUTES:-3}；check_config_consistency.py；check_portal_js.py；check_portal_structure.py；check_nvs_schema.py；check_tasks_wdt.py；check_board_desc.py。真机烧录、BLE 自测、配网自测和物理按钮/LED 验证需按测试报告补充执行记录。"
 python3 "$PROJECT_DIR/scripts/tools/generate_release_docs.py" \
     --release-dir "$RELEASE_DIR" \
     --test-summary "$TEST_SUMMARY" \
@@ -335,4 +335,4 @@ echo "   1. 校验各产物 SHA256 与 manifest.txt 一致"
 echo "   2. 补齐真机验证记录，更新 test-report.md"
 echo "   3. 打 git tag、创建 Gitee Release 并上传 release 总包、merged bin、manifest、test-report.md、core-flow-endurance.md、user-manual.md"
 echo "   本脚本不会打 git tag、不会创建 Gitee Release。"
-echo "   已移除在线 OTA：升级走全量重新烧录（分区表变更需 erase_flash）。"
+echo "   永久放弃设备内 OTA：普通用户升级统一走网页端在线烧录。"

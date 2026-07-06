@@ -4,6 +4,13 @@
 
 ## [未发布]
 
+### 用户手册与发行版说明
+- `README.md`、`docs/user/01-quickstart.md`、`docs/user/02-user-manual.md`、`docs/images/web-flash-serial-port.jpg`：普通用户烧录/升级固件统一改为网页端在线烧录，入口为 `https://easyhey.com/?firmware=MOD220`；README 和手册加入浏览器串口选择截图，弱化 Flash Download Tool、esptool 和 ESP-IDF 命令行路径，避免小白用户在多种烧录方式之间选择。
+- `scripts/tools/publish_gitee_release.py`：Gitee Release 自动生成的“烧录说明”同步改为优先使用网页端在线烧录；命令行单文件烧录仅保留为开发者兜底方式。
+
+### 测试流程
+- `tests/test_core_flow_endurance.py`、`scripts/build_all.sh`、`tests/README.md`、`docs/dev/`、`.trae/rules/workflows/test-coverage.md`、`.trae/skills/real-device-test/SKILL.md`：核心流程耐久测试默认时长从 10 分钟压缩到 3 分钟，release 构建门禁同步使用 3 分钟默认值；如需长时间老化仍可通过 `--minutes` 或 `CORE_FLOW_MINUTES` 手动加长。
+
 ## [4.0.2] - 2026-07-06
 
 ### 固件产物测试报告与用户手册

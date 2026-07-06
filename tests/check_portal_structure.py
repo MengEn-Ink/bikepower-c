@@ -249,8 +249,8 @@ def main():
     check('settings-led-silent' in js and 'change' in js, "LED 静默模式 checkbox 必须绑定 change 事件")
     check('POST' in portal_config_save_src and '/api/config' in portal_config_save_src and '/api/state' in portal_config_save_src,
           "test_portal_config_save.py 必须覆盖网页端保存后状态回显")
-    check('DEFAULT_MINUTES = 10' in core_flow_endurance_src,
-          "test_core_flow_endurance.py 必须默认执行 10 分钟核心流程耐久测试")
+    check('DEFAULT_MINUTES = 3' in core_flow_endurance_src,
+          "test_core_flow_endurance.py 必须默认执行 3 分钟核心流程耐久测试")
     check('simulate_button_flow' in core_flow_endurance_src and 'exercise_hr_following' in core_flow_endurance_src,
           "test_core_flow_endurance.py 必须覆盖模拟按钮与心率随动流程")
     check('exercise_web_edits' in core_flow_endurance_src and 'exercise_template_flow' in core_flow_endurance_src,
@@ -258,7 +258,7 @@ def main():
     check('run_mock_portal_test' in test_runner_src and 'test_portal_config_save.py' in test_runner_src,
           "test_runner.sh 必须提供 mock 配网页保存测试入口")
     check('run_endurance_test' in test_runner_src and 'test_core_flow_endurance.py' in test_runner_src,
-          "test_runner.sh 必须提供 10 分钟核心流程耐久测试入口")
+          "test_runner.sh 必须提供 3 分钟核心流程耐久测试入口")
     check('run_portal_test' in test_runner_src and 'stage5_portal_test.py' in test_runner_src,
           "test_runner.sh 必须提供配网门户 HTTP 自测入口")
     for key in [

@@ -2,7 +2,7 @@
 
 > 配套规则：[`.trae/rules/workflows/test-coverage.md`](../../.trae/rules/workflows/test-coverage.md)
 > 维护要求：每次抽取纯逻辑到领域层 / 新增测试脚本后，更新本矩阵。
-> 版本：v4.0.2（已移除在线 OTA + 家庭网络；不再保留"为覆盖率抽取但生产代码未采用"的并行实现）。
+> 版本：v4.0.2（已永久放弃设备内 OTA + 家庭网络；不再保留"为覆盖率抽取但生产代码未采用"的并行实现）。
 
 ## 一、项目模块清单与代码规模
 
@@ -57,7 +57,7 @@
 | TC-3f 板型描述表 | `tests/check_board_desc.py` | 板型枚举/引脚/名称一致性 | ✅ |
 | TC-3g 任务/WDT | `tests/check_tasks_wdt.py` | xTaskCreate/WDT/队列 | ✅ |
 | TC-3h mock 保存 | `tests/test_portal_config_save.py` | `/api/config` 保存后 `/api/state` 回显 | ✅ |
-| TC-3i 核心流程耐久 | `tests/test_core_flow_endurance.py` | 10 分钟循环覆盖按钮调功、功率/心率随动、网页编辑、LED 静默、设备模板、关闭 WiFi | ✅ |
+| TC-3i 核心流程耐久 | `tests/test_core_flow_endurance.py` | 3 分钟循环覆盖按钮调功、功率/心率随动、网页编辑、LED 静默、设备模板、关闭 WiFi | ✅ |
 
 ### 真机测试（需 ESP32-C3 + 串口 + 手机）
 
@@ -73,7 +73,7 @@
 |------|------|
 | `tests/mock_server.py` | 本地复刻全部 /api/xxx，浏览器调试 `main/web/` 前端不烧设备 |
 | `tests/test_portal_config_save.py` | 自动启动 mock server，验证配网页保存字段即时回显 |
-| `tests/test_core_flow_endurance.py` | 自动启动 mock server，默认 10 分钟循环验证核心流程并输出 markdown 报告 |
+| `tests/test_core_flow_endurance.py` | 自动启动 mock server，默认 3 分钟循环验证核心流程并输出 markdown 报告 |
 | `tests/serial_daemon.py` | 串口日志持续抓取 + 自动重连 |
 | `tests/serial_capture.py` | 单次抓取 |
 
@@ -105,7 +105,7 @@
   ↓
 7. 涉及网页保存字段 → 跑 TC-3h mock 保存回显
   ↓
-8. 生成固件前 → 跑 TC-3i 10 分钟核心流程耐久测试
+8. 生成固件前 → 跑 TC-3i 3 分钟核心流程耐久测试
   ↓
 9. 涉及 BLE/配网行为 → 跑 TC-2 / TC-3 真机
   ↓

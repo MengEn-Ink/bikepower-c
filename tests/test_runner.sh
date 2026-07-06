@@ -4,7 +4,7 @@
 #   -p <port>   串口端口（真机测试所需）
 #   -d          仅运行领域层 host 单测
 #   -m          运行 mock 配网页保存测试（无需真机）
-#   -e          运行 10 分钟核心流程耐久测试（无需真机）
+#   -e          运行 3 分钟核心流程耐久测试（无需真机）
 #   -w          运行配网门户 HTTP 自测（需设备已在配网态）
 #   -b          运行 BLE 自测（需真机）
 #   -s          运行压力测试
@@ -28,7 +28,7 @@ run_mock_portal_test() {
     python3 tests/test_portal_config_save.py
 }
 
-# 10 分钟核心流程耐久测试（无需真机）
+# 3 分钟核心流程耐久测试（无需真机）
 run_endurance_test() {
     echo "=== 核心流程耐久测试 ==="
     python3 tests/test_core_flow_endurance.py

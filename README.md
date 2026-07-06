@@ -77,9 +77,32 @@ WiFi 配网的射频共用流程可参考（v3.1.3 起为共存模式，BLE 不�
 
 ![WiFi/BLE 射频共用流程](docs/images/rf-wifi-flow.png)
 
-## 构建与烧录步骤
+## 固件烧录、构建与发布
 
-推荐使用专用脚本自动识别 ESP-IDF 和开发板串口，编译并烧录当前工作区最新版正式固件：
+### 普通用户：网页端在线烧录
+
+普通用户不需要安装 ESP-IDF、esptool 或乐鑫 Flash Download Tool，统一使用网页端在线烧录：
+
+[https://easyhey.com/?firmware=MOD220](https://easyhey.com/?firmware=MOD220)
+
+项目已永久放弃设备内 OTA 升级路径。后续固件升级、重刷和恢复出厂固件都统一走这个网页端在线烧录入口。
+
+操作步骤：
+
+1. 使用 Chrome 或 Edge 打开上面的链接。
+2. 用支持数据传输的 USB 线把 ESP32-C3 开发板连接到电脑。
+3. 点击网页里的连接或烧录按钮。
+4. 在浏览器弹出的串口列表中，选择类似 `USB JTAG/serial debug unit` 的端口；Windows 上通常显示为 `COMx`，macOS 上通常显示为 `cu.usbmodem*`。
+5. 按网页提示开始烧录，等待进度完成。
+6. 烧录完成后重新上电，或按一下开发板的 RST 复位键。
+
+![网页端选择串口](docs/images/web-flash-serial-port.jpg)
+
+如果列表里看不到开发板，优先更换一根支持数据传输的 USB 线，再重新插拔开发板并刷新网页。少数开发板需要按住 BOOT 键再点击连接或开始烧录，进度开始后即可松开。
+
+### 开发者：本地编译并烧录
+
+开发者推荐使用专用脚本自动识别 ESP-IDF 和开发板串口，编译并烧录当前工作区最新版正式固件：
 
 ```bash
 ./scripts/flash_latest.sh
@@ -93,7 +116,7 @@ WiFi 配网的射频共用流程可参考（v3.1.3 起为共存模式，BLE 不�
 ./scripts/flash_latest.sh --portal-test-auto-config
 ```
 
-其中 `--erase` 在从旧的双 OTA 分区布局切换到当前 4MB 单 factory 布局时必须使用（分区表变更需全量擦写）；`--portal-test-auto-config` 会刷启动后自动进入配网的测试固件，正式使用不要加。
+其中 `--erase` 仅用于开发者从旧的双 OTA 分区布局切换到当前 4MB 单 factory 布局时全量擦写；`--portal-test-auto-config` 会刷启动后自动进入配网的测试固件，正式使用不要加。
 
 也可以手动准备 ESP-IDF 环境，再在项目根目录执行：
 
@@ -106,7 +129,9 @@ idf.py -p <port> monitor
 
 `<port>` 请替换为你的实际串口，例如 macOS 下常见 `/dev/cu.usbmodem*`，Linux 下常见 `/dev/ttyUSB0` 或 `/dev/ttyACM0`。
 
-发版构建使用 `scripts/build_all.sh`。该脚本可编译 generic-c3 / m5stamp-c3 双板型产物，先运行 host、mock、10 分钟核心流程耐久和静态门禁，再生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip；`--dry-run` 只预览，不编译、不写文件、不打 tag、不创建 Release。
+### 发行版构建
+
+发版构建使用 `scripts/build_all.sh`。该脚本可编译 generic-c3 / m5stamp-c3 双板型产物，先运行 host、mock、3 分钟核心流程耐久和静态门禁，再生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip；`--dry-run` 只预览，不编译、不写文件、不打 tag、不创建 Release。
 
 ```bash
 ./scripts/build_all.sh --dry-run

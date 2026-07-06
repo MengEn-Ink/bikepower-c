@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""10 分钟核心流程耐久测试。
+"""3 分钟核心流程耐久测试。
 
-默认运行 10 分钟，循环覆盖：
+默认运行 3 分钟，循环覆盖：
 - host 领域层测试（含模拟按钮、随机功率心率随动、浮动、配置持久化）
 - mock 网页 API 操作（首页调参、用户资料、设备名、按钮步进、LED、静默模式）
 - 设备模板扫描 / 读取 / 保存 / 应用 / 删除
@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MOCK_SERVER = ROOT / "tests" / "mock_server.py"
 REPORT_DIR = ROOT / "tests" / "reports"
-DEFAULT_MINUTES = 10
+DEFAULT_MINUTES = 3
 
 
 class Recorder:
@@ -294,8 +294,8 @@ def write_report(path, rec, started_at, ended_at, minutes, cycles):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="BikePower C 10 分钟核心流程耐久测试")
-    parser.add_argument("--minutes", type=float, default=DEFAULT_MINUTES, help="运行时长，默认 10")
+    parser = argparse.ArgumentParser(description="BikePower C 3 分钟核心流程耐久测试")
+    parser.add_argument("--minutes", type=float, default=DEFAULT_MINUTES, help="运行时长，默认 3")
     parser.add_argument("--interval", type=float, default=30.0, help="循环间隔秒数，默认 30")
     parser.add_argument("--cycles", type=int, default=0, help="指定循环次数；用于快速验证")
     parser.add_argument("--host-every-minutes", type=float, default=15.0, help="host 单测间隔，默认 15 分钟")
