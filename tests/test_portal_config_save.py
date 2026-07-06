@@ -73,6 +73,7 @@ def main():
         wait_ready(base, proc)
         payload = {
             "device_name": "BikePower-WebTest",
+            "sport_profile": "running",
             "mode": "steady",
             "power": 345,
             "cadence": 96,
@@ -82,8 +83,11 @@ def main():
             "cadence_float": 9,
             "hr_float": 7,
             "power_step": 35,
+            "run_speed_x100": 1234,
             "run_pace_float_sec": 15,
+            "run_cadence": 181,
             "run_cadence_float": 6,
+            "run_incline_x10": 35,
             "profile_weight": 82,
             "profile_ftp": 280,
             "profile_thr_hr": 188,
@@ -117,6 +121,38 @@ def main():
         request_json(base + "/api/renew", {})
         renewed = urllib.request.urlopen(base + "/api/time", timeout=5).read().decode("utf-8")
         check(renewed == "179", "/api/renew 后倒计时恢复并继续递减", failures)
+
+        before_invalid = request_json(base + "/api/state")
+        invalid_payload = {
+            "sport_profile": "swim",
+            "mode": "invalid",
+            "power": 99999,
+            "cadence": -1,
+            "heartrate": "bad",
+            "power_step": 0,
+            "run_pace_float_sec": 999,
+            "run_cadence_float": "bad",
+            "custom_wkg_low": 70,
+            "custom_wkg_high": 10,
+            "led_wait_mode": 99,
+        }
+        request_json(base + "/api/config", invalid_payload)
+        after_invalid = request_json(base + "/api/state")
+        check(after_invalid.get("sport_profile") == before_invalid.get("sport_profile"),
+              "非法 sport_profile 保持旧值", failures)
+        check(after_invalid.get("mode") == before_invalid.get("mode"),
+              "非法 mode 保持旧值", failures)
+        check(after_invalid.get("power") == 2000, "power 越界夹到上限", failures)
+        check(after_invalid.get("cadence") == 30, "cadence 越界夹到下限", failures)
+        check(after_invalid.get("heartrate") == before_invalid.get("heartrate"),
+              "非数字 heartrate 保持旧值", failures)
+        check(after_invalid.get("power_step") == 1, "power_step 越界夹到下限", failures)
+        check(after_invalid.get("run_pace_float_sec") == 60, "跑步配速浮动夹到上限", failures)
+        check(after_invalid.get("run_cadence_float") == before_invalid.get("run_cadence_float"),
+              "非数字跑步步频浮动保持旧值", failures)
+        check(after_invalid.get("custom_wkg_low") == 70 and after_invalid.get("custom_wkg_high") == 70,
+              "自定义功体比上限自动抬到不低于下限", failures)
+        check(after_invalid.get("led_wait_mode") == 5, "LED 模式越界夹到上限", failures)
     finally:
         proc.terminate()
         try:

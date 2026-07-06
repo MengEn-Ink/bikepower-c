@@ -25,6 +25,7 @@
 | [固件防提取/防反编译](dev/02-firmware-security.md) | 编译层加固（已实现）+ Flash 加密/Secure Boot 方案与选型 |
 | [测试覆盖率分析](dev/03-test-coverage-analysis.md) | 领域层/应用层模块清单、覆盖矩阵、固件随附测试报告规则 |
 | [跑步模式兼容性调研与适配方案](dev/04-running-mode-compatibility.md) | Zwift/MyWhoosh 跑步模式 BLE 兼容口径、广播/GATT 数据需求、分阶段落地方案 |
+| [操作覆盖矩阵与测试门禁](dev/05-operation-test-gate.md) | 模式切换、保存、按钮、网页、BLE、异常稳定性的操作级门禁矩阵与人工项记录规则 |
 
 ## 🗄️ archive/ — 历史 / 归档（仅供追溯）
 

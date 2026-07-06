@@ -149,6 +149,67 @@ SCAN_DEVICES = [
 ]
 SCANNING = [False]
 
+LIMITS = {
+    "power": (0, 2000),
+    "cadence": (30, 220),
+    "heartrate": (40, 220),
+    "power_float": (0, 100),
+    "cadence_float": (0, 30),
+    "hr_float": (0, 30),
+    "power_step": (1, 100),
+    "profile_weight": (30, 150),
+    "profile_ftp": (50, 600),
+    "profile_thr_hr": (80, 220),
+    "custom_wkg_low": (5, 80),
+    "custom_wkg_high": (5, 80),
+    "run_speed_x100": (100, 3000),
+    "run_pace_float_sec": (0, 60),
+    "run_cadence": (60, 260),
+    "run_cadence_float": (0, 30),
+    "run_incline_x10": (-100, 200),
+    "led_wait_mode": (0, 5),
+    "led_wait_color": (0, 6),
+    "led_conn_mode": (0, 5),
+    "led_conn_color": (0, 6),
+    "led_wifi_mode": (0, 5),
+    "led_wifi_color": (0, 6),
+    "led_confirm_mode": (0, 5),
+    "led_confirm_color": (0, 6),
+    "led_error_mode": (0, 5),
+    "led_error_color": (0, 6),
+}
+
+ENUM_VALUES = {
+    "sport_profile": {"cycling", "running"},
+    "mode": {"steady", "road", "erg"},
+    "profile_ride_type": {"coco", "yumi", "jacques", "genie", "constance", "custom"},
+}
+
+
+def _clamp(value, lo, hi):
+    return min(max(value, lo), hi)
+
+
+def _apply_config_field(key, value):
+    if key in LIMITS:
+        if not isinstance(value, int):
+            return
+        lo, hi = LIMITS[key]
+        MOCK_STATE[key] = _clamp(value, lo, hi)
+        return
+    if key in ENUM_VALUES:
+        if isinstance(value, str) and value in ENUM_VALUES[key]:
+            MOCK_STATE[key] = value
+        return
+    if key == "led_silent":
+        if isinstance(value, int):
+            MOCK_STATE[key] = 1 if value else 0
+        return
+    if key == "hr_lock":
+        MOCK_STATE["hr_locked"] = bool(value)
+        return
+    MOCK_STATE[key] = value
+
 
 def _inline_html():
     """读取 index.html 并替换占位符为 app.css / app.js 内容（与 inline_static.py 一致）。"""
@@ -268,14 +329,16 @@ class Handler(BaseHTTPRequestHandler):
                           "led_error_mode", "led_error_color",
                           "closing"):
                     if k in data:
-                        MOCK_STATE[k] = data[k]
+                        _apply_config_field(k, data[k])
                 for p in MOCK_STATE["pacers"]:
                     if p.get("id") == "custom":
+                        if MOCK_STATE.get("custom_wkg_low", 25) > MOCK_STATE.get("custom_wkg_high", 30):
+                            MOCK_STATE["custom_wkg_high"] = MOCK_STATE["custom_wkg_low"]
                         p["name"] = MOCK_STATE.get("custom_pacer_name") or "自定义"
                         p["wkg_low"] = MOCK_STATE.get("custom_wkg_low", 25) / 10
                         p["wkg_high"] = MOCK_STATE.get("custom_wkg_high", 30) / 10
                 if "hr_lock" in data:
-                    MOCK_STATE["hr_locked"] = bool(data["hr_lock"])
+                    _apply_config_field("hr_lock", data["hr_lock"])
             self._send_json({"ok": True})
             return
         if path == "/api/renew":

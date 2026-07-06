@@ -193,6 +193,7 @@ STATIC_CHECKS = [
     ("tests/check_board_desc.py", "板型描述表 (TC-3f)"),
     ("tests/check_portal_structure.py", "门户结构 (TC-3d)"),
     ("tests/check_portal_js.py", "门户 JS 语法 (TC-3a)"),
+    ("tests/check_operation_coverage.py", "操作覆盖矩阵 (TC-3j)"),
 ]
 # 环境缺失标志：命中则降级为 warn（无设备/无依赖环境仍可跑），不算真实失败
 ENV_MISSING_MARKERS = [

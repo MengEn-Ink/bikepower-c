@@ -66,11 +66,12 @@ source $IDF_PATH/export.sh
 | `check_nvs_schema.py` | NVS schema 静态一致性检查（nvs_store ↔ config） | TC-3e | 高 |
 | `check_board_desc.py` | 板型描述表静态一致性检查（board_detect ↔ config ↔ Kconfig） | TC-3f | 高 |
 | `check_tasks_wdt.py` | 任务/队列/WDT 静态完整性检查（每个 xTaskCreate 后必须有错误检查） | TC-3g | 高 |
+| `check_operation_coverage.py` | 操作覆盖矩阵检查（关键操作必须绑定自动化或人工门禁） | TC-3j | 高 |
 
 ```bash
 # 一键跑全部静态门禁
 for s in check_portal_js check_portal_structure check_config_consistency \
-         check_nvs_schema check_board_desc check_tasks_wdt; do
+         check_nvs_schema check_board_desc check_tasks_wdt check_operation_coverage; do
     python3 tests/$s.py || exit 1
 done
 ```
@@ -90,6 +91,7 @@ done
 | `mock_server.py` | 复刻设备全部 /api/xxx JSON 接口 + 首页静态资源，本地调试 `main/web/` 前端 | 默认 8080 |
 | `test_portal_config_save.py` | 自动启动 mock server，模拟网页端 POST `/api/config` 保存并检查 `/api/state` 回显 | 随机空闲端口 |
 | `test_core_flow_endurance.py` | 3 分钟核心流程耐久测试：循环模拟按钮调功、功率变化心率随动、网页端各类编辑、LED 静默、设备模板和关闭 WiFi | 随机空闲端口 |
+| `operation_gate.py` | 操作级测试门禁聚合入口：quick/full/device，输出 Markdown 报告 | 随机空闲端口 / 真机端口 |
 
 ```bash
 # 完整 mock（覆盖全部 /api/xxx）
@@ -98,6 +100,8 @@ python3 tests/mock_server.py
 python3 tests/test_portal_config_save.py  # 自动化验证保存回显，无需真机
 python3 tests/test_core_flow_endurance.py # 默认跑 3 分钟核心流程耐久测试
 python3 tests/test_core_flow_endurance.py --minutes 90 # 需要长时间老化时手动加长
+python3 tests/operation_gate.py --level quick # 开发期快速操作门禁
+python3 tests/operation_gate.py --level full  # 提交前完整无设备门禁
 ```
 
 ### D. 串口日志工具
@@ -135,6 +139,7 @@ python3 tests/serial_daemon.py --no-crash-snapshot
 | 脚本 | 用途 |
 |------|------|
 | `test_runner.sh` | 统一入口，串联 host 单测 + BLE 自测 + 配网自测 + 压力 + 日志 |
+| `operation_gate.py` | 操作覆盖门禁入口，按 quick/full/device 分层执行并生成报告 |
 
 ```bash
 bash tests/test_runner.sh -d    # 仅 host 单测
@@ -145,6 +150,9 @@ bash tests/test_runner.sh -w    # 配网自测（需真机配网态）
 bash tests/test_runner.sh -a    # 全部
 bash tests/test_runner.sh -s    # 压力测试
 bash tests/test_runner.sh -l    # 串口日志
+python3 tests/operation_gate.py --level quick
+python3 tests/operation_gate.py --level full --build
+python3 tests/operation_gate.py --level device --port /dev/cu.usbmodem101
 ```
 
 ---
