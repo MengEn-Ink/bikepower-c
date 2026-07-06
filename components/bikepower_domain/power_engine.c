@@ -390,6 +390,10 @@ bool power_engine_set_mode(power_engine_t *e, ride_mode_t mode)
     if (mode < 0 || mode >= RIDE_MODE_COUNT) return false;
     if (e->mode == mode) return false;
     e->mode = mode;
+    if (mode != RIDE_MODE_ERG) {
+        e->has_erg_target = false;
+        e->erg_active_target = 0;
+    }
     power_engine_reset_mode_state(e);
     e->dirty = true;
     return true;
@@ -502,6 +506,27 @@ bool power_engine_set_erg_target(power_engine_t *e, int target_power)
         e->mode = RIDE_MODE_ERG;
         power_engine_reset_mode_state(e);
     }
+    e->dirty = true;
+    return true;
+}
+
+/*
+ * 清除 ERG 目标并恢复到 steady 固定功率模式。
+ * 参数：e 为功率引擎对象。
+ * 返回值：发生状态变化返回 true，当前未处于 ERG 且无目标时返回 false。
+ * 特殊行为：保留当前 base_power（通常为最后一个 ERG 目标），让用户退出训练后从可见功率继续手动调整。
+ */
+bool power_engine_clear_erg_target(power_engine_t *e)
+{
+    bool changed = e->has_erg_target || e->erg_active_target != 0 || e->mode == RIDE_MODE_ERG;
+    if (!changed) return false;
+    e->has_erg_target = false;
+    e->erg_active_target = 0;
+    if (e->mode == RIDE_MODE_ERG) {
+        e->mode = RIDE_MODE_STEADY;
+        power_engine_reset_mode_state(e);
+    }
+    e->last_power = e->base_power;
     e->dirty = true;
     return true;
 }

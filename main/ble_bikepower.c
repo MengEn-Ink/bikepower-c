@@ -71,6 +71,7 @@ static uint8_t g_ftms_feature_buf[8] = { 0x02, 0x40, 0x00, 0x00, 0x08, 0x00, 0x0
 static uint8_t g_ftms_status_buf[7]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 static ble_erg_cb_t g_erg_cb = NULL;
+static ble_erg_clear_cb_t g_erg_clear_cb = NULL;
 static sport_profile_t g_profile = DEFAULT_SPORT_PROFILE;
 static char g_device_name[DEVICE_NAME_MAX] = DEVICE_NAME;
 static esp_timer_handle_t g_notify_timer = NULL;
@@ -300,11 +301,13 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
     case FTMS_OP_STOP_PAUSE:
         g_ftms_status_buf[0] = 0x02;
         notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
+        if (g_erg_clear_cb) g_erg_clear_cb(FTMS_OP_STOP_PAUSE);
         ftms_send_response(FTMS_OP_STOP_PAUSE, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_RESET:
         g_ftms_status_buf[0] = 0x00;
         notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
+        if (g_erg_clear_cb) g_erg_clear_cb(FTMS_OP_RESET);
         ftms_send_response(FTMS_OP_RESET, FTMS_RESULT_SUCCESS);
         break;
     default:
@@ -870,6 +873,11 @@ void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartra
 void ble_bikepower_set_erg_callback(ble_erg_cb_t cb)
 {
     g_erg_cb = cb;
+}
+
+void ble_bikepower_set_erg_clear_callback(ble_erg_clear_cb_t cb)
+{
+    g_erg_clear_cb = cb;
 }
 
 /**

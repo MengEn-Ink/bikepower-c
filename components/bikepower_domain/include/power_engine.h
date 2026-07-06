@@ -121,6 +121,8 @@ bool power_engine_set_run_incline(power_engine_t *e, int incline_x10);
 /* 处理 FTMS 下发的 ERG 目标功率，并在需要时自动切到 ERG 模式。
  * 返回 true 表示设置成功（范围有效并已应用），false 表示超出范围被拒绝。 */
 bool power_engine_set_erg_target(power_engine_t *e, int target_power);
+/* 清除 ERG 目标并回到 steady 固定功率模式，供 FTMS 停止/复位/断开后恢复手动调功。 */
+bool power_engine_clear_erg_target(power_engine_t *e);
 
 /* 按当前模式重置内部功率、踏频和心率相关状态。 */
 void power_engine_reset_mode_state(power_engine_t *e);

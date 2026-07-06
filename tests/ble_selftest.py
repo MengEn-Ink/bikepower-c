@@ -101,6 +101,7 @@ DIS_EXPECT = {
 OP_REQUEST_CONTROL = 0x00
 OP_SET_TARGET_POWER = 0x05
 OP_START_RESUME = 0x07
+OP_STOP_PAUSE = 0x08
 
 # FTMS Control Point Response 结果码
 CP_RESULT_SUCCESS = 0x01
@@ -379,7 +380,19 @@ async def main():
             if cp_detail == "":
                 cp_detail = "全部通过"
 
+        stop_power = None
+        if FTMS_CP_UUID in found:
+            print("下发 Stop/Pause(0x08) — 期望退出 ERG")
+            await client.write_gatt_char(FTMS_CP_UUID, bytes([OP_STOP_PAUSE]), response=True)
+            await asyncio.sleep(3)
+            stop_power = last_power[0]
+            print(f"Stop/Pause 后功率 ~{stop_power}W")
+
         ok_erg = abs(erg_power - TARGET_POWER) <= 20 if FTMS_CP_UUID in found else True
+        ok_stop_resp = True
+        if FTMS_CP_UUID in found and stop_power is not None:
+            stop_responses = [r for r in cp_responses if len(r) >= 3 and r[0] == 0x80 and r[1] == OP_STOP_PAUSE]
+            ok_stop_resp = len(stop_responses) > 0 and stop_responses[-1][2] == CP_RESULT_SUCCESS
 
         print("--- 结果 ---")
         print(f"  五服务齐全: {'通过' if ok_services else '失败(' + ','.join(missing) + ')'}")
@@ -387,7 +400,8 @@ async def main():
         print(f"  CPS 通知:   {'通过' if ok_notify else '失败'}")
         print(f"  FTMS-CP 响应: {'通过' if ok_cp_resp else '失败(' + cp_detail + ')'}")
         print(f"  ERG 功率收敛: {'通过' if ok_erg else '失败'}")
-        ok = ok_notify and ok_services and ok_cp_resp and ok_erg and dis_ok
+        print(f"  Stop/Pause 响应: {'通过' if ok_stop_resp else '失败'}")
+        ok = ok_notify and ok_services and ok_cp_resp and ok_erg and ok_stop_resp and dis_ok
         print("总判定:", "通过" if ok else "失败")
         return 0 if ok else 1
 

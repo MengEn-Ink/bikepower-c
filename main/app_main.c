@@ -31,9 +31,11 @@ static const char *TAG = "APP";
 
 static power_engine_t s_engine;
 static QueueHandle_t s_app_queue;
-// ERG目标单独缓存：最新目标优先，不占用事件队列，避免队列满误报Invalid Param
+// ERG 控制点队列满时的兜底缓存：正常路径使用 app_queue 保序，避免 Stop/Pause 被旧目标覆盖。
 static volatile int s_pending_erg_target = 0;
 static volatile bool s_has_pending_erg = false;
+static volatile int s_pending_erg_clear_reason = 0;
+static volatile bool s_has_pending_erg_clear = false;
 
 /**
  * 处理 FTMS 控制点下发的 ERG 目标功率。
@@ -46,12 +48,35 @@ static bool on_erg_target(int target_power)
 {
     // 范围校验：与领域层 POWER_MIN/POWER_MAX 一致
     if (target_power < POWER_MIN || target_power > POWER_MAX) return false;
-    // 关中断保护写入，与主循环读取+清标志互斥，避免新目标被覆盖丢失（单核C3关中断足够）
+    app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = target_power };
+    if (s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE) {
+        return true;
+    }
+    // 队列满时保留最新目标，避免训练 App 高频下发时因瞬时队列压力误报 Invalid Param。
     portDISABLE_INTERRUPTS();
     s_pending_erg_target = target_power;
     s_has_pending_erg = true;
     portENABLE_INTERRUPTS();
     return true;
+}
+
+/**
+ * 处理 FTMS 训练停止/复位等 ERG 退出信号。
+ * 优先投递到主循环队列以保持与控制点命令顺序一致；队列满时缓存一次待清理原因。
+ * reason：退出原因，通常为 FTMS 操作码。
+ * 返回值：无。
+ * 特殊行为：运行在 NimBLE host 任务上下文，不直接修改功率引擎。
+ */
+static void on_erg_clear(int reason)
+{
+    app_evt_t e = { .type = APP_EVT_ERG_CLEAR, .data = reason };
+    if (s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE) {
+        return;
+    }
+    portDISABLE_INTERRUPTS();
+    s_pending_erg_clear_reason = reason;
+    s_has_pending_erg_clear = true;
+    portENABLE_INTERRUPTS();
 }
 
 /**
@@ -150,6 +175,7 @@ void app_main(void)
     }
 
     ble_bikepower_set_erg_callback(on_erg_target);
+    ble_bikepower_set_erg_clear_callback(on_erg_clear);
     ble_bikepower_set_profile(s_engine.sport_profile);
     ble_bikepower_set_device_name(s_engine.device_name);
     esp_err_t ble_ret = ble_bikepower_start();
@@ -187,6 +213,19 @@ void app_main(void)
         portENABLE_INTERRUPTS();
         if (has_erg) {
             app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = erg_target };
+            app_state_handle_event(&e);
+        }
+        int erg_clear_reason = 0;
+        bool has_erg_clear = false;
+        portDISABLE_INTERRUPTS();
+        if (s_has_pending_erg_clear) {
+            erg_clear_reason = s_pending_erg_clear_reason;
+            has_erg_clear = true;
+            s_has_pending_erg_clear = false;
+        }
+        portENABLE_INTERRUPTS();
+        if (has_erg_clear) {
+            app_evt_t e = { .type = APP_EVT_ERG_CLEAR, .data = erg_clear_reason };
             app_state_handle_event(&e);
         }
 

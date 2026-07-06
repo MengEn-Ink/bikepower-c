@@ -20,6 +20,15 @@
 typedef bool (*ble_erg_cb_t)(int target_power);
 
 /**
+ * ERG 清除回调类型。
+ * 当 FTMS 控制点收到 Stop/Pause、Reset 等退出训练指令时，用于通知应用层清除 ERG 状态。
+ * reason：退出原因码，通常为 FTMS 操作码。
+ * 返回值：无。
+ * 特殊行为：回调运行在 NimBLE host 任务上下文，不应执行阻塞操作。
+ */
+typedef void (*ble_erg_clear_cb_t)(int reason);
+
+/**
  * 启动 BLE 蓝牙功率计服务。
  * 初始化 NimBLE、注册五个 GATT 服务、配置设备名并开始广播和周期通知。
  * 无参数。
@@ -89,6 +98,15 @@ void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartra
  * 特殊行为：新回调会覆盖旧回调。
  */
 void ble_bikepower_set_erg_callback(ble_erg_cb_t cb);
+
+/**
+ * 注册 ERG 清除回调。
+ * 保存上层提供的回调函数，供 FTMS 控制点收到 Stop/Pause、Reset 时触发。
+ * cb：回调函数指针，可为 NULL。
+ * 返回值：无。
+ * 特殊行为：新回调会覆盖旧回调。
+ */
+void ble_bikepower_set_erg_clear_callback(ble_erg_clear_cb_t cb);
 
 /**
  * 设置 BLE 广播设备名。

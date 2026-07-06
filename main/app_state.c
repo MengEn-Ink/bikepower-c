@@ -220,6 +220,9 @@ void app_state_handle_event(const app_evt_t *e)
     switch (e->type) {
     case APP_EVT_CONN_CHANGED:
         s_connected = (e->data != 0);
+        if (!s_connected && power_engine_clear_erg_target(s_engine)) {
+            ESP_LOGI(TAG, "BLE 断开，退出 ERG 模式并恢复手动调功");
+        }
         if (s_state == ST_BLE_ACTIVE) update_idle_led();
         ESP_LOGI(TAG, "连接状态变化 connected=%d", s_connected);
         break;
@@ -227,6 +230,12 @@ void app_state_handle_event(const app_evt_t *e)
     case APP_EVT_ERG_TARGET:
         power_engine_set_erg_target(s_engine, e->data);
         ESP_LOGI(TAG, "ERG 目标功率 %dW", (int)e->data);
+        break;
+
+    case APP_EVT_ERG_CLEAR:
+        if (power_engine_clear_erg_target(s_engine)) {
+            ESP_LOGI(TAG, "退出 ERG 模式，恢复手动调功（reason=%d）", (int)e->data);
+        }
         break;
 
     case APP_EVT_WIFI_DONE:

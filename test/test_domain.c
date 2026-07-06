@@ -182,6 +182,18 @@ static void test_erg(void)
     CHECK(ok == true, "新值ERG返回true");
     CHECK(power_engine_is_dirty(&e), "新值ERG置dirty");
     CHECK(e.base_power == 260, "新值base同步=260");
+
+    power_engine_clear_dirty(&e);
+    CHECK(power_engine_clear_erg_target(&e) == true, "清除ERG目标返回true");
+    CHECK(e.mode == RIDE_MODE_STEADY, "清除ERG后回到固定功率模式");
+    CHECK(!e.has_erg_target && e.erg_active_target == 0, "清除ERG目标状态");
+    CHECK(power_engine_set_power(&e, 180) == true, "清除ERG后手动设功率恢复生效");
+    CHECK(e.base_power == 180 && e.last_power == 180, "清除ERG后功率可更新");
+    CHECK(power_engine_clear_erg_target(&e) == false, "重复清除ERG不置变更");
+
+    CHECK(power_engine_set_erg_target(&e, 240) == true, "再次进入ERG成功");
+    CHECK(power_engine_set_mode(&e, RIDE_MODE_STEADY) == true, "切回固定功率成功");
+    CHECK(!e.has_erg_target && e.erg_active_target == 0, "切回非ERG清除旧目标");
 }
 
 static void test_setters_edge(void)

@@ -18,6 +18,7 @@ typedef enum {
     APP_EVT_BTN_UP,         // 按钮释放（data=按住毫秒）
     APP_EVT_CONN_CHANGED,   // BLE 连接状态变化（data=已连接 0/1）
     APP_EVT_ERG_TARGET,     // FTMS ERG 目标功率（data=目标瓦特）
+    APP_EVT_ERG_CLEAR,      // FTMS 停止/复位/断开后清除 ERG 锁定（data=原因码）
     APP_EVT_WIFI_DONE,      // WiFi 配网结束（保存成功或超时，data=0）
 } app_evt_type_t;
 
