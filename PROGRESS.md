@@ -1,7 +1,7 @@
 # BikePower C — 项目进度
 
 > 基线方案：[docs/archive/01-cidf-nimble-rewrite.md](docs/archive/01-cidf-nimble-rewrite.md)
-> 当前固件版本：v4.0.3（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v4.0.4（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 参考仓库：git@gitee.com:mengen4jv/bikepower-c.git
 
 ---
@@ -33,7 +33,7 @@
 
 ### 就绪交付物
 
-- [x] 固件版本统一为 `v4.0.3`，DIS 固件字段与门户展示包含板型、版本号、稳定版、修复版和最后 Git 短提交 ID，`tests/ble_selftest.py` 会校验厂商/型号/固件三字段。
+- [x] 固件版本统一为 `v4.0.4`，DIS 固件字段与门户展示包含板型、版本号、稳定版、修复版和最后 Git 短提交 ID，`tests/ble_selftest.py` 会校验厂商/型号/固件三字段。
 - [x] 普通配网链路走 `radio_ctrl` + coex 共存：长按二次确认进入配网，BLE 默认不停，保存或超时后关闭 WiFi 原地回 `ST_BLE_ACTIVE`。
 - [x] 配网门户路由与前端校验已具备自动化覆盖：`tests/stage5_portal_test.py`、`tests/check_portal_structure.py`、`tests/check_portal_js.py`。
 - [x] Captive Portal DNS 与 10 个系统探测端点已实现：Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 探测路由统一 303 到首页，并注册 404 兜底覆盖未知探测路径。
@@ -57,7 +57,7 @@
 - [ ] Captive Portal 多系统弹窗：iOS、Android、Windows 分别连接 `BikePower-XXXXXX` 热点后能自动弹出配网页；不弹窗时手动访问 `192.168.4.1` 仍可配网。
 - [ ] Captive Portal 生命周期：退出配网后串口确认 DNS 任务停止，不再响应劫持。
 - [ ] 72h 老化：长时间运行无 coredump、无 WDT、无堆持续下降；建议周期性跑 `tests/ble_selftest.py` 和 `tests/stage5_portal_test.py` 采样。
-- [ ] Release 人工步骤：老化通过后执行 `scripts/build_all.sh`，校验 SHA256，打 `v4.0.3` tag，创建 Gitee Release 并上传 merged bin/manifest。首刷需 `erase_flash`（分区表从双 OTA 改单 factory，不兼容平滑迁移）。
+- [ ] Release 人工步骤：执行 `scripts/build_all.sh`，校验 SHA256，打 `v4.0.4` tag，创建 Gitee Release 并上传 merged bin/manifest。首刷需 `erase_flash`（分区表从双 OTA 改单 factory，不兼容平滑迁移）。
 
 ---
 
@@ -161,8 +161,8 @@
 
 - [ ] 72h 老化测试：长时间运行无 coredump、无堆持续下降（跑 `tests/stage5_portal_test.py` / `ble_selftest.py` 辅助）
 - [x] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`（已设为 WARN）
-- [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（代码已对齐 v4.0.3，`ble_selftest.py` 已自动校验厂商/型号/固件三字段，真机待跑）
-- [ ] 打 tag v4.0.3 + Gitee Release（老化通过后由人工执行）
+- [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（代码已对齐 v4.0.4，`ble_selftest.py` 已自动校验厂商/型号/固件三字段，真机待跑）
+- [ ] 打 tag v4.0.4 + Gitee Release
 
 ---
 
