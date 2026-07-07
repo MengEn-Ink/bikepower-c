@@ -158,6 +158,40 @@ function formatPaceSec(paceSec) {
   var sec = paceSec % 60;
   return min + ":" + (sec < 10 ? "0" : "") + sec;
 }
+function estimateHrFromPower(power) {
+  var ftp = STATE.profile_ftp || 200;
+  var thr = STATE.profile_thr_hr || 180;
+  power = clamp(parseInt(power, 10) || 0, 0, 2000);
+  var pct = ftp > 0 ? Math.floor(power * 100 / ftp) : 0;
+  var hrPct;
+  if (pct <= 55) hrPct = 42 + Math.floor(pct * 26 / 55);
+  else if (pct <= 75) hrPct = 68 + Math.floor((pct - 55) * 15 / 20);
+  else if (pct <= 90) hrPct = 83 + Math.floor((pct - 75) * 11 / 15);
+  else if (pct <= 105) hrPct = 94 + Math.floor((pct - 90) * 6 / 15);
+  else if (pct <= 120) hrPct = 100 + Math.floor((pct - 105) * 6 / 15);
+  else hrPct = 106;
+  return clamp(Math.floor(thr * hrPct / 100), 60, 200);
+}
+function runningEquivalentPower(speedX100) {
+  speedX100 = clamp(parseInt(speedX100, 10) || 1000, 300, 2500);
+  var progress = Math.floor((speedX100 - 300) * 1000 / (2500 - 300));
+  var ftp = STATE.profile_ftp || 200;
+  var pct = 35 + Math.floor(progress * 85 / 1000);
+  return clamp(Math.floor(ftp * pct / 100), 0, 2000);
+}
+function estimateLinkedHeartrate() {
+  if (STATE.sport_profile === "running") {
+    return estimateHrFromPower(runningEquivalentPower(STATE.run_speed_x100));
+  }
+  return estimateHrFromPower($("home-power") ? $("home-power").value : STATE.power);
+}
+function applyLinkedHrPreview() {
+  if (directHrControl() || STATE.hr_locked) return;
+  var hr = estimateLinkedHeartrate();
+  var input = STATE.sport_profile === "running" ? $("run-hr") : $("home-hr");
+  if (input) input.value = hr;
+  STATE.heartrate = hr;
+}
 function renderPaceFromState() {
   var minEl = $("run-pace-min");
   var secEl = $("run-pace-sec");
@@ -181,6 +215,8 @@ function syncSpeedFromPace() {
   minEl.value = Math.floor(paceSec / 60);
   secEl.value = paceSec % 60 < 10 ? "0" + (paceSec % 60) : String(paceSec % 60);
   if (label) label.textContent = (speedX100 / 100).toFixed(2) + " km/h";
+  applyLinkedHrPreview();
+  updateZoneBadges();
 }
 function onRunPacePreset(min, sec) {
   var minEl = $("run-pace-min");
@@ -629,6 +665,7 @@ function updatePacerInfo() {
   var wkgText = (lo10 / 10).toFixed(1) + " - " + (hi10 / 10).toFixed(1) + " W/kg";
   var wattText = Math.round(lo10 * w / 10) + " - " + Math.round(hi10 * w / 10) + " W";
   var mid = Math.round(((lo10 + hi10) / 2) * w / 10);
+  STATE.power = mid;
   if (isCustom) {
     var wkgRangeEl = $("custom-wkg-range"), wattRangeEl = $("custom-watt-range"), targetEl = $("custom-target-watt");
     if (wkgRangeEl) wkgRangeEl.textContent = wkgText;
@@ -639,6 +676,8 @@ function updatePacerInfo() {
     sourceSummary.innerHTML = '<span>已选' + escapeHtml(sourceName) + '</span><b>' + escapeHtml(wkgText) + ' · ' + escapeHtml(wattText) + '</b>';
   }
   if (powerInput) powerInput.value = mid;
+  applyLinkedHrPreview();
+  updateZoneBadges();
 }
 function applyHrLockState() {
   var direct = directHrControl();
@@ -662,6 +701,8 @@ function applyHrLockState() {
   if (hrFloatRow) hrFloatRow.style.display = (direct || STATE.hr_locked) ? "flex" : "none";
   var runHrFloatRow = $("run-hr-float-row");
   if (runHrFloatRow) runHrFloatRow.style.display = (direct || STATE.hr_locked) ? "flex" : "none";
+  applyLinkedHrPreview();
+  updateZoneBadges();
 }
 function onHrLockChange() {
   if (directHrControl()) {
@@ -696,6 +737,7 @@ function onRunHrLockChange() {
   applyHrLockState();
 }
 function updateZoneBadges() {
+  applyLinkedHrPreview();
   var pwr = parseInt($("home-power").value, 10) || 0;
   var hr = STATE.sport_profile === "running"
     ? (parseInt($("run-hr").value, 10) || 0)
@@ -1235,7 +1277,7 @@ function collectConfigBase() {
     run_cadence: STATE.run_cadence,
     run_cadence_float: STATE.run_cadence_float,
     run_incline_x10: STATE.run_incline_x10,
-    hr_lock: STATE.hr_locked ? 1 : 0,
+    hr_lock: directHrControl() ? 1 : (STATE.hr_locked ? 1 : 0),
     power_float: STATE.power_float,
     cadence_float: STATE.cadence_float,
     hr_float: STATE.hr_float,

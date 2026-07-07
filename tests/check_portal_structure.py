@@ -234,6 +234,12 @@ def main():
           "app.js 必须在只剩心率广播时进入心率直接控制模式")
     check('hrLockRows' in js and 'hr_lock: directHrControl() ? 1' in js,
           "只剩心率时网页端必须隐藏联动/锁死选择，并保存为直接心率值")
+    check('estimateLinkedHeartrate' in js and 'applyLinkedHrPreview' in js,
+          "网页端必须在联动心率时按当前强度刷新目标心率预览")
+    check('runningEquivalentPower' in js and 'STATE.run_speed_x100' in js,
+          "跑步联动心率必须按当前配速/速度折算强度")
+    check(js.count('hr_lock: directHrControl() ? 1') >= 2,
+          "首页和设置页保存都必须复用只剩心率直接控制语义")
     check('running-incline-card' in js and 'isRunning && broadcastEnabled("power")' in js,
           "跑步坡度必须跟随配速广播项显隐，只剩心率时不应保留无关窗口")
     check('切换骑行/跑步需点保存并关闭 WiFi' not in js,
