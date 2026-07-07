@@ -126,6 +126,12 @@
 - `TC-7c`：**常量一致性检查（每次改动必跑）**：跑 `tests/check_config_consistency.py`，验证 `bikepower_config.h` / `domain_config.h` / `README.md` / `docs/` 之间的常量值（版本号、引脚、阈值、超时、栈大小）一致，防止文档与代码漂移。
 - `TC-7d`：**配网页保存字段改动必须跑 `tests/test_portal_config_save.py`**，确保 mock 保存、状态回显和 custom pacer 展示不漂移。
 - `TC-7e`：**固件生成前必须跑 `tests/test_core_flow_endurance.py`**，默认 3 分钟；如果因时间原因仅快速验证，必须显式写明 `--cycles` 结果不能替代正式固件生成门禁。
+- `TC-7f`：**配置字段增删必须覆盖端到端同步面**：
+  - 领域层：`domain_config.h`、`config_store.c/.h`、相关 engine 结构和 setter。
+  - NVS/API：`main/bikepower_config.h`、`main/nvs_store.c`、`main/wifi_portal.c`。
+  - 前端/mock：`main/web/index.html`、`main/web/app.js`、`tests/mock_server.py`。
+  - 回归：`test/test_domain.c`、`tests/test_portal_config_save.py`、`tests/check_config_consistency.py`、`tests/check_portal_structure.py`。
+  - 删除字段时，必须补一条“旧输入可忽略”的兼容测试，避免旧 JSON/NVS 残留导致保存失败；同时补静态门禁防止旧 UI/字段回归。
 - `TC-8`：跨层改动按最高等级执行，不能只挑便宜测试。
 
 ## 影响范围评估（**每次代码修改前必做**）

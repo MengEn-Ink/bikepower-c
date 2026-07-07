@@ -72,6 +72,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 | 事件总线 | app_queue（Queue）+ button wake（二值信号量） | 2026-06-12 |
 | 状态机 | 7 态：BOOTING/BLE_ACTIVE/WIFI_CONFIRM/WIFI_CONFIG/SAVING/REBOOTING/ERROR_RECOVERY | 2026-06-12 |
 | WiFi 射频共用 | 配网默认 coex 共存（BLE 不停、不重启）；v4.0.0 已移除在线 OTA 与家庭网络配置，仅共存初始化失败时由 radio_ctrl 停 BLE 兜底 | 2026-06-28 |
+| 跑步模式核心闭环 | 当前跑步 P0 以 RSC 速度 + 步频 + 心率为核心；坡度不是必要参数，已从当前配置/API/网页/NVS 中移除，未来 FTMS Treadmill 再按需求恢复 | 2026-07-07 |
 
 ---
 
@@ -107,6 +108,12 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 - [WARNING] [2026-06-12] macOS 无 `timeout` 命令，串口抓取改用纯 Python 脚本。
 - [CRITICAL] [2026-06-12] heredoc（`python - <<'PY'`）在工具执行环境被注入污染导致 SyntaxError，必须写成脚本文件再运行。
 - [INFO] [2026-06-26] ESP-IDF 本地路径 `/home/mengen1014/work/esp32-power/esp-idf`（非 `~/esp/esp-idf`），source 其 `export.sh` 后才可用 `idf.py`。
+
+### 跑步模式 / 配置 schema
+- [INFO] [2026-07-07] 跑步模式可用性的最低闭环是速度/配速，不是坡度或 FTMS 控制；新增跑步能力先保持 RSC 路径简单，FTMS Treadmill Data / Control Point 只在目标 App 明确需要时再做。
+- [WARNING] [2026-07-07] 配置字段增删必须同步 `domain_config.h`、`config_store.c/.h`、`power_engine.c/.h`、`nvs_store.c`、`wifi_portal.c`、`main/web/*`、`tests/mock_server.py`、`tests/test_portal_config_save.py`、`tests/check_config_consistency.py` 和 `tests/check_portal_structure.py`；漏任一层容易造成网页回显、NVS 或静态门禁漂移。
+- [INFO] [2026-07-07] 删除配置字段时优先“停止导出/读写并忽略旧输入”，不必为已删除字段保留运行时结构；host 单测应覆盖旧 JSON 带该字段时 deserialize 成功且有效字段仍生效。
+- [INFO] [2026-07-07] 对 UI/配置删减，先把静态门禁改成会因旧元素/字段残留而失败，确认 RED 后再删实现；本模式已用于移除 `run_incline_x10`。
 
 ### 编译
 - [WARNING] [2026-06-12] main/CMakeLists.txt 的 REQUIRES 必须包含 `bikepower_domain`，否则领域层链接失败。
