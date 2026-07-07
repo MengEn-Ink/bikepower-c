@@ -1,8 +1,9 @@
 /* BikePower 配网门户统一样式表（v3.2.1 紧凑布局） */
+:root{--nav-h:58px;--page-pad:8px}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%}
-body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;color:#1d1d1f;padding-bottom:58px!important;overflow-y:auto;overflow-x:hidden}
-.box{width:100%;max-width:420px;margin:0 auto}
+html,body{min-height:100%;height:100%}
+body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:var(--page-pad);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;color:#1d1d1f;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + var(--page-pad))!important;overflow-y:scroll;overflow-x:hidden}
+.box{width:100%;max-width:420px;min-height:calc(100dvh - var(--nav-h) - env(safe-area-inset-bottom,0px) - var(--page-pad) * 2);margin:0 auto;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px))}
 .bar,.brand,.status,.card .val{display:flex;align-items:center}
 .bar,.status{justify-content:space-between;margin:0 0 6px}
 .brand{gap:6px;font-size:19px;font-weight:800}
@@ -40,7 +41,7 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
 .btn.warn{background:#f59e0b}
 .btn-row{display:flex;gap:8px;margin-top:6px}
 .btn-row .btn{flex:1 1 0;width:auto;min-width:0;margin-top:0;padding-left:6px;padding-right:6px;font-size:12px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}
-.home-actions{position:sticky;bottom:56px;background:#f5f5f7;padding:5px 0 4px;margin-top:4px;z-index:15}
+.home-actions{position:sticky;bottom:var(--nav-h);background:#f5f5f7;padding:5px 0 4px;margin-top:4px;z-index:15}
 .hr-lock-row{margin-top:6px;display:flex;flex-direction:column;gap:5px}
 /* 模式二选一分段控件 */
 .seg{display:flex;background:#e9e9eb;border-radius:12px;padding:3px;margin:0 0 6px;gap:3px}
@@ -176,6 +177,20 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
 .version-row{align-items:flex-start;gap:10px}
 .version-short{display:block;text-align:right;font-size:12px;font-weight:900;color:#1d1d1f;line-height:1.25}
 .version-full{display:block;text-align:right;word-break:break-all;line-height:1.3;font-size:9px;color:#86868b;margin-top:2px;max-width:240px}
+.about-details-card,.about-help-card{padding-top:9px;padding-bottom:9px}
+.about-hero{background:linear-gradient(135deg,#fff 0,#f3f9ff 58%,#eefbf3 100%);border:1px solid rgba(0,122,255,.1);border-radius:16px;padding:14px 13px;margin-bottom:7px;box-shadow:0 8px 22px rgba(0,122,255,.06)}
+.about-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.about-title{font-size:24px;font-weight:900;letter-spacing:0;line-height:1}
+.about-sub{font-size:12px;color:#3f3f46;font-weight:700;margin-top:5px;line-height:1.35}
+.about-mark{width:42px;height:42px;border-radius:14px;background:#007aff;color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:900;box-shadow:0 8px 18px rgba(0,122,255,.22);flex:0 0 auto}
+.cap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:12px}
+.cap{min-height:44px;border-radius:12px;background:rgba(255,255,255,.82);border:1px solid rgba(0,0,0,.05);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4px}
+.cap b{font-size:12px;color:#1d1d1f;line-height:1.1}
+.cap span{font-size:9px;color:#86868b;font-weight:800;margin-top:3px;line-height:1.1}
+.about-tip-list{display:grid;gap:6px}
+.about-tip{display:grid;grid-template-columns:24px 1fr;gap:8px;align-items:center;padding:7px 8px;background:#f7f7f9;border:1px solid rgba(0,0,0,.04);border-radius:10px}
+.about-tip i{width:24px;height:24px;border-radius:8px;background:#eaf4ff;color:#007aff;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:13px;font-weight:900}
+.about-tip span{font-size:12px;color:#3f3f46;line-height:1.32;font-weight:650}
 .home-card{padding:8px 10px}
 .home-card h2{font-size:12px;margin-bottom:2px}
 .home-card .val input{font-size:25px;line-height:1}
@@ -217,8 +232,8 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
 .settings-tab.on{background:#fff;color:#007aff;box-shadow:0 1px 4px rgba(0,0,0,.12)}
 .settings-panel{display:none}
 .settings-panel.on{display:block}
-#view-settings{padding-bottom:112px}
-.settings-actions{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);width:calc(100% - 16px);max-width:420px;background:#f5f5f7;padding:6px 0 4px;margin:0;z-index:20}
+#view-settings{padding-bottom:calc(var(--nav-h) + 54px)}
+.settings-actions{position:fixed;left:50%;bottom:var(--nav-h);transform:translateX(-50%);width:calc(100% - 16px);max-width:420px;background:#f5f5f7;padding:6px 0 4px;margin:0;z-index:20}
 .countdown{background:#fff;color:#007aff;font-size:38px;font-weight:800;border-radius:50%;width:74px;height:74px;display:flex;justify-content:center;align-items:center;margin:14px auto;border:1px solid rgba(0,122,255,.2);box-shadow:0 8px 20px rgba(0,122,255,.14)}
 .result-card{max-width:360px;width:100%;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:24px;padding:24px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.08);margin:20px auto}
 .result-card .icon{width:58px;height:58px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800}
@@ -227,13 +242,13 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
 .result-card .icon.warn{background:#fff3e0;color:#ff9500}
 .result-card h1{font-size:20px;margin:0 0 6px;font-weight:800;letter-spacing:-.03em}
 .result-card .sub{font-size:12px;color:#6e6e73;line-height:1.5;margin:0 0 14px}
-.toast{display:none;position:fixed;left:50%;bottom:74px;transform:translateX(-50%);background:#1d1d1f;color:#fff;padding:10px 20px;border-radius:16px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:50;max-width:90%;text-align:center}
-.navbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.06);padding:5px 0 env(safe-area-inset-bottom,5px);z-index:100;max-width:420px;margin:0 auto}
-.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#86868b;font-size:11px;font-weight:700;padding:3px 0;min-height:46px;gap:1px}
+.toast{display:none;position:fixed;left:50%;bottom:calc(var(--nav-h) + 16px);transform:translateX(-50%);background:#1d1d1f;color:#fff;padding:10px 20px;border-radius:16px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:50;max-width:90%;text-align:center}
+.navbar{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.06);padding:5px 0 calc(5px + env(safe-area-inset-bottom,0px));z-index:100;max-width:420px;margin:0 auto;transform:translateZ(0);backface-visibility:hidden;contain:layout paint}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#86868b;font-size:11px;font-weight:700;padding:3px 0;min-height:0;height:100%;gap:1px}
 .nav-item.on{color:#007aff}
 .nav-ico{font-size:18px}
 .nav-tx{font-size:10px}
-.view{display:none}
+.view{display:none;min-height:calc(100dvh - var(--nav-h) - env(safe-area-inset-bottom,0px) - var(--page-pad) * 2)}
 .view.active{display:block}
 @media(prefers-color-scheme:dark){
   body{background:linear-gradient(180deg,#111827 0,#1c1c1e 190px);color:#f5f5f7}
@@ -282,6 +297,11 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
   .info-row .v{color:#f5f5f7}
   .version-short{color:#f5f5f7}
   .version-full{color:#8e8e93}
+  .about-hero{background:linear-gradient(135deg,#1c1c1e 0,#172233 58%,#13251a 100%);border-color:#334155}
+  .about-title,.cap b{color:#f5f5f7}
+  .about-sub,.about-tip span{color:#d1d5db}
+  .cap,.about-tip{background:#2c2c2e;border-color:#3a3a3c}
+  .about-tip i{background:#1e3a5f;color:#0a84ff}
   .seg,.settings-nav{background:#2c2c2e}
   .seg-item,.settings-tab{color:#8e8e93}
   .seg-item.on,.settings-tab.on{background:#3a3a3c;color:#0a84ff}

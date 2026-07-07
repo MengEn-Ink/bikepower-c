@@ -8,6 +8,7 @@ var STATE = {
   firmware_name: "",
   board: "",
   git_sha: "",
+  build_time: "",
   sport_profile: "cycling",
   active_sport_profile: "cycling",
   broadcast_mask: 7,
@@ -858,10 +859,17 @@ function renderSettings() {
   $("settings-ftp").value = STATE.profile_ftp;
   $("settings-thr").value = STATE.profile_thr_hr;
   applyDeviceNameView();
-  $("settings-version").textContent = firmwareShortLabel();
-  $("settings-version").title = firmwareLabel();
-  var fullVer = $("settings-version-full");
-  if (fullVer) fullVer.textContent = firmwareLabel();
+  var aboutVer = $("about-version");
+  if (aboutVer) {
+    aboutVer.textContent = firmwareShortLabel();
+    aboutVer.title = firmwareLabel();
+  }
+  var aboutFullVer = $("about-version-full");
+  if (aboutFullVer) aboutFullVer.textContent = firmwareLabel();
+  var aboutBoard = $("about-board");
+  if (aboutBoard) aboutBoard.textContent = STATE.board || "-";
+  var buildTime = $("settings-build-time");
+  if (buildTime) buildTime.textContent = STATE.build_time || "-";
   var ps = $("float-pstep");
   if (ps) ps.textContent = STATE.power_step;
   renderLedControls();
@@ -1366,6 +1374,7 @@ function init() {
       STATE.firmware_name = data.firmware_name || "";
       STATE.board = data.board || "";
       STATE.git_sha = data.git_sha || "";
+      STATE.build_time = data.build_time || "";
       STATE.sport_profile = data.sport_profile || "cycling";
       STATE.active_sport_profile = STATE.sport_profile;
       STATE.broadcast_mask = data.broadcast_mask != null ? (data.broadcast_mask & 7) : 7;
@@ -1406,7 +1415,6 @@ function init() {
       STATE.remaining_sec = data.remaining_sec != null ? data.remaining_sec : 180;
       STATE.closing = !!data.closing;
       STATE.hr_locked = !!data.hr_locked;
-      loadTemplates();
       startTimePoll();
       route();
     } else {

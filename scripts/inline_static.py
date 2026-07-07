@@ -17,6 +17,7 @@ iOS Captive Portal WebView 不能加载外部 .css/.js，必须内联。
 """
 import argparse
 import os
+import re
 import sys
 
 CSS_PLACEHOLDER = "<!-- INLINE_CSS -->"
@@ -28,16 +29,77 @@ def read_text(path):
         return f.read()
 
 
-def c_string_literal(content):
-    """把任意文本转换为 C 字符串字面量（按行拼接，每行尾部 \\n）。
-
-    转义规则：\\ -> \\\\，" -> \\"；其他字符原样保留。
-    """
+def c_string_literal(content, width=160):
+    """把任意文本转换为 C 字符串字面量（按固定宽度切片拼接）。"""
+    escaped = (content
+               .replace("\\", "\\\\")
+               .replace('"', '\\"')
+               .replace("\r", "\\r")
+               .replace("\n", "\\n"))
     lines = []
-    for line in content.split("\n"):
-        line = line.replace("\\", "\\\\").replace('"', '\\"')
-        lines.append('    "' + line + '\\n"')
+    i = 0
+    while i < len(escaped):
+        end = min(i + width, len(escaped))
+        if end < len(escaped) and escaped[end - 1] == "\\":
+            end -= 1
+        lines.append('    "' + escaped[i:end] + '"')
+        i = end
     return "\n".join(lines)
+
+
+def minify_css(css):
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    css = re.sub(r"\s+", " ", css)
+    css = re.sub(r"\s*([{}:;,>])\s*", r"\1", css)
+    css = css.replace(";}", "}")
+    return css.strip()
+
+
+def _strip_js_line_comment(line):
+    out = []
+    quote = ""
+    escaped = False
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        nxt = line[i + 1] if i + 1 < len(line) else ""
+        if quote:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
+                quote = ""
+            i += 1
+            continue
+        if ch in ("'", '"', "`"):
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and nxt == "/":
+            break
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def minify_js(js):
+    js = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+    lines = []
+    for line in js.splitlines():
+        stripped = _strip_js_line_comment(line).strip()
+        if stripped:
+            lines.append(stripped)
+    return " ".join(lines)
+
+
+def minify_html(html):
+    html = re.sub(r"<!--(?! INLINE_(?:CSS|JS) ).*?-->", "", html, flags=re.S)
+    html = re.sub(r">\s+<", "><", html)
+    html = re.sub(r"\s+", " ", html)
+    return html.strip()
 
 
 def inline_html(html, css, js):
@@ -55,6 +117,8 @@ def main():
     ap = argparse.ArgumentParser(description="内联 web 静态资源为 C 头文件")
     ap.add_argument("--web-dir", required=True, help="web 资源目录")
     ap.add_argument("--output", required=True, help="输出 .h 文件路径")
+    ap.add_argument("--no-minify", action="store_true", help="不压缩内联资源，便于定位前端问题")
+    ap.add_argument("--report", action="store_true", help="输出内联资源压缩前后体积")
     args = ap.parse_args()
 
     html_path = os.path.join(args.web_dir, "index.html")
@@ -70,7 +134,11 @@ def main():
     css = read_text(css_path)
     js = read_text(js_path)
 
-    merged = inline_html(html, css, js)
+    raw_merged = inline_html(html, css, js)
+    if args.no_minify:
+        merged = raw_merged
+    else:
+        merged = inline_html(minify_html(html), minify_css(css), minify_js(js))
 
     os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as f:
@@ -81,7 +149,12 @@ def main():
         f.write("    ;\n\n")
         f.write("static const unsigned int index_html_len = sizeof(index_html) - 1;\n")
 
-    print("OK: 生成 " + args.output + " (" + str(len(merged)) + " bytes)")
+    bytes_saved = len(raw_merged.encode("utf-8")) - len(merged.encode("utf-8"))
+    print("OK: 生成 " + args.output + " (" + str(len(merged.encode("utf-8"))) + " bytes)")
+    if args.report:
+        print("web inline report: raw_bytes=" + str(len(raw_merged.encode("utf-8")))
+              + " output_bytes=" + str(len(merged.encode("utf-8")))
+              + " bytes_saved=" + str(bytes_saved))
     return 0
 
 

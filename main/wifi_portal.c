@@ -477,10 +477,11 @@ static esp_err_t h_api_state(httpd_req_t *req)
     int ride_type_idx = (e->profile.ride_type >= 0 && e->profile.ride_type < RIDE_TYPE_COUNT)
                         ? e->profile.ride_type : 0;
 
-    char buf[2432];
+    char buf[2560];
     int off = snprintf(buf, sizeof(buf),
         "{\"device_name\":\"%s\",\"firmware_version\":\"%s\",\"firmware_name\":\"%s\","
         "\"board\":\"%s\",\"stable_version\":\"%s\",\"fix_version\":\"%s\",\"git_sha\":\"%s\","
+        "\"build_time\":\"%s\","
         "\"sport_profile\":\"%s\",\"broadcast_mask\":%d,"
         "\"power\":%d,\"cadence\":%d,\"heartrate\":%d,\"mode\":\"%s\","
         "\"run_speed_x100\":%d,\"run_pace_float_sec\":%d,"
@@ -501,6 +502,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"pacers\":[",
         dn_esc, FIRMWARE_VERSION, fw_name_esc,
         board_get_desc()->name, FIRMWARE_STABLE_VERSION, FIRMWARE_FIX_VERSION, BIKEPOWER_GIT_SHA,
+        BIKEPOWER_BUILD_TIME,
         sport_to_id((int)e->sport_profile), e->broadcast_mask,
         e->base_power, e->cadence_base, e->last_heartrate, mode_to_id((int)e->mode),
         e->running.speed_x100_kmh, e->running.pace_float_sec,

@@ -174,12 +174,12 @@
   <div class="view" id="view-settings">
     <div class="settings-head">
       <h1>设置</h1>
-      <div class="sub">管理用户资料、设备信息与使用说明。</div>
+      <div class="sub">管理用户资料、设备配置与固件详情。</div>
     </div>
 
     <div class="settings-nav" role="tablist">
       <button class="settings-tab on" data-panel="profile" onclick="onSettingsPanel('profile')">用户资料</button>
-      <button class="settings-tab" data-panel="device" onclick="onSettingsPanel('device')">设备信息</button>
+      <button class="settings-tab" data-panel="device" onclick="onSettingsPanel('device')">配置设备</button>
       <button class="settings-tab" data-panel="about" onclick="onSettingsPanel('about')">关于</button>
     </div>
 
@@ -204,11 +204,11 @@
 
     <div class="settings-panel" id="settings-device">
       <div class="card">
-        <h2>设备信息</h2>
+        <h2>配置设备</h2>
         <div class="device-name-card">
           <div class="device-name-main" id="device-name-view-row">
             <div>
-              <div class="mini-label">设备名称</div>
+              <div class="mini-label">修改 BLE 广播名称</div>
               <div class="device-name-display" id="device-name-display">BikePower</div>
             </div>
             <button class="icon-btn" id="device-name-edit" onclick="onDeviceNameEdit()" aria-label="编辑设备名称">✎</button>
@@ -219,7 +219,6 @@
             <button class="icon-btn cancel" id="device-name-cancel" onclick="onDeviceNameCancel()" aria-label="取消编辑">×</button>
           </div>
         </div>
-        <div class="info-row version-row"><span class="k">固件版本</span><span class="v"><span class="version-short" id="settings-version"></span><span class="version-full" id="settings-version-full"></span></span></div>
         <div class="note">设备名称会作为 BLE 广播名显示在骑行 App 中，建议保持简短易识别。</div>
       </div>
 
@@ -397,25 +396,33 @@
     </div>
 
     <div class="settings-panel" id="settings-about">
-      <div class="card">
-        <h2>BikePower 是什么</h2>
-        <p>BikePower 是一台 BLE 骑行数据模拟设备，可向 Zwift、TrainerRoad 等 App 广播功率、踏频和心率。</p>
+      <div class="about-hero">
+        <div class="about-top">
+          <div>
+            <div class="about-title">BikePower</div>
+            <div class="about-sub">BLE 骑行/跑步数据模拟器，用于向训练 App 广播标准运动数据。</div>
+          </div>
+          <div class="about-mark">BP</div>
+        </div>
+        <div class="cap-grid">
+          <div class="cap"><b>功率 踏频 心率</b><span>CPS / CSC / HRS</span></div>
+          <div class="cap"><b>ERG 控制</b><span>FTMS 目标功率</span></div>
+          <div class="cap"><b>跑步数据</b><span>RSC 速度步频</span></div>
+        </div>
       </div>
-      <div class="card">
-        <h2>三种骑行模式</h2>
-        <p><b>固定模式</b>：按你设置的功率、踏频、心率输出，并在浮动范围内平滑变化。</p>
-        <p><b>配速机器人</b>：按体重和所选功体比自动生成目标功率，模拟跟随虚拟骑手。</p>
-        <p><b>ERG 模式</b>：骑行 App 下发目标功率时自动进入，设备跟随 App 的目标功率输出。</p>
+      <div class="card about-details-card">
+        <h2>固件详情</h2>
+        <div class="info-row"><span class="k">板型</span><span class="v" id="about-board">-</span></div>
+        <div class="info-row version-row"><span class="k">固件</span><span class="v"><span class="version-short" id="about-version"></span><span class="version-full" id="about-version-full"></span></span></div>
+        <div class="info-row"><span class="k">编译时间</span><span class="v" id="settings-build-time">-</span></div>
       </div>
-      <div class="card">
-        <h2>功率与心率</h2>
-        <p>设备会先按 FTP 判断当前功率强度，再映射到阈值心率区间，并用平滑模型模拟心率上升和下降的惯性。</p>
-      </div>
-      <div class="card">
+      <div class="card about-help-card">
         <h2>使用提醒</h2>
-        <p><b>保存生效</b>：修改后需点「保存设置」才会持久化。</p>
-        <p><b>关闭 WiFi</b>：点「保存并关闭 WiFi」返回骑行模式，BLE 持续在线。</p>
-        <p><b>重新配网</b>：长按设备按钮 2 秒，并在确认窗口内再按一次。</p>
+        <div class="about-tip-list">
+          <div class="about-tip"><i>✓</i><span>修改参数后点保存，设置才会持久化。</span></div>
+          <div class="about-tip"><i>↵</i><span>保存并关闭 WiFi 后，设备回到 BLE 骑行模式。</span></div>
+          <div class="about-tip"><i>●</i><span>重新配网：长按按钮 2 秒，并在确认窗口内再按一次。</span></div>
+        </div>
       </div>
     </div>
 

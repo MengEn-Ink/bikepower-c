@@ -33,6 +33,7 @@ add_custom_command(
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/inline_static.py
             --web-dir ${CMAKE_CURRENT_LIST_DIR}/web
             --output ${GENERATED_WEB_HEADER}
+            --report
     DEPENDS ${CMAKE_CURRENT_LIST_DIR}/web/index.html
             ${CMAKE_CURRENT_LIST_DIR}/web/app.css
             ${CMAKE_CURRENT_LIST_DIR}/web/app.js
@@ -64,3 +65,7 @@ if(NOT BIKEPOWER_GIT_SHA)
 endif()
 target_compile_definitions(${COMPONENT_LIB} PRIVATE BIKEPOWER_GIT_SHA="${BIKEPOWER_GIT_SHA}")
 message(STATUS "BIKEPOWER_GIT_SHA=${BIKEPOWER_GIT_SHA}")
+
+string(TIMESTAMP BIKEPOWER_BUILD_TIME "%Y-%m-%d %H:%M:%S %Z")
+target_compile_definitions(${COMPONENT_LIB} PRIVATE BIKEPOWER_BUILD_TIME="${BIKEPOWER_BUILD_TIME}")
+message(STATUS "BIKEPOWER_BUILD_TIME=${BIKEPOWER_BUILD_TIME}")

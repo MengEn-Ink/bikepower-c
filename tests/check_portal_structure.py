@@ -30,6 +30,7 @@ INDEX_HTML = ROOT / "main" / "web" / "index.html"
 APP_JS = ROOT / "main" / "web" / "app.js"
 APP_CSS = ROOT / "main" / "web" / "app.css"
 PORTAL_C = ROOT / "main" / "wifi_portal.c"
+INLINE_STATIC = ROOT / "scripts" / "inline_static.py"
 BLE_SCANNER_C = ROOT / "main" / "ble_scanner.c"
 CAPTIVE_PORTAL_C = ROOT / "main" / "captive_portal.c"
 PORTAL_CONFIG_SAVE_TEST = ROOT / "tests" / "test_portal_config_save.py"
@@ -99,6 +100,9 @@ def main():
     if not PORTAL_C.is_file():
         print(f"{TAG} FAIL: 文件不存在 {PORTAL_C}", file=sys.stderr)
         return 1
+    if not INLINE_STATIC.is_file():
+        print(f"{TAG} FAIL: 文件不存在 {INLINE_STATIC}", file=sys.stderr)
+        return 1
     if not BLE_SCANNER_C.is_file():
         print(f"{TAG} FAIL: 文件不存在 {BLE_SCANNER_C}", file=sys.stderr)
         return 1
@@ -119,6 +123,7 @@ def main():
     js = APP_JS.read_text(encoding="utf-8")
     css = APP_CSS.read_text(encoding="utf-8")
     csrc = PORTAL_C.read_text(encoding="utf-8")
+    inline_static_src = INLINE_STATIC.read_text(encoding="utf-8")
     scanner_src = BLE_SCANNER_C.read_text(encoding="utf-8")
     captive_src = CAPTIVE_PORTAL_C.read_text(encoding="utf-8")
     portal_config_save_src = PORTAL_CONFIG_SAVE_TEST.read_text(encoding="utf-8")
@@ -129,6 +134,7 @@ def main():
     print(f"{TAG} 检查 app.js: {len(js)} 字节")
     print(f"{TAG} 检查 app.css: {len(css)} 字节")
     print(f"{TAG} 检查 wifi_portal.c: {len(csrc)} 字节")
+    print(f"{TAG} 检查 inline_static.py: {len(inline_static_src)} 字节")
     print(f"{TAG} 检查 ble_scanner.c: {len(scanner_src)} 字节")
     print(f"{TAG} 检查 captive_portal.c: {len(captive_src)} 字节")
     print(f"{TAG} 检查 test_portal_config_save.py: {len(portal_config_save_src)} 字节")
@@ -162,14 +168,22 @@ def main():
     check('id="view-more"' not in html, "旧更多视图 view-more 必须并入设置")
     check('id="view-about"' not in html, "旧关于视图 view-about 必须并入设置")
     check('id="settings-profile"' in html, "设置页缺少用户资料分区")
-    check('id="settings-device"' in html, "设置页缺少设备信息分区")
+    check('id="settings-device"' in html, "设置页缺少配置设备分区")
     check('id="settings-about"' in html, "设置页缺少关于分区")
     check('id="settings-device-name"' in html, "设备名称输入必须挪入设置页")
     check('id="device-name-display"' in html, "设备名称必须默认以文本形式展示")
     check('id="device-name-edit"' in html, "设备名称必须提供右侧编辑按钮")
     check('id="device-name-confirm"' in html, "设备名称编辑必须提供对勾确认按钮")
     check('onDeviceNameEdit' in js and 'onDeviceNameConfirm' in js, "app.js 缺少设备名称编辑/确认交互")
-    check('id="settings-menu"' in html, "设备信息页必须提供设置菜单入口列表")
+    check('data-panel="device" onclick="onSettingsPanel(\'device\')">配置设备<' in html,
+          "设置页第二 Tab 必须改名为配置设备")
+    check('<h2>配置设备</h2>' in html and '修改 BLE 广播名称' in html,
+          "配置设备页必须聚焦设备名称和扩展设置")
+    check('id="settings-version"' not in html and 'settings-version' not in js,
+          "配置设备页不应展示或渲染固件版本")
+    check('固件版本' not in html,
+          "固件版本只能保留在关于页，不应出现在配置设备页")
+    check('id="settings-menu"' in html, "配置设备页必须提供扩展设置菜单入口列表")
     check('设备模板' in html and '物理按钮' in html and 'LED 指示' in html, "设置菜单入口名称必须短且对齐")
     check('id="settings-templates"' in html, "模板库必须迁移到设置子页面")
     check('id="settings-button"' in html, "物理按钮必须迁移到设置子页面")
@@ -177,9 +191,51 @@ def main():
     check('id="template-list"' in html, "设备信息模板库缺少列表容器")
     check('id="template-scan-btn"' in html, "设备信息模板库缺少扫描入口按钮")
     check('loadTemplates' in js and 'renderTemplates' in js, "app.js 缺少模板加载/渲染逻辑")
+    init_match = re.search(r"function init\(\) \{(?P<body>.*?)\n\}", js, re.S)
+    init_body = init_match.group("body") if init_match else ""
+    check('loadTemplates();' not in init_body, "首页初始化不应预加载设备模板，模板页进入时再拉取 /api/device-templates")
+    check('minify_css' in inline_static_src and 'minify_js' in inline_static_src and 'minify_html' in inline_static_src,
+          "inline_static.py 必须在编译期压缩内联 HTML/CSS/JS，降低门户首包大小")
+    check('minify_css(css)' in inline_static_src and 'minify_js(js)' in inline_static_src,
+          "inline_static.py 必须只压缩生成进固件的 CSS/JS 内容，源文件保持可读")
+    check('--no-minify' in inline_static_src,
+          "inline_static.py 必须提供 --no-minify 逃生开关，便于定位前端问题")
+    check('--report' in inline_static_src and 'bytes_saved' in inline_static_src,
+          "inline_static.py 必须支持输出压缩报告，便于量化网页载入优化效果")
+    check('--report' in ' '.join((ROOT / "main" / "CMakeLists.txt").read_text(encoding="utf-8").split()),
+          "main/CMakeLists.txt 必须让 inline_static.py 输出压缩报告")
+    check('--report' not in ' '.join((ROOT / "main" / "CMakeLists.txt").read_text(encoding="utf-8").split()) or 'COMMENT "Inlining web static resources -> web_index_html.h"' in (ROOT / "main" / "CMakeLists.txt").read_text(encoding="utf-8"),
+          "web 资源内联步骤说明必须保留，便于构建日志定位")
+    check('min-height:calc(100dvh - var(--nav-h)' in css and 'padding-bottom:calc(var(--nav-h)' in css,
+          "页面容器必须使用稳定视口高度与底部留白，避免页面切换时底部菜单跳动")
+    check('.view{display:none;min-height:calc(100dvh - var(--nav-h)' in css,
+          "每个 SPA 视图必须有稳定最小高度，底部导航固定不随内容高度跳动")
+    check('.navbar{position:fixed' in css and 'height:var(--nav-h)' in css and 'transform:translateZ(0)' in css,
+          "底部导航必须固定高度并启用合成层，避免多页面切换抖动")
     check('firmware_name' in csrc and 'board_firmware_name' in csrc, "wifi_portal.c 必须输出包含板型/Git/稳定版/修复版的 firmware_name")
     check('firmware_name' in js and 'firmwareLabel' in js and 'firmwareShortLabel' in js, "app.js 必须保留完整固件名并提供短标签展示")
     check('version-short' in css and 'version-full' in css, "app.css 必须同时支持固件短标签和完整版本详情")
+    cmake_src = (ROOT / "main" / "CMakeLists.txt").read_text(encoding="utf-8")
+    check('BIKEPOWER_BUILD_TIME' in cmake_src and 'string(TIMESTAMP' in cmake_src,
+          "main/CMakeLists.txt 必须在编译时注入 BIKEPOWER_BUILD_TIME")
+    check('BIKEPOWER_BUILD_TIME' in csrc and '\\"build_time\\":\\"%s\\"' in csrc,
+          "wifi_portal.c 必须在 /api/state 输出 build_time")
+    check('build_time' in js and 'settings-build-time' in html,
+          "关于页必须展示编译固件时间")
+    check('about-version' in html and 'about-version-full' in html and 'aboutVer' in js,
+          "关于页固件版本必须使用独立 DOM id，避免与设备信息页重复")
+    check('about-git' not in html and 'aboutGit' not in js and '>Git<' not in html,
+          "关于页不应展示 Git 参数")
+    check('about-device-name' not in html and 'aboutDeviceName' not in js,
+          "关于页不应重复展示设备名称，设备名称归配置设备页")
+    check('about-details-card' in html and 'about-help-card' in html,
+          "关于页必须拆成只读详情和精简提醒两块")
+    check('about-hero' in html and 'cap-grid' in html and 'about-tip-list' in html,
+          "关于页必须采用 A+ 精简概览结构")
+    check('BikePower 是什么' not in html and '三种骑行模式' not in html and '功率与心率' not in html,
+          "关于页不应保留说明书式长段落")
+    check('about-hero' in css and 'about-mark' in css and 'about-tip' in css,
+          "app.css 必须提供 A+ 关于页概览样式")
     check('"/settings/templates"' in js and '"/settings/button"' in js and '"/settings/led"' in js, "app.js 必须注册设置子路由")
     check('settingsSubpageBack' in js and 'settings-menu-row' in css, "设置子页面必须有返回与菜单行样式")
     check('pollScanResults' in js and 'onTemplateReadDevice' in js, "app.js 缺少 BLE 扫描轮询/读取逻辑")

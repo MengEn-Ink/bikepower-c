@@ -37,6 +37,7 @@ MOCK_STATE = {
     "stable_version": "4.0.0",
     "fix_version": "4.0.3",
     "git_sha": "6e90860",
+    "build_time": "2026-07-07 15:50:00 CST",
     "sport_profile": "running",
     "broadcast_mask": 7,
     "power": 150,
