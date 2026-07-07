@@ -4,7 +4,7 @@
 内容基于当前仓库实现撰写，重点对应 `main/`、`components/bikepower_domain/`、`tests/` 和 `docs/images/`。
 阅读顺序建议配合 [architecture.png](../images/architecture.png)、[main-loop-flow.png](../images/main-loop-flow.png)、[button-led-state.png](../images/button-led-state.png) 和 [rf-wifi-flow.png](../images/rf-wifi-flow.png) 一起看。
 
-当前固件版本为 `v4.0.2`。
+当前固件版本为 `v4.0.3`。
 运行环境为 `ESP-IDF v5.5.4 + NimBLE + FreeRTOS`，目标芯片为 `ESP32-C3`。
 
 ## 第一章：项目架构
@@ -267,11 +267,11 @@ DIS 读取内容来自编译期常量：
 
 - `DEVICE_MANUFACTURER = "BikePower"`
 - `DEVICE_MODEL = "ESP32-C3"`
-- `FIRMWARE_VERSION = "4.0.2"`
+- `FIRMWARE_VERSION = "4.0.3"`
 - `FIRMWARE_STABLE_VERSION = "4.0.0"`
-- `FIRMWARE_FIX_VERSION = "4.0.2"`
+- `FIRMWARE_FIX_VERSION = "4.0.3"`
 - `BIKEPOWER_GIT_SHA` 由 `main/CMakeLists.txt` 在构建时注入最后一次 Git 短提交 ID
-- DIS 固件字段与门户完整版本名使用 `board_firmware_name()` 生成，格式为 `板型-v版本-stable稳定版-fix修复版-gGitID`，例如 `generic-c3-v4.0.2-stable4.0.0-fix4.0.2-g6e90860`
+- DIS 固件字段与门户完整版本名使用 `board_firmware_name()` 生成，格式为 `板型-v版本-stable稳定版-fix修复版-gGitID`，例如 `generic-c3-v4.0.3-stable4.0.0-fix4.0.3-g6e90860`
 
 测试脚本 `tests/ble_selftest.py` 也会校验这三项。
 
@@ -935,7 +935,7 @@ idf.py build
 
 根据项目规则，C 代码改动后 `idf.py build` 必须通过。
 
-发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行会先跑 host 单测、mock 配网页保存测试、3 分钟核心流程耐久测试和静态门禁，再为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip。脚本不会打 git tag，也不会创建 Gitee Release。合并固件文件名格式为 `bikepower-c-板型-v版本-stable-fix-gGitID.bin`，例如 `bikepower-c-generic-c3-v4.0.2-stable-fix-g39c0ee5.bin`，版本号只出现一次；总包文件名格式为 `bikepower-c-release-v版本-stable-fix-gGitID.zip`。
+发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行会先跑 host 单测、mock 配网页保存测试、3 分钟核心流程耐久测试和静态门禁，再为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip。脚本不会打 git tag，也不会创建 Gitee Release。合并固件文件名格式为 `bikepower-c-板型-v版本-stable-fix-gGitID.bin`，例如 `bikepower-c-generic-c3-v4.0.3-stable-fix-g39c0ee5.bin`，版本号只出现一次；总包文件名格式为 `bikepower-c-release-v版本-stable-fix-gGitID.zip`。
 
 每次生成可分发固件时，`build/release/` 必须同时包含：
 

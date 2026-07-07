@@ -2,7 +2,7 @@
 
 > 状态：调研与落地方案草案，尚未实现固件改动。  
 > 目标软件：Zwift Run、MyWhoosh Running。  
-> 当前固件基线：BikePower C v4.0.2，NimBLE peripheral，现有 BLE 服务为 CPS + HRS + CSC + FTMS Indoor Bike + DIS。
+> 当前固件基线：BikePower C v4.0.3，NimBLE peripheral，现有 BLE 服务为 CPS + HRS + CSC + FTMS Indoor Bike + DIS。
 
 ---
 

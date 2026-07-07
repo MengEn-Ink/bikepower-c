@@ -4,6 +4,25 @@
 
 ## [未发布]
 
+## [4.0.3] - 2026-07-07
+
+### 跑步模式与广播控制
+- `components/bikepower_domain/`、`main/ble_bikepower.c`、`main/wifi_portal.c`、`main/web/`：新增跑步模式配置，提供 RSC 跑步速度/步频广播、跑步配速输入、配速浮动、步频浮动、坡度和跑步心率设置，适配 Zwift/MyWhoosh 等跑步客户端的跑步传感器发现路径。
+- `main/web/`：首页顶部新增功率/配速、踏频/步频、心率广播项开关，默认全开；取消某项后隐藏对应窗口，并同步到固件广播 mask。
+- `components/bikepower_domain/power_engine.c`、`main/app_state.c`：开发板按钮根据当前广播项选择可操作数值；只剩心率时按钮直接调心率。
+- `main/web/app.js`：只剩心率广播时隐藏“联动/锁死”选项，并按固定心率保存，避免网页或按钮操作被心率联动状态影响；跑步只剩心率时隐藏坡度等无关窗口。
+- `main/web/app.css`、`main/web/index.html`：压缩跑步模式手机端高度，底部保存按钮区改为 sticky，390×844 手机视口内可见可点。
+
+### BLE 与设备行为修复
+- `main/wifi_portal.c`、`main/app_main.c`、`main/radio_ctrl.c`：普通保存允许切换骑行/跑步，未连接时自动重启 BLE 以重建 GATT 服务表；已连接时等待断开后再重建，避免强制踢掉客户端。
+- `main/app_state.c`、`components/bikepower_domain/power_engine.c`：ERG 训练退出或客户端不再下发 ERG 时恢复手动调功，避免功率停留在训练退出时的 ERG 目标值。
+- `main/led.c`、`main/board_detect.c`：通用板 LED 低电平点亮策略修正，避免默认待连接状态表现为异常长亮。
+
+### 网页端布局与测试门禁
+- `main/web/`：骑行固定功率与配速机器人入口合并为高密度胶囊选择布局，自定义机器人功率范围合并为紧凑窗口，踏频和心率保持独立卡片。
+- `tests/check_operation_coverage.py`、`tests/operation_gate.py`、`tests/check_portal_structure.py`、`tests/test_portal_config_save.py`、`test/test_domain.c`：新增操作覆盖门禁、广播项显隐、跑步配速/步频浮动、只剩心率直接控制、BLE 跑步 profile 切换和按钮目标选择等回归检查。
+- 验证：`make -C test` 5524 通过 0 失败；`python3 tests/check_portal_js.py` 通过；`python3 tests/check_portal_structure.py` 179 通过 0 失败；`python3 tests/test_portal_config_save.py` 通过；`python3 tests/operation_gate.py --level quick` 通过；`python3 tests/operation_gate.py --level full --build` 通过；`python3 scripts/tools/quality_gate.py` 通过；`python3 tests/ble_selftest.py` 骑行模式通过；`python3 tests/ble_selftest.py --profile running 8` 跑步模式通过。
+
 ### 一致性修复
 - `PROGRESS.md`、`docs/dev/01-technical-reference.md`、`docs/user/01-quickstart.md`：同步当前固件版本、配置 schema 版本、发版 tag 和热点名口径，修复 `check_config_consistency.py` 中版本与 `CONFIG_VERSION` 漂移导致的门禁失败。
 - `sdkconfig.defaults`、`sdkconfig`：发版默认日志级别从 INFO 调整为 WARN，与项目发版规则和进度文档一致。

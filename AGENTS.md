@@ -3,7 +3,7 @@
 本文件是 AI 编码助手的跨工具入口。保持简短，链接到权威资产而非重复内容。
 
 > 项目性质：BikePower 从 MicroPython 完全重写为 **C + ESP-IDF + NimBLE**（ESP32-C3）。
-> 当前固件版本 v4.0.2。所有 MicroPython 专有约束（mpremote/gc/_thread/const/.mpy）**不适用**于本项目。
+> 当前固件版本 v4.0.3。所有 MicroPython 专有约束（mpremote/gc/_thread/const/.mpy）**不适用**于本项目。
 
 ## 必读优先级
 
