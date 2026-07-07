@@ -111,6 +111,11 @@ bool wifi_portal_consume_ble_restart_requested(void)
     return requested;
 }
 
+bool wifi_portal_ble_restart_requested(void)
+{
+    return s_ble_restart_requested;
+}
+
 // ============================ 工具函数 ============================
 
 /**
@@ -565,13 +570,16 @@ static esp_err_t h_api_config(httpd_req_t *req)
     /* 写临时副本：NVS 失败时丢弃，s_engine 完全不变，BLE 不会读到中间值 */
     power_engine_t next;
     memcpy(&next, s_engine, sizeof(power_engine_t));
-    apply_json_fields(&next, body, false);
+    bool sport_changed = apply_json_fields(&next, body, true);
     free(body);
 
     if (nvs_store_save(&next)) {
         bool name_changed = strcmp(s_engine->device_name, next.device_name) != 0;
         memcpy(s_engine, &next, sizeof(power_engine_t));
         power_engine_clear_dirty(s_engine);
+        if (sport_changed) {
+            s_ble_restart_requested = true;
+        }
         if (name_changed) ble_bikepower_refresh_device_name();
         app_state_refresh_led();
         ESP_LOGI(TAG, "配置已保存 sport=%d bmask=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d/%d",

@@ -744,15 +744,12 @@ function collectConfig() {
   });
 }
 function onSave() {
-  if (STATE.sport_profile !== STATE.active_sport_profile) {
-    toast("切换骑行/跑步需点保存并关闭 WiFi");
-    return;
-  }
   var btn = $("home-save");
   btn.disabled = true;
   api("/api/config", "POST", collectConfig(), function (status, data) {
     btn.disabled = false;
     if (status === 200 && data && data.ok) {
+      STATE.active_sport_profile = STATE.sport_profile;
       toast("已保存");
     } else {
       toast("保存失败: " + ((data && data.error) || status));
@@ -1164,10 +1161,6 @@ function applySettingsPanel() {
   if (active === "led") syncLedSilentVisibility();
 }
 function onSettingsSave() {
-  if (STATE.sport_profile !== STATE.active_sport_profile) {
-    toast("切换骑行/跑步需点保存并关闭 WiFi");
-    return;
-  }
   var btn = $("settings-save");
   btn.disabled = true;
   STATE.profile_weight = clamp(parseInt($("settings-weight").value, 10) || 0, 40, 150);
@@ -1200,6 +1193,7 @@ function onSettingsSave() {
   api("/api/config", "POST", body, function (status, data) {
     btn.disabled = false;
     if (status === 200 && data && data.ok) {
+      STATE.active_sport_profile = STATE.sport_profile;
       toast("设置已保存");
     } else {
       toast("保存失败: " + ((data && data.error) || status));

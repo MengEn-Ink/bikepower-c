@@ -282,6 +282,32 @@ void app_main(void)
             app_state_handle_event(&ce);
         }
 
+        if (wifi_portal_ble_restart_requested()) {
+            if (conn == 0) {
+                ESP_LOGI(TAG, "运动 profile 已切换，重启 BLE 以重建 GATT 服务表");
+                if (ble_bikepower_stop()) {
+                    vTaskDelay(pdMS_TO_TICKS(RADIO_BLE_RELEASE_WAIT_MS));
+                    ble_bikepower_set_profile(s_engine.sport_profile);
+                    ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
+                    ble_bikepower_set_device_name(s_engine.device_name);
+                    esp_err_t r = ble_bikepower_start();
+                    if (r == ESP_OK) {
+                        wifi_portal_consume_ble_restart_requested();
+                        last_conn = 0;
+                        app_state_clear_error();
+                    } else {
+                        ESP_LOGE(TAG, "profile 切换后 BLE 重启失败 ret=%d", r);
+                        app_state_set_error();
+                    }
+                } else {
+                    ESP_LOGE(TAG, "profile 切换时 BLE 停用失败，等待下轮重试");
+                    app_state_set_error();
+                }
+            } else if (tick % 20 == 0) {
+                ESP_LOGW(TAG, "运动 profile 已切换，等待 BLE 断开后重建 GATT 服务表 conn=%d", conn);
+            }
+        }
+
         app_state_tick();
 
         snapshot_t s = power_engine_snapshot(&s_engine);

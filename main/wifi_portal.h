@@ -47,3 +47,11 @@ void wifi_portal_set_done_callback(void (*cb)(void));
  * 特殊行为：读取后会清除内部标志，确保同一次配置只触发一次 BLE 重启。
  */
 bool wifi_portal_consume_ble_restart_requested(void);
+
+/**
+ * 查询是否已有待处理 BLE 重启请求但不清除标志。
+ * 无参数。
+ * 返回值：true 表示运动 profile 已变化，需要主任务重启 BLE 重建 GATT 表；false 表示无需处理。
+ * 特殊行为：供配网仍打开时的主循环实时处理；关闭 WiFi 路径继续使用 consume 接口保证幂等。
+ */
+bool wifi_portal_ble_restart_requested(void);

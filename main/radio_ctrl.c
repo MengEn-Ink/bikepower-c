@@ -301,15 +301,8 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
 void radio_ctrl_exit_wifi(void)
 {
     ESP_LOGI(TAG, "退出 WiFi 配网：关闭 HTTP + DNS + SoftAP，射频归还 BLE");
-    bool restart_ble = wifi_portal_consume_ble_restart_requested();
     wifi_portal_stop();
     captive_portal_stop_dns();
     radio_ctrl_stop_wifi_ap();
     s_ble_suspended = false;
-    if (restart_ble) {
-        ESP_LOGI(TAG, "运动 profile 已切换，重启 BLE 以重建 GATT 服务表");
-        ble_bikepower_stop();
-        vTaskDelay(pdMS_TO_TICKS(RADIO_BLE_RELEASE_WAIT_MS));
-        ble_bikepower_start();
-    }
 }

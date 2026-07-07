@@ -230,6 +230,20 @@ def main():
           "app.js 必须保存广播 mask 并按选择隐藏对应窗口")
     check('broadcast-toggle-bar' in css and 'broadcast-toggle' in css,
           "app.css 必须提供顶部广播多选项样式")
+    check('切换骑行/跑步需点保存并关闭 WiFi' not in js,
+          "普通保存必须允许切换骑行/跑步，并由固件即时重建 BLE GATT 表")
+    check('active_sport_profile = STATE.sport_profile' in js,
+          "保存成功后必须同步 active_sport_profile，避免误提示未保存")
+    check('apply_json_fields(&next, body, true)' in csrc,
+          "/api/config 必须允许 sport_profile 保存，不能只在关闭 WiFi 时生效")
+    check('wifi_portal_ble_restart_requested' in csrc,
+          "配网保持打开时也必须能请求 BLE 重启以重建 GATT 服务表")
+    app_main_src = (ROOT / "main" / "app_main.c").read_text(encoding="utf-8")
+    check('wifi_portal_ble_restart_requested()' in app_main_src
+          and '运动 profile 已切换，重启 BLE 以重建 GATT 服务表' in app_main_src,
+          "app_main 必须在主任务上下文处理运动 profile 切换后的 BLE 重启")
+    check('conn == 0' in app_main_src and '等待 BLE 断开后重建 GATT 服务表' in app_main_src,
+          "BLE 已连接时必须等待断开后再重建 GATT，避免强制踢掉客户端")
     check('id="ride-source-picker"' in html, "骑行页缺少固定功率/配速机器人胶囊条容器")
     check('id="ride-source-summary"' in html, "骑行页缺少当前骑行输出摘要")
     check('renderRideSourcePicker' in js and 'onRideSourceSelect' in js, "app.js 缺少骑行输出来源胶囊条渲染/切换逻辑")
