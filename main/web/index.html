@@ -161,10 +161,10 @@
           <button class="fbtn" onclick="onFloatAdj('hr',1)">+</button>
         </div>
       </div>
-      <div class="note warn">切换骑行/跑步会重建 BLE 服务表。修改运动类型后请使用「保存并关闭 WiFi」，设备会短暂重启 BLE 后按新模式广播。</div>
+      <div class="note warn running-compact-note">切换骑行/跑步会短暂重建 BLE 服务；保存后按新模式广播。</div>
     </div>
 
-    <div class="btn-row">
+    <div class="btn-row home-actions">
       <button class="btn" id="home-save" onclick="onSave()">保存配置</button>
       <button class="btn danger" id="home-close" onclick="onCloseWifi()">保存并关闭 WiFi</button>
     </div>

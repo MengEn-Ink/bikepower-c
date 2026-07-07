@@ -40,6 +40,7 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
 .btn.warn{background:#f59e0b}
 .btn-row{display:flex;gap:8px;margin-top:6px}
 .btn-row .btn{flex:1 1 0;width:auto;min-width:0;margin-top:0;padding-left:6px;padding-right:6px;font-size:12px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}
+.home-actions{position:sticky;bottom:56px;background:#f5f5f7;padding:5px 0 4px;margin-top:4px;z-index:15}
 .hr-lock-row{margin-top:6px;display:flex;flex-direction:column;gap:5px}
 /* 模式二选一分段控件 */
 .seg{display:flex;background:#e9e9eb;border-radius:12px;padding:3px;margin:0 0 6px;gap:3px}
@@ -191,13 +192,26 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
 .compact-hr-lock{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}
 .compact-hr-lock .radio-line{justify-content:center;padding:4px 6px;font-size:10px}
 .cycling-compact-note{padding:6px 9px;border-radius:10px;font-size:10px;line-height:1.25;margin-bottom:6px}
-.pace-input-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#home-running{padding-bottom:2px}
+#home-running .home-card{padding:6px 9px;margin-bottom:5px;border-radius:12px}
+#home-running .home-card h2{margin-bottom:1px}
+#home-running .home-card .val input{font-size:22px}
+#home-running .home-card .lbl{font-size:10px;line-height:1.15}
+#home-running .home-card .float-row{gap:6px;margin-top:4px;padding-top:4px}
+#home-running .home-card .float-lbl{font-size:10px}
+#home-running .home-card .float-val{font-size:11px;min-width:50px}
+#home-running .home-card .fbtn{width:26px;height:26px;border-radius:8px}
+.pace-input-row{display:grid;grid-template-columns:1fr 1fr;gap:5px}
 .card .val.pace-val{align-items:baseline;min-width:0}
-.card .val.pace-val input{min-width:0;font-size:24px;text-align:right}
+.card .val.pace-val input{min-width:0;font-size:22px;text-align:right}
 .card .val.pace-val .unit{flex:0 0 auto;white-space:nowrap}
-.pace-preset-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:7px}
-.pace-preset{border:1px solid rgba(0,122,255,.16);border-radius:10px;background:#f4f9ff;color:#007aff;font-size:12px;font-weight:900;padding:7px 0;cursor:pointer}
+.pace-preset-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:4px}
+.pace-preset{border:1px solid rgba(0,122,255,.16);border-radius:8px;background:#f4f9ff;color:#007aff;font-size:11px;font-weight:900;padding:4px 0;cursor:pointer}
 .pace-preset:active{opacity:.82;transform:scale(.97)}
+#home-running .hr-lock-row{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}
+#home-running .radio-line{justify-content:center;padding:4px 5px;font-size:10px;border-radius:9px}
+#home-running .radio-line span{line-height:1.15}
+.running-compact-note{padding:5px 8px;border-radius:9px;font-size:10px;line-height:1.25;margin-bottom:4px}
 .settings-nav{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;background:#e9e9eb;border-radius:12px;padding:3px;margin:0 0 6px}
 .settings-tab{border:0;background:transparent;color:#6e6e73;font-size:13px;font-weight:700;padding:7px 0;border-radius:9px;cursor:pointer}
 .settings-tab.on{background:#fff;color:#007aff;box-shadow:0 1px 4px rgba(0,0,0,.12)}
@@ -285,6 +299,7 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:8px;font
   .custom-pacer-metrics{background:#2c2c2e;border-color:#3a3a3c}
   .custom-pacer-metrics span,.custom-pacer-metrics b,.custom-wkg-step b{color:#f5f5f7}
   .settings-actions{background:#1c1c1e}
+  .home-actions{background:#1c1c1e}
   .float-val{color:#f5f5f7}
   .fbtn{background:#0a84ff}
 }

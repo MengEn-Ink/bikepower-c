@@ -476,6 +476,12 @@ function onSportSwitch(sport) {
 function broadcastEnabled(kind) {
   return (STATE.broadcast_mask & (BROADCAST_BITS[kind] || 0)) !== 0;
 }
+function onlyHeartrateBroadcast() {
+  return (STATE.broadcast_mask & 7) === BROADCAST_BITS.heartrate;
+}
+function directHrControl() {
+  return onlyHeartrateBroadcast();
+}
 function onBroadcastToggle(kind, checked) {
   var bit = BROADCAST_BITS[kind] || 0;
   if (!bit) return;
@@ -512,7 +518,9 @@ function applyBroadcastVisibility() {
   showIf("cycling-hr-card", !isRunning && broadcastEnabled("heartrate"));
   showIf("running-speed-card", isRunning && broadcastEnabled("power"));
   showIf("running-cadence-card", isRunning && broadcastEnabled("cadence"));
+  showIf("running-incline-card", isRunning && broadcastEnabled("power"));
   showIf("running-hr-card", isRunning && broadcastEnabled("heartrate"));
+  applyHrLockState();
 }
 /* 用户点击分段切换模式（仅改本地 STATE，保存时才落盘） */
 function onModeSwitch(mode) {
@@ -633,6 +641,7 @@ function updatePacerInfo() {
   if (powerInput) powerInput.value = mid;
 }
 function applyHrLockState() {
+  var direct = directHrControl();
   var radios = document.getElementsByName("hr-lock");
   for (var i = 0; i < radios.length; i++) {
     radios[i].checked = (radios[i].value === "1") === STATE.hr_locked;
@@ -641,16 +650,24 @@ function applyHrLockState() {
   for (var r = 0; r < runRadios.length; r++) {
     runRadios[r].checked = (runRadios[r].value === "1") === STATE.hr_locked;
   }
+  var hrLockRows = document.querySelectorAll("#cycling-hr-card .hr-lock-row,#running-hr-card .hr-lock-row");
+  for (var h = 0; h < hrLockRows.length; h++) {
+    hrLockRows[h].style.display = direct ? "none" : "";
+  }
   var hrInput = $("home-hr");
-  if (hrInput) hrInput.disabled = !STATE.hr_locked;
+  if (hrInput) hrInput.disabled = direct ? false : !STATE.hr_locked;
   var runHrInput = $("run-hr");
-  if (runHrInput) runHrInput.disabled = !STATE.hr_locked;
+  if (runHrInput) runHrInput.disabled = direct ? false : !STATE.hr_locked;
   var hrFloatRow = $("hr-float-row");
-  if (hrFloatRow) hrFloatRow.style.display = STATE.hr_locked ? "flex" : "none";
+  if (hrFloatRow) hrFloatRow.style.display = (direct || STATE.hr_locked) ? "flex" : "none";
   var runHrFloatRow = $("run-hr-float-row");
-  if (runHrFloatRow) runHrFloatRow.style.display = STATE.hr_locked ? "flex" : "none";
+  if (runHrFloatRow) runHrFloatRow.style.display = (direct || STATE.hr_locked) ? "flex" : "none";
 }
 function onHrLockChange() {
+  if (directHrControl()) {
+    applyHrLockState();
+    return;
+  }
   var radios = document.getElementsByName("hr-lock");
   for (var i = 0; i < radios.length; i++) {
     if (radios[i].checked) {
@@ -665,6 +682,10 @@ function onHrLockChange() {
   applyHrLockState();
 }
 function onRunHrLockChange() {
+  if (directHrControl()) {
+    applyHrLockState();
+    return;
+  }
   var radios = document.getElementsByName("run-hr-lock");
   for (var i = 0; i < radios.length; i++) {
     if (radios[i].checked) {
@@ -729,7 +750,7 @@ function collectConfig() {
     run_cadence: clamp(parseInt($("run-cadence").value, 10) || 0, 120, 220),
     run_cadence_float: STATE.run_cadence_float,
     run_incline_x10: clamp(Math.round((parseFloat($("run-incline").value) || 0) * 10), -50, 150),
-    hr_lock: STATE.hr_locked ? 1 : 0,
+    hr_lock: directHrControl() ? 1 : (STATE.hr_locked ? 1 : 0),
     power_float: STATE.power_float,
     cadence_float: STATE.cadence_float,
     hr_float: STATE.hr_float,
