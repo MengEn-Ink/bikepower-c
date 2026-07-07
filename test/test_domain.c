@@ -935,6 +935,7 @@ static void test_config_store(void)
     CHECK(strstr(js, "\"power_float\":12") != NULL, "serialize 含 power_float=12");
     CHECK(strstr(js, "\"run_pace_float_sec\":12") != NULL, "serialize 含 run_pace_float_sec=12");
     CHECK(strstr(js, "\"run_cadence_float\":6") != NULL, "serialize 含 run_cadence_float=6");
+    CHECK(strstr(js, "run_incline") == NULL, "serialize 不再导出跑步坡度字段");
     CHECK(strstr(js, "\"broadcast_mask\":5") != NULL, "serialize 含 broadcast_mask=5");
     CHECK(strstr(js, "\"power_step\":25") != NULL, "serialize 含 power_step=25");
     CHECK(strstr(js, "\"custom_pacer_name\":\"兔子\\\"车手\"") != NULL, "serialize 含转义后的自定义配速昵称");
@@ -968,6 +969,11 @@ static void test_config_store(void)
     CHECK(strcmp(partial.custom_pacer_name, CUSTOM_PACER_NAME_DEFAULT) == 0, "缺失自定义配速昵称保持默认");
     CHECK(partial.led.scenes[LED_SCENE_CONNECTED].mode == LED_MODE_SOLID, "缺失 LED 保持默认");
     CHECK(strcmp(partial.device_name, DEVICE_NAME_DEFAULT) == 0, "缺失设备名保持默认");
+
+    config_data_t legacy_run;
+    CHECK(config_store_deserialize("{\"schema_ver\":9,\"run_incline_x10\":35,\"run_cadence\":180}", &legacy_run),
+          "含旧跑步坡度 JSON deserialize 成功");
+    CHECK(legacy_run.run_cadence == 180, "旧 JSON 中仍保留有效跑步步频字段");
 
     // 非法 JSON（无 schema_ver）失败且不污染原对象
     config_data_t guard;

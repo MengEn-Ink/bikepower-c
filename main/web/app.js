@@ -13,7 +13,7 @@ var STATE = {
   active_sport_profile: "cycling",
   broadcast_mask: 7,
   power: 0, cadence: 0, heartrate: 0,
-  run_speed_x100: 1000, run_pace_float_sec: 10, run_cadence: 170, run_cadence_float: 4, run_incline_x10: 0,
+  run_speed_x100: 1000, run_pace_float_sec: 10, run_cadence: 170, run_cadence_float: 4,
   mode: "steady",
   power_float: 5, cadence_float: 2, hr_float: 2,
   power_step: 20,
@@ -339,7 +339,6 @@ function captureDraft() {
       STATE.run_speed_x100 = speedX100FromPaceSec((parseInt($("run-pace-min").value, 10) || 0) * 60 + (parseInt($("run-pace-sec").value, 10) || 0));
     }
     if ($("run-cadence")) STATE.run_cadence = parseInt($("run-cadence").value, 10) || 0;
-    if ($("run-incline")) STATE.run_incline_x10 = Math.round((parseFloat($("run-incline").value) || 0) * 10);
     return;
   }
   var settings = $("view-settings");
@@ -393,7 +392,6 @@ function renderHome() {
   $("run-hr").value = STATE.heartrate;
   renderPaceFromState();
   $("run-cadence").value = STATE.run_cadence;
-  $("run-incline").value = (STATE.run_incline_x10 / 10).toFixed(1);
   $("float-power").textContent = STATE.power_float;
   $("float-cadence").textContent = STATE.cadence_float;
   $("float-hr").textContent = STATE.hr_float;
@@ -555,7 +553,6 @@ function applyBroadcastVisibility() {
   showIf("cycling-hr-card", !isRunning && broadcastEnabled("heartrate"));
   showIf("running-speed-card", isRunning && broadcastEnabled("power"));
   showIf("running-cadence-card", isRunning && broadcastEnabled("cadence"));
-  showIf("running-incline-card", isRunning && broadcastEnabled("power"));
   showIf("running-hr-card", isRunning && broadcastEnabled("heartrate"));
   applyHrLockState();
 }
@@ -792,7 +789,6 @@ function collectConfig() {
     run_pace_float_sec: STATE.run_pace_float_sec,
     run_cadence: clamp(parseInt($("run-cadence").value, 10) || 0, 120, 220),
     run_cadence_float: STATE.run_cadence_float,
-    run_incline_x10: clamp(Math.round((parseFloat($("run-incline").value) || 0) * 10), -50, 150),
     hr_lock: directHrControl() ? 1 : (STATE.hr_locked ? 1 : 0),
     power_float: STATE.power_float,
     cadence_float: STATE.cadence_float,
@@ -1284,7 +1280,6 @@ function collectConfigBase() {
     run_pace_float_sec: STATE.run_pace_float_sec,
     run_cadence: STATE.run_cadence,
     run_cadence_float: STATE.run_cadence_float,
-    run_incline_x10: STATE.run_incline_x10,
     hr_lock: directHrControl() ? 1 : (STATE.hr_locked ? 1 : 0),
     power_float: STATE.power_float,
     cadence_float: STATE.cadence_float,
@@ -1386,7 +1381,6 @@ function init() {
       STATE.run_pace_float_sec = data.run_pace_float_sec != null ? data.run_pace_float_sec : 10;
       STATE.run_cadence = data.run_cadence != null ? data.run_cadence : 170;
       STATE.run_cadence_float = data.run_cadence_float != null ? data.run_cadence_float : 4;
-      STATE.run_incline_x10 = data.run_incline_x10 != null ? data.run_incline_x10 : 0;
       STATE.mode = data.mode || "steady";
       STATE.power_float = data.power_float != null ? data.power_float : 5;
       STATE.cadence_float = data.cadence_float != null ? data.cadence_float : 2;

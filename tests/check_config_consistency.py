@@ -259,7 +259,6 @@ range_expectations = {
     "run_pace_float_sec": (extract_int(domain_src, "RUN_PACE_FLOAT_SEC_MIN"), extract_int(domain_src, "RUN_PACE_FLOAT_SEC_MAX")),
     "run_cadence": (extract_int(domain_src, "RUN_CADENCE_MIN"), extract_int(domain_src, "RUN_CADENCE_MAX")),
     "run_cadence_float": (extract_int(domain_src, "RUN_CADENCE_FLOAT_MIN"), extract_int(domain_src, "RUN_CADENCE_FLOAT_MAX")),
-    "run_incline_x10": (extract_int(domain_src, "RUN_INCLINE_X10_MIN"), extract_int(domain_src, "RUN_INCLINE_X10_MAX")),
 }
 
 for key, expected in range_expectations.items():

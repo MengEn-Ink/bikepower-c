@@ -99,7 +99,6 @@ typedef enum {
 #define NVS_KEY_RUN_PACE_FLOAT "rpacef"
 #define NVS_KEY_RUN_CADENCE    "rcad"
 #define NVS_KEY_RUN_CAD_FLOAT  "rcadf"
-#define NVS_KEY_RUN_INCLINE    "rincl"
 #define NVS_KEY_LED_SILENT     "ledsil"
 #define NVS_KEY_LED_WAIT_MODE  "ledwm"
 #define NVS_KEY_LED_WAIT_COLOR "ledwc"

@@ -490,13 +490,6 @@ bool power_engine_set_run_cadence_float(power_engine_t *e, int amp_spm)
     return changed;
 }
 
-bool power_engine_set_run_incline(power_engine_t *e, int incline_x10)
-{
-    bool changed = running_engine_set_incline(&e->running, incline_x10);
-    if (changed) e->dirty = true;
-    return changed;
-}
-
 int power_engine_running_heartrate(power_engine_t *e, int speed_x100_kmh)
 {
     if (!e) return DEFAULT_HEARTRATE;

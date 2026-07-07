@@ -126,7 +126,6 @@ bool power_engine_set_run_speed(power_engine_t *e, int speed_x100_kmh);
 bool power_engine_set_run_pace_float(power_engine_t *e, int seconds);
 bool power_engine_set_run_cadence(power_engine_t *e, int cadence_spm);
 bool power_engine_set_run_cadence_float(power_engine_t *e, int amp_spm);
-bool power_engine_set_run_incline(power_engine_t *e, int incline_x10);
 /* 按跑步快照速度生成心率输出；固定用户心率时直接走锁定心率路径。 */
 int power_engine_running_heartrate(power_engine_t *e, int speed_x100_kmh);
 bool power_engine_set_broadcast_mask(power_engine_t *e, int mask);

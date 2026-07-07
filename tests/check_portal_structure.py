@@ -296,8 +296,9 @@ def main():
           "跑步联动心率必须按当前配速/速度折算强度")
     check(js.count('hr_lock: directHrControl() ? 1') >= 2,
           "首页和设置页保存都必须复用只剩心率直接控制语义")
-    check('running-incline-card' in js and 'isRunning && broadcastEnabled("power")' in js,
-          "跑步坡度必须跟随配速广播项显隐，只剩心率时不应保留无关窗口")
+    check('running-incline-card' not in html and 'running-incline-card' not in js
+          and 'run-incline' not in html and 'run_incline_x10' not in js,
+          "跑步页不应保留坡度配置，核心跑步闭环只保留配速/步频/心率")
     check('切换骑行/跑步需点保存并关闭 WiFi' not in js,
           "普通保存必须允许切换骑行/跑步，并由固件即时重建 BLE GATT 表")
     check('active_sport_profile = STATE.sport_profile' in js,

@@ -68,7 +68,6 @@ void running_engine_init(running_engine_t *e)
     e->pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT;
     e->cadence_spm = RUN_CADENCE_DEFAULT;
     e->cadence_float_spm = RUN_CADENCE_FLOAT_DEFAULT;
-    e->incline_x10 = RUN_INCLINE_X10_DEFAULT;
     running_walk_reset(&e->pace_walk);
     running_walk_reset(&e->cadence_walk);
     e->elapsed_ms = 0;
@@ -100,7 +99,6 @@ running_snapshot_t running_engine_snapshot(running_engine_t *e, uint32_t dt_ms)
 
     e->snapshot.speed_x100_kmh = output_speed_x100;
     e->snapshot.cadence_spm = output_cadence_spm;
-    e->snapshot.incline_x10 = e->incline_x10;
     e->snapshot.total_distance_m = e->distance_x1000_m / 1000u;
     e->snapshot.elapsed_time_s = e->elapsed_ms / 1000u;
     e->snapshot.rsc_speed_1_256_mps = rsc_speed;
@@ -143,14 +141,5 @@ bool running_engine_set_cadence_float(running_engine_t *e, int amp_spm)
     if (e->cadence_float_spm == clamped) return false;
     e->cadence_float_spm = clamped;
     running_walk_reset(&e->cadence_walk);
-    return true;
-}
-
-bool running_engine_set_incline(running_engine_t *e, int incline_x10)
-{
-    if (!e) return false;
-    int clamped = clamp_int(incline_x10, RUN_INCLINE_X10_MIN, RUN_INCLINE_X10_MAX);
-    if (e->incline_x10 == clamped) return false;
-    e->incline_x10 = clamped;
     return true;
 }

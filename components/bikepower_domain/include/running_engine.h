@@ -12,7 +12,6 @@
 typedef struct {
     int speed_x100_kmh;
     int cadence_spm;
-    int incline_x10;
     uint32_t total_distance_m;
     uint32_t elapsed_time_s;
     uint16_t rsc_speed_1_256_mps;
@@ -31,7 +30,6 @@ typedef struct {
     int pace_float_sec;
     int cadence_spm;
     int cadence_float_spm;
-    int incline_x10;
     running_walk_t pace_walk;
     running_walk_t cadence_walk;
     uint32_t elapsed_ms;
@@ -45,4 +43,3 @@ bool running_engine_set_speed(running_engine_t *e, int speed_x100_kmh);
 bool running_engine_set_pace_float(running_engine_t *e, int seconds);
 bool running_engine_set_cadence(running_engine_t *e, int cadence_spm);
 bool running_engine_set_cadence_float(running_engine_t *e, int amp_spm);
-bool running_engine_set_incline(running_engine_t *e, int incline_x10);

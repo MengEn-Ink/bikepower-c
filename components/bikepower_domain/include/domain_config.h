@@ -38,9 +38,6 @@
 #define RUN_CADENCE_FLOAT_MIN  0       // ±steps/min
 #define RUN_CADENCE_FLOAT_MAX  20
 #define RUN_CADENCE_FLOAT_DEFAULT 4
-#define RUN_INCLINE_X10_MIN    (-50)   // -5.0%
-#define RUN_INCLINE_X10_MAX    150     // 15.0%
-#define RUN_INCLINE_X10_DEFAULT 0
 
 // ===== 配置格式版本 =====
 // v9：新增广播数据项开关持久化。
