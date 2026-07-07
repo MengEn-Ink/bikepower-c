@@ -310,12 +310,15 @@ void app_main(void)
 
         app_state_tick();
 
-        snapshot_t s = power_engine_snapshot(&s_engine);
+        snapshot_t s = s_engine.snapshot;
         ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
         if (s_engine.sport_profile == SPORT_PROFILE_RUNNING) {
             running_snapshot_t rs = running_engine_snapshot(&s_engine.running, HR_LOOP_INTERVAL_MS);
-            ble_bikepower_set_running_data(rs, (uint8_t)s.heartrate);
+            int running_hr = power_engine_running_heartrate(&s_engine, rs.speed_x100_kmh);
+            s.heartrate = running_hr;
+            ble_bikepower_set_running_data(rs, (uint8_t)running_hr);
         } else {
+            s = power_engine_snapshot(&s_engine);
             ble_bikepower_set_data((uint16_t)s.power, (uint8_t)s.heartrate, (uint16_t)s.cadence);
         }
 

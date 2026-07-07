@@ -255,6 +255,17 @@ static void test_setters_edge(void)
     power_engine_clear_user_hr(&e);
     power_engine_snapshot(&e);
     CHECK(!e.has_user_hr, "解锁后快照不触发重新锁定");
+
+    power_engine_init(&e);
+    power_engine_set_mode(&e, RIDE_MODE_ROAD);
+    CHECK(power_engine_set_heartrate(&e, 150) == false,
+          "骑行机器人多项广播时心率仍保持联动，不允许手动锁定");
+    CHECK(power_engine_set_broadcast_mask(&e, BROADCAST_FIELD_HEARTRATE), "切到只广播心率");
+    CHECK(power_engine_set_heartrate(&e, 150) == true, "骑行只剩心率时允许直接设置心率");
+
+    power_engine_init(&e);
+    CHECK(power_engine_set_sport_profile(&e, SPORT_PROFILE_RUNNING), "切到跑步模式");
+    CHECK(power_engine_set_heartrate(&e, 145) == true, "跑步模式允许锁定目标心率");
 }
 
 static void test_hr_variation_steady(void)
@@ -511,6 +522,69 @@ static void test_random_power_hr_following_scenario(void)
         if (hr > max_hr) max_hr = hr;
     }
     CHECK(max_hr - min_hr >= 15, "多段随机功率变化产生可观察心率区间");
+}
+
+static int settle_hr_for_road_pacer(power_engine_t *e, int wkg10, int loops)
+{
+    CHECK(profile_set_custom_wkg(&e->profile, wkg10, wkg10), "设置自定义机器人功体比成功");
+    if (power_engine_get_pacer_index(e) != PACER_INDEX_CUSTOM) {
+        CHECK(power_engine_set_pacer_index(e, PACER_INDEX_CUSTOM), "切换到自定义机器人成功");
+    }
+    if (e->mode != RIDE_MODE_ROAD) {
+        CHECK(power_engine_set_mode(e, RIDE_MODE_ROAD), "切换到配速机器人模式成功");
+    }
+    snapshot_t s = { 0 };
+    for (int i = 0; i < loops; i++) {
+        s = power_engine_snapshot(e);
+    }
+    return s.heartrate;
+}
+
+static int settle_hr_for_running_speed(power_engine_t *e, int speed_x100, int loops)
+{
+    CHECK(power_engine_set_run_speed(e, speed_x100), "设置跑步速度成功");
+    running_snapshot_t s = { 0 };
+    int hr = 0;
+    for (int i = 0; i < loops; i++) {
+        s = running_engine_snapshot(&e->running, HR_LOOP_INTERVAL_MS);
+        hr = power_engine_running_heartrate(e, s.speed_x100_kmh);
+    }
+    return hr;
+}
+
+static void test_linked_hr_follows_pacer_and_running_speed(void)
+{
+    printf("[test] 联动心率跟随骑行机器人功率与跑步配速\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    domain_rng_seed(20260707);
+    profile_set_weight(&e.profile, 70);
+    profile_set_ftp(&e.profile, 250);
+    profile_set_thr_hr(&e.profile, 185);
+    power_engine_clear_user_hr(&e);
+
+    int easy_road_hr = settle_hr_for_road_pacer(&e, 12, 420);
+    int hard_road_hr = settle_hr_for_road_pacer(&e, 55, 620);
+    CHECK(hard_road_hr > easy_road_hr + 15, "骑行配速机器人功率提高后联动心率上升");
+
+    power_engine_init(&e);
+    domain_rng_seed(20260707);
+    profile_set_ftp(&e.profile, 250);
+    profile_set_thr_hr(&e.profile, 185);
+    power_engine_set_sport_profile(&e, SPORT_PROFILE_RUNNING);
+    power_engine_set_run_pace_float(&e, 0);
+    power_engine_clear_user_hr(&e);
+
+    int slow_run_hr = settle_hr_for_running_speed(&e, 600, 420);
+    int fast_run_hr = settle_hr_for_running_speed(&e, 1600, 620);
+    CHECK(fast_run_hr > slow_run_hr + 10, "跑步配速变快后联动心率上升");
+
+    CHECK(power_engine_set_heartrate(&e, 142), "跑步只控心率/锁定心率时可设置直接心率");
+    power_engine_set_hr_float(&e, 0);
+    int locked_slow_hr = settle_hr_for_running_speed(&e, 700, 80);
+    int locked_fast_hr = settle_hr_for_running_speed(&e, 1800, 80);
+    CHECK(locked_slow_hr == 142 && locked_fast_hr == 142,
+          "跑步锁定心率时速度变化不影响心率输出");
 }
 
 static void test_float_effect_scenario(void)
@@ -1265,6 +1339,7 @@ int main(void)
     test_broadcast_fields_and_button_target();
     test_button_operation_scenario();
     test_random_power_hr_following_scenario();
+    test_linked_hr_follows_pacer_and_running_speed();
     test_float_effect_scenario();
     test_web_config_persistence_scenario();
     test_engine_blindspots();

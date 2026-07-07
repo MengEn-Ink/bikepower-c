@@ -17,6 +17,20 @@ static int clampi(int v, int lo, int hi)
 static int clamp_power(int v)   { return clampi(v, POWER_MIN, POWER_MAX); }
 static int clamp_cadence(int v) { return clampi(v, CADENCE_MIN, CADENCE_MAX); }
 
+static int running_equivalent_power(power_engine_t *e, int speed_x100_kmh)
+{
+    int speed = clampi(speed_x100_kmh, RUN_SPEED_X100_MIN, RUN_SPEED_X100_MAX);
+    int span = RUN_SPEED_X100_MAX - RUN_SPEED_X100_MIN;
+    int progress = span > 0 ? (speed - RUN_SPEED_X100_MIN) * 1000 / span : 0;
+    /*
+     * 跑步没有功率源，使用速度在线性强度轴上的位置折算为 FTP 百分比。
+     * 3km/h 约恢复强度，25km/h 约 VO2 强度；只要求联动心率单调、保守、可解释。
+     */
+    int ftp = e->profile.ftp > 0 ? e->profile.ftp : PROFILE_FTP_DEFAULT;
+    int pct = 35 + progress * 85 / 1000;
+    return clamp_power(ftp * pct / 100);
+}
+
 /*
  * 在浮动带内推进一次有界平滑随机游走，返回相对基准值的整数偏移。
  * 参数：w 为游走状态；amp 为 ± 浮动幅度（<=0 表示恒定，偏移恒为 0）。
@@ -293,7 +307,8 @@ bool power_engine_set_cadence(power_engine_t *e, int value)
  */
 bool power_engine_set_heartrate(power_engine_t *e, int value)
 {
-    if (e->mode != RIDE_MODE_STEADY) return false;
+    bool direct_hr_only = (e->broadcast_mask & BROADCAST_FIELD_ALL) == BROADCAST_FIELD_HEARTRATE;
+    if (e->mode != RIDE_MODE_STEADY && e->sport_profile != SPORT_PROFILE_RUNNING && !direct_hr_only) return false;
     if (value < HR_MIN || value > HR_MAX) return false;
     e->user_heartrate = value;
     e->has_user_hr = true;
@@ -480,6 +495,23 @@ bool power_engine_set_run_incline(power_engine_t *e, int incline_x10)
     bool changed = running_engine_set_incline(&e->running, incline_x10);
     if (changed) e->dirty = true;
     return changed;
+}
+
+int power_engine_running_heartrate(power_engine_t *e, int speed_x100_kmh)
+{
+    if (!e) return DEFAULT_HEARTRATE;
+    int hr;
+    if (e->has_user_hr) {
+        hr = hr_model_steady_user(&e->hr, e->user_heartrate, e->hr_float);
+    } else {
+        int eq_power = running_equivalent_power(e, speed_x100_kmh);
+        int target_hr = hr_model_ftp_zone(&e->hr, eq_power, e->profile.ftp, e->profile.thr_hr);
+        hr = hr_model_smooth(&e->hr, target_hr);
+        hr = hr_model_emit(&e->hr, hr_clamp((int)(hr + hr_model_variation(&e->hr))));
+    }
+    e->last_heartrate = hr;
+    e->snapshot.heartrate = hr;
+    return hr;
 }
 
 bool power_engine_set_broadcast_mask(power_engine_t *e, int mask)
