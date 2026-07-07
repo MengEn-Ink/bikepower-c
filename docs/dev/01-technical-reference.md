@@ -752,7 +752,7 @@ namespace 固定为：
 
 领域层配置版本在 `domain_config.h` 中：
 
-`CONFIG_VERSION = 6`
+`CONFIG_VERSION = 9`
 
 `config_store_migrate()` 当前没有细粒度迁移逻辑。
 只要 `schema_ver != CONFIG_VERSION`，就直接 `config_store_defaults()`。
@@ -935,7 +935,7 @@ idf.py build
 
 根据项目规则，C 代码改动后 `idf.py build` 必须通过。
 
-发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行会先跑 host 单测、mock 配网页保存测试、3 分钟核心流程耐久测试和静态门禁，再为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip。脚本不会打 git tag，也不会创建 Gitee Release。合并固件文件名格式为 `bikepower-c-板型-v版本-stable-fix-gGitID.bin`，例如 `bikepower-c-generic-c3-v4.0.0-stable-fix-g39c0ee5.bin`，版本号只出现一次；总包文件名格式为 `bikepower-c-release-v版本-stable-fix-gGitID.zip`。
+发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行会先跑 host 单测、mock 配网页保存测试、3 分钟核心流程耐久测试和静态门禁，再为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip。脚本不会打 git tag，也不会创建 Gitee Release。合并固件文件名格式为 `bikepower-c-板型-v版本-stable-fix-gGitID.bin`，例如 `bikepower-c-generic-c3-v4.0.2-stable-fix-g39c0ee5.bin`，版本号只出现一次；总包文件名格式为 `bikepower-c-release-v版本-stable-fix-gGitID.zip`。
 
 每次生成可分发固件时，`build/release/` 必须同时包含：
 

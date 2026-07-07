@@ -17,10 +17,14 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG_H = ROOT / "main" / "bikepower_config.h"
 RADIO_CTRL = ROOT / "main" / "radio_ctrl.c"
 DOMAIN_H = ROOT / "components" / "bikepower_domain" / "include" / "domain_config.h"
+APP_JS = ROOT / "main" / "web" / "app.js"
+MOCK_SERVER = ROOT / "tests" / "mock_server.py"
+AGENTS = ROOT / "AGENTS.md"
 README = ROOT / "README.md"
 PROGRESS = ROOT / "PROGRESS.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
 DOC_INDEX = ROOT / "docs" / "INDEX.md"
+TECH_REF = ROOT / "docs" / "dev" / "01-technical-reference.md"
 QUICKSTART = ROOT / "docs" / "user" / "01-quickstart.md"
 USER_MANUAL = ROOT / "docs" / "user" / "02-user-manual.md"
 NIMBLE_REWRITE = ROOT / "docs" / "archive" / "01-cidf-nimble-rewrite.md"
@@ -90,14 +94,28 @@ def extract_changelog_unreleased_has_version_bump(changelog: str, target_ver: st
     return target_ver in unreleased.group(1)
 
 
+def extract_js_range(src: str, key: str):
+    m = re.search(rf'{re.escape(key)}:\s*\{{\s*min:\s*(-?\d+),\s*max:\s*(-?\d+)', src)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def extract_mock_limit(src: str, key: str):
+    m = re.search(rf'"{re.escape(key)}"\s*:\s*\((-?\d+),\s*(-?\d+)\)', src)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
 # ============================ 读取文件 ============================
 config_src = read(CONFIG_H)
 radio_ctrl_src = read(RADIO_CTRL)
 domain_src = read(DOMAIN_H)
+app_js_src = read(APP_JS)
+mock_src = read(MOCK_SERVER)
+agents_src = read(AGENTS)
 readme_src = read(README)
 progress_src = read(PROGRESS)
 changelog_src = read(CHANGELOG)
 doc_index_src = read(DOC_INDEX)
+tech_ref_src = read(TECH_REF)
 quickstart_src = read(QUICKSTART)
 user_manual_src = read(USER_MANUAL)
 nimble_rewrite_src = read(NIMBLE_REWRITE)
@@ -136,6 +154,13 @@ if latest_released:
     cur = parse_semver(fw_ver)
     rel = parse_semver(latest_released)
     check(cur >= rel, f"固件版本 {fw_ver} >= CHANGELOG 最新发布 {latest_released}")
+
+check(f"当前固件版本 v{fw_ver}" in agents_src or f"当前固件版本：v{fw_ver}" in agents_src,
+      f"AGENTS.md 当前固件版本与 FIRMWARE_VERSION({fw_ver}) 一致")
+check(f"当前固件版本：v{fw_ver}" in progress_src,
+      f"PROGRESS.md 当前固件版本与 FIRMWARE_VERSION({fw_ver}) 一致")
+check(f"当前固件版本为 `v{fw_ver}`" in tech_ref_src,
+      f"技术参考当前固件版本与 FIRMWARE_VERSION({fw_ver}) 一致")
 
 # DEVICE_NAME 一致性
 device_name_cfg = extract_define(config_src, "DEVICE_NAME")
@@ -212,6 +237,51 @@ allowed_overlap = set()
 real_duplicates = duplicates - allowed_overlap
 check(len(real_duplicates) == 0,
       f"bikepower_config.h 与 domain_config.h 无重复定义 (重复={real_duplicates})")
+
+
+# ============================ 3b. Mock/前端范围 ↔ 领域常量 ============================
+print(f"\n{TAG} [S3b] Mock/前端范围 ↔ 领域常量")
+
+range_expectations = {
+    "power": (extract_int(domain_src, "POWER_MIN"), extract_int(domain_src, "POWER_MAX")),
+    "cadence": (extract_int(domain_src, "CADENCE_MIN"), extract_int(domain_src, "CADENCE_MAX")),
+    "heartrate": (extract_int(domain_src, "HR_MIN"), extract_int(domain_src, "HR_MAX")),
+    "power_float": (extract_int(domain_src, "POWER_FLOAT_MIN"), extract_int(domain_src, "POWER_FLOAT_MAX")),
+    "cadence_float": (extract_int(domain_src, "CADENCE_FLOAT_MIN"), extract_int(domain_src, "CADENCE_FLOAT_MAX")),
+    "hr_float": (extract_int(domain_src, "HR_FLOAT_MIN"), extract_int(domain_src, "HR_FLOAT_MAX")),
+    "power_step": (extract_int(domain_src, "POWER_STEP_MIN"), extract_int(domain_src, "POWER_STEP_MAX")),
+    "profile_weight": (extract_int(domain_src, "PROFILE_WEIGHT_MIN"), extract_int(domain_src, "PROFILE_WEIGHT_MAX")),
+    "profile_ftp": (extract_int(domain_src, "PROFILE_FTP_MIN"), extract_int(domain_src, "PROFILE_FTP_MAX")),
+    "profile_thr_hr": (extract_int(domain_src, "PROFILE_THR_HR_MIN"), extract_int(domain_src, "PROFILE_THR_HR_MAX")),
+    "custom_wkg_low": (extract_int(domain_src, "CUSTOM_WKG_MIN"), extract_int(domain_src, "CUSTOM_WKG_MAX")),
+    "custom_wkg_high": (extract_int(domain_src, "CUSTOM_WKG_MIN"), extract_int(domain_src, "CUSTOM_WKG_MAX")),
+    "run_speed_x100": (extract_int(domain_src, "RUN_SPEED_X100_MIN"), extract_int(domain_src, "RUN_SPEED_X100_MAX")),
+    "run_pace_float_sec": (extract_int(domain_src, "RUN_PACE_FLOAT_SEC_MIN"), extract_int(domain_src, "RUN_PACE_FLOAT_SEC_MAX")),
+    "run_cadence": (extract_int(domain_src, "RUN_CADENCE_MIN"), extract_int(domain_src, "RUN_CADENCE_MAX")),
+    "run_cadence_float": (extract_int(domain_src, "RUN_CADENCE_FLOAT_MIN"), extract_int(domain_src, "RUN_CADENCE_FLOAT_MAX")),
+    "run_incline_x10": (extract_int(domain_src, "RUN_INCLINE_X10_MIN"), extract_int(domain_src, "RUN_INCLINE_X10_MAX")),
+}
+
+for key, expected in range_expectations.items():
+    actual = extract_mock_limit(mock_src, key)
+    check(actual == expected, f"tests/mock_server.py LIMITS[{key}] == {expected} (实际={actual})")
+
+js_ranges = {
+    "power": "power_float",
+    "cadence": "cadence_float",
+    "hr": "hr_float",
+    "runpace": "run_pace_float_sec",
+    "runcadence": "run_cadence_float",
+    "pstep": "power_step",
+}
+for js_key, domain_key in js_ranges.items():
+    actual = extract_js_range(app_js_src, js_key)
+    expected = range_expectations[domain_key]
+    check(actual == expected, f"main/web/app.js FLOAT_RANGE.{js_key} == {expected} (实际={actual})")
+
+config_version = extract_int(domain_src, "CONFIG_VERSION")
+check(f"`CONFIG_VERSION = {config_version}`" in tech_ref_src,
+      f"技术参考 schema 版本与 CONFIG_VERSION({config_version}) 一致")
 
 
 # ============================ 4. WiFi AP 凭证一致性 ============================

@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+### 一致性修复
+- `PROGRESS.md`、`docs/dev/01-technical-reference.md`、`docs/user/01-quickstart.md`：同步当前固件版本、配置 schema 版本、发版 tag 和热点名口径，修复 `check_config_consistency.py` 中版本与 `CONFIG_VERSION` 漂移导致的门禁失败。
+- `sdkconfig.defaults`、`sdkconfig`：发版默认日志级别从 INFO 调整为 WARN，与项目发版规则和进度文档一致。
+
 ### 用户手册与发行版说明
 - `README.md`、`docs/user/01-quickstart.md`、`docs/user/02-user-manual.md`、`docs/images/web-flash-serial-port.jpg`：普通用户烧录/升级固件统一改为网页端在线烧录，入口为 `https://easyhey.com/?firmware=MOD220`；README 和手册加入浏览器串口选择截图，弱化 Flash Download Tool、esptool 和 ESP-IDF 命令行路径，避免小白用户在多种烧录方式之间选择。
 - `scripts/tools/publish_gitee_release.py`：Gitee Release 自动生成的“烧录说明”同步改为优先使用网页端在线烧录；命令行单文件烧录仅保留为开发者兜底方式。

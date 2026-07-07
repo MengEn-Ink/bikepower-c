@@ -145,10 +145,10 @@ def main():
         check(after_invalid.get("mode") == before_invalid.get("mode"),
               "非法 mode 保持旧值", failures)
         check(after_invalid.get("power") == 2000, "power 越界夹到上限", failures)
-        check(after_invalid.get("cadence") == 30, "cadence 越界夹到下限", failures)
+        check(after_invalid.get("cadence") == 20, "cadence 越界夹到下限", failures)
         check(after_invalid.get("heartrate") == before_invalid.get("heartrate"),
               "非数字 heartrate 保持旧值", failures)
-        check(after_invalid.get("power_step") == 1, "power_step 越界夹到下限", failures)
+        check(after_invalid.get("power_step") == 5, "power_step 越界夹到下限", failures)
         check(after_invalid.get("run_pace_float_sec") == 60, "跑步配速浮动夹到上限", failures)
         check(after_invalid.get("run_cadence_float") == before_invalid.get("run_cadence_float"),
               "非数字跑步步频浮动保持旧值", failures)
