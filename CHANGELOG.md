@@ -12,6 +12,7 @@
 
 ### 测试门禁
 - `tools/web/ble-monitor.html`、`scripts/tools/serve_ble_monitor.py`、`tests/check_ble_monitor.py`：新增本地浏览器 BLE 监控客户端，支持连接已授权设备后持续观察 CPS/HRS/CSC/FTMS/RSC/DIS 数据、记录断连/通知停更/数值异常并导出报告；接入 `quality_gate.py`、`operation_gate.py` 和操作覆盖矩阵。
+- `tests/ble_broadcast_monitor.py`、`tests/check_ble_broadcast_monitor.py`：新增真机广播项数据面门禁，通过配网页 `/api/config` 切换 `broadcast_mask`，验证功率/踏频/心率开关是否真实影响 CPS/HRS/CSC/FTMS 通知。
 
 ## [4.0.4] - 2026-07-07
 

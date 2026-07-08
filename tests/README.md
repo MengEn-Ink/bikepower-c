@@ -81,6 +81,7 @@ done
 | 脚本 | 用途 | 依赖 | 触发方式 |
 |------|------|------|----------|
 | `ble_selftest.py` | BLE 五服务（CPS+HRS+CSC+FTMS+DIS）+ FTMS ERG 控制点 | bleak | 设备启动后直接跑 |
+| `ble_broadcast_monitor.py` | 通过配网页 API 切换广播项，并验证 CPS/HRS/CSC/FTMS 通知是否按开关停止/恢复 | bleak + 设备配网态 HTTP | 设备进入配网态后跑 |
 | `stage3_conn_test.py` | BLE 连接事件驱动状态机验证 | bleak | 设备启动后直接跑 |
 | `stage5_portal_test.py` | 配网门户 HTTP 路由自测（/api/xxx JSON 接口） | Python3 | 设备进入配网态后跑 |
 | `../scripts/tools/serve_ble_monitor.py` + `../tools/web/ble-monitor.html` | 本地浏览器 BLE 监控，持续记录断连、通知停更和数值异常 | Chrome/Edge Web Bluetooth | 启动本地服务后浏览器手动授权连接 |
@@ -121,7 +122,25 @@ python3 tests/check_ble_monitor.py
 
 Web Bluetooth 首次连接必须由用户点击“连接设备”并在浏览器弹窗中授权；授权后可点“连接已授权设备”重连。页面会监控 BLE 断连、通知停更、功率/心率/踏频/跑步速度异常，并可导出 JSON 报告用于排查。
 
-### E. 串口日志工具
+### E. BLE 广播项数据面门禁
+
+`tests/ble_broadcast_monitor.py` 是真机自动化门禁：设备处于配网态时，脚本通过 `POST /api/config` 切换 `broadcast_mask`，同时保持 BLE 连接并统计通知。
+
+覆盖场景：
+- 全开：CPS、HRS、CSC、FTMS 功率/踏频字段都应有数据。
+- 关闭功率：CPS 停止，FTMS 不再出现功率字段，心率和踏频仍正常。
+- 只开心率：仅 HRS 持续通知，CPS/CSC/FTMS 停止。
+- 只开功率：CPS 和 FTMS 功率字段正常，HRS/CSC 停止。
+
+```bash
+python3 tests/ble_broadcast_monitor.py --base-url http://192.168.4.1
+python3 tests/check_ble_broadcast_monitor.py
+python3 tests/operation_gate.py --level device --run-portal --port /dev/cu.usbmodem101
+```
+
+脚本结束会尝试恢复原始 `sport_profile` 和 `broadcast_mask`。未传 `--run-portal` 时，`operation_gate.py --level device` 会跳过这项，因为它需要设备处于配网态才能切换网页配置。
+
+### F. 串口日志工具
 
 | 脚本 | 用途 | 运行模式 |
 |------|------|----------|
@@ -145,13 +164,13 @@ python3 tests/serial_daemon.py --no-crash-snapshot
 
 > v4.0.0 起永久放弃设备内 OTA 与家庭网络配置；普通用户升级统一走网页端在线烧录，入口见 README 和用户手册。
 
-### F. 压力测试
+### G. 压力测试
 
 | 脚本 | 用途 |
 |------|------|
 | `run_stress.sh` | BLE 长连接 + 频繁通知压力测试 |
 
-### G. 测试运行器（统一入口）
+### H. 测试运行器（统一入口）
 
 | 脚本 | 用途 |
 |------|------|

@@ -31,6 +31,7 @@
 | `OP-WEB-003` | 续期、倒计时、保存并关闭 WiFi、设备模板扫描/保存/应用/删除 | `python3 tests/test_core_flow_endurance.py`、`python3 tests/stage5_portal_test.py` | 手机连接 AP 后配网入口人工确认 |
 | `OP-BCAST-001` | 顶部功率/踏频/心率多选默认全开；取消项隐藏对应窗口且保存后停止对应 BLE 通知；至少保留一项 | `make -C test run`、`python3 tests/test_portal_config_save.py`、`python3 tests/check_portal_structure.py` | Zwift/MyWhoosh 中按开启项观察数据源 |
 | `OP-BCAST-002` | BOOT 按钮按启用项选择目标：单项启用时直接调该项，多项启用时骑行优先功率、跑步优先配速/速度；长按 WiFi 确认回滚本次调节 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮在不同开关组合下人工确认 |
+| `OP-BCAST-003` | 广播项开关真实影响 BLE 数据面：关闭功率后 CPS/FTMS 功率停止，只开心率时仅 HRS 持续通知 | `python3 tests/ble_broadcast_monitor.py`、`python3 tests/check_ble_broadcast_monitor.py` | 设备需处于配网态，脚本通过 `/api/config` 切换 `broadcast_mask` |
 | `OP-BLE-001` | BLE 五服务、DIS、通知、FTMS 控制点响应 | `python3 tests/ble_selftest.py` | 第三方 App 扫描设备人工确认 |
 | `OP-BLE-002` | 连接/断开事件、断开后重广播、断开清 ERG | `python3 tests/stage3_conn_test.py`、`python3 tests/ble_selftest.py` | 训练 App 退出后重连人工确认 |
 | `OP-BLE-003` | 本地浏览器监控客户端可连接已授权 BikePower，持续记录通知停更、断连和数值异常 | `python3 tests/check_ble_monitor.py`、`python3 scripts/tools/serve_ble_monitor.py` | Web Bluetooth 首次授权必须人工点击，浏览器页面导出异常报告 |
@@ -66,6 +67,8 @@ make -C test run
 python3 tests/test_portal_config_save.py
 python3 tests/test_core_flow_endurance.py
 python3 tests/ble_selftest.py
+python3 tests/ble_broadcast_monitor.py
+python3 tests/check_ble_broadcast_monitor.py
 python3 tests/check_ble_monitor.py
 python3 tests/stage5_portal_test.py
 python3 tests/check_config_consistency.py
@@ -100,5 +103,6 @@ python3 scripts/tools/serve_ble_monitor.py
 - 新增用户可见操作时，先在本矩阵增加 `OP-*` 行，再补测试或人工门禁。
 - 新增保存字段时，同时更新 `tests/test_portal_config_save.py`、`tests/test_core_flow_endurance.py` 和本矩阵。
 - 新增模式或 BLE 控制点时，同时更新 `test/test_domain.c`、`tests/ble_selftest.py` 和本矩阵。
+- 调整广播项语义时，同步更新 `tests/ble_broadcast_monitor.py` 和 `tests/check_ble_broadcast_monitor.py`。
 - 调整 BLE 协议面或异常阈值时，同步更新 `tools/web/ble-monitor.html` 与 `tests/check_ble_monitor.py`。
 - 每次发版前运行 `python3 tests/operation_gate.py --level full`；涉及 BLE/配网/硬件行为时追加 `--level device`。

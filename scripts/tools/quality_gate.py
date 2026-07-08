@@ -154,6 +154,7 @@ required_assets = [
     "components/bikepower_domain/include/domain_config.h",
     "test/test_domain.c",
     "tests/ble_selftest.py",
+    "tests/ble_broadcast_monitor.py",
     "tests/stage3_conn_test.py",
     "tests/stage5_portal_test.py",
     "tests/test_portal_config_save.py",
@@ -197,6 +198,7 @@ STATIC_CHECKS = [
     ("tests/check_portal_js.py", "门户 JS 语法 (TC-3a)"),
     ("tests/check_operation_coverage.py", "操作覆盖矩阵 (TC-3j)"),
     ("tests/check_ble_monitor.py", "BLE 监控客户端 (TC-3k)"),
+    ("tests/check_ble_broadcast_monitor.py", "BLE 广播项监控脚本 (TC-3l)"),
 ]
 # 环境缺失标志：命中则降级为 warn（无设备/无依赖环境仍可跑），不算真实失败
 ENV_MISSING_MARKERS = [
