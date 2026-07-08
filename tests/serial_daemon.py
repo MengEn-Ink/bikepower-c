@@ -324,6 +324,28 @@ def highlight(line, use_color):
     return None, line
 
 
+# 文件句柄缓存：避免每行 open/close，保持打开 + flush
+_file_handle_cache = {}
+
+
+def _get_file_handle(filepath):
+    """获取或创建文件句柄（追加模式），若路径变更则切换"""
+    if filepath not in _file_handle_cache:
+        # 关闭旧句柄
+        for old_path, old_fh in list(_file_handle_cache.items()):
+            try:
+                old_fh.close()
+            except Exception:
+                pass
+        _file_handle_cache.clear()
+        try:
+            fh = open(filepath, "a")
+            _file_handle_cache[filepath] = fh
+        except OSError:
+            return None
+    return _file_handle_cache.get(filepath)
+
+
 def log_line(filepath, line, use_color=True, quiet=False):
     """写入一行日志到文件 + 终端高亮输出。
 
@@ -334,13 +356,23 @@ def log_line(filepath, line, use_color=True, quiet=False):
     if not line:
         return
     ts = timestamp()
-    # 文件输出：纯文本，无 ANSI
+    # 文件输出：纯文本，无 ANSI，句柄缓存 + flush 确保实时
     entry = "[%s] %s" % (ts, line)
-    try:
-        with open(filepath, "a") as f:
-            f.write(entry + "\n")
-    except OSError:
-        pass
+    fh = _get_file_handle(filepath)
+    if fh:
+        try:
+            fh.write(entry + "\n")
+            fh.flush()
+        except OSError:
+            # 句柄失效，清除缓存重试一次
+            _file_handle_cache.pop(filepath, None)
+            fh2 = _get_file_handle(filepath)
+            if fh2:
+                try:
+                    fh2.write(entry + "\n")
+                    fh2.flush()
+                except OSError:
+                    pass
 
     if quiet:
         return
@@ -359,26 +391,31 @@ def log_line(filepath, line, use_color=True, quiet=False):
             print("[%s] %s" % (ts, line), flush=True)
 
 
+# 持久行缓冲：跨 read 边界累积不完整行，避免截断
+_line_buffer = b""
+
+
 def read_serial(ser, log_path, use_color=True, quiet=False,
                 recent_lines=None, crash_keys=None, split_on_reboot=False,
                 crash_snapshot=True):
-    """非阻塞读取串口缓冲区并写入日志（参考 esp32-power 稳定模式）"""
+    """非阻塞读取串口缓冲区并写入日志（行缓冲模式，参考 esp32-power）"""
+    global _line_buffer
     try:
         waiting = ser.in_waiting or 0
         if waiting > 0:
             data = ser.read(min(waiting, BUFFER_SIZE))
-            text = data.decode("utf-8", errors="replace")
-            for line in text.split("\n"):
-                line = line.strip()
+            _line_buffer += data
+            # 只在 \n 处切分，不完整行留在缓冲中等待下一轮
+            parts = _line_buffer.split(b"\n")
+            # 最后一段可能是不完整行，保留到下次
+            _line_buffer = parts[-1]
+            for line_bytes in parts[:-1]:
+                line = line_bytes.decode("utf-8", errors="replace").strip()
                 if line:
                     log_path = process_serial_line(
                         log_path, line, use_color, quiet, recent_lines, crash_keys,
                         split_on_reboot, crash_snapshot,
                     )
-            try:
-                ser.reset_input_buffer()
-            except Exception:
-                pass
         return log_path
     except (OSError, Exception) as e:
         msg = str(e)
@@ -461,6 +498,8 @@ def run_loop(port_prefer=None, use_color=True, quiet=False,
                     f.write("")
                 ser = serial.Serial(current_port, SERIAL_BAUD, timeout=SERIAL_TIMEOUT)
                 rotate_logs()
+                global _line_buffer
+                _line_buffer = b""  # 新连接，清空残留缓冲
                 daemon_log("串口已连接: %s → %s" % (current_port, log_path))
             except Exception as e:
                 daemon_log("串口连接失败 (%s): %s" % (current_port, e))
