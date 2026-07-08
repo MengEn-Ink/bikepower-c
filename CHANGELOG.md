@@ -10,6 +10,9 @@
 ### 用户手册
 - `docs/images/web-ui/`、`docs/user/02-user-manual.md`：重新截取当前网页端操作页面，补充跑步首页和关于页截图，并将手册路径口径同步为“设置 → 配置设备”。
 
+### 测试门禁
+- `tools/web/ble-monitor.html`、`scripts/tools/serve_ble_monitor.py`、`tests/check_ble_monitor.py`：新增本地浏览器 BLE 监控客户端，支持连接已授权设备后持续观察 CPS/HRS/CSC/FTMS/RSC/DIS 数据、记录断连/通知停更/数值异常并导出报告；接入 `quality_gate.py`、`operation_gate.py` 和操作覆盖矩阵。
+
 ## [4.0.4] - 2026-07-07
 
 ### 网页加载与设置页重构

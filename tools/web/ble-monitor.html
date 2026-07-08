@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BikePower BLE 监控</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--line:#dfe5ef;--text:#172033;--muted:#667085;--blue:#1769e0;--green:#16803c;--red:#c4262e;--amber:#a15c00}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;padding:16px}.wrap{max-width:980px;margin:0 auto}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}.title h1{font-size:22px;line-height:1.1;margin:0 0 4px}.title p{margin:0;color:var(--muted);font-size:13px;line-height:1.4}.toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn{border:0;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:800;cursor:pointer;background:var(--blue);color:#fff}.btn:disabled{opacity:.45;cursor:not-allowed}.btn.alt{background:#fff;color:var(--blue);border:1px solid rgba(23,105,224,.22)}.btn.danger{background:var(--red)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 6px 22px rgba(16,24,40,.05)}.card h2{margin:0 0 10px;font-size:14px;color:var(--muted);letter-spacing:.02em}.status{display:flex;align-items:center;gap:8px;font-weight:900}.dot{width:11px;height:11px;border-radius:50%;background:#98a2b3}.dot.on{background:var(--green)}.dot.warn{background:var(--amber)}.dot.err{background:var(--red)}.data{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric{border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center;background:#fbfcff}.metric b{display:block;font-size:30px;line-height:1;margin-bottom:5px}.metric span{font-size:12px;color:var(--muted)}.row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #eef2f7;font-size:13px}.row:last-child{border-bottom:0}.row span:first-child{color:var(--muted)}.row span:last-child{font-weight:800;text-align:right;word-break:break-all}.badges{display:flex;gap:6px;flex-wrap:wrap}.badge{border-radius:999px;padding:4px 8px;font-size:12px;font-weight:800;background:#eef4ff;color:var(--blue)}.badge.ok{background:#e8f7ee;color:var(--green)}.badge.warn{background:#fff4e5;color:var(--amber)}.badge.err{background:#ffecec;color:var(--red)}.log{height:260px;overflow:auto;background:#0f172a;color:#dbeafe;border-radius:12px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.45}.log div{margin-bottom:2px}.info{color:#86efac}.data-log{color:#93c5fd}.warn-log{color:#fdba74}.err-log{color:#fca5a5}.hint{font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px}.hidden{display:none}.anomaly-list{display:grid;gap:6px}.anomaly{display:flex;justify-content:space-between;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff}.anomaly b{font-size:13px}.anomaly span{font-size:12px;color:var(--muted)}@media(max-width:760px){body{padding:10px}.top{display:block}.toolbar{justify-content:flex-start;margin-top:10px}.grid,.data{grid-template-columns:1fr}.metric b{font-size:26px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="title">
+      <h1>BikePower BLE 监控</h1>
+      <p>本地浏览器客户端，用于连接 BikePower 并持续观察 BLE 通知、断连、停更和数值异常。</p>
+    </div>
+    <div class="toolbar">
+      <button class="btn" id="connect-btn" onclick="connectWithPicker()">连接设备</button>
+      <button class="btn alt" id="auto-btn" onclick="connectAuthorized()">连接已授权设备</button>
+      <button class="btn alt" onclick="downloadReport()">导出报告</button>
+      <button class="btn danger" id="disconnect-btn" onclick="disconnect()" disabled>断开</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="support-warning">
+    当前浏览器不支持 Web Bluetooth API。请使用 Chrome / Edge，并通过本地服务页面打开。
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>连接状态</h2>
+      <div class="status"><i class="dot" id="conn-dot"></i><span id="conn-text">未连接</span></div>
+      <div class="row"><span>设备名</span><span id="device-name">--</span></div>
+      <div class="row"><span>地址</span><span id="device-id">--</span></div>
+      <div class="row"><span>Profile</span><span id="profile">--</span></div>
+      <div class="row"><span>订阅特征</span><span id="notify-count">0</span></div>
+      <div class="hint">Web Bluetooth 首次连接必须点击“连接设备”并授权；授权后可用“连接已授权设备”重连。</div>
+    </div>
+
+    <div class="card">
+      <h2>设备信息</h2>
+      <div class="row"><span>厂商</span><span id="info-manufacturer">--</span></div>
+      <div class="row"><span>型号</span><span id="info-model">--</span></div>
+      <div class="row"><span>固件</span><span id="info-fw">--</span></div>
+      <div class="row"><span>最后通知</span><span id="last-notify">--</span></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h2>实时数据</h2>
+    <div class="data">
+      <div class="metric"><b id="m-power">--</b><span>CPS 功率 W</span></div>
+      <div class="metric"><b id="m-hr">--</b><span>心率 BPM</span></div>
+      <div class="metric"><b id="m-cadence">--</b><span>踏频 RPM/SPM</span></div>
+      <div class="metric"><b id="m-speed">--</b><span>跑步速度 km/h</span></div>
+    </div>
+    <div class="badges" id="service-badges" style="margin-top:10px"></div>
+  </div>
+
+  <div class="grid" style="margin-top:12px">
+    <div class="card">
+      <h2>异常计数</h2>
+      <div class="anomaly-list" id="anomaly-list"></div>
+    </div>
+    <div class="card">
+      <h2>事件日志</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const UUIDS = {
+  cpsService: "00001818-0000-1000-8000-00805f9b34fb",
+  hrService: "0000180d-0000-1000-8000-00805f9b34fb",
+  cscService: "00001816-0000-1000-8000-00805f9b34fb",
+  rscService: "00001814-0000-1000-8000-00805f9b34fb",
+  ftmsService: "00001826-0000-1000-8000-00805f9b34fb",
+  disService: "0000180a-0000-1000-8000-00805f9b34fb",
+  cpsMeasurement: "00002a63-0000-1000-8000-00805f9b34fb",
+  hrMeasurement: "00002a37-0000-1000-8000-00805f9b34fb",
+  cscMeasurement: "00002a5b-0000-1000-8000-00805f9b34fb",
+  rscMeasurement: "00002a53-0000-1000-8000-00805f9b34fb",
+  ftmsIndoorBike: "00002ad2-0000-1000-8000-00805f9b34fb",
+  ftmsStatus: "00002ada-0000-1000-8000-00805f9b34fb",
+  manufacturer: "00002a29-0000-1000-8000-00805f9b34fb",
+  model: "00002a24-0000-1000-8000-00805f9b34fb",
+  firmware: "00002a26-0000-1000-8000-00805f9b34fb",
+};
+const ANOMALY_LIMITS = {
+  staleMs: 3500,
+  powerMax: 1500,
+  hrMin: 30,
+  hrMax: 240,
+  cadenceMax: 260,
+  speedMaxKmh: 35,
+};
+const anomalyLabels = {
+  disconnect: "BLE 断连",
+  stale: "通知停更",
+  power: "功率异常",
+  heartrate: "心率异常",
+  cadence: "踏频异常",
+  speed: "速度异常",
+  parse: "数据解析异常",
+};
+let device = null;
+let server = null;
+let notifyChars = [];
+let latest = { power: null, hr: null, cadence: null, speed: null, ftmsPower: null };
+let lastNotifyAt = 0;
+let startedAt = null;
+let anomalies = {};
+let events = [];
+let cscPrev = null;
+let staleOpen = false;
+let anomalyTimer = null;
+
+function $(id) { return document.getElementById(id); }
+function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
+function log(message, cls = "info") {
+  const line = { time: new Date().toISOString(), level: cls, message };
+  events.push(line);
+  const div = document.createElement("div");
+  div.className = cls === "error" ? "err-log" : cls === "warn" ? "warn-log" : cls === "data" ? "data-log" : "info";
+  div.textContent = new Date().toLocaleTimeString() + "  " + message;
+  $("log").appendChild(div);
+  $("log").scrollTop = $("log").scrollHeight;
+}
+function recordAnomaly(kind, detail) {
+  anomalies[kind] = (anomalies[kind] || 0) + 1;
+  log((anomalyLabels[kind] || kind) + ": " + detail, "warn");
+  renderAnomalies();
+}
+function renderAnomalies() {
+  const box = $("anomaly-list");
+  box.innerHTML = "";
+  Object.keys(anomalyLabels).forEach((key) => {
+    const item = document.createElement("div");
+    const count = anomalies[key] || 0;
+    item.className = "anomaly";
+    item.innerHTML = "<b>" + anomalyLabels[key] + "</b><span>" + count + " 次</span>";
+    box.appendChild(item);
+  });
+}
+function checkSupport() {
+  const ok = !!navigator.bluetooth;
+  $("support-warning").classList.toggle("hidden", ok);
+  return ok;
+}
+async function connectWithPicker() {
+  if (!checkSupport()) return;
+  const selected = await navigator.bluetooth.requestDevice({
+    filters: [{ namePrefix: "BikePower" }],
+    optionalServices: [UUIDS.cpsService, UUIDS.hrService, UUIDS.cscService, UUIDS.rscService, UUIDS.ftmsService, UUIDS.disService]
+  });
+  await connectDevice(selected);
+}
+async function connectAuthorized() {
+  if (!checkSupport()) return;
+  if (!navigator.bluetooth.getDevices) {
+    log("当前浏览器不支持 getDevices，需点击连接设备重新授权", "warn");
+    return;
+  }
+  const devices = await navigator.bluetooth.getDevices();
+  const candidate = devices.find((d) => (d.name || "").startsWith("BikePower"));
+  if (!candidate) {
+    log("没有已授权的 BikePower 设备，请先点击连接设备", "warn");
+    return;
+  }
+  await connectDevice(candidate);
+}
+async function connectDevice(selected) {
+  disconnect(false);
+  device = selected;
+  startedAt = new Date();
+  latest = { power: null, hr: null, cadence: null, speed: null, ftmsPower: null };
+  lastNotifyAt = 0;
+  cscPrev = null;
+  staleOpen = false;
+  setText("device-name", device.name || "BikePower");
+  setText("device-id", device.id || "--");
+  setConnection("connecting", "连接中");
+  device.addEventListener("gattserverdisconnected", onDisconnected);
+  try {
+    server = await device.gatt.connect();
+    setConnection("connected", "已连接");
+    log("GATT 已连接: " + (device.name || "BikePower"));
+    await readDeviceInfo();
+    const services = await discoverAndSubscribe();
+    renderServices(services);
+    updateProfile(services);
+    setText("notify-count", String(notifyChars.length));
+    if (anomalyTimer) clearInterval(anomalyTimer);
+    anomalyTimer = setInterval(checkAnomalies, 1000);
+    $("disconnect-btn").disabled = false;
+  } catch (err) {
+    recordAnomaly("disconnect", err.message || String(err));
+    setConnection("error", "连接失败");
+    throw err;
+  }
+}
+function disconnect(mark = true) {
+  if (anomalyTimer) clearInterval(anomalyTimer);
+  anomalyTimer = null;
+  notifyChars = [];
+  if (server && server.connected) server.disconnect();
+  server = null;
+  if (mark) setConnection("idle", "未连接");
+  $("disconnect-btn").disabled = true;
+}
+function onDisconnected() {
+  recordAnomaly("disconnect", "设备断开连接");
+  setConnection("error", "已断开");
+  server = null;
+  notifyChars = [];
+  $("disconnect-btn").disabled = true;
+}
+function setConnection(state, text) {
+  const dot = $("conn-dot");
+  dot.className = "dot" + (state === "connected" ? " on" : state === "error" ? " err" : state === "connecting" ? " warn" : "");
+  setText("conn-text", text);
+}
+async function readDeviceInfo() {
+  try {
+    const dis = await server.getPrimaryService(UUIDS.disService);
+    await readString(dis, UUIDS.manufacturer, "info-manufacturer");
+    await readString(dis, UUIDS.model, "info-model");
+    await readString(dis, UUIDS.firmware, "info-fw");
+  } catch (err) {
+    log("DIS 读取失败: " + err.message, "warn");
+  }
+}
+async function readString(service, uuid, target) {
+  const char = await service.getCharacteristic(uuid);
+  const val = await char.readValue();
+  setText(target, new TextDecoder("utf-8").decode(val).replace(/\0/g, "").trim() || "--");
+}
+async function discoverAndSubscribe() {
+  const services = {};
+  await trySubscribe("cps", UUIDS.cpsService, UUIDS.cpsMeasurement, handlePower);
+  await trySubscribe("hr", UUIDS.hrService, UUIDS.hrMeasurement, handleHeartRate);
+  await trySubscribe("csc", UUIDS.cscService, UUIDS.cscMeasurement, handleCsc);
+  await trySubscribe("rsc", UUIDS.rscService, UUIDS.rscMeasurement, handleRsc);
+  await trySubscribe("ftms", UUIDS.ftmsService, UUIDS.ftmsIndoorBike, handleIndoorBike);
+  await trySubscribe("ftmsStatus", UUIDS.ftmsService, UUIDS.ftmsStatus, handleFtmsStatus);
+  notifyChars.forEach((item) => { services[item.name] = true; });
+  return services;
+}
+async function trySubscribe(name, serviceUuid, charUuid, handler) {
+  try {
+    const service = await server.getPrimaryService(serviceUuid);
+    const char = await service.getCharacteristic(charUuid);
+    await char.startNotifications();
+    char.addEventListener("characteristicvaluechanged", handler);
+    notifyChars.push({ name, char });
+    log("已订阅 " + name, "data");
+  } catch (err) {
+    log("未订阅 " + name + ": " + err.message, "warn");
+  }
+}
+function markNotify() {
+  lastNotifyAt = Date.now();
+  staleOpen = false;
+  setText("last-notify", new Date().toLocaleTimeString());
+}
+function parseCyclingPower(view) {
+  if (view.byteLength < 4) throw new Error("CPS 长度不足");
+  return { flags: view.getUint16(0, true), power: view.getInt16(2, true) };
+}
+function parseHeartRate(view) {
+  if (view.byteLength < 2) throw new Error("HRS 长度不足");
+  const flags = view.getUint8(0);
+  if (flags & 0x01) {
+    if (view.byteLength < 3) throw new Error("HRS uint16 长度不足");
+    return view.getUint16(1, true);
+  }
+  return view.getUint8(1);
+}
+function parseCsc(view) {
+  if (view.byteLength < 5) throw new Error("CSC 长度不足");
+  const flags = view.getUint8(0);
+  if (!(flags & 0x02)) return null;
+  const revs = view.getUint16(1, true);
+  const time = view.getUint16(3, true);
+  if (!cscPrev) {
+    cscPrev = { revs, time };
+    return null;
+  }
+  const revDelta = (revs - cscPrev.revs + 65536) % 65536;
+  const timeDeltaRaw = (time - cscPrev.time + 65536) % 65536;
+  cscPrev = { revs, time };
+  if (revDelta <= 0 || timeDeltaRaw <= 0) return null;
+  return Math.round((revDelta / (timeDeltaRaw / 1024)) * 60);
+}
+function parseIndoorBike(view) {
+  if (view.byteLength < 4) throw new Error("FTMS 长度不足");
+  const flags = view.getUint16(0, true);
+  const result = { flags, speed: null, cadence: null, power: null };
+  let offset = 2;
+  if (!(flags & 0x0001) && view.byteLength >= offset + 2) {
+    result.speed = view.getUint16(offset, true) / 100;
+    offset += 2;
+  }
+  if ((flags & 0x0004) && view.byteLength >= offset + 2) {
+    result.cadence = view.getUint16(offset, true) / 2;
+    offset += 2;
+  }
+  if (view.byteLength >= offset + 2) {
+    result.power = view.getInt16(offset, true);
+  }
+  return result;
+}
+function parseRsc(view) {
+  if (view.byteLength < 4) throw new Error("RSC 长度不足");
+  const flags = view.getUint8(0);
+  let offset = 4;
+  const speed = view.getUint16(1, true) * 3.6 / 256;
+  const cadence = view.getUint8(3);
+  let stride = null;
+  let distance = null;
+  if (flags & 0x01 && view.byteLength >= offset + 2) {
+    stride = view.getUint16(offset, true);
+    offset += 2;
+  }
+  if (flags & 0x02 && view.byteLength >= offset + 4) distance = view.getUint32(offset, true);
+  return { speed, cadence, stride, distance, running: !!(flags & 0x04) };
+}
+function handlePower(event) {
+  try {
+    markNotify();
+    const parsed = parseCyclingPower(event.target.value);
+    latest.power = parsed.power;
+    setText("m-power", parsed.power);
+    if (parsed.power < 0 || parsed.power > ANOMALY_LIMITS.powerMax) recordAnomaly("power", parsed.power + " W");
+  } catch (err) { recordAnomaly("parse", err.message); }
+}
+function handleHeartRate(event) {
+  try {
+    markNotify();
+    const hr = parseHeartRate(event.target.value);
+    latest.hr = hr;
+    setText("m-hr", hr);
+    if (hr < ANOMALY_LIMITS.hrMin || hr > ANOMALY_LIMITS.hrMax) recordAnomaly("heartrate", hr + " BPM");
+  } catch (err) { recordAnomaly("parse", err.message); }
+}
+function handleCsc(event) {
+  try {
+    markNotify();
+    const cadence = parseCsc(event.target.value);
+    if (cadence === null) return;
+    latest.cadence = cadence;
+    setText("m-cadence", cadence);
+    if (cadence > ANOMALY_LIMITS.cadenceMax) recordAnomaly("cadence", cadence + " RPM");
+  } catch (err) { recordAnomaly("parse", err.message); }
+}
+function handleIndoorBike(event) {
+  try {
+    markNotify();
+    const data = parseIndoorBike(event.target.value);
+    if (data.cadence !== null && latest.cadence === null) {
+      latest.cadence = Math.round(data.cadence);
+      setText("m-cadence", Math.round(data.cadence));
+    }
+    if (data.power === null) return;
+    latest.ftmsPower = data.power;
+    if (latest.power === null) setText("m-power", data.power);
+    if (data.power < 0 || data.power > ANOMALY_LIMITS.powerMax) recordAnomaly("power", data.power + " W(FTMS)");
+  } catch (err) { recordAnomaly("parse", err.message); }
+}
+function handleRsc(event) {
+  try {
+    markNotify();
+    const data = parseRsc(event.target.value);
+    latest.speed = data.speed;
+    latest.cadence = data.cadence;
+    setText("m-speed", data.speed.toFixed(2));
+    setText("m-cadence", data.cadence);
+    if (data.speed > ANOMALY_LIMITS.speedMaxKmh) recordAnomaly("speed", data.speed.toFixed(2) + " km/h");
+    if (data.cadence > ANOMALY_LIMITS.cadenceMax) recordAnomaly("cadence", data.cadence + " SPM");
+  } catch (err) { recordAnomaly("parse", err.message); }
+}
+function handleFtmsStatus(event) {
+  const code = event.target.value.getUint8(0);
+  log("FTMS 状态码: " + code, "data");
+}
+function checkAnomalies() {
+  if (!server || !server.connected || !lastNotifyAt) return;
+  const gap = Date.now() - lastNotifyAt;
+  if (gap > ANOMALY_LIMITS.staleMs && !staleOpen) {
+    staleOpen = true;
+    recordAnomaly("stale", "超过 " + Math.round(gap) + "ms 未收到通知");
+  }
+}
+function renderServices(services) {
+  const names = [
+    ["cps", "CPS"], ["hr", "HRS"], ["csc", "CSC"],
+    ["rsc", "RSC"], ["ftms", "FTMS"], ["ftmsStatus", "FTMS Status"]
+  ];
+  $("service-badges").innerHTML = names.map(([key, label]) => {
+    const cls = services[key] ? "badge ok" : "badge warn";
+    return "<span class=\"" + cls + "\">" + label + "</span>";
+  }).join("");
+}
+function updateProfile(services) {
+  if (services.rsc) setText("profile", "running");
+  else if (services.cps || services.ftms) setText("profile", "cycling");
+  else setText("profile", "unknown");
+}
+function downloadReport() {
+  const report = {
+    started_at: startedAt ? startedAt.toISOString() : null,
+    exported_at: new Date().toISOString(),
+    device: { name: device ? device.name : null, id: device ? device.id : null },
+    latest,
+    anomalies,
+    events,
+  };
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "bikepower-ble-monitor-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+window.addEventListener("load", () => {
+  renderAnomalies();
+  checkSupport();
+  log("监控页面已就绪。");
+});
+</script>
+</body>
+</html>

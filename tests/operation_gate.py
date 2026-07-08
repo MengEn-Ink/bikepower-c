@@ -111,6 +111,7 @@ def quick_steps(gate):
     run_step(gate, "Host 领域层单测", "make -C test run", 120)
     run_step(gate, "Mock 保存回显", "python3 tests/test_portal_config_save.py", 60)
     run_step(gate, "操作覆盖矩阵", "python3 tests/check_operation_coverage.py", 30)
+    run_step(gate, "BLE 监控客户端静态门禁", "python3 tests/check_ble_monitor.py", 30)
     run_step(gate, "门户结构", "python3 tests/check_portal_structure.py", 60)
     run_step(gate, "门户 JS", "python3 tests/check_portal_js.py", 60)
 
@@ -134,6 +135,7 @@ def device_steps(gate, port, run_portal):
     run_step(gate, "BLE 自测", "python3 tests/ble_selftest.py", 60)
     run_step(gate, "BLE 跑步 profile 自测", "python3 tests/ble_selftest.py --profile running 8", 60, required=False)
     run_step(gate, "BLE 连接事件", "python3 tests/stage3_conn_test.py", 60, required=False)
+    gate.note_skip("BLE 浏览器监控", "运行 python3 scripts/tools/serve_ble_monitor.py 后用 Chrome/Edge 打开 ble-monitor.html；Web Bluetooth 首次授权必须人工点击")
     if run_portal:
         run_step(gate, "配网门户 HTTP 自测", "python3 tests/stage5_portal_test.py", 180)
     else:

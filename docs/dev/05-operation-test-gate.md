@@ -21,7 +21,7 @@
 | `OP-MODE-002` | 跑步/骑行 profile 切换；RSC 与 CPS/FTMS 服务不能混乱 | `make -C test run`、`python3 tests/ble_selftest.py --profile running` | Zwift/MyWhoosh 跑步入口人工确认 |
 | `OP-MODE-003` | ERG Stop/Pause、Reset、BLE 断开后恢复 fixed 手动调功 | `make -C test run`、`python3 tests/ble_selftest.py` | Zwift ERG 课程退出后人工调功确认 |
 | `OP-SAVE-001` | 骑行数值保存：功率、踏频、心率、心率锁定、浮动、按钮步进 | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` | 真机保存后刷新网页确认 |
-| `OP-SAVE-002` | 跑步数值保存：速度/配速、配速浮动、步频、步频浮动、坡度 | `python3 tests/test_portal_config_save.py`、`make -C test run` | MyWhoosh/Zwift 跑步速度显示人工确认 |
+| `OP-SAVE-002` | 跑步数值保存：配速、配速浮动、步频、步频浮动、心率 | `python3 tests/test_portal_config_save.py`、`make -C test run` | MyWhoosh/Zwift 跑步速度显示人工确认 |
 | `OP-SAVE-003` | 用户资料与自定义机器人：体重、FTP、阈值心率、功体比上下限、昵称 | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` | 真机网页自定义机器人 UI 人工确认 |
 | `OP-BTN-001` | 短按减功率、长按连续加功率、非 steady 模式拒绝按钮调功 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮手感和重复节拍人工确认 |
 | `OP-BTN-002` | 长按 2 秒进入 WiFi 二次确认窗口，确认后触发配网 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮 + LED 确认窗口人工确认 |
@@ -33,6 +33,7 @@
 | `OP-BCAST-002` | BOOT 按钮按启用项选择目标：单项启用时直接调该项，多项启用时骑行优先功率、跑步优先配速/速度；长按 WiFi 确认回滚本次调节 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮在不同开关组合下人工确认 |
 | `OP-BLE-001` | BLE 五服务、DIS、通知、FTMS 控制点响应 | `python3 tests/ble_selftest.py` | 第三方 App 扫描设备人工确认 |
 | `OP-BLE-002` | 连接/断开事件、断开后重广播、断开清 ERG | `python3 tests/stage3_conn_test.py`、`python3 tests/ble_selftest.py` | 训练 App 退出后重连人工确认 |
+| `OP-BLE-003` | 本地浏览器监控客户端可连接已授权 BikePower，持续记录通知停更、断连和数值异常 | `python3 tests/check_ble_monitor.py`、`python3 scripts/tools/serve_ble_monitor.py` | Web Bluetooth 首次授权必须人工点击，浏览器页面导出异常报告 |
 | `OP-RUN-001` | 跑步 RSC 速度、步频、步幅、距离单位换算 | `make -C test run`、`python3 tests/ble_selftest.py --profile running` | Zwift/MyWhoosh 跑步数据人工确认 |
 | `OP-STAB-001` | NVS schema、常量、板型、任务/WDT、门户结构不漂移 | `python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 tests/check_board_desc.py`、`python3 tests/check_tasks_wdt.py`、`python3 tests/check_operation_coverage.py` | 无 |
 | `OP-STAB-002` | 3 分钟核心流程耐久，覆盖重复保存、模板、关闭 WiFi、host 回归 | `python3 tests/test_core_flow_endurance.py` | 30/90 分钟老化按发版风险追加 |
@@ -65,6 +66,7 @@ make -C test run
 python3 tests/test_portal_config_save.py
 python3 tests/test_core_flow_endurance.py
 python3 tests/ble_selftest.py
+python3 tests/check_ble_monitor.py
 python3 tests/stage5_portal_test.py
 python3 tests/check_config_consistency.py
 python3 tests/check_nvs_schema.py
@@ -73,6 +75,7 @@ python3 tests/check_tasks_wdt.py
 python3 tests/check_portal_structure.py
 python3 tests/check_portal_js.py
 python3 tests/check_operation_coverage.py
+python3 scripts/tools/serve_ble_monitor.py
 ```
 
 ## 四、人工门禁记录
@@ -88,6 +91,7 @@ python3 tests/check_operation_coverage.py
 | Zwift/MyWhoosh 骑行 | fixed、配速机器人、ERG 课程进入/退出均可恢复调功 | 记录 App、平台、课程类型 |
 | Zwift/MyWhoosh 跑步 | RSC 速度/步频能被识别，配速浮动合理 | 记录 App、平台、速度/配速 |
 | 广播数据项开关 | 取消功率/踏频/心率后，对应窗口隐藏且客户端不再收到对应数据；至少一项保持开启 | 记录 App、开启组合、观察到的数据项 |
+| BLE 浏览器监控 | 页面能连接已授权设备，异常计数无误，导出 JSON 报告可追溯 | 记录浏览器、运行时长、异常计数和报告文件 |
 
 如果人工项未执行，报告必须写明“未执行原因”。不能冒充自动通过。
 
@@ -96,4 +100,5 @@ python3 tests/check_operation_coverage.py
 - 新增用户可见操作时，先在本矩阵增加 `OP-*` 行，再补测试或人工门禁。
 - 新增保存字段时，同时更新 `tests/test_portal_config_save.py`、`tests/test_core_flow_endurance.py` 和本矩阵。
 - 新增模式或 BLE 控制点时，同时更新 `test/test_domain.c`、`tests/ble_selftest.py` 和本矩阵。
+- 调整 BLE 协议面或异常阈值时，同步更新 `tools/web/ble-monitor.html` 与 `tests/check_ble_monitor.py`。
 - 每次发版前运行 `python3 tests/operation_gate.py --level full`；涉及 BLE/配网/硬件行为时追加 `--level device`。

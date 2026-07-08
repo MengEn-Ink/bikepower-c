@@ -83,6 +83,7 @@ done
 | `ble_selftest.py` | BLE 五服务（CPS+HRS+CSC+FTMS+DIS）+ FTMS ERG 控制点 | bleak | 设备启动后直接跑 |
 | `stage3_conn_test.py` | BLE 连接事件驱动状态机验证 | bleak | 设备启动后直接跑 |
 | `stage5_portal_test.py` | 配网门户 HTTP 路由自测（/api/xxx JSON 接口） | Python3 | 设备进入配网态后跑 |
+| `../scripts/tools/serve_ble_monitor.py` + `../tools/web/ble-monitor.html` | 本地浏览器 BLE 监控，持续记录断连、通知停更和数值异常 | Chrome/Edge Web Bluetooth | 启动本地服务后浏览器手动授权连接 |
 
 ### C. 本地 Mock（无需烧设备调试前端）
 
@@ -104,7 +105,23 @@ python3 tests/operation_gate.py --level quick # 开发期快速操作门禁
 python3 tests/operation_gate.py --level full  # 提交前完整无设备门禁
 ```
 
-### D. 串口日志工具
+### D. BLE 浏览器监控客户端
+
+| 文件 | 用途 |
+|------|------|
+| `tools/web/ble-monitor.html` | Web Bluetooth 客户端，解析 CPS/HRS/CSC/FTMS/RSC/DIS，显示实时数据、异常计数和事件日志 |
+| `scripts/tools/serve_ble_monitor.py` | 从 `tools/web/` 启动无缓存本地 HTTP 服务，默认 `http://127.0.0.1:8766/ble-monitor.html` |
+| `tests/check_ble_monitor.py` | 静态门禁，检查监控客户端、异常检测和门禁接入是否漂移 |
+
+```bash
+python3 scripts/tools/serve_ble_monitor.py
+# 用 Chrome / Edge 打开 http://127.0.0.1:8766/ble-monitor.html
+python3 tests/check_ble_monitor.py
+```
+
+Web Bluetooth 首次连接必须由用户点击“连接设备”并在浏览器弹窗中授权；授权后可点“连接已授权设备”重连。页面会监控 BLE 断连、通知停更、功率/心率/踏频/跑步速度异常，并可导出 JSON 报告用于排查。
+
+### E. 串口日志工具
 
 | 脚本 | 用途 | 运行模式 |
 |------|------|----------|
