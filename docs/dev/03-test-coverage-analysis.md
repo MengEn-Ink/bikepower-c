@@ -58,6 +58,7 @@
 | TC-3g 任务/WDT | `tests/check_tasks_wdt.py` | xTaskCreate/WDT/队列 | ✅ |
 | TC-3h mock 保存 | `tests/test_portal_config_save.py` | `/api/config` 保存后 `/api/state` 回显 | ✅ |
 | TC-3i 核心流程耐久 | `tests/test_core_flow_endurance.py` | 3 分钟循环覆盖按钮调功、功率/心率随动、网页编辑、LED 静默、设备模板、关闭 WiFi | ✅ |
+| TC-BLE-ADV 广播字段 | `tests/check_ble_advertising_fields.py` | 骑行/跑步主广播服务 UUID 与广播包名字预算 | ✅ |
 
 ### 真机测试（需 ESP32-C3 + 串口 + 手机）
 

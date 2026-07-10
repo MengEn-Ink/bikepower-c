@@ -81,6 +81,7 @@ REQUIRED_FRONTEND_APIS = [
     "/api/ble-scan/stop",
     "/api/ble-scan/results",
     "/api/ble-scan/read",
+    "/api/ble-scan/analyze",
 ]
 
 # wifi_portal.c 必须注册的核心路由（防止改坏路由表）
@@ -251,6 +252,13 @@ def main():
     check('"/settings/templates"' in js and '"/settings/button"' in js and '"/settings/led"' in js, "app.js 必须注册设置子路由")
     check('settingsSubpageBack' in js and 'settings-menu-row' in css, "设置子页面必须有返回与菜单行样式")
     check('pollScanResults' in js and 'onTemplateReadDevice' in js, "app.js 缺少 BLE 扫描轮询/读取逻辑")
+    check('onTemplateAnalyzeDevice' in js and 'analysisCardHtml' in js, "app.js 缺少外部设备分析交互/结果渲染")
+    check('template_analysis' in js and 'analysis.summary' in js and 'analysis.status' in js,
+          "app.js 必须保存并展示设备分析摘要和状态")
+    check('ble_scanner_analyze_device' in scanner_src and 'device_analysis_parse_ftms_bike' in scanner_src,
+          "ble_scanner.c 必须连接外部设备并解析运动数据样本")
+    check('DEVICE_ANALYSIS_SAMPLE_MS' in scanner_src or 'DEVICE_ANALYSIS_SAMPLE_MS' in (ROOT / "main" / "bikepower_config.h").read_text(encoding="utf-8"),
+          "设备分析采样时长必须集中定义")
     check('filterNamedDevices' in js and 'hasDeviceName' in js, "app.js 必须过滤未命名 BLE 扫描设备")
     check('filterUniqueDevices' in js and 'templateIdentityKey' in js, "app.js 必须按 MAC 地址和设备名称去重扫描结果")
     check('find_item_by_identity' in scanner_src, "ble_scanner.c 必须按 MAC 地址和设备名称合并重复扫描广播")

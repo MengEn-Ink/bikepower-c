@@ -986,6 +986,47 @@ static esp_err_t h_api_ble_scan_read(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t h_api_ble_scan_analyze(httpd_req_t *req)
+{
+    if (s_closing) {
+        send_json(req, "{\"ok\":false,\"error\":\"配网收尾中\"}");
+        return ESP_OK;
+    }
+    arm_deadline();
+    char *body = NULL;
+    int len = recv_body(req, &body);
+    if (len == -2) {
+        httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE, "request body too large");
+        return ESP_FAIL;
+    }
+    if (len < 0) {
+        send_json(req, "{\"ok\":false,\"error\":\"读取请求体失败\"}");
+        return ESP_OK;
+    }
+    char addr[DEVICE_TEMPLATE_ADDR_MAX];
+    json_get_str_def(body, "addr", addr, sizeof(addr));
+    uint8_t addr_type = (uint8_t)json_get_int_def(body, "addr_type", 0);
+    free(body);
+    device_template_t tpl;
+    device_analysis_t analysis;
+    esp_err_t rc = ble_scanner_analyze_device(addr, addr_type, DEVICE_ANALYSIS_SAMPLE_MS, &tpl, &analysis);
+    if (rc != ESP_OK) {
+        send_json(req, "{\"ok\":false,\"error\":\"连接或分析设备失败\"}");
+        return ESP_OK;
+    }
+    char item[1024];
+    char sample[1024];
+    if (device_template_serialize_json(&tpl, item, sizeof(item)) == 0
+        || device_analysis_serialize_json(&analysis, sample, sizeof(sample)) == 0) {
+        send_json(req, "{\"ok\":false,\"error\":\"分析结果序列化失败\"}");
+        return ESP_OK;
+    }
+    char resp[2200];
+    snprintf(resp, sizeof(resp), "{\"ok\":true,\"template\":%s,\"analysis\":%s}", item, sample);
+    send_json(req, resp);
+    return ESP_OK;
+}
+
 // ============================ favicon ============================
 
 static esp_err_t h_favicon(httpd_req_t *req)
@@ -1042,6 +1083,7 @@ static esp_err_t start_httpd(void)
         { .uri = "/api/ble-scan/stop",           .method = HTTP_POST, .handler = h_api_ble_scan_stop },
         { .uri = "/api/ble-scan/results",        .method = HTTP_GET,  .handler = h_api_ble_scan_results },
         { .uri = "/api/ble-scan/read",           .method = HTTP_POST, .handler = h_api_ble_scan_read },
+        { .uri = "/api/ble-scan/analyze",        .method = HTTP_POST, .handler = h_api_ble_scan_analyze },
         /* Captive Portal 探测端点：各 OS 连通性检测，统一 303 重定向到配网首页触发自动弹窗 */
         { .uri = "/generate_204",               .method = HTTP_GET, .handler = captive_portal_detect_handler },
         { .uri = "/gen_204",                    .method = HTTP_GET, .handler = captive_portal_detect_handler },

@@ -200,6 +200,7 @@ STATIC_CHECKS = [
     ("tests/check_portal_render.py", "门户渲染截图 (TC-3o)"),
     ("tests/check_operation_coverage.py", "操作覆盖矩阵 (TC-3j)"),
     ("tests/check_ble_monitor.py", "BLE 监控客户端 (TC-3k)"),
+    ("tests/check_ble_advertising_fields.py", "BLE 广播字段 (TC-BLE-ADV)"),
     ("tests/check_ble_broadcast_monitor.py", "BLE 广播项监控脚本 (TC-3l)"),
     ("tests/check_release_gate.py", "Release 产物门禁 (TC-3m)"),
     ("tests/test_release_artifacts.py", "Release 产物门禁功能样例 (TC-3p)"),

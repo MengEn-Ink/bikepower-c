@@ -128,9 +128,10 @@ typedef enum {
 #define BLE_SCAN_DEFAULT_MS          8000   // 模板库扫描附近 BLE 设备的默认时长
 #define BLE_SCAN_MAX_RESULTS         12     // 扫描结果缓存上限，避免配网态占用过多内存
 #define BLE_SCAN_READ_TIMEOUT_MS     10000  // 连接外部设备读取 DIS 的最长等待时间
-// 广播包名字 AD 字段最大字符数。31 字节预算 - flags(3) - 完整16位UUID列表(6) = 22 字节给名字 AD，
-// 减去 AD 头(2) 得 20 个字符；超出部分完整名走 scan response。
-#define BLE_ADV_NAME_MAX_LEN         20
+#define DEVICE_ANALYSIS_SAMPLE_MS    9000   // 外部运动设备短时连接采样窗口
+// 广播包名字 AD 字段最大字符数。31 字节预算 - flags(3) - 完整16位UUID列表(8) = 20 字节给名字 AD，
+// 减去 AD 头(2) 得 18 个字符；超出部分完整名走 scan response。
+#define BLE_ADV_NAME_MAX_LEN         18
 
 // ===== FTMS 控制点 OpCode（协议码，0x2AD9 写入/响应） =====
 #define FTMS_OP_REQUEST_CONTROL   0x00
@@ -184,7 +185,7 @@ typedef enum {
 #define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 保存并关闭 WiFi 前的收尾等待时间（历史命名保留）
 #define WIFI_MAX_STA_CONN      2        // SoftAP最大连接客户端数
 #define HTTP_MAX_BODY_LEN      4096     // HTTP请求体最大长度（字节）
-#define HTTP_MAX_URI_HANDLERS  29       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + 配置接口）
+#define HTTP_MAX_URI_HANDLERS  30       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + 配置接口）
 
 // ===== Captive Portal =====
 #define CAPTIVE_PORTAL_HOST    "192.168.4.1"  // SoftAP 网关 IP，DNS 劫持目标 + 重定向 Location 主机

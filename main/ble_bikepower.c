@@ -855,6 +855,7 @@ static int start_advertising(void)
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
     static ble_uuid16_t cycling_adv_uuids[] = {
         BLE_UUID16_INIT(POWER_SERVICE_UUID),
+        BLE_UUID16_INIT(CSC_SERVICE_UUID),
         BLE_UUID16_INIT(FTMS_SERVICE_UUID),
     };
     static ble_uuid16_t running_adv_uuids[] = {
@@ -864,12 +865,12 @@ static int start_advertising(void)
     static ble_uuid16_t scan_rsp_uuids[] = {
         BLE_UUID16_INIT(HR_SERVICE_UUID),
     };
-    // 广播包空间有限：主广播放 App 设备类型发现最关键的服务，完整能力由连接后 GATT 发现获取。
+    // 广播包空间有限：主广播放 App/码表按设备类型过滤时最关键的服务，完整能力由连接后 GATT 发现获取。
     fields.uuids16 = (g_profile == SPORT_PROFILE_RUNNING) ? running_adv_uuids : cycling_adv_uuids;
-    fields.num_uuids16 = 2;
+    fields.num_uuids16 = (g_profile == SPORT_PROFILE_RUNNING) ? 2 : 3;
     fields.uuids16_is_complete = 1;
-    // 31 字节广播包预算：flags(3) + 完整 16 位 UUID 列表(2+2×2=6) 占 9 字节，
-    // 留给名字 AD 22 字节即最多 BLE_ADV_NAME_MAX_LEN 个字符。超出部分（完整名）放 scan response，
+    // 31 字节广播包预算：flags(3) + 完整 16 位 UUID 列表(2+3×2=8) 占 11 字节，
+    // 留给名字 AD 20 字节即最多 BLE_ADV_NAME_MAX_LEN 个字符。超出部分（完整名）放 scan response，
     // 避免 ble_gap_adv_set_fields 因 EMSGSIZE 静默失败导致设备搜不到。
     size_t name_len = strlen(g_device_name);
     fields.name = (uint8_t *)g_device_name;

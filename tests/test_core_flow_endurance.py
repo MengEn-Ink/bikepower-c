@@ -233,6 +233,10 @@ def exercise_template_flow(base, rec, cycle):
     tpl = request_json(base + "/api/ble-scan/read", {"addr": ride_devices[cycle % len(ride_devices)]["addr"]})
     rec.check(tpl.get("ok") is True and tpl.get("template"), "读取外部设备信息")
     template = tpl["template"]
+    analysis = request_json(base + "/api/ble-scan/analyze", {"addr": template["addr"], "addr_type": template.get("addr_type", 0)})
+    rec.check(analysis.get("ok") is True and analysis.get("analysis"), "分析外部设备运动数据")
+    rec.check(analysis.get("analysis", {}).get("sample_count", 0) > 0, "设备分析收到运动数据样本")
+    rec.check("summary" in analysis.get("analysis", {}), "设备分析返回摘要文案")
     template["alias"] = f"耐久模板{cycle:03d}"
     saved = request_json(base + "/api/device-templates/save", template)
     rec.check(saved.get("ok") is True, "保存设备模板", str(saved))

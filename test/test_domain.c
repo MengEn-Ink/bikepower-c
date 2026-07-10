@@ -17,6 +17,7 @@
 #include "led_pattern.h"
 #include "button_debounce.h"
 #include "device_template.h"
+#include "device_analysis.h"
 #include "running_engine.h"
 
 static int g_pass = 0;
@@ -1193,6 +1194,56 @@ static void test_device_templates(void)
     CHECK(device_template_list_serialize_json(&list, json, 8) == 0, "JSON 缓冲不足返回0");
 }
 
+static void test_device_analysis(void)
+{
+    printf("[test] 外部运动设备分析解析\n");
+    device_analysis_t a;
+    device_analysis_defaults(&a);
+    CHECK(strcmp(a.status, "未采集") == 0, "分析默认状态为未采集");
+
+    const uint8_t cps[] = {0x20, 0x00, 0xb9, 0x00, 0x12, 0x00, 0x40, 0x12};
+    CHECK(device_analysis_parse_cps(&a, cps, sizeof(cps)), "解析功率样本");
+    CHECK(a.power_watts == 185, "功率样本提取瓦特");
+    CHECK((a.service_flags & DEVICE_TEMPLATE_SVC_CPS) != 0, "功率样本记录服务能力");
+
+    const uint8_t hr8[] = {0x00, 145};
+    CHECK(device_analysis_parse_hr(&a, hr8, sizeof(hr8)), "解析8位心率样本");
+    CHECK(a.heart_rate_bpm == 145, "8位心率提取成功");
+
+    const uint8_t csc[] = {0x02, 0x31, 0x00, 0x80, 0x10};
+    CHECK(device_analysis_parse_csc(&a, csc, sizeof(csc)), "解析踏频样本");
+    CHECK(a.cadence_rpm == 1, "踏频样本识别为有曲柄数据");
+
+    const uint8_t feature[] = {0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00};
+    CHECK(device_analysis_parse_ftms_feature(&a, feature, sizeof(feature)), "解析智能骑行台能力");
+    CHECK(a.ftms_control_supported == 1, "目标控制能力识别成功");
+
+    const uint8_t ftms[] = {0x44, 0x00, 0x1c, 0x0b, 0xa4, 0x00, 0xbe, 0x00};
+    CHECK(device_analysis_parse_ftms_bike(&a, ftms, sizeof(ftms)), "解析智能骑行台数据");
+    CHECK(a.speed_x10_kmh == 284, "速度字段按0.1km/h提取");
+    CHECK(a.cadence_rpm == 82, "踏频字段按0.5rpm换算");
+    CHECK(a.power_watts == 190, "智能骑行台功率提取");
+
+    device_analysis_finalize(&a);
+    CHECK(strcmp(a.status, "数据正常") == 0, "收到样本后状态正常");
+    CHECK(strstr(a.summary, "功率 190W") != NULL, "摘要包含功率");
+    CHECK(strstr(a.summary, "踏频 82rpm") != NULL, "摘要包含踏频");
+    CHECK(strstr(a.summary, "心率 145") != NULL, "摘要包含心率");
+    CHECK(strstr(a.summary, "速度 28.4km/h") != NULL, "摘要包含速度");
+
+    char json[512];
+    size_t n = device_analysis_serialize_json(&a, json, sizeof(json));
+    CHECK(n > 0 && n < sizeof(json), "分析结果 JSON 序列化成功");
+    CHECK(strstr(json, "\"sample_count\":4") != NULL, "JSON 含样本数量");
+    CHECK(strstr(json, "\"ftms_control_supported\":true") != NULL, "JSON 含控制能力");
+
+    device_analysis_t empty;
+    device_analysis_defaults(&empty);
+    device_analysis_finalize(&empty);
+    CHECK(strcmp(empty.status, "未收到数据") == 0, "无样本状态为未收到数据");
+    CHECK(strstr(empty.summary, "未收到运动数据") != NULL, "无样本摘要可读");
+}
+
 static void test_button_logic(void)
 {
     printf("[test] 按钮按压时长分类\n");
@@ -1492,6 +1543,7 @@ int main(void)
     test_config_store();
     test_json_miniparse();
     test_device_templates();
+    test_device_analysis();
     test_button_logic();
     test_led_pattern();
     test_button_debounce();

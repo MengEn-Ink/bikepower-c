@@ -452,6 +452,36 @@ class Handler(BaseHTTPRequestHandler):
             })
             self._send_json({"ok": True, "template": tpl})
             return
+        if path == "/api/ble-scan/analyze":
+            try:
+                data = json.loads(body) if body else {}
+            except Exception:
+                data = {}
+            dev = next((d for d in SCAN_DEVICES if d["addr"] == data.get("addr")), SCAN_DEVICES[0])
+            tpl = dict(dev)
+            tpl.update({
+                "alias": tpl.get("adv_name") or "外部设备",
+                "device_name": tpl.get("adv_name") or "ExternalPower",
+                "manufacturer": "MockPower",
+                "model": "PWR-1",
+                "firmware": "1.2.3",
+                "hardware": "A1",
+                "software": "BLE",
+                "service_flags": tpl.get("service_flags", 0) | 1,
+            })
+            analysis = {
+                "sample_count": 4,
+                "service_flags": tpl.get("service_flags", 0),
+                "power_watts": 185 if tpl.get("service_flags", 0) & 4 else 0,
+                "cadence_rpm": 82 if tpl.get("service_flags", 0) & (16 | 32) else 0,
+                "heart_rate_bpm": 145 if tpl.get("service_flags", 0) & 8 else 0,
+                "speed_x10_kmh": 284 if tpl.get("service_flags", 0) & 32 else 0,
+                "ftms_control_supported": bool(tpl.get("service_flags", 0) & 32),
+                "status": "数据正常",
+                "summary": "功率 185W / 踏频 82rpm / 心率 145",
+            }
+            self._send_json({"ok": True, "template": tpl, "analysis": analysis})
+            return
         self._send_text("Not Found", 404)
 
 

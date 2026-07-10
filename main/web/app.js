@@ -39,6 +39,7 @@ var STATE = {
   templates_max: 5,
   template_delete_arm: -1,
   template_expanded: {},
+  template_analysis: {},
   scanning: false,
   scan_devices: [],
   scan_timer: null,
@@ -1131,6 +1132,22 @@ function templateDetailCells(t) {
   }
   return html;
 }
+function analysisCardHtml(d) {
+  if (!d || !d.addr || !STATE.template_analysis) return "";
+  var analysis = STATE.template_analysis[d.addr];
+  if (!analysis) return "";
+  var metrics = [];
+  if (analysis.power_watts) metrics.push("功率 " + analysis.power_watts + "W");
+  if (analysis.cadence_rpm) metrics.push("踏频 " + analysis.cadence_rpm + "rpm");
+  if (analysis.heart_rate_bpm) metrics.push("心率 " + analysis.heart_rate_bpm);
+  if (analysis.speed_x10_kmh) metrics.push("速度 " + (analysis.speed_x10_kmh / 10).toFixed(1) + "km/h");
+  var html = '<div class="analysis-card">';
+  html += '<div class="analysis-head"><b>' + escapeHtml(analysis.status || "分析完成") + '</b><span>' + escapeHtml(String(analysis.sample_count || 0)) + ' 条样本</span></div>';
+  html += '<div class="analysis-summary">' + escapeHtml(analysis.summary || "暂无运动数据") + '</div>';
+  if (metrics.length) html += '<div class="analysis-metrics">' + escapeHtml(metrics.join(" · ")) + '</div>';
+  html += '</div>';
+  return html;
+}
 function renderTemplates() {
   var count = $("template-count");
   if (count) count.textContent = String(STATE.templates.length) + "/" + String(STATE.templates_max || 5);
@@ -1154,7 +1171,9 @@ function renderTemplates() {
       html += '<div class="template-main"><div class="template-title-row"><div class="template-title">' + escapeHtml(templateTitle(d)) + '</div><div class="svc-badges">' + serviceBadges(d.service_flags) + '</div></div>';
       html += '<div class="template-sub">' + escapeHtml(serviceSummary(d.service_flags)) + '</div>';
       html += '<div class="template-meta">地址 ' + escapeHtml(d.addr || "—") + ' · RSSI ' + escapeHtml(d.last_rssi != null ? String(d.last_rssi) : "—") + ' dBm</div></div>';
-      html += '<div class="template-actions"><button class="mini-btn primary" onclick="onTemplateReadDevice(' + s + ')">读取信息</button></div>';
+      html += analysisCardHtml(d);
+      html += '<div class="template-actions"><button class="mini-btn primary" onclick="onTemplateReadDevice(' + s + ')">读取信息</button>';
+      html += '<button class="mini-btn" onclick="onTemplateAnalyzeDevice(' + s + ')">分析数据</button></div>';
       html += '</div>';
     }
   }
@@ -1191,7 +1210,7 @@ function serviceSummary(flags) {
   if (flags & 4) parts.push("功率");
   if (flags & 8) parts.push("心率");
   if (flags & 16) parts.push("踏频");
-  if (flags & 32) parts.push("FTMS");
+  if (flags & 32) parts.push("智能骑行台");
   return parts.length ? ("服务：" + parts.join(" / ")) : "未识别标准服务，仍可尝试读取设备信息";
 }
 function stopScanPoll() {
@@ -1257,6 +1276,25 @@ function onTemplateReadDevice(index) {
       toast("已读取设备信息，请确认别名后保存");
     } else {
       toast("读取失败: " + ((data && data.error) || status));
+    }
+  });
+}
+function onTemplateAnalyzeDevice(index) {
+  var d = STATE.scan_devices[index];
+  if (!d) return;
+  toast("正在连接并分析数据…");
+  api("/api/ble-scan/analyze", "POST", { addr: d.addr, addr_type: d.addr_type || 0 }, function (status, data) {
+    if (status === 200 && data && data.ok && data.analysis) {
+      STATE.template_analysis[d.addr] = data.analysis;
+      if (data.template) {
+        d.service_flags = (d.service_flags || 0) | (data.template.service_flags || 0);
+        if (!d.device_name) d.device_name = data.template.device_name || "";
+        if (!d.adv_name) d.adv_name = data.template.adv_name || "";
+      }
+      renderTemplates();
+      toast(data.analysis.status || "分析完成");
+    } else {
+      toast("分析失败: " + ((data && data.error) || status));
     }
   });
 }

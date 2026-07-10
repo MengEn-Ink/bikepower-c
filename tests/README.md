@@ -67,11 +67,13 @@ source $IDF_PATH/export.sh
 | `check_board_desc.py` | 板型描述表静态一致性检查（board_detect ↔ config ↔ Kconfig） | TC-3f | 高 |
 | `check_tasks_wdt.py` | 任务/队列/WDT 静态完整性检查（每个 xTaskCreate 后必须有错误检查） | TC-3g | 高 |
 | `check_operation_coverage.py` | 操作覆盖矩阵检查（关键操作必须绑定自动化或人工门禁） | TC-3j | 高 |
+| `check_ble_advertising_fields.py` | BLE 广播字段检查（骑行/跑步服务 UUID 与名字预算） | TC-BLE-ADV | 高 |
 
 ```bash
 # 一键跑全部静态门禁
 for s in check_portal_js check_portal_structure check_config_consistency \
-         check_nvs_schema check_board_desc check_tasks_wdt check_operation_coverage; do
+         check_nvs_schema check_board_desc check_tasks_wdt check_operation_coverage \
+         check_ble_advertising_fields; do
     python3 tests/$s.py || exit 1
 done
 ```
@@ -210,7 +212,7 @@ python3 tests/mock_server.py                        # 本地浏览器手测
 
 ```bash
 for s in check_portal_js check_portal_structure check_config_consistency \
-         check_nvs_schema check_board_desc check_tasks_wdt; do
+         check_nvs_schema check_board_desc check_tasks_wdt check_ble_advertising_fields; do
     python3 tests/$s.py || exit 1
 done
 ```

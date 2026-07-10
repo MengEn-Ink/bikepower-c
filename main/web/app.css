@@ -161,6 +161,12 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:var(--pa
 .template-sub{font-size:11px;color:#3f3f46;line-height:1.35;margin-top:2px}
 .template-meta{font-size:10px;color:#86868b;margin-top:3px}
 .template-actions{display:flex;gap:6px}
+.analysis-card{border:1px solid rgba(52,199,89,.18);background:#f5fff7;border-radius:10px;padding:7px 8px}
+.analysis-head{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.analysis-head b{font-size:12px;color:#15803d}
+.analysis-head span{font-size:10px;color:#6e6e73;font-weight:800;white-space:nowrap}
+.analysis-summary{font-size:12px;color:#1d1d1f;font-weight:800;line-height:1.35;margin-top:3px}
+.analysis-metrics{font-size:10px;color:#3f3f46;line-height:1.35;margin-top:2px}
 .template-section-title{font-size:11px;color:#86868b;font-weight:800;margin:8px 2px 0}
 .template-item.scan-result{border-color:rgba(0,122,255,.16);background:linear-gradient(135deg,#fff 0,#f4f9ff 100%)}
 .template-item.scan-pending{border-color:rgba(52,199,89,.22);background:linear-gradient(135deg,#f4fff7 0,#fff 100%)}

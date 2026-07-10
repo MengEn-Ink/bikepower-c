@@ -37,6 +37,7 @@ FLASH_LATEST = ROOT / "scripts" / "flash_latest.sh"
 BLE_SELFTEST = ROOT / "tests" / "ble_selftest.py"
 STAGE3_CONN_TEST = ROOT / "tests" / "stage3_conn_test.py"
 BLE_BIKEPOWER_C = ROOT / "main" / "ble_bikepower.c"
+SDKCONFIG_DEFAULTS = ROOT / "sdkconfig.defaults"
 
 TAG = "[TC-3c]"
 g_pass = 0
@@ -133,6 +134,7 @@ flash_latest_src = read(FLASH_LATEST)
 ble_selftest_src = read(BLE_SELFTEST)
 stage3_conn_src = read(STAGE3_CONN_TEST)
 ble_bikepower_src = read(BLE_BIKEPOWER_C)
+sdkconfig_defaults_src = read(SDKCONFIG_DEFAULTS)
 
 
 # ============================ 1. 固件版本一致性 ============================
@@ -207,6 +209,9 @@ check("BIKEPOWER_EXPECT_BOARD" in ble_selftest_src
 check("client.is_connected" in stage3_conn_src
       and "未从 WARN 串口日志观察到" in stage3_conn_src,
       "stage3_conn_test.py 必须兼容生产 WARN 日志，仅将串口连接事件作为增强证据")
+check("CONFIG_BT_NIMBLE_NVS_PERSIST=n" in sdkconfig_defaults_src
+      and "CONFIG_BT_NIMBLE_HS_PVCY=n" in sdkconfig_defaults_src,
+      "sdkconfig.defaults 必须关闭 NimBLE privacy/RPA，避免关闭 NVS 持久化时 IRK 写入 warning 影响广播")
 
 # WIFI_SSID_PREFIX 与 DEVICE_NAME 关系（AP 名沿用设备名前缀，运行时追加 MAC 后缀）
 wifi_ssid_prefix = extract_define(config_src, "WIFI_SSID_PREFIX")
