@@ -167,6 +167,9 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:var(--pa
 .analysis-head span{font-size:10px;color:#6e6e73;font-weight:800;white-space:nowrap}
 .analysis-summary{font-size:12px;color:#1d1d1f;font-weight:800;line-height:1.35;margin-top:3px}
 .analysis-metrics{font-size:10px;color:#3f3f46;line-height:1.35;margin-top:2px}
+.analysis-large-value{display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:6px;padding:8px 0;border-radius:8px;background:rgba(0,122,255,.06)}
+.analysis-large-num{font-size:42px;font-weight:900;color:#007aff;letter-spacing:-.02em}
+.analysis-large-unit{font-size:14px;font-weight:700;color:#86868b}
 .analysis-details,.analysis-raw{margin-top:6px;border-top:1px solid rgba(52,199,89,.14);padding-top:5px}
 .analysis-details summary,.analysis-raw summary{font-size:10px;color:#15803d;font-weight:900;cursor:pointer;list-style:none}
 .analysis-details summary::-webkit-details-marker,.analysis-raw summary::-webkit-details-marker{display:none}

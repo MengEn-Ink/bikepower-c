@@ -1198,14 +1198,22 @@ function analysisCardHtml(d) {
   if (!d || !d.addr || !STATE.template_analysis) return "";
   var analysis = STATE.template_analysis[d.addr];
   if (!analysis) return "";
+  var svc = (d.service_flags || 0) | (analysis.service_flags || 0);
+  var isHrDevice = !!(svc & 8) && !(svc & 4);
+  var isPowerDevice = !!(svc & 4) && !(svc & 8);
   var metrics = [];
-  if (analysis.power_watts) metrics.push("功率 " + analysis.power_watts + "W");
-  if (analysis.cadence_rpm) metrics.push("踏频 " + analysis.cadence_rpm + "rpm");
-  if (analysis.heart_rate_bpm) metrics.push("心率 " + analysis.heart_rate_bpm);
-  if (analysis.speed_x10_kmh) metrics.push("速度 " + (analysis.speed_x10_kmh / 10).toFixed(1) + "km/h");
+  if ((!isHrDevice && analysis.power_watts) || (isPowerDevice && analysis.power_watts)) metrics.push("功率 " + analysis.power_watts + "W");
+  if ((!isHrDevice && !isPowerDevice && analysis.cadence_rpm) || (!isHrDevice && analysis.cadence_rpm)) metrics.push("踏频 " + analysis.cadence_rpm + "rpm");
+  if ((!isPowerDevice && analysis.heart_rate_bpm) || (isHrDevice && analysis.heart_rate_bpm)) metrics.push("心率 " + analysis.heart_rate_bpm);
+  if ((!isHrDevice && !isPowerDevice) && analysis.speed_x10_kmh) metrics.push("速度 " + (analysis.speed_x10_kmh / 10).toFixed(1) + "km/h");
   var html = '<div class="analysis-card">';
   html += '<div class="analysis-head"><b>' + escapeHtml(analysis.status || "分析完成") + '</b><span>' + escapeHtml(String(analysis.sample_count || 0)) + ' 条样本</span></div>';
   html += '<div class="analysis-summary">' + escapeHtml(analysis.summary || "暂无运动数据") + '</div>';
+  if (isHrDevice && analysis.heart_rate_bpm) {
+    html += '<div class="analysis-large-value"><span class="analysis-large-num">' + escapeHtml(String(analysis.heart_rate_bpm)) + '</span><span class="analysis-large-unit">bpm</span></div>';
+  } else if (isPowerDevice && analysis.power_watts) {
+    html += '<div class="analysis-large-value"><span class="analysis-large-num">' + escapeHtml(String(analysis.power_watts)) + '</span><span class="analysis-large-unit">W</span></div>';
+  }
   if (metrics.length) html += '<div class="analysis-metrics">' + escapeHtml(metrics.join(" · ")) + '</div>';
   html += analysisDetailsHtml(d, analysis);
   html += analysisRawHtml(d, analysis);
