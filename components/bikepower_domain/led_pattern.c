@@ -41,12 +41,11 @@ led_effect_t led_resolve(led_scene_t scene, const led_config_t *c, bool is_rgb)
     int idx = (scene >= 0 && scene < LED_SCENE_COUNT) ? scene : LED_SCENE_WAIT_CONN;
     led_effect_t e = { c->scenes[idx].mode, c->scenes[idx].color };
 
-    if (scene == LED_SCENE_ERROR) {
-        /* 异常强制可见：忽略 silent；灭则回退快闪 */
-        if (e.mode == LED_MODE_OFF) e.mode = LED_MODE_FAST;
-    } else if (c->silent) {
-        /* 真静默：非异常一律灭 */
+    if (c->silent) {
         e.mode = LED_MODE_OFF;
+    } else if (scene == LED_SCENE_ERROR) {
+        /* 非静默时异常强制可见：灭则回退快闪 */
+        if (e.mode == LED_MODE_OFF) e.mode = LED_MODE_FAST;
     }
 
     /* 硬件降级：非 RGB 板不支持呼吸，降级为慢闪 */

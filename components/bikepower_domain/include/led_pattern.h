@@ -53,7 +53,7 @@ typedef struct {
 /* LED 全局配置。 */
 typedef struct {
     led_scene_cfg_t scenes[LED_SCENE_COUNT];
-    uint8_t silent;  // 1=真静默（除异常外全灭）
+    uint8_t silent;  // 1=真静默（所有场景全灭）
 } led_config_t;
 
 /* 决策输出的最终灯效。 */
@@ -71,8 +71,8 @@ bool led_config_validate(led_config_t *c);
 
 /**
  * 场景→最终灯效决策（四层优先级链）：
- *   1) 异常场景强制可见：忽略 silent；mode==OFF 时回退为 FAST。
- *   2) 真静默：silent=1 时非异常场景一律 OFF。
+ *   1) 真静默：silent=1 时所有场景一律 OFF。
+ *   2) 非静默异常场景强制可见：mode==OFF 时回退为 FAST。
  *   3) 用户配置：取 scenes[scene]。
  *   4) 硬件降级：is_rgb=false 时 BREATH 降级为 SLOW（颜色由驱动忽略）。
  * scene：当前场景；c：配置；is_rgb：是否 RGB 板。

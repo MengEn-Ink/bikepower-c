@@ -1232,9 +1232,11 @@ static void test_led_pattern(void)
     CHECK(e.mode == LED_MODE_OFF, "静默时非异常场景灭灯");
     cfg.scenes[LED_SCENE_ERROR].mode = LED_MODE_OFF;
     e = led_resolve(LED_SCENE_ERROR, &cfg, true);
-    CHECK(e.mode == LED_MODE_FAST && e.color == LED_COLOR_RED, "异常场景忽略静默且强制可见");
+    CHECK(e.mode == LED_MODE_OFF, "静默时异常场景也灭灯");
 
     cfg.silent = 0;
+    e = led_resolve(LED_SCENE_ERROR, &cfg, true);
+    CHECK(e.mode == LED_MODE_FAST && e.color == LED_COLOR_RED, "非静默时异常场景灭灯回退快闪");
     cfg.scenes[LED_SCENE_CONNECTED].mode = LED_MODE_BREATH;
     e = led_resolve(LED_SCENE_CONNECTED, &cfg, false);
     CHECK(e.mode == LED_MODE_SLOW, "非 RGB 板呼吸降级为慢闪");
