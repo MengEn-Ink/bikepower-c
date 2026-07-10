@@ -14,6 +14,9 @@ DO_MONITOR=0
 CAPTURE_SECONDS=15
 TEST_AUTO_CONFIG=OFF
 STOP_DAEMON=1
+BOARD_TARGET="${BIKEPOWER_BOARD:-generic}"
+SDKCONFIG_BACKUP=""
+FLASH_DEFAULTS="sdkconfig.flash.tmp"
 
 usage() {
     cat <<'EOF'
@@ -23,6 +26,7 @@ usage() {
 
 选项:
   -p, --port PORT             指定串口；默认自动识别 Espressif USB JTAG/serial
+      --board generic|m5stamp  指定烧录板型；默认 generic
       --no-checks             跳过快速静态门禁
       --no-build              跳过显式 idf.py build，仅执行 flash
       --erase                 烧录前执行 erase-flash（首次从旧分区切到当前 4MB factory 布局时使用）
@@ -36,6 +40,7 @@ usage() {
 示例:
   ./scripts/flash_latest.sh
   ./scripts/flash_latest.sh --port /dev/ttyACM0 --monitor
+  ./scripts/flash_latest.sh --board m5stamp
   ./scripts/flash_latest.sh --erase
 EOF
 }
@@ -50,6 +55,14 @@ log() {
     echo "==> $*"
 }
 
+cleanup_flash_config() {
+    rm -f "$PROJECT_DIR/$FLASH_DEFAULTS" "$PROJECT_DIR/sdkconfig.flash.board"
+    if [ -n "$SDKCONFIG_BACKUP" ] && [ -f "$SDKCONFIG_BACKUP" ]; then
+        mv "$SDKCONFIG_BACKUP" "$PROJECT_DIR/sdkconfig"
+    fi
+}
+trap cleanup_flash_config EXIT
+
 while [ $# -gt 0 ]; do
     case "$1" in
         -p|--port)
@@ -59,6 +72,15 @@ while [ $# -gt 0 ]; do
             ;;
         --port=*)
             PORT="${1#*=}"
+            shift
+            ;;
+        --board)
+            [ $# -ge 2 ] || die "$1 需要板型参数"
+            BOARD_TARGET="$2"
+            shift 2
+            ;;
+        --board=*)
+            BOARD_TARGET="${1#*=}"
             shift
             ;;
         --no-checks)
@@ -113,6 +135,11 @@ case "$CAPTURE_SECONDS" in
     ''|*[!0-9]*)
         die "--capture-seconds 必须是非负整数"
         ;;
+esac
+
+case "$BOARD_TARGET" in
+    generic|m5stamp) ;;
+    *) die "--board 仅支持 generic 或 m5stamp" ;;
 esac
 
 detect_idf_path() {
@@ -258,10 +285,29 @@ clear_stale_board_cache() {
     local cache_file="$PROJECT_DIR/build/CMakeCache.txt"
     [ -f "$cache_file" ] || return 0
 
-    if grep -q "sdkconfig.board.tmp" "$cache_file"; then
+    if grep -q "sdkconfig.board.tmp\|sdkconfig.flash.tmp" "$cache_file"; then
         log "清理 build/CMakeCache.txt 中残留的临时板型配置"
         rm -f "$cache_file"
     fi
+}
+
+prepare_board_defaults() {
+    local kconfig
+
+    case "$BOARD_TARGET" in
+        generic) kconfig="CONFIG_BOARD_GENERIC_C3=y" ;;
+        m5stamp) kconfig="CONFIG_BOARD_M5STAMP_C3=y" ;;
+        *) die "未知板型 $BOARD_TARGET" ;;
+    esac
+
+    if [ -f "$PROJECT_DIR/sdkconfig" ] && [ -z "$SDKCONFIG_BACKUP" ]; then
+        SDKCONFIG_BACKUP="$PROJECT_DIR/sdkconfig.flash.backup.$$"
+        cp "$PROJECT_DIR/sdkconfig" "$SDKCONFIG_BACKUP"
+    fi
+
+    printf '%s\n' "$kconfig" > "$PROJECT_DIR/sdkconfig.flash.board"
+    cat "$PROJECT_DIR/sdkconfig.defaults" "$PROJECT_DIR/sdkconfig.flash.board" > "$PROJECT_DIR/$FLASH_DEFAULTS"
+    rm -f "$PROJECT_DIR/sdkconfig.flash.board" "$PROJECT_DIR/sdkconfig"
 }
 
 IDF_DETECTED="$(detect_idf_path)" || die "找不到 ESP-IDF，请设置 IDF_PATH，或准备 $HOME/esp/esp-idf-v5.5.4、$PROJECT_DIR/../esp32-power/esp-idf、/home/mengen1014/work/esp32-power/esp-idf、$HOME/esp/esp-idf，或先激活 idf.py"
@@ -283,10 +329,11 @@ else
 fi
 
 if [ "$DO_BUILD" -eq 1 ]; then
-    log "编译固件（PORTAL_TEST_AUTO_CONFIG=${TEST_AUTO_CONFIG}）"
+    log "编译固件（board=${BOARD_TARGET}, PORTAL_TEST_AUTO_CONFIG=${TEST_AUTO_CONFIG}）"
+    prepare_board_defaults
     clear_stale_board_cache
-    idf.py -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" reconfigure
-    idf.py -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" build
+    idf.py -D SDKCONFIG_DEFAULTS="$FLASH_DEFAULTS" -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" reconfigure
+    idf.py -D SDKCONFIG_DEFAULTS="$FLASH_DEFAULTS" -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" build
 else
     log "跳过显式编译"
 fi
