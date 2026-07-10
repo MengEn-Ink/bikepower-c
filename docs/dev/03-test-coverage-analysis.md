@@ -49,15 +49,15 @@
 
 | 层 | 入口 | 覆盖对象 | 状态 |
 |----|------|---------|------|
-| TC-1 host 单测 | `test/test_domain` | 领域层 9 个文件 | ✅ 全绿（5282 断言，含按钮操作场景、随机功率心率随动、浮动启停、网页保存持久化链路） |
+| TC-1 host 单测 | `test/test_domain` | 领域层 9 个文件 | ✅ 全绿（5849 断言，含按钮操作场景、随机功率心率随动、浮动启停、网页保存持久化链路、设备分析 raw hex 序列化） |
 | TC-3a JS 静态 | `tests/check_portal_js.py` | `main/web/app.js` node --check | ✅ |
 | TC-3c 常量一致性 | `tests/check_config_consistency.py` | config 头文件 ↔ 文档 | ✅ |
-| TC-3d 门户结构 | `tests/check_portal_structure.py` | 路由表/HTML/前端 API 调用 | ✅ |
+| TC-3d 门户结构 | `tests/check_portal_structure.py` | 路由表/HTML/前端 API 调用/设备分析详细与原始数据展示 | ✅ |
 | TC-3e NVS schema | `tests/check_nvs_schema.py` | NVS key 定义 vs 使用 | ✅ |
 | TC-3f 板型描述表 | `tests/check_board_desc.py` | 板型枚举/引脚/名称一致性 | ✅ |
 | TC-3g 任务/WDT | `tests/check_tasks_wdt.py` | xTaskCreate/WDT/队列 | ✅ |
 | TC-3h mock 保存 | `tests/test_portal_config_save.py` | `/api/config` 保存后 `/api/state` 回显 | ✅ |
-| TC-3i 核心流程耐久 | `tests/test_core_flow_endurance.py` | 3 分钟循环覆盖按钮调功、功率/心率随动、网页编辑、LED 静默、设备模板、关闭 WiFi | ✅ |
+| TC-3i 核心流程耐久 | `tests/test_core_flow_endurance.py` | 3 分钟循环覆盖按钮调功、功率/心率随动、网页编辑、LED 静默、设备模板、外部设备分析 raw 数据、关闭 WiFi | ✅ |
 | TC-BLE-ADV 广播字段 | `tests/check_ble_advertising_fields.py` | 骑行/跑步主广播服务 UUID 与广播包名字预算 | ✅ |
 
 ### 真机测试（需 ESP32-C3 + 串口 + 手机）

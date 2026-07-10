@@ -16,6 +16,21 @@ static int16_t le16s(const uint8_t *p)
     return (int16_t)le16u(p);
 }
 
+static void bytes_to_hex(const uint8_t *data, size_t len, char *out, size_t out_sz)
+{
+    static const char hex[] = "0123456789abcdef";
+    if (!out || out_sz == 0) return;
+    out[0] = '\0';
+    if (!data || len == 0) return;
+    size_t max_bytes = (out_sz - 1) / 2;
+    if (len > max_bytes) len = max_bytes;
+    for (size_t i = 0; i < len; i++) {
+        out[i * 2] = hex[(data[i] >> 4) & 0x0f];
+        out[i * 2 + 1] = hex[data[i] & 0x0f];
+    }
+    out[len * 2] = '\0';
+}
+
 static void append_part(char *dst, size_t dst_sz, const char *part)
 {
     if (!dst || dst_sz == 0 || !part || !part[0]) return;
@@ -80,6 +95,7 @@ void device_analysis_defaults(device_analysis_t *a)
 bool device_analysis_parse_cps(device_analysis_t *a, const uint8_t *data, size_t len)
 {
     if (!a || !data || len < 4) return false;
+    bytes_to_hex(data, len, a->last_cps_hex, sizeof(a->last_cps_hex));
     a->service_flags |= DEVICE_TEMPLATE_SVC_CPS;
     a->power_watts = le16s(data + 2);
     a->sample_count++;
@@ -89,6 +105,7 @@ bool device_analysis_parse_cps(device_analysis_t *a, const uint8_t *data, size_t
 bool device_analysis_parse_hr(device_analysis_t *a, const uint8_t *data, size_t len)
 {
     if (!a || !data || len < 2) return false;
+    bytes_to_hex(data, len, a->last_hrs_hex, sizeof(a->last_hrs_hex));
     a->service_flags |= DEVICE_TEMPLATE_SVC_HRS;
     if ((data[0] & 0x01) != 0) {
         if (len < 3) return false;
@@ -103,6 +120,7 @@ bool device_analysis_parse_hr(device_analysis_t *a, const uint8_t *data, size_t 
 bool device_analysis_parse_csc(device_analysis_t *a, const uint8_t *data, size_t len)
 {
     if (!a || !data || len < 1) return false;
+    bytes_to_hex(data, len, a->last_csc_hex, sizeof(a->last_csc_hex));
     uint8_t flags = data[0];
     size_t off = 1;
     a->service_flags |= DEVICE_TEMPLATE_SVC_CSC;
@@ -121,6 +139,7 @@ bool device_analysis_parse_csc(device_analysis_t *a, const uint8_t *data, size_t
 bool device_analysis_parse_ftms_feature(device_analysis_t *a, const uint8_t *data, size_t len)
 {
     if (!a || !data || len < 8) return false;
+    bytes_to_hex(data, len, a->ftms_feature_hex, sizeof(a->ftms_feature_hex));
     a->service_flags |= DEVICE_TEMPLATE_SVC_FTMS;
     uint32_t target = (uint32_t)data[4]
                     | ((uint32_t)data[5] << 8)
@@ -133,6 +152,7 @@ bool device_analysis_parse_ftms_feature(device_analysis_t *a, const uint8_t *dat
 bool device_analysis_parse_ftms_bike(device_analysis_t *a, const uint8_t *data, size_t len)
 {
     if (!a || !data || len < 2) return false;
+    bytes_to_hex(data, len, a->last_ftms_hex, sizeof(a->last_ftms_hex));
     uint16_t flags = le16u(data);
     size_t off = 2;
     a->service_flags |= DEVICE_TEMPLATE_SVC_FTMS;
@@ -229,7 +249,10 @@ size_t device_analysis_serialize_json(const device_analysis_t *a, char *out, siz
     int n = snprintf(out, out_sz,
         "{\"sample_count\":%u,\"service_flags\":%u,\"power_watts\":%d,"
         "\"cadence_rpm\":%u,\"heart_rate_bpm\":%u,\"speed_x10_kmh\":%u,"
-        "\"ftms_control_supported\":%s,\"status\":\"%s\",\"summary\":\"%s\"}",
+        "\"ftms_control_supported\":%s,"
+        "\"last_cps_hex\":\"%s\",\"last_hrs_hex\":\"%s\",\"last_csc_hex\":\"%s\","
+        "\"last_ftms_hex\":\"%s\",\"ftms_feature_hex\":\"%s\","
+        "\"status\":\"%s\",\"summary\":\"%s\"}",
         (unsigned)a->sample_count,
         (unsigned)a->service_flags,
         (int)a->power_watts,
@@ -237,6 +260,11 @@ size_t device_analysis_serialize_json(const device_analysis_t *a, char *out, siz
         (unsigned)a->heart_rate_bpm,
         (unsigned)a->speed_x10_kmh,
         a->ftms_control_supported ? "true" : "false",
+        a->last_cps_hex,
+        a->last_hrs_hex,
+        a->last_csc_hex,
+        a->last_ftms_hex,
+        a->ftms_feature_hex,
         status,
         summary);
     if (n < 0 || (size_t)n >= out_sz) return 0;

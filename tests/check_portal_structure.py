@@ -32,6 +32,7 @@ APP_CSS = ROOT / "main" / "web" / "app.css"
 PORTAL_C = ROOT / "main" / "wifi_portal.c"
 INLINE_STATIC = ROOT / "scripts" / "inline_static.py"
 BLE_SCANNER_C = ROOT / "main" / "ble_scanner.c"
+DEVICE_ANALYSIS_C = ROOT / "components" / "bikepower_domain" / "device_analysis.c"
 CAPTIVE_PORTAL_C = ROOT / "main" / "captive_portal.c"
 PORTAL_CONFIG_SAVE_TEST = ROOT / "tests" / "test_portal_config_save.py"
 CORE_FLOW_ENDURANCE_TEST = ROOT / "tests" / "test_core_flow_endurance.py"
@@ -126,6 +127,7 @@ def main():
     csrc = PORTAL_C.read_text(encoding="utf-8")
     inline_static_src = INLINE_STATIC.read_text(encoding="utf-8")
     scanner_src = BLE_SCANNER_C.read_text(encoding="utf-8")
+    device_analysis_src = DEVICE_ANALYSIS_C.read_text(encoding="utf-8")
     captive_src = CAPTIVE_PORTAL_C.read_text(encoding="utf-8")
     portal_config_save_src = PORTAL_CONFIG_SAVE_TEST.read_text(encoding="utf-8")
     core_flow_endurance_src = CORE_FLOW_ENDURANCE_TEST.read_text(encoding="utf-8")
@@ -137,6 +139,7 @@ def main():
     print(f"{TAG} 检查 wifi_portal.c: {len(csrc)} 字节")
     print(f"{TAG} 检查 inline_static.py: {len(inline_static_src)} 字节")
     print(f"{TAG} 检查 ble_scanner.c: {len(scanner_src)} 字节")
+    print(f"{TAG} 检查 device_analysis.c: {len(device_analysis_src)} 字节")
     print(f"{TAG} 检查 captive_portal.c: {len(captive_src)} 字节")
     print(f"{TAG} 检查 test_portal_config_save.py: {len(portal_config_save_src)} 字节")
     print(f"{TAG} 检查 test_core_flow_endurance.py: {len(core_flow_endurance_src)} 字节")
@@ -255,12 +258,20 @@ def main():
     check('onTemplateAnalyzeDevice' in js and 'analysisCardHtml' in js, "app.js 缺少外部设备分析交互/结果渲染")
     check('template_analysis' in js and 'analysis.summary' in js and 'analysis.status' in js,
           "app.js 必须保存并展示设备分析摘要和状态")
+    check('analysisDetailsHtml' in js and 'analysisRawHtml' in js,
+          "app.js 必须提供详细数据和原始数据折叠展示")
+    check('power_watts' in js and 'heart_rate_bpm' in js and 'last_cps_hex' in js and 'adv_raw_hex' in js,
+          "app.js 必须展示功率/心率等解析值和广播/通知原始 hex")
     check('readableDeviceName' in js and 'safeDeviceNameText' in js,
           "app.js 必须对不可读外部设备名做中文兜底，避免显示方块乱码")
     check('>FT</span>' not in js and '>智能</span>' in js,
           "app.js 智能骑行台能力标签必须使用用户可理解文案，不能显示 FT 缩写")
     check('ble_scanner_analyze_device' in scanner_src and 'device_analysis_parse_ftms_bike' in scanner_src,
           "ble_scanner.c 必须连接外部设备并解析运动数据样本")
+    check('adv_raw_hex' in scanner_src and 'scan_rsp_raw_hex' in scanner_src,
+          "ble_scanner.c 必须保留广播和扫描响应原始 hex")
+    check('last_cps_hex' in device_analysis_src and 'last_hrs_hex' in device_analysis_src and 'last_ftms_hex' in device_analysis_src,
+          "device_analysis 必须保留最近一次运动通知原始 hex")
     check('DEVICE_ANALYSIS_SAMPLE_MS' in scanner_src or 'DEVICE_ANALYSIS_SAMPLE_MS' in (ROOT / "main" / "bikepower_config.h").read_text(encoding="utf-8"),
           "设备分析采样时长必须集中定义")
     check('filterNamedDevices' in js and 'hasDeviceName' in js, "app.js 必须过滤未命名 BLE 扫描设备")

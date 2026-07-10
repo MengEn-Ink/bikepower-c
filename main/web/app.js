@@ -1154,6 +1154,46 @@ function templateDetailCells(t) {
   }
   return html;
 }
+function hexText(v) {
+  return v ? String(v) : "—";
+}
+function analysisDetailsHtml(d, analysis) {
+  var rows = [
+    ["功率", analysis.power_watts ? String(analysis.power_watts) + " W" : "—"],
+    ["心率", analysis.heart_rate_bpm ? String(analysis.heart_rate_bpm) : "—"],
+    ["踏频", analysis.cadence_rpm ? String(analysis.cadence_rpm) + " rpm" : "—"],
+    ["速度", analysis.speed_x10_kmh ? (analysis.speed_x10_kmh / 10).toFixed(1) + " km/h" : "—"],
+    ["RSSI", d.last_rssi != null ? String(d.last_rssi) + " dBm" : "—"],
+    ["样本", String(analysis.sample_count || 0)],
+    ["服务", serviceSummary((d.service_flags || 0) | (analysis.service_flags || 0)).replace(/^服务：/, "")],
+    ["控制", analysis.ftms_control_supported ? "支持" : "—"]
+  ];
+  var html = '<details class="analysis-details"><summary>详细数据</summary><div class="analysis-grid">';
+  for (var i = 0; i < rows.length; i++) {
+    html += '<div><span>' + escapeHtml(rows[i][0]) + '</span><b>' + escapeHtml(rows[i][1]) + '</b></div>';
+  }
+  html += '</div></details>';
+  return html;
+}
+function analysisRawHtml(d, analysis) {
+  var rows = [
+    ["广播", d.adv_raw_hex],
+    ["扫描响应", d.scan_rsp_raw_hex],
+    ["厂商数据", d.manufacturer_data_hex],
+    ["服务数据", d.service_data_hex],
+    ["功率通知", analysis.last_cps_hex],
+    ["心率通知", analysis.last_hrs_hex],
+    ["踏频通知", analysis.last_csc_hex],
+    ["骑行台通知", analysis.last_ftms_hex],
+    ["骑行台能力", analysis.ftms_feature_hex]
+  ];
+  var html = '<details class="analysis-raw"><summary>原始数据</summary><div class="analysis-raw-list">';
+  for (var i = 0; i < rows.length; i++) {
+    html += '<div><span>' + escapeHtml(rows[i][0]) + '</span><code>' + escapeHtml(hexText(rows[i][1])) + '</code></div>';
+  }
+  html += '</div></details>';
+  return html;
+}
 function analysisCardHtml(d) {
   if (!d || !d.addr || !STATE.template_analysis) return "";
   var analysis = STATE.template_analysis[d.addr];
@@ -1167,6 +1207,8 @@ function analysisCardHtml(d) {
   html += '<div class="analysis-head"><b>' + escapeHtml(analysis.status || "分析完成") + '</b><span>' + escapeHtml(String(analysis.sample_count || 0)) + ' 条样本</span></div>';
   html += '<div class="analysis-summary">' + escapeHtml(analysis.summary || "暂无运动数据") + '</div>';
   if (metrics.length) html += '<div class="analysis-metrics">' + escapeHtml(metrics.join(" · ")) + '</div>';
+  html += analysisDetailsHtml(d, analysis);
+  html += analysisRawHtml(d, analysis);
   html += '</div>';
   return html;
 }
@@ -1312,6 +1354,12 @@ function onTemplateAnalyzeDevice(index) {
         d.service_flags = (d.service_flags || 0) | (data.template.service_flags || 0);
         if (!d.device_name) d.device_name = data.template.device_name || "";
         if (!d.adv_name) d.adv_name = data.template.adv_name || "";
+        if (!d.adv_raw_hex) d.adv_raw_hex = data.template.adv_raw_hex || "";
+        if (!d.scan_rsp_raw_hex) d.scan_rsp_raw_hex = data.template.scan_rsp_raw_hex || "";
+        if (!d.manufacturer_data_hex) d.manufacturer_data_hex = data.template.manufacturer_data_hex || "";
+        if (!d.service_data_hex) d.service_data_hex = data.template.service_data_hex || "";
+        if (!d.tx_power) d.tx_power = data.template.tx_power || 0;
+        if (!d.appearance) d.appearance = data.template.appearance || 0;
       }
       renderTemplates();
       toast(data.analysis.status || "分析完成");

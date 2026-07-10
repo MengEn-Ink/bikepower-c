@@ -237,6 +237,9 @@ def exercise_template_flow(base, rec, cycle):
     rec.check(analysis.get("ok") is True and analysis.get("analysis"), "分析外部设备运动数据")
     rec.check(analysis.get("analysis", {}).get("sample_count", 0) > 0, "设备分析收到运动数据样本")
     rec.check("summary" in analysis.get("analysis", {}), "设备分析返回摘要文案")
+    rec.check(bool(analysis.get("template", {}).get("adv_raw_hex")), "设备分析返回广播原始数据")
+    raw_fields = ("last_cps_hex", "last_hrs_hex", "last_csc_hex", "last_ftms_hex")
+    rec.check(any(analysis.get("analysis", {}).get(k) for k in raw_fields), "设备分析返回通知原始数据")
     template["alias"] = f"耐久模板{cycle:03d}"
     saved = request_json(base + "/api/device-templates/save", template)
     rec.check(saved.get("ok") is True, "保存设备模板", str(saved))

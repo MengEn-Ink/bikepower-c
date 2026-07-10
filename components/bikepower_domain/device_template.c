@@ -95,8 +95,14 @@ static void merge_template(device_template_t *dst, const device_template_t *src,
     copy_if_present(dst->hardware, sizeof(dst->hardware), src->hardware);
     copy_if_present(dst->software, sizeof(dst->software), src->software);
     copy_if_present(dst->addr, sizeof(dst->addr), src->addr);
+    copy_if_present(dst->adv_raw_hex, sizeof(dst->adv_raw_hex), src->adv_raw_hex);
+    copy_if_present(dst->scan_rsp_raw_hex, sizeof(dst->scan_rsp_raw_hex), src->scan_rsp_raw_hex);
+    copy_if_present(dst->manufacturer_data_hex, sizeof(dst->manufacturer_data_hex), src->manufacturer_data_hex);
+    copy_if_present(dst->service_data_hex, sizeof(dst->service_data_hex), src->service_data_hex);
     dst->addr_type = src->addr_type <= 1 ? src->addr_type : dst->addr_type;
     if (src->last_rssi <= 0) dst->last_rssi = src->last_rssi;
+    if (src->tx_power != 0) dst->tx_power = src->tx_power;
+    if (src->appearance != 0) dst->appearance = src->appearance;
     dst->service_flags = service_flags;
     dst->used = true;
     dst->id = id;
@@ -131,6 +137,10 @@ bool device_template_validate(device_template_t *tpl)
     str_terminate(tpl->hardware, sizeof(tpl->hardware));
     str_terminate(tpl->software, sizeof(tpl->software));
     str_terminate(tpl->addr, sizeof(tpl->addr));
+    str_terminate(tpl->adv_raw_hex, sizeof(tpl->adv_raw_hex));
+    str_terminate(tpl->scan_rsp_raw_hex, sizeof(tpl->scan_rsp_raw_hex));
+    str_terminate(tpl->manufacturer_data_hex, sizeof(tpl->manufacturer_data_hex));
+    str_terminate(tpl->service_data_hex, sizeof(tpl->service_data_hex));
     if (tpl->id >= DEVICE_TEMPLATE_MAX) tpl->id = 0;
     if (tpl->addr_type > 1) tpl->addr_type = 0;
     if (tpl->last_rssi > 0) tpl->last_rssi = 0;
@@ -145,8 +155,14 @@ bool device_template_validate(device_template_t *tpl)
         || str_changed(before.hardware, tpl->hardware, sizeof(tpl->hardware))
         || str_changed(before.software, tpl->software, sizeof(tpl->software))
         || str_changed(before.addr, tpl->addr, sizeof(tpl->addr))
+        || str_changed(before.adv_raw_hex, tpl->adv_raw_hex, sizeof(tpl->adv_raw_hex))
+        || str_changed(before.scan_rsp_raw_hex, tpl->scan_rsp_raw_hex, sizeof(tpl->scan_rsp_raw_hex))
+        || str_changed(before.manufacturer_data_hex, tpl->manufacturer_data_hex, sizeof(tpl->manufacturer_data_hex))
+        || str_changed(before.service_data_hex, tpl->service_data_hex, sizeof(tpl->service_data_hex))
         || before.addr_type != tpl->addr_type
         || before.last_rssi != tpl->last_rssi
+        || before.tx_power != tpl->tx_power
+        || before.appearance != tpl->appearance
         || before.service_flags != tpl->service_flags;
 }
 
@@ -241,6 +257,10 @@ size_t device_template_serialize_json(const device_template_t *tpl, char *out, s
     char hardware[DEVICE_TEMPLATE_VERSION_MAX * 6];
     char software[DEVICE_TEMPLATE_VERSION_MAX * 6];
     char addr[DEVICE_TEMPLATE_ADDR_MAX * 6];
+    char adv_raw_hex[DEVICE_TEMPLATE_RAW_HEX_MAX * 6];
+    char scan_rsp_raw_hex[DEVICE_TEMPLATE_RAW_HEX_MAX * 6];
+    char manufacturer_data_hex[DEVICE_TEMPLATE_RAW_HEX_MAX * 6];
+    char service_data_hex[DEVICE_TEMPLATE_RAW_HEX_MAX * 6];
     if (json_escape(tpl->alias, alias, sizeof(alias)) == (size_t)-1) return 0;
     if (json_escape(tpl->adv_name, adv_name, sizeof(adv_name)) == (size_t)-1) return 0;
     if (json_escape(tpl->device_name, device_name, sizeof(device_name)) == (size_t)-1) return 0;
@@ -250,14 +270,24 @@ size_t device_template_serialize_json(const device_template_t *tpl, char *out, s
     if (json_escape(tpl->hardware, hardware, sizeof(hardware)) == (size_t)-1) return 0;
     if (json_escape(tpl->software, software, sizeof(software)) == (size_t)-1) return 0;
     if (json_escape(tpl->addr, addr, sizeof(addr)) == (size_t)-1) return 0;
+    if (json_escape(tpl->adv_raw_hex, adv_raw_hex, sizeof(adv_raw_hex)) == (size_t)-1) return 0;
+    if (json_escape(tpl->scan_rsp_raw_hex, scan_rsp_raw_hex, sizeof(scan_rsp_raw_hex)) == (size_t)-1) return 0;
+    if (json_escape(tpl->manufacturer_data_hex, manufacturer_data_hex, sizeof(manufacturer_data_hex)) == (size_t)-1) return 0;
+    if (json_escape(tpl->service_data_hex, service_data_hex, sizeof(service_data_hex)) == (size_t)-1) return 0;
     int n = snprintf(out, out_sz,
         "{\"id\":%u,\"alias\":\"%s\",\"adv_name\":\"%s\","
         "\"device_name\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\","
         "\"firmware\":\"%s\",\"hardware\":\"%s\",\"software\":\"%s\","
-        "\"addr\":\"%s\",\"addr_type\":%u,\"last_rssi\":%d,\"service_flags\":%u}",
+        "\"addr\":\"%s\",\"addr_type\":%u,\"last_rssi\":%d,"
+        "\"tx_power\":%d,\"appearance\":%u,"
+        "\"adv_raw_hex\":\"%s\",\"scan_rsp_raw_hex\":\"%s\","
+        "\"manufacturer_data_hex\":\"%s\",\"service_data_hex\":\"%s\","
+        "\"service_flags\":%u}",
         (unsigned)tpl->id, alias, adv_name, device_name, manufacturer, model,
         firmware, hardware, software, addr, (unsigned)tpl->addr_type,
-        (int)tpl->last_rssi, (unsigned)tpl->service_flags);
+        (int)tpl->last_rssi, (int)tpl->tx_power, (unsigned)tpl->appearance,
+        adv_raw_hex, scan_rsp_raw_hex, manufacturer_data_hex, service_data_hex,
+        (unsigned)tpl->service_flags);
     if (n < 0 || (size_t)n >= out_sz) return 0;
     return (size_t)n;
 }

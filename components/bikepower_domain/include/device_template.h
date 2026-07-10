@@ -14,6 +14,7 @@
 #define DEVICE_TEMPLATE_TEXT_MAX     32
 #define DEVICE_TEMPLATE_VERSION_MAX  24
 #define DEVICE_TEMPLATE_ADDR_MAX     18
+#define DEVICE_TEMPLATE_RAW_HEX_MAX  65
 
 #define DEVICE_TEMPLATE_SVC_DIS      0x0001
 #define DEVICE_TEMPLATE_SVC_BAS      0x0002
@@ -34,8 +35,14 @@ typedef struct {
     char hardware[DEVICE_TEMPLATE_VERSION_MAX];
     char software[DEVICE_TEMPLATE_VERSION_MAX];
     char addr[DEVICE_TEMPLATE_ADDR_MAX];
+    char adv_raw_hex[DEVICE_TEMPLATE_RAW_HEX_MAX];
+    char scan_rsp_raw_hex[DEVICE_TEMPLATE_RAW_HEX_MAX];
+    char manufacturer_data_hex[DEVICE_TEMPLATE_RAW_HEX_MAX];
+    char service_data_hex[DEVICE_TEMPLATE_RAW_HEX_MAX];
     uint8_t addr_type;
     int8_t last_rssi;
+    int8_t tx_power;
+    uint16_t appearance;
     uint16_t service_flags;
 } device_template_t;
 

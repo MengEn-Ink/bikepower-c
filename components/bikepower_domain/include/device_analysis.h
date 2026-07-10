@@ -12,6 +12,7 @@
 
 #define DEVICE_ANALYSIS_STATUS_MAX 32
 #define DEVICE_ANALYSIS_SUMMARY_MAX 96
+#define DEVICE_ANALYSIS_RAW_HEX_MAX 65
 
 typedef struct {
     uint16_t sample_count;
@@ -21,6 +22,11 @@ typedef struct {
     uint16_t heart_rate_bpm;
     uint16_t speed_x10_kmh;
     uint8_t ftms_control_supported;
+    char last_cps_hex[DEVICE_ANALYSIS_RAW_HEX_MAX];
+    char last_hrs_hex[DEVICE_ANALYSIS_RAW_HEX_MAX];
+    char last_csc_hex[DEVICE_ANALYSIS_RAW_HEX_MAX];
+    char last_ftms_hex[DEVICE_ANALYSIS_RAW_HEX_MAX];
+    char ftms_feature_hex[DEVICE_ANALYSIS_RAW_HEX_MAX];
     char status[DEVICE_ANALYSIS_STATUS_MAX];
     char summary[DEVICE_ANALYSIS_SUMMARY_MAX];
 } device_analysis_t;

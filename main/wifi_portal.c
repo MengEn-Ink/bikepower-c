@@ -975,12 +975,12 @@ static esp_err_t h_api_ble_scan_read(httpd_req_t *req)
         send_json(req, "{\"ok\":false,\"error\":\"连接或读取设备信息失败\"}");
         return ESP_OK;
     }
-    char item[1024];
+    char item[1600];
     if (device_template_serialize_json(&tpl, item, sizeof(item)) == 0) {
         send_json(req, "{\"ok\":false,\"error\":\"设备信息序列化失败\"}");
         return ESP_OK;
     }
-    char resp[1100];
+    char resp[1700];
     snprintf(resp, sizeof(resp), "{\"ok\":true,\"template\":%s}", item);
     send_json(req, resp);
     return ESP_OK;
@@ -1014,14 +1014,14 @@ static esp_err_t h_api_ble_scan_analyze(httpd_req_t *req)
         send_json(req, "{\"ok\":false,\"error\":\"连接或分析设备失败\"}");
         return ESP_OK;
     }
-    char item[1024];
-    char sample[1024];
+    char item[1600];
+    char sample[1600];
     if (device_template_serialize_json(&tpl, item, sizeof(item)) == 0
         || device_analysis_serialize_json(&analysis, sample, sizeof(sample)) == 0) {
         send_json(req, "{\"ok\":false,\"error\":\"分析结果序列化失败\"}");
         return ESP_OK;
     }
-    char resp[2200];
+    char resp[3400];
     snprintf(resp, sizeof(resp), "{\"ok\":true,\"template\":%s,\"analysis\":%s}", item, sample);
     send_json(req, resp);
     return ESP_OK;

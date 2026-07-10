@@ -82,6 +82,21 @@ static void copy_text(char *dst, size_t dst_sz, const uint8_t *src, size_t src_l
     dst[n] = '\0';
 }
 
+static void bytes_to_hex(const uint8_t *data, size_t len, char *out, size_t out_sz)
+{
+    static const char hex[] = "0123456789abcdef";
+    if (!out || out_sz == 0) return;
+    out[0] = '\0';
+    if (!data || len == 0) return;
+    size_t max_bytes = (out_sz - 1) / 2;
+    if (len > max_bytes) len = max_bytes;
+    for (size_t i = 0; i < len; i++) {
+        out[i * 2] = hex[(data[i] >> 4) & 0x0f];
+        out[i * 2 + 1] = hex[data[i] & 0x0f];
+    }
+    out[len * 2] = '\0';
+}
+
 static bool parse_addr_text(const char *addr, uint8_t out[6])
 {
     if (!addr || !out) return false;
@@ -122,6 +137,18 @@ static void keep_text(char *dst, size_t dst_sz, const char *src)
     dst[dst_sz - 1] = '\0';
 }
 
+static void keep_int8(int8_t *dst, int8_t src)
+{
+    if (!dst || *dst != 0 || src == 0) return;
+    *dst = src;
+}
+
+static void keep_u16(uint16_t *dst, uint16_t src)
+{
+    if (!dst || *dst != 0 || src == 0) return;
+    *dst = src;
+}
+
 static int find_item_by_identity(const device_template_t *tpl)
 {
     if (!tpl) return -1;
@@ -159,6 +186,24 @@ static bool scan_item_is_visible(const device_template_t *tpl)
     return scan_item_has_name(tpl) && device_template_has_ride_service(tpl->service_flags);
 }
 
+static bool find_scanned_template(const char *addr, uint8_t addr_type, device_template_t *out)
+{
+    if (!addr || !out || !ensure_init()) return false;
+    bool found = false;
+    xSemaphoreTake(s_scan.lock, portMAX_DELAY);
+    for (int i = 0; i < BLE_SCAN_MAX_RESULTS; i++) {
+        if (!s_scan.items[i].used) continue;
+        if (s_scan.items[i].tpl.addr_type == addr_type
+            && strcmp(s_scan.items[i].tpl.addr, addr) == 0) {
+            *out = s_scan.items[i].tpl;
+            found = true;
+            break;
+        }
+    }
+    xSemaphoreGive(s_scan.lock);
+    return found;
+}
+
 static void merge_scan_item(device_template_t *dst, const device_template_t *src, uint8_t id)
 {
     if (!dst || !src) return;
@@ -172,8 +217,14 @@ static void merge_scan_item(device_template_t *dst, const device_template_t *src
     keep_text(dst->hardware, sizeof(dst->hardware), src->hardware);
     keep_text(dst->software, sizeof(dst->software), src->software);
     if (text_present(src->addr)) strncpy(dst->addr, src->addr, sizeof(dst->addr) - 1);
+    keep_text(dst->adv_raw_hex, sizeof(dst->adv_raw_hex), src->adv_raw_hex);
+    keep_text(dst->scan_rsp_raw_hex, sizeof(dst->scan_rsp_raw_hex), src->scan_rsp_raw_hex);
+    keep_text(dst->manufacturer_data_hex, sizeof(dst->manufacturer_data_hex), src->manufacturer_data_hex);
+    keep_text(dst->service_data_hex, sizeof(dst->service_data_hex), src->service_data_hex);
     dst->addr_type = src->addr_type <= 1 ? src->addr_type : dst->addr_type;
     if (src->last_rssi <= 0) dst->last_rssi = src->last_rssi;
+    keep_int8(&dst->tx_power, src->tx_power);
+    keep_u16(&dst->appearance, src->appearance);
     dst->service_flags = flags;
     dst->id = id;
     dst->used = true;
@@ -187,6 +238,22 @@ static void parse_adv(device_template_t *tpl, const uint8_t *data, uint8_t len)
     if (ble_hs_adv_parse_fields(&fields, data, len) != 0) return;
     if (fields.name && fields.name_len > 0) copy_text(tpl->adv_name, sizeof(tpl->adv_name), fields.name, fields.name_len);
     for (int i = 0; i < fields.num_uuids16; i++) device_template_note_service(tpl, fields.uuids16[i].value);
+    if (fields.mfg_data && fields.mfg_data_len > 0) {
+        bytes_to_hex(fields.mfg_data, fields.mfg_data_len,
+                     tpl->manufacturer_data_hex, sizeof(tpl->manufacturer_data_hex));
+    }
+    if (fields.svc_data_uuid16 && fields.svc_data_uuid16_len > 0) {
+        bytes_to_hex(fields.svc_data_uuid16, fields.svc_data_uuid16_len,
+                     tpl->service_data_hex, sizeof(tpl->service_data_hex));
+    } else if (fields.svc_data_uuid32 && fields.svc_data_uuid32_len > 0) {
+        bytes_to_hex(fields.svc_data_uuid32, fields.svc_data_uuid32_len,
+                     tpl->service_data_hex, sizeof(tpl->service_data_hex));
+    } else if (fields.svc_data_uuid128 && fields.svc_data_uuid128_len > 0) {
+        bytes_to_hex(fields.svc_data_uuid128, fields.svc_data_uuid128_len,
+                     tpl->service_data_hex, sizeof(tpl->service_data_hex));
+    }
+    if (fields.tx_pwr_lvl_is_present) tpl->tx_power = fields.tx_pwr_lvl;
+    if (fields.appearance_is_present) tpl->appearance = fields.appearance;
 }
 
 static void on_disc(const struct ble_gap_disc_desc *desc)
@@ -201,6 +268,13 @@ static void on_disc(const struct ble_gap_disc_desc *desc)
     xSemaphoreTake(s_scan.lock, portMAX_DELAY);
     int idx = find_item_by_identity(&tpl);
     bool matched_existing = idx >= 0;
+    if (desc->data && desc->length_data > 0) {
+        if (matched_existing && s_scan.items[idx].tpl.adv_raw_hex[0] != '\0') {
+            bytes_to_hex(desc->data, desc->length_data, tpl.scan_rsp_raw_hex, sizeof(tpl.scan_rsp_raw_hex));
+        } else {
+            bytes_to_hex(desc->data, desc->length_data, tpl.adv_raw_hex, sizeof(tpl.adv_raw_hex));
+        }
+    }
     if (idx < 0 && !scan_item_is_visible(&tpl)) {
         xSemaphoreGive(s_scan.lock);
         return;
@@ -688,6 +762,9 @@ esp_err_t ble_scanner_read_template(const char *addr, uint8_t addr_type, uint32_
     }
     ctx.peer.type = addr_type;
     device_template_set_addr(&ctx.tpl, ctx.peer.val, ctx.peer.type);
+    device_template_t scanned_tpl;
+    bool has_scanned_tpl = find_scanned_template(ctx.tpl.addr, ctx.tpl.addr_type, &scanned_tpl);
+    if (has_scanned_tpl) merge_scan_item(&ctx.tpl, &scanned_tpl, ctx.tpl.id);
     ble_scanner_stop();
     uint8_t own_addr_type = 0;
     int rc = ble_hs_id_infer_auto(0, &own_addr_type);
@@ -773,6 +850,9 @@ esp_err_t ble_scanner_analyze_device(const char *addr,
     }
     ctx.peer.type = addr_type;
     device_template_set_addr(&ctx.tpl, ctx.peer.val, ctx.peer.type);
+    device_template_t scanned_tpl;
+    bool has_scanned_tpl = find_scanned_template(ctx.tpl.addr, ctx.tpl.addr_type, &scanned_tpl);
+    if (has_scanned_tpl) merge_scan_item(&ctx.tpl, &scanned_tpl, ctx.tpl.id);
     ble_scanner_stop();
     uint8_t own_addr_type = 0;
     int rc = ble_hs_id_infer_auto(0, &own_addr_type);

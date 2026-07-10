@@ -660,9 +660,9 @@ v3.2.0 起配网门户前后端分离：
 - `POST /api/device-templates/apply`（把模板设备名应用为本设备 BLE 名称并持久化）
 - `POST /api/ble-scan/start`（启动 8 秒 BLE active scan，结果缓存在内存中）
 - `POST /api/ble-scan/stop`（停止当前扫描）
-- `GET /api/ble-scan/results`（返回扫描状态和最多 12 个附近设备摘要；仅包含有名称且广播服务命中骑行功率、踏频、心率或智能骑行台任意一种的设备）
-- `POST /api/ble-scan/read`（临时连接指定设备，读取 GAP Device Name 与 DIS 厂商/型号/版本字段后断开）
-- `POST /api/ble-scan/analyze`（临时连接指定设备，读取基础信息并订阅运动数据通知，短时采样后返回功率、踏频、心率、速度和设备能力摘要）
+- `GET /api/ble-scan/results`（返回扫描状态和最多 12 个附近设备摘要；仅包含有名称且广播服务命中骑行功率、踏频、心率或智能骑行台任意一种的设备；运行态结果包含 `adv_raw_hex`、`scan_rsp_raw_hex`、`manufacturer_data_hex`、`service_data_hex`、`tx_power`、`appearance` 等诊断字段）
+- `POST /api/ble-scan/read`（临时连接指定设备，读取 GAP Device Name 与 DIS 厂商/型号/版本字段后断开；若该设备来自本轮扫描，会合并扫描阶段的原始广播字段）
+- `POST /api/ble-scan/analyze`（临时连接指定设备，读取基础信息并订阅运动数据通知，短时采样后返回功率、踏频、心率、速度、设备能力摘要，以及最近一次 CPS/HRS/CSC/FTMS 通知 raw hex）
 
 Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Location: /` 和短文本 body `Redirect to the captive portal`。这与 ESP-IDF captive_portal 示例保持一致：iOS Captive Network Assistant 对“只有空 302”的响应兼容性较差，带 body 的 303 更稳；404 兜底则用于覆盖 Chrome/Chromium `browsernetworktime/*` 等新增或变化的系统探测路径。DHCP Option 114 走 `/.well-known/captive-portal` JSON API，避免新系统把 HTML 首页当作 Captive Portal API 解析失败而不弹窗。
 
@@ -699,7 +699,7 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 
 ### 8.5 前端反馈与 JSON 安全
 
-配网门户是单页 SPA。首页与设置页通过 `location.hash` 切换，保存入口统一为 `POST /api/config`，保存并关闭 WiFi 入口为 `POST /api/close-wifi`。前端提交完整 JSON payload，保存成功后页面显示即时反馈；字段级校验覆盖功率、踏频、心率、体重、FTP、阈值心率、设备名称、调功步进、浮动幅度、自定义 W/kg 与 LED 配置。设备名称在设置页默认文本展示，点击右侧编辑按钮后进入输入态，点对勾确认后再随“保存设置”持久化；设备信息页提供“设备信息模板库”折叠卡片，最多保存 5 个模板，支持扫描附近 BLE 设备、连接读取设备基础信息、短时分析运动数据、确认别名后保存、应用模板设备名和二次确认删除。扫描结果只展示包含骑行功率、踏频、心率或智能骑行台任意能力的有名称设备，并在设备名称行右侧以小型圆角标签显示功率、踏频、心率、智能骑行台能力；同一设备包含多个服务时并排显示多个标签。分析结果只保存在前端运行态和本次 HTTP 响应中，用于辅助识别外部设备能力，不写入 `ble_tpl` 模板 NVS，也不改变主配置 schema。物理按钮和 LED 配置卡片默认收起，仅用户主动展开时显示编辑控件。
+配网门户是单页 SPA。首页与设置页通过 `location.hash` 切换，保存入口统一为 `POST /api/config`，保存并关闭 WiFi 入口为 `POST /api/close-wifi`。前端提交完整 JSON payload，保存成功后页面显示即时反馈；字段级校验覆盖功率、踏频、心率、体重、FTP、阈值心率、设备名称、调功步进、浮动幅度、自定义 W/kg 与 LED 配置。设备名称在设置页默认文本展示，点击右侧编辑按钮后进入输入态，点对勾确认后再随“保存设置”持久化；设备信息页提供“设备信息模板库”折叠卡片，最多保存 5 个模板，支持扫描附近 BLE 设备、连接读取设备基础信息、短时分析运动数据、确认别名后保存、应用模板设备名和二次确认删除。扫描结果只展示包含骑行功率、踏频、心率或智能骑行台任意能力的有名称设备，并在设备名称行右侧以小型圆角标签显示功率、踏频、心率、智能骑行台能力；同一设备包含多个服务时并排显示多个标签。分析卡默认只显示状态、样本数和摘要，用户展开“详细数据”后可查看功率、心率、踏频、速度、RSSI、样本数和服务能力，展开“原始数据”后可查看广播 raw hex、扫描响应 raw hex、厂商数据、服务数据以及最近一次运动通知 raw hex。分析结果和原始诊断字段只保存在前端运行态和本次 HTTP 响应中，用于辅助识别外部设备能力；`POST /api/device-templates/save` 只接收常规模板字段，不把 raw hex 写入 `ble_tpl` 模板 NVS，也不改变主配置 schema。物理按钮和 LED 配置卡片默认收起，仅用户主动展开时显示编辑控件。
 
 `wifi_portal.c` 使用 `json_escape()` 转义字符串字段，避免设备名等用户可控内容破坏 JSON；前端渲染动态文本时使用 HTML 转义。`tests/check_portal_js.py` 与 `tests/check_portal_structure.py` 分别覆盖 JS 语法和前后端路由/视图契约。
 

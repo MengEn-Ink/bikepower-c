@@ -1091,8 +1091,14 @@ static void test_device_templates(void)
     strcpy(tpl.model, "P325-CS");
     strcpy(tpl.firmware, "1.2.8");
     strcpy(tpl.addr, "AA:BB:CC:DD:EE:FF");
+    strcpy(tpl.adv_raw_hex, "02010603031818");
+    strcpy(tpl.scan_rsp_raw_hex, "09094d6167656e65");
+    strcpy(tpl.manufacturer_data_hex, "ffff0102");
+    strcpy(tpl.service_data_hex, "1818b900");
     tpl.addr_type = 1;
     tpl.last_rssi = -58;
+    tpl.tx_power = -4;
+    tpl.appearance = 1152;
     tpl.service_flags = DEVICE_TEMPLATE_SVC_CPS | DEVICE_TEMPLATE_SVC_DIS;
 
     CHECK(device_template_list_add(&list, &tpl) == 0, "新增模板写入第0槽");
@@ -1101,6 +1107,8 @@ static void test_device_templates(void)
     CHECK(list.items[0].id == 0, "新增时重编号为槽位ID");
     CHECK(strcmp(list.items[0].alias, "迈金功率计") == 0, "模板别名保留");
     CHECK(strcmp(list.items[0].device_name, "P325") == 0, "模板设备名保留");
+    CHECK(strcmp(list.items[0].adv_raw_hex, "02010603031818") == 0, "模板广播原始 hex 保留");
+    CHECK(list.items[0].tx_power == -4, "模板 TX Power 保留");
     CHECK(list.items[0].service_flags == (DEVICE_TEMPLATE_SVC_CPS | DEVICE_TEMPLATE_SVC_DIS), "服务标记保留");
 
     device_template_t tpl_same_addr;
@@ -1191,6 +1199,12 @@ static void test_device_templates(void)
     CHECK(strstr(json, "\"alias\":\"同名功率计\"") != NULL, "JSON 含更新后的中文别名");
     CHECK(strstr(json, "\"manufacturer\":\"MagenePlus\"") != NULL, "JSON 含更新后的厂商");
     CHECK(strstr(json, "\"service_flags\":21") != NULL, "JSON 含合并后的服务标记");
+    CHECK(strstr(json, "\"adv_raw_hex\":\"02010603031818\"") != NULL, "JSON 含广播原始 hex");
+    CHECK(strstr(json, "\"scan_rsp_raw_hex\":\"09094d6167656e65\"") != NULL, "JSON 含扫描响应原始 hex");
+    CHECK(strstr(json, "\"manufacturer_data_hex\":\"ffff0102\"") != NULL, "JSON 含厂商数据原始 hex");
+    CHECK(strstr(json, "\"service_data_hex\":\"1818b900\"") != NULL, "JSON 含服务数据原始 hex");
+    CHECK(strstr(json, "\"tx_power\":-4") != NULL, "JSON 含 TX Power");
+    CHECK(strstr(json, "\"appearance\":1152") != NULL, "JSON 含 Appearance");
     CHECK(device_template_list_serialize_json(&list, json, 8) == 0, "JSON 缓冲不足返回0");
 }
 
@@ -1205,24 +1219,29 @@ static void test_device_analysis(void)
     CHECK(device_analysis_parse_cps(&a, cps, sizeof(cps)), "解析功率样本");
     CHECK(a.power_watts == 185, "功率样本提取瓦特");
     CHECK((a.service_flags & DEVICE_TEMPLATE_SVC_CPS) != 0, "功率样本记录服务能力");
+    CHECK(strcmp(a.last_cps_hex, "2000b90012004012") == 0, "记录功率原始通知 hex");
 
     const uint8_t hr8[] = {0x00, 145};
     CHECK(device_analysis_parse_hr(&a, hr8, sizeof(hr8)), "解析8位心率样本");
     CHECK(a.heart_rate_bpm == 145, "8位心率提取成功");
+    CHECK(strcmp(a.last_hrs_hex, "0091") == 0, "记录心率原始通知 hex");
 
     const uint8_t csc[] = {0x02, 0x31, 0x00, 0x80, 0x10};
     CHECK(device_analysis_parse_csc(&a, csc, sizeof(csc)), "解析踏频样本");
     CHECK(a.cadence_rpm == 1, "踏频样本识别为有曲柄数据");
+    CHECK(strcmp(a.last_csc_hex, "0231008010") == 0, "记录踏频原始通知 hex");
 
     const uint8_t feature[] = {0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00};
     CHECK(device_analysis_parse_ftms_feature(&a, feature, sizeof(feature)), "解析智能骑行台能力");
     CHECK(a.ftms_control_supported == 1, "目标控制能力识别成功");
+    CHECK(strcmp(a.ftms_feature_hex, "0000000020000000") == 0, "记录智能骑行台能力原始 hex");
 
     const uint8_t ftms[] = {0x44, 0x00, 0x1c, 0x0b, 0xa4, 0x00, 0xbe, 0x00};
     CHECK(device_analysis_parse_ftms_bike(&a, ftms, sizeof(ftms)), "解析智能骑行台数据");
     CHECK(a.speed_x10_kmh == 284, "速度字段按0.1km/h提取");
     CHECK(a.cadence_rpm == 82, "踏频字段按0.5rpm换算");
     CHECK(a.power_watts == 190, "智能骑行台功率提取");
+    CHECK(strcmp(a.last_ftms_hex, "44001c0ba400be00") == 0, "记录智能骑行台数据原始通知 hex");
 
     device_analysis_finalize(&a);
     CHECK(strcmp(a.status, "数据正常") == 0, "收到样本后状态正常");
@@ -1236,6 +1255,11 @@ static void test_device_analysis(void)
     CHECK(n > 0 && n < sizeof(json), "分析结果 JSON 序列化成功");
     CHECK(strstr(json, "\"sample_count\":4") != NULL, "JSON 含样本数量");
     CHECK(strstr(json, "\"ftms_control_supported\":true") != NULL, "JSON 含控制能力");
+    CHECK(strstr(json, "\"last_cps_hex\":\"2000b90012004012\"") != NULL, "JSON 含功率原始通知");
+    CHECK(strstr(json, "\"last_hrs_hex\":\"0091\"") != NULL, "JSON 含心率原始通知");
+    CHECK(strstr(json, "\"last_csc_hex\":\"0231008010\"") != NULL, "JSON 含踏频原始通知");
+    CHECK(strstr(json, "\"last_ftms_hex\":\"44001c0ba400be00\"") != NULL, "JSON 含智能骑行台原始通知");
+    CHECK(strstr(json, "\"ftms_feature_hex\":\"0000000020000000\"") != NULL, "JSON 含智能骑行台能力原始数据");
 
     device_analysis_t empty;
     device_analysis_defaults(&empty);
