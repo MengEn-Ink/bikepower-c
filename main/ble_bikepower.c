@@ -73,8 +73,15 @@ static uint8_t g_ftms_treadmill_buf[16];
 static size_t g_ftms_treadmill_len = 16;
 static uint8_t g_ftms_resp_buf[3];
 
-// FTMS 静态特征值
-static uint8_t g_ftms_feature_buf[8] = { 0x02, 0x40, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00 };
+// FTMS 静态特征值：前 4 字节为 machine feature，后 4 字节为 target setting feature。
+static const uint8_t g_ftms_cycling_feature_buf[8] = {
+    0x02, 0x40, 0x00, 0x00, // cadence + power measurement
+    0x08, 0x00, 0x00, 0x00, // target power setting
+};
+static const uint8_t g_ftms_running_feature_buf[8] = {
+    0x84, 0x05, 0x00, 0x00, // distance + inclination/ramp + heart rate + elapsed time
+    0x03, 0x00, 0x00, 0x00, // target speed + target inclination settings
+};
 static uint8_t g_ftms_status_buf[7]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 static ble_erg_cb_t g_erg_cb = NULL;
@@ -99,8 +106,9 @@ static SemaphoreHandle_t g_notify_lock = NULL;
  * 特殊行为：广播字段中只声明 CPS 和 HRS 服务 UUID，以兼容旧版发现行为。
  */
 static int start_advertising(void);
-// 发送单个特征通知（定义在通知模块），FTMS 控制点回调需提前用于推送 Training Status。
+// 发送单个特征通知/indication（定义在通知模块），FTMS 控制点回调需提前用于推送响应。
 static void notify_one(uint16_t handle, const uint8_t *buf, size_t len);
+static void indicate_one(uint16_t handle, const uint8_t *buf, size_t len);
 
 // ============================ GATT 访问回调 ============================
 
@@ -204,7 +212,12 @@ static int sensor_location_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_c
 static int ftms_feat_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_ftms_feature_buf, sizeof(g_ftms_feature_buf));
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        const uint8_t *buf = (g_profile == SPORT_PROFILE_RUNNING)
+            ? g_ftms_running_feature_buf
+            : g_ftms_cycling_feature_buf;
+        return chr_read_buf(ctxt, buf, sizeof(g_ftms_cycling_feature_buf));
+    }
     return BLE_ATT_ERR_UNLIKELY;
 }
 
@@ -262,7 +275,7 @@ static void ftms_send_response(uint8_t request_op, uint8_t result)
     g_ftms_resp_buf[0] = FTMS_OP_RESPONSE_CODE;
     g_ftms_resp_buf[1] = request_op;
     g_ftms_resp_buf[2] = result;
-    notify_one(g_ftms_cp_handle, g_ftms_resp_buf, sizeof(g_ftms_resp_buf));
+    indicate_one(g_ftms_cp_handle, g_ftms_resp_buf, sizeof(g_ftms_resp_buf));
 }
 
 /**
@@ -479,7 +492,7 @@ static const struct ble_gatt_svc_def cycling_gatt_svcs[] = {
               .val_handle = &g_ftms_bike_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_CONTROL_POINT_CHAR_UUID),
               .access_cb = ftms_cp_cb,
-              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_NOTIFY,
+              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_INDICATE,
               .val_handle = &g_ftms_cp_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_STATUS_CHAR_UUID),
               .access_cb = ftms_status_cb,
@@ -546,7 +559,7 @@ static const struct ble_gatt_svc_def running_gatt_svcs[] = {
               .val_handle = &g_ftms_treadmill_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_CONTROL_POINT_CHAR_UUID),
               .access_cb = ftms_cp_cb,
-              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_NOTIFY,
+              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_INDICATE,
               .val_handle = &g_ftms_cp_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_STATUS_CHAR_UUID),
               .access_cb = ftms_status_cb,
@@ -720,6 +733,16 @@ static void notify_one(uint16_t handle, const uint8_t *buf, size_t len)
     xSemaphoreGive(g_notify_lock);
 }
 
+static void indicate_one(uint16_t handle, const uint8_t *buf, size_t len)
+{
+    if (!g_notify_lock || xSemaphoreTake(g_notify_lock, pdMS_TO_TICKS(BLE_NOTIFY_LOCK_WAIT_MS)) != pdTRUE) return;
+    if (!g_stopping && g_ready && g_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+        struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
+        if (om) ble_gatts_indicate_custom(g_conn_handle, handle, om);
+    }
+    xSemaphoreGive(g_notify_lock);
+}
+
 /**
  * BLE 周期通知定时器回调。
  * 在有连接时打包当前数据并通知 CPS、HRS、CSC、FTMS 四个动态特征。
@@ -832,13 +855,16 @@ static int start_advertising(void)
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
     static ble_uuid16_t cycling_adv_uuids[] = {
         BLE_UUID16_INIT(POWER_SERVICE_UUID),
-        BLE_UUID16_INIT(HR_SERVICE_UUID),
+        BLE_UUID16_INIT(FTMS_SERVICE_UUID),
     };
     static ble_uuid16_t running_adv_uuids[] = {
         BLE_UUID16_INIT(RSC_SERVICE_UUID),
+        BLE_UUID16_INIT(FTMS_SERVICE_UUID),
+    };
+    static ble_uuid16_t scan_rsp_uuids[] = {
         BLE_UUID16_INIT(HR_SERVICE_UUID),
     };
-    // 广播包空间有限，只放最关键的两个 16 位服务 UUID，完整服务能力由连接后 GATT 发现获取。
+    // 广播包空间有限：主广播放 App 设备类型发现最关键的服务，完整能力由连接后 GATT 发现获取。
     fields.uuids16 = (g_profile == SPORT_PROFILE_RUNNING) ? running_adv_uuids : cycling_adv_uuids;
     fields.num_uuids16 = 2;
     fields.uuids16_is_complete = 1;
@@ -858,16 +884,16 @@ static int start_advertising(void)
     rc = ble_gap_adv_set_fields(&fields);
     if (rc != 0) { ESP_LOGE(TAG, "设置广播字段失败 rc=%d", rc); return rc; }
 
-    // 名字被截断时，完整设备名放进 scan response，扫描设备仍可显示完整名称。
-    if (!fields.name_is_complete) {
-        struct ble_hs_adv_fields rsp_fields;
-        memset(&rsp_fields, 0, sizeof(rsp_fields));
-        rsp_fields.name = (uint8_t *)g_device_name;
-        rsp_fields.name_len = name_len;
-        rsp_fields.name_is_complete = 1;
-        rc = ble_gap_adv_rsp_set_fields(&rsp_fields);
-        if (rc != 0) { ESP_LOGE(TAG, "设置 scan response 失败 rc=%d", rc); return rc; }
-    }
+    struct ble_hs_adv_fields rsp_fields;
+    memset(&rsp_fields, 0, sizeof(rsp_fields));
+    rsp_fields.uuids16 = scan_rsp_uuids;
+    rsp_fields.num_uuids16 = 1;
+    rsp_fields.uuids16_is_complete = 0;
+    rsp_fields.name = (uint8_t *)g_device_name;
+    rsp_fields.name_len = name_len;
+    rsp_fields.name_is_complete = 1;
+    rc = ble_gap_adv_rsp_set_fields(&rsp_fields);
+    if (rc != 0) { ESP_LOGE(TAG, "设置 scan response 失败 rc=%d", rc); return rc; }
 
     memset(&adv_params, 0, sizeof(adv_params));
     adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;

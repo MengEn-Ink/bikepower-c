@@ -24,6 +24,7 @@ HR_UUID = "00002a37-0000-1000-8000-00805f9b34fb"
 CSC_UUID = "00002a5b-0000-1000-8000-00805f9b34fb"
 FTMS_BIKE_UUID = "00002ad2-0000-1000-8000-00805f9b34fb"
 FTMS_TREADMILL_UUID = "00002acd-0000-1000-8000-00805f9b34fb"
+FTMS_FEATURE_UUID = "00002acc-0000-1000-8000-00805f9b34fb"
 FTMS_CP_UUID = "00002ad9-0000-1000-8000-00805f9b34fb"
 RSC_UUID = "00002a53-0000-1000-8000-00805f9b34fb"
 RSC_FEATURE_UUID = "00002a54-0000-1000-8000-00805f9b34fb"
@@ -197,6 +198,29 @@ def parse_treadmill(data: bytes):
     }
 
 
+async def check_ftms_feature(client, found, expected_machine_mask, expected_target_mask):
+    if FTMS_FEATURE_UUID not in found:
+        print("  FTMS Feature: 无特征")
+        return False
+    try:
+        data = bytes(await client.read_gatt_char(FTMS_FEATURE_UUID))
+    except Exception as e:
+        print(f"  FTMS Feature: 读取失败 {type(e).__name__}")
+        return False
+    if len(data) < 8:
+        print(f"  FTMS Feature: 长度异常 {len(data)}")
+        return False
+    machine = struct.unpack_from("<I", data, 0)[0]
+    target = struct.unpack_from("<I", data, 4)[0]
+    ok_machine = (machine & expected_machine_mask) == expected_machine_mask
+    ok_target = (target & expected_target_mask) == expected_target_mask
+    print(
+        "  FTMS Feature: machine=0x%08x target=0x%08x %s"
+        % (machine, target, "通过" if ok_machine and ok_target else "失败")
+    )
+    return ok_machine and ok_target
+
+
 async def run_running_profile(client, found):
     services = [
         ("RSC", RSC_UUID),
@@ -214,6 +238,12 @@ async def run_running_profile(client, found):
             missing.append(label)
 
     dis_ok = await check_dis(client, found)
+    ftms_feature_ok = await check_ftms_feature(
+        client,
+        found,
+        expected_machine_mask=0x00000584,
+        expected_target_mask=0x00000003,
+    )
     samples = []
     treadmill_samples = []
     cp_responses = []
@@ -369,7 +399,7 @@ async def run_running_profile(client, found):
             if reset_samples:
                 ok_reset = ok_reset and reset_samples[0]["distance"] is not None and reset_samples[0]["distance"] <= 2
     ok = (
-        ok_services and dis_ok and ok_notify and ok_speed and ok_cadence and ok_distance and ok_flags
+        ok_services and dis_ok and ftms_feature_ok and ok_notify and ok_speed and ok_cadence and ok_distance and ok_flags
         and ok_treadmill_notify and ok_treadmill_speed and ok_treadmill_distance
         and ok_treadmill_incline and ok_treadmill_hr and ok_treadmill_elapsed
         and ok_cp_control and ok_reset
@@ -377,6 +407,7 @@ async def run_running_profile(client, found):
     print("--- 结果 ---")
     print(f"  跑步服务齐全: {'通过' if ok_services else '失败(' + ','.join(missing) + ')'}")
     print(f"  DIS 设备信息: {'通过' if dis_ok else '失败'}")
+    print(f"  FTMS Feature: {'通过' if ftms_feature_ok else '失败'}")
     print(f"  RSC 通知: {'通过' if ok_notify else '失败'}")
     print(f"  RSC 速度: {'通过' if ok_speed else '失败'}")
     print(f"  RSC 步频: {'通过' if ok_cadence else '失败'}")
@@ -448,6 +479,12 @@ async def main():
                 missing.append(label)
 
         dis_ok = await check_dis(client, found)
+        ftms_feature_ok = await check_ftms_feature(
+            client,
+            found,
+            expected_machine_mask=0x00004002,
+            expected_target_mask=0x00000008,
+        )
 
         counts = {"cps": 0, "hr": 0, "csc": 0, "ftms": 0}
         last_power = [0]
@@ -576,11 +613,12 @@ async def main():
         print("--- 结果 ---")
         print(f"  五服务齐全: {'通过' if ok_services else '失败(' + ','.join(missing) + ')'}")
         print(f"  DIS 设备信息: {'通过' if dis_ok else '失败'}")
+        print(f"  FTMS Feature: {'通过' if ftms_feature_ok else '失败'}")
         print(f"  CPS 通知:   {'通过' if ok_notify else '失败'}")
         print(f"  FTMS-CP 响应: {'通过' if ok_cp_resp else '失败(' + cp_detail + ')'}")
         print(f"  ERG 功率收敛: {'通过' if ok_erg else '失败'}")
         print(f"  Stop/Pause 响应: {'通过' if ok_stop_resp else '失败'}")
-        ok = ok_notify and ok_services and ok_cp_resp and ok_erg and ok_stop_resp and dis_ok
+        ok = ok_notify and ok_services and ftms_feature_ok and ok_cp_resp and ok_erg and ok_stop_resp and dis_ok
         print("总判定:", "通过" if ok else "失败")
         return 0 if ok else 1
 

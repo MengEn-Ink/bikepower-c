@@ -507,10 +507,21 @@ running_gatt = re.search(r"static const struct ble_gatt_svc_def running_gatt_svc
 running_gatt_src = running_gatt.group(0) if running_gatt else ""
 check("FTMS_SERVICE_UUID" in running_gatt_src and "FTMS_TREADMILL_CHAR_UUID" in running_gatt_src,
       "running profile GATT 表包含 FTMS Treadmill Data")
+check("BLE_GATT_CHR_F_INDICATE" in running_gatt_src and "BLE_GATT_CHR_F_NOTIFY" not in running_gatt_src.split("FTMS_CONTROL_POINT_CHAR_UUID", 1)[1].split("FTMS_STATUS_CHAR_UUID", 1)[0],
+      "running FTMS Control Point 使用 indicate 响应，不使用 notify")
 check("g_ftms_treadmill_handle" in ble_bikepower_src and "g_ftms_treadmill_buf" in ble_bikepower_src,
       "ble_bikepower.c 维护 FTMS Treadmill 通知句柄和缓冲区")
 check("FTMS_TREADMILL_UUID" in ble_selftest_src and "parse_treadmill" in ble_selftest_src,
       "ble_selftest.py 覆盖 FTMS Treadmill Data 发现和解析")
+check("g_ftms_cycling_feature_buf" in ble_bikepower_src and "g_ftms_running_feature_buf" in ble_bikepower_src,
+      "FTMS Feature 必须按 cycling/running profile 分开声明")
+check("FTMS_SERVICE_UUID" in ble_bikepower_src.split("cycling_adv_uuids", 1)[1].split("running_adv_uuids", 1)[0],
+      "cycling 广播 UUID 必须包含 FTMS，便于可控训练器入口发现")
+check("FTMS_SERVICE_UUID" in ble_bikepower_src.split("running_adv_uuids", 1)[1].split("fields.uuids16", 1)[0],
+      "running 广播 UUID 必须包含 FTMS，便于跑步机入口发现")
+check("read_gatt_char(FTMS_FEATURE_UUID)" in ble_selftest_src
+      and "FTMS Feature" in ble_selftest_src,
+      "ble_selftest.py 必须读取并校验 FTMS Feature")
 
 
 # ============================ 9. 板型枚举完整性 ============================
