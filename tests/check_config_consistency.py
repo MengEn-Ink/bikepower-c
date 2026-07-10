@@ -33,6 +33,8 @@ REVIEW_CHECKLIST = ROOT / "docs" / "archive" / "03-review-checklist.md"
 HW_CONSTRAINTS = ROOT / ".trae" / "rules" / "hardware-constraints.md"
 BUILD_ALL = ROOT / "scripts" / "build_all.sh"
 FLASH_LATEST = ROOT / "scripts" / "flash_latest.sh"
+BLE_SELFTEST = ROOT / "tests" / "ble_selftest.py"
+STAGE3_CONN_TEST = ROOT / "tests" / "stage3_conn_test.py"
 
 TAG = "[TC-3c]"
 g_pass = 0
@@ -125,6 +127,8 @@ review_checklist_src = read(REVIEW_CHECKLIST)
 hw_src = read(HW_CONSTRAINTS) if HW_CONSTRAINTS.exists() else ""
 build_all_src = read(BUILD_ALL)
 flash_latest_src = read(FLASH_LATEST)
+ble_selftest_src = read(BLE_SELFTEST)
+stage3_conn_src = read(STAGE3_CONN_TEST)
 
 
 # ============================ 1. 固件版本一致性 ============================
@@ -192,6 +196,13 @@ check("--board generic|m5stamp" in flash_latest_src
       and "CONFIG_BOARD_GENERIC_C3=y" in flash_latest_src
       and "CONFIG_BOARD_M5STAMP_C3=y" in flash_latest_src,
       "flash_latest.sh 必须显式选择烧录板型，避免 build_all.sh 后沿用最后板型")
+check("BIKEPOWER_EXPECT_BOARD" in ble_selftest_src
+      and '"generic": "generic-c3"' in ble_selftest_src
+      and '"m5stamp": "m5stamp-c3"' in ble_selftest_src,
+      "ble_selftest.py 必须支持显式板型期望，避免双板构建后误读 sdkconfig")
+check("client.is_connected" in stage3_conn_src
+      and "未从 WARN 串口日志观察到" in stage3_conn_src,
+      "stage3_conn_test.py 必须兼容生产 WARN 日志，仅将串口连接事件作为增强证据")
 
 # WIFI_SSID_PREFIX 与 DEVICE_NAME 关系（AP 名沿用设备名前缀，运行时追加 MAC 后缀）
 wifi_ssid_prefix = extract_define(config_src, "WIFI_SSID_PREFIX")

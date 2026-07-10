@@ -34,7 +34,13 @@ DIS_FW_UUID = "00002a26-0000-1000-8000-00805f9b34fb"
 def get_expected_board_name(repo_root):
     env_board = os.environ.get("BIKEPOWER_EXPECT_BOARD", "")
     if env_board:
-        return env_board
+        aliases = {
+            "generic": "generic-c3",
+            "generic-c3": "generic-c3",
+            "m5stamp": "m5stamp-c3",
+            "m5stamp-c3": "m5stamp-c3",
+        }
+        return aliases.get(env_board, env_board)
     sdkconfig_path = os.path.join(repo_root, "sdkconfig")
     config_path = os.path.join(repo_root, "main", "bikepower_config.h")
     try:

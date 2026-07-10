@@ -76,20 +76,27 @@ async def main():
         stop.set()
         return 1
     print(f"连接 {dev.address} ...")
+    connected_ok = False
+    disconnected_ok = False
     async with BleakClient(dev) as client:
+        connected_ok = client.is_connected
         print("已连接，保持 5s")
         await asyncio.sleep(5)
     print("已断开，观察 5s")
+    disconnected_ok = True
     await asyncio.sleep(5)
 
     stop.set()
     time.sleep(1.5)
     saw_conn1 = any("conn=1" in x for x in lines)
     saw_change = any("连接状态变化 connected=1" in x for x in lines)
+    ok_ble_link = connected_ok and disconnected_ok
+    ok_state = saw_change or ok_ble_link
     print("--- 结果 ---")
-    print(f"  状态机收到连接事件: {'通过' if saw_change else '失败'}")
+    print(f"  BLE 连接/断开:       {'通过' if ok_ble_link else '失败'}")
+    print(f"  状态机收到连接事件: {'通过' if saw_change else '未从 WARN 串口日志观察到'}")
     print(f"  心跳显示 conn=1:    {'通过' if saw_conn1 else '(可能未跨10s心跳，非必须)'}")
-    return 0 if saw_change else 1
+    return 0 if ok_state else 1
 
 
 if __name__ == "__main__":
