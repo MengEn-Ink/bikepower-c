@@ -61,7 +61,7 @@ static uint16_t g_crank_rev = 0;
 static uint32_t g_last_crank_ms = 0;
 
 // 预分配通知缓冲区（运行时零 malloc）
-static uint8_t g_cps_buf[8];
+static uint8_t g_cps_buf[9];
 static uint8_t g_hr_buf[2];
 static uint8_t g_csc_buf[5];
 static uint8_t g_rsc_buf[10];
@@ -618,11 +618,12 @@ static void pack_all(void)
     g_last_crank_ms = adjusted_ms;
 
     // 基于踏频推演曲柄累计量，统一驱动 CPS 和 CSC 的 rev/time 字段。
-    // CPS: flags=0x0020 + power + rev + time
-    g_cps_buf[0] = 0x20; g_cps_buf[1] = 0x00;
-    g_cps_buf[2] = power & 0xFF;       g_cps_buf[3] = (power >> 8) & 0xFF;
-    g_cps_buf[4] = rev & 0xFF;         g_cps_buf[5] = (rev >> 8) & 0xFF;
-    g_cps_buf[6] = time_1024 & 0xFF;   g_cps_buf[7] = (time_1024 >> 8) & 0xFF;
+    // CPS: flags=0x20(bit5=crank data present) + power(2) + crank_rev(4) + crank_time(2)
+    g_cps_buf[0] = 0x20;
+    g_cps_buf[1] = power & 0xFF;       g_cps_buf[2] = (power >> 8) & 0xFF;
+    g_cps_buf[3] = rev & 0xFF;         g_cps_buf[4] = (rev >> 8) & 0xFF;
+    g_cps_buf[5] = 0x00;               g_cps_buf[6] = 0x00;
+    g_cps_buf[7] = time_1024 & 0xFF;   g_cps_buf[8] = (time_1024 >> 8) & 0xFF;
 
     // HR: flags=0x00 + bpm
     g_hr_buf[0] = 0x00;

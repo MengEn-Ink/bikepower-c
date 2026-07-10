@@ -698,7 +698,6 @@ static int analysis_gap_cb(struct ble_gap_event *event, void *arg)
             ctx->next_read_uuid = 0x2A00;
             device_template_note_service(&ctx->tpl, DIS_SERVICE_UUID);
             ESP_LOGI(TAG, "分析：已连接 conn=%u，开始读取DIS+发现特征", ctx->conn_handle);
-            analysis_read_next_char(ctx);
             analysis_start_next_disc(ctx);
             if (ctx->done) xSemaphoreGive(ctx->done);
         } else {

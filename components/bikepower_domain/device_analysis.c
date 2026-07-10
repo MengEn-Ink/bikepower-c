@@ -94,10 +94,24 @@ void device_analysis_defaults(device_analysis_t *a)
 
 bool device_analysis_parse_cps(device_analysis_t *a, const uint8_t *data, size_t len)
 {
-    if (!a || !data || len < 4) return false;
+    if (!a || !data || len < 2) return false;
     bytes_to_hex(data, len, a->last_cps_hex, sizeof(a->last_cps_hex));
     a->service_flags |= DEVICE_TEMPLATE_SVC_CPS;
-    a->power_watts = le16s(data + 2);
+    uint8_t flags = data[0];
+    size_t off = 1;
+    if ((flags & 0x01) == 0) {
+        if (len < off + 2) return false;
+        a->power_watts = le16s(data + off);
+        off += 2;
+    }
+    if (flags & 0x20) {
+        off += 4;
+        if (len >= off + 2) off += 2;
+    }
+    if (flags & 0x04) {
+        off += 4;
+        if (len >= off + 2) off += 2;
+    }
     a->sample_count++;
     return true;
 }
