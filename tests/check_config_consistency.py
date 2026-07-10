@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG_H = ROOT / "main" / "bikepower_config.h"
 RADIO_CTRL = ROOT / "main" / "radio_ctrl.c"
 DOMAIN_H = ROOT / "components" / "bikepower_domain" / "include" / "domain_config.h"
+CONFIG_STORE_C = ROOT / "components" / "bikepower_domain" / "config_store.c"
 APP_JS = ROOT / "main" / "web" / "app.js"
 MOCK_SERVER = ROOT / "tests" / "mock_server.py"
 AGENTS = ROOT / "AGENTS.md"
@@ -111,6 +112,7 @@ def extract_mock_limit(src: str, key: str):
 config_src = read(CONFIG_H)
 radio_ctrl_src = read(RADIO_CTRL)
 domain_src = read(DOMAIN_H)
+config_store_src = read(CONFIG_STORE_C)
 app_js_src = read(APP_JS)
 mock_src = read(MOCK_SERVER)
 agents_src = read(AGENTS)
@@ -303,6 +305,11 @@ for js_key, domain_key in js_ranges.items():
 config_version = extract_int(domain_src, "CONFIG_VERSION")
 check(f"`CONFIG_VERSION = {config_version}`" in tech_ref_src,
       f"技术参考 schema 版本与 CONFIG_VERSION({config_version}) 一致")
+for legacy_ver in sorted({int(v) for v in re.findall(r'c->schema_ver == (\d+)', config_store_src)}):
+    check(f"v{legacy_ver}" in tech_ref_src,
+          f"技术参考记录 v{legacy_ver} -> v{config_version} schema 迁移策略")
+check("未知旧版本" in tech_ref_src and "默认配置" in tech_ref_src,
+      "技术参考记录未知旧 schema 的默认回退策略")
 
 
 # ============================ 4. WiFi AP 凭证一致性 ============================

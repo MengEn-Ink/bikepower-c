@@ -754,13 +754,14 @@ namespace 固定为：
 
 `CONFIG_VERSION = 9`
 
-`config_store_migrate()` 当前没有细粒度迁移逻辑。
-只要 `schema_ver != CONFIG_VERSION`，就直接 `config_store_defaults()`。
+`config_store_migrate()` 负责把旧 `schema_ver` 升级到当前版本。当前策略是：
 
-这意味着当前策略是：
+- v6 -> v9：保留已有配置，补 `run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT`
+- v7 -> v9：保留已有配置，补 `run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT`
+- v8 -> v9：补 `broadcast_mask = BROADCAST_FIELD_ALL`，并执行一次校验
+- 未知旧版本：回退默认配置
 
-- 新版本不尝试修修补补兼容旧字段
-- 版本不一致就重置为默认配置
+这意味着 v6/v7/v8 升级到当前版本时会保留主要用户配置；更早或无法识别的 schema 会安全回默认，避免异常配置导致新固件启动异常。
 
 ### 9.3 校验与夹紧
 

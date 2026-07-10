@@ -53,7 +53,7 @@ bool config_store_validate(config_data_t *c);
 
 /**
  * 版本迁移：把旧 schema_ver 的数据升级到当前 CONFIG_VERSION。
- * 当前无历史版本，仅在 schema_ver 不匹配时重置为默认。
+ * 已知旧版本会做字段级补默认并保留已有配置；未知旧版本回退默认配置。
  * 返回是否发生迁移。
  */
 bool config_store_migrate(config_data_t *c);
