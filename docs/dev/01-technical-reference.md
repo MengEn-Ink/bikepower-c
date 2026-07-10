@@ -861,7 +861,7 @@ ISR 内禁止日志。
 需要每次设备启动 banner 都切新文件时，可启动 `tests/serial_daemon.py --split-on-reboot`。
 
 日志保留策略：默认只保留最近 5 个 `device_*.log`，多余文件按修改时间从旧到新删除；`daemon.log` 和 `daemon_restart.log` 由 `scripts/log_daemon.sh cleanup` 清理 1 天前文件。
-一次性烧录抓取由 `scripts/flash_latest.sh` 生成 `tests/logs/flash_latest_YYYYMMDD_HHMMSS.log`。
+一次性烧录抓取由 `scripts/flash_latest.sh` 生成 `tests/logs/flash_latest_YYYYMMDD_HHMMSS.log`。该脚本在正式 build 前执行 `idf.py reconfigure`，确保 `BIKEPOWER_GIT_SHA` 和 `BIKEPOWER_BUILD_TIME` 从当前源码状态重新注入，避免增量构建沿用旧 CMake 缓存。
 
 故障证据规则：守护进程检测到 `panic`、`abort`、`Backtrace`、`Guru Meditation`、`task_wdt`、`watchdog`、`WDT` 等关键字时，会生成 `tests/logs/crash_YYYYMMDD_HHMMSS.log`，保存触发行和最近上下文，避免关键故障被普通日志轮转覆盖。
 如需关闭该行为，可使用 `tests/serial_daemon.py --no-crash-snapshot`。
@@ -950,6 +950,8 @@ idf.py build
 - `*.zip.sha256`
 
 `test-report.md` 由 `scripts/tools/generate_release_docs.py` 生成，必须记录已执行测试、未执行项和原因；`core-flow-endurance.md` 由 `tests/test_core_flow_endurance.py` 输出，记录按钮、心率随动、网页编辑、模板和关闭 WiFi 等核心流程循环；`user-manual.md` 从 `docs/user/` 生成，要求先更新源用户文档再打包。
+
+双板型完整构建结束后，`scripts/build_all.sh` 会调用 `python3 scripts/tools/check_release_artifacts.py --allow-dirty` 做本地产物门禁，校验 10 个上传附件、SHA256 旁文件、`manifest.txt` 和 release zip 内容。正式创建 Gitee Release 前必须再运行 `python3 scripts/tools/check_release_artifacts.py --require-pushed`，确保产物名中的 Git ID 对应已推送源码；`scripts/tools/publish_gitee_release.py` 上传前也会复用该检查。`python3 tests/test_release_artifacts.py` 提供无需真实固件的样例回归，覆盖标准产物、SHA256 篡改和 zip 缺文件。
 
 ### 12.2 领域层 host 单测
 

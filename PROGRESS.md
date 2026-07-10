@@ -41,7 +41,8 @@
 - [x] 配网入口交互已补强：设备名铅笔编辑、保存成功强反馈、不关闭 WiFi 时可继续修改。
 - [x] 配置导入/导出基础能力已落到领域层：`config_store_serialize` / `config_store_deserialize` 支持 JSON 往返、缺字段默认值和范围夹紧。
 - [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、单一版本号、stable/fix 标识和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 Gitee Release。
-- [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合。
+- [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合；`tests/operation_gate.py --level full` 已接入 release 产物门禁和核心流程耐久。
+- [x] 当前 generic-c3 真机自动化验证通过：`flash_latest.sh --port /dev/cu.usbmodem1101 --capture-seconds 20` 烧录后启动 v4.0.4，DIS 固件名为 `generic-c3-v4.0.4-stable4.0.0-fix4.0.4-g1cbf634`；`tests/ble_selftest.py 8` 和 `tests/stage3_conn_test.py --port /dev/cu.usbmodem1101` 均通过。
 
 ### 待人工确认（P0）
 
@@ -57,7 +58,7 @@
 - [ ] Captive Portal 多系统弹窗：iOS、Android、Windows 分别连接 `BikePower-XXXXXX` 热点后能自动弹出配网页；不弹窗时手动访问 `192.168.4.1` 仍可配网。
 - [ ] Captive Portal 生命周期：退出配网后串口确认 DNS 任务停止，不再响应劫持。
 - [ ] 72h 老化：长时间运行无 coredump、无 WDT、无堆持续下降；建议周期性跑 `tests/ble_selftest.py` 和 `tests/stage5_portal_test.py` 采样。
-- [ ] Release 人工步骤：执行 `scripts/build_all.sh`，校验 SHA256，打 `v4.0.4` tag，创建 Gitee Release 并上传 merged bin/manifest。首刷需 `erase_flash`（分区表从双 OTA 改单 factory，不兼容平滑迁移）。
+- [ ] Release 人工步骤：从已提交并已推送源码执行 `scripts/build_all.sh`，校验 SHA256，打 `v4.0.4` tag，创建 Gitee Release 并上传 merged bin/manifest。首刷需 `erase_flash`（分区表从双 OTA 改单 factory，不兼容平滑迁移）。
 
 ---
 
@@ -128,11 +129,11 @@
 | 模块 | 文件 | 说明 |
 |------|------|------|
 | 射频控制 | [main/radio_ctrl.c](main/radio_ctrl.c) | 唯一 WiFi/BLE 射频入口；配网走 coex 共存（BLE 不停），共存失败才降级为停 BLE 兜底 |
-| 配网门户 | [main/wifi_portal.c](main/wifi_portal.c) | esp_http_server（SoftAP 由 radio_ctrl 启动），内嵌 snprintf HTML 分块发送；移植旧版完整 UI（iOS 三卡 + 训练区间染色 + 动态碎片页）；路由 `/` `/config` `/success` `/more` `/draft` `/ui/module` `/closing` `/time` `/renew` `/mem_stats` `/favicon.ico` |
+| 配网门户 | [main/wifi_portal.c](main/wifi_portal.c) / [main/web/](main/web) | esp_http_server（SoftAP 由 radio_ctrl 启动）；前端三件套 `main/web/` 由 `scripts/inline_static.py` 编译时内联到固件；C 侧仅保留静态首页、`/api/xxx` JSON、Captive Portal 探测路由和 404 兜底 |
 | 状态机接入 | [main/app_state.c](main/app_state.c) | ST_WIFI_CONFIRM → ST_WIFI_CONFIG，经 `wifi_trigger` 回调触发 radio_ctrl |
 
 - 超时方案：180s（`WIFI_SHUTDOWN_MS`）无续期自动关闭 WiFi 回到 BLE，保存并关闭后 5s 收尾再退出配网
-- 前端每秒轮询 `/time` 显示剩余时间，`/renew` 续期；`/mem_stats` 返回堆内存 JSON，`/favicon.ico` 返回 204
+- 前端每秒轮询 `/api/time` 显示剩余时间，`/api/renew` 续期；`/api/mem_stats` 返回堆内存 JSON，`/favicon.ico` 返回 204
 - 配网表单可改：功率/踏频/心率/模式/体重/FTP/阈值心率/配速机器人/设备名，保存后写入 power_engine + NVS
 
 ### 待人工确认（需配网真机流程）
@@ -140,7 +141,7 @@
 - [ ] 长按 + 二次确认 → 进入配网，手机连 `BikePower` 热点
 - [ ] 浏览器访问 `192.168.4.1` → 修改参数 → 保存并关闭 WiFi → BLE 保持/恢复在线且参数生效
 - [ ] 180s 无操作 → 自动超时关闭 WiFi 回到 BLE
-- [ ] 连上热点后跑 `python3 tests/stage5_portal_test.py` 校验 HTTP 路由（首页/more/碎片/time/mem_stats/favicon/success 守卫）
+- [ ] 连上热点后跑 `python3 tests/stage5_portal_test.py` 校验 HTTP 路由（首页、`/api/state`、`/api/time`、`/api/config`、`/api/renew`、`/api/close-wifi`、Captive Portal 探测与 404 兜底）
 
 ---
 
@@ -161,7 +162,7 @@
 
 - [ ] 72h 老化测试：长时间运行无 coredump、无堆持续下降（跑 `tests/stage5_portal_test.py` / `ble_selftest.py` 辅助）
 - [x] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`（已设为 WARN）
-- [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（代码已对齐 v4.0.4，`ble_selftest.py` 已自动校验厂商/型号/固件三字段，真机待跑）
+- [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（generic-c3 真机 `ble_selftest.py 8` 已校验厂商/型号/固件三字段）
 - [ ] 打 tag v4.0.4 + Gitee Release
 
 ---
@@ -223,7 +224,7 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 
 ### OTA 实施（v3.1.6 引入，v4.0.0 已移除）
 
-在线 OTA（家庭 WiFi + SNTP + HTTPS 拉 `latest.json` + 流式 `esp_ota_write` + 自检回滚 + 防降级）曾在 v3.1.6~v3.1.8 实现，已于 **v4.0.0 整体移除**（连同家庭网络配置与双 OTA 分区表）。移除范围与理由见阶段 13 与 [docs/archive/07-remove-ota-plan.md](docs/archive/07-remove-ota-plan.md)。当前固件升级走全量重新烧录（分区表变更需 `erase_flash`）。
+在线 OTA（家庭 WiFi + SNTP + HTTPS 拉 `latest.json` + 流式 `esp_ota_write` + 自检回滚 + 防降级）曾在 v3.1.6~v3.1.8 实现，已于 **v4.0.0 整体移除**（连同家庭网络配置与双 OTA 分区表）。移除范围与理由见阶段 13 与 [docs/archive/07-remove-ota-plan.md](docs/archive/07-remove-ota-plan.md)。当前固件升级走电脑端网页烧录，入口为 `https://easyhey.com/?firmware=MOD220`；手机端不支持烧录。分区表变更场景仍需 `erase_flash`。
 
 ---
 

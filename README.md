@@ -118,6 +118,8 @@ WiFi 配网的射频共用流程可参考（v3.1.3 起为共存模式，BLE 不�
 
 其中 `--erase` 仅用于开发者从旧的双 OTA 分区布局切换到当前 4MB 单 factory 布局时全量擦写；`--portal-test-auto-config` 会刷启动后自动进入配网的测试固件，正式使用不要加。
 
+`flash_latest.sh` 会在正式 build 前执行 `idf.py reconfigure`，确保网页和 BLE DIS 中展示的 Git ID、编译时间来自当前源码状态，避免 CMake 缓存导致设备显示旧版本标识。
+
 也可以手动准备 ESP-IDF 环境，再在项目根目录执行：
 
 ```bash
@@ -139,6 +141,13 @@ idf.py -p <port> monitor
 ```
 
 每次生成可分发固件时，`build/release/` 必须同时包含两个板型 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip` 总包。测试报告记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行项必须写明原因。
+
+正式上传前必须运行 release 产物门禁，校验 10 个上传附件、SHA256、manifest 和 zip 内容；Gitee 发布脚本也会在上传前自动复用同一检查。
+
+```bash
+python3 scripts/tools/check_release_artifacts.py --require-pushed
+python3 tests/test_release_artifacts.py
+```
 
 提交前推荐先跑聚合门禁：
 

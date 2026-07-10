@@ -200,6 +200,7 @@ python3 tests/operation_gate.py --level device --port /dev/cu.usbmodem101
 ```bash
 python3 tests/check_portal_js.py                    # TC-3a，必跑
 python3 tests/check_portal_structure.py             # TC-3d
+python3 tests/check_portal_render.py                # 渲染关于页并保存截图
 python3 tests/test_portal_config_save.py            # mock 保存回显
 python3 tests/test_core_flow_endurance.py --cycles 1 --skip-host  # 快速走一轮核心流程
 python3 tests/mock_server.py                        # 本地浏览器手测
@@ -277,7 +278,7 @@ idf.py build -DPORTAL_TEST_AUTO_CONFIG=ON
 
 > `PORTAL_TEST_AUTO_CONFIG` 是 CMake option，默认 OFF。正式发版编译不带此选项，测试编译传 `-DPORTAL_TEST_AUTO_CONFIG=ON`。两者代码一致，仅测试固件多一个启动自动配网钩子。
 
-> 切换 option 后必须 `idf.py reconfigure` 或删 `build/CMakeCache.txt`，否则缓存不刷新。
+> 切换 option 后必须 `idf.py reconfigure` 或删 `build/CMakeCache.txt`，否则缓存不刷新。`scripts/flash_latest.sh` 已在 build 前自动执行 reconfigure，确保 `BIKEPOWER_GIT_SHA` / `BIKEPOWER_BUILD_TIME` 不沿用旧 CMake 缓存。
 
 ---
 

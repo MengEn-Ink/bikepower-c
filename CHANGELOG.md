@@ -4,6 +4,29 @@
 
 ## [未发布]
 
+### 网页端升级说明
+- `main/web/`：设置页“关于”模块去掉顶部介绍和能力概览，改为一页内紧凑展示当前版本、编译时间、在线升级入口和使用提醒。
+- `main/web/`：新增 `https://easyhey.com/?firmware=MOD220` 在线升级地址及一键复制按钮；文案明确“仅支持电脑端烧录，手机端不支持升级”。
+- `tests/check_portal_structure.py`、`tests/check_portal_render.py`、`tests/check_portal_render_gate.py`：新增关于页升级入口、电脑端限制、一键复制、旧介绍区移除和真实浏览器渲染截图门禁。
+
+### 发布与烧录门禁
+- `scripts/tools/check_release_artifacts.py`：新增 release 产物门禁，校验 10 个上传附件、SHA256 旁文件、`manifest.txt`、release zip 内容和 Git ID。
+- `scripts/build_all.sh`、`scripts/tools/publish_gitee_release.py`：双板型 release 构建后自动执行本地产物门禁；Gitee 上传前复用同一门禁并要求源码已推送。
+- `tests/check_release_gate.py`、`tests/test_release_artifacts.py`：新增 release 门禁接线检查和无需真实固件的功能样例，覆盖标准产物、SHA256 篡改和 zip 缺文件。
+- `scripts/tools/quality_gate.py`、`tests/operation_gate.py`、`docs/dev/05-operation-test-gate.md`：聚合 release 产物门禁、门户渲染门禁，并在 full 操作门禁和操作矩阵中记录 `OP-REL-001`。
+- `scripts/flash_latest.sh`、`tests/check_config_consistency.py`：烧录脚本在 build 前执行 `idf.py reconfigure`，刷新 `BIKEPOWER_GIT_SHA` / `BIKEPOWER_BUILD_TIME`；静态一致性检查防止该步骤被删回。
+
+### 文档事实防漂移
+- `PROGRESS.md`、`docs/dev/03-test-coverage-analysis.md`、`docs/dev/04-running-mode-compatibility.md`：同步当前 `main/web/` 前端三件套、电脑端网页烧录、跑步模式实现状态和 v4.0.4 测试覆盖口径。
+- `README.md`、`docs/dev/01-technical-reference.md`、`tests/README.md`：补充 release 产物门禁、门户渲染截图检查和 `flash_latest.sh` 构建前 reconfigure 说明。
+
+### 验证
+- `python3 scripts/tools/quality_gate.py`：通过，49 pass / 1 warn / 0 fail；唯一 warn 为当前工作区存在未提交改动。
+- `python3 tests/operation_gate.py --level full --report /tmp/bikepower_operation_full_release_gate.md`：通过，覆盖 release 门禁接线、release 功能样例和 6 轮核心流程耐久。
+- `./scripts/flash_latest.sh --port /dev/cu.usbmodem1101 --capture-seconds 20`：编译并烧录通过；启动日志 `tests/logs/flash_latest_20260710_132921.log` 显示 `generic-c3-v4.0.4-stable4.0.0-fix4.0.4-g1cbf634`、BLE 就绪、20 秒遥测正常。
+- `python3 tests/ble_selftest.py 8`：通过，五服务齐全，DIS 固件名、CPS/HRS/CSC/FTMS 通知、FTMS 控制点、ERG 200W 收敛和 Stop/Pause 均正常。
+- `python3 tests/stage3_conn_test.py --port /dev/cu.usbmodem1101`：通过，串口观察到 connected=1 / connected=0 状态机事件。
+
 ### 跑步模式精简
 - `components/bikepower_domain/`、`main/wifi_portal.c`、`main/web/`、`tests/`：移除当前跑步模式的坡度配置、持久化和网页控件，保留配速、配速浮动、步频、步频浮动和心率作为核心跑步闭环。
 

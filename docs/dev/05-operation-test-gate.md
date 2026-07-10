@@ -38,6 +38,7 @@
 | `OP-RUN-001` | 跑步 RSC 速度、步频、步幅、距离单位换算 | `make -C test run`、`python3 tests/ble_selftest.py --profile running` | Zwift/MyWhoosh 跑步数据人工确认 |
 | `OP-STAB-001` | NVS schema、常量、板型、任务/WDT、门户结构不漂移 | `python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 tests/check_board_desc.py`、`python3 tests/check_tasks_wdt.py`、`python3 tests/check_operation_coverage.py` | 无 |
 | `OP-STAB-002` | 3 分钟核心流程耐久，覆盖重复保存、模板、关闭 WiFi、host 回归 | `python3 tests/test_core_flow_endurance.py` | 30/90 分钟老化按发版风险追加 |
+| `OP-REL-001` | 发布产物门禁：10 个上传附件、SHA256、manifest、zip 内容、Git ID 不漂移 | `python3 scripts/tools/check_release_artifacts.py --require-pushed`、`python3 tests/check_release_gate.py`、`python3 tests/test_release_artifacts.py` | 正式发布前必须从已提交并已推送源码重新构建 |
 | `OP-MANUAL-001` | 物理按钮、LED 颜色/闪烁、手机 Captive Portal、真实 Zwift/MyWhoosh 课程 | 自动化脚本只能准备状态和记录结果 | 必须人工记录“通过/失败/未执行原因” |
 
 ## 三、统一门禁命令
@@ -78,6 +79,8 @@ python3 tests/check_tasks_wdt.py
 python3 tests/check_portal_structure.py
 python3 tests/check_portal_js.py
 python3 tests/check_operation_coverage.py
+python3 tests/check_release_gate.py
+python3 tests/test_release_artifacts.py
 python3 scripts/tools/serve_ble_monitor.py
 ```
 
