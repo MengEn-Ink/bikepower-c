@@ -1071,8 +1071,30 @@ function loadTemplates() {
     }
   });
 }
+function safeDeviceNameText(s) {
+  if (s == null) return "";
+  s = String(s).trim();
+  if (!s) return "";
+  var readable = 0;
+  for (var i = 0; i < s.length; i++) {
+    var code = s.charCodeAt(i);
+    if ((code >= 0x30 && code <= 0x39) ||
+        (code >= 0x41 && code <= 0x5a) ||
+        (code >= 0x61 && code <= 0x7a) ||
+        (code >= 0x4e00 && code <= 0x9fff)) {
+      readable++;
+    }
+  }
+  if (readable === 0 || s.indexOf("□") >= 0 || s.indexOf("\ufffd") >= 0) return "";
+  return s;
+}
+function readableDeviceName(t) {
+  if (!t) return "外部运动设备";
+  var name = safeDeviceNameText(t.alias) || safeDeviceNameText(t.device_name) || safeDeviceNameText(t.adv_name);
+  return name || "外部运动设备";
+}
 function templateTitle(t) {
-  return (t.alias || t.device_name || t.adv_name || "未命名设备").trim();
+  return readableDeviceName(t);
 }
 function hasDeviceName(t) {
   return !!(t && ((t.alias && t.alias.trim()) || (t.device_name && t.device_name.trim()) || (t.adv_name && t.adv_name.trim())));
@@ -1103,7 +1125,7 @@ function serviceBadges(flags) {
   if (flags & 4) html += '<span class="svc-badge svc-power" title="功率">⚡</span>';
   if (flags & 16) html += '<span class="svc-badge svc-cadence" title="踏频">↻</span>';
   if (flags & 8) html += '<span class="svc-badge svc-hr" title="心率">♥</span>';
-  if (flags & 32) html += '<span class="svc-badge svc-ftms" title="智能骑行台">FT</span>';
+  if (flags & 32) html += '<span class="svc-badge svc-ftms" title="智能骑行台">智能</span>';
   return html;
 }
 function templateSubtitle(t) {
@@ -1115,8 +1137,8 @@ function templateSubtitle(t) {
 }
 function templateDetailCells(t) {
   var rows = [
-    ["设备名", t.device_name || t.adv_name || "—"],
-    ["别名", t.alias || "—"],
+    ["设备名", safeDeviceNameText(t.device_name) || safeDeviceNameText(t.adv_name) || "外部运动设备"],
+    ["别名", safeDeviceNameText(t.alias) || "—"],
     ["MAC", t.addr || "—"],
     ["厂商", t.manufacturer || "—"],
     ["型号", t.model || "—"],

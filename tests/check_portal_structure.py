@@ -255,6 +255,10 @@ def main():
     check('onTemplateAnalyzeDevice' in js and 'analysisCardHtml' in js, "app.js 缺少外部设备分析交互/结果渲染")
     check('template_analysis' in js and 'analysis.summary' in js and 'analysis.status' in js,
           "app.js 必须保存并展示设备分析摘要和状态")
+    check('readableDeviceName' in js and 'safeDeviceNameText' in js,
+          "app.js 必须对不可读外部设备名做中文兜底，避免显示方块乱码")
+    check('>FT</span>' not in js and '>智能</span>' in js,
+          "app.js 智能骑行台能力标签必须使用用户可理解文案，不能显示 FT 缩写")
     check('ble_scanner_analyze_device' in scanner_src and 'device_analysis_parse_ftms_bike' in scanner_src,
           "ble_scanner.c 必须连接外部设备并解析运动数据样本")
     check('DEVICE_ANALYSIS_SAMPLE_MS' in scanner_src or 'DEVICE_ANALYSIS_SAMPLE_MS' in (ROOT / "main" / "bikepower_config.h").read_text(encoding="utf-8"),
