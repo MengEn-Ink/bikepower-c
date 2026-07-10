@@ -82,8 +82,13 @@ static void post(app_evt_type_t type, int32_t data)
         ESP_LOGW(TAG, "事件队列满，丢弃按钮事件 type=%d data=%ld", (int)type, (long)data);
     } else {
         // 诊断日志：确认 ISR→button_task→app_queue 链路通畅。
+        // BTN_REPEAT 高频路径降级为 DEBUG，避免长按期间日志刷屏。
         // 看不到本日志说明 ISR 未触发或 button_task 未被唤醒（硬件接线/引脚配置问题）。
-        ESP_LOGI(TAG, "事件 type=%d data=%ld", (int)type, (long)data);
+        if (type == APP_EVT_BTN_REPEAT) {
+            ESP_LOGD(TAG, "事件 type=%d data=%ld", (int)type, (long)data);
+        } else {
+            ESP_LOGI(TAG, "事件 type=%d data=%ld", (int)type, (long)data);
+        }
     }
 }
 

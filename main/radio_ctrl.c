@@ -182,6 +182,25 @@ esp_err_t radio_ctrl_start_wifi_ap(void)
     ap_cfg.ap.channel = WIFI_AP_CHANNEL;
     ap_cfg.ap.max_connection = WIFI_MAX_STA_CONN;
     ap_cfg.ap.authmode = WIFI_AUTH_WPA2_PSK;
+    /*
+     * PMF (Protected Management Frames) 配置：必须显式设置，避免 SA Query 超时导致 Captive Portal 失败。
+     * 
+     * 【注意事项/坑点】
+     * ESP-IDF 默认行为可能启用 PMF required，导致 AP 强制要求 STA 响应 SA Query 验证。
+     * 部分手机/操作系统不响应 SA Query，AP 会因超时断开连接，客户端反复重连无法完成
+     * Captive Portal 连通性探测，最终无法自动弹出配网网页。
+     * 
+     * 【正确配置】
+     * capable = true：AP 支持 PMF（可选），兼容支持 PMF 的客户端
+     * required = false：不强制要求 STA 支持 PMF，确保所有客户端都能稳定连接
+     * 
+     * 【排查要点】
+     * 若 WiFi 连接后无法自动弹出网页，检查日志中是否有：
+     *   "STA not responded to 6 SA Query attempts"
+     * 若出现此日志，说明 PMF required 配置导致连接不稳定。
+     */
+    ap_cfg.ap.pmf_cfg.capable = true;
+    ap_cfg.ap.pmf_cfg.required = false;
 
     ret = esp_wifi_set_config(WIFI_IF_AP, &ap_cfg);
     if (ret != ESP_OK) {
