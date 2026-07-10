@@ -4,6 +4,8 @@
 
 ## [未发布]
 
+## [4.0.5] - 2026-07-10
+
 ### 网页端升级说明
 - `main/web/`：设置页“关于”模块去掉顶部介绍和能力概览，改为一页内紧凑展示当前版本、编译时间、在线升级入口和使用提醒。
 - `main/web/`：新增 `https://easyhey.com/?firmware=MOD220` 在线升级地址及一键复制按钮；文案明确“仅支持电脑端烧录，手机端不支持升级”。
@@ -17,7 +19,7 @@
 - `scripts/flash_latest.sh`、`tests/check_config_consistency.py`：烧录脚本在 build 前执行 `idf.py reconfigure`，刷新 `BIKEPOWER_GIT_SHA` / `BIKEPOWER_BUILD_TIME`；静态一致性检查防止该步骤被删回。
 
 ### 文档事实防漂移
-- `PROGRESS.md`、`docs/dev/03-test-coverage-analysis.md`、`docs/dev/04-running-mode-compatibility.md`：同步当前 `main/web/` 前端三件套、电脑端网页烧录、跑步模式实现状态和 v4.0.4 测试覆盖口径。
+- `PROGRESS.md`、`docs/dev/03-test-coverage-analysis.md`、`docs/dev/04-running-mode-compatibility.md`：同步当前 `main/web/` 前端三件套、电脑端网页烧录、跑步模式实现状态和 v4.0.5 测试覆盖口径。
 - `README.md`、`docs/dev/01-technical-reference.md`、`tests/README.md`：补充 release 产物门禁、门户渲染截图检查和 `flash_latest.sh` 构建前 reconfigure 说明。
 
 ### 验证

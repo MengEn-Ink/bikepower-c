@@ -195,9 +195,9 @@ typedef enum {
 #define DEVICE_NAME          "BikePower"
 #define DEVICE_MANUFACTURER  "BikePower"
 #define DEVICE_MODEL         "ESP32-C3"
-#define FIRMWARE_VERSION     "4.0.4"
+#define FIRMWARE_VERSION     "4.0.5"
 #define FIRMWARE_STABLE_VERSION "4.0.0"
-#define FIRMWARE_FIX_VERSION    "4.0.4"
+#define FIRMWARE_FIX_VERSION    "4.0.5"
 
 #ifndef BIKEPOWER_GIT_SHA
 #define BIKEPOWER_GIT_SHA "nogit"
