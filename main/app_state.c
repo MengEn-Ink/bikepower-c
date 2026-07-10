@@ -236,6 +236,31 @@ void app_state_handle_event(const app_evt_t *e)
         }
         break;
 
+    case APP_EVT_RUN_TARGET_SPEED:
+        if (power_engine_set_run_speed(s_engine, e->data)) {
+            ESP_LOGI(TAG, "跑步 FTMS 目标速度 %.2fkm/h", (double)e->data / 100.0);
+        }
+        break;
+
+    case APP_EVT_RUN_TARGET_INCLINE:
+        if (power_engine_set_run_incline(s_engine, e->data)) {
+            ESP_LOGI(TAG, "跑步 FTMS 坡度 %.1f%%", (double)e->data / 10.0);
+        }
+        break;
+
+    case APP_EVT_RUN_START:
+        ESP_LOGI(TAG, "跑步 FTMS 开始/恢复");
+        break;
+
+    case APP_EVT_RUN_STOP:
+        ESP_LOGI(TAG, "跑步 FTMS 暂停/停止");
+        break;
+
+    case APP_EVT_RUN_RESET:
+        power_engine_run_reset(s_engine);
+        ESP_LOGI(TAG, "跑步 FTMS reset，清空距离和用时");
+        break;
+
     case APP_EVT_WIFI_DONE:
         // 配网结束（保存成功或超时）：先关闭 WiFi 资源（HTTP + SoftAP），再回到 BLE 活动态。
         // BLE 全程未停，无需重激活；LED 直接根据当前连接状态刷新。

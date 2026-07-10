@@ -36,6 +36,7 @@ BUILD_ALL = ROOT / "scripts" / "build_all.sh"
 FLASH_LATEST = ROOT / "scripts" / "flash_latest.sh"
 BLE_SELFTEST = ROOT / "tests" / "ble_selftest.py"
 STAGE3_CONN_TEST = ROOT / "tests" / "stage3_conn_test.py"
+BLE_BIKEPOWER_C = ROOT / "main" / "ble_bikepower.c"
 
 TAG = "[TC-3c]"
 g_pass = 0
@@ -131,6 +132,7 @@ build_all_src = read(BUILD_ALL)
 flash_latest_src = read(FLASH_LATEST)
 ble_selftest_src = read(BLE_SELFTEST)
 stage3_conn_src = read(STAGE3_CONN_TEST)
+ble_bikepower_src = read(BLE_BIKEPOWER_C)
 
 
 # ============================ 1. 固件版本一致性 ============================
@@ -283,6 +285,9 @@ range_expectations = {
     "run_pace_float_sec": (extract_int(domain_src, "RUN_PACE_FLOAT_SEC_MIN"), extract_int(domain_src, "RUN_PACE_FLOAT_SEC_MAX")),
     "run_cadence": (extract_int(domain_src, "RUN_CADENCE_MIN"), extract_int(domain_src, "RUN_CADENCE_MAX")),
     "run_cadence_float": (extract_int(domain_src, "RUN_CADENCE_FLOAT_MIN"), extract_int(domain_src, "RUN_CADENCE_FLOAT_MAX")),
+    "run_pace_low_sec": (extract_int(domain_src, "RUN_PACE_SEC_MIN"), extract_int(domain_src, "RUN_PACE_SEC_MAX")),
+    "run_pace_high_sec": (extract_int(domain_src, "RUN_PACE_SEC_MIN"), extract_int(domain_src, "RUN_PACE_SEC_MAX")),
+    "run_incline_x10": (extract_int(domain_src, "RUN_INCLINE_X10_MIN"), extract_int(domain_src, "RUN_INCLINE_X10_MAX")),
 }
 
 for key, expected in range_expectations.items():
@@ -303,8 +308,41 @@ for js_key, domain_key in js_ranges.items():
     check(actual == expected, f"main/web/app.js FLOAT_RANGE.{js_key} == {expected} (实际={actual})")
 
 config_version = extract_int(domain_src, "CONFIG_VERSION")
+check(config_version == 10, f"CONFIG_VERSION 必须升级到 10 (实际={config_version})")
 check(f"`CONFIG_VERSION = {config_version}`" in tech_ref_src,
       f"技术参考 schema 版本与 CONFIG_VERSION({config_version}) 一致")
+for macro in [
+    "RUN_MODE_FIXED",
+    "RUN_MODE_PACER",
+    "RUN_PACER_JOG",
+    "RUN_PACER_AEROBIC",
+    "RUN_PACER_TEMPO",
+    "RUN_PACER_INTERVAL",
+    "RUN_PACER_CUSTOM",
+    "RUN_CUSTOM_NAME_MAX",
+    "RUN_INCLINE_X10_DEFAULT",
+]:
+    check(macro in domain_src, f"domain_config.h 必须定义 {macro}")
+for macro in [
+    "NVS_KEY_RUN_MODE",
+    "NVS_KEY_RUN_PACER",
+    "NVS_KEY_RUN_PACE_LO",
+    "NVS_KEY_RUN_PACE_HI",
+    "NVS_KEY_RUN_CUSTOM_NAME",
+    "NVS_KEY_RUN_INCLINE",
+]:
+    check(macro in config_src and macro in read(ROOT / "main" / "nvs_store.c"),
+          f"{macro} 必须在配置头与 nvs_store.c 中同步使用")
+for field in [
+    "run_mode",
+    "run_pacer_type",
+    "run_pace_low_sec",
+    "run_pace_high_sec",
+    "run_custom_name",
+    "run_incline_x10",
+]:
+    check(field in config_store_src and field in mock_src and field in app_js_src,
+          f"{field} 必须贯通 config_store、mock 和前端")
 for legacy_ver in sorted({int(v) for v in re.findall(r'c->schema_ver == (\d+)', config_store_src)}):
     check(f"v{legacy_ver}" in tech_ref_src,
           f"技术参考记录 v{legacy_ver} -> v{config_version} schema 迁移策略")
@@ -451,12 +489,28 @@ print(f"\n{TAG} [S8] FTMS OpCode 值不冲突")
 ftms_ops = {
     "FTMS_OP_REQUEST_CONTROL": extract_int(config_src, "FTMS_OP_REQUEST_CONTROL"),
     "FTMS_OP_RESET": extract_int(config_src, "FTMS_OP_RESET"),
+    "FTMS_OP_SET_TARGET_SPEED": extract_int(config_src, "FTMS_OP_SET_TARGET_SPEED"),
+    "FTMS_OP_SET_TARGET_INCLINATION": extract_int(config_src, "FTMS_OP_SET_TARGET_INCLINATION"),
     "FTMS_OP_SET_TARGET_POWER": extract_int(config_src, "FTMS_OP_SET_TARGET_POWER"),
     "FTMS_OP_START_RESUME": extract_int(config_src, "FTMS_OP_START_RESUME"),
     "FTMS_OP_STOP_PAUSE": extract_int(config_src, "FTMS_OP_STOP_PAUSE"),
 }
 values = [v for v in ftms_ops.values() if v is not None]
 check(len(values) == len(set(values)), f"FTMS OpCode 值唯一 (实际={values})")
+check(ftms_ops["FTMS_OP_SET_TARGET_SPEED"] == 0x02,
+      f"FTMS_OP_SET_TARGET_SPEED = 0x02 (实际={ftms_ops['FTMS_OP_SET_TARGET_SPEED']})")
+check(ftms_ops["FTMS_OP_SET_TARGET_INCLINATION"] == 0x03,
+      f"FTMS_OP_SET_TARGET_INCLINATION = 0x03 (实际={ftms_ops['FTMS_OP_SET_TARGET_INCLINATION']})")
+check(extract_int(config_src, "FTMS_TREADMILL_CHAR_UUID") == 0x2ACD,
+      f"FTMS_TREADMILL_CHAR_UUID = 0x2ACD (实际={extract_int(config_src, 'FTMS_TREADMILL_CHAR_UUID')})")
+running_gatt = re.search(r"static const struct ble_gatt_svc_def running_gatt_svcs\[\].*?;\n\nstatic const struct", ble_bikepower_src, re.S)
+running_gatt_src = running_gatt.group(0) if running_gatt else ""
+check("FTMS_SERVICE_UUID" in running_gatt_src and "FTMS_TREADMILL_CHAR_UUID" in running_gatt_src,
+      "running profile GATT 表包含 FTMS Treadmill Data")
+check("g_ftms_treadmill_handle" in ble_bikepower_src and "g_ftms_treadmill_buf" in ble_bikepower_src,
+      "ble_bikepower.c 维护 FTMS Treadmill 通知句柄和缓冲区")
+check("FTMS_TREADMILL_UUID" in ble_selftest_src and "parse_treadmill" in ble_selftest_src,
+      "ble_selftest.py 覆盖 FTMS Treadmill Data 发现和解析")
 
 
 # ============================ 9. 板型枚举完整性 ============================

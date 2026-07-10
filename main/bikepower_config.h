@@ -67,6 +67,7 @@ typedef enum {
 #define SENSOR_LOCATION_CHAR_UUID  0x2A5D
 #define FTMS_FEATURE_CHAR_UUID     0x2ACC
 #define FTMS_CONTROL_POINT_CHAR_UUID 0x2AD9
+#define FTMS_TREADMILL_CHAR_UUID   0x2ACD
 #define FTMS_POWER_CHAR_UUID       0x2AD2
 #define FTMS_STATUS_CHAR_UUID      0x2ADA
 #define DIS_MANUFACTURER_CHAR_UUID 0x2A29
@@ -99,6 +100,12 @@ typedef enum {
 #define NVS_KEY_RUN_PACE_FLOAT "rpacef"
 #define NVS_KEY_RUN_CADENCE    "rcad"
 #define NVS_KEY_RUN_CAD_FLOAT  "rcadf"
+#define NVS_KEY_RUN_MODE       "rmode"
+#define NVS_KEY_RUN_PACER      "rpacer"
+#define NVS_KEY_RUN_PACE_LO    "rplo"
+#define NVS_KEY_RUN_PACE_HI    "rphi"
+#define NVS_KEY_RUN_CUSTOM_NAME "rcname"
+#define NVS_KEY_RUN_INCLINE    "rincl"
 #define NVS_KEY_LED_SILENT     "ledsil"
 #define NVS_KEY_LED_WAIT_MODE  "ledwm"
 #define NVS_KEY_LED_WAIT_COLOR "ledwc"
@@ -128,6 +135,8 @@ typedef enum {
 // ===== FTMS 控制点 OpCode（协议码，0x2AD9 写入/响应） =====
 #define FTMS_OP_REQUEST_CONTROL   0x00
 #define FTMS_OP_RESET             0x01
+#define FTMS_OP_SET_TARGET_SPEED  0x02
+#define FTMS_OP_SET_TARGET_INCLINATION 0x03
 #define FTMS_OP_SET_TARGET_POWER  0x05
 #define FTMS_OP_START_RESUME      0x07
 #define FTMS_OP_STOP_PAUSE        0x08

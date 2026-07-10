@@ -308,9 +308,30 @@ def main():
           "跑步联动心率必须按当前配速/速度折算强度")
     check(js.count('hr_lock: directHrControl() ? 1') >= 2,
           "首页和设置页保存都必须复用只剩心率直接控制语义")
-    check('running-incline-card' not in html and 'running-incline-card' not in js
-          and 'run-incline' not in html and 'run_incline_x10' not in js,
-          "跑步页不应保留坡度配置，核心跑步闭环只保留配速/步频/心率")
+    check('id="run-source-picker"' in html and 'id="run-source-summary"' in html,
+          "跑步页缺少固定/模板来源胶囊条和摘要")
+    check('id="run-fixed-panel"' in html and 'id="run-custom-panel"' in html,
+          "跑步页缺少固定配速区和自定义模板区")
+    check('id="running-incline-row"' in html and 'id="run-incline"' in html,
+          "跑步页缺少坡度控件")
+    check('renderRunSourcePicker' in js and 'onRunSourceSelect' in js and 'updateRunPacerInfo' in js,
+          "app.js 缺少跑步来源渲染/切换/摘要逻辑")
+    check('onRunCustomPaceAdj' in js and 'onRunCustomNameInput' in js and 'onRunInclineAdj' in js,
+          "app.js 缺少自定义跑步模板或坡度交互逻辑")
+    check('paceSecText' in js and 'speedTextFromPaceSec' in js,
+          "app.js 缺少跑步配速/速度展示格式化逻辑")
+    check('run_pacers' in js and 'run_incline_x10' in js,
+          "app.js 必须保存跑步模板列表和坡度字段")
+    for field in [
+        "run_mode",
+        "run_pacer_type",
+        "run_pace_low_sec",
+        "run_pace_high_sec",
+        "run_custom_name",
+        "run_incline_x10",
+    ]:
+        check(field in js and field in portal_config_save_src,
+              f"网页保存测试和 app.js 必须覆盖跑步字段 {field}")
     check('切换骑行/跑步需点保存并关闭 WiFi' not in js,
           "普通保存必须允许切换骑行/跑步，并由固件即时重建 BLE GATT 表")
     check('active_sport_profile = STATE.sport_profile' in js,

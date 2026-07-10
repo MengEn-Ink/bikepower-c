@@ -28,6 +28,16 @@ typedef bool (*ble_erg_cb_t)(int target_power);
  */
 typedef void (*ble_erg_clear_cb_t)(int reason);
 
+typedef enum {
+    BLE_RUN_CTRL_SPEED,
+    BLE_RUN_CTRL_INCLINE,
+    BLE_RUN_CTRL_START,
+    BLE_RUN_CTRL_STOP,
+    BLE_RUN_CTRL_RESET,
+} ble_run_control_type_t;
+
+typedef bool (*ble_run_control_cb_t)(ble_run_control_type_t type, int value);
+
 /**
  * 启动 BLE 蓝牙功率计服务。
  * 初始化 NimBLE、注册五个 GATT 服务、配置设备名并开始广播和周期通知。
@@ -108,6 +118,8 @@ void ble_bikepower_set_erg_callback(ble_erg_cb_t cb);
  * 特殊行为：新回调会覆盖旧回调。
  */
 void ble_bikepower_set_erg_clear_callback(ble_erg_clear_cb_t cb);
+
+void ble_bikepower_set_run_control_callback(ble_run_control_cb_t cb);
 
 /**
  * 设置 BLE 广播设备名。

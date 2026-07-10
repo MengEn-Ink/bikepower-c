@@ -47,6 +47,12 @@ MOCK_STATE = {
     "run_pace_float_sec": 10,
     "run_cadence": 170,
     "run_cadence_float": 4,
+    "run_mode": "fixed",
+    "run_pacer_type": "jog",
+    "run_pace_low_sec": 390,
+    "run_pace_high_sec": 450,
+    "run_custom_name": "自定义",
+    "run_incline_x10": 0,
     "mode": "steady",
     "power_float": 5,
     "cadence_float": 2,
@@ -80,6 +86,13 @@ MOCK_STATE = {
         {"id": "genie", "name": "Genie", "wkg_low": 3.5, "wkg_high": 3.9},
         {"id": "constance", "name": "Constance", "wkg_low": 4.0, "wkg_high": 4.4},
         {"id": "custom", "name": "自定义", "wkg_low": 2.5, "wkg_high": 3.0, "custom": True},
+    ],
+    "run_pacers": [
+        {"id": "jog", "name": "慢跑", "pace_low_sec": 390, "pace_high_sec": 450, "cadence": 165},
+        {"id": "aerobic", "name": "有氧", "pace_low_sec": 330, "pace_high_sec": 390, "cadence": 170},
+        {"id": "tempo", "name": "节奏", "pace_low_sec": 270, "pace_high_sec": 315, "cadence": 174},
+        {"id": "interval", "name": "间歇", "pace_low_sec": 210, "pace_high_sec": 255, "cadence": 180},
+        {"id": "custom", "name": "自定义", "pace_low_sec": 390, "pace_high_sec": 450, "cadence": 170, "custom": True},
     ],
 }
 
@@ -167,6 +180,9 @@ LIMITS = {
     "run_pace_float_sec": (0, 60),
     "run_cadence": (120, 220),
     "run_cadence_float": (0, 20),
+    "run_pace_low_sec": (144, 1200),
+    "run_pace_high_sec": (144, 1200),
+    "run_incline_x10": (-100, 150),
     "led_wait_mode": (0, 5),
     "led_wait_color": (0, 6),
     "led_conn_mode": (0, 5),
@@ -183,6 +199,8 @@ ENUM_VALUES = {
     "sport_profile": {"cycling", "running"},
     "mode": {"steady", "road", "erg"},
     "profile_ride_type": {"coco", "yumi", "jacques", "genie", "constance", "custom"},
+    "run_mode": {"fixed", "pacer"},
+    "run_pacer_type": {"jog", "aerobic", "tempo", "interval", "custom"},
 }
 
 
@@ -320,6 +338,8 @@ class Handler(BaseHTTPRequestHandler):
                 for k in ("device_name", "sport_profile", "mode", "power", "cadence",
                           "heartrate", "run_speed_x100", "run_pace_float_sec",
                           "run_cadence", "run_cadence_float",
+                          "run_mode", "run_pacer_type", "run_pace_low_sec",
+                          "run_pace_high_sec", "run_custom_name", "run_incline_x10",
                           "broadcast_mask",
                           "power_float", "cadence_float", "hr_float",
                           "power_step",
@@ -342,6 +362,14 @@ class Handler(BaseHTTPRequestHandler):
                         p["name"] = MOCK_STATE.get("custom_pacer_name") or "自定义"
                         p["wkg_low"] = MOCK_STATE.get("custom_wkg_low", 25) / 10
                         p["wkg_high"] = MOCK_STATE.get("custom_wkg_high", 30) / 10
+                if MOCK_STATE.get("run_pace_low_sec", 390) > MOCK_STATE.get("run_pace_high_sec", 450):
+                    MOCK_STATE["run_pace_high_sec"] = MOCK_STATE["run_pace_low_sec"]
+                for p in MOCK_STATE["run_pacers"]:
+                    if p.get("id") == "custom":
+                        p["name"] = MOCK_STATE.get("run_custom_name") or "自定义"
+                        p["pace_low_sec"] = MOCK_STATE.get("run_pace_low_sec", 390)
+                        p["pace_high_sec"] = MOCK_STATE.get("run_pace_high_sec", 450)
+                        p["cadence"] = MOCK_STATE.get("run_cadence", 170)
                 if "hr_lock" in data:
                     _apply_config_field("hr_lock", data["hr_lock"])
             self._send_json({"ok": True})

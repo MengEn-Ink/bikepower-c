@@ -490,6 +490,48 @@ bool power_engine_set_run_cadence_float(power_engine_t *e, int amp_spm)
     return changed;
 }
 
+bool power_engine_set_run_mode(power_engine_t *e, run_mode_t mode)
+{
+    bool changed = running_engine_set_mode(&e->running, mode);
+    if (changed) e->dirty = true;
+    return changed;
+}
+
+bool power_engine_set_run_pacer(power_engine_t *e, run_pacer_type_t pacer)
+{
+    bool changed = running_engine_set_pacer(&e->running, pacer);
+    if (changed) e->dirty = true;
+    return changed;
+}
+
+bool power_engine_set_run_custom_pacer(power_engine_t *e, const char *name, int pace_low_sec, int pace_high_sec, int cadence_spm)
+{
+    bool changed = running_engine_set_custom_pacer(&e->running, name, pace_low_sec, pace_high_sec, cadence_spm);
+    if (changed) e->dirty = true;
+    return changed;
+}
+
+bool power_engine_set_run_pace_range(power_engine_t *e, int pace_low_sec, int pace_high_sec)
+{
+    bool changed = running_engine_set_pace_range(&e->running, pace_low_sec, pace_high_sec);
+    if (changed) e->dirty = true;
+    return changed;
+}
+
+bool power_engine_set_run_incline(power_engine_t *e, int incline_x10)
+{
+    bool changed = running_engine_set_incline(&e->running, incline_x10);
+    if (changed) e->dirty = true;
+    return changed;
+}
+
+void power_engine_run_reset(power_engine_t *e)
+{
+    if (!e) return;
+    running_engine_reset_session(&e->running);
+    e->dirty = true;
+}
+
 int power_engine_running_heartrate(power_engine_t *e, int speed_x100_kmh)
 {
     if (!e) return DEFAULT_HEARTRATE;

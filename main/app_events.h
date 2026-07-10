@@ -19,6 +19,11 @@ typedef enum {
     APP_EVT_CONN_CHANGED,   // BLE 连接状态变化（data=已连接 0/1）
     APP_EVT_ERG_TARGET,     // FTMS ERG 目标功率（data=目标瓦特）
     APP_EVT_ERG_CLEAR,      // FTMS 停止/复位/断开后清除 ERG 锁定（data=原因码）
+    APP_EVT_RUN_TARGET_SPEED,   // FTMS 跑步目标速度（data=km/h*100）
+    APP_EVT_RUN_TARGET_INCLINE, // FTMS 跑步坡度（data=坡度*10）
+    APP_EVT_RUN_START,      // FTMS 跑步开始/恢复（data=0）
+    APP_EVT_RUN_STOP,       // FTMS 跑步暂停/停止（data=0）
+    APP_EVT_RUN_RESET,      // FTMS 跑步重置距离/用时（data=0）
     APP_EVT_WIFI_DONE,      // WiFi 配网结束（保存成功或超时，data=0）
 } app_evt_type_t;
 

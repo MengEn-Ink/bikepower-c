@@ -47,6 +47,13 @@ void config_store_defaults(config_data_t *c)
     c->run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT;
     c->run_cadence = RUN_CADENCE_DEFAULT;
     c->run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT;
+    c->run_mode = RUN_MODE_DEFAULT;
+    c->run_pacer_type = RUN_PACER_DEFAULT;
+    c->run_pace_low_sec = RUN_PACERS[RUN_PACER_DEFAULT].pace_low_sec;
+    c->run_pace_high_sec = RUN_PACERS[RUN_PACER_DEFAULT].pace_high_sec;
+    strncpy(c->run_custom_name, RUN_CUSTOM_NAME_DEFAULT, RUN_CUSTOM_NAME_MAX - 1);
+    c->run_custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
+    c->run_incline_x10 = RUN_INCLINE_X10_DEFAULT;
     strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
@@ -89,6 +96,16 @@ bool config_store_validate(config_data_t *c)
     c->run_pace_float_sec = clamp_int(c->run_pace_float_sec, RUN_PACE_FLOAT_SEC_MIN, RUN_PACE_FLOAT_SEC_MAX);
     c->run_cadence = clamp_int(c->run_cadence, RUN_CADENCE_MIN, RUN_CADENCE_MAX);
     c->run_cadence_float = clamp_int(c->run_cadence_float, RUN_CADENCE_FLOAT_MIN, RUN_CADENCE_FLOAT_MAX);
+    if (c->run_mode < 0 || c->run_mode >= RUN_MODE_COUNT) c->run_mode = RUN_MODE_DEFAULT;
+    if (c->run_pacer_type < 0 || c->run_pacer_type >= RUN_PACER_COUNT) c->run_pacer_type = RUN_PACER_DEFAULT;
+    c->run_pace_low_sec = clamp_int(c->run_pace_low_sec, RUN_PACE_SEC_MIN, RUN_PACE_SEC_MAX);
+    c->run_pace_high_sec = clamp_int(c->run_pace_high_sec, RUN_PACE_SEC_MIN, RUN_PACE_SEC_MAX);
+    if (c->run_pace_low_sec > c->run_pace_high_sec) c->run_pace_high_sec = c->run_pace_low_sec;
+    c->run_custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
+    if (c->run_custom_name[0] == '\0') {
+        strncpy(c->run_custom_name, RUN_CUSTOM_NAME_DEFAULT, RUN_CUSTOM_NAME_MAX - 1);
+    }
+    c->run_incline_x10 = clamp_int(c->run_incline_x10, RUN_INCLINE_X10_MIN, RUN_INCLINE_X10_MAX);
 
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
     if (c->device_name[0] == '\0') {
@@ -118,6 +135,12 @@ bool config_store_validate(config_data_t *c)
         || in.run_pace_float_sec != c->run_pace_float_sec
         || in.run_cadence != c->run_cadence
         || in.run_cadence_float != c->run_cadence_float
+        || in.run_mode != c->run_mode
+        || in.run_pacer_type != c->run_pacer_type
+        || in.run_pace_low_sec != c->run_pace_low_sec
+        || in.run_pace_high_sec != c->run_pace_high_sec
+        || strncmp(in.run_custom_name, c->run_custom_name, RUN_CUSTOM_NAME_MAX) != 0
+        || in.run_incline_x10 != c->run_incline_x10
         || strncmp(in.device_name, c->device_name, DEVICE_NAME_MAX) != 0;
 }
 
@@ -141,8 +164,18 @@ bool config_store_migrate(config_data_t *c)
         c->run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT;
     }
     if (c->schema_ver == 8) {
-        c->schema_ver = CONFIG_VERSION;
+        c->schema_ver = 9;
         c->broadcast_mask = BROADCAST_FIELD_ALL;
+    }
+    if (c->schema_ver == 9) {
+        c->schema_ver = CONFIG_VERSION;
+        c->run_mode = RUN_MODE_DEFAULT;
+        c->run_pacer_type = RUN_PACER_DEFAULT;
+        c->run_pace_low_sec = RUN_PACERS[RUN_PACER_DEFAULT].pace_low_sec;
+        c->run_pace_high_sec = RUN_PACERS[RUN_PACER_DEFAULT].pace_high_sec;
+        strncpy(c->run_custom_name, RUN_CUSTOM_NAME_DEFAULT, RUN_CUSTOM_NAME_MAX - 1);
+        c->run_custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
+        c->run_incline_x10 = RUN_INCLINE_X10_DEFAULT;
         config_store_validate(c);
         return true;
     }
@@ -232,6 +265,8 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
     /* 字符串转义后最大膨胀 6 倍（\u00XX），分别按缓冲区大小预留 */
     char custom_esc[CUSTOM_PACER_NAME_MAX * 6];
     if (json_escape(c->custom_pacer_name, custom_esc, sizeof(custom_esc)) == (size_t)-1) return 0;
+    char run_custom_esc[RUN_CUSTOM_NAME_MAX * 6];
+    if (json_escape(c->run_custom_name, run_custom_esc, sizeof(run_custom_esc)) == (size_t)-1) return 0;
     char esc[DEVICE_NAME_MAX * 6];
     if (json_escape(c->device_name, esc, sizeof(esc)) == (size_t)-1) return 0;
 
@@ -255,6 +290,9 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         "\"sport_profile\":%d,\"broadcast_mask\":%d,\"run_speed_x100\":%d,"
         "\"run_pace_float_sec\":%d,"
         "\"run_cadence\":%d,\"run_cadence_float\":%d,"
+        "\"run_mode\":%d,\"run_pacer_type\":%d,"
+        "\"run_pace_low_sec\":%d,\"run_pace_high_sec\":%d,"
+        "\"run_custom_name\":\"%s\",\"run_incline_x10\":%d,"
         "\"device_name\":\"%s\"}",
         c->schema_ver, c->power, c->cadence, c->mode,
         c->heartrate, c->has_user_hr,
@@ -273,6 +311,9 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         c->sport_profile, c->broadcast_mask, c->run_speed_x100,
         c->run_pace_float_sec,
         c->run_cadence, c->run_cadence_float,
+        c->run_mode, c->run_pacer_type,
+        c->run_pace_low_sec, c->run_pace_high_sec,
+        run_custom_esc, c->run_incline_x10,
         esc);
 
     if (n < 0 || (size_t)n >= sizeof(buf)) return 0;  /* 编码错误或内部缓冲不足 */
@@ -308,6 +349,11 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         {"run_pace_float_sec", &tmp.run_pace_float_sec},
         {"run_cadence", &tmp.run_cadence},
         {"run_cadence_float", &tmp.run_cadence_float},
+        {"run_mode", &tmp.run_mode},
+        {"run_pacer_type", &tmp.run_pacer_type},
+        {"run_pace_low_sec", &tmp.run_pace_low_sec},
+        {"run_pace_high_sec", &tmp.run_pace_high_sec},
+        {"run_incline_x10", &tmp.run_incline_x10},
     };
     for (size_t i = 0; i < sizeof(int_keys) / sizeof(int_keys[0]); i++) {
         char pat[40];
@@ -342,6 +388,12 @@ bool config_store_deserialize(const char *json, config_data_t *c)
     if (cp) {
         cp += strlen("\"custom_pacer_name\":\"");
         json_unescape(cp, tmp.custom_pacer_name, CUSTOM_PACER_NAME_MAX);
+    }
+
+    const char *rp = strstr(json, "\"run_custom_name\":\"");
+    if (rp) {
+        rp += strlen("\"run_custom_name\":\"");
+        json_unescape(rp, tmp.run_custom_name, RUN_CUSTOM_NAME_MAX);
     }
 
     /* device_name：定位值起点后做反转义（json_get_str 不处理转义） */

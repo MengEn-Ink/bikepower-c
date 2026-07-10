@@ -38,10 +38,17 @@
 #define RUN_CADENCE_FLOAT_MIN  0       // ±steps/min
 #define RUN_CADENCE_FLOAT_MAX  20
 #define RUN_CADENCE_FLOAT_DEFAULT 4
+#define RUN_PACE_SEC_MIN       144     // 2:24 /km，25.0 km/h
+#define RUN_PACE_SEC_MAX       1200    // 20:00 /km，3.0 km/h
+#define RUN_CUSTOM_NAME_MAX    32      // 自定义跑步档名称缓冲区（含结尾 \0）
+#define RUN_CUSTOM_NAME_DEFAULT "自定义"
+#define RUN_INCLINE_X10_MIN    (-100)  // -10.0%
+#define RUN_INCLINE_X10_MAX    150     // 15.0%
+#define RUN_INCLINE_X10_DEFAULT 0      // 0.0%
 
 // ===== 配置格式版本 =====
-// v9：新增广播数据项开关持久化。
-#define CONFIG_VERSION        9
+// v10：新增跑步模板/自定义配速区间/坡度持久化。
+#define CONFIG_VERSION        10
 
 // ===== 设备名称（BLE 广播名，可配网修改并持久化） =====
 #define DEVICE_NAME_MAX       24
@@ -64,6 +71,36 @@ typedef enum {
 } broadcast_field_t;
 
 #define BROADCAST_FIELD_ALL (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_HEARTRATE)
+
+// ===== 跑步输出模式 =====
+typedef enum {
+    RUN_MODE_FIXED = 0,
+    RUN_MODE_PACER = 1,
+} run_mode_t;
+
+#define RUN_MODE_COUNT 2
+#define RUN_MODE_DEFAULT RUN_MODE_FIXED
+
+typedef enum {
+    RUN_PACER_JOG = 0,
+    RUN_PACER_AEROBIC,
+    RUN_PACER_TEMPO,
+    RUN_PACER_INTERVAL,
+    RUN_PACER_CUSTOM,
+} run_pacer_type_t;
+
+#define RUN_PACER_PRESET_COUNT 4
+#define RUN_PACER_COUNT 5
+#define RUN_PACER_DEFAULT RUN_PACER_JOG
+
+typedef struct {
+    const char *name;
+    int pace_low_sec;
+    int pace_high_sec;
+    int cadence_spm;
+} run_pacer_t;
+
+extern const run_pacer_t RUN_PACERS[RUN_PACER_PRESET_COUNT];
 
 // ===== 骑行模式 ID =====
 /* 骑行模式枚举：决定功率、踏频和心率快照的生成策略。 */

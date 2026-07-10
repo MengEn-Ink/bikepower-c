@@ -79,6 +79,35 @@ static void on_erg_clear(int reason)
     portENABLE_INTERRUPTS();
 }
 
+static bool on_run_control(ble_run_control_type_t type, int value)
+{
+    app_evt_t e = { 0 };
+    switch (type) {
+    case BLE_RUN_CTRL_SPEED:
+        if (value < RUN_SPEED_X100_MIN || value > RUN_SPEED_X100_MAX) return false;
+        e.type = APP_EVT_RUN_TARGET_SPEED;
+        e.data = value;
+        break;
+    case BLE_RUN_CTRL_INCLINE:
+        if (value < RUN_INCLINE_X10_MIN || value > RUN_INCLINE_X10_MAX) return false;
+        e.type = APP_EVT_RUN_TARGET_INCLINE;
+        e.data = value;
+        break;
+    case BLE_RUN_CTRL_START:
+        e.type = APP_EVT_RUN_START;
+        break;
+    case BLE_RUN_CTRL_STOP:
+        e.type = APP_EVT_RUN_STOP;
+        break;
+    case BLE_RUN_CTRL_RESET:
+        e.type = APP_EVT_RUN_RESET;
+        break;
+    default:
+        return false;
+    }
+    return s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE;
+}
+
 /**
  * 处理进入 WiFi 配网模式的触发回调。
  * 由状态机在用户完成二次确认后调用，切换到 WiFi/BLE 共存的 WiFi 配网流程。
@@ -176,6 +205,7 @@ void app_main(void)
 
     ble_bikepower_set_erg_callback(on_erg_target);
     ble_bikepower_set_erg_clear_callback(on_erg_clear);
+    ble_bikepower_set_run_control_callback(on_run_control);
     ble_bikepower_set_profile(s_engine.sport_profile);
     ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
     ble_bikepower_set_device_name(s_engine.device_name);

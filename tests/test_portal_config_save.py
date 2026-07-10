@@ -88,6 +88,12 @@ def main():
             "run_pace_float_sec": 15,
             "run_cadence": 181,
             "run_cadence_float": 6,
+            "run_mode": "pacer",
+            "run_pacer_type": "custom",
+            "run_pace_low_sec": 300,
+            "run_pace_high_sec": 360,
+            "run_custom_name": "晨跑",
+            "run_incline_x10": 25,
             "profile_weight": 82,
             "profile_ftp": 280,
             "profile_thr_hr": 188,
@@ -117,6 +123,12 @@ def main():
             check(custom.get("name") == "冲刺档", "custom 档名称随保存更新", failures)
             check(abs(custom.get("wkg_low", 0) - 3.1) < 0.001, "custom wkg_low 随保存更新", failures)
             check(abs(custom.get("wkg_high", 0) - 3.7) < 0.001, "custom wkg_high 随保存更新", failures)
+        run_custom = next((p for p in state.get("run_pacers", []) if p.get("id") == "custom"), None)
+        check(run_custom is not None, "run_pacers 含 custom 档", failures)
+        if run_custom:
+            check(run_custom.get("name") == "晨跑", "custom 跑步档名称随保存更新", failures)
+            check(run_custom.get("pace_low_sec") == 300, "custom 跑步快配随保存更新", failures)
+            check(run_custom.get("pace_high_sec") == 360, "custom 跑步慢配随保存更新", failures)
 
         request_json(base + "/api/renew", {})
         renewed = urllib.request.urlopen(base + "/api/time", timeout=5).read().decode("utf-8")
@@ -132,6 +144,10 @@ def main():
             "power_step": 0,
             "run_pace_float_sec": 999,
             "run_cadence_float": "bad",
+            "run_mode": "bad",
+            "run_pace_low_sec": 1,
+            "run_pace_high_sec": 9999,
+            "run_incline_x10": 999,
             "custom_wkg_low": 70,
             "custom_wkg_high": 10,
             "led_wait_mode": 99,
@@ -151,6 +167,11 @@ def main():
         check(after_invalid.get("run_pace_float_sec") == 60, "跑步配速浮动夹到上限", failures)
         check(after_invalid.get("run_cadence_float") == before_invalid.get("run_cadence_float"),
               "非数字跑步步频浮动保持旧值", failures)
+        check(after_invalid.get("run_mode") == before_invalid.get("run_mode"),
+              "非法 run_mode 保持旧值", failures)
+        check(after_invalid.get("run_pace_low_sec") == 144, "跑步快配夹到下限", failures)
+        check(after_invalid.get("run_pace_high_sec") == 1200, "跑步慢配夹到上限", failures)
+        check(after_invalid.get("run_incline_x10") == 150, "跑步坡度夹到上限", failures)
         check(after_invalid.get("custom_wkg_low") == 70 and after_invalid.get("custom_wkg_high") == 70,
               "自定义功体比上限自动抬到不低于下限", failures)
         check(after_invalid.get("led_wait_mode") == 5, "LED 模式越界夹到上限", failures)

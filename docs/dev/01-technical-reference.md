@@ -741,6 +741,18 @@ namespace 固定为：
 - `NVS_KEY_LED_CONFIRM_COLOR = "ledcfc"`
 - `NVS_KEY_LED_ERROR_MODE = "lederrm"`
 - `NVS_KEY_LED_ERROR_COLOR = "lederrc"`
+- `NVS_KEY_SPORT_PROFILE = "sport"`
+- `NVS_KEY_BROADCAST_MASK = "bmask"`
+- `NVS_KEY_RUN_SPEED = "rspeed"`
+- `NVS_KEY_RUN_PACE_FLOAT = "rpacef"`
+- `NVS_KEY_RUN_CADENCE = "rcad"`
+- `NVS_KEY_RUN_CAD_FLOAT = "rcadf"`
+- `NVS_KEY_RUN_MODE = "rmode"`
+- `NVS_KEY_RUN_PACER = "rpacer"`
+- `NVS_KEY_RUN_PACE_LO = "rplo"`
+- `NVS_KEY_RUN_PACE_HI = "rphi"`
+- `NVS_KEY_RUN_CUSTOM_NAME = "rcname"`
+- `NVS_KEY_RUN_INCLINE = "rincl"`
 
 设备信息模板由 `main/device_template_store.c` 单独管理，避免模板集合数据影响主配置保存。模板 namespace 固定为：
 
@@ -752,16 +764,17 @@ namespace 固定为：
 
 领域层配置版本在 `domain_config.h` 中：
 
-`CONFIG_VERSION = 9`
+`CONFIG_VERSION = 10`
 
 `config_store_migrate()` 负责把旧 `schema_ver` 升级到当前版本。当前策略是：
 
-- v6 -> v9：保留已有配置，补 `run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT`
-- v7 -> v9：保留已有配置，补 `run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT`
-- v8 -> v9：补 `broadcast_mask = BROADCAST_FIELD_ALL`，并执行一次校验
+- v6 -> v10：保留已有配置，补 `run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT`
+- v7 -> v10：保留已有配置，补 `run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT`
+- v8 -> v10：补 `broadcast_mask = BROADCAST_FIELD_ALL`
+- v9 -> v10：保留既有跑步速度、配速浮动、步频、步频浮动，补 `run_mode`、`run_pacer_type`、`run_pace_low_sec`、`run_pace_high_sec`、`run_custom_name`、`run_incline_x10`
 - 未知旧版本：回退默认配置
 
-这意味着 v6/v7/v8 升级到当前版本时会保留主要用户配置；更早或无法识别的 schema 会安全回默认，避免异常配置导致新固件启动异常。
+这意味着 v6/v7/v8/v9 升级到当前版本时会保留主要用户配置；更早或无法识别的 schema 会安全回默认，避免异常配置导致新固件启动异常。
 
 ### 9.3 校验与夹紧
 

@@ -234,6 +234,40 @@ static const char *sport_to_id(int sport)
     return "cycling";
 }
 
+static int run_mode_from_id(const char *id)
+{
+    if (strcmp(id, "pacer") == 0) return RUN_MODE_PACER;
+    if (strcmp(id, "fixed") == 0) return RUN_MODE_FIXED;
+    return -1;
+}
+
+static const char *run_mode_to_id(int mode)
+{
+    if (mode == RUN_MODE_PACER) return "pacer";
+    return "fixed";
+}
+
+static int run_pacer_from_id(const char *id)
+{
+    if (strcmp(id, "jog") == 0) return RUN_PACER_JOG;
+    if (strcmp(id, "aerobic") == 0) return RUN_PACER_AEROBIC;
+    if (strcmp(id, "tempo") == 0) return RUN_PACER_TEMPO;
+    if (strcmp(id, "interval") == 0) return RUN_PACER_INTERVAL;
+    if (strcmp(id, "custom") == 0) return RUN_PACER_CUSTOM;
+    return -1;
+}
+
+static const char *run_pacer_to_id(int pacer)
+{
+    switch (pacer) {
+    case RUN_PACER_AEROBIC: return "aerobic";
+    case RUN_PACER_TEMPO: return "tempo";
+    case RUN_PACER_INTERVAL: return "interval";
+    case RUN_PACER_CUSTOM: return "custom";
+    default: return "jog";
+    }
+}
+
 // ============================ 配置应用 ============================
 
 /**
@@ -346,6 +380,46 @@ static bool apply_json_fields(power_engine_t *e, const char *body, bool allow_sp
     power_engine_set_run_cadence_float(e, new_val);
     if (old_val != e->running.cadence_float_spm)
         ESP_LOGI(TAG, "  run_cadence_float: %d → %d", old_val, e->running.cadence_float_spm);
+
+    if (json_get_str(body, "run_custom_name", val, sizeof(val))) {
+        power_engine_set_run_custom_pacer(e, val, e->running.pace_low_sec, e->running.pace_high_sec, e->running.cadence_spm);
+        ESP_LOGI(TAG, "  run_custom_name: %s", e->running.custom_name);
+    }
+    if (json_has_key(body, "run_pace_low_sec") || json_has_key(body, "run_pace_high_sec")) {
+        int lo = json_get_int_def(body, "run_pace_low_sec", e->running.pace_low_sec);
+        int hi = json_get_int_def(body, "run_pace_high_sec", e->running.pace_high_sec);
+        power_engine_set_run_pace_range(e, lo, hi);
+        ESP_LOGI(TAG, "  run_pace_range: %d-%d", e->running.pace_low_sec, e->running.pace_high_sec);
+    }
+    if (json_has_key(body, "run_pacer_type")) {
+        int pacer = -1;
+        if (json_get_str(body, "run_pacer_type", val, sizeof(val))) {
+            pacer = run_pacer_from_id(val);
+        } else {
+            pacer = json_get_int_def(body, "run_pacer_type", (int)e->running.pacer_type);
+        }
+        if (pacer >= 0 && pacer < RUN_PACER_COUNT) {
+            power_engine_set_run_pacer(e, (run_pacer_type_t)pacer);
+            ESP_LOGI(TAG, "  run_pacer_type: %s", run_pacer_to_id((int)e->running.pacer_type));
+        }
+    }
+    if (json_has_key(body, "run_mode")) {
+        int rm = -1;
+        if (json_get_str(body, "run_mode", val, sizeof(val))) {
+            rm = run_mode_from_id(val);
+        } else {
+            rm = json_get_int_def(body, "run_mode", (int)e->running.mode);
+        }
+        if (rm >= 0 && rm < RUN_MODE_COUNT) {
+            power_engine_set_run_mode(e, (run_mode_t)rm);
+            ESP_LOGI(TAG, "  run_mode: %s", run_mode_to_id((int)e->running.mode));
+        }
+    }
+    old_val = e->running.incline_x10;
+    new_val = json_get_int_def(body, "run_incline_x10", old_val);
+    power_engine_set_run_incline(e, new_val);
+    if (old_val != e->running.incline_x10)
+        ESP_LOGI(TAG, "  run_incline_x10: %d → %d", old_val, e->running.incline_x10);
 
     /* 心率锁定：hr_lock=1 锁定到 heartrate 值，hr_lock=0 解锁随功率联动 */
     if (json_has_key(body, "hr_lock")) {
@@ -463,6 +537,8 @@ static esp_err_t h_api_state(httpd_req_t *req)
     json_escape(e->device_name, dn_esc, sizeof(dn_esc));
     char custom_name_esc[CUSTOM_PACER_NAME_MAX * 2 + 1] = {0};
     json_escape(e->profile.custom_pacer_name, custom_name_esc, sizeof(custom_name_esc));
+    char run_custom_name_esc[RUN_CUSTOM_NAME_MAX * 2 + 1] = {0};
+    json_escape(e->running.custom_name, run_custom_name_esc, sizeof(run_custom_name_esc));
     char fw_name[96];
     char fw_name_esc[192] = {0};
     board_firmware_name(fw_name, sizeof(fw_name));
@@ -471,7 +547,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
     int ride_type_idx = (e->profile.ride_type >= 0 && e->profile.ride_type < RIDE_TYPE_COUNT)
                         ? e->profile.ride_type : 0;
 
-    char buf[2560];
+    char buf[3328];
     int off = snprintf(buf, sizeof(buf),
         "{\"device_name\":\"%s\",\"firmware_version\":\"%s\",\"firmware_name\":\"%s\","
         "\"board\":\"%s\",\"stable_version\":\"%s\",\"fix_version\":\"%s\",\"git_sha\":\"%s\","
@@ -480,6 +556,9 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"power\":%d,\"cadence\":%d,\"heartrate\":%d,\"mode\":\"%s\","
         "\"run_speed_x100\":%d,\"run_pace_float_sec\":%d,"
         "\"run_cadence\":%d,\"run_cadence_float\":%d,"
+        "\"run_mode\":\"%s\",\"run_pacer_type\":\"%s\","
+        "\"run_pace_low_sec\":%d,\"run_pace_high_sec\":%d,"
+        "\"run_custom_name\":\"%s\",\"run_incline_x10\":%d,"
         "\"power_float\":%d,\"cadence_float\":%d,\"hr_float\":%d,"
         "\"power_step\":%d,"
         "\"profile_weight\":%d,\"profile_ftp\":%d,\"profile_thr_hr\":%d,"
@@ -501,6 +580,9 @@ static esp_err_t h_api_state(httpd_req_t *req)
         e->base_power, e->cadence_base, e->last_heartrate, mode_to_id((int)e->mode),
         e->running.speed_x100_kmh, e->running.pace_float_sec,
         e->running.cadence_spm, e->running.cadence_float_spm,
+        run_mode_to_id((int)e->running.mode), run_pacer_to_id((int)e->running.pacer_type),
+        e->running.pace_low_sec, e->running.pace_high_sec,
+        run_custom_name_esc, e->running.incline_x10,
         e->power_float, e->cadence_float, e->hr_float,
         e->power_step,
         e->profile.weight, e->profile.ftp, e->profile.thr_hr,
@@ -532,7 +614,17 @@ static esp_err_t h_api_state(httpd_req_t *req)
             e->profile.custom_wkg_low / 10, e->profile.custom_wkg_low % 10,
             e->profile.custom_wkg_high / 10, e->profile.custom_wkg_high % 10);
     }
-    off += snprintf(buf + off, sizeof(buf) - off, "]}");
+    off += snprintf(buf + off, sizeof(buf) - off, "],\"run_pacers\":[");
+    for (int i = 0; i < RUN_PACER_PRESET_COUNT && off < (int)sizeof(buf) - 128; i++) {
+        off += snprintf(buf + off, sizeof(buf) - off,
+            "%s{\"id\":\"%s\",\"name\":\"%s\",\"pace_low_sec\":%d,\"pace_high_sec\":%d,\"cadence\":%d}",
+            i == 0 ? "" : ",",
+            run_pacer_to_id(i), RUN_PACERS[i].name,
+            RUN_PACERS[i].pace_low_sec, RUN_PACERS[i].pace_high_sec, RUN_PACERS[i].cadence_spm);
+    }
+    off += snprintf(buf + off, sizeof(buf) - off,
+        ",{\"id\":\"custom\",\"name\":\"%s\",\"pace_low_sec\":%d,\"pace_high_sec\":%d,\"cadence\":%d,\"custom\":true}]}",
+        run_custom_name_esc, e->running.pace_low_sec, e->running.pace_high_sec, e->running.cadence_spm);
 
     send_json(req, buf);
     return ESP_OK;

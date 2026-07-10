@@ -40,6 +40,7 @@ static uint16_t g_hr_val_handle;
 static uint16_t g_csc_val_handle;
 static uint16_t g_rsc_val_handle;
 static uint16_t g_ftms_bike_handle;
+static uint16_t g_ftms_treadmill_handle;
 static uint16_t g_ftms_cp_handle;
 static uint16_t g_ftms_status_handle;
 
@@ -50,8 +51,10 @@ static volatile uint16_t g_cadence   = DEFAULT_CADENCE;
 static volatile uint8_t  g_broadcast_mask = BROADCAST_FIELD_ALL;
 static volatile uint16_t g_run_speed = 0;
 static volatile uint8_t  g_run_cadence = RUN_CADENCE_DEFAULT;
+static volatile int16_t  g_run_incline_x10 = RUN_INCLINE_X10_DEFAULT;
 static volatile uint16_t g_run_stride_cm = 0;
 static volatile uint32_t g_run_distance_m = 0;
+static volatile uint32_t g_run_elapsed_s = 0;
 
 // 曲柄累计（CPS/CSC 共用）
 static uint16_t g_crank_rev = 0;
@@ -66,6 +69,8 @@ static uint8_t g_rsc_feature_buf[4] = { 0x03, 0x00, 0x00, 0x00 };
 static uint8_t g_sensor_location = 0x05;
 static uint8_t g_ftms_bike_buf[8];
 static size_t g_ftms_bike_len = 8;
+static uint8_t g_ftms_treadmill_buf[16];
+static size_t g_ftms_treadmill_len = 16;
 static uint8_t g_ftms_resp_buf[3];
 
 // FTMS 静态特征值
@@ -74,6 +79,7 @@ static uint8_t g_ftms_status_buf[7]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0
 
 static ble_erg_cb_t g_erg_cb = NULL;
 static ble_erg_clear_cb_t g_erg_clear_cb = NULL;
+static ble_run_control_cb_t g_run_control_cb = NULL;
 static sport_profile_t g_profile = DEFAULT_SPORT_PROFILE;
 static char g_device_name[DEVICE_NAME_MAX] = DEVICE_NAME;
 static esp_timer_handle_t g_notify_timer = NULL;
@@ -215,7 +221,14 @@ static int ftms_feat_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
 static int ftms_bike_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_ftms_bike_buf, sizeof(g_ftms_bike_buf));
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_ftms_bike_buf, g_ftms_bike_len);
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+static int ftms_treadmill_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_ftms_treadmill_buf, g_ftms_treadmill_len);
     return BLE_ATT_ERR_UNLIKELY;
 }
 
@@ -279,6 +292,10 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
         ftms_send_response(FTMS_OP_REQUEST_CONTROL, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_SET_TARGET_POWER:
+        if (g_profile == SPORT_PROFILE_RUNNING) {
+            ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
+            break;
+        }
         if (len >= 3) {
             // Set Target Power 的负载为 signed 16-bit 目标功率（小端）
             int16_t target_s16 = (int16_t)(buf[1] | ((uint16_t)buf[2] << 8));
@@ -295,21 +312,56 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
             ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
         }
         break;
+    case FTMS_OP_SET_TARGET_SPEED:
+        if (g_profile != SPORT_PROFILE_RUNNING || len < 3) {
+            ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
+            break;
+        }
+        {
+            uint16_t target_speed = (uint16_t)(buf[1] | ((uint16_t)buf[2] << 8));
+            bool ok = false;
+            if (g_run_control_cb) ok = g_run_control_cb(BLE_RUN_CTRL_SPEED, (int)target_speed);
+            ftms_send_response(op, ok ? FTMS_RESULT_SUCCESS : FTMS_RESULT_INVALID_PARAM);
+        }
+        break;
+    case FTMS_OP_SET_TARGET_INCLINATION:
+        if (g_profile != SPORT_PROFILE_RUNNING || len < 3) {
+            ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
+            break;
+        }
+        {
+            int16_t target_incline = (int16_t)(buf[1] | ((uint16_t)buf[2] << 8));
+            bool ok = false;
+            if (g_run_control_cb) ok = g_run_control_cb(BLE_RUN_CTRL_INCLINE, (int)target_incline);
+            ftms_send_response(op, ok ? FTMS_RESULT_SUCCESS : FTMS_RESULT_INVALID_PARAM);
+        }
+        break;
     case FTMS_OP_START_RESUME:
         g_ftms_status_buf[0] = 0x01;
         notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
+        if (g_profile == SPORT_PROFILE_RUNNING && g_run_control_cb) {
+            (void)g_run_control_cb(BLE_RUN_CTRL_START, 0);
+        }
         ftms_send_response(FTMS_OP_START_RESUME, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_STOP_PAUSE:
         g_ftms_status_buf[0] = 0x02;
         notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
-        if (g_erg_clear_cb) g_erg_clear_cb(FTMS_OP_STOP_PAUSE);
+        if (g_profile == SPORT_PROFILE_RUNNING) {
+            if (g_run_control_cb) (void)g_run_control_cb(BLE_RUN_CTRL_STOP, 0);
+        } else if (g_erg_clear_cb) {
+            g_erg_clear_cb(FTMS_OP_STOP_PAUSE);
+        }
         ftms_send_response(FTMS_OP_STOP_PAUSE, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_RESET:
         g_ftms_status_buf[0] = 0x00;
         notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
-        if (g_erg_clear_cb) g_erg_clear_cb(FTMS_OP_RESET);
+        if (g_profile == SPORT_PROFILE_RUNNING) {
+            if (g_run_control_cb) (void)g_run_control_cb(BLE_RUN_CTRL_RESET, 0);
+        } else if (g_erg_clear_cb) {
+            g_erg_clear_cb(FTMS_OP_RESET);
+        }
         ftms_send_response(FTMS_OP_RESET, FTMS_RESULT_SUCCESS);
         break;
     default:
@@ -481,6 +533,28 @@ static const struct ble_gatt_svc_def running_gatt_svcs[] = {
             { 0 }
         }
     },
+    {   // Fitness Machine Service (Treadmill)
+        .type = BLE_GATT_SVC_TYPE_PRIMARY,
+        .uuid = BLE_UUID16_DECLARE(FTMS_SERVICE_UUID),
+        .characteristics = (struct ble_gatt_chr_def[]){
+            { .uuid = BLE_UUID16_DECLARE(FTMS_FEATURE_CHAR_UUID),
+              .access_cb = ftms_feat_cb,
+              .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(FTMS_TREADMILL_CHAR_UUID),
+              .access_cb = ftms_treadmill_cb,
+              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .val_handle = &g_ftms_treadmill_handle },
+            { .uuid = BLE_UUID16_DECLARE(FTMS_CONTROL_POINT_CHAR_UUID),
+              .access_cb = ftms_cp_cb,
+              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_NOTIFY,
+              .val_handle = &g_ftms_cp_handle },
+            { .uuid = BLE_UUID16_DECLARE(FTMS_STATUS_CHAR_UUID),
+              .access_cb = ftms_status_cb,
+              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .val_handle = &g_ftms_status_handle },
+            { 0 }
+        }
+    },
     {   // Device Information Service
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
         .uuid = BLE_UUID16_DECLARE(DIS_SERVICE_UUID),
@@ -575,6 +649,8 @@ static void pack_running(void)
     uint16_t speed = g_run_speed;
     uint16_t stride = g_run_stride_cm;
     uint32_t distance = g_run_distance_m;
+    int16_t incline = g_run_incline_x10;
+    uint32_t elapsed = g_run_elapsed_s;
 
     g_hr_buf[0] = 0x00;
     g_hr_buf[1] = g_hr_bpm;
@@ -589,6 +665,26 @@ static void pack_running(void)
     g_rsc_buf[7] = (distance >> 8) & 0xFF;
     g_rsc_buf[8] = (distance >> 16) & 0xFF;
     g_rsc_buf[9] = (distance >> 24) & 0xFF;
+
+    uint16_t ftms_speed = (uint16_t)(((uint32_t)speed * 360u + 128u) / 256u);
+    uint16_t flags = 0x0386; // distance + inclination/ramp + heart rate + elapsed time
+    uint8_t off = 2;
+    g_ftms_treadmill_buf[off++] = ftms_speed & 0xFF;
+    g_ftms_treadmill_buf[off++] = (ftms_speed >> 8) & 0xFF;
+    g_ftms_treadmill_buf[off++] = distance & 0xFF;
+    g_ftms_treadmill_buf[off++] = (distance >> 8) & 0xFF;
+    g_ftms_treadmill_buf[off++] = (distance >> 16) & 0xFF;
+    g_ftms_treadmill_buf[off++] = incline & 0xFF;
+    g_ftms_treadmill_buf[off++] = (incline >> 8) & 0xFF;
+    g_ftms_treadmill_buf[off++] = 0x00;
+    g_ftms_treadmill_buf[off++] = 0x00;
+    g_ftms_treadmill_buf[off++] = g_hr_bpm;
+    uint16_t elapsed16 = elapsed > 0xFFFFu ? 0xFFFFu : (uint16_t)elapsed;
+    g_ftms_treadmill_buf[off++] = elapsed16 & 0xFF;
+    g_ftms_treadmill_buf[off++] = (elapsed16 >> 8) & 0xFF;
+    g_ftms_treadmill_buf[0] = flags & 0xFF;
+    g_ftms_treadmill_buf[1] = (flags >> 8) & 0xFF;
+    g_ftms_treadmill_len = off;
 }
 
 /**
@@ -647,6 +743,9 @@ static void notify_tick(void *arg)
             notify_one_nolock(g_rsc_val_handle, g_rsc_buf, sizeof(g_rsc_buf));
         }
         if (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
+        if (g_broadcast_mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_HEARTRATE)) {
+            notify_one_nolock(g_ftms_treadmill_handle, g_ftms_treadmill_buf, g_ftms_treadmill_len);
+        }
     } else {
         pack_all();
         if (g_broadcast_mask & BROADCAST_FIELD_POWER) notify_one_nolock(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
@@ -884,8 +983,10 @@ void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartra
     g_run_speed = snapshot.rsc_speed_1_256_mps;
     g_hr_bpm = heartrate_bpm;
     g_run_cadence = (uint8_t)snapshot.cadence_spm;
+    g_run_incline_x10 = (int16_t)snapshot.incline_x10;
     g_run_stride_cm = snapshot.stride_cm;
     g_run_distance_m = snapshot.total_distance_m;
+    g_run_elapsed_s = snapshot.elapsed_time_s;
 }
 
 /**
@@ -903,6 +1004,11 @@ void ble_bikepower_set_erg_callback(ble_erg_cb_t cb)
 void ble_bikepower_set_erg_clear_callback(ble_erg_clear_cb_t cb)
 {
     g_erg_clear_cb = cb;
+}
+
+void ble_bikepower_set_run_control_callback(ble_run_control_cb_t cb)
+{
+    g_run_control_cb = cb;
 }
 
 /**

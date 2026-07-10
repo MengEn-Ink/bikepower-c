@@ -12,6 +12,7 @@
 typedef struct {
     int speed_x100_kmh;
     int cadence_spm;
+    int incline_x10;
     uint32_t total_distance_m;
     uint32_t elapsed_time_s;
     uint16_t rsc_speed_1_256_mps;
@@ -30,8 +31,15 @@ typedef struct {
     int pace_float_sec;
     int cadence_spm;
     int cadence_float_spm;
+    run_mode_t mode;
+    run_pacer_type_t pacer_type;
+    int pace_low_sec;
+    int pace_high_sec;
+    char custom_name[RUN_CUSTOM_NAME_MAX];
+    int incline_x10;
     running_walk_t pace_walk;
     running_walk_t cadence_walk;
+    running_walk_t pacer_pace_walk;
     uint32_t elapsed_ms;
     uint32_t distance_x1000_m;
     running_snapshot_t snapshot;
@@ -43,3 +51,9 @@ bool running_engine_set_speed(running_engine_t *e, int speed_x100_kmh);
 bool running_engine_set_pace_float(running_engine_t *e, int seconds);
 bool running_engine_set_cadence(running_engine_t *e, int cadence_spm);
 bool running_engine_set_cadence_float(running_engine_t *e, int amp_spm);
+bool running_engine_set_mode(running_engine_t *e, run_mode_t mode);
+bool running_engine_set_pacer(running_engine_t *e, run_pacer_type_t pacer);
+bool running_engine_set_custom_pacer(running_engine_t *e, const char *name, int pace_low_sec, int pace_high_sec, int cadence_spm);
+bool running_engine_set_pace_range(running_engine_t *e, int pace_low_sec, int pace_high_sec);
+bool running_engine_set_incline(running_engine_t *e, int incline_x10);
+void running_engine_reset_session(running_engine_t *e);

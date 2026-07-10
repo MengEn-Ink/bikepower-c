@@ -114,23 +114,60 @@
 
     <div id="home-running" style="display:none">
       <div class="card home-card" id="running-speed-card">
-        <div class="pace-input-row">
-          <div class="val pace-val"><input type="number" inputmode="numeric" id="run-pace-min" value="5"><span class="unit">分</span></div>
-          <div class="val pace-val"><input type="number" inputmode="numeric" id="run-pace-sec" value="00"><span class="unit">秒/km</span></div>
+        <h2>跑步输出</h2>
+        <div class="ride-source-picker" id="run-source-picker" aria-label="跑步输出来源"></div>
+        <div class="ride-source-summary" id="run-source-summary">
+          <span>已选固定配速</span><b>按填写配速输出</b>
         </div>
-        <div class="lbl"><span>跑步配速</span><span id="run-pace-speed">12.00 km/h</span></div>
-        <div class="pace-preset-grid" id="run-pace-presets" aria-label="常用跑步配速">
-          <button class="pace-preset" onclick="onRunPacePreset(3,0)">3:00</button>
-          <button class="pace-preset" onclick="onRunPacePreset(4,0)">4:00</button>
-          <button class="pace-preset" onclick="onRunPacePreset(5,0)">5:00</button>
-          <button class="pace-preset" onclick="onRunPacePreset(6,0)">6:00</button>
-          <button class="pace-preset" onclick="onRunPacePreset(7,0)">7:00</button>
+        <div class="run-fixed-panel" id="run-fixed-panel">
+          <div class="pace-input-row">
+            <div class="val pace-val"><input type="number" inputmode="numeric" id="run-pace-min" value="5"><span class="unit">分</span></div>
+            <div class="val pace-val"><input type="number" inputmode="numeric" id="run-pace-sec" value="00"><span class="unit">秒/km</span></div>
+          </div>
+          <div class="lbl"><span>跑步配速</span><span id="run-pace-speed">12.00 km/h</span></div>
+          <div class="pace-preset-grid" id="run-pace-presets" aria-label="常用跑步配速">
+            <button class="pace-preset" onclick="onRunPacePreset(3,0)">3:00</button>
+            <button class="pace-preset" onclick="onRunPacePreset(4,0)">4:00</button>
+            <button class="pace-preset" onclick="onRunPacePreset(5,0)">5:00</button>
+            <button class="pace-preset" onclick="onRunPacePreset(6,0)">6:00</button>
+            <button class="pace-preset" onclick="onRunPacePreset(7,0)">7:00</button>
+          </div>
+          <div class="float-row" id="run-pace-float">
+            <span class="float-lbl">配速浮动</span>
+            <button class="fbtn" onclick="onFloatAdj('runpace',-1)">−</button>
+            <span class="float-val">±<span id="float-run-pace">10</span> 秒/km</span>
+            <button class="fbtn" onclick="onFloatAdj('runpace',1)">+</button>
+          </div>
         </div>
-        <div class="float-row" id="run-pace-float">
-          <span class="float-lbl">配速浮动</span>
-          <button class="fbtn" onclick="onFloatAdj('runpace',-1)">−</button>
-          <span class="float-val">±<span id="float-run-pace">10</span> 秒/km</span>
-          <button class="fbtn" onclick="onFloatAdj('runpace',1)">+</button>
+        <div class="custom-pacer-panel" id="run-custom-panel" style="display:none">
+          <div class="custom-pacer-head">
+            <input type="text" id="run-custom-name" maxlength="31" placeholder="自定义" oninput="onRunCustomNameInput()">
+            <div class="custom-pacer-target"><span id="run-custom-speed">—</span><small>km/h</small></div>
+          </div>
+          <div class="custom-pacer-metrics">
+            <span id="run-custom-pace-range">5:00 - 6:00 /km</span>
+            <b id="run-custom-cadence-text">170 spm</b>
+          </div>
+          <div class="custom-wkg-controls run-custom-controls">
+            <div class="custom-wkg-step">
+              <span>快配</span>
+              <button class="fbtn" onclick="onRunCustomPaceAdj('low',-5)">−</button>
+              <b id="run-pace-low">5:00</b>
+              <button class="fbtn" onclick="onRunCustomPaceAdj('low',5)">+</button>
+            </div>
+            <div class="custom-wkg-step">
+              <span>慢配</span>
+              <button class="fbtn" onclick="onRunCustomPaceAdj('high',-5)">−</button>
+              <b id="run-pace-high">6:00</b>
+              <button class="fbtn" onclick="onRunCustomPaceAdj('high',5)">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="float-row running-incline-row" id="running-incline-row">
+          <span class="float-lbl">坡度</span>
+          <button class="fbtn" onclick="onRunInclineAdj(-5)">−</button>
+          <span class="float-val"><span id="run-incline">0.0</span>%</span>
+          <button class="fbtn" onclick="onRunInclineAdj(5)">+</button>
         </div>
       </div>
       <div class="card home-card" id="running-cadence-card">

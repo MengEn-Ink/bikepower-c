@@ -14,6 +14,8 @@ var STATE = {
   broadcast_mask: 7,
   power: 0, cadence: 0, heartrate: 0,
   run_speed_x100: 1000, run_pace_float_sec: 10, run_cadence: 170, run_cadence_float: 4,
+  run_mode: "fixed", run_pacer_type: "jog", run_pace_low_sec: 390, run_pace_high_sec: 450,
+  run_custom_name: "自定义", run_incline_x10: 0,
   mode: "steady",
   power_float: 5, cadence_float: 2, hr_float: 2,
   power_step: 20,
@@ -27,6 +29,7 @@ var STATE = {
   led_confirm_mode: 3, led_confirm_color: 3,
   led_error_mode: 3, led_error_color: 0,
   pacers: [],
+  run_pacers: [],
   remaining_sec: 180,
   closing: false,
   hr_locked: false,
@@ -141,6 +144,34 @@ function syncCustomPacerOption() {
     });
   }
 }
+function runCustomDisplayName() {
+  var name = (STATE.run_custom_name || "").trim();
+  return name || "自定义";
+}
+function syncRunPacerOption() {
+  var found = false;
+  for (var i = 0; i < STATE.run_pacers.length; i++) {
+    if (STATE.run_pacers[i].id === "custom") {
+      STATE.run_pacers[i].name = runCustomDisplayName();
+      STATE.run_pacers[i].pace_low_sec = STATE.run_pace_low_sec;
+      STATE.run_pacers[i].pace_high_sec = STATE.run_pace_high_sec;
+      STATE.run_pacers[i].cadence = STATE.run_cadence;
+      STATE.run_pacers[i].custom = true;
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    STATE.run_pacers.push({
+      id: "custom",
+      name: runCustomDisplayName(),
+      pace_low_sec: STATE.run_pace_low_sec,
+      pace_high_sec: STATE.run_pace_high_sec,
+      cadence: STATE.run_cadence,
+      custom: true
+    });
+  }
+}
 function intOr(v, fallback) {
   var n = parseInt(v, 10);
   return isNaN(n) ? fallback : n;
@@ -158,6 +189,12 @@ function formatPaceSec(paceSec) {
   var min = Math.floor(paceSec / 60);
   var sec = paceSec % 60;
   return min + ":" + (sec < 10 ? "0" : "") + sec;
+}
+function paceSecText(sec) {
+  return formatPaceSec(sec) + " /km";
+}
+function speedTextFromPaceSec(sec) {
+  return (speedX100FromPaceSec(sec) / 100).toFixed(2) + " km/h";
 }
 function estimateHrFromPower(power) {
   var ftp = STATE.profile_ftp || 200;
@@ -206,6 +243,10 @@ function renderPaceFromState() {
   if (label) label.textContent = (speedX100 / 100).toFixed(2) + " km/h";
 }
 function syncSpeedFromPace() {
+  if (STATE.run_mode === "pacer") {
+    updateRunPacerInfo();
+    return;
+  }
   var minEl = $("run-pace-min");
   var secEl = $("run-pace-sec");
   var label = $("run-pace-speed");
@@ -226,6 +267,105 @@ function onRunPacePreset(min, sec) {
   minEl.value = min;
   secEl.value = sec < 10 ? "0" + sec : String(sec);
   syncSpeedFromPace();
+}
+function renderRunSourcePicker() {
+  var picker = $("run-source-picker");
+  if (!picker) return;
+  syncRunPacerOption();
+  var html = '<button class="ride-source-pill" data-source="fixed" onclick="onRunSourceSelect(\'fixed\')">固定</button>';
+  for (var i = 0; i < STATE.run_pacers.length; i++) {
+    var p = STATE.run_pacers[i];
+    html += '<button class="ride-source-pill" data-source="' + escapeHtml(p.id) + '" onclick="onRunSourceSelect(\'' + escapeHtml(p.id) + '\')">' + escapeHtml(p.name) + '</button>';
+  }
+  picker.innerHTML = html;
+}
+function selectedRunPacer() {
+  syncRunPacerOption();
+  var id = STATE.run_pacer_type || "jog";
+  for (var i = 0; i < STATE.run_pacers.length; i++) {
+    if (STATE.run_pacers[i].id === id) return STATE.run_pacers[i];
+  }
+  return STATE.run_pacers.length ? STATE.run_pacers[0] : null;
+}
+function onRunSourceSelect(source) {
+  captureDraft();
+  if (source === "fixed") {
+    STATE.run_mode = "fixed";
+  } else {
+    STATE.run_mode = "pacer";
+    STATE.run_pacer_type = source || "jog";
+    var p = selectedRunPacer();
+    if (p && p.id !== "custom") {
+      STATE.run_pace_low_sec = p.pace_low_sec;
+      STATE.run_pace_high_sec = p.pace_high_sec;
+      STATE.run_cadence = p.cadence || STATE.run_cadence;
+    }
+  }
+  renderRunSourcePicker();
+  updateRunPacerInfo();
+}
+function onRunCustomPaceAdj(which, delta) {
+  var lo = clamp(STATE.run_pace_low_sec + (which === "low" ? delta : 0), 144, 1200);
+  var hi = clamp(STATE.run_pace_high_sec + (which === "high" ? delta : 0), 144, 1200);
+  if (lo > hi) {
+    if (which === "low") hi = lo;
+    else lo = hi;
+  }
+  STATE.run_pace_low_sec = lo;
+  STATE.run_pace_high_sec = hi;
+  syncRunPacerOption();
+  updateRunPacerInfo();
+}
+function onRunCustomNameInput() {
+  var inp = $("run-custom-name");
+  if (!inp) return;
+  STATE.run_custom_name = (inp.value || "").trim();
+  syncRunPacerOption();
+  renderRunSourcePicker();
+  updateRunPacerInfo();
+}
+function onRunInclineAdj(delta) {
+  STATE.run_incline_x10 = clamp((STATE.run_incline_x10 || 0) + delta, -100, 150);
+  updateRunPacerInfo();
+}
+function updateRunPacerInfo() {
+  var isPacer = STATE.run_mode === "pacer";
+  var isCustom = isPacer && STATE.run_pacer_type === "custom";
+  var fixed = $("run-fixed-panel");
+  var custom = $("run-custom-panel");
+  var summary = $("run-source-summary");
+  if (fixed) fixed.style.display = isPacer ? "none" : "block";
+  if (custom) custom.style.display = isCustom ? "block" : "none";
+  var pills = document.querySelectorAll("#run-source-picker .ride-source-pill");
+  var selectedSource = isPacer ? STATE.run_pacer_type : "fixed";
+  for (var i = 0; i < pills.length; i++) {
+    pills[i].classList.toggle("selected", pills[i].getAttribute("data-source") === selectedSource);
+  }
+  if (!isPacer) {
+    if (summary) summary.innerHTML = '<span>已选固定配速</span><b>按填写配速输出</b>';
+  } else {
+    var p = selectedRunPacer();
+    if (p) {
+      var lo = isCustom ? STATE.run_pace_low_sec : p.pace_low_sec;
+      var hi = isCustom ? STATE.run_pace_high_sec : p.pace_high_sec;
+      var cad = isCustom ? STATE.run_cadence : p.cadence;
+      if (summary) summary.innerHTML = '<span>已选' + escapeHtml(p.name) + '</span><b>' + escapeHtml(paceSecText(lo)) + ' - ' + escapeHtml(paceSecText(hi)) + '</b>';
+      if (!isCustom) STATE.run_cadence = cad || STATE.run_cadence;
+    }
+  }
+  var nameEl = $("run-custom-name");
+  if (nameEl && document.activeElement !== nameEl) nameEl.value = runCustomDisplayName();
+  var lowEl = $("run-pace-low"), highEl = $("run-pace-high");
+  if (lowEl) lowEl.textContent = formatPaceSec(STATE.run_pace_low_sec);
+  if (highEl) highEl.textContent = formatPaceSec(STATE.run_pace_high_sec);
+  var rangeEl = $("run-custom-pace-range");
+  if (rangeEl) rangeEl.textContent = paceSecText(STATE.run_pace_low_sec) + " - " + paceSecText(STATE.run_pace_high_sec);
+  var speedEl = $("run-custom-speed");
+  if (speedEl) speedEl.textContent = (speedX100FromPaceSec(Math.round((STATE.run_pace_low_sec + STATE.run_pace_high_sec) / 2)) / 100).toFixed(1);
+  var cadEl = $("run-custom-cadence-text");
+  if (cadEl) cadEl.textContent = String(STATE.run_cadence || 170) + " spm";
+  var incline = $("run-incline");
+  if (incline) incline.textContent = ((STATE.run_incline_x10 || 0) / 10).toFixed(1);
 }
 function setSelect(id, value) {
   var e = $(id);
@@ -339,6 +479,8 @@ function captureDraft() {
       STATE.run_speed_x100 = speedX100FromPaceSec((parseInt($("run-pace-min").value, 10) || 0) * 60 + (parseInt($("run-pace-sec").value, 10) || 0));
     }
     if ($("run-cadence")) STATE.run_cadence = parseInt($("run-cadence").value, 10) || 0;
+    var runName = $("run-custom-name");
+    if (runName) STATE.run_custom_name = (runName.value || "").trim();
     return;
   }
   var settings = $("view-settings");
@@ -401,8 +543,10 @@ function renderHome() {
   applyHrLockState();
   updateZoneBadges();
   renderRideSourcePicker();
+  renderRunSourcePicker();
   applySportView();
   applyModeView();
+  updateRunPacerInfo();
   applyBroadcastVisibility();
 }
 function templateIdentityKey(t) {
@@ -500,6 +644,7 @@ function applySportView() {
     var s = items[i].getAttribute("data-sport");
     items[i].classList.toggle("on", s === STATE.sport_profile);
   }
+  if (isRunning) updateRunPacerInfo();
   applyBroadcastVisibility();
 }
 function onSportSwitch(sport) {
@@ -789,6 +934,12 @@ function collectConfig() {
     run_pace_float_sec: STATE.run_pace_float_sec,
     run_cadence: clamp(parseInt($("run-cadence").value, 10) || 0, 120, 220),
     run_cadence_float: STATE.run_cadence_float,
+    run_mode: STATE.run_mode,
+    run_pacer_type: STATE.run_pacer_type,
+    run_pace_low_sec: STATE.run_pace_low_sec,
+    run_pace_high_sec: STATE.run_pace_high_sec,
+    run_custom_name: STATE.run_custom_name,
+    run_incline_x10: STATE.run_incline_x10,
     hr_lock: directHrControl() ? 1 : (STATE.hr_locked ? 1 : 0),
     power_float: STATE.power_float,
     cadence_float: STATE.cadence_float,
@@ -1305,6 +1456,12 @@ function collectConfigBase() {
     run_pace_float_sec: STATE.run_pace_float_sec,
     run_cadence: STATE.run_cadence,
     run_cadence_float: STATE.run_cadence_float,
+    run_mode: STATE.run_mode,
+    run_pacer_type: STATE.run_pacer_type,
+    run_pace_low_sec: STATE.run_pace_low_sec,
+    run_pace_high_sec: STATE.run_pace_high_sec,
+    run_custom_name: STATE.run_custom_name,
+    run_incline_x10: STATE.run_incline_x10,
     hr_lock: directHrControl() ? 1 : (STATE.hr_locked ? 1 : 0),
     power_float: STATE.power_float,
     cadence_float: STATE.cadence_float,
@@ -1406,6 +1563,12 @@ function init() {
       STATE.run_pace_float_sec = data.run_pace_float_sec != null ? data.run_pace_float_sec : 10;
       STATE.run_cadence = data.run_cadence != null ? data.run_cadence : 170;
       STATE.run_cadence_float = data.run_cadence_float != null ? data.run_cadence_float : 4;
+      STATE.run_mode = data.run_mode != null ? data.run_mode : 0;
+      STATE.run_pacer_type = data.run_pacer_type != null ? data.run_pacer_type : 0;
+      STATE.run_pace_low_sec = data.run_pace_low_sec != null ? data.run_pace_low_sec : 390;
+      STATE.run_pace_high_sec = data.run_pace_high_sec != null ? data.run_pace_high_sec : 450;
+      STATE.run_custom_name = data.run_custom_name || "自定义";
+      STATE.run_incline_x10 = data.run_incline_x10 != null ? data.run_incline_x10 : 0;
       STATE.mode = data.mode || "steady";
       STATE.power_float = data.power_float != null ? data.power_float : 5;
       STATE.cadence_float = data.cadence_float != null ? data.cadence_float : 2;
