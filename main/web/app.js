@@ -846,6 +846,33 @@ function onCloseWifi() {
   });
 }
 
+function copyTextFallback(text) {
+  var area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "readonly");
+  area.style.position = "fixed";
+  area.style.left = "-9999px";
+  document.body.appendChild(area);
+  area.select();
+  var ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  document.body.removeChild(area);
+  return ok;
+}
+function onCopyUpgradeUrl() {
+  var urlEl = $("upgrade-url");
+  var url = urlEl ? urlEl.textContent : "https://easyhey.com/?firmware=MOD220";
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function () {
+      toast("升级地址已复制");
+    }, function () {
+      toast(copyTextFallback(url) ? "升级地址已复制" : "复制失败，请长按地址手动复制");
+    });
+    return;
+  }
+  toast(copyTextFallback(url) ? "升级地址已复制" : "复制失败，请长按地址手动复制");
+}
+
 /* ============ 设置 ============ */
 function renderSettings() {
   syncSettingsPanelFromRoute();

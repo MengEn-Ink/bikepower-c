@@ -230,12 +230,24 @@ def main():
           "关于页不应重复展示设备名称，设备名称归配置设备页")
     check('about-details-card' in html and 'about-help-card' in html,
           "关于页必须拆成只读详情和精简提醒两块")
-    check('about-hero' in html and 'cap-grid' in html and 'about-tip-list' in html,
-          "关于页必须采用 A+ 精简概览结构")
+    check('about-upgrade-card' in html and 'https://easyhey.com/?firmware=MOD220' in html,
+          "关于页必须提供 MOD220 在线升级入口")
+    check('电脑端' in html and '手机端不支持' in html and '手机或电脑' not in html,
+          "在线升级说明必须明确只支持电脑端烧录，手机端不支持")
+    check('id="upgrade-url"' in html and 'onCopyUpgradeUrl' in html,
+          "在线升级地址必须提供一键复制操作")
+    check('onCopyUpgradeUrl' in js and 'navigator.clipboard' in js and 'document.execCommand("copy")' in js,
+          "app.js 必须实现升级地址复制并提供旧 WebView 兜底")
+    check('about-upgrade-card' in css and 'upgrade-copy-row' in css and 'upgrade-copy-btn' in css,
+          "app.css 必须提供在线升级卡片和复制控件样式")
+    check('about-hero' not in html and 'cap-grid' not in html,
+          "关于页必须去掉顶部介绍和能力概览以保持一页展示")
+    check('about-tip-list' in html,
+          "关于页必须保留精简使用提醒")
     check('BikePower 是什么' not in html and '三种骑行模式' not in html and '功率与心率' not in html,
           "关于页不应保留说明书式长段落")
-    check('about-hero' in css and 'about-mark' in css and 'about-tip' in css,
-          "app.css 必须提供 A+ 关于页概览样式")
+    check('about-details-card' in css and 'about-upgrade-card' in css and 'about-tip' in css,
+          "app.css 必须提供紧凑关于页样式")
     check('"/settings/templates"' in js and '"/settings/button"' in js and '"/settings/led"' in js, "app.js 必须注册设置子路由")
     check('settingsSubpageBack' in js and 'settings-menu-row' in css, "设置子页面必须有返回与菜单行样式")
     check('pollScanResults' in js and 'onTemplateReadDevice' in js, "app.js 缺少 BLE 扫描轮询/读取逻辑")
