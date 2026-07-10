@@ -326,6 +326,20 @@ echo "${PACKAGE_NAME}.sha256  ${package_sha_size}  ${package_sha_sum}" >> "$MANI
 echo "  总包: $RELEASE_DIR/$PACKAGE_NAME"
 ls -lh "$RELEASE_DIR/$PACKAGE_NAME" | awk '{print "  大小: "$5}'
 
+if [ "${#TARGETS[@]}" -eq 2 ]; then
+    echo ""
+    echo "=== Release 产物门禁：附件 / SHA256 / manifest / zip ==="
+    python3 "$PROJECT_DIR/scripts/tools/check_release_artifacts.py" \
+        --release-dir "$RELEASE_DIR" \
+        --version "$VERSION" \
+        --git-sha "$GIT_SHA" \
+        --allow-dirty
+else
+    echo ""
+    echo "=== Release 产物门禁：跳过 ==="
+    echo "当前仅构建单板型，完整 10 附件发布门禁需双板型构建后执行。"
+fi
+
 echo ""
 echo "=== 构建完成，产物在 $RELEASE_DIR/ ==="
 ls -lh "$RELEASE_DIR/"

@@ -12,6 +12,8 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+from check_release_artifacts import validate_release_artifacts
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_OWNER = "mengen4jv"
 DEFAULT_REPO = "bikepower-c"
@@ -72,22 +74,15 @@ def api_request(method, url, token, data=None, files=None):
 
 
 def find_artifacts(release_dir, version, git_sha):
-    required = [
-        f"bikepower-c-generic-c3-v{version}-stable-fix-g{git_sha}.bin",
-        f"bikepower-c-generic-c3-v{version}-stable-fix-g{git_sha}.bin.sha256",
-        f"bikepower-c-m5stamp-c3-v{version}-stable-fix-g{git_sha}.bin",
-        f"bikepower-c-m5stamp-c3-v{version}-stable-fix-g{git_sha}.bin.sha256",
-        f"bikepower-c-release-v{version}-stable-fix-g{git_sha}.zip",
-        f"bikepower-c-release-v{version}-stable-fix-g{git_sha}.zip.sha256",
-        "manifest.txt",
-        "test-report.md",
-        "core-flow-endurance.md",
-        "user-manual.md",
-    ]
-    missing = [name for name in required if not (release_dir / name).is_file()]
-    if missing:
-        raise FileNotFoundError("release 产物缺失: " + ", ".join(missing))
-    return [release_dir / name for name in required]
+    artifacts, messages = validate_release_artifacts(
+        release_dir=release_dir,
+        version=version,
+        git_sha=git_sha,
+        require_pushed=True,
+    )
+    for message in messages:
+        print(f"[release-gate] {message}")
+    return artifacts
 
 
 def release_body(version, git_sha, artifacts):
