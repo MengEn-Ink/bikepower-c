@@ -166,10 +166,17 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:var(--pa
 .analysis-head b{font-size:12px;color:#15803d}
 .analysis-head span{font-size:10px;color:#6e6e73;font-weight:800;white-space:nowrap}
 .analysis-summary{font-size:12px;color:#1d1d1f;font-weight:800;line-height:1.35;margin-top:3px}
+.analysis-metric-board{display:grid;grid-template-columns:1.1fr 1fr;gap:6px;margin-top:7px}
+.analysis-metric{background:#fff;border:1px solid rgba(52,199,89,.14);border-radius:9px;padding:7px 8px;min-width:0}
+.analysis-metric-primary{grid-row:span 2;background:linear-gradient(135deg,#eaffef 0,#fff 76%);border-color:rgba(52,199,89,.24)}
+.analysis-metric-secondary{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.analysis-metric-label{display:block;font-size:10px;color:#15803d;font-weight:900;line-height:1}
+.analysis-metric div{display:flex;align-items:flex-end;gap:3px;margin-top:4px;min-width:0}
+.analysis-metric-secondary div{margin-top:0}
+.analysis-metric-value{display:block;color:#1d1d1f;font-size:30px;line-height:.95;font-weight:900;letter-spacing:0;font-variant-numeric:tabular-nums}
+.analysis-metric-secondary .analysis-metric-value{font-size:18px;line-height:1}
+.analysis-metric em{font-style:normal;font-size:10px;color:#6e6e73;font-weight:900;line-height:1.15;white-space:nowrap}
 .analysis-metrics{font-size:10px;color:#3f3f46;line-height:1.35;margin-top:2px}
-.analysis-large-value{display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:6px;padding:8px 0;border-radius:8px;background:rgba(0,122,255,.06)}
-.analysis-large-num{font-size:42px;font-weight:900;color:#007aff;letter-spacing:-.02em}
-.analysis-large-unit{font-size:14px;font-weight:700;color:#86868b}
 .analysis-details,.analysis-raw{margin-top:6px;border-top:1px solid rgba(52,199,89,.14);padding-top:5px}
 .analysis-details summary,.analysis-raw summary{font-size:10px;color:#15803d;font-weight:900;cursor:pointer;list-style:none}
 .analysis-details summary::-webkit-details-marker,.analysis-raw summary::-webkit-details-marker{display:none}

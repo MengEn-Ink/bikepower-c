@@ -262,6 +262,10 @@ def main():
           "app.js 必须提供详细数据和原始数据折叠展示")
     check('power_watts' in js and 'heart_rate_bpm' in js and 'last_cps_hex' in js and 'adv_raw_hex' in js,
           "app.js 必须展示功率/心率等解析值和广播/通知原始 hex")
+    check('analysisMetricBoardHtml' in js and 'analysis-metric-board' in css and 'analysis-metric-value' in css,
+          "app.js/app.css 必须用大号数值面板突出显示扫描分析数值")
+    check('analysis-metric-primary' in js and 'analysis-metric-secondary' in css,
+          "扫描分析数值面板必须区分主指标和辅助指标")
     check('readableDeviceName' in js and 'safeDeviceNameText' in js,
           "app.js 必须对不可读外部设备名做中文兜底，避免显示方块乱码")
     check('>FT</span>' not in js and '>智能</span>' in js,

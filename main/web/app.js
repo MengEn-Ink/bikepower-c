@@ -1157,6 +1157,32 @@ function templateDetailCells(t) {
 function hexText(v) {
   return v ? String(v) : "—";
 }
+function analysisMetricBoardHtml(analysis) {
+  var items = [];
+  if (analysis.power_watts) {
+    items.push({ label: "功率", value: String(analysis.power_watts), unit: "W", primary: true });
+  }
+  if (analysis.speed_x10_kmh) {
+    items.push({ label: "速度", value: (analysis.speed_x10_kmh / 10).toFixed(1), unit: "km/h", primary: !analysis.power_watts });
+  }
+  if (analysis.heart_rate_bpm) {
+    items.push({ label: "心率", value: String(analysis.heart_rate_bpm), unit: "bpm", primary: false });
+  }
+  if (analysis.cadence_rpm) {
+    items.push({ label: "踏频", value: String(analysis.cadence_rpm), unit: "rpm", primary: false });
+  }
+  if (!items.length) return "";
+  var html = '<div class="analysis-metric-board">';
+  for (var i = 0; i < items.length; i++) {
+    var cls = items[i].primary ? "analysis-metric-primary" : "analysis-metric-secondary";
+    html += '<div class="analysis-metric ' + cls + '">';
+    html += '<span class="analysis-metric-label">' + escapeHtml(items[i].label) + '</span>';
+    html += '<div><b class="analysis-metric-value">' + escapeHtml(items[i].value) + '</b><em>' + escapeHtml(items[i].unit) + '</em></div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
 function analysisDetailsHtml(d, analysis) {
   var rows = [
     ["功率", analysis.power_watts ? String(analysis.power_watts) + " W" : "—"],
@@ -1209,11 +1235,7 @@ function analysisCardHtml(d) {
   var html = '<div class="analysis-card">';
   html += '<div class="analysis-head"><b>' + escapeHtml(analysis.status || "分析完成") + '</b><span>' + escapeHtml(String(analysis.sample_count || 0)) + ' 条样本</span></div>';
   html += '<div class="analysis-summary">' + escapeHtml(analysis.summary || "暂无运动数据") + '</div>';
-  if (isHrDevice && analysis.heart_rate_bpm) {
-    html += '<div class="analysis-large-value"><span class="analysis-large-num">' + escapeHtml(String(analysis.heart_rate_bpm)) + '</span><span class="analysis-large-unit">bpm</span></div>';
-  } else if (isPowerDevice && analysis.power_watts) {
-    html += '<div class="analysis-large-value"><span class="analysis-large-num">' + escapeHtml(String(analysis.power_watts)) + '</span><span class="analysis-large-unit">W</span></div>';
-  }
+  html += analysisMetricBoardHtml(analysis);
   if (metrics.length) html += '<div class="analysis-metrics">' + escapeHtml(metrics.join(" · ")) + '</div>';
   html += analysisDetailsHtml(d, analysis);
   html += analysisRawHtml(d, analysis);
