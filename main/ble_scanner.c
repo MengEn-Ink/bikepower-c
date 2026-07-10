@@ -616,7 +616,12 @@ static int analysis_subscribe_desc_cb(uint16_t conn_handle, const struct ble_gat
             if (ch) {
                 uint8_t value[2] = {0x01, 0x00};
                 int rc = ble_gattc_write_flat(ctx->conn_handle, dsc->handle, value, sizeof(value), NULL, NULL);
-                if (rc == 0) ch->subscribed = true;
+                if (rc == 0) {
+                    ch->subscribed = true;
+                    ESP_LOGI(TAG, "订阅成功 uuid=0x%04x val_handle=%u", ch->uuid16, ch->val_handle);
+                } else {
+                    ESP_LOGW(TAG, "订阅失败 uuid=0x%04x rc=%d", ch->uuid16, rc);
+                }
             }
         }
         return 0;
@@ -636,6 +641,7 @@ static int analysis_chr_cb(uint16_t conn_handle, const struct ble_gatt_error *er
     if (!ctx) return 0;
     if (error && error->status == 0 && chr) {
         uint16_t uuid16 = ble_uuid_u16(&chr->uuid.u);
+        ESP_LOGI(TAG, "发现特征 uuid=0x%04x val_handle=%u", uuid16, chr->val_handle);
         analysis_char_t *ch = analysis_find_char(ctx, uuid16);
         if (ch) {
             ch->found = true;
@@ -672,9 +678,10 @@ static void analysis_start_next_disc(analysis_ctx_t *ctx)
             continue;
         }
         ble_uuid16_t uuid = BLE_UUID16_INIT(uuid16);
+        ESP_LOGI(TAG, "开始发现特征 uuid=0x%04x", uuid16);
         int rc = ble_gattc_disc_chrs_by_uuid(ctx->conn_handle, 1, 0xffff, &uuid.u, analysis_chr_cb, ctx);
         if (rc == 0) return;
-        ESP_LOGD(TAG, "特征发现启动失败 uuid=0x%04x rc=%d", uuid16, rc);
+        ESP_LOGW(TAG, "特征发现启动失败 uuid=0x%04x rc=%d", uuid16, rc);
         ctx->disc_index++;
     }
 }
@@ -690,20 +697,31 @@ static int analysis_gap_cb(struct ble_gap_event *event, void *arg)
             ctx->conn_handle = event->connect.conn_handle;
             ctx->next_read_uuid = 0x2A00;
             device_template_note_service(&ctx->tpl, DIS_SERVICE_UUID);
+            ESP_LOGI(TAG, "分析：已连接 conn=%u，开始读取DIS+发现特征", ctx->conn_handle);
             analysis_read_next_char(ctx);
             analysis_start_next_disc(ctx);
             if (ctx->done) xSemaphoreGive(ctx->done);
         } else {
+            ESP_LOGW(TAG, "分析：连接失败 status=%d", event->connect.status);
             analysis_ctx_finish(ctx, ESP_FAIL);
         }
         return 0;
     case BLE_GAP_EVENT_NOTIFY_RX:
         {
             analysis_char_t *ch = analysis_find_char_by_handle(ctx, event->notify_rx.attr_handle);
-            if (ch) analysis_handle_sample(ctx, ch->uuid16, event->notify_rx.om);
+            if (ch) {
+                int len = OS_MBUF_PKTLEN(event->notify_rx.om);
+                ESP_LOGI(TAG, "收到通知 uuid=0x%04x len=%d sample_count=%u", ch->uuid16, len, ctx->analysis.sample_count + 1);
+                analysis_handle_sample(ctx, ch->uuid16, event->notify_rx.om);
+            } else {
+                ESP_LOGD(TAG, "收到未知通知 attr_handle=%u", event->notify_rx.attr_handle);
+            }
         }
         return 0;
     case BLE_GAP_EVENT_DISCONNECT:
+        ESP_LOGI(TAG, "分析：断开连接 samples=%u power=%dW hr=%u cadence=%u",
+                 ctx->analysis.sample_count, ctx->analysis.power_watts,
+                 ctx->analysis.heart_rate_bpm, ctx->analysis.cadence_rpm);
         ctx->connected = false;
         if (ctx->disconnected) xSemaphoreGive(ctx->disconnected);
         if (!ctx->done_flag) analysis_ctx_finish(ctx, ESP_OK);
@@ -879,12 +897,19 @@ esp_err_t ble_scanner_analyze_device(const char *addr,
 
     bool connected = xSemaphoreTake(ctx.done, pdMS_TO_TICKS(1500)) == pdTRUE && ctx.connected;
     if (connected) {
+        ESP_LOGI(TAG, "分析：连接成功，等待采样 %ums", (unsigned)timeout_ms);
         vTaskDelay(pdMS_TO_TICKS(timeout_ms));
+        ESP_LOGI(TAG, "分析：采样结束 samples=%u subscribed=%d%d%d%d%d",
+                 ctx.analysis.sample_count,
+                 ctx.chars[0].subscribed, ctx.chars[1].subscribed,
+                 ctx.chars[2].subscribed, ctx.chars[3].subscribed,
+                 ctx.chars[4].subscribed);
         if (ctx.connected) {
             ble_gap_terminate(ctx.conn_handle, BLE_ERR_REM_USER_CONN_TERM);
             xSemaphoreTake(ctx.disconnected, pdMS_TO_TICKS(1000));
         }
     } else {
+        ESP_LOGW(TAG, "分析：连接超时，取消连接");
         ble_gap_conn_cancel();
         xSemaphoreTake(ctx.done, pdMS_TO_TICKS(1000));
     }
