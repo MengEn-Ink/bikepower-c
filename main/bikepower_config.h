@@ -157,7 +157,7 @@ typedef enum {
 #define TASK_PRIO_BTN           5      // 按钮任务调度优先级
 #define TASK_STACK_LED          2048   // LED任务栈大小（字节）
 #define TASK_PRIO_LED           3      // LED任务调度优先级
-#define TASK_STACK_HTTPD        8192   // HTTP服务器任务栈大小（字节）
+#define TASK_STACK_HTTPD        12288  // HTTP服务器任务栈大小（字节），BLE扫描/分析handler需大栈空间
 #define TASK_PRIO_NET           5      // 网络辅助任务调度优先级
 
 // ===== 按钮时间阈值（毫秒） =====
