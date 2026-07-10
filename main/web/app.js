@@ -887,8 +887,6 @@ function renderSettings() {
     aboutVer.textContent = firmwareShortLabel();
     aboutVer.title = firmwareLabel();
   }
-  var aboutFullVer = $("about-version-full");
-  if (aboutFullVer) aboutFullVer.textContent = firmwareLabel();
   var aboutBoard = $("about-board");
   if (aboutBoard) aboutBoard.textContent = STATE.board || "-";
   var buildTime = $("settings-build-time");

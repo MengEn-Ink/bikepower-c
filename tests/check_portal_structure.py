@@ -214,7 +214,7 @@ def main():
           "底部导航必须固定高度并启用合成层，避免多页面切换抖动")
     check('firmware_name' in csrc and 'board_firmware_name' in csrc, "wifi_portal.c 必须输出包含板型/Git/稳定版/修复版的 firmware_name")
     check('firmware_name' in js and 'firmwareLabel' in js and 'firmwareShortLabel' in js, "app.js 必须保留完整固件名并提供短标签展示")
-    check('version-short' in css and 'version-full' in css, "app.css 必须同时支持固件短标签和完整版本详情")
+    check('version-short' in css and 'version-full' not in css, "app.css 关于页只应保留固件短标签样式")
     cmake_src = (ROOT / "main" / "CMakeLists.txt").read_text(encoding="utf-8")
     check('BIKEPOWER_BUILD_TIME' in cmake_src and 'string(TIMESTAMP' in cmake_src,
           "main/CMakeLists.txt 必须在编译时注入 BIKEPOWER_BUILD_TIME")
@@ -222,8 +222,8 @@ def main():
           "wifi_portal.c 必须在 /api/state 输出 build_time")
     check('build_time' in js and 'settings-build-time' in html,
           "关于页必须展示编译固件时间")
-    check('about-version' in html and 'about-version-full' in html and 'aboutVer' in js,
-          "关于页固件版本必须使用独立 DOM id，避免与设备信息页重复")
+    check('about-version' in html and 'about-version-full' not in html and 'aboutVer' in js and 'aboutFullVer' not in js,
+          "关于页固件版本必须只显示简称，避免完整固件名占用页面")
     check('about-git' not in html and 'aboutGit' not in js and '>Git<' not in html,
           "关于页不应展示 Git 参数")
     check('about-device-name' not in html and 'aboutDeviceName' not in js,

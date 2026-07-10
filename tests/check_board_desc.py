@@ -13,6 +13,7 @@ main/bikepower_config.h 的板型枚举/引脚/名称宏保持一致，防止：
 2. 描述表每行使用的 BTN_PIN_* / LED_PIN_* / LED_DRV_* / BOARD_NAME_* 必须在 config 中定义。
 3. Kconfig 板型宏 CONFIG_BOARD_*_C3 与枚举值一一对应。
 4. BOARD_NAME_* 字符串符合 kebab-case + 末尾 -c3 命名规范。
+5. 已知板型的 LED 有效电平必须与硬件一致，防止静默模式反向点亮。
 
 设计：纯静态文本匹配，不依赖编译器。
 
@@ -107,6 +108,19 @@ def main():
         ok = bool(re.match(r'^[a-z0-9]+(-[a-z0-9]+)*-c3$', name))
         check(ok,
               f"{macro} = {name!r} 不符合 kebab-case + '-c3' 后缀命名规范")
+
+    # 校验 5：已知板型 LED 有效电平与硬件一致
+    expected_led_active = {
+        "BOARD_GENERIC_C3": "LED_ACTIVE_HIGH",
+        "BOARD_M5STAMP_C3": "LED_ACTIVE_HIGH",
+    }
+    desc_by_enum = {enum: body for enum, body in desc_rows}
+    for enum, expected in expected_led_active.items():
+        body = desc_by_enum.get(enum, "")
+        active = re.search(r'\b(LED_ACTIVE_\w+)\b', body)
+        actual = active.group(1) if active else None
+        check(actual == expected,
+              f"{enum} LED 有效电平应为 {expected}，实际为 {actual or '缺失'}")
 
     # 总结
     print(f"\n{TAG} 结果: {g_pass} 通过, {g_fail} 失败")
