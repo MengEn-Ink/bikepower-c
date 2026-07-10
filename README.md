@@ -118,7 +118,7 @@ WiFi 配网的射频共用流程可参考（v3.1.3 起为共存模式，BLE 不�
 
 其中 `--erase` 仅用于开发者从旧的双 OTA 分区布局切换到当前 4MB 单 factory 布局时全量擦写；`--portal-test-auto-config` 会刷启动后自动进入配网的测试固件，正式使用不要加。
 
-`flash_latest.sh` 会在正式 build 前执行 `idf.py reconfigure`，确保网页和 BLE DIS 中展示的 Git ID、编译时间来自当前源码状态，避免 CMake 缓存导致设备显示旧版本标识。
+`flash_latest.sh` 会在正式 build 前执行 `idf.py reconfigure`，确保网页和 BLE DIS 中展示的 Git ID、编译时间来自当前源码状态；如果检测到 `build_all.sh` 留下的临时板型配置缓存，也会先清理，避免 CMake 继续引用已删除的 `sdkconfig.board.tmp`。
 
 也可以手动准备 ESP-IDF 环境，再在项目根目录执行：
 

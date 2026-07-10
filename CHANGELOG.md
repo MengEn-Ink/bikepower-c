@@ -4,7 +4,7 @@
 
 ## [未发布]
 
-## [4.0.5] - 2026-07-10
+## [4.0.6] - 2026-07-10
 
 ### 网页端升级说明
 - `main/web/`：设置页“关于”模块去掉顶部介绍和能力概览，改为一页内紧凑展示当前版本、编译时间、在线升级入口和使用提醒。
@@ -17,9 +17,10 @@
 - `tests/check_release_gate.py`、`tests/test_release_artifacts.py`：新增 release 门禁接线检查和无需真实固件的功能样例，覆盖标准产物、SHA256 篡改和 zip 缺文件。
 - `scripts/tools/quality_gate.py`、`tests/operation_gate.py`、`docs/dev/05-operation-test-gate.md`：聚合 release 产物门禁、门户渲染门禁，并在 full 操作门禁和操作矩阵中记录 `OP-REL-001`。
 - `scripts/flash_latest.sh`、`tests/check_config_consistency.py`：烧录脚本在 build 前执行 `idf.py reconfigure`，刷新 `BIKEPOWER_GIT_SHA` / `BIKEPOWER_BUILD_TIME`；静态一致性检查防止该步骤被删回。
+- `scripts/flash_latest.sh`：烧录前清理 `build/CMakeCache.txt` 中残留的 `sdkconfig.board.tmp`，避免先跑 `scripts/build_all.sh` 后临时板型配置被删除导致 reconfigure 失败。
 
 ### 文档事实防漂移
-- `PROGRESS.md`、`docs/dev/03-test-coverage-analysis.md`、`docs/dev/04-running-mode-compatibility.md`：同步当前 `main/web/` 前端三件套、电脑端网页烧录、跑步模式实现状态和 v4.0.5 测试覆盖口径。
+- `PROGRESS.md`、`docs/dev/03-test-coverage-analysis.md`、`docs/dev/04-running-mode-compatibility.md`：同步当前 `main/web/` 前端三件套、电脑端网页烧录、跑步模式实现状态和 v4.0.6 测试覆盖口径。
 - `README.md`、`docs/dev/01-technical-reference.md`、`tests/README.md`：补充 release 产物门禁、门户渲染截图检查和 `flash_latest.sh` 构建前 reconfigure 说明。
 
 ### 验证

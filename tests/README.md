@@ -278,7 +278,7 @@ idf.py build -DPORTAL_TEST_AUTO_CONFIG=ON
 
 > `PORTAL_TEST_AUTO_CONFIG` 是 CMake option，默认 OFF。正式发版编译不带此选项，测试编译传 `-DPORTAL_TEST_AUTO_CONFIG=ON`。两者代码一致，仅测试固件多一个启动自动配网钩子。
 
-> 切换 option 后必须 `idf.py reconfigure` 或删 `build/CMakeCache.txt`，否则缓存不刷新。`scripts/flash_latest.sh` 已在 build 前自动执行 reconfigure，确保 `BIKEPOWER_GIT_SHA` / `BIKEPOWER_BUILD_TIME` 不沿用旧 CMake 缓存。
+> 切换 option 后必须 `idf.py reconfigure` 或删 `build/CMakeCache.txt`，否则缓存不刷新。`scripts/flash_latest.sh` 已在 build 前自动执行 reconfigure，确保 `BIKEPOWER_GIT_SHA` / `BIKEPOWER_BUILD_TIME` 不沿用旧 CMake 缓存；若 `build_all.sh` 后残留 `sdkconfig.board.tmp` 缓存，脚本会先清理 `build/CMakeCache.txt` 再重新配置。
 
 ---
 

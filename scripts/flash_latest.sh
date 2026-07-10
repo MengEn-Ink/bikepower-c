@@ -254,6 +254,16 @@ run_quick_checks() {
     done
 }
 
+clear_stale_board_cache() {
+    local cache_file="$PROJECT_DIR/build/CMakeCache.txt"
+    [ -f "$cache_file" ] || return 0
+
+    if grep -q "sdkconfig.board.tmp" "$cache_file"; then
+        log "清理 build/CMakeCache.txt 中残留的临时板型配置"
+        rm -f "$cache_file"
+    fi
+}
+
 IDF_DETECTED="$(detect_idf_path)" || die "找不到 ESP-IDF，请设置 IDF_PATH，或准备 $HOME/esp/esp-idf-v5.5.4、$PROJECT_DIR/../esp32-power/esp-idf、/home/mengen1014/work/esp32-power/esp-idf、$HOME/esp/esp-idf，或先激活 idf.py"
 activate_idf "$IDF_DETECTED"
 
@@ -274,6 +284,7 @@ fi
 
 if [ "$DO_BUILD" -eq 1 ]; then
     log "编译固件（PORTAL_TEST_AUTO_CONFIG=${TEST_AUTO_CONFIG}）"
+    clear_stale_board_cache
     idf.py -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" reconfigure
     idf.py -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" build
 else

@@ -185,6 +185,8 @@ check("stable%s-fix%s" not in build_all_src,
       "Release 合并固件文件名不得重复拼接稳定版/修复版版本号")
 check(" reconfigure" in flash_latest_src,
       "flash_latest.sh 必须在 build 前 reconfigure，刷新 BIKEPOWER_GIT_SHA/BIKEPOWER_BUILD_TIME")
+check("sdkconfig.board.tmp" in flash_latest_src and "CMakeCache.txt" in flash_latest_src,
+      "flash_latest.sh 必须清理 build_all.sh 后残留的临时板型 CMake 缓存")
 
 # WIFI_SSID_PREFIX 与 DEVICE_NAME 关系（AP 名沿用设备名前缀，运行时追加 MAC 后缀）
 wifi_ssid_prefix = extract_define(config_src, "WIFI_SSID_PREFIX")
