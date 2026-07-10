@@ -314,6 +314,8 @@ def main():
           "跑步页缺少固定配速区和自定义模板区")
     check('id="running-incline-row"' in html and 'id="run-incline"' in html,
           "跑步页缺少坡度控件")
+    check('RSC + HRS + FTMS Treadmill' in html,
+          "跑步页缺少最简协议兼容提示")
     check('renderRunSourcePicker' in js and 'onRunSourceSelect' in js and 'updateRunPacerInfo' in js,
           "app.js 缺少跑步来源渲染/切换/摘要逻辑")
     check('onRunCustomPaceAdj' in js and 'onRunCustomNameInput' in js and 'onRunInclineAdj' in js,
