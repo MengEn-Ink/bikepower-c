@@ -123,6 +123,8 @@ def full_steps(gate, build):
     run_step(gate, "NVS schema", "python3 tests/check_nvs_schema.py", 60)
     run_step(gate, "板型描述表", "python3 tests/check_board_desc.py", 60)
     run_step(gate, "任务/WDT", "python3 tests/check_tasks_wdt.py", 60)
+    run_step(gate, "Release 产物门禁接线", "python3 tests/check_release_gate.py", 30)
+    run_step(gate, "Release 产物门禁功能样例", "python3 tests/test_release_artifacts.py", 30)
     run_step(gate, "核心流程耐久", "python3 tests/test_core_flow_endurance.py", 240)
     if build:
         run_step(gate, "ESP-IDF 编译", f"{idf_prefix()}idf.py build", 240)

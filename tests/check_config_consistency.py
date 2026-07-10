@@ -32,6 +32,7 @@ MPY_COMPARISON = ROOT / "docs" / "archive" / "02-micropython-vs-c-comparison.md"
 REVIEW_CHECKLIST = ROOT / "docs" / "archive" / "03-review-checklist.md"
 HW_CONSTRAINTS = ROOT / ".trae" / "rules" / "hardware-constraints.md"
 BUILD_ALL = ROOT / "scripts" / "build_all.sh"
+FLASH_LATEST = ROOT / "scripts" / "flash_latest.sh"
 
 TAG = "[TC-3c]"
 g_pass = 0
@@ -123,6 +124,7 @@ mpy_comparison_src = read(MPY_COMPARISON)
 review_checklist_src = read(REVIEW_CHECKLIST)
 hw_src = read(HW_CONSTRAINTS) if HW_CONSTRAINTS.exists() else ""
 build_all_src = read(BUILD_ALL)
+flash_latest_src = read(FLASH_LATEST)
 
 
 # ============================ 1. 固件版本一致性 ============================
@@ -181,6 +183,8 @@ check("zip -qr \"$PACKAGE_NAME\"" in build_all_src,
       "Release 构建脚本必须使用 zip 生成可直接分发的总包")
 check("stable%s-fix%s" not in build_all_src,
       "Release 合并固件文件名不得重复拼接稳定版/修复版版本号")
+check(" reconfigure" in flash_latest_src,
+      "flash_latest.sh 必须在 build 前 reconfigure，刷新 BIKEPOWER_GIT_SHA/BIKEPOWER_BUILD_TIME")
 
 # WIFI_SSID_PREFIX 与 DEVICE_NAME 关系（AP 名沿用设备名前缀，运行时追加 MAC 后缀）
 wifi_ssid_prefix = extract_define(config_src, "WIFI_SSID_PREFIX")
@@ -361,6 +365,27 @@ check("阶段 0-13 完成情况" in doc_index_src,
 if "| 13 |" in progress_src:
     check("阶段 0-13" in doc_index_src,
           "PROGRESS.md 含阶段 13 时 docs/INDEX.md 同步到阶段 0-13")
+
+
+# ============================ 4f. 当前实现事实防漂移 ============================
+print(f"\n{TAG} [S4f] 当前实现事实防漂移")
+
+running_mode_doc = read(ROOT / "docs" / "dev" / "04-running-mode-compatibility.md")
+coverage_doc = read(ROOT / "docs" / "dev" / "03-test-coverage-analysis.md")
+check("内嵌 snprintf HTML 分块发送" not in progress_src,
+      "PROGRESS.md 不应把当前门户描述为旧版 C 内嵌 HTML")
+check("前端三件套 `main/web/`" in progress_src and "scripts/inline_static.py" in progress_src,
+      "PROGRESS.md 必须描述当前 main/web 前端三件套与 inline_static.py 架构")
+check("`/config`" not in progress_src and "`/draft`" not in progress_src and "`/ui/module`" not in progress_src,
+      "PROGRESS.md 不应保留当前已废弃的旧门户路由")
+check("当前固件升级走电脑端网页烧录" in progress_src and "手机端不支持烧录" in progress_src,
+      "PROGRESS.md 必须说明当前升级走电脑端网页烧录且手机端不支持")
+check("尚未实现固件改动" not in running_mode_doc,
+      "docs/dev/04-running-mode-compatibility.md 不应继续标注跑步模式尚未实现")
+check(f"当前固件基线：BikePower C v{fw_ver}" in running_mode_doc,
+      f"docs/dev/04-running-mode-compatibility.md 当前固件基线与 FIRMWARE_VERSION({fw_ver}) 一致")
+check(f"版本：v{fw_ver}" in coverage_doc,
+      f"docs/dev/03-test-coverage-analysis.md 版本与 FIRMWARE_VERSION({fw_ver}) 一致")
 
 
 # ============================ 5. BLE 通知间隔一致性 ============================
