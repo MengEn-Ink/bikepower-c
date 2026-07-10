@@ -26,6 +26,7 @@
 | [测试覆盖率分析](dev/03-test-coverage-analysis.md) | 领域层/应用层模块清单、覆盖矩阵、固件随附测试报告规则 |
 | [跑步模式兼容性调研与适配方案](dev/04-running-mode-compatibility.md) | Zwift/MyWhoosh 跑步模式 BLE 兼容口径、广播/GATT 数据需求、分阶段落地方案 |
 | [操作覆盖矩阵与测试门禁](dev/05-operation-test-gate.md) | 模式切换、保存、按钮、网页、BLE、异常稳定性的操作级门禁矩阵与人工项记录规则 |
+| [跑步模式完整升级方案](dev/06-running-mode-full-upgrade-plan.md) | 跑步输出来源、FTMS Treadmill、跑步控制点、配置迁移、网页交互与测试分批方案 |
 
 ## 🗄️ archive/ — 历史 / 归档（仅供追溯）
 
