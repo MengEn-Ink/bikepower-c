@@ -547,7 +547,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
     int ride_type_idx = (e->profile.ride_type >= 0 && e->profile.ride_type < RIDE_TYPE_COUNT)
                         ? e->profile.ride_type : 0;
 
-    char buf[3328];
+    static char buf[3328];
     int off = snprintf(buf, sizeof(buf),
         "{\"device_name\":\"%s\",\"firmware_version\":\"%s\",\"firmware_name\":\"%s\","
         "\"board\":\"%s\",\"stable_version\":\"%s\",\"fix_version\":\"%s\",\"git_sha\":\"%s\","
@@ -784,7 +784,7 @@ static esp_err_t h_api_device_templates(httpd_req_t *req)
     arm_deadline();
     device_template_list_t list;
     device_template_store_load(&list);
-    char buf[2048];
+    static char buf[2048];
     if (device_template_list_serialize_json(&list, buf, sizeof(buf)) == 0) {
         send_json(req, "{\"max\":5,\"count\":0,\"items\":[]}");
         return ESP_OK;
@@ -939,7 +939,7 @@ static esp_err_t h_api_ble_scan_stop(httpd_req_t *req)
 static esp_err_t h_api_ble_scan_results(httpd_req_t *req)
 {
     arm_deadline();
-    char buf[4096];
+    static char buf[4096];
     if (ble_scanner_serialize_results(buf, sizeof(buf)) == 0) {
         send_json(req, "{\"scanning\":false,\"devices\":[]}");
         return ESP_OK;
@@ -969,18 +969,18 @@ static esp_err_t h_api_ble_scan_read(httpd_req_t *req)
     json_get_str_def(body, "addr", addr, sizeof(addr));
     uint8_t addr_type = (uint8_t)json_get_int_def(body, "addr_type", 0);
     free(body);
-    device_template_t tpl;
+    static device_template_t tpl;
     esp_err_t rc = ble_scanner_read_template(addr, addr_type, BLE_SCAN_READ_TIMEOUT_MS, &tpl);
     if (rc != ESP_OK) {
         send_json(req, "{\"ok\":false,\"error\":\"连接或读取设备信息失败\"}");
         return ESP_OK;
     }
-    char item[1600];
+    static char item[1600];
     if (device_template_serialize_json(&tpl, item, sizeof(item)) == 0) {
         send_json(req, "{\"ok\":false,\"error\":\"设备信息序列化失败\"}");
         return ESP_OK;
     }
-    char resp[1700];
+    static char resp[1700];
     snprintf(resp, sizeof(resp), "{\"ok\":true,\"template\":%s}", item);
     send_json(req, resp);
     return ESP_OK;
@@ -1007,21 +1007,21 @@ static esp_err_t h_api_ble_scan_analyze(httpd_req_t *req)
     json_get_str_def(body, "addr", addr, sizeof(addr));
     uint8_t addr_type = (uint8_t)json_get_int_def(body, "addr_type", 0);
     free(body);
-    device_template_t tpl;
-    device_analysis_t analysis;
+    static device_template_t tpl;
+    static device_analysis_t analysis;
     esp_err_t rc = ble_scanner_analyze_device(addr, addr_type, DEVICE_ANALYSIS_SAMPLE_MS, &tpl, &analysis);
     if (rc != ESP_OK) {
         send_json(req, "{\"ok\":false,\"error\":\"连接或分析设备失败\"}");
         return ESP_OK;
     }
-    char item[1600];
-    char sample[1600];
+    static char item[1600];
+    static char sample[1600];
     if (device_template_serialize_json(&tpl, item, sizeof(item)) == 0
         || device_analysis_serialize_json(&analysis, sample, sizeof(sample)) == 0) {
         send_json(req, "{\"ok\":false,\"error\":\"分析结果序列化失败\"}");
         return ESP_OK;
     }
-    char resp[3400];
+    static char resp[3400];
     snprintf(resp, sizeof(resp), "{\"ok\":true,\"template\":%s,\"analysis\":%s}", item, sample);
     send_json(req, resp);
     return ESP_OK;
