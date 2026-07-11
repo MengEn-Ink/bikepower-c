@@ -23,11 +23,18 @@ port = None
 
 def detect_port():
     ports = list(list_ports.comports())
+    # 优先匹配 ESP32-C3 USB VID:PID
     for p in ports:
         if p.vid == 0x303A and p.pid == 0x1001:
             return p.device
+    # 次优匹配：常见 USB 串口设备名（跨平台）
     for p in ports:
-        if "ttyACM" in p.device or "ttyUSB" in p.device or "usbmodem" in p.device:
+        device = p.device or ""
+        desc = (p.description or "").lower()
+        if "ttyACM" in device or "ttyUSB" in device or "usbmodem" in device:
+            return p.device
+        # Windows COM 口：描述含 espressif/usb serial/jtag
+        if device.upper().startswith("COM") and ("espressif" in desc or "jtag/serial" in desc or "usb serial" in desc):
             return p.device
     return None
 

@@ -6,6 +6,7 @@ This test keeps the validator wired to the release workflow and checks the
 dry-run/sample path without requiring ESP-IDF builds or real release binaries.
 """
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -78,7 +79,7 @@ def main():
           "操作覆盖矩阵记录 release 产物门禁", failures)
 
     result = subprocess.run(
-        ["python3", str(SCRIPT), "--release-dir", str(Path(tempfile.gettempdir()) / "missing-release-dir"),
+        [sys.executable, str(SCRIPT), "--release-dir", str(Path(tempfile.gettempdir()) / "missing-release-dir"),
          "--version", "0.0.0", "--git-sha", "deadbee", "--skip-git-check"],
         cwd=ROOT,
         capture_output=True,
