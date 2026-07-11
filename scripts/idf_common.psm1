@@ -90,6 +90,9 @@ function Find-EspIdf {
         "E:\Espressif\frameworks",
         (Join-Path $env:USERPROFILE "esp"),
         (Join-Path $env:USERPROFILE ".espressif\frameworks"),
+        (Join-Path $env:USERPROFILE "workspace"),
+        "D:\work\workspace",
+        "D:\workspace",
         "C:\esp",
         "D:\esp",
         "C:\esp-idf",
@@ -146,6 +149,10 @@ function Get-IdfPython {
 function Activate-IdfEnv {
     param([string]$IdfPath)
     if (-not $IdfPath) {
+        # 验证 idf.py 是否真的在 PATH 中
+        if (-not (Get-Command "idf.py" -ErrorAction SilentlyContinue)) {
+            Die "idf.py 不在 PATH 中，ESP-IDF 环境未激活。请用 -IdfPath 指定 ESP-IDF 安装路径。"
+        }
         Write-Log "使用当前 shell 中已激活的 ESP-IDF"
         return
     }
@@ -154,7 +161,21 @@ function Activate-IdfEnv {
     if (-not (Test-Path $exportScript)) {
         Die "找不到 ESP-IDF 导出脚本: $exportScript"
     }
-    . $exportScript
+    # 保存当前 ErrorActionPreference，export.ps1 内部可能有非致命错误
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        . $exportScript
+    } catch {
+        $ErrorActionPreference = $oldEAP
+        Die "ESP-IDF 激活失败: $_"
+    }
+    $ErrorActionPreference = $oldEAP
+
+    # 验证激活是否成功
+    if (-not $env:IDF_PATH) {
+        Die "ESP-IDF 激活失败: IDF_PATH 未设置。可能 Python venv 或工具链未安装。`n  请运行 install.ps1 安装 ESP-IDF 工具链。"
+    }
     Write-Success ("ESP-IDF 已激活: IDF_PATH=" + $env:IDF_PATH)
 }
 
@@ -196,17 +217,19 @@ function Invoke-IdfCommand {
         [string[]]$IdfArgs = @(),
         [string]$WorkingDir = $Global:BikePowerProjectDir
     )
-    $pythonExe = Get-IdfPython
     if ($IdfPath) {
+        # 指定了 ESP-IDF 路径：用 python 执行 idf.py
+        $pythonExe = Get-IdfPython
         $idfPy = Join-Path $IdfPath "tools\idf.py"
         if (-not (Test-Path $idfPy)) {
             Die "找不到 idf.py: $idfPy"
         }
+        $allArgs = @($idfPy) + $IdfArgs
+        return Invoke-SafeCommand -Command $pythonExe -ArgsList $allArgs -WorkingDir $WorkingDir
     } else {
-        $idfPy = "idf.py"
+        # 当前 shell 已激活 ESP-IDF：idf.py 在 PATH 中，直接调用
+        return Invoke-SafeCommand -Command "idf.py" -ArgsList $IdfArgs -WorkingDir $WorkingDir
     }
-    $allArgs = @($idfPy) + $IdfArgs
-    return Invoke-SafeCommand -Command $pythonExe -ArgsList $allArgs -WorkingDir $WorkingDir
 }
 
 # 调用 esptool.py
@@ -216,17 +239,18 @@ function Invoke-EsptoolCommand {
         [string[]]$ToolArgs = @(),
         [string]$WorkingDir = $Global:BikePowerProjectDir
     )
-    $pythonExe = Get-IdfPython
     if ($IdfPath) {
+        $pythonExe = Get-IdfPython
         $esptoolPy = Join-Path $IdfPath "components\esptool_py\esptool\esptool.py"
         if (-not (Test-Path $esptoolPy)) {
             Die "找不到 esptool.py: $esptoolPy"
         }
+        $allArgs = @($esptoolPy) + $ToolArgs
+        return Invoke-SafeCommand -Command $pythonExe -ArgsList $allArgs -WorkingDir $WorkingDir
     } else {
-        $esptoolPy = "esptool.py"
+        # 当前 shell 已激活：esptool.py 在 PATH 中
+        return Invoke-SafeCommand -Command "esptool.py" -ArgsList $ToolArgs -WorkingDir $WorkingDir
     }
-    $allArgs = @($esptoolPy) + $ToolArgs
-    return Invoke-SafeCommand -Command $pythonExe -ArgsList $allArgs -WorkingDir $WorkingDir
 }
 
 # 调用 Python 脚本（统一走 IDF Python 环境）
