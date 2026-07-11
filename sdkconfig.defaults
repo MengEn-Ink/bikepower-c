@@ -63,3 +63,12 @@ CONFIG_HTTPD_MAX_URI_LEN=128
 
 # 板型：通用 ESP32-C3 开发板（GPIO12 LED, GPIO9 按钮）
 CONFIG_BOARD_GENERIC_C3=y
+
+# 编译加速：ccache 缓存编译结果，增量编译快 50-80%
+# 首次编译无加速（填缓存），后续编译命中缓存跳过编译
+# 需要先安装 ccache（ESP-IDF install.ps1 会自动安装）
+CONFIG_CCACHE_ENABLE=y
+
+# 构建系统：Ninja（默认，比 Make 快很多）
+# IDF_BUILD_SYSTEM_NINJA=y  # ESP-IDF v5.5+ 默认使用 Ninja
+

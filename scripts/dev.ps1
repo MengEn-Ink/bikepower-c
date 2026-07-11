@@ -124,6 +124,16 @@ function Cleanup-BoardConfig {
 function Do-Build {
     Write-Log "编译固件（board=$Board）"
 
+    # 显示 ccache 状态
+    $ccacheExe = Get-Command "ccache" -ErrorAction SilentlyContinue
+    if ($ccacheExe) {
+        Write-Host "  ccache: 已启用" -ForegroundColor Gray
+    } else {
+        Write-Host "  ccache: 未启用（安装后可加速增量编译）" -ForegroundColor Gray
+    }
+
+    $buildStartTime = Get-Date
+
     Clear-StaleBoardCache
 
     $mergedFile = Prepare-BoardConfig
@@ -140,7 +150,8 @@ function Do-Build {
         Cleanup-BoardConfig
     }
 
-    Write-Success "编译完成"
+    $buildDuration = (Get-Date) - $buildStartTime
+    Write-Success ("编译完成，耗时 {0:hh\:mm\:ss}" -f $buildDuration)
 }
 
 # 烧录固件
@@ -291,7 +302,18 @@ if ($Board -ne "generic") { Write-Host ("板型: " + $Board) }
 if ($Port) { Write-Host ("串口: " + $Port) }
 Write-Host ""
 
-# 探测 ESP-IDF（erase/monitor 只需激活环境，不需要编译）
+# check 和 test 只需要 Python，不需要 ESP-IDF
+if ($Action -eq "check") {
+    Do-Check
+    exit 0
+}
+
+if ($Action -eq "test") {
+    Do-Test
+    exit 0
+}
+
+# build/flash/monitor/clean/reconfigure/erase 需要 ESP-IDF 环境
 $IdfPath = Find-EspIdf -UserSpecified $IdfPath
 if ($null -eq $IdfPath) {
     Die "找不到 ESP-IDF 环境`n  请通过 -IdfPath 指定 ESP-IDF 安装目录，或设置 IDF_PATH 环境变量。`n  常见安装位置: C:\Espressif\frameworks\ 或 %USERPROFILE%\esp\"
@@ -309,8 +331,6 @@ switch ($Action) {
         Do-Flash
     }
     "monitor" { Do-Monitor }
-    "test" { Do-Test }
-    "check" { Do-Check }
     "clean" { Do-Clean }
     "reconfigure" { Do-Reconfigure }
     "erase" { Do-Erase }
