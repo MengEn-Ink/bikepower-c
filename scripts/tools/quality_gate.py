@@ -16,22 +16,28 @@
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 
 # 项目根目录：脚本位于 scripts/tools/，向上两级即项目根
 PROJECT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
+IS_WINDOWS = sys.platform.startswith("win")
+
 # IDF 路径探测优先级列表
 IDF_CANDIDATE_PATHS = [
     # 优先使用环境变量
     os.environ.get("IDF_PATH"),
+    # Windows 默认安装路径
+    os.path.expandvars(r"%USERPROFILE%\esp\esp-idf-v5.5.4") if IS_WINDOWS else None,
+    r"C:\Espressif\frameworks\esp-idf-v5.5.4" if IS_WINDOWS else None,
     # macOS 默认安装路径
-    os.path.expanduser("~/esp/esp-idf-v5.5.4"),
+    os.path.expanduser("~/esp/esp-idf-v5.5.4") if not IS_WINDOWS else None,
     # 相邻项目布局（bikepower-c 和 esp32-power 在同一父目录）
     os.path.abspath(os.path.join(PROJECT, "..", "esp32-power", "esp-idf")),
     # 原 Linux 开发机默认路径
-    "/home/mengen1014/work/esp32-power/esp-idf",
+    "/home/mengen1014/work/esp32-power/esp-idf" if not IS_WINDOWS else None,
 ]
 
 SCORE = {"pass": 0, "warn": 0, "fail": 0}
@@ -39,91 +45,170 @@ SCORE = {"pass": 0, "warn": 0, "fail": 0}
 
 def ok(msg):
     SCORE["pass"] += 1
-    print(f"  ✅ {msg}")
+    print(f"  \u2705 {msg}")
 
 
 def warn(msg):
     SCORE["warn"] += 1
-    print(f"  ⚠️  {msg}")
+    print(f"  \u26a0\ufe0f  {msg}")
 
 
 def fail(msg):
     SCORE["fail"] += 1
-    print(f"  ❌ {msg}")
+    print(f"  \u274c {msg}")
+
+
+def find_python():
+    """返回可用的 Python 解释器路径。"""
+    for py in ["python3", "python"]:
+        if shutil.which(py):
+            return py
+    return sys.executable
+
+
+def run_cmd(cmd_args, cwd=PROJECT, timeout=None):
+    """以列表参数形式运行命令，返回 (stdout+stderr, returncode)。
+    优先直接传参，不经过 shell，避免平台差异。"""
+    try:
+        r = subprocess.run(
+            cmd_args,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=timeout,
+        )
+        return r.stdout + r.stderr, r.returncode
+    except FileNotFoundError as e:
+        return f"命令未找到: {e}", 127
+    except Exception as e:
+        return f"执行异常: {e}", 1
 
 
 def run(cmd):
-    r = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, cwd=PROJECT)
-    return r.stdout + r.stderr, r.returncode
+    """向后兼容：接受字符串命令，Windows 下走 cmd /c，非 Windows 走 bash -c。
+    新代码优先用 run_cmd 直接传参。"""
+    if IS_WINDOWS:
+        return run_cmd(["cmd", "/c", cmd])
+    else:
+        return run_cmd(["bash", "-c", cmd])
 
 
 def idf_ready():
     """检查 idf.py 是否已在 PATH 中可用。"""
-    r = subprocess.run(["bash", "-c", "idf.py --version >/dev/null 2>&1"])
-    return r.returncode == 0
+    if shutil.which("idf.py"):
+        return True
+    if os.environ.get("IDF_PATH"):
+        idf_py = os.path.join(os.environ["IDF_PATH"], "tools", "idf.py")
+        if os.path.exists(idf_py):
+            return True
+    return False
+
+
+def find_idf_python(idf_path):
+    """在 ESP-IDF 安装中找到对应的 Python 解释器。"""
+    python_env = os.environ.get("IDF_PYTHON_ENV_PATH", "")
+    if python_env:
+        py_exe = os.path.join(python_env, "Scripts", "python.exe") if IS_WINDOWS else os.path.join(python_env, "bin", "python")
+        if os.path.exists(py_exe):
+            return py_exe
+    for cand in [
+        os.path.join(os.path.expanduser("~"), ".espressif", "python_env", "idf5.5_py3.11_env", "Scripts", "python.exe") if IS_WINDOWS else os.path.join(os.path.expanduser("~"), ".espressif", "python_env", "idf5.5_py3.9_env", "bin", "python"),
+        os.path.join(os.path.expanduser("~"), ".espressif", "python_env", "idf5.5_py3.9_env", "Scripts", "python.exe") if IS_WINDOWS else None,
+    ]:
+        if cand and os.path.exists(cand):
+            return cand
+    return find_python()
 
 
 def ensure_idf():
-    """若 idf.py 不可用，则按优先级探测 IDF 路径并返回激活命令前缀。
+    """若 idf.py 不可用，则按优先级探测 IDF 路径。
     返回 None 表示未找到可用的 ESP-IDF 环境。
-    """
+    返回 (idf_path, python_exe) 表示可用的 IDF 根目录和对应 Python。"""
     if idf_ready():
-        return ""
+        return os.environ.get("IDF_PATH", ""), sys.executable
     # 过滤掉 None/空路径，按顺序探测
     for path in filter(None, IDF_CANDIDATE_PATHS):
-        export_sh = os.path.join(path, "export.sh")
-        if not os.path.exists(export_sh):
+        export_file = os.path.join(path, "export.ps1" if IS_WINDOWS else "export.sh")
+        idf_py = os.path.join(path, "tools", "idf.py")
+        if not os.path.exists(idf_py):
             continue
-        # 验证 source 后 idf.py 确实可用
-        test_cmd = f". {export_sh} >/dev/null 2>&1 && idf.py --version >/dev/null 2>&1"
-        r = subprocess.run(["bash", "-c", test_cmd], cwd=PROJECT)
-        if r.returncode == 0:
-            return f". {export_sh} >/dev/null 2>&1 && "
-    # 所有候选路径均无效
+        py_exe = find_idf_python(path)
+        # 验证 idf.py 确实可运行
+        try:
+            r = subprocess.run(
+                [py_exe, idf_py, "--version"],
+                capture_output=True,
+                text=True,
+                cwd=PROJECT,
+                timeout=30,
+            )
+            if r.returncode == 0:
+                os.environ["IDF_PATH"] = path
+                return path, py_exe
+        except Exception:
+            continue
     return None
 
 
 # 1. 编译检查
 print("\n=== 1. 编译检查 ===")
-idf_prefix = ensure_idf()
-if idf_prefix is None:
-    fail("未找到可用的 ESP-IDF v5.5.x 环境，请设置 IDF_PATH 环境变量，或安装到默认路径 ~/esp/esp-idf-v5.5.4")
+idf_result = ensure_idf()
+if idf_result is None:
+    fail("未找到可用的 ESP-IDF v5.5.x 环境，请设置 IDF_PATH 环境变量")
 else:
-    out, rc = run(f"{idf_prefix}idf.py build 2>&1 | tail -5")
+    idf_path, py_exe = idf_result
+    idf_py = os.path.join(idf_path, "tools", "idf.py") if idf_path else "idf.py"
+    out, rc = run_cmd([py_exe, idf_py, "build"])
+    last_lines = "\n".join(out.strip().splitlines()[-5:])
     if rc == 0 and ("Project build complete" in out or "write_flash" in out):
         ok("idf.py build 通过")
     else:
-        fail(f"idf.py build 失败 (rc={rc}): {out[:200]}")
+        fail(f"idf.py build 失败 (rc={rc}): {last_lines[:200]}")
 
 # 2. Host 单测
 print("\n=== 2. Host 单测 ===")
-out, rc = run("make -C test clean >/dev/null 2>&1 && make -C test 2>&1 >/dev/null && ./test/test_domain 2>&1 | tail -3")
-m = re.search(r'(\d+) 通过.*?(\d+) 失败', out)
-if m:
-    npass, nfail = int(m.group(1)), int(m.group(2))
-    if nfail == 0:
-        ok(f"单测通过 ({npass} 断言)")
-    else:
-        fail(f"单测有失败: {npass} 通过, {nfail} 失败")
+make_cmd = shutil.which("make") or shutil.which("mingw32-make")
+gcc_cmd = shutil.which("gcc") or shutil.which("clang")
+if not make_cmd or not gcc_cmd:
+    warn("无 host 编译工具链（make/gcc），跳过单测")
 else:
-    fail(f"单测未识别输出: {out[:200]}")
+    test_dir = os.path.join(PROJECT, "test")
+    run_cmd([make_cmd, "-C", "test", "clean"], cwd=test_dir)
+    _, rc_build = run_cmd([make_cmd, "-C", "test"], cwd=test_dir)
+    if rc_build != 0:
+        fail("host 单测编译失败")
+    else:
+        test_bin = os.path.join(test_dir, "test_domain.exe" if IS_WINDOWS else "test_domain")
+        out, rc = run_cmd([test_bin], cwd=test_dir)
+        m = re.search(r'(\d+) 通过.*?(\d+) 失败', out)
+        if m:
+            npass, nfail = int(m.group(1)), int(m.group(2))
+            if nfail == 0:
+                ok(f"单测通过 ({npass} 断言)")
+            else:
+                fail(f"单测有失败: {npass} 通过, {nfail} 失败")
+        else:
+            fail(f"单测未识别输出: {out[:200]}")
 
 # 3. Git 状态
 print("\n=== 3. Git 状态 ===")
-out, _ = run("git status --short")
-out_stripped = out.strip()
-if out_stripped:
-    n = len(out_stripped.split('\n'))
-    warn(f"有 {n} 个未提交的改动")
-else:
-    ok("工作区 clean")
+if shutil.which("git"):
+    out, _ = run_cmd(["git", "-C", PROJECT, "status", "--short"])
+    out_stripped = out.strip()
+    if out_stripped:
+        n = len(out_stripped.split('\n'))
+        warn(f"有 {n} 个未提交的改动")
+    else:
+        ok("工作区 clean")
 
-out, _ = run("git rev-list --count @{u}..HEAD 2>/dev/null")
-out = out.strip()
-if out.isdigit() and int(out) > 0:
-    warn(f"有 {out} 个未推送的 commit")
+    out, _ = run_cmd(["git", "-C", PROJECT, "rev-list", "--count", "@{u}..HEAD"])
+    out = out.strip()
+    if out.isdigit() and int(out) > 0:
+        warn(f"有 {out} 个未推送的 commit")
+    else:
+        ok("全部已推送（或无上游）")
 else:
-    ok("全部已推送（或无上游）")
+    warn("未找到 git，跳过 Git 状态检查")
 
 # 4. 必备资产
 print("\n=== 4. 必备资产 ===")
@@ -215,12 +300,13 @@ ENV_MISSING_MARKERS = [
     "No module named",
     "ModuleNotFoundError",
 ]
+python_exe = find_python()
 for rel_path, name in STATIC_CHECKS:
     full = os.path.join(PROJECT, rel_path)
     if not os.path.exists(full):
         fail(f"{name}: 脚本缺失 {rel_path}")
         continue
-    out, rc = run(f"python3 {rel_path} 2>&1")
+    out, rc = run_cmd([python_exe, full], cwd=PROJECT)
     if rc == 0:
         ok(f"{name} 通过")
     elif any(marker in out for marker in ENV_MISSING_MARKERS):
