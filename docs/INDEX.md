@@ -28,6 +28,7 @@
 | [操作覆盖矩阵与测试门禁](dev/05-operation-test-gate.md) | 模式切换、保存、按钮、网页、BLE、异常稳定性的操作级门禁矩阵与人工项记录规则 |
 | [跑步模式完整升级方案](dev/06-running-mode-full-upgrade-plan.md) | 跑步输出来源、FTMS Treadmill、跑步控制点、配置迁移、网页交互与测试分批方案 |
 | [跑步模式完整升级实施计划](dev/07-running-mode-implementation-plan.md) | 跑步升级按 TDD 执行的批次、文件、RED/GREEN 测试、提交边界与真机验收清单 |
+| [Windows 环境编译指南](dev/08-windows-build-guide.md) | Windows 下环境配置、编译流程、速度优化（ccache/Defender/Ninja）、排障 |
 
 ## 🗄️ archive/ — 历史 / 归档（仅供追溯）
 
