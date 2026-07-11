@@ -4,6 +4,53 @@
 
 ## [未发布]
 
+## [4.1.0] - 2026-07-11
+
+### 跑步模式升级
+- `components/bikepower_domain/running_engine.c`：完整升级跑步模式引擎，支持配速/配速浮动/步频/步频浮动/心率核心闭环，移除坡度配置。
+- `components/bikepower_domain/config_store.c`、`include/config_store.h`：新增跑步模式配置字段（配速、配速浮动、步频、步频浮动），移除坡度字段。
+- `components/bikepower_domain/include/domain_config.h`：跑步模式参数范围与默认值更新。
+- `main/wifi_portal.c`、`main/web/`：网页端跑步模式首页精简为配速/步频/心率核心控件，移除坡度 UI。
+- `main/web/app.css`：压缩跑步模式手机端高度，390×844 视口内可见可操作。
+- `docs/dev/06-running-mode-full-upgrade-plan.md`、`docs/dev/07-running-mode-implementation-plan.md`：跑步升级方案与实施计划文档。
+
+### 外部运动设备分析
+- `main/ble_scanner.c/.h`：新增 BLE 扫描器模块，支持限时扫描周边运动设备并收集广播数据。
+- `components/bikepower_domain/device_analysis.c/.h`：新增设备分析领域层，按服务类型（CPS/CSC/HRS/FTMS）分类解析广播数据，过滤仅 DIS/BAS 的设备。
+- `main/ble_bikepower.c/.h`：增加 central/observer 受控能力，配网页触发限时扫描，分析结果通过 `/api/scan-results` 和 `/api/device-detail` 输出。
+- `main/web/app.js`、`main/web/index.html`：新增设备分析卡片，按设备类型（功率计/速度踏频/心率带/骑行台）大字展示核心数据，支持查看详细与原始广播数据。
+- `main/device_template_store.c`：分析结果数值放大展示（功率/踏频/心率等），便于阅读。
+- `main/app_events.h`、`main/app_main.c`、`main/app_state.c`：新增扫描事件和处理流程。
+- `feat(ble)`：优化 Zwift 与 MyWhoosh 兼容发现，确保骑行 App 能稳定发现设备。
+
+### 稳定性修复
+- `fix(stack)`：修复 HTTPD 任务栈溢出导致设备崩溃，HTTP 服务器栈大小增加至 12288 字节。
+- `fix(ble)`：修复外部设备数据读取失败问题，GATT 读取回调正确处理偏移和长度。
+- `fix(ble)`：修正 CPS 功率解析偏移，功率值与规范一致。
+- `fix(log)`：修复按钮日志刷屏和 Captive Portal 自动弹窗失败。
+- `fix(config)`：增加 HTTP 服务器栈大小至 12288 字节，防止高并发请求时栈溢出。
+- `main/radio_ctrl.c`：配网流程增加诊断日志，便于排查启动失败。
+
+### 配置持久化
+- `main/nvs_store.c`：新增跑步模式配置字段 NVS 读写，与领域层 schema 一致。
+
+### 测试与门禁
+- `tests/ble_selftest.py`：新增 RSC 跑步服务自测、外部设备扫描验证和 DIS 字段校验。
+- `tests/check_config_consistency.py`：新增跑步模式配置一致性检查和外部设备分析字段校验。
+- `tests/check_portal_structure.py`：新增设备分析卡片、跑步模式精简和广播项显隐静态回归检查。
+- `tests/check_ble_advertising_fields.py`：新增 BLE 广播字段门禁。
+- `tests/mock_server.py`：新增 `/api/scan-results`、`/api/device-detail` 和跑步模式配置路由。
+- `tests/test_portal_config_save.py`：新增跑步模式配置保存测试。
+- `tests/test_core_flow_endurance.py`：新增跑步模式核心流程耐久测试。
+- `test/test_domain.c`：新增跑步引擎、设备分析和配置 schema 单测。
+- `scripts/tools/quality_gate.py`：接入新增门禁脚本。
+
+### 文档
+- `docs/dev/01-technical-reference.md`：同步跑步模式升级和外部设备分析章节。
+- `docs/dev/03-test-coverage-analysis.md`：更新测试覆盖口径。
+- `docs/user/02-user-manual.md`：同步跑步模式操作说明和设备分析功能。
+- `docs/INDEX.md`：索引新增文档。
+
 ## [4.0.6] - 2026-07-10
 
 ### 网页端升级说明
