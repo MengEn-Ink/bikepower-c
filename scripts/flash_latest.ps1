@@ -31,185 +31,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectDir = Resolve-Path (Join-Path $ScriptDir "..")
+Import-Module (Join-Path $ScriptDir "idf_common.psm1") -Force
+$ProjectDir = $Global:BikePowerProjectDir
 $FlashDefaults = "sdkconfig.flash.tmp"
 $FlashBoardFile = "sdkconfig.flash.board"
 $SdkconfigBackup = $null
-
-function Write-Log {
-    param([string]$Message)
-    Write-Host ""
-    Write-Host "==> $Message" -ForegroundColor Cyan
-}
-
-function Write-Success {
-    param([string]$Message)
-    Write-Host "[OK] $Message" -ForegroundColor Green
-}
-
-function Write-Fail {
-    param([string]$Message)
-    Write-Host "[FAIL] $Message" -ForegroundColor Red
-}
-
-function Die {
-    param([string]$Message)
-    Write-Fail $Message
-    exit 1
-}
-
-function Invoke-SafeCommand {
-    param(
-        [string]$Command,
-        [string[]]$ArgsList = @(),
-        [string]$WorkingDir = $ProjectDir,
-        [switch]$IgnoreExitCode
-    )
-    Write-Host "+ $Command $($ArgsList -join ' ')" -ForegroundColor Gray
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $Command
-    $psi.Arguments = ($ArgsList -join ' ')
-    $psi.WorkingDirectory = $WorkingDir
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    $psi.RedirectStandardInput = $true
-    $proc = [System.Diagnostics.Process]::Start($psi)
-    $output = $proc.StandardOutput.ReadToEnd()
-    $error = $proc.StandardError.ReadToEnd()
-    $proc.WaitForExit()
-    if ($output) { Write-Host $output }
-    if ($error -and -not $IgnoreExitCode) { Write-Host $error -ForegroundColor Yellow }
-    if ($proc.ExitCode -ne 0 -and -not $IgnoreExitCode) {
-        throw "命令失败 (exit=$($proc.ExitCode)): $Command $($ArgsList -join ' ')"
-    }
-    return $proc.ExitCode
-}
-
-function Find-EspIdf {
-    param([string]$UserSpecified = "")
-    if ($UserSpecified -and (Test-Path (Join-Path $UserSpecified "export.ps1"))) {
-        return (Resolve-Path $UserSpecified).Path
-    }
-    if ($env:IDF_PATH -and (Test-Path (Join-Path $env:IDF_PATH "export.ps1"))) {
-        return $env:IDF_PATH
-    }
-    $candidates = @(
-        "C:\Espressif\frameworks\esp-idf-v5.5.4",
-        "C:\Espressif\frameworks\esp-idf-v5.5.1",
-        "C:\Espressif\frameworks\esp-idf-v5.5",
-        "$env:USERPROFILE\esp\esp-idf-v5.5.4",
-        "$env:USERPROFILE\esp\esp-idf-v5.5.1",
-        "$env:USERPROFILE\esp\esp-idf"
-    )
-    foreach ($cand in $candidates) {
-        if ($cand -and (Test-Path (Join-Path $cand "export.ps1"))) {
-            return $cand
-        }
-    }
-    if (Get-Command "idf.py" -ErrorAction SilentlyContinue) {
-        return ""
-    }
-    return $null
-}
-
-function Activate-IdfEnv {
-    param([string]$IdfPath)
-    if (-not $IdfPath) {
-        Write-Log "使用当前 shell 中已激活的 ESP-IDF"
-        return
-    }
-    Write-Log "激活 ESP-IDF: $IdfPath"
-    $exportScript = Join-Path $IdfPath "export.ps1"
-    if (-not (Test-Path $exportScript)) {
-        Die "找不到 ESP-IDF 导出脚本: $exportScript"
-    }
-    . $exportScript
-    Write-Success "ESP-IDF 已激活: IDF_PATH=$env:IDF_PATH"
-}
-
-function Get-IdfPython {
-    $pyEnv = $env:IDF_PYTHON_ENV_PATH
-    if ($pyEnv -and (Test-Path (Join-Path $pyEnv "Scripts\python.exe"))) {
-        return Join-Path $pyEnv "Scripts\python.exe"
-    }
-    $candidates = @(
-        ($env:USERPROFILE + "\.espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe"),
-        ($env:USERPROFILE + "\.espressif\python_env\idf5.5_py3.9_env\Scripts\python.exe")
-    )
-    foreach ($cand in $candidates) {
-        if (Test-Path $cand) { return $cand }
-    }
-    return "python"
-}
-
-function Invoke-IdfCommand {
-    param(
-        [string]$IdfPath,
-        [string[]]$IdfArgs = @(),
-        [string]$WorkingDir = $ProjectDir
-    )
-    $pythonExe = Get-IdfPython
-    if ($IdfPath) {
-        $idfPy = Join-Path $IdfPath "tools\idf.py"
-        if (-not (Test-Path $idfPy)) {
-            Die "找不到 idf.py: $idfPy"
-        }
-    } else {
-        $idfPy = "idf.py"
-    }
-    $allArgs = @($idfPy) + $IdfArgs
-    return Invoke-SafeCommand -Command $pythonExe -ArgsList $allArgs -WorkingDir $WorkingDir
-}
-
-function Detect-Port {
-    $detected = ""
-    try {
-        $pyscript = @'
-try:
-    from serial.tools import list_ports
-except Exception:
-    import sys
-    sys.exit(0)
-
-ports = list(list_ports.comports())
-
-def score(port):
-    hwid = (port.hwid or "").upper()
-    desc = (port.description or "").lower()
-    device = port.device or ""
-    if "303A:1001" in hwid:
-        return (0, device)
-    if "ESP" in hwid or "espressif" in desc or "jtag/serial" in desc or "usb serial" in desc:
-        return (1, device)
-    if device.upper().startswith("COM"):
-        try:
-            num = int(device[3:])
-            return (2, device)
-        except:
-            pass
-    return (9, device)
-
-candidates = [p for p in ports if score(p)[0] < 9]
-if candidates:
-    print(sorted(candidates, key=score)[0].device)
-'@
-        $detected = (& python -c $pyscript 2>$null)
-    } catch {}
-
-    if ($detected) {
-        return $detected
-    }
-
-    try {
-        $comPorts = [System.IO.Ports.SerialPort]::GetPortNames()
-        if ($comPorts -and $comPorts.Count -gt 0) {
-            return $comPorts[0]
-        }
-    } catch {}
-
-    return $null
-}
 
 function Run-QuickChecks {
     Write-Log "运行快速静态门禁"
@@ -223,23 +49,14 @@ function Run-QuickChecks {
     foreach ($check in $checks) {
         $fullPath = Join-Path $ProjectDir $check
         if (Test-Path $fullPath) {
-            & python $fullPath
-            if ($LASTEXITCODE -ne 0) {
+            try {
+                Invoke-PythonScript -ScriptPath $fullPath
+            } catch {
                 Die "静态门禁失败: $check"
             }
         }
     }
     Write-Success "快速静态门禁全部通过"
-}
-
-function Clear-StaleBoardCache {
-    $cmakeCache = Join-Path (Join-Path $ProjectDir "build") "CMakeCache.txt"
-    if (-not (Test-Path $cmakeCache)) { return }
-    $content = Get-Content $cmakeCache -Raw
-    if ($content -match "sdkconfig\.board\.tmp|sdkconfig\.flash\.tmp") {
-        Write-Host "  清理 build/CMakeCache.txt 中残留的临时板型配置" -ForegroundColor Yellow
-        Remove-Item $cmakeCache -Force
-    }
 }
 
 function Prepare-BoardDefaults {
@@ -291,10 +108,14 @@ try {
     Activate-IdfEnv -IdfPath $IdfPath
 
     if (-not $Port) {
-        $Port = Detect-Port
+        $Port = Detect-SerialPort
         if (-not $Port) {
             Die "找不到串口设备，请用 -Port 指定"
         }
+    }
+
+    if (-not (Test-SerialPort -PortName $Port)) {
+        Die "串口 $Port 不存在，请检查设备连接或用 -Port 指定"
     }
 
     Write-Log "使用串口: $Port"
@@ -340,7 +161,8 @@ try {
 
         $captureScript = Join-Path $ProjectDir "tests\serial_capture.py"
         if (Test-Path $captureScript) {
-            & python $captureScript --port $Port --duration $CaptureSeconds 2>&1 | Tee-Object -FilePath $logFile
+            $pythonExe = Get-IdfPython
+            & $pythonExe $captureScript --port $Port --duration $CaptureSeconds 2>&1 | Tee-Object -FilePath $logFile
         } else {
             Write-Host "  警告: 找不到 serial_capture.py，跳过启动日志抓取" -ForegroundColor Yellow
         }

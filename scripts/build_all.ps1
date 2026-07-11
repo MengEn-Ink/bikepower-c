@@ -1,4 +1,4 @@
-# BikePower C - Windows 双板型构建脚本
+﻿# BikePower C - Windows 双板型构建脚本
 # 分别编译通用 ESP32-C3 和 M5Stamp C3 固件，
 # 输出合并后的单文件固件包，包名包含板型、版本号、stable/fix 标识和 Git ID。
 #
@@ -27,62 +27,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectDir = Resolve-Path (Join-Path $ScriptDir "..")
+Import-Module (Join-Path $ScriptDir "idf_common.psm1") -Force
+$ProjectDir = $Global:BikePowerProjectDir
 $ReleaseDir = Join-Path (Join-Path $ProjectDir "build") "release"
-
-function Write-Log {
-    param([string]$Message)
-    Write-Host ""
-    Write-Host ("==> " + $Message) -ForegroundColor Cyan
-}
-
-function Write-Success {
-    param([string]$Message)
-    Write-Host ("[OK] " + $Message) -ForegroundColor Green
-}
-
-function Write-Fail {
-    param([string]$Message)
-    Write-Host ("[FAIL] " + $Message) -ForegroundColor Red
-}
-
-function Invoke-SafeCommand {
-    param(
-        [string]$Command,
-        [string[]]$ArgsList = @(),
-        [string]$WorkingDir = $ProjectDir,
-        [switch]$IgnoreExitCode
-    )
-    $argStr = $ArgsList -join ' '
-    Write-Host ("+ " + $Command + " " + $argStr) -ForegroundColor Gray
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $Command
-    $psi.Arguments = $argStr
-    $psi.WorkingDirectory = $WorkingDir
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    $psi.RedirectStandardInput = $true
-    $proc = [System.Diagnostics.Process]::Start($psi)
-    $outText = $proc.StandardOutput.ReadToEnd()
-    $errText = $proc.StandardError.ReadToEnd()
-    $proc.WaitForExit()
-    if ($outText) { Write-Host $outText }
-    if ($errText -and -not $IgnoreExitCode) { Write-Host $errText -ForegroundColor Yellow }
-    if ($proc.ExitCode -ne 0 -and -not $IgnoreExitCode) {
-        throw ("命令失败 (exit=" + $proc.ExitCode + "): " + $Command + " " + $argStr)
-    }
-    return $proc.ExitCode
-}
-
-function Extract-Define {
-    param([string]$Src, [string]$Name)
-    $pattern = "#define\s+" + $Name + "\s+`"([^`"]+)`""
-    if ($Src -match $pattern) {
-        return $Matches[1]
-    }
-    return ""
-}
 
 function Get-BoardName {
     param([string]$Target)
@@ -91,107 +38,6 @@ function Get-BoardName {
         "m5stamp" { return "m5stamp-c3" }
         default { throw ("未知板型: " + $Target) }
     }
-}
-
-function Get-Sha256 {
-    param([string]$Path)
-    return (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLower()
-}
-
-function Find-EspIdf {
-    param([string]$UserSpecified = "")
-    if ($UserSpecified -and (Test-Path (Join-Path $UserSpecified "export.ps1"))) {
-        return (Resolve-Path $UserSpecified).Path
-    }
-    if ($env:IDF_PATH -and (Test-Path (Join-Path $env:IDF_PATH "export.ps1"))) {
-        return $env:IDF_PATH
-    }
-    $candidates = @(
-        "C:\Espressif\frameworks\esp-idf-v5.5.4",
-        "C:\Espressif\frameworks\esp-idf-v5.5.1",
-        "C:\Espressif\frameworks\esp-idf-v5.5",
-        ($env:USERPROFILE + "\esp\esp-idf-v5.5.4"),
-        ($env:USERPROFILE + "\esp\esp-idf-v5.5.1"),
-        ($env:USERPROFILE + "\esp\esp-idf"),
-        $env:IDF_PATH
-    )
-    foreach ($cand in $candidates) {
-        if ($cand -and (Test-Path (Join-Path $cand "export.ps1"))) {
-            return $cand
-        }
-    }
-    if (Get-Command "idf.py" -ErrorAction SilentlyContinue) {
-        return ""
-    }
-    return $null
-}
-
-function Get-IdfPython {
-    $pyEnv = $env:IDF_PYTHON_ENV_PATH
-    if ($pyEnv -and (Test-Path (Join-Path $pyEnv "Scripts\python.exe"))) {
-        return Join-Path $pyEnv "Scripts\python.exe"
-    }
-    $candidates = @(
-        ($env:USERPROFILE + "\.espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe"),
-        ($env:USERPROFILE + "\.espressif\python_env\idf5.5_py3.9_env\Scripts\python.exe")
-    )
-    foreach ($cand in $candidates) {
-        if (Test-Path $cand) { return $cand }
-    }
-    return "python"
-}
-
-function Invoke-IdfCommand {
-    param(
-        [string]$IdfPath,
-        [string[]]$IdfArgs = @(),
-        [string]$WorkingDir = $ProjectDir
-    )
-    $pythonExe = Get-IdfPython
-    if ($IdfPath) {
-        $idfPy = Join-Path $IdfPath "tools\idf.py"
-        if (-not (Test-Path $idfPy)) {
-            throw ("找不到 idf.py: " + $idfPy)
-        }
-    } else {
-        $idfPy = "idf.py"
-    }
-    $allArgs = @($idfPy) + $IdfArgs
-    return Invoke-SafeCommand -Command $pythonExe -ArgsList $allArgs -WorkingDir $WorkingDir
-}
-
-function Invoke-EsptoolCommand {
-    param(
-        [string]$IdfPath,
-        [string[]]$ToolArgs = @(),
-        [string]$WorkingDir = $ProjectDir
-    )
-    $pythonExe = Get-IdfPython
-    if ($IdfPath) {
-        $esptoolPy = Join-Path $IdfPath "components\esptool_py\esptool\esptool.py"
-        if (-not (Test-Path $esptoolPy)) {
-            throw ("找不到 esptool.py: " + $esptoolPy)
-        }
-    } else {
-        $esptoolPy = "esptool.py"
-    }
-    $allArgs = @($esptoolPy) + $ToolArgs
-    return Invoke-SafeCommand -Command $pythonExe -ArgsList $allArgs -WorkingDir $WorkingDir
-}
-
-function Activate-IdfEnv {
-    param([string]$IdfPath)
-    if (-not $IdfPath) {
-        Write-Log "使用当前 shell 中已激活的 ESP-IDF"
-        return
-    }
-    Write-Log ("激活 ESP-IDF: " + $IdfPath)
-    $exportScript = Join-Path $IdfPath "export.ps1"
-    if (-not (Test-Path $exportScript)) {
-        throw ("找不到 ESP-IDF 导出脚本: " + $exportScript)
-    }
-    . $exportScript
-    Write-Success ("ESP-IDF 已激活: IDF_PATH=" + $env:IDF_PATH)
 }
 
 function Run-HostTests {
@@ -212,10 +58,7 @@ function Run-HostTests {
             Invoke-SafeCommand -Command "make" -ArgsList @() -WorkingDir $testDir
         }
         $testBin = Join-Path $testDir "test_domain.exe"
-        & $testBin
-        if ($LASTEXITCODE -ne 0) {
-            throw ("host 单测失败 (exit=" + $LASTEXITCODE + ")")
-        }
+        Invoke-SafeCommand -Command $testBin -ArgsList @() -WorkingDir $testDir
     } finally {
         Pop-Location
     }
@@ -236,7 +79,7 @@ function Run-StaticChecks {
     foreach ($check in $checks) {
         $fullPath = Join-Path $ProjectDir $check
         if (Test-Path $fullPath) {
-            Invoke-SafeCommand -Command "python" -ArgsList @($fullPath)
+            Invoke-PythonScript -ScriptPath $fullPath
         }
     }
     Write-Success "静态门禁检查全部通过"
@@ -248,7 +91,7 @@ function Run-MockTests {
     foreach ($test in $tests) {
         $fullPath = Join-Path $ProjectDir $test
         if (Test-Path $fullPath) {
-            Invoke-SafeCommand -Command "python" -ArgsList @($fullPath)
+            Invoke-PythonScript -ScriptPath $fullPath
         }
     }
 }
@@ -530,8 +373,12 @@ if (Test-Path $releaseDocsPy) {
     Write-Log "生成测试报告与用户文档"
     $testSummary = "构建前门禁已通过：静态门禁全绿；Mock 测试通过；host 单测按环境可选执行。"
     $notes = "build_all.ps1 生成的是本地 release 产物；正式发版前必须补齐真机验证结果。"
-    & python $releaseDocsPy --release-dir $ReleaseDir --test-summary $testSummary --notes $notes
-    if ($LASTEXITCODE -ne 0) {
+    $docsExit = Invoke-PythonScript -ScriptPath $releaseDocsPy -ScriptArgs @(
+        "--release-dir", $ReleaseDir,
+        "--test-summary", $testSummary,
+        "--notes", $notes
+    ) -IgnoreExitCode
+    if ($docsExit -ne 0) {
         Write-Host "  警告: 文档生成脚本返回非零退出码" -ForegroundColor Yellow
     }
 }
@@ -555,8 +402,13 @@ $zipName = Build-ZipPackage -Version $Version -GitSha $GitSha -ReleaseDir $Relea
 $artifactGate = Join-Path (Join-Path (Join-Path $ScriptDir "tools") "check_release_artifacts.py")
 if ($Board.Count -eq 2 -and (Test-Path $artifactGate)) {
     Write-Log "运行 Release 产物门禁"
-    & python $artifactGate --release-dir $ReleaseDir --version $Version --git-sha $GitSha --allow-dirty
-    if ($LASTEXITCODE -ne 0) {
+    $gateExit = Invoke-PythonScript -ScriptPath $artifactGate -ScriptArgs @(
+        "--release-dir", $ReleaseDir,
+        "--version", $Version,
+        "--git-sha", $GitSha,
+        "--allow-dirty"
+    ) -IgnoreExitCode
+    if ($gateExit -ne 0) {
         Write-Fail "Release 产物门禁未通过"
         exit 1
     }
