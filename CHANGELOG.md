@@ -4,6 +4,16 @@
 
 ## [未发布]
 
+### Windows 开发环境适配
+- `scripts/idf_common.psm1`：新增 Windows PowerShell 共享模块，统一封装 ESP-IDF 路径探测（扫描目录非硬编码版本号）、Python 环境探测、子进程调用、串口探测等通用逻辑。
+- `scripts/dev.ps1`：新增 Windows 统一开发入口，支持 build/flash/monitor/test/check/clean/reconfigure/erase 子命令，自动探测 ESP-IDF 和串口。
+- `scripts/build_all.ps1`：重构使用共享模块，删除 11 个重复函数，所有 Python 调用统一走 IDF Python 环境。
+- `scripts/flash_latest.ps1`：重构使用共享模块，删除 10 个重复函数，新增串口存在性校验。
+- `scripts/tools/device_monitor.py`：删除硬编码 Unix 串口路径，改用 pyserial list_ports 自动探测（跨平台）。
+- `tests/stage3_conn_test.py`：串口探测增加 Windows COM 口识别。
+- `tests/serial_capture.py`：默认端口从 /dev/ttyACM0 改为自动探测。
+- `tests/check_release_gate.py`：python3 调用改为 sys.executable（Windows 无 python3 命令）。
+
 ## [4.1.0] - 2026-07-11
 
 ### 跑步模式升级
