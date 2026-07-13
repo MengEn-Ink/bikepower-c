@@ -185,6 +185,7 @@ typedef enum {
 #define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 保存并关闭 WiFi 前的收尾等待时间（历史命名保留）
 #define WIFI_MAX_STA_CONN      2        // SoftAP最大连接客户端数
 #define HTTP_MAX_BODY_LEN      4096     // HTTP请求体最大长度（字节）
+#define HTTP_RECV_TIMEOUT_RETRIES 3     // httpd_req_recv 超时有限重试次数
 #define HTTP_MAX_URI_HANDLERS  30       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + 配置接口）
 
 // ===== Captive Portal =====
@@ -194,6 +195,8 @@ typedef enum {
 // ===== 射频软切换（radio_ctrl，毫秒） =====
 #define RADIO_BLE_RELEASE_WAIT_MS  200   // 停 BLE 后留给控制器释放射频的时间
 #define RADIO_RESTART_DELAY_MS     1000  // 失败兜底 esp_restart 前的等待
+#define BLE_STOP_LOCK_WAIT_MS      100   // 停 BLE 等待通知回调退出的最大时间
+#define BLE_SCAN_LOCK_WAIT_MS      5     // BLE 扫描回调等待扫描结果锁的最大时间
 
 // ===== 功率/踏频/心率范围、调功步进、默认值 =====
 // 单一事实源：以下领域常量统一在 domain_config.h 定义，本头直接引入避免两处 drift。

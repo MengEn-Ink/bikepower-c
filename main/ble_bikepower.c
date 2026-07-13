@@ -1192,7 +1192,15 @@ bool ble_bikepower_stop(void)
     }
     // 拿锁等待可能正在执行的 notify_tick 回调结束（esp_timer_delete 不保证等待飞行中的回调），
     // 之后再释放协议栈，确保回调不会访问已 deinit 的 NimBLE 资源。
-    if (g_notify_lock) xSemaphoreTake(g_notify_lock, portMAX_DELAY);
+    bool have_notify_lock = false;
+    if (g_notify_lock) {
+        if (xSemaphoreTake(g_notify_lock, pdMS_TO_TICKS(BLE_STOP_LOCK_WAIT_MS)) != pdTRUE) {
+            ESP_LOGE(TAG, "等待通知锁超时，取消停用 BLE");
+            g_stopping = false;
+            return false;
+        }
+        have_notify_lock = true;
+    }
 
     if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
         ble_gap_terminate(g_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
@@ -1211,6 +1219,6 @@ bool ble_bikepower_stop(void)
     g_ready = false;
     g_start_failed = false;
 
-    if (g_notify_lock) xSemaphoreGive(g_notify_lock);
+    if (have_notify_lock) xSemaphoreGive(g_notify_lock);
     return released;
 }

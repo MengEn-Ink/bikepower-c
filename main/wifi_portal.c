@@ -130,9 +130,18 @@ static int recv_body(httpd_req_t *req, char **out)
     char *buf = malloc(total + 1);
     if (!buf) return -1;
     size_t recv = 0;
+    int timeout_retries = 0;
     while (recv < total) {
         int r = httpd_req_recv(req, buf + recv, total - recv);
+        if (r == HTTPD_SOCK_ERR_TIMEOUT) {
+            if (++timeout_retries <= HTTP_RECV_TIMEOUT_RETRIES) {
+                continue;
+            }
+            free(buf);
+            return -1;
+        }
         if (r <= 0) { free(buf); return -1; }
+        timeout_retries = 0;
         recv += (size_t)r;
     }
     buf[recv] = '\0';

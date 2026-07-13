@@ -37,6 +37,8 @@ FLASH_LATEST = ROOT / "scripts" / "flash_latest.sh"
 BLE_SELFTEST = ROOT / "tests" / "ble_selftest.py"
 STAGE3_CONN_TEST = ROOT / "tests" / "stage3_conn_test.py"
 BLE_BIKEPOWER_C = ROOT / "main" / "ble_bikepower.c"
+WIFI_PORTAL_C = ROOT / "main" / "wifi_portal.c"
+BLE_SCANNER_C = ROOT / "main" / "ble_scanner.c"
 SDKCONFIG_DEFAULTS = ROOT / "sdkconfig.defaults"
 
 TAG = "[TC-3c]"
@@ -134,6 +136,8 @@ flash_latest_src = read(FLASH_LATEST)
 ble_selftest_src = read(BLE_SELFTEST)
 stage3_conn_src = read(STAGE3_CONN_TEST)
 ble_bikepower_src = read(BLE_BIKEPOWER_C)
+wifi_portal_src = read(WIFI_PORTAL_C)
+ble_scanner_src = read(BLE_SCANNER_C)
 sdkconfig_defaults_src = read(SDKCONFIG_DEFAULTS)
 
 
@@ -492,6 +496,19 @@ check(httpd_stack == 12288, f"TASK_STACK_HTTPD = 12288 (实际={httpd_stack})")
 
 check("CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y" in sdkconfig_defaults_src,
       "sdkconfig.defaults 启用 CONFIG_ESP_COEX_SW_COEXIST_ENABLE")
+
+http_retry = extract_int(config_src, "HTTP_RECV_TIMEOUT_RETRIES")
+ble_stop_wait = extract_int(config_src, "BLE_STOP_LOCK_WAIT_MS")
+ble_scan_wait = extract_int(config_src, "BLE_SCAN_LOCK_WAIT_MS")
+check(http_retry == 3, f"HTTP_RECV_TIMEOUT_RETRIES = 3 (实际={http_retry})")
+check(ble_stop_wait == 100, f"BLE_STOP_LOCK_WAIT_MS = 100 (实际={ble_stop_wait})")
+check(ble_scan_wait == 5, f"BLE_SCAN_LOCK_WAIT_MS = 5 (实际={ble_scan_wait})")
+check("HTTPD_SOCK_ERR_TIMEOUT" in wifi_portal_src and "HTTP_RECV_TIMEOUT_RETRIES" in wifi_portal_src,
+      "wifi_portal.c 对 HTTPD_SOCK_ERR_TIMEOUT 做有限重试")
+check("xSemaphoreTake(g_notify_lock, portMAX_DELAY)" not in ble_bikepower_src and "BLE_STOP_LOCK_WAIT_MS" in ble_bikepower_src,
+      "ble_bikepower_stop 不无限等待通知锁")
+check("xSemaphoreTake(s_scan.lock, portMAX_DELAY)" not in ble_scanner_src and "BLE_SCAN_LOCK_WAIT_MS" in ble_scanner_src,
+      "ble_scanner 回调不无限等待扫描锁")
 
 
 # ============================ 8. FTMS OpCode 唯一性 ============================

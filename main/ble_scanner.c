@@ -73,6 +73,12 @@ static bool ensure_init(void)
     return s_scan.lock != NULL;
 }
 
+static bool scan_lock_take(void)
+{
+    return s_scan.lock
+        && xSemaphoreTake(s_scan.lock, pdMS_TO_TICKS(BLE_SCAN_LOCK_WAIT_MS)) == pdTRUE;
+}
+
 static void copy_text(char *dst, size_t dst_sz, const uint8_t *src, size_t src_len)
 {
     if (!dst || dst_sz == 0) return;
@@ -190,7 +196,7 @@ static bool find_scanned_template(const char *addr, uint8_t addr_type, device_te
 {
     if (!addr || !out || !ensure_init()) return false;
     bool found = false;
-    xSemaphoreTake(s_scan.lock, portMAX_DELAY);
+    if (!scan_lock_take()) return false;
     for (int i = 0; i < BLE_SCAN_MAX_RESULTS; i++) {
         if (!s_scan.items[i].used) continue;
         if (s_scan.items[i].tpl.addr_type == addr_type
@@ -265,7 +271,7 @@ static void on_disc(const struct ble_gap_disc_desc *desc)
     device_template_set_addr(&tpl, desc->addr.val, desc->addr.type);
     tpl.last_rssi = desc->rssi == 127 ? 0 : desc->rssi;
     parse_adv(&tpl, desc->data, desc->length_data);
-    xSemaphoreTake(s_scan.lock, portMAX_DELAY);
+    if (!scan_lock_take()) return;
     int idx = find_item_by_identity(&tpl);
     bool matched_existing = idx >= 0;
     if (desc->data && desc->length_data > 0) {
@@ -301,9 +307,10 @@ static int scan_gap_cb(struct ble_gap_event *event, void *arg)
         return 0;
     case BLE_GAP_EVENT_DISC_COMPLETE:
         if (ensure_init()) {
-            xSemaphoreTake(s_scan.lock, portMAX_DELAY);
-            s_scan.scanning = false;
-            xSemaphoreGive(s_scan.lock);
+            if (scan_lock_take()) {
+                s_scan.scanning = false;
+                xSemaphoreGive(s_scan.lock);
+            }
         }
         ESP_LOGI(TAG, "扫描完成 reason=%d", event->disc_complete.reason);
         return 0;
@@ -325,16 +332,17 @@ esp_err_t ble_scanner_start(uint32_t duration_ms)
     params.window = BLE_GAP_SCAN_WIN_MS(30);
     params.passive = 0;
     params.filter_duplicates = 0;
-    xSemaphoreTake(s_scan.lock, portMAX_DELAY);
+    if (!scan_lock_take()) return ESP_ERR_TIMEOUT;
     memset(s_scan.items, 0, sizeof(s_scan.items));
     s_scan.count = 0;
     s_scan.scanning = true;
     xSemaphoreGive(s_scan.lock);
     rc = ble_gap_disc(own_addr_type, (int32_t)duration_ms, &params, scan_gap_cb, NULL);
     if (rc != 0) {
-        xSemaphoreTake(s_scan.lock, portMAX_DELAY);
-        s_scan.scanning = false;
-        xSemaphoreGive(s_scan.lock);
+        if (scan_lock_take()) {
+            s_scan.scanning = false;
+            xSemaphoreGive(s_scan.lock);
+        }
         ESP_LOGW(TAG, "启动扫描失败 rc=%d", rc);
         return ESP_FAIL;
     }
@@ -346,7 +354,7 @@ esp_err_t ble_scanner_stop(void)
 {
     if (!ensure_init()) return ESP_ERR_NO_MEM;
     int rc = ble_gap_disc_cancel();
-    xSemaphoreTake(s_scan.lock, portMAX_DELAY);
+    if (!scan_lock_take()) return ESP_ERR_TIMEOUT;
     s_scan.scanning = false;
     xSemaphoreGive(s_scan.lock);
     if (rc != 0 && rc != BLE_HS_EALREADY) return ESP_FAIL;
@@ -356,7 +364,7 @@ esp_err_t ble_scanner_stop(void)
 bool ble_scanner_is_scanning(void)
 {
     if (!ensure_init()) return false;
-    xSemaphoreTake(s_scan.lock, portMAX_DELAY);
+    if (!scan_lock_take()) return false;
     bool scanning = s_scan.scanning;
     xSemaphoreGive(s_scan.lock);
     return scanning;
@@ -365,7 +373,7 @@ bool ble_scanner_is_scanning(void)
 size_t ble_scanner_serialize_results(char *out, size_t out_sz)
 {
     if (!out || out_sz == 0 || !ensure_init()) return 0;
-    xSemaphoreTake(s_scan.lock, portMAX_DELAY);
+    if (!scan_lock_take()) return 0;
     size_t off = 0;
     int n = snprintf(out, out_sz, "{\"scanning\":%s,\"devices\":[", s_scan.scanning ? "true" : "false");
     if (n < 0 || (size_t)n >= out_sz) {
