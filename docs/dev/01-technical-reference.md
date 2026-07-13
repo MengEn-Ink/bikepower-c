@@ -111,7 +111,7 @@
 
 如果存在旧值，则：
 
-1. 从键 `sv`、`power`、`cadence`、`mode`、`hr`、`hashr`、`weight`、`ftp`、`thr_hr`、`ride`、`devname` 读取
+1. 从键 `sv`、`power`、`cadence`、`mode`、`hr`、`hashr`、`pfloat`、`cfloat`、`hrfloat`、`pstep`、`weight`、`ftp`、`thr_hr`、`ride`、`cwkglo`、`cwkghi`、`cname`、`sport`、`bmask`、`rspeed`、`rpacef`、`rcad`、`rcadf`、`rmode`、`rpacer`、`rplo`、`rphi`、`rcname`、`rincl`、`devname` 和 `led*` 场景配置读取
 2. `config_store_migrate(&c)`
 3. `config_store_validate(&c)`
 4. `config_to_engine(&c, e)`
@@ -157,6 +157,13 @@
 - `APP_EVT_BTN_UP`
 - `APP_EVT_CONN_CHANGED`
 - `APP_EVT_ERG_TARGET`
+- `APP_EVT_ERG_CLEAR`
+- `APP_EVT_RUN_TARGET_SPEED`
+- `APP_EVT_RUN_TARGET_INCLINE`
+- `APP_EVT_RUN_START`
+- `APP_EVT_RUN_STOP`
+- `APP_EVT_RUN_RESET`
+- `APP_EVT_WIFI_DONE`
 
 所有这些事件都汇聚到 `app_state_handle_event()`。
 因此状态机是应用层高层行为的唯一决策中心。
@@ -283,6 +290,8 @@ DIS 读取内容来自编译期常量：
 
 - `FTMS_OP_REQUEST_CONTROL = 0x00`
 - `FTMS_OP_RESET = 0x01`
+- `FTMS_OP_SET_TARGET_SPEED = 0x02`
+- `FTMS_OP_SET_TARGET_INCLINATION = 0x03`
 - `FTMS_OP_SET_TARGET_POWER = 0x05`
 - `FTMS_OP_START_RESUME = 0x07`
 - `FTMS_OP_STOP_PAUSE = 0x08`
@@ -297,6 +306,8 @@ DIS 读取内容来自编译期常量：
 
 - `RequestControl`：直接 success
 - `SetTargetPower`：解析 `<h` 16-bit 功率值，调用 `g_erg_cb(target)`
+- `SetTargetSpeed`：解析 `uint16` 速度（km/h*100），投递跑步目标速度事件
+- `SetTargetInclination`：解析 `int16` 坡度（坡度*10），投递跑步坡度事件
 - `StartResume`：`g_ftms_status_buf[0] = 0x01`
 - `StopPause`：`g_ftms_status_buf[0] = 0x02`
 - `Reset`：`g_ftms_status_buf[0] = 0x00`
@@ -351,8 +362,8 @@ DIS 读取内容来自编译期常量：
 
 语义规则如下：
 
-- 短按 `< SHORT_PRESS_MS(500ms)`：`power_engine_adjust_power(-POWER_STEP_W)`
-- 长按 `>=500ms`：每 `BTN_AUTO_REPEAT_MS(200ms)` 自动 `+20W`
+- 短按 `< SHORT_PRESS_MS(500ms)`：按当前可配置步进降低控制目标，默认 `20W`，范围 `5-50W`
+- 长按 `>=500ms`：每 `BTN_AUTO_REPEAT_MS(200ms)` 按当前可配置步进提高控制目标（仅 steady 模式）
 - 长按释放 `>= WIFI_BTN_HOLD_MS(2000ms)`：进入确认窗口
 - 确认窗口内再按一次：触发 `trigger_wifi()`
 - 确认窗口超过 `CONFIRM_WINDOW_MS(3000ms)`：取消并回 `ST_BLE_ACTIVE`
@@ -640,7 +651,7 @@ v3.2.0 起配网门户前后端分离：
 - `cfg.server_port = WIFI_PORT`
 - `cfg.lru_purge_enable = true`
 - `cfg.max_uri_handlers = HTTP_MAX_URI_HANDLERS`（当前 30）
-- `cfg.stack_size = 8192`
+- `cfg.stack_size = TASK_STACK_HTTPD`（当前 12288）
 - `cfg.keep_alive_enable = false`
 
 已注册业务路由 17 个，另有 10 个 Captive Portal 探测路由：

@@ -12,9 +12,9 @@
 |------|------|------|------|
 | 0 | 工程骨架（CMake/分区/sdkconfig） | ✅ 完成 | 空工程启动日志 |
 | 1 | NimBLE CPS 单服务最小闭环 | ✅ 完成 | 手机搜到 BikePower 看到功率 |
-| 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测 573 断言 |
+| 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测持续扩展（当前 5849 断言） |
 | 3 | GPIO 中断按钮 + LED 任务 + 状态机 | ✅ 代码完成（物理按钮待人工确认） | 短/中/长按 + 二次确认 + LED 各态 |
-| 4 | 配置持久化（NVS load/save/migrate） | ✅ 完成 | 调功后断电重启功率由260W恢复为200W，host 单测 568 断言 |
+| 4 | 配置持久化（NVS load/save/migrate） | ✅ 完成 | 调功后断电重启功率由260W恢复为200W，host 单测持续覆盖 |
 | 5 | WiFi 配网（radio_ctrl 共存 + AP + HTTP，设备不重启） | ✅ 代码完成（配网真机流程待人工确认） | 长按确认→配网→保存→关 WiFi 回到 BLE，BLE 全程不断 |
 | 6 | 稳定性与发版（WDT/coredump/老化/tag） | ✅ 完成 | v3.0.0 已发版 |
 | 7 | M5Stamp C3 适配（板型检测/SK6812/配网页面修复） | ✅ 完成 | v3.1.0 已发版 |
@@ -43,7 +43,7 @@
 - [x] 配置导入/导出基础能力已落到领域层：`config_store_serialize` / `config_store_deserialize` 支持 JSON 往返、缺字段默认值和范围夹紧。
 - [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、单一版本号、stable/fix 标识和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 Gitee Release。
 - [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合；`tests/operation_gate.py --level full` 已接入 release 产物门禁和核心流程耐久。
-- [x] 当前 generic-c3 真机自动化验证通过：`flash_latest.sh --port /dev/cu.usbmodem1101 --capture-seconds 20` 烧录后启动 v4.0.4，DIS 固件名为 `generic-c3-v4.0.4-stable4.0.0-fix4.0.4-g1cbf634`；`tests/ble_selftest.py 8` 和 `tests/stage3_conn_test.py --port /dev/cu.usbmodem1101` 均通过。
+- [x] 最近一次 generic-c3 真机自动化验证记录：`flash_latest.sh --port /dev/cu.usbmodem1101 --capture-seconds 20` 烧录后启动 v4.0.4，DIS 固件名为 `generic-c3-v4.0.4-stable4.0.0-fix4.0.4-g1cbf634`；`tests/ble_selftest.py 8` 和 `tests/stage3_conn_test.py --port /dev/cu.usbmodem1101` 均通过。当前 v4.0.6 真机完整回归仍需重跑后更新本项。
 
 ### 待人工确认（P0）
 
@@ -112,14 +112,14 @@
 | NVS 桥接 | [main/nvs_store.c](main/nvs_store.c) | namespace=bikepower 短key，load（缺失/版本不匹配用默认并回写）+ save（脏标记落盘） |
 | 主循环接入 | [main/app_main.c](main/app_main.c) | 启动 load + clear_dirty，10s 心跳脏标记落盘 |
 
-- NVS namespace `bikepower`，短 key：`sv`/`power`/`cadence`/`mode`/`hr`/`hashr`/`weight`/`ftp`/`thr_hr`/`ride`/`devname`（schema v5：心率持久化替代已移除的 tune_road）
+- NVS namespace `bikepower`，schema v10；短 key 包含 `sv`/`power`/`cadence`/`mode`/`hr`/`hashr`/`pfloat`/`cfloat`/`hrfloat`/`pstep`/`weight`/`ftp`/`thr_hr`/`ride`/`cwkglo`/`cwkghi`/`cname`/`sport`/`bmask`/`rspeed`/`rpacef`/`rcad`/`rcadf`/`rmode`/`rpacer`/`rplo`/`rphi`/`rcname`/`rincl`/`devname` 以及 `led*` 场景配置。
 - 旧 MicroPython JSON 配置不迁移，首刷重置为默认
 
 ### 真机验证（已通过）
 
 - 首刷启动用默认值并回写：`p=260W c=90RPM mode=0 hr=150 w=70 ftp=300 thr=190 ride=0`
 - 短按 3 次（每次 -20W）→ 等待落盘 → 断电重启 → 功率恢复为 `p=200W`，证明持久化生效
-- host 单测 568 断言全过（新增 config_store 23 断言）
+- host 单测 5849 断言全过（覆盖 config_store、跑步配置、设备模板、按钮与 LED 领域逻辑）
 
 ---
 
@@ -153,7 +153,7 @@
 | 项 | 文件 | 说明 |
 |------|------|------|
 | Task WDT 覆盖 | [main/app_main.c](main/app_main.c) / [main/led.c](main/led.c) | app_main 主循环与 led_task 均 `esp_task_wdt_add(NULL)` + 周期 `esp_task_wdt_reset()`；IDLE 任务由 `CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0` 监控 |
-| 低内存监控 | [main/app_main.c](main/app_main.c) | 心跳检查空闲堆：低于 `HEAP_WARN_BYTES`(40KB) 告警，低于 `HEAP_CRIT_BYTES`(20KB) 严重告警 |
+| 低内存监控 | [main/app_main.c](main/app_main.c) | 心跳检查空闲堆：低于 `HEAP_WARN_BYTES`(80KB) 告警，低于 `HEAP_CRIT_BYTES`(20KB) 严重告警 |
 | Coredump | [partitions.csv](partitions.csv) / [sdkconfig.defaults](sdkconfig.defaults) | 新增 `coredump` 分区（64KB @ 0x1d0000），ELF 格式写 flash，CRC32 校验 |
 
 - button_task 为中断驱动、空闲时无限阻塞等唤醒，**刻意不订阅 WDT**（订阅会在无按键 5s 时误复位）
@@ -197,16 +197,16 @@
 
 | 模块 | 文件 | 说明 |
 |------|------|------|
-| Captive Portal | [main/captive_portal.c](main/captive_portal.c) / [main/captive_portal.h](main/captive_portal.h) | 自研轻量 DNS 服务器（UDP 53 劫持所有 A 查询返回 192.168.4.1）+ OS 探测端点 302 重定向 handler |
+| Captive Portal | [main/captive_portal.c](main/captive_portal.c) / [main/captive_portal.h](main/captive_portal.h) | 自研轻量 DNS 服务器（UDP 53 劫持所有 A 查询返回 192.168.4.1）+ OS 探测端点 303 重定向 handler |
 | DNS 生命周期 | [main/radio_ctrl.c](main/radio_ctrl.c) | AP 启动后启动 DNS，退出配网时停止（captive_portal_start_dns / captive_portal_stop_dns） |
-| 探测端点路由 | [main/wifi_portal.c](main/wifi_portal.c) | 注册 10 个 OS 探测端点（/generate_204、/hotspot-detect.html、/ncsi.txt 等），统一 302 重定向到首页 |
+| 探测端点路由 | [main/wifi_portal.c](main/wifi_portal.c) | 注册 10 个 OS 探测端点（/generate_204、/hotspot-detect.html、/ncsi.txt 等），统一 303 重定向到首页 |
 | 分区表 | [partitions.csv](partitions.csv) | v4.0.0 起改为单 factory（3.875MB），仍 4MB Flash（阶段 9 时为 ota_0/ota_1 双 OTA 布局，已随 OTA 移除废弃） |
 
 > 注：本阶段的在线 OTA（4MB 双 OTA 分区 + 回滚 + HTTPS 下载）已于 **v4.0.0 整体移除**，详见阶段 13 与 [docs/archive/07-remove-ota-plan.md](docs/archive/07-remove-ota-plan.md)。以下 Captive Portal 部分仍然有效。
 
 ### 覆盖的 OS 探测端点
 
-Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统一 302 重定向触发系统自动弹出 Captive Portal 窗口。
+Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统一 303 重定向触发系统自动弹出 Captive Portal 窗口。
 
 ### 资源占用
 
@@ -221,7 +221,7 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 - [ ] Windows 连上后浏览器提示需登录
 - [ ] 不弹窗时手动访问 192.168.4.1 仍可配网（降级兼容）
 - [ ] 退出配网后 DNS 任务已停止（串口日志）
-- [ ] 首次烧录需 `esptool.py erase_flash`（2MB→4MB 分区表变更）
+- [ ] 从旧双 OTA 分区切到当前单 factory 分区时需 `esptool.py erase_flash`；当前仍是 4MB Flash。
 
 ### OTA 实施（v3.1.6 引入，v4.0.0 已移除）
 
