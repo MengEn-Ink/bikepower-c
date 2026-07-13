@@ -220,6 +220,6 @@ typedef enum {
 // ===== 看门狗 =====
 #define WDT_TIMEOUT_MS       5000
 
-// ===== 低内存监控（无 GC，沿用 ESP-IDF 习惯阈值） =====
-#define HEAP_WARN_BYTES      40960
+// ===== 低内存监控（无 GC，80KB 健康线 + 20KB 严重告警） =====
+#define HEAP_WARN_BYTES      81920
 #define HEAP_CRIT_BYTES      20480

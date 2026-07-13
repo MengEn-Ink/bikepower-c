@@ -471,13 +471,13 @@ print(f"\n{TAG} [S6] 内存阈值一致性")
 
 heap_warn = extract_int(config_src, "HEAP_WARN_BYTES")
 heap_crit = extract_int(config_src, "HEAP_CRIT_BYTES")
-check(heap_warn == 40960, f"HEAP_WARN_BYTES = 40960 (实际={heap_warn})")
+check(heap_warn == 81920, f"HEAP_WARN_BYTES = 81920 (实际={heap_warn})")
 check(heap_crit == 20480, f"HEAP_CRIT_BYTES = 20480 (实际={heap_crit})")
 
-# hardware-constraints.md 应提到堆告警阈值（40KB/20KB 与 HEAP_WARN/CRIT 对齐）
+# hardware-constraints.md 应提到堆健康阈值（80KB 与 HEAP_WARN 对齐）
 if hw_src:
-    check("40KB" in hw_src or "40 KB" in hw_src or "20480" in hw_src or "20KB" in hw_src,
-          "hardware-constraints.md 提到堆告警阈值 40KB/20KB")
+    check("80KB" in hw_src or "80 KB" in hw_src or "81920" in hw_src,
+          "hardware-constraints.md 提到堆健康阈值 80KB")
 
 
 # ============================ 7. 任务栈大小合理性 ============================
@@ -486,6 +486,12 @@ print(f"\n{TAG} [S7] 任务栈大小合理性")
 for stk_name in ["TASK_STACK_BTN", "TASK_STACK_LED", "TASK_STACK_HTTPD"]:
     v = extract_int(config_src, stk_name)
     check(v is not None and v >= 1024, f"{stk_name} >= 1024 (实际={v})")
+
+httpd_stack = extract_int(config_src, "TASK_STACK_HTTPD")
+check(httpd_stack == 12288, f"TASK_STACK_HTTPD = 12288 (实际={httpd_stack})")
+
+check("CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y" in sdkconfig_defaults_src,
+      "sdkconfig.defaults 启用 CONFIG_ESP_COEX_SW_COEXIST_ENABLE")
 
 
 # ============================ 8. FTMS OpCode 唯一性 ============================
