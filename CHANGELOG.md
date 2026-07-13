@@ -21,6 +21,7 @@
 - `main/radio_ctrl.c/.h`、`main/wifi_portal.c`：收窄 radio_ctrl 公共接口，将 SoftAP 启停 helper 私有化，删除不必要的反向 include。
 - `main/wifi_portal.c`：`recv_body()` 对 `HTTPD_SOCK_ERR_TIMEOUT` 做有限重试，降低慢客户端导致读取失败的概率。
 - `main/ble_bikepower.c`、`main/ble_scanner.c`：BLE 停止和扫描结果锁从无限等待改为有限等待，避免主循环、HTTPD 或 NimBLE callback 被异常锁持有拖死。
+- `scripts/tools/quality_gate.py`：修复 host 单测路径，避免在 `test/` 下重复执行 `make -C test` 导致误判编译失败。
 - `README.md`、`PROGRESS.md`、`docs/user/01-quickstart.md`、`docs/dev/01-technical-reference.md`、`.trae/rules/*`：同步 v4.1.0、NVS schema v10、303 Captive Portal、80KB 堆健康线、HTTPD 栈 12288、配网密码和 LED 配网态等事实。
 
 ### 验证

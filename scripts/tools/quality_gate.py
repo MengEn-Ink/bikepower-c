@@ -173,8 +173,8 @@ if not make_cmd or not gcc_cmd:
     warn("无 host 编译工具链（make/gcc），跳过单测")
 else:
     test_dir = os.path.join(PROJECT, "test")
-    run_cmd([make_cmd, "-C", "test", "clean"], cwd=test_dir)
-    _, rc_build = run_cmd([make_cmd, "-C", "test"], cwd=test_dir)
+    run_cmd([make_cmd, "-C", "test", "clean"], cwd=PROJECT)
+    _, rc_build = run_cmd([make_cmd, "-C", "test"], cwd=PROJECT)
     if rc_build != 0:
         fail("host 单测编译失败")
     else:
