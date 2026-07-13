@@ -14,6 +14,21 @@
 - `tests/serial_capture.py`：默认端口从 /dev/ttyACM0 改为自动探测。
 - `tests/check_release_gate.py`：python3 调用改为 sys.executable（Windows 无 python3 命令）。
 
+### 项目优化
+- `sdkconfig.defaults`：显式启用 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE`，让 WiFi/BLE 共存配网承诺有构建配置兜底。
+- `main/bikepower_config.h`：低内存告警线从 40KB 提升到 80KB，保留 20KB 严重告警；新增 HTTP 请求体读取超时重试、BLE 停止锁等待和 BLE 扫描锁等待常量。
+- `tests/check_config_consistency.py`：新增 coex、80KB 堆健康线、HTTPD 栈精确值、HTTP timeout 重试和 BLE 有界等待静态门禁。
+- `main/radio_ctrl.c/.h`、`main/wifi_portal.c`：收窄 radio_ctrl 公共接口，将 SoftAP 启停 helper 私有化，删除不必要的反向 include。
+- `main/wifi_portal.c`：`recv_body()` 对 `HTTPD_SOCK_ERR_TIMEOUT` 做有限重试，降低慢客户端导致读取失败的概率。
+- `main/ble_bikepower.c`、`main/ble_scanner.c`：BLE 停止和扫描结果锁从无限等待改为有限等待，避免主循环、HTTPD 或 NimBLE callback 被异常锁持有拖死。
+- `README.md`、`PROGRESS.md`、`docs/user/01-quickstart.md`、`docs/dev/01-technical-reference.md`、`.trae/rules/*`：同步 v4.1.0、NVS schema v10、303 Captive Portal、80KB 堆健康线、HTTPD 栈 12288、配网密码和 LED 配网态等事实。
+
+### 验证
+- `python3 tests/check_config_consistency.py`：通过，212 pass / 0 fail。
+- `make -C test clean && make -C test && ./test/test_domain`：通过，5849 断言 0 失败。
+- `python3 scripts/tools/quality_gate.py`：通过，49 pass / 2 warn / 0 fail；warn 为本批提交前存在未提交改动和本地 commit 未 push。
+- 真机烧录、WiFi/BLE coex 配网、BLE 扫描读取/分析未执行；这些仍需设备侧回归确认。
+
 ## [4.1.0] - 2026-07-11
 
 ### 跑步模式升级
