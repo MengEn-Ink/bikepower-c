@@ -12,7 +12,6 @@
 #include <stdbool.h>
 #include "esp_err.h"
 #include "power_engine.h"
-#include "esp_wifi.h"   // wifi_ap_record_t
 
 /**
  * 进入 WiFi 配网模式（共存版）。
@@ -33,25 +32,6 @@ void radio_ctrl_enter_wifi(power_engine_t *engine);
  * 特殊行为：通常由 wifi_portal 保存/超时后通过回调间接触发；调用后状态机回到 ST_BLE_ACTIVE。
  */
 void radio_ctrl_exit_wifi(void);
-
-/**
- * 启动 WiFi SoftAP（由 radio_ctrl 独占管理）。
- * 初始化 netif、事件循环、WiFi 驱动并启动 AP 模式，失败时逐步清理并返回错误码。
- * 无参数。
- * 返回值：`ESP_OK` 表示 AP 已成功启动，否则为对应错误码。
- * 特殊行为：BLE 是否在运行由调用方决定；本函数只负责 AP，不负责 HTTP 门户；
- *           成功后会记录 netif/init/event_loop 句柄标志，供 radio_ctrl_stop_wifi_ap 按序释放。
- */
-esp_err_t radio_ctrl_start_wifi_ap(void);
-
-/**
- * 关闭 WiFi SoftAP 并释放 netif/事件循环资源。
- * 按 WiFi → netif → event_loop → netif_deinit 顺序释放，与启动顺序严格相反。
- * 无参数。
- * 返回值：无。
- * 特殊行为：仅释放本模块自建的资源；不重启设备，不触碰 BLE；可重复调用（幂等）。
- */
-void radio_ctrl_stop_wifi_ap(void);
 
 /**
  * 查询 BLE 是否被射频控制器有意挂起。

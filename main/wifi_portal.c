@@ -27,7 +27,6 @@
 #include "web_index_html.h"   /* scripts/inline_static.py 自动生成 */
 #include "captive_portal.h"
 #include "board_detect.h"
-#include "radio_ctrl.h"
 #include "nvs_store.h"
 #include "device_template_store.h"
 #include "ble_bikepower.h"

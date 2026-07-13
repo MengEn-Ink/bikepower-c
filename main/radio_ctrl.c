@@ -35,7 +35,7 @@ static volatile bool s_ble_suspended = false;  // 独占 WiFi 兜底主动停 BL
 static const char s_portal_uri[] = "http://" CAPTIVE_PORTAL_HOST CAPTIVE_PORTAL_API_PATH;
 
 // 前向声明：stop_wifi_ap 在 start_wifi_ap 失败时被复用做统一回滚
-void radio_ctrl_stop_wifi_ap(void);
+static void radio_ctrl_stop_wifi_ap(void);
 
 static esp_err_t build_softap_ssid(char *ap_ssid, size_t ap_ssid_size)
 {
@@ -113,7 +113,7 @@ static void configure_captive_portal_dhcp(void)
  * 特殊行为：BLE 是否在运行由调用方决定；本函数只负责 AP，不触碰 NimBLE。
  *           成功后会记录 netif/init/event_loop 句柄标志，供 radio_ctrl_exit_wifi_coex 按序释放。
  */
-esp_err_t radio_ctrl_start_wifi_ap(void)
+static esp_err_t radio_ctrl_start_wifi_ap(void)
 {
     esp_err_t ret;
 
@@ -229,7 +229,7 @@ fail:
  * 返回值：无。
  * 特殊行为：仅释放本模块自建的资源；不重启设备，不触碰 BLE；可重复调用（幂等）。
  */
-void radio_ctrl_stop_wifi_ap(void)
+static void radio_ctrl_stop_wifi_ap(void)
 {
     if (s_wifi_inited) {
         esp_wifi_stop();
