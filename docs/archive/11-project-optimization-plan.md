@@ -1,5 +1,7 @@
 # Project Optimization Implementation Plan
 
+> Status: historical execution-plan archive. The live project now uses `docs/user`, `docs/dev`, and `docs/archive`; the old `docs/superpowers` working directory has been retired.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix project optimization issues in small tested commits covering hard constraints, gates, docs, architecture boundaries, and bounded waits.
@@ -12,8 +14,8 @@
 
 ## File Map
 
-- `docs/superpowers/specs/2026-07-13-project-optimization-design.md`: approved design for this optimization round.
-- `docs/superpowers/plans/2026-07-13-project-optimization.md`: execution plan and test/commit loop.
+- `docs/archive/10-project-optimization-design.md`: archived design for this optimization round.
+- `docs/archive/11-project-optimization-plan.md`: archived execution plan and test/commit loop.
 - `sdkconfig.defaults`: build-time hard constraints, including WiFi/BLE coex.
 - `main/bikepower_config.h`: runtime constants for heap thresholds, task stacks, waits, and firmware metadata.
 - `tests/check_config_consistency.py`: static gate for constants and documentation synchronization.
@@ -30,14 +32,14 @@
 ## Task 1: Planning Commit
 
 **Files:**
-- Create: `docs/superpowers/specs/2026-07-13-project-optimization-design.md`
-- Create: `docs/superpowers/plans/2026-07-13-project-optimization.md`
+- Create: `docs/archive/10-project-optimization-design.md`
+- Create: `docs/archive/11-project-optimization-plan.md`
 
 - [ ] **Step 1: Inspect diff**
 
 Run: `git diff --name-status`
 
-Expected: only the two `docs/superpowers` files are listed.
+Expected: only the two planning files are listed.
 
 - [ ] **Step 2: Run lightweight validation**
 
@@ -50,7 +52,7 @@ Expected: `结果: 204 通过, 0 失败` or higher pass count with zero failures
 Run:
 
 ```bash
-git add docs/superpowers/specs/2026-07-13-project-optimization-design.md docs/superpowers/plans/2026-07-13-project-optimization.md
+git add docs/archive/10-project-optimization-design.md docs/archive/11-project-optimization-plan.md
 git commit -m "docs: add project optimization plan"
 ```
 

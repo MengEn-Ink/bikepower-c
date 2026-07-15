@@ -111,7 +111,7 @@
 
 如果存在旧值，则：
 
-1. 从键 `sv`、`power`、`cadence`、`mode`、`hr`、`hashr`、`pfloat`、`cfloat`、`hrfloat`、`pstep`、`weight`、`ftp`、`thr_hr`、`ride`、`cwkglo`、`cwkghi`、`cname`、`sport`、`bmask`、`rspeed`、`rpacef`、`rcad`、`rcadf`、`rmode`、`rpacer`、`rplo`、`rphi`、`rcname`、`rincl`、`devname` 和 `led*` 场景配置读取
+1. 从键 `sv`、`power`、`cadence`、`mode`、`hr`、`hashr`、`pfloat`、`cfloat`、`hrfloat`、`pstep`、`weight`、`ftp`、`thr_hr`、`ride`、`cwkglo`、`cwkghi`、`cname`、`sport`、`bmask`、`rspeed`、`rpacef`、`rcad`、`rcadf`、`rmode`、`rpacer`、`rplo`、`rphi`、`rcname`、`devname` 和 `led*` 场景配置读取
 2. `config_store_migrate(&c)`
 3. `config_store_validate(&c)`
 4. `config_to_engine(&c, e)`
@@ -959,7 +959,7 @@ idf.py build
 
 根据项目规则，C 代码改动后 `idf.py build` 必须通过。
 
-发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行会先跑 host 单测、mock 配网页保存测试、3 分钟核心流程耐久测试和静态门禁，再为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip。脚本不会打 git tag，也不会创建 Gitee Release。合并固件文件名格式为 `bikepower-c-板型-v版本-stable-fix-gGitID.bin`，例如 `bikepower-c-generic-c3-v4.0.4-stable-fix-g39c0ee5.bin`，版本号只出现一次；总包文件名格式为 `bikepower-c-release-v版本-stable-fix-gGitID.zip`。
+发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行会先跑 host 单测、mock 配网页保存测试、3 分钟核心流程耐久测试和静态门禁，再为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip。脚本不会打 git tag，也不会创建 Gitee Release。合并固件文件名格式为 `bikepower-c-板型-v版本-stable-fix-gGitID.bin`，例如 `bikepower-c-generic-c3-v4.1.0-stable-fix-g6d7eaaf.bin`，版本号只出现一次；总包文件名格式为 `bikepower-c-release-v版本-stable-fix-gGitID.zip`。
 
 每次生成可分发固件时，`build/release/` 必须同时包含：
 

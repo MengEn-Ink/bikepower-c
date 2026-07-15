@@ -1,5 +1,7 @@
 # Project Optimization Design
 
+> Status: historical planning archive. The executed outcomes have been folded into current code, gates, `CHANGELOG.md`, and `docs/dev/01-technical-reference.md`. Keep this file only for traceability.
+
 ## Goal
 
 Improve BikePower C project quality by fixing rule drift, strengthening release gates, synchronizing documents, and reducing low-risk architecture and robustness issues without changing core BLE riding behavior.

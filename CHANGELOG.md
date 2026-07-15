@@ -7,7 +7,8 @@
 ### 收口修复
 - `components/bikepower_domain/`、`main/nvs_store.c`、`main/wifi_portal.c`、`main/ble_bikepower.c`、`main/web/`：彻底移除运行坡度字段、NVS key、Portal API/UI、FTMS Set Target Inclination 控制点和 Treadmill Data 坡度输出，配置 schema 升级到 v11。
 - `tests/check_config_consistency.py`、`tests/check_portal_structure.py`、`test/test_domain.c`、`tests/test_portal_config_save.py`、`tests/ble_selftest.py`：新增/同步坡度残留门禁和跑步核心链路测试，BLE 自测改为验证速度、距离、心率、用时和目标速度控制。
-- `PROGRESS.md`、`docs/user/01-quickstart.md`、`docs/user/02-user-manual.md`、`docs/dev/01-technical-reference.md`、`docs/INDEX.md`：同步 v4.1.0、NVS schema v11、跑步模式当前能力和阶段索引。
+- `PROGRESS.md`、`docs/user/01-quickstart.md`、`docs/user/02-user-manual.md`、`docs/dev/01-technical-reference.md`、`docs/INDEX.md`：同步 v4.1.0、NVS schema v11、跑步模式当前能力、阶段索引和真机回归口径。
+- `docs/archive/08-running-mode-full-upgrade-plan.md`、`docs/archive/09-running-mode-implementation-plan.md`、`docs/archive/10-project-optimization-design.md`、`docs/archive/11-project-optimization-plan.md`：归档历史跑步/优化计划，移除游离 `docs/superpowers` 工作目录。
 
 ### Windows 开发环境适配
 - `scripts/idf_common.psm1`：新增 Windows PowerShell 共享模块，统一封装 ESP-IDF 路径探测（扫描目录非硬编码版本号）、Python 环境探测、子进程调用、串口探测等通用逻辑。
@@ -27,7 +28,7 @@
 - `main/wifi_portal.c`：`recv_body()` 对 `HTTPD_SOCK_ERR_TIMEOUT` 做有限重试，降低慢客户端导致读取失败的概率。
 - `main/ble_bikepower.c`、`main/ble_scanner.c`：BLE 停止和扫描结果锁从无限等待改为有限等待，避免主循环、HTTPD 或 NimBLE callback 被异常锁持有拖死。
 - `scripts/tools/quality_gate.py`：修复 host 单测路径，避免在 `test/` 下重复执行 `make -C test` 导致误判编译失败。
-- `README.md`、`PROGRESS.md`、`docs/user/01-quickstart.md`、`docs/dev/01-technical-reference.md`、`.trae/rules/*`：同步 v4.1.0、NVS schema v10、303 Captive Portal、80KB 堆健康线、HTTPD 栈 12288、配网密码和 LED 配网态等事实。
+- `README.md`、`PROGRESS.md`、`docs/user/01-quickstart.md`、`docs/dev/01-technical-reference.md`、`.trae/rules/*`：同步 v4.1.0、当时 NVS schema v10、303 Captive Portal、80KB 堆健康线、HTTPD 栈 12288、配网密码和 LED 配网态等事实。
 
 ### 验证
 - `python3 tests/check_config_consistency.py`：通过，212 pass / 0 fail。
@@ -43,7 +44,7 @@
 - `components/bikepower_domain/include/domain_config.h`：跑步模式参数范围与默认值更新。
 - `main/wifi_portal.c`、`main/web/`：网页端跑步模式首页精简为配速/步频/心率核心控件，移除坡度 UI。
 - `main/web/app.css`：压缩跑步模式手机端高度，390×844 视口内可见可操作。
-- `docs/dev/06-running-mode-full-upgrade-plan.md`、`docs/dev/07-running-mode-implementation-plan.md`：跑步升级方案与实施计划文档。
+- `docs/archive/08-running-mode-full-upgrade-plan.md`、`docs/archive/09-running-mode-implementation-plan.md`：跑步升级方案与实施计划文档，当前已归档为历史计划。
 
 ### 外部运动设备分析
 - `main/ble_scanner.c/.h`：新增 BLE 扫描器模块，支持限时扫描周边运动设备并收集广播数据。

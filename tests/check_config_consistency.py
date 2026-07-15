@@ -25,6 +25,7 @@ README = ROOT / "README.md"
 PROGRESS = ROOT / "PROGRESS.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
 DOC_INDEX = ROOT / "docs" / "INDEX.md"
+DOCS_SUPERPOWERS = ROOT / "docs" / "superpowers"
 TECH_REF = ROOT / "docs" / "dev" / "01-technical-reference.md"
 QUICKSTART = ROOT / "docs" / "user" / "01-quickstart.md"
 USER_MANUAL = ROOT / "docs" / "user" / "02-user-manual.md"
@@ -452,6 +453,11 @@ stage_numbers = [int(n) for n in re.findall(r'^\|\s*(\d+)\s*\|', progress_src, r
 max_stage = max(stage_numbers) if stage_numbers else 0
 check(f"阶段 0-{max_stage} 完成情况" in doc_index_src,
       f"docs/INDEX.md 含阶段 0-{max_stage} 项目进度描述")
+check(not DOCS_SUPERPOWERS.exists(),
+      "docs/superpowers 工作目录已归档，不应重新出现")
+check("archive/10-project-optimization-design.md" in doc_index_src
+      and "archive/11-project-optimization-plan.md" in doc_index_src,
+      "docs/INDEX.md 收录历史项目优化计划归档入口")
 
 
 # ============================ 4f. 当前实现事实防漂移 ============================

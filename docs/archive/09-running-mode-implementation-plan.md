@@ -1,7 +1,7 @@
 # 跑步模式完整升级实施计划
 
-> 状态：执行计划。  
-> 上游方案：[跑步模式完整升级方案](06-running-mode-full-upgrade-plan.md)。  
+> 状态：历史实施计划归档，仅供追溯，不代表当前 v4.1.0+ 实现。当前实现已移除跑步坡度配置、NVS key、Portal UI/API 和 Set Target Inclination 控制点。  
+> 上游方案：[跑步模式完整升级方案](08-running-mode-full-upgrade-plan.md)。  
 > 执行原则：TDD 红绿闭环、按批次提交、每批可独立验证，不破坏骑行 CPS/HRS/CSC/FTMS Indoor Bike/ERG。  
 
 ---
