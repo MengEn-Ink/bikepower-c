@@ -51,7 +51,6 @@ static volatile uint16_t g_cadence   = DEFAULT_CADENCE;
 static volatile uint8_t  g_broadcast_mask = BROADCAST_FIELD_ALL;
 static volatile uint16_t g_run_speed = 0;
 static volatile uint8_t  g_run_cadence = RUN_CADENCE_DEFAULT;
-static volatile int16_t  g_run_incline_x10 = RUN_INCLINE_X10_DEFAULT;
 static volatile uint16_t g_run_stride_cm = 0;
 static volatile uint32_t g_run_distance_m = 0;
 static volatile uint32_t g_run_elapsed_s = 0;
@@ -69,8 +68,8 @@ static uint8_t g_rsc_feature_buf[4] = { 0x03, 0x00, 0x00, 0x00 };
 static uint8_t g_sensor_location = 0x05;
 static uint8_t g_ftms_bike_buf[8];
 static size_t g_ftms_bike_len = 8;
-static uint8_t g_ftms_treadmill_buf[16];
-static size_t g_ftms_treadmill_len = 16;
+static uint8_t g_ftms_treadmill_buf[12];
+static size_t g_ftms_treadmill_len = 12;
 static uint8_t g_ftms_resp_buf[3];
 
 // FTMS 静态特征值：前 4 字节为 machine feature，后 4 字节为 target setting feature。
@@ -79,8 +78,8 @@ static const uint8_t g_ftms_cycling_feature_buf[8] = {
     0x08, 0x00, 0x00, 0x00, // target power setting
 };
 static const uint8_t g_ftms_running_feature_buf[8] = {
-    0x84, 0x05, 0x00, 0x00, // distance + inclination/ramp + heart rate + elapsed time
-    0x03, 0x00, 0x00, 0x00, // target speed + target inclination settings
+    0x04, 0x05, 0x00, 0x00, // distance + heart rate + elapsed time
+    0x02, 0x00, 0x00, 0x00, // target speed setting
 };
 static uint8_t g_ftms_status_buf[7]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
@@ -334,18 +333,6 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
             uint16_t target_speed = (uint16_t)(buf[1] | ((uint16_t)buf[2] << 8));
             bool ok = false;
             if (g_run_control_cb) ok = g_run_control_cb(BLE_RUN_CTRL_SPEED, (int)target_speed);
-            ftms_send_response(op, ok ? FTMS_RESULT_SUCCESS : FTMS_RESULT_INVALID_PARAM);
-        }
-        break;
-    case FTMS_OP_SET_TARGET_INCLINATION:
-        if (g_profile != SPORT_PROFILE_RUNNING || len < 3) {
-            ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
-            break;
-        }
-        {
-            int16_t target_incline = (int16_t)(buf[1] | ((uint16_t)buf[2] << 8));
-            bool ok = false;
-            if (g_run_control_cb) ok = g_run_control_cb(BLE_RUN_CTRL_INCLINE, (int)target_incline);
             ftms_send_response(op, ok ? FTMS_RESULT_SUCCESS : FTMS_RESULT_INVALID_PARAM);
         }
         break;
@@ -663,7 +650,6 @@ static void pack_running(void)
     uint16_t speed = g_run_speed;
     uint16_t stride = g_run_stride_cm;
     uint32_t distance = g_run_distance_m;
-    int16_t incline = g_run_incline_x10;
     uint32_t elapsed = g_run_elapsed_s;
 
     g_hr_buf[0] = 0x00;
@@ -681,17 +667,13 @@ static void pack_running(void)
     g_rsc_buf[9] = (distance >> 24) & 0xFF;
 
     uint16_t ftms_speed = (uint16_t)(((uint32_t)speed * 360u + 128u) / 256u);
-    uint16_t flags = 0x0386; // distance + inclination/ramp + heart rate + elapsed time
+    uint16_t flags = 0x0306; // distance + heart rate + elapsed time
     uint8_t off = 2;
     g_ftms_treadmill_buf[off++] = ftms_speed & 0xFF;
     g_ftms_treadmill_buf[off++] = (ftms_speed >> 8) & 0xFF;
     g_ftms_treadmill_buf[off++] = distance & 0xFF;
     g_ftms_treadmill_buf[off++] = (distance >> 8) & 0xFF;
     g_ftms_treadmill_buf[off++] = (distance >> 16) & 0xFF;
-    g_ftms_treadmill_buf[off++] = incline & 0xFF;
-    g_ftms_treadmill_buf[off++] = (incline >> 8) & 0xFF;
-    g_ftms_treadmill_buf[off++] = 0x00;
-    g_ftms_treadmill_buf[off++] = 0x00;
     g_ftms_treadmill_buf[off++] = g_hr_bpm;
     uint16_t elapsed16 = elapsed > 0xFFFFu ? 0xFFFFu : (uint16_t)elapsed;
     g_ftms_treadmill_buf[off++] = elapsed16 & 0xFF;
@@ -1011,7 +993,6 @@ void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartra
     g_run_speed = snapshot.rsc_speed_1_256_mps;
     g_hr_bpm = heartrate_bpm;
     g_run_cadence = (uint8_t)snapshot.cadence_spm;
-    g_run_incline_x10 = (int16_t)snapshot.incline_x10;
     g_run_stride_cm = snapshot.stride_cm;
     g_run_distance_m = snapshot.total_distance_m;
     g_run_elapsed_s = snapshot.elapsed_time_s;

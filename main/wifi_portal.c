@@ -423,12 +423,6 @@ static bool apply_json_fields(power_engine_t *e, const char *body, bool allow_sp
             ESP_LOGI(TAG, "  run_mode: %s", run_mode_to_id((int)e->running.mode));
         }
     }
-    old_val = e->running.incline_x10;
-    new_val = json_get_int_def(body, "run_incline_x10", old_val);
-    power_engine_set_run_incline(e, new_val);
-    if (old_val != e->running.incline_x10)
-        ESP_LOGI(TAG, "  run_incline_x10: %d → %d", old_val, e->running.incline_x10);
-
     /* 心率锁定：hr_lock=1 锁定到 heartrate 值，hr_lock=0 解锁随功率联动 */
     if (json_has_key(body, "hr_lock")) {
         if (json_get_int(body, "hr_lock")) {
@@ -566,7 +560,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"run_cadence\":%d,\"run_cadence_float\":%d,"
         "\"run_mode\":\"%s\",\"run_pacer_type\":\"%s\","
         "\"run_pace_low_sec\":%d,\"run_pace_high_sec\":%d,"
-        "\"run_custom_name\":\"%s\",\"run_incline_x10\":%d,"
+        "\"run_custom_name\":\"%s\","
         "\"power_float\":%d,\"cadence_float\":%d,\"hr_float\":%d,"
         "\"power_step\":%d,"
         "\"profile_weight\":%d,\"profile_ftp\":%d,\"profile_thr_hr\":%d,"
@@ -590,7 +584,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         e->running.cadence_spm, e->running.cadence_float_spm,
         run_mode_to_id((int)e->running.mode), run_pacer_to_id((int)e->running.pacer_type),
         e->running.pace_low_sec, e->running.pace_high_sec,
-        run_custom_name_esc, e->running.incline_x10,
+        run_custom_name_esc,
         e->power_float, e->cadence_float, e->hr_float,
         e->power_step,
         e->profile.weight, e->profile.ftp, e->profile.thr_hr,

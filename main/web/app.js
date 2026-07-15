@@ -15,7 +15,7 @@ var STATE = {
   power: 0, cadence: 0, heartrate: 0,
   run_speed_x100: 1000, run_pace_float_sec: 10, run_cadence: 170, run_cadence_float: 4,
   run_mode: "fixed", run_pacer_type: "jog", run_pace_low_sec: 390, run_pace_high_sec: 450,
-  run_custom_name: "自定义", run_incline_x10: 0,
+  run_custom_name: "自定义",
   mode: "steady",
   power_float: 5, cadence_float: 2, hr_float: 2,
   power_step: 20,
@@ -325,10 +325,6 @@ function onRunCustomNameInput() {
   renderRunSourcePicker();
   updateRunPacerInfo();
 }
-function onRunInclineAdj(delta) {
-  STATE.run_incline_x10 = clamp((STATE.run_incline_x10 || 0) + delta, -100, 150);
-  updateRunPacerInfo();
-}
 function updateRunPacerInfo() {
   var isPacer = STATE.run_mode === "pacer";
   var isCustom = isPacer && STATE.run_pacer_type === "custom";
@@ -365,8 +361,6 @@ function updateRunPacerInfo() {
   if (speedEl) speedEl.textContent = (speedX100FromPaceSec(Math.round((STATE.run_pace_low_sec + STATE.run_pace_high_sec) / 2)) / 100).toFixed(1);
   var cadEl = $("run-custom-cadence-text");
   if (cadEl) cadEl.textContent = String(STATE.run_cadence || 170) + " spm";
-  var incline = $("run-incline");
-  if (incline) incline.textContent = ((STATE.run_incline_x10 || 0) / 10).toFixed(1);
 }
 function setSelect(id, value) {
   var e = $(id);
@@ -940,7 +934,6 @@ function collectConfig() {
     run_pace_low_sec: STATE.run_pace_low_sec,
     run_pace_high_sec: STATE.run_pace_high_sec,
     run_custom_name: STATE.run_custom_name,
-    run_incline_x10: STATE.run_incline_x10,
     hr_lock: directHrControl() ? 1 : (STATE.hr_locked ? 1 : 0),
     power_float: STATE.power_float,
     cadence_float: STATE.cadence_float,
@@ -1599,7 +1592,6 @@ function collectConfigBase() {
     run_pace_low_sec: STATE.run_pace_low_sec,
     run_pace_high_sec: STATE.run_pace_high_sec,
     run_custom_name: STATE.run_custom_name,
-    run_incline_x10: STATE.run_incline_x10,
     hr_lock: directHrControl() ? 1 : (STATE.hr_locked ? 1 : 0),
     power_float: STATE.power_float,
     cadence_float: STATE.cadence_float,
@@ -1706,7 +1698,6 @@ function init() {
       STATE.run_pace_low_sec = data.run_pace_low_sec != null ? data.run_pace_low_sec : 390;
       STATE.run_pace_high_sec = data.run_pace_high_sec != null ? data.run_pace_high_sec : 450;
       STATE.run_custom_name = data.run_custom_name || "自定义";
-      STATE.run_incline_x10 = data.run_incline_x10 != null ? data.run_incline_x10 : 0;
       STATE.mode = data.mode || "steady";
       STATE.power_float = data.power_float != null ? data.power_float : 5;
       STATE.cadence_float = data.cadence_float != null ? data.cadence_float : 2;
@@ -1762,7 +1753,6 @@ function init() {
   var runPaceSec = $("run-pace-sec");
   if (runPaceSec) runPaceSec.addEventListener("input", syncSpeedFromPace);
   bindInputRange("run-cadence", 120, 220);
-  bindInputRange("run-incline", -5, 15);
   bindInputRange("settings-weight", 40, 150);
   bindInputRange("settings-ftp", 50, 500);
   bindInputRange("settings-thr", 100, 220);

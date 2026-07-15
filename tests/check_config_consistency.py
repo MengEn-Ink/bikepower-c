@@ -296,7 +296,6 @@ range_expectations = {
     "run_cadence_float": (extract_int(domain_src, "RUN_CADENCE_FLOAT_MIN"), extract_int(domain_src, "RUN_CADENCE_FLOAT_MAX")),
     "run_pace_low_sec": (extract_int(domain_src, "RUN_PACE_SEC_MIN"), extract_int(domain_src, "RUN_PACE_SEC_MAX")),
     "run_pace_high_sec": (extract_int(domain_src, "RUN_PACE_SEC_MIN"), extract_int(domain_src, "RUN_PACE_SEC_MAX")),
-    "run_incline_x10": (extract_int(domain_src, "RUN_INCLINE_X10_MIN"), extract_int(domain_src, "RUN_INCLINE_X10_MAX")),
 }
 
 for key, expected in range_expectations.items():
@@ -317,7 +316,7 @@ for js_key, domain_key in js_ranges.items():
     check(actual == expected, f"main/web/app.js FLOAT_RANGE.{js_key} == {expected} (实际={actual})")
 
 config_version = extract_int(domain_src, "CONFIG_VERSION")
-check(config_version == 10, f"CONFIG_VERSION 必须升级到 10 (实际={config_version})")
+check(config_version == 11, f"CONFIG_VERSION 必须升级到 11 (实际={config_version})")
 check(f"`CONFIG_VERSION = {config_version}`" in tech_ref_src,
       f"技术参考 schema 版本与 CONFIG_VERSION({config_version}) 一致")
 for macro in [
@@ -329,7 +328,6 @@ for macro in [
     "RUN_PACER_INTERVAL",
     "RUN_PACER_CUSTOM",
     "RUN_CUSTOM_NAME_MAX",
-    "RUN_INCLINE_X10_DEFAULT",
 ]:
     check(macro in domain_src, f"domain_config.h 必须定义 {macro}")
 for macro in [
@@ -338,7 +336,6 @@ for macro in [
     "NVS_KEY_RUN_PACE_LO",
     "NVS_KEY_RUN_PACE_HI",
     "NVS_KEY_RUN_CUSTOM_NAME",
-    "NVS_KEY_RUN_INCLINE",
 ]:
     check(macro in config_src and macro in read(ROOT / "main" / "nvs_store.c"),
           f"{macro} 必须在配置头与 nvs_store.c 中同步使用")
@@ -348,10 +345,29 @@ for field in [
     "run_pace_low_sec",
     "run_pace_high_sec",
     "run_custom_name",
-    "run_incline_x10",
 ]:
     check(field in config_store_src and field in mock_src and field in app_js_src,
           f"{field} 必须贯通 config_store、mock 和前端")
+removed_in_runtime_sources = [
+    "run_incline_x10",
+    "NVS_KEY_RUN_INCLINE",
+    "RUN_INCLINE_X10",
+    "FTMS_OP_SET_TARGET_INCLINATION",
+    "APP_EVT_RUN_TARGET_INCLINE",
+    "power_engine_set_run_incline",
+    "running_engine_set_incline",
+]
+for label, src in [
+    ("domain_config.h", domain_src),
+    ("bikepower_config.h", config_src),
+    ("config_store.c", config_store_src),
+    ("wifi_portal.c", wifi_portal_src),
+    ("ble_bikepower.c", ble_bikepower_src),
+    ("app.js", app_js_src),
+    ("mock_server.py", mock_src),
+]:
+    for removed in removed_in_runtime_sources:
+        check(removed not in src, f"{label} 不应残留已删除跑步坡度字段/控制 {removed}")
 for legacy_ver in sorted({int(v) for v in re.findall(r'c->schema_ver == (\d+)', config_store_src)}):
     check(f"v{legacy_ver}" in tech_ref_src,
           f"技术参考记录 v{legacy_ver} -> v{config_version} schema 迁移策略")
@@ -432,11 +448,10 @@ print(f"\n{TAG} [S4e] 文档索引阶段范围一致性")
 
 check("阶段 0-9 完成情况" not in doc_index_src,
       "docs/INDEX.md 不含过时阶段 0-9 项目进度描述")
-check("阶段 0-13 完成情况" in doc_index_src,
-      "docs/INDEX.md 含阶段 0-13 项目进度描述")
-if "| 13 |" in progress_src:
-    check("阶段 0-13" in doc_index_src,
-          "PROGRESS.md 含阶段 13 时 docs/INDEX.md 同步到阶段 0-13")
+stage_numbers = [int(n) for n in re.findall(r'^\|\s*(\d+)\s*\|', progress_src, re.MULTILINE)]
+max_stage = max(stage_numbers) if stage_numbers else 0
+check(f"阶段 0-{max_stage} 完成情况" in doc_index_src,
+      f"docs/INDEX.md 含阶段 0-{max_stage} 项目进度描述")
 
 
 # ============================ 4f. 当前实现事实防漂移 ============================
@@ -518,7 +533,6 @@ ftms_ops = {
     "FTMS_OP_REQUEST_CONTROL": extract_int(config_src, "FTMS_OP_REQUEST_CONTROL"),
     "FTMS_OP_RESET": extract_int(config_src, "FTMS_OP_RESET"),
     "FTMS_OP_SET_TARGET_SPEED": extract_int(config_src, "FTMS_OP_SET_TARGET_SPEED"),
-    "FTMS_OP_SET_TARGET_INCLINATION": extract_int(config_src, "FTMS_OP_SET_TARGET_INCLINATION"),
     "FTMS_OP_SET_TARGET_POWER": extract_int(config_src, "FTMS_OP_SET_TARGET_POWER"),
     "FTMS_OP_START_RESUME": extract_int(config_src, "FTMS_OP_START_RESUME"),
     "FTMS_OP_STOP_PAUSE": extract_int(config_src, "FTMS_OP_STOP_PAUSE"),
@@ -527,8 +541,6 @@ values = [v for v in ftms_ops.values() if v is not None]
 check(len(values) == len(set(values)), f"FTMS OpCode 值唯一 (实际={values})")
 check(ftms_ops["FTMS_OP_SET_TARGET_SPEED"] == 0x02,
       f"FTMS_OP_SET_TARGET_SPEED = 0x02 (实际={ftms_ops['FTMS_OP_SET_TARGET_SPEED']})")
-check(ftms_ops["FTMS_OP_SET_TARGET_INCLINATION"] == 0x03,
-      f"FTMS_OP_SET_TARGET_INCLINATION = 0x03 (实际={ftms_ops['FTMS_OP_SET_TARGET_INCLINATION']})")
 check(extract_int(config_src, "FTMS_TREADMILL_CHAR_UUID") == 0x2ACD,
       f"FTMS_TREADMILL_CHAR_UUID = 0x2ACD (实际={extract_int(config_src, 'FTMS_TREADMILL_CHAR_UUID')})")
 running_gatt = re.search(r"static const struct ble_gatt_svc_def running_gatt_svcs\[\].*?;\n\nstatic const struct", ble_bikepower_src, re.S)

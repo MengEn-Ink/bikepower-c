@@ -55,5 +55,5 @@ BikePower C 已永久放弃设备内 OTA 升级。后续升级、重刷或恢复
 ## 5. 下一步
 
 - 完整按钮操作、LED 灯效、配网字段、骑行模式与 FAQ：见 [用户手册](02-user-manual.md)
-- 固件升级：当前 v4.0.6 已永久放弃设备内 OTA，普通用户升级统一走 [网页端在线烧录](https://easyhey.com/?firmware=MOD220)
+- 固件升级：当前 v4.1.0 已永久放弃设备内 OTA，普通用户升级统一走 [网页端在线烧录](https://easyhey.com/?firmware=MOD220)
 - 硬件接线、供电与排障：见 [硬件指南](03-hardware.md)

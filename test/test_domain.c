@@ -925,7 +925,6 @@ static void test_config_store(void)
     src.run_pace_low_sec = 300;
     src.run_pace_high_sec = 360;
     strcpy(src.run_custom_name, "晨跑\"A");
-    src.run_incline_x10 = 35;
     src.broadcast_mask = BROADCAST_FIELD_POWER | BROADCAST_FIELD_HEARTRATE;
     src.power_step = 25;
     strcpy(src.custom_pacer_name, "兔子\"车手");
@@ -947,7 +946,6 @@ static void test_config_store(void)
     CHECK(strstr(js, "\"run_pace_low_sec\":300") != NULL, "serialize 含 run_pace_low_sec=300");
     CHECK(strstr(js, "\"run_pace_high_sec\":360") != NULL, "serialize 含 run_pace_high_sec=360");
     CHECK(strstr(js, "\"run_custom_name\":\"晨跑\\\"A\"") != NULL, "serialize 含转义后的自定义跑步名称");
-    CHECK(strstr(js, "\"run_incline_x10\":35") != NULL, "serialize 含 run_incline_x10=35");
     CHECK(strstr(js, "\"broadcast_mask\":5") != NULL, "serialize 含 broadcast_mask=5");
     CHECK(strstr(js, "\"power_step\":25") != NULL, "serialize 含 power_step=25");
     CHECK(strstr(js, "\"custom_pacer_name\":\"兔子\\\"车手\"") != NULL, "serialize 含转义后的自定义配速昵称");
@@ -965,7 +963,6 @@ static void test_config_store(void)
     CHECK(dst.run_mode == RUN_MODE_PACER && dst.run_pacer_type == RUN_PACER_CUSTOM, "往返跑步模式/模板一致");
     CHECK(dst.run_pace_low_sec == 300 && dst.run_pace_high_sec == 360, "往返跑步配速区间一致");
     CHECK(strcmp(dst.run_custom_name, "晨跑\"A") == 0, "往返自定义跑步名称一致");
-    CHECK(dst.run_incline_x10 == 35, "往返跑步坡度一致");
     CHECK(dst.broadcast_mask == (BROADCAST_FIELD_POWER | BROADCAST_FIELD_HEARTRATE), "往返广播项一致");
     CHECK(dst.power_step == 25, "往返调功步进一致");
     CHECK(strcmp(dst.custom_pacer_name, "兔子\"车手") == 0, "往返自定义配速昵称一致");
@@ -987,8 +984,8 @@ static void test_config_store(void)
     CHECK(strcmp(partial.device_name, DEVICE_NAME_DEFAULT) == 0, "缺失设备名保持默认");
 
     config_data_t legacy_run;
-    CHECK(config_store_deserialize("{\"schema_ver\":9,\"run_incline_x10\":35,\"run_cadence\":180}", &legacy_run),
-          "含旧跑步坡度 JSON deserialize 成功");
+    CHECK(config_store_deserialize("{\"schema_ver\":9,\"run_cadence\":180}", &legacy_run),
+          "旧跑步 JSON deserialize 成功");
     CHECK(legacy_run.run_cadence == 180, "旧 JSON 中仍保留有效跑步步频字段");
 
     // 非法 JSON（无 schema_ver）失败且不污染原对象
@@ -1432,13 +1429,12 @@ static void test_running_pacer_defaults(void)
     config_data_t c;
     config_store_defaults(&c);
 
-    CHECK(CONFIG_VERSION == 10, "配置 schema 版本升级到 10");
+    CHECK(CONFIG_VERSION == 11, "配置 schema 版本升级到 11");
     CHECK(c.run_mode == RUN_MODE_FIXED, "默认跑步模式为固定配速");
     CHECK(c.run_pacer_type == RUN_PACER_JOG, "默认跑步模板为慢跑");
     CHECK(c.run_pace_low_sec == 390, "默认跑步模板下限=6:30/km");
     CHECK(c.run_pace_high_sec == 450, "默认跑步模板上限=7:30/km");
     CHECK(strcmp(c.run_custom_name, RUN_CUSTOM_NAME_DEFAULT) == 0, "默认自定义跑步档名称");
-    CHECK(c.run_incline_x10 == RUN_INCLINE_X10_DEFAULT, "默认跑步坡度=0");
 }
 
 static void test_running_pacer_templates(void)
@@ -1492,17 +1488,12 @@ static void test_running_custom_pacer_validation(void)
     CHECK(e.pace_low_sec == 500 && e.pace_high_sec == 500, "自定义模板下限大于上限时上限跟随下限");
 }
 
-static void test_running_incline_and_control_values(void)
+static void test_running_control_values(void)
 {
-    printf("[test] 跑步坡度与控制值\n");
+    printf("[test] 跑步控制值\n");
     power_engine_t e;
     power_engine_init(&e);
     CHECK(power_engine_set_sport_profile(&e, SPORT_PROFILE_RUNNING), "切到跑步 profile");
-
-    CHECK(power_engine_set_run_incline(&e, -250), "设置负坡度被夹紧");
-    CHECK(e.running.incline_x10 == RUN_INCLINE_X10_MIN, "坡度夹到下限");
-    CHECK(power_engine_set_run_incline(&e, 250), "设置正坡度被夹紧");
-    CHECK(e.running.incline_x10 == RUN_INCLINE_X10_MAX, "坡度夹到上限");
 
     CHECK(power_engine_set_run_pacer(&e, RUN_PACER_CUSTOM), "切到跑步自定义模板");
     CHECK(e.running.mode == RUN_MODE_PACER, "跑步自定义模板模式生效");
@@ -1519,9 +1510,9 @@ static void test_running_incline_and_control_values(void)
     CHECK(after_reset.total_distance_m == 0 && after_reset.elapsed_time_s == 0, "跑步 reset 清空距离和用时");
 }
 
-static void test_config_migrate_v9_to_v10_running_fields(void)
+static void test_config_migrate_v9_to_v11_running_fields(void)
 {
-    printf("[test] v9 到 v10 跑步配置迁移\n");
+    printf("[test] v9 到 v11 跑步配置迁移\n");
     config_data_t c;
     config_store_defaults(&c);
     c.schema_ver = 9;
@@ -1530,7 +1521,7 @@ static void test_config_migrate_v9_to_v10_running_fields(void)
     c.run_pace_float_sec = 12;
     c.run_cadence = 181;
     c.run_cadence_float = 6;
-    CHECK(config_store_migrate(&c), "v9 配置迁移到 v10");
+    CHECK(config_store_migrate(&c), "v9 配置迁移到 v11");
     CHECK(c.schema_ver == CONFIG_VERSION, "v9 迁移后 schema=当前版本");
     CHECK(c.power == 333, "v9 迁移保留功率");
     CHECK(c.run_speed_x100 == 1234, "v9 迁移保留跑步速度");
@@ -1541,7 +1532,6 @@ static void test_config_migrate_v9_to_v10_running_fields(void)
     CHECK(c.run_pacer_type == RUN_PACER_JOG, "v9 迁移补默认跑步模板");
     CHECK(c.run_pace_low_sec == 390 && c.run_pace_high_sec == 450, "v9 迁移补默认模板区间");
     CHECK(strcmp(c.run_custom_name, RUN_CUSTOM_NAME_DEFAULT) == 0, "v9 迁移补默认自定义跑步名称");
-    CHECK(c.run_incline_x10 == RUN_INCLINE_X10_DEFAULT, "v9 迁移补默认跑步坡度");
 }
 
 int main(void)
@@ -1575,8 +1565,8 @@ int main(void)
     test_running_pacer_defaults();
     test_running_pacer_templates();
     test_running_custom_pacer_validation();
-    test_running_incline_and_control_values();
-    test_config_migrate_v9_to_v10_running_fields();
+    test_running_control_values();
+    test_config_migrate_v9_to_v11_running_fields();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

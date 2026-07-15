@@ -518,13 +518,6 @@ bool power_engine_set_run_pace_range(power_engine_t *e, int pace_low_sec, int pa
     return changed;
 }
 
-bool power_engine_set_run_incline(power_engine_t *e, int incline_x10)
-{
-    bool changed = running_engine_set_incline(&e->running, incline_x10);
-    if (changed) e->dirty = true;
-    return changed;
-}
-
 void power_engine_run_reset(power_engine_t *e)
 {
     if (!e) return;

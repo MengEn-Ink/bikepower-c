@@ -242,12 +242,6 @@ void app_state_handle_event(const app_evt_t *e)
         }
         break;
 
-    case APP_EVT_RUN_TARGET_INCLINE:
-        if (power_engine_set_run_incline(s_engine, e->data)) {
-            ESP_LOGI(TAG, "跑步 FTMS 坡度 %.1f%%", (double)e->data / 10.0);
-        }
-        break;
-
     case APP_EVT_RUN_START:
         ESP_LOGI(TAG, "跑步 FTMS 开始/恢复");
         break;

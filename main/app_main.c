@@ -88,11 +88,6 @@ static bool on_run_control(ble_run_control_type_t type, int value)
         e.type = APP_EVT_RUN_TARGET_SPEED;
         e.data = value;
         break;
-    case BLE_RUN_CTRL_INCLINE:
-        if (value < RUN_INCLINE_X10_MIN || value > RUN_INCLINE_X10_MAX) return false;
-        e.type = APP_EVT_RUN_TARGET_INCLINE;
-        e.data = value;
-        break;
     case BLE_RUN_CTRL_START:
         e.type = APP_EVT_RUN_START;
         break;

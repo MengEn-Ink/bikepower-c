@@ -82,7 +82,6 @@ void running_engine_init(running_engine_t *e)
     e->pace_high_sec = RUN_PACERS[RUN_PACER_DEFAULT].pace_high_sec;
     strncpy(e->custom_name, RUN_CUSTOM_NAME_DEFAULT, RUN_CUSTOM_NAME_MAX - 1);
     e->custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
-    e->incline_x10 = RUN_INCLINE_X10_DEFAULT;
     running_walk_reset(&e->pace_walk);
     running_walk_reset(&e->cadence_walk);
     running_walk_reset(&e->pacer_pace_walk);
@@ -126,7 +125,6 @@ running_snapshot_t running_engine_snapshot(running_engine_t *e, uint32_t dt_ms)
 
     e->snapshot.speed_x100_kmh = output_speed_x100;
     e->snapshot.cadence_spm = output_cadence_spm;
-    e->snapshot.incline_x10 = e->incline_x10;
     e->snapshot.total_distance_m = e->distance_x1000_m / 1000u;
     e->snapshot.elapsed_time_s = e->elapsed_ms / 1000u;
     e->snapshot.rsc_speed_1_256_mps = rsc_speed;
@@ -253,15 +251,6 @@ bool running_engine_set_custom_pacer(running_engine_t *e, const char *name, int 
     }
     if (changed) running_walk_reset(&e->pacer_pace_walk);
     return changed;
-}
-
-bool running_engine_set_incline(running_engine_t *e, int incline_x10)
-{
-    if (!e) return false;
-    int clamped = clamp_int(incline_x10, RUN_INCLINE_X10_MIN, RUN_INCLINE_X10_MAX);
-    if (e->incline_x10 == clamped) return false;
-    e->incline_x10 = clamped;
-    return true;
 }
 
 void running_engine_reset_session(running_engine_t *e)

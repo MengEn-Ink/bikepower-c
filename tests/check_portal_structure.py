@@ -339,23 +339,24 @@ def main():
           "跑步页缺少固定/模板来源胶囊条和摘要")
     check('id="run-fixed-panel"' in html and 'id="run-custom-panel"' in html,
           "跑步页缺少固定配速区和自定义模板区")
-    check('id="running-incline-row"' in html and 'id="run-incline"' in html,
-          "跑步页缺少坡度控件")
+    check('running-incline-row' not in html and 'run-incline' not in html,
+          "跑步页不应残留坡度控件")
     check('renderRunSourcePicker' in js and 'onRunSourceSelect' in js and 'updateRunPacerInfo' in js,
           "app.js 缺少跑步来源渲染/切换/摘要逻辑")
-    check('onRunCustomPaceAdj' in js and 'onRunCustomNameInput' in js and 'onRunInclineAdj' in js,
-          "app.js 缺少自定义跑步模板或坡度交互逻辑")
+    check('onRunCustomPaceAdj' in js and 'onRunCustomNameInput' in js,
+          "app.js 缺少自定义跑步模板交互逻辑")
+    check('onRunInclineAdj' not in js and 'run_incline_x10' not in js,
+          "app.js 不应残留跑步坡度交互或保存字段")
     check('paceSecText' in js and 'speedTextFromPaceSec' in js,
           "app.js 缺少跑步配速/速度展示格式化逻辑")
-    check('run_pacers' in js and 'run_incline_x10' in js,
-          "app.js 必须保存跑步模板列表和坡度字段")
+    check('run_pacers' in js,
+          "app.js 必须保存跑步模板列表")
     for field in [
         "run_mode",
         "run_pacer_type",
         "run_pace_low_sec",
         "run_pace_high_sec",
         "run_custom_name",
-        "run_incline_x10",
     ]:
         check(field in js and field in portal_config_save_src,
               f"网页保存测试和 app.js 必须覆盖跑步字段 {field}")

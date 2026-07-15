@@ -30,7 +30,6 @@ typedef void (*ble_erg_clear_cb_t)(int reason);
 
 typedef enum {
     BLE_RUN_CTRL_SPEED,
-    BLE_RUN_CTRL_INCLINE,
     BLE_RUN_CTRL_START,
     BLE_RUN_CTRL_STOP,
     BLE_RUN_CTRL_RESET,

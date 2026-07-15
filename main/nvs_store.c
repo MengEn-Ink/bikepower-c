@@ -58,7 +58,6 @@ static void engine_to_config(power_engine_t *e, config_data_t *c)
     c->run_pace_high_sec = e->running.pace_high_sec;
     strncpy(c->run_custom_name, e->running.custom_name, RUN_CUSTOM_NAME_MAX - 1);
     c->run_custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
-    c->run_incline_x10 = e->running.incline_x10;
     strncpy(c->device_name, e->device_name, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
@@ -103,7 +102,6 @@ static void config_to_engine(const config_data_t *c, power_engine_t *e)
         power_engine_set_run_pace_range(e, c->run_pace_low_sec, c->run_pace_high_sec);
     }
     power_engine_set_run_mode(e, (run_mode_t)c->run_mode);
-    power_engine_set_run_incline(e, c->run_incline_x10);
     power_engine_set_device_name(e, c->device_name);
 }
 
@@ -182,7 +180,6 @@ void nvs_store_load(power_engine_t *e)
     get_i32(h, NVS_KEY_RUN_PACER, &c.run_pacer_type);
     get_i32(h, NVS_KEY_RUN_PACE_LO, &c.run_pace_low_sec);
     get_i32(h, NVS_KEY_RUN_PACE_HI, &c.run_pace_high_sec);
-    get_i32(h, NVS_KEY_RUN_INCLINE, &c.run_incline_x10);
     size_t cn_len = sizeof(c.custom_pacer_name);
     esp_err_t cn_err = nvs_get_str(h, NVS_KEY_CUSTOM_NAME, c.custom_pacer_name, &cn_len);
     if (cn_err != ESP_OK && cn_err != ESP_ERR_NVS_NOT_FOUND) {
@@ -217,13 +214,13 @@ void nvs_store_load(power_engine_t *e)
     bool fixed = config_store_validate(&c);
     config_to_engine(&c, e);
 
-    ESP_LOGI(TAG, "配置加载完成 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d kg ftp=%dW thr=%dBPM ride=%d custom=%s pf=%d cf=%d hf=%d step=%d sport=%d bmask=%d run=%d/%d/%d/%d rmode=%d rpacer=%d rpace=%d-%d rincl=%d dn=%s%s%s",
+    ESP_LOGI(TAG, "配置加载完成 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d kg ftp=%dW thr=%dBPM ride=%d custom=%s pf=%d cf=%d hf=%d step=%d sport=%d bmask=%d run=%d/%d/%d/%d rmode=%d rpacer=%d rpace=%d-%d dn=%s%s%s",
              c.power, c.cadence, c.mode, c.heartrate, c.has_user_hr,
              c.weight, c.ftp, c.thr_hr, c.ride_type,
              c.custom_pacer_name,
              c.power_float, c.cadence_float, c.hr_float, c.power_step,
              c.sport_profile, c.broadcast_mask, c.run_speed_x100, c.run_pace_float_sec, c.run_cadence, c.run_cadence_float,
-             c.run_mode, c.run_pacer_type, c.run_pace_low_sec, c.run_pace_high_sec, c.run_incline_x10,
+             c.run_mode, c.run_pacer_type, c.run_pace_low_sec, c.run_pace_high_sec,
              c.device_name,
              migrated ? " [migrated]" : "", fixed ? " [clamped]" : "");
 
@@ -299,7 +296,6 @@ bool nvs_store_save(power_engine_t *e)
     SET_I32(NVS_KEY_RUN_PACER, c.run_pacer_type);
     SET_I32(NVS_KEY_RUN_PACE_LO, c.run_pace_low_sec);
     SET_I32(NVS_KEY_RUN_PACE_HI, c.run_pace_high_sec);
-    SET_I32(NVS_KEY_RUN_INCLINE, c.run_incline_x10);
     SET_I32(NVS_KEY_LED_SILENT, c.led.silent);
     SET_I32(NVS_KEY_LED_WAIT_MODE, c.led.scenes[LED_SCENE_WAIT_CONN].mode);
     SET_I32(NVS_KEY_LED_WAIT_COLOR, c.led.scenes[LED_SCENE_WAIT_CONN].color);
@@ -343,13 +339,13 @@ bool nvs_store_save(power_engine_t *e)
     xSemaphoreGive(s_save_mutex);
 
     if (ok) {
-        ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d ftp=%d thr=%d ride=%d custom=%s pf=%d cf=%d hf=%d step=%d sport=%d bmask=%d run=%d/%d/%d/%d rmode=%d rpacer=%d rpace=%d-%d rincl=%d dn=%s",
+        ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d ftp=%d thr=%d ride=%d custom=%s pf=%d cf=%d hf=%d step=%d sport=%d bmask=%d run=%d/%d/%d/%d rmode=%d rpacer=%d rpace=%d-%d dn=%s",
                  c.power, c.cadence, c.mode, c.heartrate, c.has_user_hr,
                  c.weight, c.ftp, c.thr_hr, c.ride_type,
                  c.custom_pacer_name,
                  c.power_float, c.cadence_float, c.hr_float, c.power_step,
                  c.sport_profile, c.broadcast_mask, c.run_speed_x100, c.run_pace_float_sec, c.run_cadence, c.run_cadence_float,
-                 c.run_mode, c.run_pacer_type, c.run_pace_low_sec, c.run_pace_high_sec, c.run_incline_x10,
+                 c.run_mode, c.run_pacer_type, c.run_pace_low_sec, c.run_pace_high_sec,
                  c.device_name);
     }
     return ok;

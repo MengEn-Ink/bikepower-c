@@ -130,7 +130,6 @@ bool power_engine_set_run_mode(power_engine_t *e, run_mode_t mode);
 bool power_engine_set_run_pacer(power_engine_t *e, run_pacer_type_t pacer);
 bool power_engine_set_run_custom_pacer(power_engine_t *e, const char *name, int pace_low_sec, int pace_high_sec, int cadence_spm);
 bool power_engine_set_run_pace_range(power_engine_t *e, int pace_low_sec, int pace_high_sec);
-bool power_engine_set_run_incline(power_engine_t *e, int incline_x10);
 void power_engine_run_reset(power_engine_t *e);
 /* 按跑步快照速度生成心率输出；固定用户心率时直接走锁定心率路径。 */
 int power_engine_running_heartrate(power_engine_t *e, int speed_x100_kmh);

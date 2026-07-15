@@ -93,7 +93,6 @@ def main():
             "run_pace_low_sec": 300,
             "run_pace_high_sec": 360,
             "run_custom_name": "晨跑",
-            "run_incline_x10": 25,
             "profile_weight": 82,
             "profile_ftp": 280,
             "profile_thr_hr": 188,
@@ -147,7 +146,6 @@ def main():
             "run_mode": "bad",
             "run_pace_low_sec": 1,
             "run_pace_high_sec": 9999,
-            "run_incline_x10": 999,
             "custom_wkg_low": 70,
             "custom_wkg_high": 10,
             "led_wait_mode": 99,
@@ -171,7 +169,6 @@ def main():
               "非法 run_mode 保持旧值", failures)
         check(after_invalid.get("run_pace_low_sec") == 144, "跑步快配夹到下限", failures)
         check(after_invalid.get("run_pace_high_sec") == 1200, "跑步慢配夹到上限", failures)
-        check(after_invalid.get("run_incline_x10") == 150, "跑步坡度夹到上限", failures)
         check(after_invalid.get("custom_wkg_low") == 70 and after_invalid.get("custom_wkg_high") == 70,
               "自定义功体比上限自动抬到不低于下限", failures)
         check(after_invalid.get("led_wait_mode") == 5, "LED 模式越界夹到上限", failures)

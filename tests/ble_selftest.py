@@ -113,7 +113,6 @@ DIS_EXPECT = {
 OP_REQUEST_CONTROL = 0x00
 OP_RESET = 0x01
 OP_SET_TARGET_SPEED = 0x02
-OP_SET_TARGET_INCLINE = 0x03
 OP_SET_TARGET_POWER = 0x05
 OP_START_RESUME = 0x07
 OP_STOP_PAUSE = 0x08
@@ -161,8 +160,6 @@ def parse_treadmill(data: bytes):
     speed = struct.unpack_from("<H", b, 2)[0]
     off = 4
     distance = None
-    incline = None
-    ramp = None
     hr = None
     elapsed = None
     if flags & 0x0004:
@@ -173,10 +170,7 @@ def parse_treadmill(data: bytes):
     if flags & 0x0080:
         if len(b) < off + 4:
             return None
-        incline = struct.unpack_from("<h", b, off)[0]
-        off += 2
-        ramp = struct.unpack_from("<h", b, off)[0]
-        off += 2
+        off += 4
     if flags & 0x0100:
         if len(b) < off + 1:
             return None
@@ -191,8 +185,6 @@ def parse_treadmill(data: bytes):
         "speed_x100": speed,
         "speed_kmh": speed / 100.0,
         "distance": distance,
-        "incline_x10": incline,
-        "ramp_x10": ramp,
         "hr": hr,
         "elapsed": elapsed,
     }
@@ -241,8 +233,8 @@ async def run_running_profile(client, found):
     ftms_feature_ok = await check_ftms_feature(
         client,
         found,
-        expected_machine_mask=0x00000584,
-        expected_target_mask=0x00000003,
+        expected_machine_mask=0x00000504,
+        expected_target_mask=0x00000002,
     )
     samples = []
     treadmill_samples = []
@@ -297,16 +289,7 @@ async def run_running_profile(client, found):
             response=True,
         )
         await asyncio.sleep(0.4)
-        print("下发 running SetTargetInclination(0x03, 3.5%)")
-        await client.write_gatt_char(
-            FTMS_CP_UUID,
-            bytes([OP_SET_TARGET_INCLINE]) + struct.pack("<h", 35),
-            response=True,
-        )
-        await asyncio.sleep(0.4)
-
     expected_speed = 12.0 if RUN_CONTROL else 10.0
-    expected_incline = 35 if RUN_CONTROL else None
     print(f"采集 RSC/HRS/FTMS Treadmill 通知 {DURATION}s ...")
     await asyncio.sleep(DURATION)
 
@@ -318,7 +301,6 @@ async def run_running_profile(client, found):
     ok_treadmill_notify = len(treadmill_samples) > 0
     ok_treadmill_speed = False
     ok_treadmill_distance = False
-    ok_treadmill_incline = False
     ok_treadmill_hr = False
     ok_treadmill_elapsed = False
     if samples:
@@ -351,11 +333,6 @@ async def run_running_profile(client, found):
             and last_tm["distance"] is not None
             and last_tm["distance"] >= first_tm["distance"]
         )
-        ok_treadmill_incline = (
-            last_tm["incline_x10"] is not None
-            if expected_incline is None
-            else last_tm["incline_x10"] == expected_incline
-        )
         ok_treadmill_hr = last_tm["hr"] is not None and 60 <= last_tm["hr"] <= 200
         ok_treadmill_elapsed = (
             first_tm["elapsed"] is not None
@@ -363,11 +340,10 @@ async def run_running_profile(client, found):
             and last_tm["elapsed"] >= first_tm["elapsed"]
         )
         print(
-            "FTMS Treadmill 最后样本: speed=%.2fkm/h distance=%s incline=%s hr=%s elapsed=%s flags=0x%04x"
+            "FTMS Treadmill 最后样本: speed=%.2fkm/h distance=%s hr=%s elapsed=%s flags=0x%04x"
             % (
                 last_tm["speed_kmh"],
                 str(last_tm["distance"]),
-                str(last_tm["incline_x10"]),
                 str(last_tm["hr"]),
                 str(last_tm["elapsed"]),
                 last_tm["flags"],
@@ -386,7 +362,6 @@ async def run_running_profile(client, found):
             and cp_results(OP_START_RESUME)[-1:] == [CP_RESULT_SUCCESS]
             and cp_results(OP_SET_TARGET_POWER)[-1:] == [CP_RESULT_NOT_SUPPORTED]
             and cp_results(OP_SET_TARGET_SPEED)[-1:] == [CP_RESULT_SUCCESS]
-            and cp_results(OP_SET_TARGET_INCLINE)[-1:] == [CP_RESULT_SUCCESS]
         )
         if FTMS_CP_UUID in found:
             print("下发 running Reset(0x01)")
@@ -401,7 +376,7 @@ async def run_running_profile(client, found):
     ok = (
         ok_services and dis_ok and ftms_feature_ok and ok_notify and ok_speed and ok_cadence and ok_distance and ok_flags
         and ok_treadmill_notify and ok_treadmill_speed and ok_treadmill_distance
-        and ok_treadmill_incline and ok_treadmill_hr and ok_treadmill_elapsed
+        and ok_treadmill_hr and ok_treadmill_elapsed
         and ok_cp_control and ok_reset
     )
     print("--- 结果 ---")
@@ -416,7 +391,6 @@ async def run_running_profile(client, found):
     print(f"  FTMS Treadmill 通知: {'通过' if ok_treadmill_notify else '失败'}")
     print(f"  FTMS Treadmill 速度: {'通过' if ok_treadmill_speed else '失败'}")
     print(f"  FTMS Treadmill 距离: {'通过' if ok_treadmill_distance else '失败'}")
-    print(f"  FTMS Treadmill 坡度: {'通过' if ok_treadmill_incline else '失败'}")
     print(f"  FTMS Treadmill 心率: {'通过' if ok_treadmill_hr else '失败'}")
     print(f"  FTMS Treadmill 用时: {'通过' if ok_treadmill_elapsed else '失败'}")
     print(f"  FTMS 跑步控制点: {'通过' if ok_cp_control else '失败'}")

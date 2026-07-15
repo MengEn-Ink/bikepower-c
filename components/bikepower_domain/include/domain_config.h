@@ -42,13 +42,10 @@
 #define RUN_PACE_SEC_MAX       1200    // 20:00 /km，3.0 km/h
 #define RUN_CUSTOM_NAME_MAX    32      // 自定义跑步档名称缓冲区（含结尾 \0）
 #define RUN_CUSTOM_NAME_DEFAULT "自定义"
-#define RUN_INCLINE_X10_MIN    (-100)  // -10.0%
-#define RUN_INCLINE_X10_MAX    150     // 15.0%
-#define RUN_INCLINE_X10_DEFAULT 0      // 0.0%
 
 // ===== 配置格式版本 =====
-// v10：新增跑步模板/自定义配速区间/坡度持久化。
-#define CONFIG_VERSION        10
+// v11：移除未落地的跑步坡度持久化字段，仅保留速度/步频/配速核心参数。
+#define CONFIG_VERSION        11
 
 // ===== 设备名称（BLE 广播名，可配网修改并持久化） =====
 #define DEVICE_NAME_MAX       24

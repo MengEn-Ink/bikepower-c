@@ -44,7 +44,6 @@ typedef struct {
     int run_pace_low_sec;  // 跑步模板/自定义配速下限，秒/km
     int run_pace_high_sec; // 跑步模板/自定义配速上限，秒/km
     char run_custom_name[RUN_CUSTOM_NAME_MAX]; // 自定义跑步档名称
-    int run_incline_x10; // 跑步坡度，0.1% 单位
     char device_name[DEVICE_NAME_MAX];  // BLE 广播名
 } config_data_t;
 

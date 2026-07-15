@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+### 收口修复
+- `components/bikepower_domain/`、`main/nvs_store.c`、`main/wifi_portal.c`、`main/ble_bikepower.c`、`main/web/`：彻底移除运行坡度字段、NVS key、Portal API/UI、FTMS Set Target Inclination 控制点和 Treadmill Data 坡度输出，配置 schema 升级到 v11。
+- `tests/check_config_consistency.py`、`tests/check_portal_structure.py`、`test/test_domain.c`、`tests/test_portal_config_save.py`、`tests/ble_selftest.py`：新增/同步坡度残留门禁和跑步核心链路测试，BLE 自测改为验证速度、距离、心率、用时和目标速度控制。
+- `PROGRESS.md`、`docs/user/01-quickstart.md`、`docs/user/02-user-manual.md`、`docs/dev/01-technical-reference.md`、`docs/INDEX.md`：同步 v4.1.0、NVS schema v11、跑步模式当前能力和阶段索引。
+
 ### Windows 开发环境适配
 - `scripts/idf_common.psm1`：新增 Windows PowerShell 共享模块，统一封装 ESP-IDF 路径探测（扫描目录非硬编码版本号）、Python 环境探测、子进程调用、串口探测等通用逻辑。
 - `scripts/dev.ps1`：新增 Windows 统一开发入口，支持 build/flash/monitor/test/check/clean/reconfigure/erase 子命令，自动探测 ESP-IDF 和串口。

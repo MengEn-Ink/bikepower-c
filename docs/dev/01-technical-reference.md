@@ -159,7 +159,6 @@
 - `APP_EVT_ERG_TARGET`
 - `APP_EVT_ERG_CLEAR`
 - `APP_EVT_RUN_TARGET_SPEED`
-- `APP_EVT_RUN_TARGET_INCLINE`
 - `APP_EVT_RUN_START`
 - `APP_EVT_RUN_STOP`
 - `APP_EVT_RUN_RESET`
@@ -291,7 +290,6 @@ DIS 读取内容来自编译期常量：
 - `FTMS_OP_REQUEST_CONTROL = 0x00`
 - `FTMS_OP_RESET = 0x01`
 - `FTMS_OP_SET_TARGET_SPEED = 0x02`
-- `FTMS_OP_SET_TARGET_INCLINATION = 0x03`
 - `FTMS_OP_SET_TARGET_POWER = 0x05`
 - `FTMS_OP_START_RESUME = 0x07`
 - `FTMS_OP_STOP_PAUSE = 0x08`
@@ -307,7 +305,6 @@ DIS 读取内容来自编译期常量：
 - `RequestControl`：直接 success
 - `SetTargetPower`：解析 `<h` 16-bit 功率值，调用 `g_erg_cb(target)`
 - `SetTargetSpeed`：解析 `uint16` 速度（km/h*100），投递跑步目标速度事件
-- `SetTargetInclination`：解析 `int16` 坡度（坡度*10），投递跑步坡度事件
 - `StartResume`：`g_ftms_status_buf[0] = 0x01`
 - `StopPause`：`g_ftms_status_buf[0] = 0x02`
 - `Reset`：`g_ftms_status_buf[0] = 0x00`
@@ -765,7 +762,6 @@ namespace 固定为：
 - `NVS_KEY_RUN_PACE_LO = "rplo"`
 - `NVS_KEY_RUN_PACE_HI = "rphi"`
 - `NVS_KEY_RUN_CUSTOM_NAME = "rcname"`
-- `NVS_KEY_RUN_INCLINE = "rincl"`
 
 设备信息模板由 `main/device_template_store.c` 单独管理，避免模板集合数据影响主配置保存。模板 namespace 固定为：
 
@@ -777,17 +773,18 @@ namespace 固定为：
 
 领域层配置版本在 `domain_config.h` 中：
 
-`CONFIG_VERSION = 10`
+`CONFIG_VERSION = 11`
 
 `config_store_migrate()` 负责把旧 `schema_ver` 升级到当前版本。当前策略是：
 
-- v6 -> v10：保留已有配置，补 `run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT`
-- v7 -> v10：保留已有配置，补 `run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT`
-- v8 -> v10：补 `broadcast_mask = BROADCAST_FIELD_ALL`
-- v9 -> v10：保留既有跑步速度、配速浮动、步频、步频浮动，补 `run_mode`、`run_pacer_type`、`run_pace_low_sec`、`run_pace_high_sec`、`run_custom_name`、`run_incline_x10`
+- v6 -> v11：保留已有配置，补 `run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT`
+- v7 -> v11：保留已有配置，补 `run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT`
+- v8 -> v11：补 `broadcast_mask = BROADCAST_FIELD_ALL`
+- v9 -> v11：保留既有跑步速度、配速浮动、步频、步频浮动，补 `run_mode`、`run_pacer_type`、`run_pace_low_sec`、`run_pace_high_sec`、`run_custom_name`
+- v10 -> v11：移除未落地的跑步坡度持久化字段，保留其他当前字段
 - 未知旧版本：回退默认配置
 
-这意味着 v6/v7/v8/v9 升级到当前版本时会保留主要用户配置；更早或无法识别的 schema 会安全回默认，避免异常配置导致新固件启动异常。
+这意味着 v6/v7/v8/v9/v10 升级到当前版本时会保留主要用户配置；更早或无法识别的 schema 会安全回默认，避免异常配置导致新固件启动异常。
 
 ### 9.3 校验与夹紧
 
