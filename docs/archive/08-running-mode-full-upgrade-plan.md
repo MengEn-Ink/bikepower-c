@@ -1,8 +1,8 @@
 # 跑步模式完整升级方案
 
-> 状态：历史方案归档，仅供追溯，不代表当前 v4.1.0+ 实现。当前实现以 RSC 速度、步频、心率和 FTMS Treadmill 核心数据为主，已移除跑步坡度配置、NVS key、Portal UI/API 和 Set Target Inclination 控制点。  
-> 目标版本：v4.0.x 后续迭代。  
-> 范围：跑步输出来源、网页交互、配置持久化、RSC 数据面、FTMS Treadmill Data、FTMS 跑步控制点、测试与发布门禁。  
+> 状态：历史方案归档，仅供追溯，不代表当前 v4.1.0+ 实现。当前实现以 RSC 速度、步频、心率和 FTMS Treadmill 核心数据为主，已移除跑步坡度配置、NVS key、Portal UI/API 和 Set Target Inclination 控制点。
+> 目标版本：v4.0.x 后续迭代。
+> 范围：跑步输出来源、网页交互、配置持久化、RSC 数据面、FTMS Treadmill Data、FTMS 跑步控制点、测试与发布门禁。
 > 前置约束：不得破坏现有骑行 CPS/HRS/CSC/FTMS Indoor Bike/ERG 行为；WiFi/BLE 射频共用规则不变；BLE profile 切换仍由主任务上下文串行处理。
 
 ---

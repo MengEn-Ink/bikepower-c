@@ -9,6 +9,8 @@
 - `tests/check_config_consistency.py`、`tests/check_portal_structure.py`、`test/test_domain.c`、`tests/test_portal_config_save.py`、`tests/ble_selftest.py`：新增/同步坡度残留门禁和跑步核心链路测试，BLE 自测改为验证速度、距离、心率、用时和目标速度控制。
 - `PROGRESS.md`、`docs/user/01-quickstart.md`、`docs/user/02-user-manual.md`、`docs/dev/01-technical-reference.md`、`docs/INDEX.md`：同步 v4.1.0、NVS schema v11、跑步模式当前能力、阶段索引和真机回归口径。
 - `docs/archive/08-running-mode-full-upgrade-plan.md`、`docs/archive/09-running-mode-implementation-plan.md`、`docs/archive/10-project-optimization-design.md`、`docs/archive/11-project-optimization-plan.md`：归档历史跑步/优化计划，移除游离 `docs/superpowers` 工作目录。
+- `scripts/tools/quality_gate.py`、`tests/check_config_consistency.py`：新增工作区/暂存区 whitespace 门禁，工作区 clean 时同步检查最近提交，防止 Markdown 行尾空格再次进入提交。
+- `PROGRESS.md`、`CHANGELOG.md`、`docs/dev/03-test-coverage-analysis.md`、`docs/archive/08-running-mode-full-upgrade-plan.md`、`docs/archive/09-running-mode-implementation-plan.md`：同步当前 host 单测 5841 断言并清理归档文档行尾空格。
 
 ### Windows 开发环境适配
 - `scripts/idf_common.psm1`：新增 Windows PowerShell 共享模块，统一封装 ESP-IDF 路径探测（扫描目录非硬编码版本号）、Python 环境探测、子进程调用、串口探测等通用逻辑。
@@ -31,9 +33,11 @@
 - `README.md`、`PROGRESS.md`、`docs/user/01-quickstart.md`、`docs/dev/01-technical-reference.md`、`.trae/rules/*`：同步 v4.1.0、当时 NVS schema v10、303 Captive Portal、80KB 堆健康线、HTTPD 栈 12288、配网密码和 LED 配网态等事实。
 
 ### 验证
-- `python3 tests/check_config_consistency.py`：通过，212 pass / 0 fail。
-- `make -C test clean && make -C test && ./test/test_domain`：通过，5849 断言 0 失败。
-- `python3 scripts/tools/quality_gate.py`：通过，49 pass / 2 warn / 0 fail；warn 为本批提交前存在未提交改动和本地 commit 未 push。
+- `python3 tests/check_config_consistency.py`：通过，259 pass / 0 fail。
+- `make -C test clean && make -C test && ./test/test_domain`：通过，5841 断言 0 失败。
+- `git diff --check`：通过。
+- `git show --check --format= HEAD`：发现上一提交 3 处 Markdown 行尾空格，本批已清理，并由 `quality_gate.py` 增加防回归。
+- `python3 scripts/tools/quality_gate.py`：通过，52 pass / 2 warn / 0 fail；warn 为本批提交前存在未提交改动，以及工作区未 clean 时跳过最近提交 whitespace 检查。
 - 真机烧录、WiFi/BLE coex 配网、BLE 扫描读取/分析未执行；这些仍需设备侧回归确认。
 
 ## [4.1.0] - 2026-07-11

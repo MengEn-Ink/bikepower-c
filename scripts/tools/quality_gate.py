@@ -201,6 +201,27 @@ if shutil.which("git"):
     else:
         ok("工作区 clean")
 
+    out, rc = run_cmd(["git", "-C", PROJECT, "diff", "--check"])
+    if rc == 0:
+        ok("工作区 whitespace 检查通过")
+    else:
+        fail(f"工作区 whitespace 检查失败: {out.strip().splitlines()[0] if out.strip() else f'rc={rc}'}")
+
+    out, rc = run_cmd(["git", "-C", PROJECT, "diff", "--cached", "--check"])
+    if rc == 0:
+        ok("暂存区 whitespace 检查通过")
+    else:
+        fail(f"暂存区 whitespace 检查失败: {out.strip().splitlines()[0] if out.strip() else f'rc={rc}'}")
+
+    if out_stripped:
+        warn("工作区未 clean，跳过最近提交 whitespace 检查")
+    else:
+        out, rc = run_cmd(["git", "-C", PROJECT, "show", "--check", "--format=", "HEAD"])
+        if rc == 0:
+            ok("最近提交 whitespace 检查通过")
+        else:
+            fail(f"最近提交 whitespace 检查失败: {out.strip().splitlines()[0] if out.strip() else f'rc={rc}'}")
+
     out, _ = run_cmd(["git", "-C", PROJECT, "rev-list", "--count", "@{u}..HEAD"])
     out = out.strip()
     if out.isdigit() and int(out) > 0:

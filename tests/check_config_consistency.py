@@ -35,6 +35,7 @@ REVIEW_CHECKLIST = ROOT / "docs" / "archive" / "03-review-checklist.md"
 HW_CONSTRAINTS = ROOT / ".trae" / "rules" / "hardware-constraints.md"
 BUILD_ALL = ROOT / "scripts" / "build_all.sh"
 FLASH_LATEST = ROOT / "scripts" / "flash_latest.sh"
+QUALITY_GATE = ROOT / "scripts" / "tools" / "quality_gate.py"
 BLE_SELFTEST = ROOT / "tests" / "ble_selftest.py"
 STAGE3_CONN_TEST = ROOT / "tests" / "stage3_conn_test.py"
 BLE_BIKEPOWER_C = ROOT / "main" / "ble_bikepower.c"
@@ -134,6 +135,7 @@ review_checklist_src = read(REVIEW_CHECKLIST)
 hw_src = read(HW_CONSTRAINTS) if HW_CONSTRAINTS.exists() else ""
 build_all_src = read(BUILD_ALL)
 flash_latest_src = read(FLASH_LATEST)
+quality_gate_src = read(QUALITY_GATE)
 ble_selftest_src = read(BLE_SELFTEST)
 stage3_conn_src = read(STAGE3_CONN_TEST)
 ble_bikepower_src = read(BLE_BIKEPOWER_C)
@@ -479,6 +481,10 @@ check(f"当前固件基线：BikePower C v{fw_ver}" in running_mode_doc,
       f"docs/dev/04-running-mode-compatibility.md 当前固件基线与 FIRMWARE_VERSION({fw_ver}) 一致")
 check(f"版本：v{fw_ver}" in coverage_doc,
       f"docs/dev/03-test-coverage-analysis.md 版本与 FIRMWARE_VERSION({fw_ver}) 一致")
+check('"diff", "--check"' in quality_gate_src,
+      "quality_gate.py 必须检查工作区 whitespace")
+check('"show", "--check", "--format=", "HEAD"' in quality_gate_src,
+      "quality_gate.py 必须在工作区 clean 时检查最近提交 whitespace")
 
 
 # ============================ 5. BLE 通知间隔一致性 ============================
