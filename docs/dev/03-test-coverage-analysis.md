@@ -58,6 +58,9 @@
 | TC-3g 任务/WDT | `tests/check_tasks_wdt.py` | xTaskCreate/WDT/队列 | ✅ |
 | TC-3h mock 保存 | `tests/test_portal_config_save.py` | `/api/config` 保存后 `/api/state` 回显 | ✅ |
 | TC-3i 核心流程耐久 | `tests/test_core_flow_endurance.py` | 3 分钟循环覆盖按钮调功、功率/心率随动、网页编辑、LED 静默、设备模板、外部设备分析 raw 数据、关闭 WiFi | ✅ |
+| TC-3q 真机验收证据 | `tests/test_device_acceptance.py` | 证据 schema、版本/Git 匹配、P0 严格模式、原子写入 | ✅ |
+| TC-3r device 证据采集 | `tests/test_operation_gate_evidence.py` | 自动结果 PASS/FAIL 映射、未执行项保持、人工证据保留 | ✅ |
+| TC-3s 串口启动判定 | `tests/test_serial_boot_check.py` | 空日志、缺 ROM/复位标志、panic、Backtrace、Task WDT/coredump 拒绝 | ✅ |
 | TC-BLE-ADV 广播字段 | `tests/check_ble_advertising_fields.py` | 骑行/跑步主广播服务 UUID 与广播包名字预算 | ✅ |
 
 ### 真机测试（需 ESP32-C3 + 串口 + 手机）
@@ -68,6 +71,8 @@
 | TC-3 配网自测 | `tests/stage5_portal_test.py` | 首页/倒计时/续期/提交（/api/xxx JSON） | ✅ |
 | DT 真机系列 | `.trae/rules/workflows/device-testing.md` | 按钮/LED/状态机/内存 | 🟡 物理按钮/LED 人工确认 |
 
+真机自动测试和人工确认按板型分别写入 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`。每份文件必须匹配板型、当前 `FIRMWARE_VERSION` 和 Git ID；`NOT_RUN` 不算通过。开发期可以只校验结构，正式双板发布要求两个板型的全部 P0 项通过。
+
 ### 本地 Mock / 串口工具（辅助）
 
 | 脚本 | 用途 |
@@ -76,7 +81,7 @@
 | `tests/test_portal_config_save.py` | 自动启动 mock server，验证配网页保存字段即时回显 |
 | `tests/test_core_flow_endurance.py` | 自动启动 mock server，默认 3 分钟循环验证核心流程并输出 markdown 报告 |
 | `tests/serial_daemon.py` | 串口日志持续抓取 + 自动重连 |
-| `tests/serial_capture.py` | 单次抓取 |
+| `tests/serial_capture.py` | 单次抓取；`--check-boot` 模式要求 ROM/复位启动标志完整且无致命异常，BLE 就绪由 `ble_selftest.py` 独立验证 |
 
 ## 三、覆盖策略
 
@@ -110,9 +115,10 @@
   ↓
 9. 涉及 BLE/配网行为 → 跑 TC-2 / TC-3 真机
   ↓
-10. 生成固件产物 → 同步生成 test-report.md + core-flow-endurance.md + user-manual.md + release 总包 zip
+10. 生成固件产物 → 同步生成 test-report.md + core-flow-endurance.md + user-manual.md + release 总包 zip；存在当前版本证据时按板型收录到 `evidence/`
+11. 正式发布 → `check_release_artifacts.py --require-pushed --require-device-evidence`，证据缺失、过期或 P0 未通过均阻断
   ↓
-11. 更新本矩阵 + test-coverage.md 断言规模
+12. 更新本矩阵 + test-coverage.md 断言规模
   ↓
 12. 全静态门禁绿 → 提交
 ```

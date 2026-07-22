@@ -970,12 +970,28 @@ idf.py build
 - `core-flow-endurance.md`
 - `user-manual.md`
 - `images/`
+- `evidence/device-acceptance-generic-c3.json`（当前版本证据存在时收录）
+- `evidence/device-acceptance-m5stamp-c3.json`（当前版本证据存在时收录）
 - `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip`
 - `*.zip.sha256`
 
-`test-report.md` 由 `scripts/tools/generate_release_docs.py` 生成，必须记录已执行测试、未执行项和原因；`core-flow-endurance.md` 由 `tests/test_core_flow_endurance.py` 输出，记录按钮、心率随动、网页编辑、模板和关闭 WiFi 等核心流程循环；`user-manual.md` 从 `docs/user/` 生成，要求先更新源用户文档再打包。
+`test-report.md` 由 `scripts/tools/generate_release_docs.py` 生成，必须记录已执行测试、未执行项、原因以及真机验收证据摘要；`core-flow-endurance.md` 由 `tests/test_core_flow_endurance.py` 输出，记录按钮、心率随动、网页编辑、模板和关闭 WiFi 等核心流程循环；`user-manual.md` 从 `docs/user/` 生成，要求先更新源用户文档再打包。
 
-双板型完整构建结束后，`scripts/build_all.sh` 会调用 `python3 scripts/tools/check_release_artifacts.py --allow-dirty` 做本地产物门禁，校验 10 个上传附件、SHA256 旁文件、`manifest.txt` 和 release zip 内容。正式创建 Gitee Release 前必须再运行 `python3 scripts/tools/check_release_artifacts.py --require-pushed`，确保产物名中的 Git ID 对应已推送源码；`scripts/tools/publish_gitee_release.py` 上传前也会复用该检查。`python3 tests/test_release_artifacts.py` 提供无需真实固件的样例回归，覆盖标准产物、SHA256 篡改和 zip 缺文件。
+真机自动测试与人工确认由 `scripts/tools/device_acceptance.py` 按板型分别写入 `tests/reports/device-acceptance-generic-c3.json` 和 `tests/reports/device-acceptance-m5stamp-c3.json`。证据限定为 `PASS`、`FAIL`、`NOT_RUN`，并绑定 `FIRMWARE_VERSION`、Git ID 和板型。`tests/operation_gate.py --level device --board <板型>` 只更新对应板型实际执行的串口、BLE、重连、配网和广播项结果，不覆盖按钮、LED、手机等人工记录。
+
+双板型完整构建结束后，`scripts/build_all.sh` 会调用 `python3 scripts/tools/check_release_artifacts.py --allow-dirty` 做本地产物门禁，校验 10 个上传附件、SHA256 旁文件、`manifest.txt` 和 release zip 内容。本地构建允许未提供证据；存在匹配当前版本的证据时，脚本会将其写入 manifest、测试报告和 release 总包。正式创建 Gitee Release 前必须运行：
+
+```bash
+python3 scripts/tools/device_acceptance.py validate --strict \
+  --file tests/reports/device-acceptance-generic-c3.json
+python3 scripts/tools/device_acceptance.py validate --strict \
+  --file tests/reports/device-acceptance-m5stamp-c3.json
+python3 scripts/tools/check_release_artifacts.py \
+  --require-pushed \
+  --require-device-evidence
+```
+
+严格模式要求两个板型各自全部 P0 项为 `PASS`，证据缺失、`FAIL`、`NOT_RUN`、板型、固件版本或 Git ID 不匹配都会阻断。`scripts/tools/publish_gitee_release.py` 上传前自动复用该检查。`python3 tests/test_release_artifacts.py` 提供无需真实固件的样例回归，覆盖标准产物、SHA256 篡改、zip 缺文件、单板证据缺失、证据过期和 P0 未完成。
 
 ### 12.2 领域层 host 单测
 

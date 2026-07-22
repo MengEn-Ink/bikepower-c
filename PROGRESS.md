@@ -43,6 +43,7 @@
 - [x] 配置导入/导出基础能力已落到领域层：`config_store_serialize` / `config_store_deserialize` 支持 JSON 往返、缺字段默认值和范围夹紧。
 - [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、单一版本号、stable/fix 标识和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 Gitee Release。
 - [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合；`tests/operation_gate.py --level full` 已接入 release 产物门禁和核心流程耐久。
+- [x] 稳定交付证据链已接入：`scripts/tools/device_acceptance.py` 统一记录真机自动项与人工项，`operation_gate.py --level device` 可写入自动结果，正式 Gitee 发布要求当前版本与 Git ID 的 P0 证据全部通过。
 - [x] 最近一次 generic-c3 真机自动化验证记录：历史 v4.0.4 记录见 `CHANGELOG.md` 归档；当前 v4.1.0 代码侧已通过 `python3 scripts/tools/quality_gate.py`（含 `idf.py build`、host 单测、静态门禁、门户渲染、BLE 广播字段和 release 产物门禁）。当前 v4.1.0 真机烧录、BLE cycling/running 自测和配网流程仍需重跑后更新本项。
 
 ### 待人工确认（P0）
@@ -59,6 +60,8 @@
 - [ ] Captive Portal 多系统弹窗：iOS、Android、Windows 分别连接 `BikePower-XXXXXX` 热点后能自动弹出配网页；不弹窗时手动访问 `192.168.4.1` 仍可配网。
 - [ ] Captive Portal 生命周期：退出配网后串口确认 DNS 任务停止，不再响应劫持。
 - [ ] 72h 老化：长时间运行无 coredump、无 WDT、无堆持续下降；建议周期性跑 `tests/ble_selftest.py` 和 `tests/stage5_portal_test.py` 采样。
+
+上述未完成项继续保持待验收状态。执行时按板型写入 `tests/reports/device-acceptance-<板型>.json`；`NOT_RUN` 不视为通过，正式双板发布前必须分别对 generic-c3 与 m5stamp-c3 运行 `python3 scripts/tools/device_acceptance.py validate --strict --file <证据文件>`。
 - [ ] Release 人工步骤：从已提交并已推送源码执行 `scripts/build_all.sh`，校验 SHA256，打 `v4.1.0` tag，创建 Gitee Release 并上传 merged bin/manifest。
 
 ---

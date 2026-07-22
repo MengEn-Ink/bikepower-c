@@ -4,6 +4,24 @@
 
 ## [未发布]
 
+### 稳定交付证据链
+- `scripts/tools/device_acceptance.py`、`tests/test_device_acceptance.py`：新增绑定固件版本、Git ID 和板型的真机验收证据，支持初始化、单项更新、摘要与 P0 严格校验，写文件采用原子替换。
+- `tests/operation_gate.py`、`tests/test_operation_gate_evidence.py`：device 门禁可将串口、骑行/跑步 BLE、重连、配网门户和广播开关结果写入证据，失败如实记录为 `FAIL`，未执行项保持 `NOT_RUN`，不覆盖人工按钮/LED 记录。
+- `tests/serial_capture.py`、`tests/test_serial_boot_check.py`：新增 `--check-boot` 严格判定，空日志、缺少 ROM/复位启动标志或出现 panic、Task WDT、Backtrace、coredump 时返回失败；BLE 就绪继续由 `ble_selftest.py` 独立验证，兼容 release 固件 WARN 日志级别。
+- `scripts/build_all.sh`、`scripts/build_all.ps1`、`scripts/tools/generate_release_docs.py`：Unix/Windows 构建在当前版本证据存在时按板型收录到 `evidence/device-acceptance-<板型>.json`，同步进入 manifest、测试报告和 release 总包；无设备环境仍允许本地构建。
+- `scripts/tools/check_release_artifacts.py`、`scripts/tools/publish_gitee_release.py`：新增 `--require-device-evidence`，正式双板 Gitee 发布强制要求 generic-c3 与 m5stamp-c3 各自匹配当前版本/Git 且全部 P0 项通过，同时保持 10 个顶层上传附件不变。
+- `tests/test_release_artifacts.py`、`tests/check_release_gate.py`、`scripts/tools/quality_gate.py`：新增证据缺失、Git ID 不匹配、P0 未完成和发布接线防回归测试。
+- `docs/dev/10-stable-delivery-design.md`、`docs/dev/11-stable-delivery-plan.md`、`docs/dev/05-operation-test-gate.md`、`tests/README.md`：记录稳定交付设计、分批计划、人工结果录入和正式发布命令。
+
+### 稳定交付验证
+- `python3 tests/test_device_acceptance.py`：通过，覆盖证据模型、严格模式、非法输入、原子读写和 CLI。
+- `python3 tests/test_operation_gate_evidence.py`：通过，覆盖自动结果映射、新建证据和人工记录保留。
+- `python3 tests/test_release_artifacts.py`、`python3 tests/check_release_gate.py`：通过，覆盖标准 release、完整证据、缺证据、过期证据、P0 未完成和 zip 篡改。
+- `python3 tests/operation_gate.py --level quick --report /tmp/bikepower-operation-quick.md`：通过，host 5841 断言、Mock 保存、操作矩阵、BLE 监控、门户结构和 JS 全绿。
+- `python3 tests/operation_gate.py --level full --report /tmp/bikepower-operation-full-stable-delivery.md`：通过，包含 6 轮核心流程耐久、release 严格证据样例、259 项配置一致性和 122 项 NVS schema 检查。
+- `python3 scripts/tools/quality_gate.py`：通过，61 pass / 2 warn / 0 fail；两个 warn 为工作区存在本轮未提交改动，以及工作区未 clean 时跳过最近提交 whitespace 检查。
+- 真机烧录、按钮、LED、手机 Captive Portal 和 72h 老化尚未执行，证据仍应保持 `NOT_RUN`，不能冒充通过。
+
 ### 收口修复
 - `components/bikepower_domain/`、`main/nvs_store.c`、`main/wifi_portal.c`、`main/ble_bikepower.c`、`main/web/`：彻底移除运行坡度字段、NVS key、Portal API/UI、FTMS Set Target Inclination 控制点和 Treadmill Data 坡度输出，配置 schema 升级到 v11。
 - `tests/check_config_consistency.py`、`tests/check_portal_structure.py`、`test/test_domain.c`、`tests/test_portal_config_save.py`、`tests/ble_selftest.py`：新增/同步坡度残留门禁和跑步核心链路测试，BLE 自测改为验证速度、距离、心率、用时和目标速度控制。

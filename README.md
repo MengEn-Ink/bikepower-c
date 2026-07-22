@@ -143,12 +143,20 @@ idf.py -p <port> monitor
 
 每次生成可分发固件时，`build/release/` 必须同时包含两个板型 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip` 总包。测试报告记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行项必须写明原因。
 
-正式上传前必须运行 release 产物门禁，校验 10 个上传附件、SHA256、manifest 和 zip 内容；Gitee 发布脚本也会在上传前自动复用同一检查。
+真机自动测试和按钮、LED、手机 Captive Portal 等人工确认按板型分别记录到 `tests/reports/device-acceptance-generic-c3.json` 和 `tests/reports/device-acceptance-m5stamp-c3.json`。本地构建允许没有证据；证据存在且匹配当前版本时，`build_all.sh` 会将其收录到总包 `evidence/`。正式双板上传要求两个板型的当前固件版本、Git ID 和全部 P0 项均为 `PASS`，`NOT_RUN` 不能视为通过。
 
 ```bash
-python3 scripts/tools/check_release_artifacts.py --require-pushed
+python3 scripts/tools/device_acceptance.py validate --strict \
+  --file tests/reports/device-acceptance-generic-c3.json
+python3 scripts/tools/device_acceptance.py validate --strict \
+  --file tests/reports/device-acceptance-m5stamp-c3.json
+python3 scripts/tools/check_release_artifacts.py \
+  --require-pushed \
+  --require-device-evidence
 python3 tests/test_release_artifacts.py
 ```
+
+Gitee 发布脚本会在调用远端 API 前自动复用严格检查，继续保持 10 个顶层上传附件不变。
 
 提交前推荐先跑聚合门禁：
 
