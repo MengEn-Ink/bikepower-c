@@ -246,9 +246,12 @@ required_assets = [
     "docs/dev/01-technical-reference.md",
     "docs/dev/02-firmware-security.md",
     "docs/dev/03-test-coverage-analysis.md",
+    "docs/dev/10-stable-delivery-design.md",
+    "docs/dev/11-stable-delivery-plan.md",
     "docs/archive/01-cidf-nimble-rewrite.md",
     "docs/archive/02-micropython-vs-c-comparison.md",
     "scripts/tools/generate_release_docs.py",
+    "scripts/tools/device_acceptance.py",
     "scripts/tools/publish_gitee_release.py",
     "scripts/tools/serve_ble_monitor.py",
     "tools/web/ble-monitor.html",
@@ -265,6 +268,9 @@ required_assets = [
     "tests/stage5_portal_test.py",
     "tests/test_portal_config_save.py",
     "tests/test_core_flow_endurance.py",
+    "tests/test_device_acceptance.py",
+    "tests/test_operation_gate_evidence.py",
+    "tests/test_serial_boot_check.py",
     "tests/serial_capture.py",
 ]
 for d in required_assets:
@@ -310,6 +316,9 @@ STATIC_CHECKS = [
     ("tests/check_ble_broadcast_monitor.py", "BLE 广播项监控脚本 (TC-3l)"),
     ("tests/check_release_gate.py", "Release 产物门禁 (TC-3m)"),
     ("tests/test_release_artifacts.py", "Release 产物门禁功能样例 (TC-3p)"),
+    ("tests/test_device_acceptance.py", "真机验收证据功能样例 (TC-3q)"),
+    ("tests/test_operation_gate_evidence.py", "真机门禁证据采集样例 (TC-3r)"),
+    ("tests/test_serial_boot_check.py", "串口启动日志判定样例 (TC-3s)"),
 ]
 # 环境缺失标志：命中则降级为 warn（无设备/无依赖环境仍可跑），不算真实失败
 ENV_MISSING_MARKERS = [

@@ -20,6 +20,7 @@ managed_components/
 
 # Editor / tooling cache
 .cache/
+.superpowers/
 compile_commands.json
 
 # Environment variables (contains tokens)
