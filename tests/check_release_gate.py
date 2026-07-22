@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "tools" / "check_release_artifacts.py"
 BUILD_ALL = ROOT / "scripts" / "build_all.sh"
+BUILD_ALL_PS1 = ROOT / "scripts" / "build_all.ps1"
 PUBLISH = ROOT / "scripts" / "tools" / "publish_gitee_release.py"
 README = ROOT / "README.md"
 TECH_REF = ROOT / "docs" / "dev" / "01-technical-reference.md"
@@ -39,6 +40,7 @@ def main():
 
     script_src = SCRIPT.read_text(encoding="utf-8")
     build_all_src = BUILD_ALL.read_text(encoding="utf-8")
+    build_all_ps1_src = BUILD_ALL_PS1.read_text(encoding="utf-8-sig")
     publish_src = PUBLISH.read_text(encoding="utf-8")
     readme_src = README.read_text(encoding="utf-8")
     tech_ref_src = TECH_REF.read_text(encoding="utf-8")
@@ -55,14 +57,25 @@ def main():
         ("git status --short", "发布严格模式检查工作区状态"),
         ("--allow-dirty", "允许显式放宽 dirty 工作区检查"),
         ("--skip-git-check", "允许离线样例或历史产物跳过 Git 状态检查"),
+        ("--require-device-evidence", "正式发布可强制校验真机验收证据"),
+        ("device-acceptance-generic-c3.json", "校验 generic-c3 真机验收证据"),
+        ("device-acceptance-m5stamp-c3.json", "校验 m5stamp-c3 真机验收证据"),
     ]
     for token, message in required_tokens:
         check(token in script_src, message, failures)
 
     check("python3 \"$PROJECT_DIR/scripts/tools/check_release_artifacts.py\"" in build_all_src,
           "build_all.sh 生成后调用 release 产物门禁", failures)
+    check("device_acceptance.py\" validate" in build_all_src
+          and "device-acceptance-${board_name}.json" in build_all_src,
+          "build_all.sh 校验并收录各板型真机验收证据", failures)
+    check("device_acceptance.py" in build_all_ps1_src
+          and '"device-acceptance-" + $boardName + ".json"' in build_all_ps1_src,
+          "build_all.ps1 校验并收录各板型真机验收证据", failures)
     check("check_release_artifacts" in publish_src,
           "publish_gitee_release.py 上传前复用 release 产物门禁", failures)
+    check("require_device_evidence=True" in publish_src,
+          "publish_gitee_release.py 正式发布强制完整 P0 证据", failures)
     check("check_release_artifacts.py" in readme_src,
           "README 记录 release 产物门禁命令", failures)
     check("check_release_artifacts.py" in tech_ref_src,
@@ -77,6 +90,10 @@ def main():
           "operation_gate.py full 模式聚合 release 产物门禁", failures)
     check("check_release_artifacts.py" in op_doc_src and "test_release_artifacts.py" in op_doc_src,
           "操作覆盖矩阵记录 release 产物门禁", failures)
+    check("device_acceptance.py validate --strict" in op_doc_src
+          and "device-acceptance-generic-c3.json" in op_doc_src
+          and "device-acceptance-m5stamp-c3.json" in op_doc_src,
+          "操作覆盖矩阵记录双板严格真机证据门禁", failures)
 
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "--release-dir", str(Path(tempfile.gettempdir()) / "missing-release-dir"),

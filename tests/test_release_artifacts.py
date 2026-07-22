@@ -15,6 +15,7 @@ from check_release_artifacts import (  # noqa: E402
     expected_attachment_names,
     validate_release_artifacts,
 )
+from device_acceptance import P0_ITEM_IDS, new_record, set_item, write_record  # noqa: E402
 
 TAG = "[release-artifacts-test]"
 VERSION = "9.8.7"
@@ -33,7 +34,11 @@ def write_sidecar(release_dir, name):
     )
 
 
-def create_release_dir():
+def create_release_dir(
+    evidence_boards=(),
+    evidence_git_sha=GIT_SHA,
+    incomplete_p0=False,
+):
     temp = tempfile.TemporaryDirectory()
     release_dir = Path(temp.name)
 
@@ -52,6 +57,17 @@ def create_release_dir():
     image_dir.mkdir()
     (image_dir / "web-flash-serial-port.jpg").write_bytes(b"fake-image")
 
+    evidence_rel_names = []
+    for board in evidence_boards:
+        evidence_rel = f"evidence/device-acceptance-{board}.json"
+        evidence = new_record(VERSION, evidence_git_sha, board, "tester")
+        for item_id in P0_ITEM_IDS:
+            if incomplete_p0 and item_id == P0_ITEM_IDS[-1]:
+                continue
+            set_item(evidence, item_id, "PASS", f"{item_id} verified")
+        write_record(release_dir / evidence_rel, evidence)
+        evidence_rel_names.append(evidence_rel)
+
     package_name = f"bikepower-c-release-v{VERSION}-stable-fix-g{GIT_SHA}.zip"
     manifest_lines = [
         "# BikePower C Release 产物清单",
@@ -67,6 +83,7 @@ def create_release_dir():
         "user-manual.md",
         "images/web-flash-serial-port.jpg",
     ]
+    pre_zip_manifest_targets.extend(evidence_rel_names)
     for rel in pre_zip_manifest_targets:
         path = release_dir / rel
         manifest_lines.append(f"{rel}  {path.stat().st_size}  {sha256_file(path)}")
@@ -81,6 +98,7 @@ def create_release_dir():
         "user-manual.md",
         "images/web-flash-serial-port.jpg",
     ]
+    zip_entries.extend(evidence_rel_names)
     with zipfile.ZipFile(release_dir / package_name, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for rel in zip_entries:
             archive.write(release_dir / rel, rel)
@@ -124,6 +142,63 @@ def main():
             version=VERSION,
             git_sha=GIT_SHA,
             skip_git_check=True,
+        ))
+    finally:
+        temp.cleanup()
+
+    temp, release_dir = create_release_dir(evidence_boards=("generic-c3", "m5stamp-c3"))
+    try:
+        artifacts, messages = validate_release_artifacts(
+            release_dir=release_dir,
+            version=VERSION,
+            git_sha=GIT_SHA,
+            skip_git_check=True,
+            require_device_evidence=True,
+        )
+        assert len(artifacts) == 10
+        assert any("真机验收证据" in message for message in messages)
+        print(f"{TAG} PASS 完整 P0 真机证据通过严格门禁")
+    finally:
+        temp.cleanup()
+
+    temp, release_dir = create_release_dir(evidence_boards=("generic-c3",))
+    try:
+        expect_error("缺少板型真机验收证据", lambda: validate_release_artifacts(
+            release_dir=release_dir,
+            version=VERSION,
+            git_sha=GIT_SHA,
+            skip_git_check=True,
+            require_device_evidence=True,
+        ))
+    finally:
+        temp.cleanup()
+
+    temp, release_dir = create_release_dir(
+        evidence_boards=("generic-c3", "m5stamp-c3"),
+        evidence_git_sha="deadbee",
+    )
+    try:
+        expect_error("Git ID 不匹配", lambda: validate_release_artifacts(
+            release_dir=release_dir,
+            version=VERSION,
+            git_sha=GIT_SHA,
+            skip_git_check=True,
+            require_device_evidence=True,
+        ))
+    finally:
+        temp.cleanup()
+
+    temp, release_dir = create_release_dir(
+        evidence_boards=("generic-c3", "m5stamp-c3"),
+        incomplete_p0=True,
+    )
+    try:
+        expect_error("P0 验收未通过", lambda: validate_release_artifacts(
+            release_dir=release_dir,
+            version=VERSION,
+            git_sha=GIT_SHA,
+            skip_git_check=True,
+            require_device_evidence=True,
         ))
     finally:
         temp.cleanup()

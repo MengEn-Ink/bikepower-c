@@ -15,6 +15,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 RELEASE_DIR="$PROJECT_DIR/build/release"
+DEVICE_ACCEPTANCE_DIR="${DEVICE_ACCEPTANCE_DIR:-$PROJECT_DIR/tests/reports}"
 # 对齐build_firmware.sh逻辑：优先使用环境变量IDF_PATH，默认macOS路径
 IDF_PATH="${IDF_PATH:-$HOME/esp/esp-idf-v5.5.4}"
 
@@ -45,6 +46,8 @@ usage() {
   bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip
                                       双板型固件、报告、手册、截图的总包
   *.zip.sha256                         总包 SHA256 校验文件
+  evidence/device-acceptance-<板型>.json
+                                        当前版本各板型真机验收证据（存在时收录）
 
 说明:
   - 本脚本仅在本地生成产物，不会打 git tag、不会创建 Gitee Release。
@@ -154,6 +157,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
     echo "  - core-flow-endurance.md （3 分钟核心流程耐久测试明细）"
     echo "  - user-manual.md   （用户文档副本）"
     echo "  - images/          （用户文档截图与示意图）"
+    echo "  - evidence/device-acceptance-<板型>.json （当前版本各板型真机验收证据；存在时收录）"
     echo "  - bikepower-c-release-v${VERSION}-stable-fix-g${GIT_SHA}.zip （release 总包）"
     echo "  - bikepower-c-release-v${VERSION}-stable-fix-g${GIT_SHA}.zip.sha256"
     exit 0
@@ -181,6 +185,7 @@ rm -f "$RELEASE_DIR"/bikepower-c-*.bin \
       "$RELEASE_DIR"/user-manual.md \
       "$RELEASE_DIR"/bikepower-c-release-*.zip \
       "$RELEASE_DIR"/bikepower-c-release-*.zip.sha256
+rm -rf "$RELEASE_DIR/evidence"
 
 echo ""
 echo "=== 构建前测试门禁：host / mock / static ==="
@@ -270,6 +275,28 @@ for fw in "${PRODUCED_BINS[@]}"; do
     echo "  SHA256: $fw -> ${sum:0:16}..."
 done
 
+echo ""
+echo "=== 真机验收证据：按板型校验并收录 ==="
+EVIDENCE_COUNT=0
+for target in "${TARGETS[@]}"; do
+    board_name="$(board_name_of "$target")"
+    evidence_name="device-acceptance-${board_name}.json"
+    evidence_src="$DEVICE_ACCEPTANCE_DIR/$evidence_name"
+    if [ -f "$evidence_src" ]; then
+        python3 "$PROJECT_DIR/scripts/tools/device_acceptance.py" validate \
+            --file "$evidence_src" \
+            --firmware-version "$VERSION" \
+            --git-sha "$GIT_SHA" \
+            --board "$board_name"
+        mkdir -p "$RELEASE_DIR/evidence"
+        cp "$evidence_src" "$RELEASE_DIR/evidence/$evidence_name"
+        echo "  已收录: evidence/$evidence_name"
+        EVIDENCE_COUNT=$((EVIDENCE_COUNT + 1))
+    else
+        echo "  未找到 $evidence_src；允许本地构建，正式发布前必须补齐该板型全部 P0 证据。"
+    fi
+done
+
 TEST_SUMMARY="构建前门禁已通过：make -C test && ./test/test_domain；python3 tests/test_portal_config_save.py；python3 tests/test_core_flow_endurance.py --minutes ${CORE_FLOW_MINUTES:-3}；check_config_consistency.py；check_portal_js.py；check_portal_structure.py；check_nvs_schema.py；check_tasks_wdt.py；check_board_desc.py；check_ble_advertising_fields.py。真机烧录、BLE 自测、配网自测和物理按钮/LED 验证需按测试报告补充执行记录。"
 python3 "$PROJECT_DIR/scripts/tools/generate_release_docs.py" \
     --release-dir "$RELEASE_DIR" \
@@ -289,6 +316,14 @@ if [ -d "$RELEASE_DIR/images" ]; then
         size="$(wc -c < "$img" | tr -d ' ')"
         echo "${rel}  ${size}  ${sum}" >> "$MANIFEST"
     done < <(find "$RELEASE_DIR/images" -type f | sort)
+fi
+if [ -d "$RELEASE_DIR/evidence" ]; then
+    while IFS= read -r evidence_path; do
+        evidence_rel="${evidence_path#$RELEASE_DIR/}"
+        evidence_sum="$(sha256_of "$evidence_path")"
+        evidence_size="$(wc -c < "$evidence_path" | tr -d ' ')"
+        echo "${evidence_rel}  ${evidence_size}  ${evidence_sum}" >> "$MANIFEST"
+    done < <(find "$RELEASE_DIR/evidence" -type f -name 'device-acceptance-*.json' | sort)
 fi
 
 # 版本号一致性校验：产物文件名必须含当前固件版本与标识信息，且版本号只出现一次
@@ -313,6 +348,9 @@ done
 PACKAGE_ITEMS+=("manifest.txt" "test-report.md" "core-flow-endurance.md" "user-manual.md")
 if [ -d "$RELEASE_DIR/images" ]; then
     PACKAGE_ITEMS+=("images")
+fi
+if [ -d "$RELEASE_DIR/evidence" ]; then
+    PACKAGE_ITEMS+=("evidence")
 fi
 
 rm -f "$RELEASE_DIR/$PACKAGE_NAME" "$RELEASE_DIR/${PACKAGE_NAME}.sha256"
@@ -348,6 +386,7 @@ echo ""
 echo "⚠️  发布前人工步骤（本脚本不自动执行）："
 echo "   1. 校验各产物 SHA256 与 manifest.txt 一致"
 echo "   2. 补齐真机验证记录，更新 test-report.md"
-echo "   3. 打 git tag、创建 Gitee Release 并上传 release 总包、merged bin、manifest、test-report.md、core-flow-endurance.md、user-manual.md"
+echo "   3. 运行 device_acceptance.py validate --strict，确认全部 P0 证据通过"
+echo "   4. 打 git tag、创建 Gitee Release 并上传 release 总包、merged bin、manifest、test-report.md、core-flow-endurance.md、user-manual.md"
 echo "   本脚本不会打 git tag、不会创建 Gitee Release。"
 echo "   永久放弃设备内 OTA：普通用户升级统一走网页端在线烧录。"

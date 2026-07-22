@@ -2,12 +2,17 @@
 """生成固件随附测试报告与用户文档副本。"""
 import argparse
 import hashlib
+import json
 import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+DEVICE_EVIDENCE_RELS = {
+    "generic-c3": Path("evidence") / "device-acceptance-generic-c3.json",
+    "m5stamp-c3": Path("evidence") / "device-acceptance-m5stamp-c3.json",
+}
 
 
 def read_text(path):
@@ -54,6 +59,56 @@ def collect_artifacts(release_dir, git_sha):
     return items
 
 
+def evidence_lines(release_dir):
+    existing = [
+        (board, rel_path, release_dir / rel_path)
+        for board, rel_path in DEVICE_EVIDENCE_RELS.items()
+        if (release_dir / rel_path).is_file()
+    ]
+    if not existing:
+        return [
+            "- 真机验收证据：未收录。",
+            "- 结论：本地构建可继续；正式双板发布前必须补齐两个板型的当前版本 P0 证据。",
+        ]
+    lines = []
+    for board, rel_path, evidence_path in existing:
+        try:
+            record = json.loads(evidence_path.read_text(encoding="utf-8"))
+            items = list(record["items"].values())
+            counts = {
+                priority: {
+                    status: sum(
+                        1
+                        for item in items
+                        if item.get("priority") == priority and item.get("status") == status
+                    )
+                    for status in ("PASS", "FAIL", "NOT_RUN")
+                }
+                for priority in ("P0", "P1")
+            }
+        except (KeyError, TypeError, json.JSONDecodeError) as exc:
+            lines.append(f"- `{board}`：证据无法解析（{exc}），正式发布门禁将拒绝。")
+            continue
+        lines.extend([
+            f"- `{board}` 证据：`{rel_path.as_posix()}`",
+            f"  - 版本：`v{record.get('firmware_version', '')}` / Git `{record.get('git_sha', '')}`",
+            (
+                "  - P0："
+                f"PASS {counts['P0']['PASS']} / FAIL {counts['P0']['FAIL']} / "
+                f"NOT_RUN {counts['P0']['NOT_RUN']}"
+            ),
+            (
+                "  - P1："
+                f"PASS {counts['P1']['PASS']} / FAIL {counts['P1']['FAIL']} / "
+                f"NOT_RUN {counts['P1']['NOT_RUN']}"
+            ),
+        ])
+    missing = sorted(set(DEVICE_EVIDENCE_RELS) - {board for board, _, _ in existing})
+    if missing:
+        lines.append("- 未收录板型：" + "、".join(f"`{board}`" for board in missing))
+    return lines
+
+
 def write_test_report(release_dir, version, stable, fix, git_sha, test_summary, notes):
     report = release_dir / "test-report.md"
     artifacts = collect_artifacts(release_dir, git_sha)
@@ -89,7 +144,11 @@ def write_test_report(release_dir, version, stable, fix, git_sha, test_summary, 
         "",
         test_summary.strip() or "未提供额外测试摘要；请以本报告生成前实际执行的门禁记录为准。",
         "",
-        "## 三、最低验证要求",
+        "## 三、真机验收证据",
+        "",
+        *evidence_lines(release_dir),
+        "",
+        "## 四、最低验证要求",
         "",
         "- 编译：`idf.py build` 或 `scripts/build_all.sh` 必须 0 error。",
         "- Host 单测：`make -C test && ./test/test_domain` 必须全绿。",
@@ -98,7 +157,7 @@ def write_test_report(release_dir, version, stable, fix, git_sha, test_summary, 
         "- 真机验证：烧录后至少确认启动日志无 panic/WDT/Backtrace，BLE 自测通过；涉及配网时补跑 `stage5_portal_test.py`。",
         "- 人工项：物理按钮和 LED 灯效必须由人工确认，未执行时在报告中明确标记。",
         "",
-        "## 四、补充说明",
+        "## 五、补充说明",
         "",
         notes.strip() or "无。",
         "",

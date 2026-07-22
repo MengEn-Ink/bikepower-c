@@ -30,6 +30,11 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Import-Module (Join-Path $ScriptDir "idf_common.psm1") -Force
 $ProjectDir = $Global:BikePowerProjectDir
 $ReleaseDir = Join-Path (Join-Path $ProjectDir "build") "release"
+$DeviceAcceptanceDir = if ($env:DEVICE_ACCEPTANCE_DIR) {
+    $env:DEVICE_ACCEPTANCE_DIR
+} else {
+    Join-Path $ProjectDir "tests\reports"
+}
 
 function Get-BoardName {
     param([string]$Target)
@@ -244,6 +249,17 @@ function Build-ReleaseArtifacts {
         }
     }
 
+    $evidenceDir = Join-Path $ReleaseDir "evidence"
+    if (Test-Path $evidenceDir) {
+        $evidenceFiles = Get-ChildItem -Path $evidenceDir -File -Filter "device-acceptance-*.json" | Sort-Object Name
+        foreach ($evidence in $evidenceFiles) {
+            $relPath = "evidence/" + $evidence.Name
+            $sha = Get-Sha256 $evidence.FullName
+            $size = $evidence.Length
+            $manifestLines += ($relPath + "  " + $size + "  " + $sha)
+        }
+    }
+
     Set-Content -Path $manifestPath -Value $manifestLines -Encoding ASCII
     Write-Success "manifest.txt 已生成"
 }
@@ -314,6 +330,7 @@ if ($DryRun) {
     Write-Host "  - core-flow-endurance.md  (核心流程耐久测试明细)"
     Write-Host "  - user-manual.md  (用户文档副本)"
     Write-Host "  - images/  (用户文档截图与示意图)"
+    Write-Host "  - evidence\device-acceptance-<板型>.json  (当前版本各板型真机验收证据；存在时收录)"
     Write-Host ("  - bikepower-c-release-v" + $Version + "-stable-fix-g" + $GitSha + ".zip  (release 总包)")
     Write-Host ("  - bikepower-c-release-v" + $Version + "-stable-fix-g" + $GitSha + ".zip.sha256")
     exit 0
@@ -347,6 +364,10 @@ foreach ($pat in $oldPatterns) {
     $oldPath = Join-Path $ReleaseDir $pat
     Remove-Item -Path $oldPath -Force -ErrorAction SilentlyContinue
 }
+$oldEvidenceDir = Join-Path $ReleaseDir "evidence"
+if (Test-Path $oldEvidenceDir) {
+    Remove-Item -Path $oldEvidenceDir -Recurse -Force
+}
 
 Activate-IdfEnv -IdfPath $IdfPath
 
@@ -366,6 +387,29 @@ $producedBins = @()
 foreach ($target in $Board) {
     $fwName = Build-Board -IdfPath $IdfPath -Target $target -Version $Version -GitSha $GitSha -ReleaseDir $ReleaseDir
     $producedBins += $fwName
+}
+
+$deviceAcceptancePy = Join-Path (Join-Path (Join-Path $ScriptDir "tools") "device_acceptance.py")
+Write-Log "按板型校验并收录真机验收证据"
+foreach ($target in $Board) {
+    $boardName = Get-BoardName $target
+    $evidenceName = "device-acceptance-" + $boardName + ".json"
+    $evidenceSource = Join-Path $DeviceAcceptanceDir $evidenceName
+    if (Test-Path $evidenceSource) {
+        Invoke-PythonScript -ScriptPath $deviceAcceptancePy -ScriptArgs @(
+            "validate",
+            "--file", $evidenceSource,
+            "--firmware-version", $Version,
+            "--git-sha", $GitSha,
+            "--board", $boardName
+        )
+        $evidenceDir = Join-Path $ReleaseDir "evidence"
+        New-Item -Path $evidenceDir -ItemType Directory -Force | Out-Null
+        Copy-Item $evidenceSource (Join-Path $evidenceDir $evidenceName) -Force
+        Write-Success ("已收录 evidence\" + $evidenceName)
+    } else {
+        Write-Host ("  未找到 " + $evidenceSource + "；允许本地构建，正式发布前必须补齐该板型全部 P0 证据。") -ForegroundColor Yellow
+    }
 }
 
 $releaseDocsPy = Join-Path (Join-Path (Join-Path $ScriptDir "tools") "generate_release_docs.py")
@@ -396,6 +440,8 @@ foreach ($doc in @("manifest.txt", "test-report.md", "core-flow-endurance.md", "
 }
 $imageDir = Join-Path $ReleaseDir "images"
 if (Test-Path $imageDir) { $zipItems += $imageDir }
+$evidenceDir = Join-Path $ReleaseDir "evidence"
+if (Test-Path $evidenceDir) { $zipItems += $evidenceDir }
 
 $zipName = Build-ZipPackage -Version $Version -GitSha $GitSha -ReleaseDir $ReleaseDir -Items $zipItems
 

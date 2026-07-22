@@ -2,14 +2,21 @@
 """Validate BikePower C release artifacts before publication."""
 import argparse
 import hashlib
+import json
 import re
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
 
+from device_acceptance import AcceptanceError, validate_record
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_RELEASE_DIR = ROOT / "build" / "release"
+DEVICE_EVIDENCE_RELS = {
+    "generic-c3": "evidence/device-acceptance-generic-c3.json",
+    "m5stamp-c3": "evidence/device-acceptance-m5stamp-c3.json",
+}
 GIT_SHA_COMMAND = "git rev-parse --short HEAD"
 GIT_STATUS_COMMAND = "git status --short"
 
@@ -125,6 +132,7 @@ def validate_release_artifacts(
     allow_dirty=False,
     require_pushed=False,
     skip_git_check=False,
+    require_device_evidence=False,
 ):
     release_dir = Path(release_dir).resolve()
     version = version or read_firmware_version()
@@ -147,6 +155,37 @@ def validate_release_artifacts(
     if unexpected:
         raise ReleaseGateError("release 目录存在非标准顶层文件: " + ", ".join(unexpected))
 
+    evidence_rel_names = []
+    missing_evidence_boards = [
+        board
+        for board, rel_name in DEVICE_EVIDENCE_RELS.items()
+        if not (release_dir / rel_name).is_file()
+    ]
+    if require_device_evidence and missing_evidence_boards:
+        raise ReleaseGateError(
+            "缺少板型真机验收证据: " + ", ".join(missing_evidence_boards)
+        )
+    for board, rel_name in DEVICE_EVIDENCE_RELS.items():
+        evidence_path = release_dir / rel_name
+        if not evidence_path.is_file():
+            continue
+        try:
+            record = json.loads(evidence_path.read_text(encoding="utf-8"))
+            validate_record(
+                record,
+                expected_version=version,
+                expected_git_sha=git_sha,
+                expected_board=board,
+                strict=require_device_evidence,
+            )
+        except (AcceptanceError, json.JSONDecodeError) as exc:
+            raise ReleaseGateError(f"真机验收证据无效 ({board}): {exc}") from exc
+        evidence_rel_names.append(rel_name)
+        messages.append(
+            f"{board} 真机验收证据通过"
+            + ("（P0 完整）" if require_device_evidence else "（结构与版本匹配）")
+        )
+
     for name in expected:
         path = release_dir / name
         if path.stat().st_size <= 0:
@@ -167,7 +206,7 @@ def validate_release_artifacts(
     manifest = parse_manifest(release_dir / "manifest.txt")
     manifest_required = [name for name in expected if name != "manifest.txt"]
     image_rel_names = [str(path.relative_to(release_dir)) for path in iter_image_files(release_dir)]
-    for rel_name in manifest_required + image_rel_names:
+    for rel_name in manifest_required + image_rel_names + evidence_rel_names:
         if rel_name not in manifest:
             raise ReleaseGateError(f"manifest.txt 缺少记录: {rel_name}")
         path = release_dir / rel_name
@@ -180,7 +219,12 @@ def validate_release_artifacts(
                 f"manifest=({size},{digest}) actual=({actual_size},{actual_digest})"
             )
 
-    manifest_extra = sorted(set(manifest) - set(manifest_required) - set(image_rel_names))
+    manifest_extra = sorted(
+        set(manifest)
+        - set(manifest_required)
+        - set(image_rel_names)
+        - set(evidence_rel_names)
+    )
     if manifest_extra:
         raise ReleaseGateError("manifest.txt 存在非标准记录: " + ", ".join(manifest_extra))
 
@@ -192,6 +236,7 @@ def validate_release_artifacts(
     }
     expected_zip_entries.update({"manifest.txt", "test-report.md", "core-flow-endurance.md", "user-manual.md"})
     expected_zip_entries.update(image_rel_names)
+    expected_zip_entries.update(evidence_rel_names)
 
     with zipfile.ZipFile(zip_path) as archive:
         entries = {name for name in archive.namelist() if not name.endswith("/")}
@@ -221,6 +266,8 @@ def main():
                         help="要求当前 HEAD 已推送到上游分支")
     parser.add_argument("--skip-git-check", action="store_true",
                         help="跳过 Git 状态检查，用于离线历史产物或测试样例")
+    parser.add_argument("--require-device-evidence", action="store_true",
+                        help="要求 release 内含当前版本且 P0 全通过的真机验收证据")
     args = parser.parse_args()
 
     try:
@@ -231,6 +278,7 @@ def main():
             allow_dirty=args.allow_dirty,
             require_pushed=args.require_pushed,
             skip_git_check=args.skip_git_check,
+            require_device_evidence=args.require_device_evidence,
         )
     except (ReleaseGateError, subprocess.CalledProcessError, zipfile.BadZipFile) as exc:
         print(f"[release-gate] FAIL {exc}")

@@ -79,6 +79,7 @@ def find_artifacts(release_dir, version, git_sha):
         version=version,
         git_sha=git_sha,
         require_pushed=True,
+        require_device_evidence=True,
     )
     for message in messages:
         print(f"[release-gate] {message}")
@@ -115,7 +116,8 @@ def release_body(version, git_sha, artifacts):
         "- `test-report.md`：发版测试报告。",
         "- `core-flow-endurance.md`：3 分钟核心流程耐久测试明细。",
         "- `user-manual.md`：随固件分发的用户手册。",
-        "- 未执行的真机或人工项以测试报告记录为准。",
+        "- release 总包 `evidence/device-acceptance-<板型>.json`：两个板型各自的真机与人工验收证据。",
+        "- 正式发布已要求 generic-c3 与 m5stamp-c3 的全部 P0 验收项通过；P1 未执行项以测试报告记录为准。",
         "",
         f"Git ID: `{git_sha}`",
     ])
