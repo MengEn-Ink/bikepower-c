@@ -13,6 +13,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REPORT_DIR = ROOT / "tests" / "reports"
+TOOLS_DIR = ROOT / "scripts" / "tools"
+sys.path.insert(0, str(TOOLS_DIR))
+
+from device_acceptance import (  # noqa: E402
+    AcceptanceError,
+    current_git_sha,
+    load_record,
+    new_record,
+    read_firmware_version,
+    set_item,
+    validate_record,
+    write_record,
+)
 
 IDF_CANDIDATES = [
     os.environ.get("IDF_PATH"),
@@ -23,19 +36,29 @@ IDF_CANDIDATES = [
 
 
 class Gate:
-    def __init__(self, level, report):
+    def __init__(self, level, report, evidence_path=None):
         self.level = level
         self.report = report
+        self.evidence_path = evidence_path
         self.rows = []
         self.failures = []
 
-    def record(self, name, command, rc, output, required=True):
+    def record(self, name, command, rc, output, required=True, acceptance_item=None):
         status = "PASS" if rc == 0 else "FAIL" if required else "SKIP"
         detail = tail(output)
         self.rows.append((datetime.now().strftime("%H:%M:%S"), status, name, command, detail))
         print(f"[operation-gate] {status} {name}")
         if detail:
             print(f"[operation-gate]   {detail}")
+        if self.evidence_path and acceptance_item:
+            record_gate_result(
+                self.evidence_path,
+                acceptance_item,
+                rc=rc,
+                output=output,
+                command=command,
+                required=required,
+            )
         if rc != 0 and required:
             self.failures.append(f"{name}: rc={rc}")
 
@@ -80,6 +103,38 @@ def tail(text, lines=6):
     return " / ".join(text.splitlines()[-lines:])
 
 
+def prepare_evidence(path, firmware_version, git_sha, board, operator):
+    path = Path(path)
+    if path.exists():
+        record = load_record(path)
+        validate_record(
+            record,
+            expected_version=firmware_version,
+            expected_git_sha=git_sha,
+            expected_board=board or None,
+        )
+        if operator and record["operator"] != operator:
+            record["operator"] = operator
+            record["updated_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
+            write_record(path, record)
+        return path
+    if not board:
+        return None
+    record = new_record(firmware_version, git_sha, board, operator)
+    write_record(path, record)
+    return path
+
+
+def record_gate_result(path, item_id, rc, output, command, required=True):
+    del required
+    record = load_record(path)
+    status = "PASS" if rc == 0 else "FAIL"
+    detail = tail(output) or f"rc={rc}"
+    evidence = f"{command}: {detail}"
+    set_item(record, item_id, status, evidence)
+    write_record(path, record)
+
+
 def run_shell(command, timeout):
     return subprocess.run(
         ["bash", "-lc", command],
@@ -99,12 +154,26 @@ def idf_prefix():
     return ""
 
 
-def run_step(gate, name, command, timeout=120, required=True):
+def run_step(gate, name, command, timeout=120, required=True, acceptance_item=None):
     try:
         result = run_shell(command, timeout)
-        gate.record(name, command, result.returncode, result.stdout, required=required)
+        gate.record(
+            name,
+            command,
+            result.returncode,
+            result.stdout,
+            required=required,
+            acceptance_item=acceptance_item,
+        )
     except subprocess.TimeoutExpired as exc:
-        gate.record(name, command, 124, (exc.stdout or "") + "\nTIMEOUT", required=required)
+        gate.record(
+            name,
+            command,
+            124,
+            (exc.stdout or "") + "\nTIMEOUT",
+            required=required,
+            acceptance_item=acceptance_item,
+        )
 
 
 def quick_steps(gate):
@@ -132,19 +201,57 @@ def full_steps(gate, build):
 
 def device_steps(gate, port, run_portal):
     if port:
-        run_step(gate, "串口启动日志", f"python3 tests/serial_capture.py -p {port} -d 12", 30)
+        run_step(
+            gate,
+            "串口启动日志",
+            f"python3 tests/serial_capture.py -p {port} -d 12 --check-boot",
+            30,
+            acceptance_item="serial_boot",
+        )
     else:
         gate.note_skip("串口启动日志", "未传 --port")
-    run_step(gate, "BLE 自测", "python3 tests/ble_selftest.py", 60)
-    run_step(gate, "BLE 跑步 profile 自测", "python3 tests/ble_selftest.py --profile running 8", 60, required=False)
+    run_step(
+        gate,
+        "BLE 自测",
+        "python3 tests/ble_selftest.py",
+        60,
+        acceptance_item="ble_cycling",
+    )
+    run_step(
+        gate,
+        "BLE 跑步 profile 自测",
+        "python3 tests/ble_selftest.py --profile running 8",
+        60,
+        required=False,
+        acceptance_item="ble_running",
+    )
     if run_portal:
-        run_step(gate, "BLE 广播项数据面监控", "python3 tests/ble_broadcast_monitor.py", 120)
+        run_step(
+            gate,
+            "BLE 广播项数据面监控",
+            "python3 tests/ble_broadcast_monitor.py",
+            120,
+            acceptance_item="broadcast_mask",
+        )
     else:
         gate.note_skip("BLE 广播项数据面监控", "未传 --run-portal；需要设备处于配网态以便 /api/config 切换 broadcast_mask")
-    run_step(gate, "BLE 连接事件", "python3 tests/stage3_conn_test.py", 60, required=False)
+    run_step(
+        gate,
+        "BLE 连接事件",
+        "python3 tests/stage3_conn_test.py",
+        60,
+        required=False,
+        acceptance_item="ble_reconnect",
+    )
     gate.note_skip("BLE 浏览器监控", "运行 python3 scripts/tools/serve_ble_monitor.py 后用 Chrome/Edge 打开 ble-monitor.html；Web Bluetooth 首次授权必须人工点击")
     if run_portal:
-        run_step(gate, "配网门户 HTTP 自测", "python3 tests/stage5_portal_test.py", 180)
+        run_step(
+            gate,
+            "配网门户 HTTP 自测",
+            "python3 tests/stage5_portal_test.py",
+            180,
+            acceptance_item="portal_http",
+        )
     else:
         gate.note_skip("配网门户 HTTP 自测", "未传 --run-portal；需要设备处于配网态")
     gate.note_skip("人工按钮/LED/Zwift/MyWhoosh", "必须按 docs/dev/05-operation-test-gate.md 人工记录，不能冒充自动通过")
@@ -157,10 +264,40 @@ def main():
     parser.add_argument("--run-portal", action="store_true", help="device 模式下运行配网门户 HTTP 自测")
     parser.add_argument("--build", action="store_true", help="full 模式追加 idf.py build")
     parser.add_argument("--report", default="", help="报告输出路径")
+    parser.add_argument("--board", choices=("generic-c3", "m5stamp-c3"), default="",
+                        help="device 模式下新建证据时使用的板型")
+    parser.add_argument("--operator", default="", help="device 模式下记录验收执行人")
+    parser.add_argument("--evidence", default="",
+                        help="device 模式下验收证据 JSON 路径；默认按板型写入 tests/reports/")
     args = parser.parse_args()
 
     report = Path(args.report) if args.report else REPORT_DIR / f"operation_gate_{args.level}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-    gate = Gate(args.level, report)
+    evidence_path = None
+    if args.level == "device":
+        evidence_arg = args.evidence
+        if not evidence_arg and args.board:
+            evidence_arg = str(
+                REPORT_DIR / f"device-acceptance-{args.board}.json"
+            )
+        elif not evidence_arg:
+            evidence_arg = ""
+        try:
+            if evidence_arg:
+                evidence_path = prepare_evidence(
+                    evidence_arg,
+                    firmware_version=read_firmware_version(),
+                    git_sha=current_git_sha(),
+                    board=args.board,
+                    operator=args.operator,
+                )
+        except AcceptanceError as exc:
+            print(f"[operation-gate] FAIL 无法准备验收证据: {exc}")
+            return 1
+        if evidence_path:
+            print(f"[operation-gate] evidence: {evidence_path}")
+        else:
+            print("[operation-gate] evidence disabled: 文件不存在且未传 --board")
+    gate = Gate(args.level, report, evidence_path=evidence_path)
 
     if args.level == "quick":
         quick_steps(gate)

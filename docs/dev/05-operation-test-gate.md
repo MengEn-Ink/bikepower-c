@@ -11,7 +11,7 @@
 | Mock 网页层 | `/api/config` 保存回显、网页核心流程、设备模板、关闭 WiFi | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` |
 | 静态门禁 | 门户结构、JS、常量、NVS、任务/WDT、板型、操作矩阵 | `python3 tests/check_operation_coverage.py` 等 |
 | 真机自动化 | 串口启动、BLE 五服务、FTMS ERG、配网门户 HTTP | `python3 tests/ble_selftest.py`、`python3 tests/stage5_portal_test.py` |
-| 人工门禁 | 物理按钮手感、LED 肉眼灯效、手机 Captive Portal、Zwift/MyWhoosh 真实课程 | 本文“人工门禁记录” |
+| 人工门禁 | 物理按钮手感、LED 肉眼灯效、手机 Captive Portal、Zwift/MyWhoosh 真实课程 | `scripts/tools/device_acceptance.py` + 本文“人工门禁记录” |
 
 ## 二、操作覆盖矩阵
 
@@ -38,8 +38,8 @@
 | `OP-RUN-001` | 跑步 RSC 速度、步频、步幅、距离单位换算 | `make -C test run`、`python3 tests/ble_selftest.py --profile running` | Zwift/MyWhoosh 跑步数据人工确认 |
 | `OP-STAB-001` | NVS schema、常量、板型、任务/WDT、门户结构不漂移 | `python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 tests/check_board_desc.py`、`python3 tests/check_tasks_wdt.py`、`python3 tests/check_operation_coverage.py` | 无 |
 | `OP-STAB-002` | 3 分钟核心流程耐久，覆盖重复保存、模板、关闭 WiFi、host 回归 | `python3 tests/test_core_flow_endurance.py` | 30/90 分钟老化按发版风险追加 |
-| `OP-REL-001` | 发布产物门禁：10 个上传附件、SHA256、manifest、zip 内容、Git ID 不漂移 | `python3 scripts/tools/check_release_artifacts.py --require-pushed`、`python3 tests/check_release_gate.py`、`python3 tests/test_release_artifacts.py` | 正式发布前必须从已提交并已推送源码重新构建 |
-| `OP-MANUAL-001` | 物理按钮、LED 颜色/闪烁、手机 Captive Portal、真实 Zwift/MyWhoosh 课程 | 自动化脚本只能准备状态和记录结果 | 必须人工记录“通过/失败/未执行原因” |
+| `OP-REL-001` | 发布产物门禁：10 个上传附件、SHA256、manifest、zip 内容、Git ID 和真机证据不漂移 | `python3 scripts/tools/check_release_artifacts.py --require-pushed --require-device-evidence`、`python3 tests/check_release_gate.py`、`python3 tests/test_release_artifacts.py` | 正式发布前必须从已提交并已推送源码重新构建，且当前 Git 的 P0 证据全部通过 |
+| `OP-MANUAL-001` | 物理按钮、LED 颜色/闪烁、手机 Captive Portal、真实 Zwift/MyWhoosh 课程 | `python3 scripts/tools/device_acceptance.py validate` 校验记录结构 | 必须人工记录 `PASS`、`FAIL` 或 `NOT_RUN`；`NOT_RUN` 不能冒充通过 |
 
 ## 三、统一门禁命令
 
@@ -58,7 +58,11 @@ python3 tests/operation_gate.py --level full
 真机门禁：
 
 ```bash
-python3 tests/operation_gate.py --level device --port /dev/cu.usbmodem101
+python3 tests/operation_gate.py --level device \
+  --board generic-c3 \
+  --operator "验收人" \
+  --port /dev/cu.usbmodem101 \
+  --run-portal
 ```
 
 手工拆分命令：
@@ -82,11 +86,12 @@ python3 tests/check_operation_coverage.py
 python3 tests/check_release_gate.py
 python3 tests/test_release_artifacts.py
 python3 scripts/tools/serve_ble_monitor.py
+python3 scripts/tools/device_acceptance.py validate
 ```
 
 ## 四、人工门禁记录
 
-每次发可分发固件时，必须在测试报告中记录以下人工项：
+每次发可分发固件时，必须按板型在结构化证据和测试报告中记录以下人工项。证据文件是 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`，release 总包内保留相同文件名到 `evidence/`。
 
 | 项目 | 通过标准 | 记录要求 |
 |------|----------|----------|
@@ -99,7 +104,46 @@ python3 scripts/tools/serve_ble_monitor.py
 | 广播数据项开关 | 取消功率/踏频/心率后，对应窗口隐藏且客户端不再收到对应数据；至少一项保持开启 | 记录 App、开启组合、观察到的数据项 |
 | BLE 浏览器监控 | 页面能连接已授权设备，异常计数无误，导出 JSON 报告可追溯 | 记录浏览器、运行时长、异常计数和报告文件 |
 
-如果人工项未执行，报告必须写明“未执行原因”。不能冒充自动通过。
+初始化当前固件和 Git ID 的证据：
+
+```bash
+python3 scripts/tools/device_acceptance.py init \
+  --board generic-c3 \
+  --operator "验收人"
+```
+
+记录人工项：
+
+```bash
+python3 scripts/tools/device_acceptance.py set \
+  --file tests/reports/device-acceptance-generic-c3.json \
+  --item led_patterns \
+  --status PASS \
+  --evidence "generic-c3：待连接慢闪、连接常亮、确认快闪"
+```
+
+开发期可校验结构、版本和 Git ID：
+
+```bash
+python3 scripts/tools/device_acceptance.py validate \
+  --file tests/reports/device-acceptance-generic-c3.json
+```
+
+正式发布前必须运行严格校验：
+
+```bash
+python3 scripts/tools/device_acceptance.py validate --strict \
+  --file tests/reports/device-acceptance-generic-c3.json
+python3 scripts/tools/device_acceptance.py validate --strict \
+  --file tests/reports/device-acceptance-m5stamp-c3.json
+python3 scripts/tools/check_release_artifacts.py \
+  --require-pushed \
+  --require-device-evidence
+```
+
+状态只有 `PASS`、`FAIL` 和 `NOT_RUN`。如果人工项未执行，保留 `NOT_RUN` 并在 evidence 中写明原因；`NOT_RUN` 不能冒充自动通过。每份证据的板型、`FIRMWARE_VERSION` 和 Git ID 必须匹配，旧固件或另一板型证据不得复用。
+
+本地 `build_all.sh` 允许没有证据，以便在无设备环境生成预览产物；若证据存在，脚本会按目标板型校验并收录到 release 的 manifest、测试报告和总包。`publish_gitee_release.py` 正式双板发布时强制要求 generic-c3 与 m5stamp-c3 的全部 P0 项通过。
 
 ## 五、维护规则
 
@@ -109,3 +153,5 @@ python3 scripts/tools/serve_ble_monitor.py
 - 调整广播项语义时，同步更新 `tests/ble_broadcast_monitor.py` 和 `tests/check_ble_broadcast_monitor.py`。
 - 调整 BLE 协议面或异常阈值时，同步更新 `tools/web/ble-monitor.html` 与 `tests/check_ble_monitor.py`。
 - 每次发版前运行 `python3 tests/operation_gate.py --level full`；涉及 BLE/配网/硬件行为时追加 `--level device`。
+- 真机步骤重跑时只更新对应自动项，不覆盖按钮、LED、手机等人工证据。
+- 固件版本或 Git ID 变化后重新初始化并执行证据，不能手工修改元数据绕过重测。

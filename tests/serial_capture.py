@@ -9,6 +9,20 @@ import time
 import serial
 from serial.tools import list_ports
 
+BOOT_REQUIRED_MARKERS = (
+    "ESP-ROM:esp32c3",
+    "rst:",
+)
+BOOT_FATAL_MARKERS = (
+    "Guru Meditation",
+    "Backtrace:",
+    "Task watchdog",
+    "task_wdt:",
+    "coredump",
+    "Core 0 panic'ed",
+    "Core 1 panic'ed",
+)
+
 
 def find_port():
     """自动探测 ESP32-C3 串口设备。"""
@@ -39,6 +53,11 @@ def parse_args():
     parser.add_argument("-p", "--port", help="串口端口（不传则自动探测）")
     parser.add_argument("-d", "--duration", type=float, help="抓取时长秒数")
     parser.add_argument("-o", "--output", help="日志输出文件；不指定则输出到 stdout")
+    parser.add_argument(
+        "--check-boot",
+        action="store_true",
+        help="抓取后检查 ROM 复位启动标志，并拒绝 panic/WDT/Backtrace/coredump",
+    )
     args = parser.parse_args()
     port = args.port or args.port_pos or find_port()
     if not port:
@@ -46,25 +65,54 @@ def parse_args():
     duration = args.duration if args.duration is not None else (args.duration_pos if args.duration_pos is not None else 13.0)
     if duration < 0:
         parser.error("duration 必须大于等于 0")
-    return port, duration, args.output
+    return port, duration, args.output, args.check_boot
 
-port, duration, output = parse_args()
 
-s = serial.Serial(port, 115200, timeout=1)
-s.setDTR(False)
-s.setRTS(True)
-time.sleep(0.1)
-s.setRTS(False)
-time.sleep(0.1)
+def analyze_boot_log(text):
+    if not text.strip():
+        return False, "启动日志为空"
+    for marker in BOOT_FATAL_MARKERS:
+        if marker.lower() in text.lower():
+            return False, f"启动日志包含致命标志: {marker}"
+    missing = [marker for marker in BOOT_REQUIRED_MARKERS if marker not in text]
+    if missing:
+        return False, "启动日志缺少标志: " + ", ".join(missing)
+    return True, "ROM 复位启动标志完整，未发现致命异常"
 
-t = time.time()
-out = open(output, "a", encoding="utf-8") if output else sys.stdout
-try:
-    while time.time() - t < duration:
-        line = s.readline().decode("utf-8", "replace").rstrip()
-        if line:
-            print(line, file=out, flush=True)
-finally:
-    if output:
-        out.close()
-    s.close()
+
+def capture(port, duration, output):
+    serial_port = serial.Serial(port, 115200, timeout=1)
+    serial_port.setDTR(False)
+    serial_port.setRTS(True)
+    time.sleep(0.1)
+    serial_port.setRTS(False)
+    time.sleep(0.1)
+
+    lines = []
+    started_at = time.time()
+    out = open(output, "a", encoding="utf-8") if output else sys.stdout
+    try:
+        while time.time() - started_at < duration:
+            line = serial_port.readline().decode("utf-8", "replace").rstrip()
+            if line:
+                lines.append(line)
+                print(line, file=out, flush=True)
+    finally:
+        if output:
+            out.close()
+        serial_port.close()
+    return "\n".join(lines)
+
+
+def main():
+    port, duration, output, check_boot = parse_args()
+    text = capture(port, duration, output)
+    if not check_boot:
+        return 0
+    ok, detail = analyze_boot_log(text)
+    print(f"[serial-boot] {'PASS' if ok else 'FAIL'} {detail}", file=sys.stderr)
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
