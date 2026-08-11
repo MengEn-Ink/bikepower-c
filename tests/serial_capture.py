@@ -18,9 +18,16 @@ BOOT_FATAL_MARKERS = (
     "Backtrace:",
     "Task watchdog",
     "task_wdt:",
-    "coredump",
+    "Saving core dump",
+    "Coredump to",
+    "espcoredump",
     "Core 0 panic'ed",
     "Core 1 panic'ed",
+)
+BOOT_FATAL_LINE_SKIP = (
+    "boot:",
+    "esp_image:",
+    "End of partition table",
 )
 
 
@@ -71,9 +78,13 @@ def parse_args():
 def analyze_boot_log(text):
     if not text.strip():
         return False, "启动日志为空"
-    for marker in BOOT_FATAL_MARKERS:
-        if marker.lower() in text.lower():
-            return False, f"启动日志包含致命标志: {marker}"
+    for raw_line in text.splitlines():
+        if any(skip in raw_line for skip in BOOT_FATAL_LINE_SKIP):
+            continue
+        lowered = raw_line.lower()
+        for marker in BOOT_FATAL_MARKERS:
+            if marker.lower() in lowered:
+                return False, f"启动日志包含致命标志: {marker}"
     missing = [marker for marker in BOOT_REQUIRED_MARKERS if marker not in text]
     if missing:
         return False, "启动日志缺少标志: " + ", ".join(missing)

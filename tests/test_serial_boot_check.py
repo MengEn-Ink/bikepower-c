@@ -42,6 +42,23 @@ def main():
     assert not ok
     assert "Task watchdog" in detail
 
+    partition_table = "\n".join(
+        [
+            healthy,
+            "I (46) boot: ## Label            Usage          Type ST Offset   Length",
+            "I (72) boot:  2 factory          factory app      00 00 00010000 003e0000",
+            "I (79) boot:  3 coredump         Unknown data     01 03 003f0000 00010000",
+            "I (82) boot: End of partition table",
+        ]
+    )
+    ok, detail = analyze_boot_log(partition_table)
+    assert ok, f"分区表 coredump 标签不应误报致命异常: {detail}"
+
+    real_coredump = healthy + "\nI (999) esp_core_dump_flash: Saving core dump to flash..."
+    ok, detail = analyze_boot_log(real_coredump)
+    assert not ok
+    assert "Saving core dump" in detail
+
     print(f"{TAG} PASS: serial boot log checks passed")
     return 0
 

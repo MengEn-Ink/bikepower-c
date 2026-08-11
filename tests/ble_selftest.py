@@ -124,7 +124,8 @@ CP_RESULT_INVALID_PARAM = 0x03
 
 
 def parse_cps(data: bytes):
-    flags, power = struct.unpack_from("<HH", data, 0)
+    flags = data[0]
+    power = struct.unpack_from("<h", data, 1)[0]
     return flags, power
 
 def parse_rsc(data: bytes):
