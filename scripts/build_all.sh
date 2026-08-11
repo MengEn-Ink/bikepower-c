@@ -281,7 +281,7 @@ EVIDENCE_COUNT=0
 for target in "${TARGETS[@]}"; do
     board_name="$(board_name_of "$target")"
     evidence_name="device-acceptance-${board_name}.json"
-    evidence_src="$DEVICE_ACCEPTANCE_DIR/$evidence_name"
+    evidence_src="${DEVICE_ACCEPTANCE_DIR}/${evidence_name}"
     if [ -f "$evidence_src" ]; then
         python3 "$PROJECT_DIR/scripts/tools/device_acceptance.py" validate \
             --file "$evidence_src" \
@@ -293,7 +293,7 @@ for target in "${TARGETS[@]}"; do
         echo "  已收录: evidence/$evidence_name"
         EVIDENCE_COUNT=$((EVIDENCE_COUNT + 1))
     else
-        echo "  未找到 $evidence_src；允许本地构建，正式发布前必须补齐该板型全部 P0 证据。"
+        echo "  未找到 ${evidence_src} (允许本地构建，正式发布前必须补齐该板型全部 P0 证据)"
     fi
 done
 
