@@ -4,6 +4,19 @@
 
 ## [未发布]
 
+### 真机测试修复（v4.1.1 发布后）
+- `tests/serial_capture.py`：`--check-boot` 的 coredump 致命标志原用裸词大小写不敏感子串匹配，会命中分区表标签行 `3 coredump Unknown data`，导致任何正常启动都误报致命异常。改为逐行扫描并跳过 `boot:`/`esp_image:` 分区表行，致命词收敛为真实崩溃日志短语（`Saving core dump`/`Coredump to`/`espcoredump`）。
+- `tests/ble_selftest.py`：`parse_cps` 原用 `<HH`（2 字节 flags）解析，与固件实际 1 字节 flags + 有符号 int16 功率的 CPS 包错位，造成功率读数为垃圾值（2561/7680W）、ERG 收敛误判失败。改为 `flags=data[0]` + 有符号 `<h` 功率，与 `parse_rsc` 对齐。
+- `tests/test_serial_boot_check.py`：新增“分区表 coredump 标签不误报”“真实 coredump 触发误报”两条回归用例。
+
+### v4.1.1 通用版真机验收（generic-c3，串口 /dev/cu.usbmodem101，固件 ga9f127c）
+- 编译前门禁：host 单测 5841 通过、mock 门户保存通过、3 分钟核心流程耐久 6 循环通过。
+- 启动：`serial_capture.py --check-boot` 通过，ROM 复位启动标志完整，无 panic/WDT/Backtrace/真实 coredump。
+- BLE：`ble_selftest.py` 全绿——CPS/HRS/CSC/FTMS/DIS 五服务齐全、DIS 版本正确、FTMS Feature 正确、ERG 收敛（基线 198W→目标 200W→实测 202W→Stop 200W）、非法目标正确拒绝。
+- 连接：`stage3_conn_test.py` 连接/断开与自动重广播通过。
+- 证据：`tests/reports/device-acceptance-generic-c3.json`（P0 PASS 3 / NOT_RUN 9），已随 release 总包 `evidence/` 分发。
+- 待验证：m5stamp-c3 真机、物理按钮/LED、手机 Captive Portal 弹窗、配网门户 HTTP、72h 老化。
+
 ## [4.1.1] - 2026-08-11
 
 ### 收口修复
