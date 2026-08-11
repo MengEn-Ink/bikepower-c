@@ -1,7 +1,7 @@
 # BikePower C — 项目进度
 
 > 基线方案：[docs/archive/01-cidf-nimble-rewrite.md](docs/archive/01-cidf-nimble-rewrite.md)
-> 当前固件版本：v4.1.0（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v4.1.1（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 参考仓库：git@gitee.com:mengen4jv/bikepower-c.git
 
 ---
@@ -62,7 +62,7 @@
 - [ ] 72h 老化：长时间运行无 coredump、无 WDT、无堆持续下降；建议周期性跑 `tests/ble_selftest.py` 和 `tests/stage5_portal_test.py` 采样。
 
 上述未完成项继续保持待验收状态。执行时按板型写入 `tests/reports/device-acceptance-<板型>.json`；`NOT_RUN` 不视为通过，正式双板发布前必须分别对 generic-c3 与 m5stamp-c3 运行 `python3 scripts/tools/device_acceptance.py validate --strict --file <证据文件>`。
-- [ ] Release 人工步骤：从已提交并已推送源码执行 `scripts/build_all.sh`，校验 SHA256，打 `v4.1.0` tag，创建 Gitee Release 并上传 merged bin/manifest。
+- [ ] Release 人工步骤：从已提交并已推送源码执行 `scripts/build_all.sh`，校验 SHA256，打 `v4.1.1` tag，创建 Gitee Release 并上传 merged bin/manifest。
 
 ---
 
@@ -167,7 +167,7 @@
 - [ ] 72h 老化测试：长时间运行无 coredump、无堆持续下降（跑 `tests/stage5_portal_test.py` / `ble_selftest.py` 辅助）
 - [x] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`（已设为 WARN）
 - [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（generic-c3 真机 `ble_selftest.py 8` 已校验厂商/型号/固件三字段）
-- [ ] 打 tag v4.1.0 + Gitee Release
+- [ ] 打 tag v4.1.1 + Gitee Release
 
 ---
 

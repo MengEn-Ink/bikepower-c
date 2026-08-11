@@ -2,7 +2,7 @@
 
 > 状态：协议调研与实现追踪。P0 RSC + HRS 跑步传感器路径已落地；FTMS Treadmill Data / Control Point 仍作为后续兼容增强评估。
 > 目标软件：Zwift Run、MyWhoosh Running。  
-> 当前固件基线：BikePower C v4.1.0，NimBLE peripheral；骑行模式提供 CPS + HRS + CSC + FTMS Indoor Bike + DIS，跑步模式提供 RSC + HRS + DIS。
+> 当前固件基线：BikePower C v4.1.1，NimBLE peripheral；骑行模式提供 CPS + HRS + CSC + FTMS Indoor Bike + DIS，跑步模式提供 RSC + HRS + DIS。
 
 ---
 

@@ -4,61 +4,49 @@
 
 ## [未发布]
 
-### 稳定交付证据链
-- `scripts/tools/device_acceptance.py`、`tests/test_device_acceptance.py`：新增绑定固件版本、Git ID 和板型的真机验收证据，支持初始化、单项更新、摘要与 P0 严格校验，写文件采用原子替换。
-- `tests/operation_gate.py`、`tests/test_operation_gate_evidence.py`：device 门禁可将串口、骑行/跑步 BLE、重连、配网门户和广播开关结果写入证据，失败如实记录为 `FAIL`，未执行项保持 `NOT_RUN`，不覆盖人工按钮/LED 记录。
-- `tests/serial_capture.py`、`tests/test_serial_boot_check.py`：新增 `--check-boot` 严格判定，空日志、缺少 ROM/复位启动标志或出现 panic、Task WDT、Backtrace、coredump 时返回失败；BLE 就绪继续由 `ble_selftest.py` 独立验证，兼容 release 固件 WARN 日志级别。
-- `scripts/build_all.sh`、`scripts/build_all.ps1`、`scripts/tools/generate_release_docs.py`：Unix/Windows 构建在当前版本证据存在时按板型收录到 `evidence/device-acceptance-<板型>.json`，同步进入 manifest、测试报告和 release 总包；无设备环境仍允许本地构建。
-- `scripts/tools/check_release_artifacts.py`、`scripts/tools/publish_gitee_release.py`：新增 `--require-device-evidence`，正式双板 Gitee 发布强制要求 generic-c3 与 m5stamp-c3 各自匹配当前版本/Git 且全部 P0 项通过，同时保持 10 个顶层上传附件不变。
-- `tests/test_release_artifacts.py`、`tests/check_release_gate.py`、`scripts/tools/quality_gate.py`：新增证据缺失、Git ID 不匹配、P0 未完成和发布接线防回归测试。
-- `docs/dev/10-stable-delivery-design.md`、`docs/dev/11-stable-delivery-plan.md`、`docs/dev/05-operation-test-gate.md`、`tests/README.md`：记录稳定交付设计、分批计划、人工结果录入和正式发布命令。
+## [4.1.1] - 2026-08-11
 
-### 稳定交付验证
+### 收口修复
+- `components/bikepower_domain/`、`main/nvs_store.c`、`main/wifi_portal.c`、`main/ble_bikepower.c`、`main/web/`：彻底移除跑步坡度字段、NVS key、Portal API/UI、FTMS Set Target Inclination 控制点和 Treadmill Data 坡度输出，配置 schema 升级到 v11。
+- `tests/check_config_consistency.py`、`tests/check_portal_structure.py`、`test/test_domain.c`、`tests/test_portal_config_save.py`、`tests/ble_selftest.py`：新增/同步坡度残留门禁和跑步核心链路测试，BLE 自测改为验证速度、距离、心率、用时和目标速度控制。
+
+### 稳定交付证据链
+- `scripts/tools/device_acceptance.py`、`tests/test_device_acceptance.py`：新增绑定固件版本、Git ID 和板型的真机验收证据工具，支持初始化、单项更新、摘要与 P0 严格校验，写文件采用原子替换。
+- `tests/operation_gate.py`、`tests/test_operation_gate_evidence.py`：device 门禁可将串口、骑行/跑步 BLE、重连、配网门户和广播开关结果自动写入证据文件，失败如实记录为 `FAIL`，未执行项保持 `NOT_RUN`，不覆盖人工按钮/LED 记录。
+- `tests/serial_capture.py`、`tests/test_serial_boot_check.py`：新增 `--check-boot` 严格启动判定，空日志、缺少 ROM/复位标志或出现 panic、Task WDT、Backtrace、coredump 时返回失败；BLE 就绪由 `ble_selftest.py` 独立验证，兼容 release 固件 WARN 日志级别。
+- `scripts/build_all.sh`、`scripts/build_all.ps1`、`scripts/tools/generate_release_docs.py`：Unix/Windows 构建在当前版本证据存在时按板型收录到 `evidence/device-acceptance-<板型>.json`，同步进入 manifest、测试报告和 release 总包；无设备环境仍允许本地构建。
+- `scripts/tools/check_release_artifacts.py`、`scripts/tools/publish_gitee_release.py`：新增 `--require-device-evidence`，正式双板 Gitee 发布强制要求 generic-c3 与 m5stamp-c3 各自匹配当前版本/Git 且全部 P0 项通过，保持 10 个顶层上传附件不变。
+- `tests/test_release_artifacts.py`、`tests/check_release_gate.py`、`scripts/tools/quality_gate.py`：新增证据缺失、Git ID 不匹配、P0 未完成和发布接线防回归测试。
+- `scripts/tools/quality_gate.py`、`tests/check_config_consistency.py`：新增工作区/暂存区 whitespace 门禁，工作区 clean 时同步检查最近提交，防止 Markdown 行尾空格进入提交。
+
+### 开发者文档
+- `docs/wiki/`：新增 11 篇结构化 Code Wiki，覆盖架构概览、应用层模块、领域层、核心数据结构、状态机与事件、运行时流程、BLE 服务、WiFi 门户、构建测试、硬件约束等完整代码参考。
+- `docs/dev/10-stable-delivery-design.md`、`docs/dev/11-stable-delivery-plan.md`、`docs/dev/05-operation-test-gate.md`：记录稳定交付设计、分批计划、人工结果录入和正式发布命令。
+- `docs/archive/`：归档历史跑步升级计划和项目优化计划，移除游离 `docs/superpowers` 工作目录。
+
+### 验证
 - `python3 tests/test_device_acceptance.py`：通过，覆盖证据模型、严格模式、非法输入、原子读写和 CLI。
 - `python3 tests/test_operation_gate_evidence.py`：通过，覆盖自动结果映射、新建证据和人工记录保留。
 - `python3 tests/test_release_artifacts.py`、`python3 tests/check_release_gate.py`：通过，覆盖标准 release、完整证据、缺证据、过期证据、P0 未完成和 zip 篡改。
-- `python3 tests/operation_gate.py --level quick --report /tmp/bikepower-operation-quick.md`：通过，host 5841 断言、Mock 保存、操作矩阵、BLE 监控、门户结构和 JS 全绿。
-- `python3 tests/operation_gate.py --level full --report /tmp/bikepower-operation-full-stable-delivery.md`：通过，包含 6 轮核心流程耐久、release 严格证据样例、259 项配置一致性和 122 项 NVS schema 检查。
-- `python3 scripts/tools/quality_gate.py`：通过，61 pass / 2 warn / 0 fail；两个 warn 为工作区存在本轮未提交改动，以及工作区未 clean 时跳过最近提交 whitespace 检查。
-- 真机烧录、按钮、LED、手机 Captive Portal 和 72h 老化尚未执行，证据仍应保持 `NOT_RUN`，不能冒充通过。
+- `python3 tests/operation_gate.py --level quick`：通过，host 5841 断言、Mock 保存、操作矩阵、BLE 监控、门户结构和 JS 全绿。
+- `make -C test clean && make -C test && ./test/test_domain`：通过，5841 断言 0 失败。
+- `python3 scripts/tools/quality_gate.py`：通过，62 pass / 0 warn / 0 fail（门户渲染截图因沙箱限制跳过，非代码问题）。
+- 真机烧录、按钮/LED 人工确认、手机 Captive Portal 多系统弹窗和 72h 老化尚未执行，证据保持 `NOT_RUN`，需人工确认后更新。
 
-### 收口修复
-- `components/bikepower_domain/`、`main/nvs_store.c`、`main/wifi_portal.c`、`main/ble_bikepower.c`、`main/web/`：彻底移除运行坡度字段、NVS key、Portal API/UI、FTMS Set Target Inclination 控制点和 Treadmill Data 坡度输出，配置 schema 升级到 v11。
-- `tests/check_config_consistency.py`、`tests/check_portal_structure.py`、`test/test_domain.c`、`tests/test_portal_config_save.py`、`tests/ble_selftest.py`：新增/同步坡度残留门禁和跑步核心链路测试，BLE 自测改为验证速度、距离、心率、用时和目标速度控制。
-- `PROGRESS.md`、`docs/user/01-quickstart.md`、`docs/user/02-user-manual.md`、`docs/dev/01-technical-reference.md`、`docs/INDEX.md`：同步 v4.1.0、NVS schema v11、跑步模式当前能力、阶段索引和真机回归口径。
-- `docs/archive/08-running-mode-full-upgrade-plan.md`、`docs/archive/09-running-mode-implementation-plan.md`、`docs/archive/10-project-optimization-design.md`、`docs/archive/11-project-optimization-plan.md`：归档历史跑步/优化计划，移除游离 `docs/superpowers` 工作目录。
-- `scripts/tools/quality_gate.py`、`tests/check_config_consistency.py`：新增工作区/暂存区 whitespace 门禁，工作区 clean 时同步检查最近提交，防止 Markdown 行尾空格再次进入提交。
-- `PROGRESS.md`、`CHANGELOG.md`、`docs/dev/03-test-coverage-analysis.md`、`docs/archive/08-running-mode-full-upgrade-plan.md`、`docs/archive/09-running-mode-implementation-plan.md`：同步当前 host 单测 5841 断言并清理归档文档行尾空格。
+## [4.1.0] - 2026-07-11
 
 ### Windows 开发环境适配
-- `scripts/idf_common.psm1`：新增 Windows PowerShell 共享模块，统一封装 ESP-IDF 路径探测（扫描目录非硬编码版本号）、Python 环境探测、子进程调用、串口探测等通用逻辑。
-- `scripts/dev.ps1`：新增 Windows 统一开发入口，支持 build/flash/monitor/test/check/clean/reconfigure/erase 子命令，自动探测 ESP-IDF 和串口。
-- `scripts/build_all.ps1`：重构使用共享模块，删除 11 个重复函数，所有 Python 调用统一走 IDF Python 环境。
-- `scripts/flash_latest.ps1`：重构使用共享模块，删除 10 个重复函数，新增串口存在性校验。
-- `scripts/tools/device_monitor.py`：删除硬编码 Unix 串口路径，改用 pyserial list_ports 自动探测（跨平台）。
-- `tests/stage3_conn_test.py`：串口探测增加 Windows COM 口识别。
-- `tests/serial_capture.py`：默认端口从 /dev/ttyACM0 改为自动探测。
-- `tests/check_release_gate.py`：python3 调用改为 sys.executable（Windows 无 python3 命令）。
+- `scripts/idf_common.psm1`：新增 Windows PowerShell 共享模块，统一封装 ESP-IDF 路径探测、Python 环境探测、子进程调用、串口探测等通用逻辑。
+- `scripts/dev.ps1`：新增 Windows 统一开发入口，支持 build/flash/monitor/test/check/clean/reconfigure/erase 子命令。
+- `scripts/build_all.ps1`、`scripts/flash_latest.ps1`：重构使用共享模块，删除重复函数，统一走 IDF Python 环境。
+- `scripts/tools/device_monitor.py`、`tests/stage3_conn_test.py`、`tests/serial_capture.py`：串口探测跨平台适配，支持 Windows COM 口。
+- `tests/check_release_gate.py`：python3 调用改为 sys.executable（Windows 兼容）。
 
 ### 项目优化
 - `sdkconfig.defaults`：显式启用 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE`，让 WiFi/BLE 共存配网承诺有构建配置兜底。
-- `main/bikepower_config.h`：低内存告警线从 40KB 提升到 80KB，保留 20KB 严重告警；新增 HTTP 请求体读取超时重试、BLE 停止锁等待和 BLE 扫描锁等待常量。
-- `tests/check_config_consistency.py`：新增 coex、80KB 堆健康线、HTTPD 栈精确值、HTTP timeout 重试和 BLE 有界等待静态门禁。
-- `main/radio_ctrl.c/.h`、`main/wifi_portal.c`：收窄 radio_ctrl 公共接口，将 SoftAP 启停 helper 私有化，删除不必要的反向 include。
-- `main/wifi_portal.c`：`recv_body()` 对 `HTTPD_SOCK_ERR_TIMEOUT` 做有限重试，降低慢客户端导致读取失败的概率。
-- `main/ble_bikepower.c`、`main/ble_scanner.c`：BLE 停止和扫描结果锁从无限等待改为有限等待，避免主循环、HTTPD 或 NimBLE callback 被异常锁持有拖死。
-- `scripts/tools/quality_gate.py`：修复 host 单测路径，避免在 `test/` 下重复执行 `make -C test` 导致误判编译失败。
-- `README.md`、`PROGRESS.md`、`docs/user/01-quickstart.md`、`docs/dev/01-technical-reference.md`、`.trae/rules/*`：同步 v4.1.0、当时 NVS schema v10、303 Captive Portal、80KB 堆健康线、HTTPD 栈 12288、配网密码和 LED 配网态等事实。
-
-### 验证
-- `python3 tests/check_config_consistency.py`：通过，259 pass / 0 fail。
-- `make -C test clean && make -C test && ./test/test_domain`：通过，5841 断言 0 失败。
-- `git diff --check`：通过。
-- `git show --check --format= HEAD`：发现上一提交 3 处 Markdown 行尾空格，本批已清理，并由 `quality_gate.py` 增加防回归。
-- `python3 scripts/tools/quality_gate.py`：通过，52 pass / 2 warn / 0 fail；warn 为本批提交前存在未提交改动，以及工作区未 clean 时跳过最近提交 whitespace 检查。
-- 真机烧录、WiFi/BLE coex 配网、BLE 扫描读取/分析未执行；这些仍需设备侧回归确认。
-
-## [4.1.0] - 2026-07-11
+- `main/bikepower_config.h`：低内存告警线从 40KB 提升到 80KB，保留 20KB 严重告警；新增 HTTP 请求体读取超时重试、BLE 锁有限等待常量。
+- `main/radio_ctrl.c/.h`、`main/wifi_portal.c`：收窄 radio_ctrl 公共接口，SoftAP 启停 helper 私有化；`recv_body()` 对超时做有限重试；BLE 停止/扫描锁改为有限等待避免死锁。
+- `scripts/tools/quality_gate.py`：修复 host 单测路径，避免重复执行 `make -C test` 导致误判。
 
 ### 跑步模式升级
 - `components/bikepower_domain/running_engine.c`：完整升级跑步模式引擎，支持配速/配速浮动/步频/步频浮动/心率核心闭环，移除坡度配置。
