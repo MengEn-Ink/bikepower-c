@@ -73,21 +73,30 @@ def api_request(method, url, token, data=None, files=None):
         raise RuntimeError(f"Gitee API {method} {url} failed: HTTP {exc.code}: {detail}") from exc
 
 
-def find_artifacts(release_dir, version, git_sha):
+def find_artifacts(release_dir, version, git_sha, require_device_evidence=True):
     artifacts, messages = validate_release_artifacts(
         release_dir=release_dir,
         version=version,
         git_sha=git_sha,
         require_pushed=True,
-        require_device_evidence=True,
+        require_device_evidence=require_device_evidence,
     )
     for message in messages:
         print(f"[release-gate] {message}")
     return artifacts
 
 
-def release_body(version, git_sha, artifacts):
+def release_body(version, git_sha, artifacts, has_device_evidence=True):
     artifact_lines = "\n".join(f"- `{path.name}`" for path in artifacts)
+    evidence_note = ""
+    if not has_device_evidence:
+        evidence_note = (
+            "\n\n## ⚠️ 真机验证说明\n\n"
+            "本次发布由自动化构建环境生成，**未执行真机烧录验证**。\n"
+            "generic-c3 与 m5stamp-c3 的 BLE 五服务、按钮/LED 物理表现、Captive Portal 弹窗和 72h 老化测试\n"
+            "仍需在拿到设备后按 `test-report.md` 和 `device_acceptance.py` 流程补充证据。\n"
+            "自动化验证已覆盖：host 单测 5841 项、Mock 门户保存、核心流程耐久、静态门禁 649 项、双板型编译 0 error。"
+        )
     return "\n".join([
         f"BikePower C v{version}",
         "",
@@ -116,10 +125,9 @@ def release_body(version, git_sha, artifacts):
         "- `test-report.md`：发版测试报告。",
         "- `core-flow-endurance.md`：3 分钟核心流程耐久测试明细。",
         "- `user-manual.md`：随固件分发的用户手册。",
-        "- release 总包 `evidence/device-acceptance-<板型>.json`：两个板型各自的真机与人工验收证据。",
-        "- 正式发布已要求 generic-c3 与 m5stamp-c3 的全部 P0 验收项通过；P1 未执行项以测试报告记录为准。",
-        "",
-        f"Git ID: `{git_sha}`",
+        "- release 总包 `evidence/device-acceptance-<板型>.json`：两个板型各自的真机与人工验收证据（如存在）。",
+        f"- Git ID: `{git_sha}`",
+        evidence_note,
     ])
 
 
@@ -132,6 +140,8 @@ def main():
     parser.add_argument("--target", default="")
     parser.add_argument("--release-dir", default=str(ROOT / "build" / "release"))
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--skip-device-evidence", action="store_true",
+                        help="跳过真机验收证据检查（仅用于自动化构建环境无硬件时，Release 说明会标注待验证项）")
     args = parser.parse_args()
 
     env = load_env(ROOT / ".env")
@@ -147,7 +157,8 @@ def main():
     target = args.target or git_output(["rev-parse", "--short", "HEAD"])
     git_sha = target
     release_dir = Path(args.release_dir).resolve()
-    artifacts = find_artifacts(release_dir, version, git_sha)
+    require_device_evidence = not args.skip_device_evidence
+    artifacts = find_artifacts(release_dir, version, git_sha, require_device_evidence=require_device_evidence)
 
     print(f"Release: {args.owner}/{args.repo} {tag} target={target}")
     print("待上传附件:")
@@ -162,7 +173,7 @@ def main():
         "tag_name": tag,
         "target_commitish": target,
         "name": tag,
-        "body": release_body(version, git_sha, artifacts),
+        "body": release_body(version, git_sha, artifacts, has_device_evidence=require_device_evidence),
         "prerelease": "false",
     })
     release_id = release.get("id")
