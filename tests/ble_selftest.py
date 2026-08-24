@@ -148,6 +148,20 @@ def find_characteristic_in_service(services, service_uuid, characteristic_uuid):
                 return characteristic
     return None
 
+
+def has_stable_tail(samples, predicate, minimum=2):
+    if len(samples) < minimum:
+        return False
+    return all(predicate(sample) for sample in samples[-minimum:])
+
+
+def has_reset_sample(samples, maximum_distance=2):
+    return any(
+        sample.get("distance") is not None
+        and sample["distance"] <= maximum_distance
+        for sample in samples
+    )
+
 def parse_rsc(data: bytes):
     try:
         parsed = parse_rsc_payload(bytes(data))
@@ -429,12 +443,13 @@ async def run_running_profile(client, found):
             ok_pause = bool(
                 pause_responses
                 and pause_responses[-1] == CP_RESULT_SUCCESS
-                and pause_rsc
-                and all(not sample["running"] and sample["speed"] == 0 and sample["cadence"] == 0 for sample in pause_rsc)
-                and pause_tm
-                and all(sample["speed_x100"] == 0 for sample in pause_tm)
-                and len({sample["distance"] for sample in pause_tm}) == 1
-                and len({sample["elapsed"] for sample in pause_tm}) == 1
+                and has_stable_tail(
+                    pause_rsc,
+                    lambda sample: not sample["running"] and sample["speed"] == 0 and sample["cadence"] == 0,
+                )
+                and has_stable_tail(pause_tm, lambda sample: sample["speed_x100"] == 0)
+                and len({sample["distance"] for sample in pause_tm[-2:]}) == 1
+                and len({sample["elapsed"] for sample in pause_tm[-2:]}) == 1
             )
 
             print("下发 running Start/Resume(0x07)")
@@ -464,8 +479,7 @@ async def run_running_profile(client, found):
             reset_samples = treadmill_samples[before_reset_count:]
             reset_responses = cp_results(OP_RESET)
             ok_reset = bool(reset_responses and reset_responses[-1] == CP_RESULT_SUCCESS)
-            if reset_samples:
-                ok_reset = ok_reset and reset_samples[0]["distance"] is not None and reset_samples[0]["distance"] <= 2
+            ok_reset = ok_reset and has_reset_sample(reset_samples)
     ok = (
         ok_services and dis_ok and ftms_feature_ok and running_features_ok
         and ok_notify and ok_speed and ok_cadence and ok_distance and ok_flags

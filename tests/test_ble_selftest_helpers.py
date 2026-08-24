@@ -31,6 +31,27 @@ def main():
     )
     assert selected is cycling_location, "重复 UUID 必须按所属 service 定位"
     print("[ble-selftest-helper] PASS: 重复特征按所属 service 定位")
+
+    pause_samples = [
+        {"running": True, "speed": 850, "cadence": 160},
+        {"running": False, "speed": 0, "cadence": 0},
+        {"running": False, "speed": 0, "cadence": 0},
+    ]
+    assert ble_selftest.has_stable_tail(
+        pause_samples,
+        lambda sample: not sample["running"] and sample["speed"] == 0 and sample["cadence"] == 0,
+        minimum=2,
+    ), "允许命令响应后的首帧仍是过渡帧"
+    assert not ble_selftest.has_stable_tail(
+        pause_samples[:2],
+        lambda sample: not sample["running"],
+        minimum=2,
+    ), "稳定态必须至少连续两帧"
+    assert ble_selftest.has_reset_sample(
+        [{"distance": 143}, {"distance": 1}, {"distance": 2}],
+        maximum_distance=2,
+    ), "Reset 校验应接受窗口内任一清零后的样本"
+    print("[ble-selftest-helper] PASS: 控制命令忽略单帧过渡并要求稳定尾帧")
     return 0
 
 
