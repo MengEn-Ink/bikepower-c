@@ -162,6 +162,14 @@ def has_reset_sample(samples, maximum_distance=2):
         for sample in samples
     )
 
+
+def missing_profile_characteristics(profile, found):
+    required = {
+        "cycling": {CPS_UUID, CPS_FEATURE_UUID, CSC_UUID, CSC_FEATURE_UUID, FTMS_BIKE_UUID, FTMS_CP_UUID},
+        "running": {RSC_UUID, RSC_FEATURE_UUID, FTMS_TREADMILL_UUID, FTMS_CP_UUID},
+    }
+    return sorted(required[profile] - set(found))
+
 def parse_rsc(data: bytes):
     try:
         parsed = parse_rsc_payload(bytes(data))
@@ -546,6 +554,14 @@ async def main():
     async with BleakClient(dev) as client:
         print("已连接")
         found = {c.uuid for s in client.services for c in s.characteristics}
+        profile_missing = missing_profile_characteristics(PROFILE, found)
+        if profile_missing:
+            await check_dis(client, found)
+            print(
+                "目标 profile 必需特征缺失：" + ", ".join(profile_missing)
+                + "；请确认烧录 profile，并在系统缓存旧 GATT 表时关闭再开启蓝牙后重试"
+            )
+            return 1
         if PROFILE == "running":
             return await run_running_profile(client, found)
 

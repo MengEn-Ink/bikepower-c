@@ -52,6 +52,13 @@ def main():
         maximum_distance=2,
     ), "Reset 校验应接受窗口内任一清零后的样本"
     print("[ble-selftest-helper] PASS: 控制命令忽略单帧过渡并要求稳定尾帧")
+
+    cycling_found = {ble_selftest.CPS_UUID, ble_selftest.HR_UUID}
+    assert ble_selftest.missing_profile_characteristics("cycling", cycling_found)
+    assert ble_selftest.RSC_UUID in ble_selftest.missing_profile_characteristics(
+        "running", cycling_found
+    )
+    print("[ble-selftest-helper] PASS: profile 必需特征缺失可提前诊断")
     return 0
 
 
