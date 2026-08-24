@@ -11,6 +11,7 @@
 #   .\scripts\flash_latest.ps1 -Monitor               # 烧录后进入串口监视器
 #   .\scripts\flash_latest.ps1 -NoCapture             # 烧录后不抓取启动日志
 #   .\scripts\flash_latest.ps1 -CaptureSeconds 30     # 抓取 30 秒启动日志
+#   .\scripts\flash_latest.ps1 -TestProfile running   # 烧录隔离的跑步测试固件
 #   .\scripts\flash_latest.ps1 -IdfPath "C:\Espressif\frameworks\esp-idf-v5.5.4"
 #
 # 首次从旧分区切到当前 4MB factory 布局时使用 -Erase。
@@ -26,6 +27,8 @@ param(
     [switch]$Monitor,
     [switch]$NoCapture,
     [int]$CaptureSeconds = 15,
+    [ValidateSet("", "cycling", "running")]
+    [string]$TestProfile = "",
     [string]$IdfPath = ""
 )
 
@@ -35,7 +38,12 @@ Import-Module (Join-Path $ScriptDir "idf_common.psm1") -Force
 $ProjectDir = $Global:BikePowerProjectDir
 $FlashDefaults = "sdkconfig.flash.tmp"
 $FlashBoardFile = "sdkconfig.flash.board"
-$FlashBuildDir = Join-Path (Join-Path $ProjectDir "build") ("build-flash-" + $Board)
+$FlashBuildName = if ($TestProfile) {
+    "build-flash-" + $Board + "-" + $TestProfile
+} else {
+    "build-flash-" + $Board
+}
+$FlashBuildDir = Join-Path (Join-Path $ProjectDir "build") $FlashBuildName
 
 function Run-QuickChecks {
     Write-Log "运行快速静态门禁"
@@ -117,7 +125,8 @@ try {
     }
 
     if (-not $NoBuild) {
-        Write-Log "编译固件（board=$Board）"
+        $profileLabel = if ($TestProfile) { $TestProfile } else { "default" }
+        Write-Log "编译固件（board=$Board, test_profile=$profileLabel）"
         Prepare-BoardDefaults
         Clear-StaleBoardCache
         New-Item -Path $FlashBuildDir -ItemType Directory -Force | Out-Null
@@ -127,12 +136,14 @@ try {
             "-B", $FlashBuildDir,
             "-D", "SDKCONFIG=$buildSdkconfig",
             "-D", "SDKCONFIG_DEFAULTS=$FlashDefaults",
+            "-D", "BIKEPOWER_TEST_PROFILE=$TestProfile",
             "reconfigure"
         )
         Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @(
             "-B", $FlashBuildDir,
             "-D", "SDKCONFIG=$buildSdkconfig",
             "-D", "SDKCONFIG_DEFAULTS=$FlashDefaults",
+            "-D", "BIKEPOWER_TEST_PROFILE=$TestProfile",
             "build"
         )
     } else {
@@ -148,7 +159,7 @@ try {
     Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @("-B", $FlashBuildDir, "-p", $Port, "flash")
 
     if (-not $NoCapture -and $CaptureSeconds -gt 0) {
-        $logsDir = Join-Path $ProjectDir "tests\logs"
+        $logsDir = Join-Path (Join-Path $ProjectDir "build") "test-logs"
         if (-not (Test-Path $logsDir)) {
             New-Item -Path $logsDir -ItemType Directory -Force | Out-Null
         }

@@ -13,7 +13,10 @@ EXPECTED = ROOT / "build" / "test-reports"
 assert operation_gate.REPORT_DIR == EXPECTED
 assert test_core_flow_endurance.REPORT_DIR == EXPECTED
 flash_script = (ROOT / "scripts" / "flash_latest.sh").read_text(encoding="utf-8")
+flash_ps1 = (ROOT / "scripts" / "flash_latest.ps1").read_text(encoding="utf-8-sig")
 assert 'mkdir -p build/test-logs' in flash_script
 assert 'LOG_FILE="build/test-logs/flash_latest_' in flash_script
 assert "mkdir -p tests/logs" not in flash_script
+assert '"test-logs"' in flash_ps1
+assert '"tests\\logs"' not in flash_ps1
 print("[report-paths] PASS: 运行报告默认写入 build/test-reports")
