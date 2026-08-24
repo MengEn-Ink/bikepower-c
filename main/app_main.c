@@ -130,6 +130,10 @@ void app_main(void)
 
     power_engine_init(&s_engine);
     nvs_store_load(&s_engine);
+#ifdef BIKEPOWER_TEST_SPORT_PROFILE
+    s_engine.sport_profile = BIKEPOWER_TEST_SPORT_PROFILE;
+    ESP_LOGW(TAG, "[测试固件] 运动 profile 覆盖为 %d，不写入 NVS", (int)s_engine.sport_profile);
+#endif
     power_engine_clear_dirty(&s_engine);
     ESP_LOGI(TAG, "功率引擎初始化 p=%dW c=%dRPM hr=%d mode=%d",
              s_engine.base_power, s_engine.cadence_base,

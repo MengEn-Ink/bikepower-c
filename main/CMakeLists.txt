@@ -54,6 +54,17 @@ if(PORTAL_TEST_AUTO_CONFIG)
     message(STATUS "PORTAL_TEST_AUTO_CONFIG=ON（测试固件，启动自动配网）")
 endif()
 
+set(BIKEPOWER_TEST_PROFILE "" CACHE STRING "测试固件运动 profile 覆盖：cycling 或 running；正式构建留空")
+if(BIKEPOWER_TEST_PROFILE STREQUAL "cycling")
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE BIKEPOWER_TEST_SPORT_PROFILE=SPORT_PROFILE_CYCLING)
+    message(STATUS "BIKEPOWER_TEST_PROFILE=cycling（测试固件）")
+elseif(BIKEPOWER_TEST_PROFILE STREQUAL "running")
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE BIKEPOWER_TEST_SPORT_PROFILE=SPORT_PROFILE_RUNNING)
+    message(STATUS "BIKEPOWER_TEST_PROFILE=running（测试固件）")
+elseif(NOT BIKEPOWER_TEST_PROFILE STREQUAL "")
+    message(FATAL_ERROR "BIKEPOWER_TEST_PROFILE 只允许为空、cycling 或 running")
+endif()
+
 execute_process(
     COMMAND git -C ${CMAKE_SOURCE_DIR} rev-parse --short HEAD
     OUTPUT_VARIABLE BIKEPOWER_GIT_SHA

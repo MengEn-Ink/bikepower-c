@@ -26,6 +26,7 @@ run_host_test() {
     python3 tests/check_ble_reconnect.py
     python3 tests/check_control_event_reliability.py
     python3 tests/check_build_isolation.py
+    python3 tests/check_test_profile_build.py
     python3 tests/check_project_hygiene.py
 }
 

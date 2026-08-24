@@ -109,7 +109,7 @@ def main():
 
     operation_gate.run_step = fake_run_step
     try:
-        device_steps(recorder, port="/dev/fake", run_portal=True)
+        device_steps(recorder, port="/dev/fake", run_portal=True, device_profile="cycling")
     finally:
         operation_gate.run_step = original_run_step
 
@@ -121,12 +121,26 @@ def main():
     for item_id in (
         "serial_boot",
         "ble_cycling",
-        "ble_running",
         "ble_reconnect",
         "portal_http",
         "broadcast_mask",
     ):
         assert required_by_item.get(item_id) is True, f"{item_id} 必须是 required P0"
+    assert not any(item == "ble_running" for _name, _required, item in recorder.steps)
+
+    recorder = StepRecorder()
+    operation_gate.run_step = fake_run_step
+    try:
+        device_steps(recorder, port="/dev/fake", run_portal=False, device_profile="running")
+    finally:
+        operation_gate.run_step = original_run_step
+    required_by_item = {
+        acceptance_item: required
+        for _name, required, acceptance_item in recorder.steps
+        if acceptance_item
+    }
+    assert required_by_item.get("ble_running") is True, "ble_running 必须是 required P0"
+    assert not any(item == "ble_cycling" for _name, _required, item in recorder.steps)
     print(f"{TAG} PASS device P0 steps are required")
 
     print(f"{TAG} PASS: operation gate evidence tests passed")

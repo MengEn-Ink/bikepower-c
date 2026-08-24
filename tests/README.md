@@ -51,6 +51,7 @@ python3 tests/serial_capture.py -p <port> -d 12 --check-boot
 python3 tests/ble_selftest.py
 
 # 跑步 BLE、暂停、恢复、Reset
+./scripts/flash_latest.sh --board generic --test-profile running
 python3 tests/ble_selftest.py --profile running --control 12
 
 # 两次独立扫描与重连
@@ -60,6 +61,8 @@ python3 tests/stage3_conn_test.py -p <port>
 python3 tests/stage5_portal_test.py
 python3 tests/ble_broadcast_monitor.py
 ```
+
+`--test-profile` 只覆盖本次测试固件的运行 profile，不写入 NVS；恢复正式行为时重新烧录不带该参数的固件。`operation_gate.py --level device` 必须用 `--device-profile cycling` 或 `running` 明确声明当前固件，只执行对应 profile 的 BLE P0，另一项保持 `NOT_RUN`。
 
 浏览器监控：
 

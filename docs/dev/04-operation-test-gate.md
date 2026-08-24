@@ -60,10 +60,24 @@ python3 tests/operation_gate.py --level full
 ```bash
 python3 tests/operation_gate.py --level device \
   --board generic-c3 \
+  --device-profile cycling \
   --operator "验收人" \
   --port /dev/cu.usbmodem101 \
   --run-portal
 ```
+
+跑步 profile 需先烧录隔离的测试固件，再在同一 Git ID 的证据文件上累积结果：
+
+```bash
+./scripts/flash_latest.sh --board generic --test-profile running
+python3 tests/operation_gate.py --level device \
+  --board generic-c3 \
+  --device-profile running \
+  --operator "验收人" \
+  --port /dev/cu.usbmodem101
+```
+
+`--test-profile` 不写 NVS；验收结束后重新烧录不带该参数的正式固件。cycling 与 running 不得在未切换 GATT profile 的同一次启动上连续判定。
 
 手工拆分命令：
 

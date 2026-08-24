@@ -13,6 +13,7 @@ DO_ERASE=0
 DO_MONITOR=0
 CAPTURE_SECONDS=15
 TEST_AUTO_CONFIG=OFF
+TEST_PROFILE=""
 STOP_DAEMON=1
 BOARD_TARGET="${BIKEPOWER_BOARD:-generic}"
 SDKCONFIG_BACKUP=""
@@ -35,6 +36,7 @@ usage() {
       --no-capture            烧录后不抓取启动串口日志
       --capture-seconds N     烧录后抓取 N 秒启动日志，默认 15
       --portal-test-auto-config  编译配网自动触发测试固件；默认刷正式固件
+      --test-profile PROFILE    临时覆盖运动 profile（cycling|running），不写 NVS
       --keep-daemon           不自动停止 tests/serial_daemon.py
   -h, --help                  显示帮助
 
@@ -115,6 +117,15 @@ while [ $# -gt 0 ]; do
             ;;
         --portal-test-auto-config)
             TEST_AUTO_CONFIG=ON
+            shift
+            ;;
+        --test-profile)
+            [ $# -ge 2 ] || die "$1 需要 profile 参数"
+            TEST_PROFILE="$2"
+            shift 2
+            ;;
+        --test-profile=*)
+            TEST_PROFILE="${1#*=}"
             shift
             ;;
         --keep-daemon)
@@ -311,7 +322,15 @@ prepare_board_defaults() {
 
 IDF_DETECTED="$(detect_idf_path)" || die "找不到 ESP-IDF，请设置 IDF_PATH，或准备 $HOME/esp/esp-idf-v5.5.4、$PROJECT_DIR/../esp32-power/esp-idf、/home/mengen1014/work/esp32-power/esp-idf、$HOME/esp/esp-idf，或先激活 idf.py"
 activate_idf "$IDF_DETECTED"
-FLASH_BUILD_DIR="$PROJECT_DIR/build/flash-$BOARD_TARGET"
+case "$TEST_PROFILE" in
+    ""|cycling|running) ;;
+    *) die "--test-profile 只允许 cycling 或 running" ;;
+esac
+if [ -n "$TEST_PROFILE" ]; then
+    FLASH_BUILD_DIR="$PROJECT_DIR/build/flash-$BOARD_TARGET-$TEST_PROFILE"
+else
+    FLASH_BUILD_DIR="$PROJECT_DIR/build/flash-$BOARD_TARGET"
+fi
 
 if [ -z "$PORT" ]; then
     PORT="$(detect_port)" || die "找不到串口设备，请用 --port 指定"
@@ -329,7 +348,7 @@ else
 fi
 
 if [ "$DO_BUILD" -eq 1 ]; then
-    log "编译固件（board=${BOARD_TARGET}, PORTAL_TEST_AUTO_CONFIG=${TEST_AUTO_CONFIG}）"
+    log "编译固件（board=${BOARD_TARGET}, PORTAL_TEST_AUTO_CONFIG=${TEST_AUTO_CONFIG}, TEST_PROFILE=${TEST_PROFILE:-default}）"
     prepare_board_defaults
     clear_stale_board_cache
     mkdir -p "$FLASH_BUILD_DIR"
@@ -338,11 +357,13 @@ if [ "$DO_BUILD" -eq 1 ]; then
         -D SDKCONFIG="$FLASH_BUILD_DIR/sdkconfig" \
         -D SDKCONFIG_DEFAULTS="$FLASH_DEFAULTS" \
         -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" \
+        -DBIKEPOWER_TEST_PROFILE="${TEST_PROFILE}" \
         reconfigure
     idf.py -B "$FLASH_BUILD_DIR" \
         -D SDKCONFIG="$FLASH_BUILD_DIR/sdkconfig" \
         -D SDKCONFIG_DEFAULTS="$FLASH_DEFAULTS" \
         -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" \
+        -DBIKEPOWER_TEST_PROFILE="${TEST_PROFILE}" \
         build
 else
     log "跳过显式编译"

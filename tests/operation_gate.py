@@ -206,7 +206,7 @@ def full_steps(gate, build):
         run_step(gate, "ESP-IDF 编译", f"{idf_prefix()}idf.py build", 240)
 
 
-def device_steps(gate, port, run_portal):
+def device_steps(gate, port, run_portal, device_profile):
     if port:
         run_step(
             gate,
@@ -217,20 +217,24 @@ def device_steps(gate, port, run_portal):
         )
     else:
         gate.note_skip("串口启动日志", "未传 --port")
-    run_step(
-        gate,
-        "BLE 自测",
-        "python3 tests/ble_selftest.py",
-        60,
-        acceptance_item="ble_cycling",
-    )
-    run_step(
-        gate,
-        "BLE 跑步 profile 自测",
-        "python3 tests/ble_selftest.py --profile running --control 12",
-        90,
-        acceptance_item="ble_running",
-    )
+    if device_profile == "cycling":
+        run_step(
+            gate,
+            "BLE 骑行 profile 自测",
+            "python3 tests/ble_selftest.py --profile cycling",
+            60,
+            acceptance_item="ble_cycling",
+        )
+        gate.note_skip("BLE 跑步 profile 自测", "当前固件按 cycling profile 构建")
+    else:
+        gate.note_skip("BLE 骑行 profile 自测", "当前固件按 running profile 构建")
+        run_step(
+            gate,
+            "BLE 跑步 profile 自测",
+            "python3 tests/ble_selftest.py --profile running --control 12",
+            90,
+            acceptance_item="ble_running",
+        )
     if run_portal:
         run_step(
             gate,
@@ -267,6 +271,8 @@ def main():
     parser.add_argument("--level", choices=("quick", "full", "device"), default="quick")
     parser.add_argument("--port", default="", help="真机串口，例如 /dev/cu.usbmodem101")
     parser.add_argument("--run-portal", action="store_true", help="device 模式下运行配网门户 HTTP 自测")
+    parser.add_argument("--device-profile", choices=("cycling", "running"), default="cycling",
+                        help="device 模式下当前固件暴露的 BLE profile")
     parser.add_argument("--build", action="store_true", help="full 模式追加 idf.py build")
     parser.add_argument("--report", default="", help="报告输出路径")
     parser.add_argument("--board", choices=("generic-c3", "m5stamp-c3"), default="",
@@ -309,7 +315,7 @@ def main():
     elif args.level == "full":
         full_steps(gate, args.build)
     else:
-        device_steps(gate, args.port, args.run_portal)
+        device_steps(gate, args.port, args.run_portal, args.device_profile)
 
     gate.write_report()
     if gate.failures:
