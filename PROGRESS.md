@@ -21,20 +21,25 @@
 - `make -C test run`：5866 通过，0 失败。
 - `python3 tests/test_ble_protocol_vectors.py`：10 个固定协议向量双路径通过。
 - `python3 tests/operation_gate.py --level full`：通过，包含 6 轮核心流程耐久。
-- `python3 scripts/tools/quality_gate.py`：72 通过，0 失败；工作区未提交产生 2 个预期告警。
-- `idf.py build`：通过，固件大小 `0x116260`，app 分区剩余 72%。
-- 配置一致性：262 通过，0 失败。
+- `python3 scripts/tools/quality_gate.py`：76 通过，0 告警，0 失败。
+- `idf.py build`：通过，固件大小 `0x116250`，app 分区剩余 72%。
+- 配置一致性：252 通过，0 失败。
 - 门户结构：242 通过，0 失败。
 - Portal 响应缓冲复用后，`libmain.a` `.bss` 从 27863 字节降至 12594 字节。
 
+## 最近真机验证
+
+- generic-c3 已烧录当前分支固件。
+- 串口启动日志通过，未发现 panic、WDT、Backtrace 或真实 coredump。
+- 骑行 BLE 服务、CPS/CSC Feature、Sensor Location、通知、ERG 收敛与 Stop 恢复通过。
+- 两次独立扫描、连接、断开与重新广播通过。
+
 ## 当前待验收
 
-当前分支未检测到 ESP32-C3 串口，以下项目保持 `NOT_RUN`，不得复用旧 Git ID 的证据：
+以下项目保持 `NOT_RUN`，不得复用其他 Git ID 或板型的证据：
 
-- generic-c3 与 m5stamp-c3 各自烧录、启动日志与空闲堆。
-- 骑行 BLE 服务、CPS/CSC Feature、ERG 收敛与 Stop 恢复。
-- 跑步 RSC/FTMS、Stop 冻结、Start 恢复、Reset。
-- 两次独立扫描、连接、断开与重新广播。
+- generic-c3 跑步 RSC/FTMS、Stop 冻结、Start 恢复与 Reset。
+- m5stamp-c3 烧录、启动日志、骑行/跑步 BLE 与重连。
 - 配网门户、保存退出、BLE 连续性和 profile 重建提示。
 - 物理按钮、LED、手机 Captive Portal。
 - 72 小时老化。
@@ -49,7 +54,7 @@
 
 ## 下一步
 
-1. 连接 generic-c3，执行 `tests/operation_gate.py --level device`。
-2. 切换 running profile，执行带 `--control` 的跑步 BLE 自测。
+1. 将 generic-c3 切换到 running profile，执行带 `--control` 的跑步 BLE 自测。
+2. 进入配网模式，验证 Portal、广播项、保存退出和 BLE 连续性。
 3. 连接 m5stamp-c3 重复 P0 验收。
-4. 补人工按钮、LED、Captive Portal 和老化证据。
+4. 补人工按钮、LED、手机 Captive Portal 和老化证据。

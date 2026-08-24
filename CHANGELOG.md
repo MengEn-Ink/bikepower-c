@@ -33,9 +33,10 @@
 - `make -C test run`：5866 通过，0 失败。
 - `python3 tests/test_ble_protocol_vectors.py`：10 个向量双路径通过。
 - `python3 tests/operation_gate.py --level full`：通过，包含 6 轮核心流程耐久。
-- `python3 scripts/tools/quality_gate.py`：72 通过，0 失败；仅有工作区未提交告警。
-- `idf.py build`：通过，固件 `0x116260`，app 分区剩余 72%。
-- 当前未检测到 ESP32-C3 串口；真机项目保持 `NOT_RUN`，未复用旧证据。
+- `python3 scripts/tools/quality_gate.py`：76 通过，0 告警，0 失败。
+- `idf.py build`：通过，固件 `0x116250`，app 分区剩余 72%。
+- generic-c3 当前提交已完成烧录、启动日志、骑行 BLE 和两次独立重连验证；跑步、配网与人工项目保持 `NOT_RUN`。
+- 修正 BLE 自测在 CPS、CSC 同时暴露 Sensor Location 时按 UUID 读取产生歧义的问题，并新增回归门禁。
 
 ## [4.1.1] - 2026-08-11
 
