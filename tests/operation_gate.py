@@ -12,7 +12,8 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REPORT_DIR = ROOT / "tests" / "reports"
+REPORT_DIR = ROOT / "build" / "test-reports"
+EVIDENCE_DIR = ROOT / "tests" / "reports"
 TOOLS_DIR = ROOT / "scripts" / "tools"
 sys.path.insert(0, str(TOOLS_DIR))
 
@@ -288,7 +289,7 @@ def main():
         evidence_arg = args.evidence
         if not evidence_arg and args.board:
             evidence_arg = str(
-                REPORT_DIR / f"device-acceptance-{args.board}.json"
+                EVIDENCE_DIR / f"device-acceptance-{args.board}.json"
             )
         elif not evidence_arg:
             evidence_arg = ""

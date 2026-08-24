@@ -378,8 +378,8 @@ log "烧录固件到 $PORT"
 idf.py -B "$FLASH_BUILD_DIR" -p "$PORT" flash
 
 if [ "$CAPTURE_SECONDS" -gt 0 ]; then
-    mkdir -p tests/logs
-    LOG_FILE="tests/logs/flash_latest_$(date +%Y%m%d_%H%M%S).log"
+    mkdir -p build/test-logs
+    LOG_FILE="build/test-logs/flash_latest_$(date +%Y%m%d_%H%M%S).log"
     log "抓取启动日志 ${CAPTURE_SECONDS}s: $LOG_FILE"
     python3 tests/serial_capture.py --port "$PORT" --duration "$CAPTURE_SECONDS" | tee "$LOG_FILE"
 fi

@@ -92,5 +92,5 @@ python3 scripts/tools/check_release_artifacts.py \
 
 - `test/`：纯 C host 单测。
 - `tests/`：Python 门禁、mock、真机和证据工具。
-- `tests/reports/`：只保留当前设备验收 JSON；运行生成的 Markdown 报告不纳入源码。
+- `tests/reports/`：只保留当前设备验收 JSON；运行生成的 Markdown 报告默认写入 `build/test-reports/`。
 - `tests/logs/`：运行日志，不纳入源码。

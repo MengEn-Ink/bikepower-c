@@ -21,7 +21,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MOCK_SERVER = ROOT / "tests" / "mock_server.py"
-REPORT_DIR = ROOT / "tests" / "reports"
+REPORT_DIR = ROOT / "build" / "test-reports"
 DEFAULT_MINUTES = 3
 
 
