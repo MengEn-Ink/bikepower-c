@@ -1,8 +1,5 @@
 /**
- * 功率数据引擎（纯 C，可 host 单测）
- * 由 MicroPython power_data.py + ride_modes.py 移植。
- * 职责：按骑行模式生成功率/踏频/心率快照，支持调功/ERG/模式切换。
- * 不含持久化（由 config_store 负责），不依赖 ESP-IDF。
+ * 功率数据引擎（纯 C，可 host 单测）。
  */
 #pragma once
 
@@ -130,6 +127,7 @@ bool power_engine_set_run_mode(power_engine_t *e, run_mode_t mode);
 bool power_engine_set_run_pacer(power_engine_t *e, run_pacer_type_t pacer);
 bool power_engine_set_run_custom_pacer(power_engine_t *e, const char *name, int pace_low_sec, int pace_high_sec, int cadence_spm);
 bool power_engine_set_run_pace_range(power_engine_t *e, int pace_low_sec, int pace_high_sec);
+bool power_engine_set_run_running(power_engine_t *e, bool running);
 void power_engine_run_reset(power_engine_t *e);
 /* 按跑步快照速度生成心率输出；固定用户心率时直接走锁定心率路径。 */
 int power_engine_running_heartrate(power_engine_t *e, int speed_x100_kmh);

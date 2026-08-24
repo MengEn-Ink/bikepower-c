@@ -1,6 +1,5 @@
 /**
- * BikePower 全局配置常量
- * 由 MicroPython config.py 移植，保持 BLE UUID / 数据格式 / 阈值位级兼容。
+ * BikePower 平台、协议和运行时常量。
  */
 #pragma once
 
@@ -60,8 +59,10 @@ typedef enum {
 
 // ===== 特征值 UUID =====
 #define POWER_CHAR_UUID            0x2A63
+#define CYCLING_POWER_FEATURE_CHAR_UUID 0x2A65
 #define HR_CHAR_UUID               0x2A37
 #define CSC_CHAR_UUID              0x2A5B
+#define CSC_FEATURE_CHAR_UUID      0x2A5C
 #define RSC_MEASUREMENT_CHAR_UUID  0x2A53
 #define RSC_FEATURE_CHAR_UUID      0x2A54
 #define SENSOR_LOCATION_CHAR_UUID  0x2A5D
@@ -144,6 +145,7 @@ typedef enum {
 #define FTMS_RESULT_SUCCESS       0x01
 #define FTMS_RESULT_NOT_SUPPORTED 0x02
 #define FTMS_RESULT_INVALID_PARAM 0x03
+#define FTMS_RESULT_OPERATION_FAILED 0x04
 #define FTMS_CP_BUF_SIZE          20     // FTMS控制点接收缓冲区大小（字节）
 
 // ===== 应用事件队列 =====

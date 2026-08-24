@@ -72,6 +72,7 @@ static int speed_from_pace_sec(int pace_sec)
 void running_engine_init(running_engine_t *e)
 {
     if (!e) return;
+    e->running = true;
     e->speed_x100_kmh = RUN_SPEED_X100_DEFAULT;
     e->pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT;
     e->cadence_spm = RUN_CADENCE_DEFAULT;
@@ -93,6 +94,18 @@ void running_engine_init(running_engine_t *e)
 running_snapshot_t running_engine_snapshot(running_engine_t *e, uint32_t dt_ms)
 {
     if (!e) return (running_snapshot_t){ 0 };
+
+    if (!e->running) {
+        e->snapshot.running = false;
+        e->snapshot.speed_x100_kmh = 0;
+        e->snapshot.cadence_spm = 0;
+        e->snapshot.total_distance_m = e->distance_x1000_m / 1000u;
+        e->snapshot.total_distance_x10_m = e->distance_x1000_m / 100u;
+        e->snapshot.elapsed_time_s = e->elapsed_ms / 1000u;
+        e->snapshot.rsc_speed_1_256_mps = 0;
+        e->snapshot.stride_cm = 0;
+        return e->snapshot;
+    }
 
     e->elapsed_ms += dt_ms;
     int pace_sec;
@@ -123,9 +136,11 @@ running_snapshot_t running_engine_snapshot(running_engine_t *e, uint32_t dt_ms)
         stride_cm = (uint16_t)(((uint32_t)output_speed_x100 * 100u + (uint32_t)output_cadence_spm * 3u) / ((uint32_t)output_cadence_spm * 6u));
     }
 
+    e->snapshot.running = true;
     e->snapshot.speed_x100_kmh = output_speed_x100;
     e->snapshot.cadence_spm = output_cadence_spm;
     e->snapshot.total_distance_m = e->distance_x1000_m / 1000u;
+    e->snapshot.total_distance_x10_m = e->distance_x1000_m / 100u;
     e->snapshot.elapsed_time_s = e->elapsed_ms / 1000u;
     e->snapshot.rsc_speed_1_256_mps = rsc_speed;
     e->snapshot.stride_cm = stride_cm;
@@ -253,11 +268,19 @@ bool running_engine_set_custom_pacer(running_engine_t *e, const char *name, int 
     return changed;
 }
 
+bool running_engine_set_running(running_engine_t *e, bool running)
+{
+    if (!e || e->running == running) return false;
+    e->running = running;
+    return true;
+}
+
 void running_engine_reset_session(running_engine_t *e)
 {
     if (!e) return;
     e->elapsed_ms = 0;
     e->distance_x1000_m = 0;
     e->snapshot.total_distance_m = 0;
+    e->snapshot.total_distance_x10_m = 0;
     e->snapshot.elapsed_time_s = 0;
 }

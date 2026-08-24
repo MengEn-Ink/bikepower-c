@@ -243,10 +243,12 @@ void app_state_handle_event(const app_evt_t *e)
         break;
 
     case APP_EVT_RUN_START:
+        power_engine_set_run_running(s_engine, true);
         ESP_LOGI(TAG, "跑步 FTMS 开始/恢复");
         break;
 
     case APP_EVT_RUN_STOP:
+        power_engine_set_run_running(s_engine, false);
         ESP_LOGI(TAG, "跑步 FTMS 暂停/停止");
         break;
 

@@ -1,5 +1,6 @@
 idf_component_register(
-    SRCS "profile.c"
+    SRCS "ble_payload_codec.c"
+         "profile.c"
          "domain_rng.c"
          "hr_model.c"
          "power_engine.c"

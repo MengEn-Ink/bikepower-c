@@ -10,9 +10,11 @@
 #include "domain_config.h"
 
 typedef struct {
+    bool running;
     int speed_x100_kmh;
     int cadence_spm;
     uint32_t total_distance_m;
+    uint32_t total_distance_x10_m;
     uint32_t elapsed_time_s;
     uint16_t rsc_speed_1_256_mps;
     uint16_t stride_cm;
@@ -26,6 +28,7 @@ typedef struct {
 } running_walk_t;
 
 typedef struct {
+    bool running;
     int speed_x100_kmh;
     int pace_float_sec;
     int cadence_spm;
@@ -53,4 +56,5 @@ bool running_engine_set_mode(running_engine_t *e, run_mode_t mode);
 bool running_engine_set_pacer(running_engine_t *e, run_pacer_type_t pacer);
 bool running_engine_set_custom_pacer(running_engine_t *e, const char *name, int pace_low_sec, int pace_high_sec, int cadence_spm);
 bool running_engine_set_pace_range(running_engine_t *e, int pace_low_sec, int pace_high_sec);
+bool running_engine_set_running(running_engine_t *e, bool running);
 void running_engine_reset_session(running_engine_t *e);
