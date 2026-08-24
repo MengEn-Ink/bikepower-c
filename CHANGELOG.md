@@ -27,16 +27,23 @@
 - 当前文档收敛到 `README.md`、`PROGRESS.md`、`docs/user/`、`docs/dev/` 与 `tests/README.md`。
 - `PROGRESS.md`、技术参考、测试指南与 `.trae` 规则/记忆改为当前事实版；源码删除模板化函数注释，只保留协议、并发、ISR、锁、WDT 和硬件约束。
 - 新增 `tests/check_project_hygiene.py`，阻止历史目录、旧报告、日志、测试二进制和未引用 SVG 回流。
+- 真机验收固件支持隔离的 `cycling` / `running` profile 覆盖，不修改 NVS；device gate 只判定当前声明的 profile。
+- 运行报告与烧录日志改写到 `build/`，避免测试执行后反向污染源码树。
+- ccache 增加统一 `CCACHE_BASEDIR` 与 `CCACHE_NOHASHDIR=true`；实测第二个全新构建目录命中 1048 次。
+- WiFi 完成 timer 回调改为零等待投递；ERG target/clear 始终走同一 last-command mailbox，消除队列交错顺序窗口。
+- BLE 骑行/跑步输入与编码缓冲增加短临界区，保证通知和 GATT read 使用同一帧快照。
 
 ### 验证
 
 - `make -C test run`：5866 通过，0 失败。
 - `python3 tests/test_ble_protocol_vectors.py`：10 个向量双路径通过。
 - `python3 tests/operation_gate.py --level full`：通过，包含 6 轮核心流程耐久。
-- `python3 scripts/tools/quality_gate.py`：76 通过，0 告警，0 失败。
+- `python3 scripts/tools/quality_gate.py`：82 通过，0 告警，0 失败；新增门禁全部接入后的最终结果见提交说明。
 - `idf.py build`：通过，固件 `0x116250`，app 分区剩余 72%。
-- generic-c3 当前提交已完成烧录、启动日志、骑行 BLE 和两次独立重连验证；跑步、配网与人工项目保持 `NOT_RUN`。
+- generic-c3 已分别用 cycling/running 测试固件验证两套 GATT profile；running 的 RSC/FTMS、12km/h 目标、Stop 冻结、Start 恢复与 Reset 全部通过。
+- Portal 测试固件启动后 BLE 骑行链路保持正常；本机企业网络扩展将 `192.168.4.1` 强制路由到 `utun4`，HTTP/广播项/退出测试保持 `NOT_RUN`。
 - 修正 BLE 自测在 CPS、CSC 同时暴露 Sensor Location 时按 UUID 读取产生歧义的问题，并新增回归门禁。
+- 质量门禁明确区分未配置 upstream、存在未推送提交与已同步状态。
 
 ## [4.1.1] - 2026-08-11
 

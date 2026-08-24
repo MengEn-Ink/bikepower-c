@@ -21,7 +21,7 @@
 - `make -C test run`：5866 通过，0 失败。
 - `python3 tests/test_ble_protocol_vectors.py`：10 个固定协议向量双路径通过。
 - `python3 tests/operation_gate.py --level full`：通过，包含 6 轮核心流程耐久。
-- `python3 scripts/tools/quality_gate.py`：76 通过，0 告警，0 失败。
+- `python3 scripts/tools/quality_gate.py`：82 通过，0 告警，0 失败；新增门禁全部接入后的最终结果见提交说明。
 - `idf.py build`：通过，固件大小 `0x116250`，app 分区剩余 72%。
 - 配置一致性：252 通过，0 失败。
 - 门户结构：242 通过，0 失败。
@@ -33,14 +33,15 @@
 - 串口启动日志通过，未发现 panic、WDT、Backtrace 或真实 coredump。
 - 骑行 BLE 服务、CPS/CSC Feature、Sensor Location、通知、ERG 收敛与 Stop 恢复通过。
 - 两次独立扫描、连接、断开与重新广播通过。
+- 隔离的 running 测试固件已通过 RSC/FTMS、12km/h 目标速度、Stop 冻结、Start 恢复和 Reset。
+- ccache 跨两个全新隔离目录实测：第二轮命中 1048 次。
 
 ## 当前待验收
 
 以下项目保持 `NOT_RUN`，不得复用其他 Git ID 或板型的证据：
 
-- generic-c3 跑步 RSC/FTMS、Stop 冻结、Start 恢复与 Reset。
 - m5stamp-c3 烧录、启动日志、骑行/跑步 BLE 与重连。
-- 配网门户、保存退出、BLE 连续性和 profile 重建提示。
+- 配网门户 HTTP、广播项、保存退出和 profile 重建提示；当前测试机的企业网络扩展把 `192.168.4.1` 路由到 `utun4`，无法访问设备 AP。
 - 物理按钮、LED、手机 Captive Portal。
 - 72 小时老化。
 
@@ -54,7 +55,6 @@
 
 ## 下一步
 
-1. 将 generic-c3 切换到 running profile，执行带 `--control` 的跑步 BLE 自测。
-2. 进入配网模式，验证 Portal、广播项、保存退出和 BLE 连续性。
-3. 连接 m5stamp-c3 重复 P0 验收。
-4. 补人工按钮、LED、手机 Captive Portal 和老化证据。
+1. 在不拦截 `192.168.4.0/24` 的网络环境验证 Portal、广播项、保存退出和 BLE 连续性。
+2. 连接 m5stamp-c3 重复 P0 验收。
+3. 补人工按钮、LED、手机 Captive Portal 和老化证据。
