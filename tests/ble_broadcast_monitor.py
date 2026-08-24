@@ -14,6 +14,11 @@ import time
 import urllib.request
 
 from bleak import BleakClient, BleakScanner
+from ble_protocol import (
+    parse_cps as parse_cps_payload,
+    parse_ftms_bike as parse_ftms_bike_payload,
+    parse_rsc as parse_rsc_payload,
+)
 
 DEVICE_NAME = "BikePower"
 
@@ -55,9 +60,11 @@ def parse_hr(data):
 
 
 def parse_cps(data):
-    if len(data) < 4:
+    try:
+        parsed = parse_cps_payload(bytes(data))
+    except ValueError:
         return None
-    return struct.unpack_from("<h", data, 2)[0]
+    return parsed["power_w"]
 
 
 def parse_csc(data, prev):
@@ -77,28 +84,25 @@ def parse_csc(data, prev):
 
 
 def parse_rsc(data):
-    if len(data) < 4:
+    try:
+        parsed = parse_rsc_payload(bytes(data))
+    except ValueError:
         return None
-    speed = struct.unpack_from("<H", data, 1)[0] * 3.6 / 256.0
-    cadence = data[3]
-    return {"speed_kmh": speed, "cadence": cadence}
+    return {
+        "speed_kmh": parsed["speed_1_256_mps"] * 3.6 / 256.0,
+        "cadence": parsed["cadence_spm"],
+    }
 
 
 def parse_ftms_indoor_bike(data):
-    if len(data) < 4:
+    try:
+        parsed = parse_ftms_bike_payload(bytes(data))
+    except ValueError:
         return {"power": None, "cadence": None}
-    flags = struct.unpack_from("<H", data, 0)[0]
-    off = 2
-    if not (flags & 0x0001) and len(data) >= off + 2:
-        off += 2
-    cadence = None
-    if (flags & 0x0004) and len(data) >= off + 2:
-        cadence = struct.unpack_from("<H", data, off)[0] / 2.0
-        off += 2
-    power = None
-    if len(data) >= off + 2:
-        power = struct.unpack_from("<h", data, off)[0]
-    return {"power": power, "cadence": cadence}
+    return {
+        "power": parsed["power_w"],
+        "cadence": parsed["cadence_rpm"],
+    }
 
 
 class BleCounters:

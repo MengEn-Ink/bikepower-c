@@ -70,37 +70,58 @@ async def main():
     t.start()
     time.sleep(1)
 
-    print("扫描设备...")
-    dev = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
-    if not dev:
+    async def find_device():
+        found = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
+        if found:
+            return found
         devices = await BleakScanner.discover(timeout=5)
-        for d in devices:
-            if d.name and d.name.startswith(DEVICE_NAME):
-                dev = d
-                break
-    if not dev:
-        print("未发现设备")
+        for item in devices:
+            if item.name and item.name.startswith(DEVICE_NAME):
+                return item
+        return None
+
+    print("第一次扫描设备...")
+    first_device = await find_device()
+    if not first_device:
+        print("第一次扫描未发现设备")
         stop.set()
         return 1
-    print(f"连接 {dev.address} ...")
-    connected_ok = False
-    disconnected_ok = False
-    async with BleakClient(dev) as client:
-        connected_ok = client.is_connected
-        print("已连接，保持 5s")
-        await asyncio.sleep(5)
-    print("已断开，观察 5s")
-    disconnected_ok = True
+
+    print(f"第一次连接 {first_device.address} ...")
+    first_connected = False
+    async with BleakClient(first_device) as client:
+        first_connected = client.is_connected
+        print("第一次已连接，保持 3s")
+        await asyncio.sleep(3)
+    print("第一次已断开，等待重新广播 3s")
+    await asyncio.sleep(3)
+
+    print("第二次扫描设备...")
+    second_device = await find_device()
+    if not second_device:
+        print("第二次扫描未发现设备")
+        stop.set()
+        return 1
+
+    print(f"第二次连接 {second_device.address} ...")
+    second_connected = False
+    async with BleakClient(second_device) as client:
+        second_connected = client.is_connected
+        print("第二次已连接，保持 3s")
+        await asyncio.sleep(3)
+    print("第二次已断开，观察 5s")
     await asyncio.sleep(5)
+
+    disconnected_ok = first_connected and second_connected
 
     stop.set()
     time.sleep(1.5)
     saw_conn1 = any("conn=1" in x for x in lines)
     saw_change = any("连接状态变化 connected=1" in x for x in lines)
-    ok_ble_link = connected_ok and disconnected_ok
+    ok_ble_link = first_connected and second_connected and disconnected_ok
     ok_state = saw_change or ok_ble_link
     print("--- 结果 ---")
-    print(f"  BLE 连接/断开:       {'通过' if ok_ble_link else '失败'}")
+    print(f"  BLE 两次连接/断开:   {'通过' if ok_ble_link else '失败'}")
     print(f"  状态机收到连接事件: {'通过' if saw_change else '未从 WARN 串口日志观察到'}")
     print(f"  心跳显示 conn=1:    {'通过' if saw_conn1 else '(可能未跨10s心跳，非必须)'}")
     return 0 if ok_state else 1

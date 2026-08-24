@@ -20,6 +20,12 @@ run_host_test() {
     echo "=== Host 单测 ==="
     make -C test
     $HOST_TEST
+    python3 tests/test_ble_protocol_vectors.py
+    python3 tests/check_wifi_done_reliability.py
+    python3 tests/check_ble_reconnect.py
+    python3 tests/check_control_event_reliability.py
+    python3 tests/check_build_isolation.py
+    python3 tests/check_project_hygiene.py
 }
 
 # Mock 配网页保存测试（无需真机）

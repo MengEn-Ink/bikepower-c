@@ -9,11 +9,23 @@ sys.path.insert(0, str(ROOT / "scripts" / "tools"))
 sys.path.insert(0, str(ROOT / "tests"))
 
 from device_acceptance import load_record, new_record, set_item, write_record  # noqa: E402
-from operation_gate import prepare_evidence, record_gate_result  # noqa: E402
+from operation_gate import device_steps, prepare_evidence, record_gate_result  # noqa: E402
 
 TAG = "[operation-gate-evidence-test]"
 VERSION = "9.8.7"
 GIT_SHA = "abc1234"
+
+
+class StepRecorder:
+    def __init__(self):
+        self.steps = []
+        self.skips = []
+
+    def record_step(self, name, required, acceptance_item):
+        self.steps.append((name, required, acceptance_item))
+
+    def note_skip(self, name, reason):
+        self.skips.append((name, reason))
 
 
 def main():
@@ -85,6 +97,37 @@ def main():
         assert prepared is None
         assert not path.exists()
         print(f"{TAG} PASS missing board leaves evidence disabled")
+
+    import operation_gate
+
+    recorder = StepRecorder()
+    original_run_step = operation_gate.run_step
+
+    def fake_run_step(gate, name, command, timeout=120, required=True, acceptance_item=None):
+        del command, timeout
+        gate.record_step(name, required, acceptance_item)
+
+    operation_gate.run_step = fake_run_step
+    try:
+        device_steps(recorder, port="/dev/fake", run_portal=True)
+    finally:
+        operation_gate.run_step = original_run_step
+
+    required_by_item = {
+        acceptance_item: required
+        for _name, required, acceptance_item in recorder.steps
+        if acceptance_item
+    }
+    for item_id in (
+        "serial_boot",
+        "ble_cycling",
+        "ble_running",
+        "ble_reconnect",
+        "portal_http",
+        "broadcast_mask",
+    ):
+        assert required_by_item.get(item_id) is True, f"{item_id} 必须是 required P0"
+    print(f"{TAG} PASS device P0 steps are required")
 
     print(f"{TAG} PASS: operation gate evidence tests passed")
     return 0

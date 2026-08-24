@@ -17,11 +17,18 @@ import struct
 import sys
 
 from bleak import BleakScanner, BleakClient
+from ble_protocol import (
+    parse_cps as parse_cps_payload,
+    parse_ftms_treadmill as parse_treadmill_payload,
+    parse_rsc as parse_rsc_payload,
+)
 
 DEVICE_NAME = "BikePower"
 CPS_UUID = "00002a63-0000-1000-8000-00805f9b34fb"
+CPS_FEATURE_UUID = "00002a65-0000-1000-8000-00805f9b34fb"
 HR_UUID = "00002a37-0000-1000-8000-00805f9b34fb"
 CSC_UUID = "00002a5b-0000-1000-8000-00805f9b34fb"
+CSC_FEATURE_UUID = "00002a5c-0000-1000-8000-00805f9b34fb"
 FTMS_BIKE_UUID = "00002ad2-0000-1000-8000-00805f9b34fb"
 FTMS_TREADMILL_UUID = "00002acd-0000-1000-8000-00805f9b34fb"
 FTMS_FEATURE_UUID = "00002acc-0000-1000-8000-00805f9b34fb"
@@ -124,70 +131,36 @@ CP_RESULT_INVALID_PARAM = 0x03
 
 
 def parse_cps(data: bytes):
-    flags = data[0]
-    power = struct.unpack_from("<h", data, 1)[0]
-    return flags, power
+    parsed = parse_cps_payload(bytes(data))
+    return parsed["flags"], parsed["power_w"]
 
 def parse_rsc(data: bytes):
-    b = bytes(data)
-    if len(b) < 4:
+    try:
+        parsed = parse_rsc_payload(bytes(data))
+    except ValueError:
         return None
-    flags = b[0]
-    speed = struct.unpack_from("<H", b, 1)[0]
-    cadence = b[3]
-    off = 4
-    stride = None
-    distance = None
-    if flags & 0x01 and len(b) >= off + 2:
-        stride = struct.unpack_from("<H", b, off)[0]
-        off += 2
-    if flags & 0x02 and len(b) >= off + 4:
-        distance = struct.unpack_from("<I", b, off)[0]
     return {
-        "flags": flags,
-        "speed": speed,
-        "speed_kmh": speed * 3.6 / 256.0,
-        "cadence": cadence,
-        "stride": stride,
-        "distance": distance,
-        "running": bool(flags & 0x04),
+        "flags": parsed["flags"],
+        "speed": parsed["speed_1_256_mps"],
+        "speed_kmh": parsed["speed_1_256_mps"] * 3.6 / 256.0,
+        "cadence": parsed["cadence_spm"],
+        "stride": parsed["stride_cm"],
+        "distance": parsed["total_distance_x10_m"] / 10.0,
+        "running": parsed["running"],
     }
 
 def parse_treadmill(data: bytes):
-    b = bytes(data)
-    if len(b) < 4:
+    try:
+        parsed = parse_treadmill_payload(bytes(data))
+    except ValueError:
         return None
-    flags = struct.unpack_from("<H", b, 0)[0]
-    speed = struct.unpack_from("<H", b, 2)[0]
-    off = 4
-    distance = None
-    hr = None
-    elapsed = None
-    if flags & 0x0004:
-        if len(b) < off + 3:
-            return None
-        distance = b[off] | (b[off + 1] << 8) | (b[off + 2] << 16)
-        off += 3
-    if flags & 0x0080:
-        if len(b) < off + 4:
-            return None
-        off += 4
-    if flags & 0x0100:
-        if len(b) < off + 1:
-            return None
-        hr = b[off]
-        off += 1
-    if flags & 0x0200:
-        if len(b) < off + 2:
-            return None
-        elapsed = struct.unpack_from("<H", b, off)[0]
     return {
-        "flags": flags,
-        "speed_x100": speed,
-        "speed_kmh": speed / 100.0,
-        "distance": distance,
-        "hr": hr,
-        "elapsed": elapsed,
+        "flags": parsed["flags"],
+        "speed_x100": parsed["speed_x100_kmh"],
+        "speed_kmh": parsed["speed_x100_kmh"] / 100.0,
+        "distance": parsed["distance_m"],
+        "hr": parsed["heart_rate_bpm"],
+        "elapsed": parsed["elapsed_s"],
     }
 
 
@@ -214,6 +187,55 @@ async def check_ftms_feature(client, found, expected_machine_mask, expected_targ
     return ok_machine and ok_target
 
 
+async def check_cycling_features(client, found):
+    expected = {
+        CPS_FEATURE_UUID: ("Cycling Power Feature", 4, 0x00000008),
+        CSC_FEATURE_UUID: ("CSC Feature", 2, 0x0002),
+        SENSOR_LOCATION_UUID: ("Sensor Location", 1, 0x05),
+    }
+    ok = True
+    for uuid, (label, length, expected_value) in expected.items():
+        if uuid not in found:
+            print(f"  {label}: 无特征")
+            ok = False
+            continue
+        try:
+            data = bytes(await client.read_gatt_char(uuid))
+        except Exception as exc:
+            print(f"  {label}: 读取失败 {type(exc).__name__}")
+            ok = False
+            continue
+        value = int.from_bytes(data, "little")
+        matched = len(data) == length and value == expected_value
+        print(f"  {label}: 0x{value:0{length * 2}x} {'通过' if matched else '失败'}")
+        ok = ok and matched
+    return ok
+
+
+async def check_running_features(client, found):
+    expected = {
+        RSC_FEATURE_UUID: ("RSC Feature", 2, 0x0007),
+        SENSOR_LOCATION_UUID: ("Sensor Location", 1, 0x01),
+    }
+    ok = True
+    for uuid, (label, length, expected_value) in expected.items():
+        if uuid not in found:
+            print(f"  {label}: 无特征")
+            ok = False
+            continue
+        try:
+            data = bytes(await client.read_gatt_char(uuid))
+        except Exception as exc:
+            print(f"  {label}: 读取失败 {type(exc).__name__}")
+            ok = False
+            continue
+        value = int.from_bytes(data, "little")
+        matched = len(data) == length and value == expected_value
+        print(f"  {label}: 0x{value:0{length * 2}x} {'通过' if matched else '失败'}")
+        ok = ok and matched
+    return ok
+
+
 async def run_running_profile(client, found):
     services = [
         ("RSC", RSC_UUID),
@@ -237,6 +259,7 @@ async def run_running_profile(client, found):
         expected_machine_mask=0x00000504,
         expected_target_mask=0x00000002,
     )
+    running_features_ok = await check_running_features(client, found)
     samples = []
     treadmill_samples = []
     cp_responses = []
@@ -354,6 +377,8 @@ async def run_running_profile(client, found):
 
     ok_services = not missing
     ok_cp_control = True
+    ok_pause = True
+    ok_resume = True
     ok_reset = True
     if RUN_CONTROL:
         def cp_results(op_code):
@@ -365,6 +390,45 @@ async def run_running_profile(client, found):
             and cp_results(OP_SET_TARGET_SPEED)[-1:] == [CP_RESULT_SUCCESS]
         )
         if FTMS_CP_UUID in found:
+            print("下发 running Stop/Pause(0x08)")
+            before_pause_rsc = len(samples)
+            before_pause_tm = len(treadmill_samples)
+            await client.write_gatt_char(FTMS_CP_UUID, bytes([OP_STOP_PAUSE]), response=True)
+            await asyncio.sleep(3)
+            pause_rsc = samples[before_pause_rsc:]
+            pause_tm = treadmill_samples[before_pause_tm:]
+            pause_responses = cp_results(OP_STOP_PAUSE)
+            ok_pause = bool(
+                pause_responses
+                and pause_responses[-1] == CP_RESULT_SUCCESS
+                and pause_rsc
+                and all(not sample["running"] and sample["speed"] == 0 and sample["cadence"] == 0 for sample in pause_rsc)
+                and pause_tm
+                and all(sample["speed_x100"] == 0 for sample in pause_tm)
+                and len({sample["distance"] for sample in pause_tm}) == 1
+                and len({sample["elapsed"] for sample in pause_tm}) == 1
+            )
+
+            print("下发 running Start/Resume(0x07)")
+            before_resume_rsc = len(samples)
+            before_resume_tm = len(treadmill_samples)
+            await client.write_gatt_char(FTMS_CP_UUID, bytes([OP_START_RESUME]), response=True)
+            await asyncio.sleep(3)
+            resume_rsc = samples[before_resume_rsc:]
+            resume_tm = treadmill_samples[before_resume_tm:]
+            resume_responses = cp_results(OP_START_RESUME)
+            ok_resume = bool(
+                resume_responses
+                and resume_responses[-1] == CP_RESULT_SUCCESS
+                and resume_rsc
+                and resume_rsc[-1]["running"]
+                and resume_rsc[-1]["speed"] > 0
+                and resume_tm
+                and resume_tm[-1]["speed_x100"] > 0
+                and resume_tm[-1]["distance"] >= resume_tm[0]["distance"]
+                and resume_tm[-1]["elapsed"] >= resume_tm[0]["elapsed"]
+            )
+
             print("下发 running Reset(0x01)")
             before_reset_count = len(treadmill_samples)
             await client.write_gatt_char(FTMS_CP_UUID, bytes([OP_RESET]), response=True)
@@ -375,15 +439,17 @@ async def run_running_profile(client, found):
             if reset_samples:
                 ok_reset = ok_reset and reset_samples[0]["distance"] is not None and reset_samples[0]["distance"] <= 2
     ok = (
-        ok_services and dis_ok and ftms_feature_ok and ok_notify and ok_speed and ok_cadence and ok_distance and ok_flags
+        ok_services and dis_ok and ftms_feature_ok and running_features_ok
+        and ok_notify and ok_speed and ok_cadence and ok_distance and ok_flags
         and ok_treadmill_notify and ok_treadmill_speed and ok_treadmill_distance
         and ok_treadmill_hr and ok_treadmill_elapsed
-        and ok_cp_control and ok_reset
+        and ok_cp_control and ok_pause and ok_resume and ok_reset
     )
     print("--- 结果 ---")
     print(f"  跑步服务齐全: {'通过' if ok_services else '失败(' + ','.join(missing) + ')'}")
     print(f"  DIS 设备信息: {'通过' if dis_ok else '失败'}")
     print(f"  FTMS Feature: {'通过' if ftms_feature_ok else '失败'}")
+    print(f"  RSC Feature: {'通过' if running_features_ok else '失败'}")
     print(f"  RSC 通知: {'通过' if ok_notify else '失败'}")
     print(f"  RSC 速度: {'通过' if ok_speed else '失败'}")
     print(f"  RSC 步频: {'通过' if ok_cadence else '失败'}")
@@ -395,6 +461,8 @@ async def run_running_profile(client, found):
     print(f"  FTMS Treadmill 心率: {'通过' if ok_treadmill_hr else '失败'}")
     print(f"  FTMS Treadmill 用时: {'通过' if ok_treadmill_elapsed else '失败'}")
     print(f"  FTMS 跑步控制点: {'通过' if ok_cp_control else '失败'}")
+    print(f"  FTMS 跑步暂停冻结: {'通过' if ok_pause else '失败'}")
+    print(f"  FTMS 跑步恢复累计: {'通过' if ok_resume else '失败'}")
     print(f"  FTMS 跑步 Reset: {'通过' if ok_reset else '失败'}")
     print("总判定:", "通过" if ok else "失败")
     return 0 if ok else 1
@@ -441,8 +509,11 @@ async def main():
 
         services = [
             ("CPS", CPS_UUID),
+            ("CPS-Feature", CPS_FEATURE_UUID),
             ("HR", HR_UUID),
             ("CSC", CSC_UUID),
+            ("CSC-Feature", CSC_FEATURE_UUID),
+            ("SensorLocation", SENSOR_LOCATION_UUID),
             ("FTMS-Bike", FTMS_BIKE_UUID),
             ("FTMS-CP", FTMS_CP_UUID),
         ]
@@ -460,6 +531,7 @@ async def main():
             expected_machine_mask=0x00004002,
             expected_target_mask=0x00000008,
         )
+        cycling_features_ok = await check_cycling_features(client, found)
 
         counts = {"cps": 0, "hr": 0, "csc": 0, "ftms": 0}
         last_power = [0]
@@ -589,11 +661,15 @@ async def main():
         print(f"  五服务齐全: {'通过' if ok_services else '失败(' + ','.join(missing) + ')'}")
         print(f"  DIS 设备信息: {'通过' if dis_ok else '失败'}")
         print(f"  FTMS Feature: {'通过' if ftms_feature_ok else '失败'}")
+        print(f"  CPS/CSC Feature: {'通过' if cycling_features_ok else '失败'}")
         print(f"  CPS 通知:   {'通过' if ok_notify else '失败'}")
         print(f"  FTMS-CP 响应: {'通过' if ok_cp_resp else '失败(' + cp_detail + ')'}")
         print(f"  ERG 功率收敛: {'通过' if ok_erg else '失败'}")
         print(f"  Stop/Pause 响应: {'通过' if ok_stop_resp else '失败'}")
-        ok = ok_notify and ok_services and ftms_feature_ok and ok_cp_resp and ok_erg and ok_stop_resp and dis_ok
+        ok = (
+            ok_notify and ok_services and ftms_feature_ok and cycling_features_ok
+            and ok_cp_resp and ok_erg and ok_stop_resp and dis_ok
+        )
         print("总判定:", "通过" if ok else "失败")
         return 0 if ok else 1
 

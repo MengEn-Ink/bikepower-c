@@ -178,10 +178,16 @@ def run_step(gate, name, command, timeout=120, required=True, acceptance_item=No
 
 def quick_steps(gate):
     run_step(gate, "Host 领域层单测", "make -C test run", 120)
+    run_step(gate, "BLE 协议固定向量", "python3 tests/test_ble_protocol_vectors.py", 60)
     run_step(gate, "Mock 保存回显", "python3 tests/test_portal_config_save.py", 60)
     run_step(gate, "操作覆盖矩阵", "python3 tests/check_operation_coverage.py", 30)
     run_step(gate, "BLE 监控客户端静态门禁", "python3 tests/check_ble_monitor.py", 30)
     run_step(gate, "BLE 广播项监控静态门禁", "python3 tests/check_ble_broadcast_monitor.py", 30)
+    run_step(gate, "BLE 重连脚本静态门禁", "python3 tests/check_ble_reconnect.py", 30)
+    run_step(gate, "WiFi 完成事件可靠性", "python3 tests/check_wifi_done_reliability.py", 30)
+    run_step(gate, "FTMS 控制事件顺序", "python3 tests/check_control_event_reliability.py", 30)
+    run_step(gate, "构建目录隔离", "python3 tests/check_build_isolation.py", 30)
+    run_step(gate, "项目结构清理", "python3 tests/check_project_hygiene.py", 30)
     run_step(gate, "门户结构", "python3 tests/check_portal_structure.py", 60)
     run_step(gate, "门户 JS", "python3 tests/check_portal_js.py", 60)
 
@@ -220,9 +226,8 @@ def device_steps(gate, port, run_portal):
     run_step(
         gate,
         "BLE 跑步 profile 自测",
-        "python3 tests/ble_selftest.py --profile running 8",
-        60,
-        required=False,
+        "python3 tests/ble_selftest.py --profile running --control 12",
+        90,
         acceptance_item="ble_running",
     )
     if run_portal:
@@ -240,7 +245,6 @@ def device_steps(gate, port, run_portal):
         "BLE 连接事件",
         "python3 tests/stage3_conn_test.py",
         60,
-        required=False,
         acceptance_item="ble_reconnect",
     )
     gate.note_skip("BLE 浏览器监控", "运行 python3 scripts/tools/serve_ble_monitor.py 后用 Chrome/Edge 打开 ble-monitor.html；Web Bluetooth 首次授权必须人工点击")
@@ -254,7 +258,7 @@ def device_steps(gate, port, run_portal):
         )
     else:
         gate.note_skip("配网门户 HTTP 自测", "未传 --run-portal；需要设备处于配网态")
-    gate.note_skip("人工按钮/LED/Zwift/MyWhoosh", "必须按 docs/dev/05-operation-test-gate.md 人工记录，不能冒充自动通过")
+    gate.note_skip("人工按钮/LED/Zwift/MyWhoosh", "必须按 docs/dev/04-operation-test-gate.md 人工记录，不能冒充自动通过")
 
 
 def main():

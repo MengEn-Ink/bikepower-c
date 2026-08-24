@@ -16,6 +16,7 @@
 
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -124,8 +125,11 @@ def ensure_idf():
     """若 idf.py 不可用，则按优先级探测 IDF 路径。
     返回 None 表示未找到可用的 ESP-IDF 环境。
     返回 (idf_path, python_exe) 表示可用的 IDF 根目录和对应 Python。"""
-    if idf_ready():
-        return os.environ.get("IDF_PATH", ""), sys.executable
+    if shutil.which("idf.py"):
+        return "", sys.executable
+    active_idf_path = os.environ.get("IDF_PATH", "")
+    if active_idf_path and os.path.exists(os.path.join(active_idf_path, "tools", "idf.py")):
+        return active_idf_path, find_idf_python(active_idf_path)
     # 过滤掉 None/空路径，按顺序探测
     for path in filter(None, IDF_CANDIDATE_PATHS):
         export_file = os.path.join(path, "export.ps1" if IS_WINDOWS else "export.sh")
@@ -150,6 +154,45 @@ def ensure_idf():
     return None
 
 
+def run_idf_build(idf_path, py_exe, build_dir, sdkconfig_path):
+    idf_py = os.path.join(idf_path, "tools", "idf.py") if idf_path else "idf.py"
+    idf_args = [
+        "-B",
+        build_dir,
+        "-D",
+        f"SDKCONFIG={sdkconfig_path}",
+        "-D",
+        "SDKCONFIG_DEFAULTS=sdkconfig.defaults",
+        "build",
+    ]
+    if not idf_path:
+        return run_cmd([idf_py, *idf_args])
+    if IS_WINDOWS:
+        export_ps1 = os.path.join(idf_path, "export.ps1")
+        command = (
+            f"& {shlex.quote(export_ps1)}; "
+            f"& {shlex.quote(py_exe)} {shlex.quote(idf_py)} "
+            + " ".join(shlex.quote(arg) for arg in idf_args)
+        )
+        return run_cmd([
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            command,
+        ])
+    export_sh = os.path.join(idf_path, "export.sh")
+    ccache_env = "export IDF_CCACHE_ENABLE=1 && " if shutil.which("ccache") else ""
+    command = (
+        f". {shlex.quote(export_sh)} >/dev/null 2>&1 && "
+        f"{ccache_env}"
+        f"{shlex.quote(py_exe)} {shlex.quote(idf_py)} "
+        + " ".join(shlex.quote(arg) for arg in idf_args)
+    )
+    return run_cmd(["bash", "-lc", command])
+
+
 # 1. 编译检查
 print("\n=== 1. 编译检查 ===")
 idf_result = ensure_idf()
@@ -157,8 +200,9 @@ if idf_result is None:
     fail("未找到可用的 ESP-IDF v5.5.x 环境，请设置 IDF_PATH 环境变量")
 else:
     idf_path, py_exe = idf_result
-    idf_py = os.path.join(idf_path, "tools", "idf.py") if idf_path else "idf.py"
-    out, rc = run_cmd([py_exe, idf_py, "build"])
+    quality_build = os.path.join(PROJECT, "build", "quality-gate")
+    quality_sdkconfig = os.path.join(quality_build, "sdkconfig")
+    out, rc = run_idf_build(idf_path, py_exe, quality_build, quality_sdkconfig)
     last_lines = "\n".join(out.strip().splitlines()[-5:])
     if rc == 0 and ("Project build complete" in out or "write_flash" in out):
         ok("idf.py build 通过")
@@ -245,11 +289,9 @@ required_assets = [
     "docs/user/03-hardware.md",
     "docs/dev/01-technical-reference.md",
     "docs/dev/02-firmware-security.md",
-    "docs/dev/03-test-coverage-analysis.md",
-    "docs/dev/10-stable-delivery-design.md",
-    "docs/dev/11-stable-delivery-plan.md",
-    "docs/archive/01-cidf-nimble-rewrite.md",
-    "docs/archive/02-micropython-vs-c-comparison.md",
+    "docs/dev/03-running-mode-compatibility.md",
+    "docs/dev/04-operation-test-gate.md",
+    "docs/dev/05-windows-build-guide.md",
     "scripts/tools/generate_release_docs.py",
     "scripts/tools/device_acceptance.py",
     "scripts/tools/publish_gitee_release.py",
@@ -263,7 +305,14 @@ required_assets = [
     "components/bikepower_domain/include/domain_config.h",
     "test/test_domain.c",
     "tests/ble_selftest.py",
+    "tests/ble_protocol.py",
     "tests/ble_broadcast_monitor.py",
+    "tests/test_ble_protocol_vectors.py",
+    "tests/check_wifi_done_reliability.py",
+    "tests/check_ble_reconnect.py",
+    "tests/check_control_event_reliability.py",
+    "tests/check_build_isolation.py",
+    "tests/check_project_hygiene.py",
     "tests/stage3_conn_test.py",
     "tests/stage5_portal_test.py",
     "tests/test_portal_config_save.py",
@@ -314,6 +363,12 @@ STATIC_CHECKS = [
     ("tests/check_ble_monitor.py", "BLE 监控客户端 (TC-3k)"),
     ("tests/check_ble_advertising_fields.py", "BLE 广播字段 (TC-BLE-ADV)"),
     ("tests/check_ble_broadcast_monitor.py", "BLE 广播项监控脚本 (TC-3l)"),
+    ("tests/test_ble_protocol_vectors.py", "BLE 协议固定向量 (TC-BLE-CODEC)"),
+    ("tests/check_wifi_done_reliability.py", "WiFi 完成事件可靠性 (TC-WIFI-DONE)"),
+    ("tests/check_ble_reconnect.py", "BLE 真实重连脚本 (TC-BLE-RECONNECT)"),
+    ("tests/check_control_event_reliability.py", "FTMS 控制事件顺序 (TC-BLE-CONTROL)"),
+    ("tests/check_build_isolation.py", "构建目录隔离 (TC-BUILD-ISOLATION)"),
+    ("tests/check_project_hygiene.py", "项目结构与生成物清理 (TC-PROJECT-HYGIENE)"),
     ("tests/check_release_gate.py", "Release 产物门禁 (TC-3m)"),
     ("tests/test_release_artifacts.py", "Release 产物门禁功能样例 (TC-3p)"),
     ("tests/test_device_acceptance.py", "真机验收证据功能样例 (TC-3q)"),

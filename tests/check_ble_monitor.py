@@ -14,7 +14,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parent.parent
 HTML = ROOT / "tools" / "web" / "ble-monitor.html"
 SERVER = ROOT / "scripts" / "tools" / "serve_ble_monitor.py"
-OP_DOC = ROOT / "docs" / "dev" / "05-operation-test-gate.md"
+OP_DOC = ROOT / "docs" / "dev" / "04-operation-test-gate.md"
 TESTS_README = ROOT / "tests" / "README.md"
 QUALITY_GATE = ROOT / "scripts" / "tools" / "quality_gate.py"
 OP_GATE = ROOT / "tests" / "operation_gate.py"
@@ -57,6 +57,7 @@ def main():
         ("result.power", "FTMS 解析按当前固件变长数据提取功率"),
         ("result.cadence", "FTMS 解析可同步踏频字段"),
         ("parseRsc", "解析 RSC 跑步通知"),
+        ("getUint32(offset, true) / 10", "RSC 累计距离按 0.1m 分辨率换算为米"),
         ("recordAnomaly", "异常统一计数和日志"),
         ("downloadReport", "支持导出监控报告"),
         ("00001818-0000-1000-8000-00805f9b34fb", "包含 Cycling Power Service UUID"),

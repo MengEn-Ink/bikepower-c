@@ -1,0 +1,126 @@
+{
+  "vectors": [
+    {
+      "name": "cps_positive",
+      "protocol": "cps",
+      "args": [200, 4660, 22136],
+      "expected_hex": "2000c80034127856",
+      "expected": {
+        "flags": 32,
+        "power_w": 200,
+        "crank_revs": 4660,
+        "crank_event_time": 22136
+      }
+    },
+    {
+      "name": "cps_negative",
+      "protocol": "cps",
+      "args": [-1, 1, 2],
+      "expected_hex": "2000ffff01000200",
+      "expected": {
+        "flags": 32,
+        "power_w": -1,
+        "crank_revs": 1,
+        "crank_event_time": 2
+      }
+    },
+    {
+      "name": "csc_crank_only",
+      "protocol": "csc",
+      "args": [4660, 22136],
+      "expected_hex": "0234127856",
+      "expected": {
+        "flags": 2,
+        "crank_revs": 4660,
+        "crank_event_time": 22136
+      }
+    },
+    {
+      "name": "hrs_8bit",
+      "protocol": "hrs",
+      "args": [150],
+      "expected_hex": "0096",
+      "expected": {
+        "flags": 0,
+        "heart_rate_bpm": 150
+      }
+    },
+    {
+      "name": "ftms_bike_all",
+      "protocol": "ftms_bike",
+      "args": [1, 1, 2700, 90, 200],
+      "expected_hex": "44008c0ab400c800",
+      "expected": {
+        "flags": 68,
+        "speed_x100_kmh": 2700,
+        "cadence_rpm": 90,
+        "power_w": 200
+      }
+    },
+    {
+      "name": "ftms_bike_cadence_only",
+      "protocol": "ftms_bike",
+      "args": [1, 0, 2700, 90, 200],
+      "expected_hex": "04008c0ab400",
+      "expected": {
+        "flags": 4,
+        "speed_x100_kmh": 2700,
+        "cadence_rpm": 90,
+        "power_w": null
+      }
+    },
+    {
+      "name": "ftms_bike_power_only",
+      "protocol": "ftms_bike",
+      "args": [0, 1, 2700, 90, 200],
+      "expected_hex": "4100c800",
+      "expected": {
+        "flags": 65,
+        "speed_x100_kmh": null,
+        "cadence_rpm": null,
+        "power_w": 200
+      }
+    },
+    {
+      "name": "ftms_treadmill_complete",
+      "protocol": "ftms_treadmill",
+      "args": [1000, 123456, 150, 321],
+      "expected_hex": "0405e80340e201964101",
+      "expected": {
+        "flags": 1284,
+        "speed_x100_kmh": 1000,
+        "distance_m": 123456,
+        "heart_rate_bpm": 150,
+        "elapsed_s": 321
+      }
+    },
+    {
+      "name": "rsc_running",
+      "protocol": "rsc",
+      "args": [1, 711, 170, 100, 1234],
+      "expected_hex": "07c702aa6400d2040000",
+      "expected": {
+        "flags": 7,
+        "running": true,
+        "speed_1_256_mps": 711,
+        "cadence_spm": 170,
+        "stride_cm": 100,
+        "total_distance_x10_m": 1234
+      }
+    },
+    {
+      "name": "rsc_paused",
+      "protocol": "rsc",
+      "args": [0, 711, 170, 100, 1234],
+      "expected_hex": "030000000000d2040000",
+      "expected": {
+        "flags": 3,
+        "running": false,
+        "speed_1_256_mps": 0,
+        "cadence_spm": 0,
+        "stride_cm": 0,
+        "total_distance_x10_m": 1234
+      }
+    }
+  ]
+}

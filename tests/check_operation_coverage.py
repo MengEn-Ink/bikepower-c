@@ -9,7 +9,7 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-DOC = ROOT / "docs" / "dev" / "05-operation-test-gate.md"
+DOC = ROOT / "docs" / "dev" / "04-operation-test-gate.md"
 
 REQUIRED_IDS = [
     "OP-MODE-001",

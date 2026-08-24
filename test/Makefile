@@ -4,6 +4,7 @@ DOMAIN := ../components/bikepower_domain
 CC ?= clang
 CFLAGS := -std=c11 -Wall -Wextra -I$(DOMAIN)/include
 SRCS := test_domain.c \
+        $(DOMAIN)/ble_payload_codec.c \
         $(DOMAIN)/profile.c \
         $(DOMAIN)/domain_rng.c \
         $(DOMAIN)/hr_model.c \

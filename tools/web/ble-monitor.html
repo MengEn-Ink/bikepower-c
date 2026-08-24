@@ -308,7 +308,7 @@ function parseIndoorBike(view) {
     result.cadence = view.getUint16(offset, true) / 2;
     offset += 2;
   }
-  if (view.byteLength >= offset + 2) {
+  if ((flags & 0x0040) && view.byteLength >= offset + 2) {
     result.power = view.getInt16(offset, true);
   }
   return result;
@@ -325,7 +325,7 @@ function parseRsc(view) {
     stride = view.getUint16(offset, true);
     offset += 2;
   }
-  if (flags & 0x02 && view.byteLength >= offset + 4) distance = view.getUint32(offset, true);
+  if (flags & 0x02 && view.byteLength >= offset + 4) distance = view.getUint32(offset, true) / 10;
   return { speed, cadence, stride, distance, running: !!(flags & 0x04) };
 }
 function handlePower(event) {

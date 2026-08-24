@@ -7,7 +7,7 @@ import sys
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "tests" / "ble_broadcast_monitor.py"
 OP_GATE = ROOT / "tests" / "operation_gate.py"
-OP_DOC = ROOT / "docs" / "dev" / "05-operation-test-gate.md"
+OP_DOC = ROOT / "docs" / "dev" / "04-operation-test-gate.md"
 README = ROOT / "tests" / "README.md"
 QUALITY_GATE = ROOT / "scripts" / "tools" / "quality_gate.py"
 

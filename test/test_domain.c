@@ -150,14 +150,17 @@ static void test_adjust_power(void)
 
 static void test_erg(void)
 {
-    printf("[test] ERG 目标功率自动切模式\n");
+    printf("[test] ERG 会话态不污染持久配置\n");
     power_engine_t e;
     power_engine_init(&e);
+    CHECK(power_engine_set_power(&e, 180), "设置ERG前基准功率");
+    power_engine_clear_dirty(&e);
     bool ok = power_engine_set_erg_target(&e, 250);
     CHECK(ok == true, "ERG合法目标返回true");
     CHECK(e.mode == RIDE_MODE_ERG, "ERG下发自动切ERG");
     CHECK(e.has_erg_target && e.erg_active_target == 250, "ERG目标=250");
-    CHECK(e.base_power == 250, "base同步=250");
+    CHECK(e.base_power == 180, "ERG不修改持久基准功率");
+    CHECK(!power_engine_is_dirty(&e), "ERG会话态不置dirty");
     // 超范围拒绝（高于上限）
     ok = power_engine_set_erg_target(&e, 9999);
     CHECK(ok == false, "超范围ERG返回false");
@@ -181,15 +184,16 @@ static void test_erg(void)
     CHECK(!power_engine_is_dirty(&e), "同值ERG不置dirty");
     ok = power_engine_set_erg_target(&e, 260);
     CHECK(ok == true, "新值ERG返回true");
-    CHECK(power_engine_is_dirty(&e), "新值ERG置dirty");
-    CHECK(e.base_power == 260, "新值base同步=260");
+    CHECK(!power_engine_is_dirty(&e), "新值ERG仍不置dirty");
+    CHECK(e.base_power == 180, "新值ERG仍保留基准功率");
 
-    power_engine_clear_dirty(&e);
     CHECK(power_engine_clear_erg_target(&e) == true, "清除ERG目标返回true");
     CHECK(e.mode == RIDE_MODE_STEADY, "清除ERG后回到固定功率模式");
     CHECK(!e.has_erg_target && e.erg_active_target == 0, "清除ERG目标状态");
-    CHECK(power_engine_set_power(&e, 180) == true, "清除ERG后手动设功率恢复生效");
-    CHECK(e.base_power == 180 && e.last_power == 180, "清除ERG后功率可更新");
+    CHECK(e.base_power == 180 && e.last_power == 180, "清除ERG后恢复原基准功率");
+    CHECK(!power_engine_is_dirty(&e), "清除ERG会话态不置dirty");
+    CHECK(power_engine_set_power(&e, 200) == true, "清除ERG后手动设功率恢复生效");
+    CHECK(e.base_power == 200 && e.last_power == 200, "清除ERG后功率可更新");
     CHECK(power_engine_clear_erg_target(&e) == false, "重复清除ERG不置变更");
 
     CHECK(power_engine_set_erg_target(&e, 240) == true, "再次进入ERG成功");
@@ -726,15 +730,14 @@ static void test_engine_blindspots(void)
     power_engine_set_mode(&e, RIDE_MODE_ROAD);
     CHECK(power_engine_set_power(&e, 150) == false, "非 steady set_power 拒绝");
 
-    // set_erg_target 同值幂等：已在 ERG 且目标未变，返回 true 但不置 dirty（防 flash 损耗）
+    // set_erg_target 为连接会话态：首次、同值和变更目标都不置 dirty
     power_engine_init(&e);
     CHECK(power_engine_set_erg_target(&e, 200) == true, "首次 ERG 目标成功");
-    CHECK(e.mode == RIDE_MODE_ERG && e.dirty, "ERG 切模式并置 dirty");
-    power_engine_clear_dirty(&e);
+    CHECK(e.mode == RIDE_MODE_ERG && !e.dirty, "ERG 切模式但不置 dirty");
     CHECK(power_engine_set_erg_target(&e, 200) == true, "同值 ERG 幂等返回 true");
     CHECK(!power_engine_is_dirty(&e), "同值 ERG 不置 dirty");
     CHECK(power_engine_set_erg_target(&e, 210) == true, "变更 ERG 目标成功");
-    CHECK(power_engine_is_dirty(&e), "变更 ERG 置 dirty");
+    CHECK(!power_engine_is_dirty(&e), "变更 ERG 仍不置 dirty");
 
     // reset_mode_state：ERG 有目标时 last_power=目标，无目标时回退 base_power
     power_engine_init(&e);
@@ -1399,10 +1402,36 @@ static void test_running_engine_defaults(void)
     CHECK(first.rsc_speed_1_256_mps == 711, "RSC速度单位=1/256m/s");
     CHECK(first.stride_cm == 98, "默认步幅约98cm");
     CHECK(first.total_distance_m == 2, "1秒后累计距离整数米=2");
+    CHECK(first.total_distance_x10_m == 27, "1秒后RSC累计距离=27分米");
 
     running_snapshot_t second = running_engine_snapshot(&e, 1000);
     CHECK(second.total_distance_m == 5, "2秒后累计距离整数米=5");
+    CHECK(second.total_distance_x10_m == 55, "2秒后RSC累计距离=55分米");
     CHECK(second.elapsed_time_s == 2, "2秒后用时=2s");
+    CHECK(second.running, "跑步引擎默认运行");
+
+    CHECK(running_engine_set_running(&e, false), "跑步暂停成功");
+    running_snapshot_t paused = running_engine_snapshot(&e, 5000);
+    CHECK(!paused.running, "暂停快照标记为未运行");
+    CHECK(paused.speed_x100_kmh == 0, "暂停速度归零");
+    CHECK(paused.cadence_spm == 0, "暂停步频归零");
+    CHECK(paused.stride_cm == 0, "暂停步幅归零");
+    CHECK(paused.total_distance_m == second.total_distance_m, "暂停距离冻结");
+    CHECK(paused.total_distance_x10_m == second.total_distance_x10_m, "暂停RSC距离冻结");
+    CHECK(paused.elapsed_time_s == second.elapsed_time_s, "暂停用时冻结");
+
+    running_engine_reset_session(&e);
+    running_snapshot_t paused_reset = running_engine_snapshot(&e, 1000);
+    CHECK(!paused_reset.running, "暂停时reset保持暂停");
+    CHECK(paused_reset.total_distance_m == 0, "暂停时reset清空距离");
+    CHECK(paused_reset.elapsed_time_s == 0, "暂停时reset清空用时");
+
+    CHECK(running_engine_set_running(&e, true), "跑步恢复成功");
+    running_snapshot_t resumed = running_engine_snapshot(&e, 1000);
+    CHECK(resumed.running, "恢复快照标记为运行");
+    CHECK(resumed.speed_x100_kmh > 0, "恢复后速度非零");
+    CHECK(resumed.total_distance_m > 0, "恢复后距离继续累计");
+    CHECK(resumed.elapsed_time_s == 1, "恢复后用时继续累计");
 
     CHECK(e.pace_float_sec == RUN_PACE_FLOAT_SEC_DEFAULT, "默认跑步配速浮动=10秒/km");
     CHECK(running_engine_set_pace_float(&e, 0), "关闭跑步配速浮动");
@@ -1534,6 +1563,16 @@ static void test_config_migrate_v9_to_v11_running_fields(void)
     CHECK(strcmp(c.run_custom_name, RUN_CUSTOM_NAME_DEFAULT) == 0, "v9 迁移补默认自定义跑步名称");
 }
 
+static void test_config_rejects_persisted_erg(void)
+{
+    printf("[test] 持久配置拒绝ERG会话模式\n");
+    config_data_t c;
+    config_store_defaults(&c);
+    c.mode = RIDE_MODE_ERG;
+    CHECK(config_store_validate(&c), "持久ERG模式被修正");
+    CHECK(c.mode == RIDE_MODE_STEADY, "持久ERG模式规范化为steady");
+}
+
 int main(void)
 {
     test_profile();
@@ -1567,6 +1606,7 @@ int main(void)
     test_running_custom_pacer_validation();
     test_running_control_values();
     test_config_migrate_v9_to_v11_running_fields();
+    test_config_rejects_persisted_erg();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

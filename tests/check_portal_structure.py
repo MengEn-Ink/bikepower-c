@@ -337,6 +337,17 @@ def main():
           "首页和设置页保存都必须复用只剩心率直接控制语义")
     check('id="run-source-picker"' in html and 'id="run-source-summary"' in html,
           "跑步页缺少固定/模板来源胶囊条和摘要")
+    check('id="profile-restart-note"' in html,
+          "首页必须提供 BLE profile 重建等待提示")
+    check('\\"ble_restart_pending\\":%s' in csrc
+          and 'ble_restart_pending' in js
+          and 'profile-restart-note' in js,
+          "后端和前端必须同步 BLE profile 重建等待状态")
+    check('static char s_response_buf[4096]' in csrc,
+          "wifi_portal.c 必须复用单个 4KB HTTP 响应缓冲")
+    response_buffers = re.findall(r'static char (?:buf|item|sample|resp)\[\d+\]', csrc)
+    check(not response_buffers,
+          f"wifi_portal.c 不应保留互斥 handler 的重复静态响应缓冲: {response_buffers}")
     check('id="run-fixed-panel"' in html and 'id="run-custom-panel"' in html,
           "跑步页缺少固定配速区和自定义模板区")
     check('running-incline-row' not in html and 'run-incline' not in html,
