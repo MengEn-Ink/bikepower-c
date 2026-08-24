@@ -21,7 +21,7 @@
 - `make -C test run`：5866 通过，0 失败。
 - `python3 tests/test_ble_protocol_vectors.py`：10 个固定协议向量双路径通过。
 - `python3 tests/operation_gate.py --level full`：通过，包含 6 轮核心流程耐久。
-- `python3 scripts/tools/quality_gate.py`：82 通过，0 告警，0 失败；新增门禁全部接入后的最终结果见提交说明。
+- `python3 scripts/tools/quality_gate.py`：83 通过，0 失败；未配置 upstream 时会明确给出 1 个状态告警。
 - `idf.py build`：通过，固件大小 `0x116250`，app 分区剩余 72%。
 - 配置一致性：252 通过，0 失败。
 - 门户结构：242 通过，0 失败。
