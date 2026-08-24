@@ -32,6 +32,7 @@ var STATE = {
   run_pacers: [],
   remaining_sec: 180,
   closing: false,
+  ble_restart_pending: false,
   hr_locked: false,
   settings_panel: "profile",
   device_name_editing: false,
@@ -535,6 +536,8 @@ function renderHome() {
   $("float-run-hr").textContent = STATE.hr_float;
   $("float-run-pace").textContent = STATE.run_pace_float_sec;
   $("float-run-cadence").textContent = STATE.run_cadence_float;
+  var restartNote = $("profile-restart-note");
+  if (restartNote) restartNote.style.display = STATE.ble_restart_pending ? "block" : "none";
   applyHrLockState();
   updateZoneBadges();
   renderRideSourcePicker();
@@ -955,6 +958,8 @@ function onSave() {
     btn.disabled = false;
     if (status === 200 && data && data.ok) {
       STATE.active_sport_profile = STATE.sport_profile;
+      STATE.ble_restart_pending = !!data.ble_restart_pending;
+      renderHome();
       toast("已保存");
     } else {
       toast("保存失败: " + ((data && data.error) || status));
@@ -1568,6 +1573,8 @@ function onSettingsSave() {
     btn.disabled = false;
     if (status === 200 && data && data.ok) {
       STATE.active_sport_profile = STATE.sport_profile;
+      STATE.ble_restart_pending = !!data.ble_restart_pending;
+      renderHome();
       toast("设置已保存");
     } else {
       toast("保存失败: " + ((data && data.error) || status));
@@ -1725,6 +1732,7 @@ function init() {
       syncCustomPacerOption();
       STATE.remaining_sec = data.remaining_sec != null ? data.remaining_sec : 180;
       STATE.closing = !!data.closing;
+      STATE.ble_restart_pending = !!data.ble_restart_pending;
       STATE.hr_locked = !!data.hr_locked;
       startTimePoll();
       route();

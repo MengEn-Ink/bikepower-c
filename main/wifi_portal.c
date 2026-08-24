@@ -4,7 +4,7 @@
  * 架构（v3.2.0 重构）：
  *   - 静态资源：web/index.html + app.css + app.js 由 scripts/inline_static.py
  *     在编译时内联为 main/web_index_html.h，C 侧 GET / 原样吐出。
- *   - JSON API：21 个 snprintf 拼 HTML 的 handler 改为 14 个 /api/xxx JSON 接口。
+ *   - JSON API：配置、状态、模板和 BLE 扫描接口统一使用 /api/xxx。
  *   - 前端 SPA：app.js 通过 fetch() 调用 /api/xxx 自行渲染，完全脱离 C 代码。
  *
  * 路由表：
@@ -60,7 +60,8 @@ static volatile bool s_closing = false;
 static volatile bool s_done_called = false;
 static volatile bool s_ble_restart_requested = false;
 // 配网结束回调：保存/超时后由 portal 调用，通知 app_main 投递 APP_EVT_WIFI_DONE 切换状态
-static void (*s_done_cb)(void) = NULL;
+static bool (*s_done_cb)(void) = NULL;
+static char s_response_buf[4096];
 
 // ============================ 超时管理 ============================
 
@@ -88,7 +89,9 @@ static void shutdown_check_cb(void *arg)
     (void)arg;
     if (s_done_called) return;
     if (now_sec() >= s_deadline_sec) {
-        ESP_LOGI(TAG, "WiFi 配网窗口到期/收尾窗口到期，关闭 WiFi 回到 BLE");
+        if (!s_closing) {
+            ESP_LOGI(TAG, "WiFi 配网窗口到期/收尾窗口到期，关闭 WiFi 回到 BLE");
+        }
         portal_done();
     }
 }
@@ -96,11 +99,13 @@ static void shutdown_check_cb(void *arg)
 static void portal_done(void)
 {
     if (s_done_called) return;
-    s_done_called = true;
     s_closing = true;
-    ESP_LOGI(TAG, "portal_done 触发，调用 done_cb 投递 APP_EVT_WIFI_DONE");
-    if (s_done_cb) s_done_cb();
-    else ESP_LOGE(TAG, "s_done_cb 为 NULL，APP_EVT_WIFI_DONE 无法投递");
+    if (s_done_cb && s_done_cb()) {
+        s_done_called = true;
+        ESP_LOGI(TAG, "portal_done 已被应用层可靠接收");
+        return;
+    }
+    ESP_LOGW(TAG, "portal_done 尚未被应用层接收，将继续重试");
 }
 
 bool wifi_portal_consume_ble_restart_requested(void)
@@ -203,6 +208,13 @@ static void send_json(httpd_req_t *req, const char *body)
     httpd_resp_sendstr(req, body);
 }
 
+static void begin_json_chunks(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_type(req, "application/json");
+    set_no_store_headers(req);
+}
+
 /* 统一发送纯文本响应（Connection: close + no-store） */
 static void send_text(httpd_req_t *req, const char *body)
 {
@@ -217,7 +229,6 @@ static void send_text(httpd_req_t *req, const char *body)
 static int mode_from_id(const char *id)
 {
     if (strcmp(id, "road") == 0) return RIDE_MODE_ROAD;
-    if (strcmp(id, "erg") == 0) return RIDE_MODE_ERG;
     if (strcmp(id, "steady") == 0) return RIDE_MODE_STEADY;
     return -1;
 }
@@ -549,8 +560,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
     int ride_type_idx = (e->profile.ride_type >= 0 && e->profile.ride_type < RIDE_TYPE_COUNT)
                         ? e->profile.ride_type : 0;
 
-    static char buf[3328];
-    int off = snprintf(buf, sizeof(buf),
+    int off = snprintf(s_response_buf, sizeof(s_response_buf),
         "{\"device_name\":\"%s\",\"firmware_version\":\"%s\",\"firmware_name\":\"%s\","
         "\"board\":\"%s\",\"stable_version\":\"%s\",\"fix_version\":\"%s\",\"git_sha\":\"%s\","
         "\"build_time\":\"%s\","
@@ -572,7 +582,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         "\"led_wifi_mode\":%d,\"led_wifi_color\":%d,"
         "\"led_confirm_mode\":%d,\"led_confirm_color\":%d,"
         "\"led_error_mode\":%d,\"led_error_color\":%d,"
-        "\"remaining_sec\":%d,\"closing\":%s,"
+        "\"remaining_sec\":%d,\"closing\":%s,\"ble_restart_pending\":%s,"
         "\"hr_locked\":%s,"
         "\"pacers\":[",
         dn_esc, FIRMWARE_VERSION, fw_name_esc,
@@ -597,10 +607,11 @@ static esp_err_t h_api_state(httpd_req_t *req)
         e->led.scenes[LED_SCENE_WIFI_CONFIRM].mode, e->led.scenes[LED_SCENE_WIFI_CONFIRM].color,
         e->led.scenes[LED_SCENE_ERROR].mode, e->led.scenes[LED_SCENE_ERROR].color,
         remaining_seconds(), s_closing ? "true" : "false",
+        s_ble_restart_requested ? "true" : "false",
         e->has_user_hr ? "true" : "false");
 
-    for (int i = 0; i < PACER_COUNT && off < (int)sizeof(buf) - 96; i++) {
-        off += snprintf(buf + off, sizeof(buf) - off,
+    for (int i = 0; i < PACER_COUNT && off < (int)sizeof(s_response_buf) - 96; i++) {
+        off += snprintf(s_response_buf + off, sizeof(s_response_buf) - off,
             "%s{\"id\":\"%s\",\"name\":\"%s\",\"wkg_low\":%d.%d,\"wkg_high\":%d.%d}",
             i == 0 ? "" : ",",
             PROFILE_RIDE_TYPE_OPTIONS[i], ROAD_PACERS[i].name,
@@ -608,27 +619,27 @@ static esp_err_t h_api_state(httpd_req_t *req)
             ROAD_PACERS[i].wkg_high / 10, ROAD_PACERS[i].wkg_high % 10);
     }
     /* 追加自定义档（id=custom），昵称和 W/kg 范围取自 profile，供前端下拉与编辑 */
-    if (off < (int)sizeof(buf) - 96) {
-        off += snprintf(buf + off, sizeof(buf) - off,
+    if (off < (int)sizeof(s_response_buf) - 96) {
+        off += snprintf(s_response_buf + off, sizeof(s_response_buf) - off,
             ",{\"id\":\"%s\",\"name\":\"%s\",\"wkg_low\":%d.%d,\"wkg_high\":%d.%d,\"custom\":true}",
             PROFILE_RIDE_TYPE_OPTIONS[PACER_INDEX_CUSTOM],
             custom_name_esc,
             e->profile.custom_wkg_low / 10, e->profile.custom_wkg_low % 10,
             e->profile.custom_wkg_high / 10, e->profile.custom_wkg_high % 10);
     }
-    off += snprintf(buf + off, sizeof(buf) - off, "],\"run_pacers\":[");
-    for (int i = 0; i < RUN_PACER_PRESET_COUNT && off < (int)sizeof(buf) - 128; i++) {
-        off += snprintf(buf + off, sizeof(buf) - off,
+    off += snprintf(s_response_buf + off, sizeof(s_response_buf) - off, "],\"run_pacers\":[");
+    for (int i = 0; i < RUN_PACER_PRESET_COUNT && off < (int)sizeof(s_response_buf) - 128; i++) {
+        off += snprintf(s_response_buf + off, sizeof(s_response_buf) - off,
             "%s{\"id\":\"%s\",\"name\":\"%s\",\"pace_low_sec\":%d,\"pace_high_sec\":%d,\"cadence\":%d}",
             i == 0 ? "" : ",",
             run_pacer_to_id(i), RUN_PACERS[i].name,
             RUN_PACERS[i].pace_low_sec, RUN_PACERS[i].pace_high_sec, RUN_PACERS[i].cadence_spm);
     }
-    off += snprintf(buf + off, sizeof(buf) - off,
+    off += snprintf(s_response_buf + off, sizeof(s_response_buf) - off,
         ",{\"id\":\"custom\",\"name\":\"%s\",\"pace_low_sec\":%d,\"pace_high_sec\":%d,\"cadence\":%d,\"custom\":true}]}",
         run_custom_name_esc, e->running.pace_low_sec, e->running.pace_high_sec, e->running.cadence_spm);
 
-    send_json(req, buf);
+    send_json(req, s_response_buf);
     return ESP_OK;
 }
 
@@ -682,7 +693,10 @@ static esp_err_t h_api_config(httpd_req_t *req)
                  s_engine->profile.ride_type,
                  s_engine->running.speed_x100_kmh, s_engine->running.cadence_spm,
                  s_engine->running.cadence_float_spm);
-        send_json(req, "{\"ok\":true}");
+        snprintf(s_response_buf, sizeof(s_response_buf),
+                 "{\"ok\":true,\"ble_restart_pending\":%s}",
+                 s_ble_restart_requested ? "true" : "false");
+        send_json(req, s_response_buf);
     } else {
         ESP_LOGE(TAG, "配置保存失败，s_engine 保持原值");
         arm_deadline();
@@ -741,7 +755,10 @@ static esp_err_t h_api_close_wifi(httpd_req_t *req)
         /* 5s 收尾窗口：让前端切到 #/closing 页面后关闭 WiFi */
         s_closing = true;
         s_deadline_sec = now_sec() + WIFI_PORTAL_REBOOT_DELAY_SEC;
-        send_json(req, "{\"ok\":true}");
+        snprintf(s_response_buf, sizeof(s_response_buf),
+                 "{\"ok\":true,\"ble_restart_pending\":%s}",
+                 s_ble_restart_requested ? "true" : "false");
+        send_json(req, s_response_buf);
     } else {
         ESP_LOGE(TAG, "配置保存失败，s_engine 保持原值");
         arm_deadline();
@@ -786,12 +803,11 @@ static esp_err_t h_api_device_templates(httpd_req_t *req)
     arm_deadline();
     device_template_list_t list;
     device_template_store_load(&list);
-    static char buf[2048];
-    if (device_template_list_serialize_json(&list, buf, sizeof(buf)) == 0) {
+    if (device_template_list_serialize_json(&list, s_response_buf, sizeof(s_response_buf)) == 0) {
         send_json(req, "{\"max\":5,\"count\":0,\"items\":[]}");
         return ESP_OK;
     }
-    send_json(req, buf);
+    send_json(req, s_response_buf);
     return ESP_OK;
 }
 
@@ -941,12 +957,11 @@ static esp_err_t h_api_ble_scan_stop(httpd_req_t *req)
 static esp_err_t h_api_ble_scan_results(httpd_req_t *req)
 {
     arm_deadline();
-    static char buf[4096];
-    if (ble_scanner_serialize_results(buf, sizeof(buf)) == 0) {
+    if (ble_scanner_serialize_results(s_response_buf, sizeof(s_response_buf)) == 0) {
         send_json(req, "{\"scanning\":false,\"devices\":[]}");
         return ESP_OK;
     }
-    send_json(req, buf);
+    send_json(req, s_response_buf);
     return ESP_OK;
 }
 
@@ -977,14 +992,15 @@ static esp_err_t h_api_ble_scan_read(httpd_req_t *req)
         send_json(req, "{\"ok\":false,\"error\":\"连接或读取设备信息失败\"}");
         return ESP_OK;
     }
-    static char item[1600];
-    if (device_template_serialize_json(&tpl, item, sizeof(item)) == 0) {
+    if (device_template_serialize_json(&tpl, s_response_buf, sizeof(s_response_buf)) == 0) {
         send_json(req, "{\"ok\":false,\"error\":\"设备信息序列化失败\"}");
         return ESP_OK;
     }
-    static char resp[1700];
-    snprintf(resp, sizeof(resp), "{\"ok\":true,\"template\":%s}", item);
-    send_json(req, resp);
+    begin_json_chunks(req);
+    httpd_resp_send_chunk(req, "{\"ok\":true,\"template\":", HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send_chunk(req, s_response_buf, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send_chunk(req, "}", HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
 
@@ -1016,16 +1032,21 @@ static esp_err_t h_api_ble_scan_analyze(httpd_req_t *req)
         send_json(req, "{\"ok\":false,\"error\":\"连接或分析设备失败\"}");
         return ESP_OK;
     }
-    static char item[1600];
-    static char sample[1600];
-    if (device_template_serialize_json(&tpl, item, sizeof(item)) == 0
-        || device_analysis_serialize_json(&analysis, sample, sizeof(sample)) == 0) {
+    if (device_template_serialize_json(&tpl, s_response_buf, sizeof(s_response_buf)) == 0) {
         send_json(req, "{\"ok\":false,\"error\":\"分析结果序列化失败\"}");
         return ESP_OK;
     }
-    static char resp[3400];
-    snprintf(resp, sizeof(resp), "{\"ok\":true,\"template\":%s,\"analysis\":%s}", item, sample);
-    send_json(req, resp);
+    begin_json_chunks(req);
+    httpd_resp_send_chunk(req, "{\"ok\":true,\"template\":", HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send_chunk(req, s_response_buf, HTTPD_RESP_USE_STRLEN);
+    if (device_analysis_serialize_json(&analysis, s_response_buf, sizeof(s_response_buf)) == 0) {
+        httpd_resp_send_chunk(req, NULL, 0);
+        return ESP_FAIL;
+    }
+    httpd_resp_send_chunk(req, ",\"analysis\":", HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send_chunk(req, s_response_buf, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send_chunk(req, "}", HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
 
@@ -1174,7 +1195,7 @@ void wifi_portal_stop(void)
     ESP_LOGI(TAG, "HTTP 配网门户已停止 堆=%lu", (unsigned long)esp_get_free_heap_size());
 }
 
-void wifi_portal_set_done_callback(void (*cb)(void))
+void wifi_portal_set_done_callback(bool (*cb)(void))
 {
     s_done_cb = cb;
 }

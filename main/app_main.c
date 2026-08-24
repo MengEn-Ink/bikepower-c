@@ -31,11 +31,10 @@ static const char *TAG = "APP";
 
 static power_engine_t s_engine;
 static QueueHandle_t s_app_queue;
-// ERG 控制点队列满时的兜底缓存：正常路径使用 app_queue 保序，避免 Stop/Pause 被旧目标覆盖。
-static volatile int s_pending_erg_target = 0;
-static volatile bool s_has_pending_erg = false;
-static volatile int s_pending_erg_clear_reason = 0;
-static volatile bool s_has_pending_erg_clear = false;
+// ERG 控制点队列满时的单槽邮箱：保留最后一条 target/clear 命令，避免两个独立槽反转顺序。
+static volatile app_evt_t s_pending_erg_event;
+static volatile bool s_has_pending_erg_event = false;
+static volatile bool s_pending_wifi_done = false;
 
 /**
  * 处理 FTMS 控制点下发的 ERG 目标功率。
@@ -52,10 +51,10 @@ static bool on_erg_target(int target_power)
     if (s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE) {
         return true;
     }
-    // 队列满时保留最新目标，避免训练 App 高频下发时因瞬时队列压力误报 Invalid Param。
+    // 队列满时保留最后一条 ERG 命令，后续 clear/target 可按真实到达顺序覆盖。
     portDISABLE_INTERRUPTS();
-    s_pending_erg_target = target_power;
-    s_has_pending_erg = true;
+    s_pending_erg_event = e;
+    s_has_pending_erg_event = true;
     portENABLE_INTERRUPTS();
     return true;
 }
@@ -74,8 +73,8 @@ static void on_erg_clear(int reason)
         return;
     }
     portDISABLE_INTERRUPTS();
-    s_pending_erg_clear_reason = reason;
-    s_has_pending_erg_clear = true;
+    s_pending_erg_event = e;
+    s_has_pending_erg_event = true;
     portENABLE_INTERRUPTS();
 }
 
@@ -143,10 +142,14 @@ static void on_wifi_done(void)
     for (int i = 0; i < 5; i++) {
         if (xQueueSend(s_app_queue, &e, pdMS_TO_TICKS(10)) == pdTRUE) {
             ESP_LOGI(TAG, "APP_EVT_WIFI_DONE 已投递（尝试 %d）", i + 1);
-            return;
+            return true;
         }
     }
-    ESP_LOGE(TAG, "APP_EVT_WIFI_DONE 投递失败，设备将卡在 ST_WIFI_CONFIG，需手动重启");
+    portDISABLE_INTERRUPTS();
+    s_pending_wifi_done = true;
+    portENABLE_INTERRUPTS();
+    ESP_LOGW(TAG, "APP_EVT_WIFI_DONE 队列投递失败，已转入主循环 pending latch");
+    return true;
 }
 
 void app_main(void)
@@ -227,32 +230,28 @@ void app_main(void)
         while (xQueueReceive(s_app_queue, &e, 0) == pdTRUE) {
             app_state_handle_event(&e);
         }
-        // 处理待处理的ERG目标：关中断原子复制目标+清标志，避免竞态丢新目标（单核C3足够）
-        int erg_target = 0;
-        bool has_erg = false;
+        bool has_wifi_done = false;
         portDISABLE_INTERRUPTS();
-        if (s_has_pending_erg) {
-            erg_target = s_pending_erg_target;
-            has_erg = true;
-            s_has_pending_erg = false;
+        if (s_pending_wifi_done) {
+            s_pending_wifi_done = false;
+            has_wifi_done = true;
         }
         portENABLE_INTERRUPTS();
-        if (has_erg) {
-            app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = erg_target };
-            app_state_handle_event(&e);
+        if (has_wifi_done) {
+            app_evt_t wifi_done = { .type = APP_EVT_WIFI_DONE, .data = 0 };
+            app_state_handle_event(&wifi_done);
         }
-        int erg_clear_reason = 0;
-        bool has_erg_clear = false;
+        app_evt_t pending_erg_event = { 0 };
+        bool has_pending_erg_event = false;
         portDISABLE_INTERRUPTS();
-        if (s_has_pending_erg_clear) {
-            erg_clear_reason = s_pending_erg_clear_reason;
-            has_erg_clear = true;
-            s_has_pending_erg_clear = false;
+        if (s_has_pending_erg_event) {
+            pending_erg_event = s_pending_erg_event;
+            has_pending_erg_event = true;
+            s_has_pending_erg_event = false;
         }
         portENABLE_INTERRUPTS();
-        if (has_erg_clear) {
-            app_evt_t e = { .type = APP_EVT_ERG_CLEAR, .data = erg_clear_reason };
-            app_state_handle_event(&e);
+        if (has_pending_erg_event) {
+            app_state_handle_event(&pending_erg_event);
         }
 
         // WiFi 配网模式（共存）：BLE 保持在线继续通知，主循环继续生成快照推 BLE；
