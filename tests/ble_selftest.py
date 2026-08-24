@@ -24,6 +24,8 @@ from ble_protocol import (
 )
 
 DEVICE_NAME = "BikePower"
+CPS_SERVICE_UUID = "00001818-0000-1000-8000-00805f9b34fb"
+RSC_SERVICE_UUID = "00001814-0000-1000-8000-00805f9b34fb"
 CPS_UUID = "00002a63-0000-1000-8000-00805f9b34fb"
 CPS_FEATURE_UUID = "00002a65-0000-1000-8000-00805f9b34fb"
 HR_UUID = "00002a37-0000-1000-8000-00805f9b34fb"
@@ -134,6 +136,18 @@ def parse_cps(data: bytes):
     parsed = parse_cps_payload(bytes(data))
     return parsed["flags"], parsed["power_w"]
 
+
+def find_characteristic_in_service(services, service_uuid, characteristic_uuid):
+    service_uuid = service_uuid.lower()
+    characteristic_uuid = characteristic_uuid.lower()
+    for service in services:
+        if service.uuid.lower() != service_uuid:
+            continue
+        for characteristic in service.characteristics:
+            if characteristic.uuid.lower() == characteristic_uuid:
+                return characteristic
+    return None
+
 def parse_rsc(data: bytes):
     try:
         parsed = parse_rsc_payload(bytes(data))
@@ -200,7 +214,14 @@ async def check_cycling_features(client, found):
             ok = False
             continue
         try:
-            data = bytes(await client.read_gatt_char(uuid))
+            characteristic = uuid
+            if uuid == SENSOR_LOCATION_UUID:
+                characteristic = find_characteristic_in_service(
+                    client.services, CPS_SERVICE_UUID, uuid
+                )
+                if characteristic is None:
+                    raise ValueError("CPS Sensor Location 特征不存在")
+            data = bytes(await client.read_gatt_char(characteristic))
         except Exception as exc:
             print(f"  {label}: 读取失败 {type(exc).__name__}")
             ok = False
@@ -224,7 +245,14 @@ async def check_running_features(client, found):
             ok = False
             continue
         try:
-            data = bytes(await client.read_gatt_char(uuid))
+            characteristic = uuid
+            if uuid == SENSOR_LOCATION_UUID:
+                characteristic = find_characteristic_in_service(
+                    client.services, RSC_SERVICE_UUID, uuid
+                )
+                if characteristic is None:
+                    raise ValueError("RSC Sensor Location 特征不存在")
+            data = bytes(await client.read_gatt_char(characteristic))
         except Exception as exc:
             print(f"  {label}: 读取失败 {type(exc).__name__}")
             ok = False

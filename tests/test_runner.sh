@@ -21,6 +21,7 @@ run_host_test() {
     make -C test
     $HOST_TEST
     python3 tests/test_ble_protocol_vectors.py
+    python3 tests/test_ble_selftest_helpers.py
     python3 tests/check_wifi_done_reliability.py
     python3 tests/check_ble_reconnect.py
     python3 tests/check_control_event_reliability.py
