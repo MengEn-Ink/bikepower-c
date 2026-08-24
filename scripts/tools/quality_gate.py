@@ -279,12 +279,21 @@ if shutil.which("git"):
         else:
             fail(f"最近提交 whitespace 检查失败: {out.strip().splitlines()[0] if out.strip() else f'rc={rc}'}")
 
-    out, _ = run_cmd(["git", "-C", PROJECT, "rev-list", "--count", "@{u}..HEAD"])
-    out = out.strip()
-    if out.isdigit() and int(out) > 0:
-        warn(f"有 {out} 个未推送的 commit")
+    upstream, upstream_rc = run_cmd([
+        "git", "-C", PROJECT, "rev-parse", "--abbrev-ref",
+        "--symbolic-full-name", "@{u}",
+    ])
+    if upstream_rc != 0:
+        warn("当前分支未配置 upstream，无法判断是否已推送")
     else:
-        ok("全部已推送（或无上游）")
+        out, rc = run_cmd(["git", "-C", PROJECT, "rev-list", "--count", "@{u}..HEAD"])
+        out = out.strip()
+        if rc != 0 or not out.isdigit():
+            fail("无法判断未推送 commit 数")
+        elif int(out) > 0:
+            warn(f"有 {out} 个未推送的 commit（upstream={upstream.strip()}）")
+        else:
+            ok(f"全部已推送（upstream={upstream.strip()}）")
 else:
     warn("未找到 git，跳过 Git 状态检查")
 
@@ -329,6 +338,7 @@ required_assets = [
     "tests/check_build_isolation.py",
     "tests/check_test_profile_build.py",
     "tests/check_ble_snapshot_atomicity.py",
+    "tests/test_quality_gate_git_status.py",
     "tests/check_project_hygiene.py",
     "tests/stage3_conn_test.py",
     "tests/stage5_portal_test.py",
@@ -389,6 +399,7 @@ STATIC_CHECKS = [
     ("tests/check_build_isolation.py", "构建目录隔离 (TC-BUILD-ISOLATION)"),
     ("tests/check_test_profile_build.py", "测试 profile 构建隔离 (TC-TEST-PROFILE)"),
     ("tests/check_ble_snapshot_atomicity.py", "BLE 快照原子性 (TC-BLE-SNAPSHOT)"),
+    ("tests/test_quality_gate_git_status.py", "Git 推送状态判定 (TC-GIT-STATUS)"),
     ("tests/check_project_hygiene.py", "项目结构与生成物清理 (TC-PROJECT-HYGIENE)"),
     ("tests/check_release_gate.py", "Release 产物门禁 (TC-3m)"),
     ("tests/test_release_artifacts.py", "Release 产物门禁功能样例 (TC-3p)"),

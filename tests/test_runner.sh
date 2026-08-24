@@ -24,6 +24,7 @@ run_host_test() {
     python3 tests/test_ble_selftest_helpers.py
     python3 tests/test_report_paths.py
     python3 tests/check_ble_snapshot_atomicity.py
+    python3 tests/test_quality_gate_git_status.py
     python3 tests/check_wifi_done_reliability.py
     python3 tests/check_ble_reconnect.py
     python3 tests/check_control_event_reliability.py
