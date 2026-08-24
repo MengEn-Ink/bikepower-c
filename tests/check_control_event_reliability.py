@@ -11,6 +11,12 @@ checks = [
     ("s_pending_erg_target" not in SOURCE, "不得分别缓存 ERG target"),
     ("s_pending_erg_clear" not in SOURCE, "不得分别缓存 ERG clear"),
 ]
+target_callback = SOURCE.split("static bool on_erg_target", 1)[1].split("static void on_erg_clear", 1)[0]
+clear_callback = SOURCE.split("static void on_erg_clear", 1)[1].split("static bool on_run_control", 1)[0]
+checks.extend([
+    ("xQueueSend" not in target_callback, "ERG target 不得与队列混用导致新旧命令反转"),
+    ("xQueueSend" not in clear_callback, "ERG clear 不得与队列混用导致新旧命令反转"),
+])
 
 failures = [message for condition, message in checks if not condition]
 for failure in failures:

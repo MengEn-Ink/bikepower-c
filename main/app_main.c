@@ -41,10 +41,7 @@ static bool on_erg_target(int target_power)
     // 范围校验：与领域层 POWER_MIN/POWER_MAX 一致
     if (target_power < POWER_MIN || target_power > POWER_MAX) return false;
     app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = target_power };
-    if (s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE) {
-        return true;
-    }
-    // 队列满时保留最后一条 ERG 命令，后续 clear/target 可按真实到达顺序覆盖。
+    // target/clear 统一走单槽邮箱，严格保留最后到达的命令，避免与队列交错后顺序反转。
     portDISABLE_INTERRUPTS();
     s_pending_erg_event = e;
     s_has_pending_erg_event = true;
@@ -55,9 +52,6 @@ static bool on_erg_target(int target_power)
 static void on_erg_clear(int reason)
 {
     app_evt_t e = { .type = APP_EVT_ERG_CLEAR, .data = reason };
-    if (s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE) {
-        return;
-    }
     portDISABLE_INTERRUPTS();
     s_pending_erg_event = e;
     s_has_pending_erg_event = true;
