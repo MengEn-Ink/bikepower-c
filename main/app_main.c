@@ -101,13 +101,10 @@ static void on_wifi_exit(void)
 static bool on_wifi_done(void)
 {
     app_evt_t e = { .type = APP_EVT_WIFI_DONE, .data = 0 };
-    // esp_timer 任务上下文投递事件给主循环。队列满时短暂重试，避免事件丢失导致
-    // 永久卡在 ST_WIFI_CONFIG（portal_done 的 s_closing 守卫会阻止后续重试）。
-    for (int i = 0; i < 5; i++) {
-        if (xQueueSend(s_app_queue, &e, pdMS_TO_TICKS(10)) == pdTRUE) {
-            ESP_LOGI(TAG, "APP_EVT_WIFI_DONE 已投递（尝试 %d）", i + 1);
-            return true;
-        }
+    // esp_timer 任务上下文不得阻塞；队列满时使用主循环消费的 pending latch。
+    if (s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE) {
+        ESP_LOGI(TAG, "APP_EVT_WIFI_DONE 已投递");
+        return true;
     }
     portDISABLE_INTERRUPTS();
     s_pending_wifi_done = true;

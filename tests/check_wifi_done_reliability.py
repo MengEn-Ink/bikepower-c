@@ -20,6 +20,9 @@ check("bool (*cb)(void)" in PORTAL_H, "done callback 必须返回 bool")
 check("static bool on_wifi_done(void)" in APP_MAIN, "app_main done callback 必须返回 bool")
 check("s_pending_wifi_done" in APP_MAIN, "app_main 必须提供 pending WiFi done latch")
 check("if (s_pending_wifi_done)" in APP_MAIN, "主循环必须消费 pending WiFi done latch")
+done_callback = APP_MAIN.split("static bool on_wifi_done(void)", 1)[1].split("void app_main(void)", 1)[0]
+check("pdMS_TO_TICKS" not in done_callback, "esp_timer done callback 禁止阻塞等待队列")
+check("xQueueSend(s_app_queue, &e, 0)" in done_callback, "done callback 只能零等待投递")
 check("if (s_done_cb && s_done_cb())" in PORTAL_C, "portal 仅在回调接受后标记完成")
 shutdown_body = PORTAL_C.split("static void shutdown_check_cb", 1)[1].split(
     "static void portal_done", 1
