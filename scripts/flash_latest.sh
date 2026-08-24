@@ -206,6 +206,8 @@ activate_idf() {
 
     if command -v ccache >/dev/null 2>&1; then
         export IDF_CCACHE_ENABLE=1
+        export CCACHE_BASEDIR="$PROJECT_DIR"
+        export CCACHE_NOHASHDIR=true
     fi
     idf.py --version
 }

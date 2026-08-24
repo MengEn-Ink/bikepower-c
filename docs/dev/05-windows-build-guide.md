@@ -118,6 +118,7 @@ Add-MpPreference -ExclusionPath "$env:USERPROFILE\.espressif"
 ### 3.1 ccache（最有效，已启用）
 
 ESP-IDF 使用环境变量 `IDF_CCACHE_ENABLE=1` 启用 ccache。项目 PowerShell 构建入口检测到 `ccache` 后会自动设置该变量。
+同时设置 `CCACHE_BASEDIR` 与 `CCACHE_NOHASHDIR=true`，使 release、flash 和 quality gate 的隔离构建目录可以共享缓存键。
 
 - 首次编译：无加速（填缓存）
 - 后续增量编译：快 50-80%
@@ -261,4 +262,4 @@ Python 环境不匹配。原因：系统 Python 被误用而非 IDF Python venv�
 | [scripts/build_all.ps1](../../scripts/build_all.ps1) | 完整 Release 构建 |
 | [scripts/flash_latest.ps1](../../scripts/flash_latest.ps1) | 编译+烧录 |
 | [scripts/idf_common.psm1](../../scripts/idf_common.psm1) | PowerShell 共享模块 |
-| [sdkconfig.defaults](../../sdkconfig.defaults) | 默认配置（含 ccache 启用） |
+| [sdkconfig.defaults](../../sdkconfig.defaults) | 固件默认配置；ccache 由构建脚本按环境启用 |

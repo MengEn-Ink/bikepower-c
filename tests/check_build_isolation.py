@@ -9,6 +9,8 @@ FILES = {
     "build_all.ps1": ROOT / "scripts" / "build_all.ps1",
     "flash_latest.ps1": ROOT / "scripts" / "flash_latest.ps1",
     "quality_gate.py": ROOT / "scripts" / "tools" / "quality_gate.py",
+    "idf_common.psm1": ROOT / "scripts" / "idf_common.psm1",
+    "build_firmware.sh": ROOT / "scripts" / "platform" / "unix" / "build_firmware.sh",
 }
 
 sources = {name: path.read_text(encoding="utf-8-sig") for name, path in FILES.items()}
@@ -20,6 +22,21 @@ checks = [
      "build_all.ps1 使用板型专用构建目录"),
     ('"build-flash-" + $Board' in sources["flash_latest.ps1"], "flash_latest.ps1 使用烧录专用构建目录"),
     ('"build", "quality-gate"' in sources["quality_gate.py"], "quality_gate.py 使用专用构建目录"),
+    ('CCACHE_BASEDIR="$PROJECT_DIR"' in sources["build_all.sh"]
+     and 'CCACHE_NOHASHDIR=true' in sources["build_all.sh"],
+     "build_all.sh 支持跨隔离目录复用 ccache"),
+    ('CCACHE_BASEDIR="$PROJECT_DIR"' in sources["flash_latest.sh"]
+     and 'CCACHE_NOHASHDIR=true' in sources["flash_latest.sh"],
+     "flash_latest.sh 支持跨隔离目录复用 ccache"),
+    ('CCACHE_BASEDIR' in sources["quality_gate.py"]
+     and 'CCACHE_NOHASHDIR' in sources["quality_gate.py"],
+     "quality_gate.py 支持跨隔离目录复用 ccache"),
+    ('$env:CCACHE_BASEDIR' in sources["idf_common.psm1"]
+     and '$env:CCACHE_NOHASHDIR' in sources["idf_common.psm1"],
+     "Windows 构建支持跨隔离目录复用 ccache"),
+    ('CCACHE_BASEDIR="$PROJECT_DIR"' in sources["build_firmware.sh"]
+     and 'CCACHE_NOHASHDIR=true' in sources["build_firmware.sh"],
+     "Unix 通用构建支持跨隔离目录复用 ccache"),
 ]
 
 failures = [message for condition, message in checks if not condition]

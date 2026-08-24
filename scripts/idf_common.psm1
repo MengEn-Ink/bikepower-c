@@ -155,6 +155,8 @@ function Activate-IdfEnv {
         }
         if (Get-Command "ccache" -ErrorAction SilentlyContinue) {
             $env:IDF_CCACHE_ENABLE = "1"
+            $env:CCACHE_BASEDIR = $Global:BikePowerProjectDir
+            $env:CCACHE_NOHASHDIR = "true"
         }
         Write-Log "使用当前 shell 中已激活的 ESP-IDF"
         return
@@ -181,6 +183,8 @@ function Activate-IdfEnv {
     }
     if (Get-Command "ccache" -ErrorAction SilentlyContinue) {
         $env:IDF_CCACHE_ENABLE = "1"
+        $env:CCACHE_BASEDIR = $Global:BikePowerProjectDir
+        $env:CCACHE_NOHASHDIR = "true"
     }
     Write-Success ("ESP-IDF 已激活: IDF_PATH=" + $env:IDF_PATH)
 }

@@ -173,6 +173,8 @@ echo "激活ESP-IDF环境: $IDF_PATH"
 source "$IDF_PATH/export.sh" > /dev/null
 if command -v ccache >/dev/null 2>&1; then
     export IDF_CCACHE_ENABLE=1
+    export CCACHE_BASEDIR="$PROJECT_DIR"
+    export CCACHE_NOHASHDIR=true
 fi
 
 cd "$PROJECT_DIR"

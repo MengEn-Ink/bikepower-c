@@ -67,7 +67,7 @@ def find_python():
     return sys.executable
 
 
-def run_cmd(cmd_args, cwd=PROJECT, timeout=None):
+def run_cmd(cmd_args, cwd=PROJECT, timeout=None, env=None):
     """以列表参数形式运行命令，返回 (stdout+stderr, returncode)。
     优先直接传参，不经过 shell，避免平台差异。"""
     try:
@@ -77,6 +77,7 @@ def run_cmd(cmd_args, cwd=PROJECT, timeout=None):
             text=True,
             cwd=cwd,
             timeout=timeout,
+            env=env,
         )
         return r.stdout + r.stderr, r.returncode
     except FileNotFoundError as e:
@@ -165,8 +166,16 @@ def run_idf_build(idf_path, py_exe, build_dir, sdkconfig_path):
         "SDKCONFIG_DEFAULTS=sdkconfig.defaults",
         "build",
     ]
+    ccache_available = shutil.which("ccache") is not None
+    build_env = os.environ.copy()
+    if ccache_available:
+        build_env.update({
+            "IDF_CCACHE_ENABLE": "1",
+            "CCACHE_BASEDIR": PROJECT,
+            "CCACHE_NOHASHDIR": "true",
+        })
     if not idf_path:
-        return run_cmd([idf_py, *idf_args])
+        return run_cmd([idf_py, *idf_args], env=build_env)
     if IS_WINDOWS:
         export_ps1 = os.path.join(idf_path, "export.ps1")
         command = (
@@ -183,7 +192,11 @@ def run_idf_build(idf_path, py_exe, build_dir, sdkconfig_path):
             command,
         ])
     export_sh = os.path.join(idf_path, "export.sh")
-    ccache_env = "export IDF_CCACHE_ENABLE=1 && " if shutil.which("ccache") else ""
+    ccache_env = (
+        f"export IDF_CCACHE_ENABLE=1 CCACHE_BASEDIR={shlex.quote(PROJECT)} "
+        "CCACHE_NOHASHDIR=true && "
+        if ccache_available else ""
+    )
     command = (
         f". {shlex.quote(export_sh)} >/dev/null 2>&1 && "
         f"{ccache_env}"
