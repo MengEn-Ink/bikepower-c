@@ -100,6 +100,8 @@ static esp_timer_handle_t g_notify_timer = NULL;
 static volatile bool g_ready = false;
 static volatile bool g_stopping = false;
 static volatile bool g_start_failed = false;
+// 保护 app_main 写入与 timer/GATT 回调读取的整组运动数据和编码缓冲。
+static portMUX_TYPE g_data_mux = portMUX_INITIALIZER_UNLOCKED;
 // 通知互斥锁：保证 notify_tick 回调与 ble_bikepower_stop 的 deinit 互斥，
 // stop 在释放 NimBLE 前必须先拿到锁，确保没有 notify 回调正在访问协议栈（消除 UAF 窗口）。
 static SemaphoreHandle_t g_notify_lock = NULL;
@@ -117,24 +119,48 @@ static int chr_read_buf(struct ble_gatt_access_ctxt *ctxt, const uint8_t *buf, s
     return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
+static int chr_read_measurement(struct ble_gatt_access_ctxt *ctxt,
+                                const uint8_t *buf, size_t len)
+{
+    uint8_t snapshot[10];
+    if (len > sizeof(snapshot)) return BLE_ATT_ERR_UNLIKELY;
+    portENTER_CRITICAL(&g_data_mux);
+    memcpy(snapshot, buf, len);
+    portEXIT_CRITICAL(&g_data_mux);
+    return chr_read_buf(ctxt, snapshot, len);
+}
+
+static int chr_read_variable_measurement(struct ble_gatt_access_ctxt *ctxt,
+                                         const uint8_t *buf, const size_t *len)
+{
+    uint8_t snapshot[10];
+    size_t snapshot_len;
+    portENTER_CRITICAL(&g_data_mux);
+    snapshot_len = *len;
+    if (snapshot_len <= sizeof(snapshot)) memcpy(snapshot, buf, snapshot_len);
+    portEXIT_CRITICAL(&g_data_mux);
+    if (snapshot_len > sizeof(snapshot)) return BLE_ATT_ERR_UNLIKELY;
+    return chr_read_buf(ctxt, snapshot, snapshot_len);
+}
+
 static int cps_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_cps_buf, sizeof(g_cps_buf));
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_measurement(ctxt, g_cps_buf, sizeof(g_cps_buf));
     return BLE_ATT_ERR_UNLIKELY;
 }
 
 static int hr_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_hr_buf, sizeof(g_hr_buf));
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_measurement(ctxt, g_hr_buf, sizeof(g_hr_buf));
     return BLE_ATT_ERR_UNLIKELY;
 }
 
 static int csc_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_csc_buf, sizeof(g_csc_buf));
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_measurement(ctxt, g_csc_buf, sizeof(g_csc_buf));
     return BLE_ATT_ERR_UNLIKELY;
 }
 
@@ -159,7 +185,7 @@ static int csc_feature_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt 
 static int rsc_measurement_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_rsc_buf, sizeof(g_rsc_buf));
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_measurement(ctxt, g_rsc_buf, sizeof(g_rsc_buf));
     return BLE_ATT_ERR_UNLIKELY;
 }
 
@@ -195,14 +221,18 @@ static int ftms_feat_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
 static int ftms_bike_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_ftms_bike_buf, g_ftms_bike_len);
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        return chr_read_variable_measurement(ctxt, g_ftms_bike_buf, &g_ftms_bike_len);
+    }
     return BLE_ATT_ERR_UNLIKELY;
 }
 
 static int ftms_treadmill_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_ftms_treadmill_buf, g_ftms_treadmill_len);
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        return chr_read_variable_measurement(ctxt, g_ftms_treadmill_buf, &g_ftms_treadmill_len);
+    }
     return BLE_ATT_ERR_UNLIKELY;
 }
 
@@ -515,8 +545,9 @@ static const struct ble_gatt_svc_def *active_gatt_svcs(void)
 
 // ============================ 数据打包 ============================
 
-static void pack_all(void)
+static uint8_t pack_all(void)
 {
+    portENTER_CRITICAL(&g_data_mux);
     uint16_t power = g_power_w;
     uint16_t cadence = g_cadence;
     if (cadence < 1) cadence = 1;
@@ -545,10 +576,14 @@ static void pack_all(void)
         g_ftms_bike_buf, sizeof(g_ftms_bike_buf),
         cadence_enabled, power_enabled,
         (uint16_t)(cadence * 30u), cadence, (int16_t)power);
+    uint8_t mask = g_broadcast_mask;
+    portEXIT_CRITICAL(&g_data_mux);
+    return mask;
 }
 
-static void pack_running(void)
+static uint8_t pack_running(void)
 {
+    portENTER_CRITICAL(&g_data_mux);
     uint16_t speed = g_run_speed;
     uint16_t stride = g_run_stride_cm;
     uint32_t distance = g_run_distance_m;
@@ -562,6 +597,9 @@ static void pack_running(void)
     g_ftms_treadmill_len = ble_payload_encode_treadmill(
         g_ftms_treadmill_buf, sizeof(g_ftms_treadmill_buf),
         g_run_speed_x100, distance, g_hr_bpm, elapsed16);
+    uint8_t mask = g_broadcast_mask;
+    portEXIT_CRITICAL(&g_data_mux);
+    return mask;
 }
 
 static void notify_one_nolock(uint16_t handle, const uint8_t *buf, size_t len)
@@ -600,20 +638,20 @@ static void notify_tick(void *arg)
         return;
     }
     if (g_profile == SPORT_PROFILE_RUNNING) {
-        pack_running();
-        if ((g_broadcast_mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) == (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) {
+        uint8_t mask = pack_running();
+        if ((mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) == (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) {
             notify_one_nolock(g_rsc_val_handle, g_rsc_buf, sizeof(g_rsc_buf));
         }
-        if (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
-        if (g_broadcast_mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_HEARTRATE)) {
+        if (mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
+        if (mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_HEARTRATE)) {
             notify_one_nolock(g_ftms_treadmill_handle, g_ftms_treadmill_buf, g_ftms_treadmill_len);
         }
     } else {
-        pack_all();
-        if (g_broadcast_mask & BROADCAST_FIELD_POWER) notify_one_nolock(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
-        if (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
-        if (g_broadcast_mask & BROADCAST_FIELD_CADENCE) notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
-        if (g_broadcast_mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, g_ftms_bike_len);
+        uint8_t mask = pack_all();
+        if (mask & BROADCAST_FIELD_POWER) notify_one_nolock(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
+        if (mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
+        if (mask & BROADCAST_FIELD_CADENCE) notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
+        if (mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, g_ftms_bike_len);
     }
     xSemaphoreGive(g_notify_lock);
 }
@@ -772,16 +810,20 @@ static void ble_host_task(void *param)
 
 void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm)
 {
+    portENTER_CRITICAL(&g_data_mux);
     g_power_w = power_w;
     g_hr_bpm = heartrate_bpm;
     g_cadence = cadence_rpm;
+    portEXIT_CRITICAL(&g_data_mux);
 }
 
 void ble_bikepower_set_broadcast_mask(int mask)
 {
     int normalized = mask & BROADCAST_FIELD_ALL;
     if (normalized == 0) normalized = BROADCAST_FIELD_ALL;
+    portENTER_CRITICAL(&g_data_mux);
     g_broadcast_mask = (uint8_t)normalized;
+    portEXIT_CRITICAL(&g_data_mux);
 }
 
 void ble_bikepower_set_profile(sport_profile_t profile)
@@ -792,6 +834,7 @@ void ble_bikepower_set_profile(sport_profile_t profile)
 
 void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartrate_bpm)
 {
+    portENTER_CRITICAL(&g_data_mux);
     g_run_speed = snapshot.rsc_speed_1_256_mps;
     g_run_speed_x100 = (uint16_t)snapshot.speed_x100_kmh;
     g_run_running = snapshot.running;
@@ -801,6 +844,7 @@ void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartra
     g_run_distance_m = snapshot.total_distance_m;
     g_run_distance_x10_m = snapshot.total_distance_x10_m;
     g_run_elapsed_s = snapshot.elapsed_time_s;
+    portEXIT_CRITICAL(&g_data_mux);
 }
 
 void ble_bikepower_set_erg_callback(ble_erg_cb_t cb)

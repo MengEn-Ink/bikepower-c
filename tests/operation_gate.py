@@ -181,6 +181,7 @@ def quick_steps(gate):
     run_step(gate, "Host 领域层单测", "make -C test run", 120)
     run_step(gate, "BLE 协议固定向量", "python3 tests/test_ble_protocol_vectors.py", 60)
     run_step(gate, "BLE 自测辅助函数", "python3 tests/test_ble_selftest_helpers.py", 30)
+    run_step(gate, "BLE 快照原子性", "python3 tests/check_ble_snapshot_atomicity.py", 30)
     run_step(gate, "Mock 保存回显", "python3 tests/test_portal_config_save.py", 60)
     run_step(gate, "操作覆盖矩阵", "python3 tests/check_operation_coverage.py", 30)
     run_step(gate, "BLE 监控客户端静态门禁", "python3 tests/check_ble_monitor.py", 30)
