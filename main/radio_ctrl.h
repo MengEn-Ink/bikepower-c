@@ -13,30 +13,8 @@
 #include "esp_err.h"
 #include "power_engine.h"
 
-/**
- * 进入 WiFi 配网模式（共存版）。
- * BLE 保持在线继续通知，直接启动 SoftAP 和 HTTP 配网门户，配置变更通过 power_engine setter 实时生效。
- * 极端失败兜底：WiFi 启动彻底失败时降级为停 BLE + esp_restart 恢复。
- * engine：配网门户读写配置时使用的功率引擎实例。
- * 返回值：无。
- * 特殊行为：这是唯一允许启动 WiFi SoftAP 的入口，调用后设备进入 ST_WIFI_CONFIG 态，
- *           BLE 仍在线但射频由 coex 时间片仲裁。
- */
 void radio_ctrl_enter_wifi(power_engine_t *engine);
 
-/**
- * 退出 WiFi 配网模式（共存版）。
- * 关闭 SoftAP 和 netif 资源，射频带宽归还 BLE；不重启设备，不触碰 BLE 协议栈。
- * 无参数。
- * 返回值：无。
- * 特殊行为：通常由 wifi_portal 保存/超时后通过回调间接触发；调用后状态机回到 ST_BLE_ACTIVE。
- */
 void radio_ctrl_exit_wifi(void);
 
-/**
- * 查询 BLE 是否被射频控制器有意挂起。
- * 无参数。
- * 返回值：true 表示当前处于独占 WiFi 兜底路径，主循环不应自动重启 BLE。
- * 特殊行为：用于区分 BLE 真故障和独占 WiFi 期间的主动停用。
- */
 bool radio_ctrl_ble_suspended(void);

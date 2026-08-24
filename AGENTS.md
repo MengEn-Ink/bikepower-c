@@ -14,7 +14,7 @@
 - [.trae/rules/hardware-constraints.md](.trae/rules/hardware-constraints.md) — ESP32-C3 硬件约束。
 - [.trae/rules/wifi-ble-mutex.md](.trae/rules/wifi-ble-mutex.md) — WiFi/BLE 射频共用（硬约束）。
 - [docs/dev/01-technical-reference.md](docs/dev/01-technical-reference.md) — 技术参考（当前实现的权威行为规格）。
-- [docs/archive/01-cidf-nimble-rewrite.md](docs/archive/01-cidf-nimble-rewrite.md) — 基线重写方案（历史归档，仅供追溯）。
+- [docs/INDEX.md](docs/INDEX.md) — 当前文档入口；历史变更查 `CHANGELOG.md` 和 Git。
 
 ## Hard Rules
 

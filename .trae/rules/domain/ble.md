@@ -21,6 +21,8 @@
 - `CSC`：Cycling Speed and Cadence Service，UUID `0x1816`
 - `FTMS`：Fitness Machine Service，UUID `0x1826`
 - `DIS`：Device Information Service，UUID `0x180A`
+- `BLE-4a`：Cycling Power Feature、CSC Feature、RSC Feature 和各服务要求的 Sensor Location 必须随 Measurement 一起注册，不得只实现通知特征。
+- `BLE-4b`：骑行 Sensor Location 使用 Left Crank `0x05`，跑步 Sensor Location 使用 Top of Shoe `0x01`，不得跨 profile 共用错误语义。
 
 ## 广播与连接
 
@@ -49,23 +51,25 @@
 ## 数据包格式
 
 - `BLE-14`：所有打包按蓝牙规范使用小端字节序。
-- `BLE-15`：CPS 数据包格式固定为 `flags + instantaneous_power + cumulative_wheel_revs + last_wheel_event_time`。
+- `BLE-15`：CPS 数据包格式固定为 `flags + instantaneous_power + cumulative_crank_revolutions + last_crank_event_time`，总长 8 字节。
 - `flags`：2 字节
 - `power`：2 字节，有符号功率值，单位 W
-- `rev`：4 字节，累计轮转数
-- `time`：2 字节，最后轮事件时间
+- `rev`：2 字节，累计曲柄转数
+- `time`：2 字节，最后曲柄事件时间，1/1024 秒
 - `BLE-16`：HRS 数据包格式固定为 `flags + bpm`。
 - `flags`：1 字节
 - `bpm`：1 字节
-- `BLE-17`：CSC 数据包格式固定为 `flags + cumulative_wheel_revs + last_wheel_event_time`。
+- `BLE-17`：CSC 使用 crank-only 格式 `flags + cumulative_crank_revolutions + last_crank_event_time`，总长 5 字节。
 - `flags`：1 字节
-- `rev`：4 字节
+- `rev`：2 字节
 - `time`：2 字节
-- `BLE-18`：FTMS Indoor Bike Data 数据包格式固定为 `speed + cadence + power`。
+- `BLE-18`：FTMS Indoor Bike Data 的 flags 必须与实际字段一致；全开时为 `0x0044`，仅踏频时为 `0x0004`，仅功率时为 `0x0041`。
 - `speed`：2 字节
 - `cadence`：2 字节
 - `power`：2 字节
-- `BLE-19`：字段增减、flags 位变化或单位变化都视为协议兼容性变更，必须同步更新自测脚本与外部文档。
+- `BLE-19`：FTMS Treadmill Data 当前 flags 固定为 `0x0504`，payload 为 speed + distance + heart rate + elapsed time，总长 10 字节。
+- `BLE-19b`：RSC Total Distance 使用 0.1m 分辨率，FTMS Treadmill Total Distance 使用 1m 分辨率，两者必须从同一内部累计值分别换算。
+- `BLE-19a`：字段增减、flags 位变化或单位变化都视为协议兼容性变更，必须先更新人工维护的 golden vectors，再同步生产 codec、Python 解析器和文档。
 
 ## FTMS 控制点
 
@@ -77,7 +81,8 @@
 - `Reset`
 - `BLE-21`：未支持的 OpCode 必须返回 `Response Code + Not Supported`，禁止静默吞掉。
 - `BLE-22`：`SetTargetPower` 只负责解析目标功率并交给应用层回调，禁止在控制点回调内直接改动复杂状态机。
-- `BLE-23`：`StartResume`、`StopPause`、`Reset` 只更新 FTMS 状态缓冲区和响应，不引入阻塞行为。
+- `BLE-23`：`StartResume`、`StopPause`、`Reset` 必须先把事件可靠交给主循环；未接受时返回 Operation Failed，禁止提前更新 FTMS 状态。
+- `BLE-23a`：ERG 目标和训练启停属于连接会话态，不得置配置 dirty 或写入 NVS。
 
 ## 回调与中断安全
 

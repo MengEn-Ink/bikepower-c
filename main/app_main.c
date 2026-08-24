@@ -36,13 +36,6 @@ static volatile app_evt_t s_pending_erg_event;
 static volatile bool s_has_pending_erg_event = false;
 static volatile bool s_pending_wifi_done = false;
 
-/**
- * 处理 FTMS 控制点下发的 ERG 目标功率。
- * 先做范围校验，缓存最新目标由主循环串行处理，不进事件队列。
- * target_power：目标功率，单位瓦特（signed 16-bit）。
- * 返回值：true 表示参数合法已接收，false 表示范围无效。
- * 特殊行为：运行在 NimBLE host 任务上下文，只做轻量校验和缓存，不直接改引擎状态；永远使用最新目标，旧目标自动覆盖。
- */
 static bool on_erg_target(int target_power)
 {
     // 范围校验：与领域层 POWER_MIN/POWER_MAX 一致
@@ -59,13 +52,6 @@ static bool on_erg_target(int target_power)
     return true;
 }
 
-/**
- * 处理 FTMS 训练停止/复位等 ERG 退出信号。
- * 优先投递到主循环队列以保持与控制点命令顺序一致；队列满时缓存一次待清理原因。
- * reason：退出原因，通常为 FTMS 操作码。
- * 返回值：无。
- * 特殊行为：运行在 NimBLE host 任务上下文，不直接修改功率引擎。
- */
 static void on_erg_clear(int reason)
 {
     app_evt_t e = { .type = APP_EVT_ERG_CLEAR, .data = reason };
@@ -102,39 +88,17 @@ static bool on_run_control(ble_run_control_type_t type, int value)
     return s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE;
 }
 
-/**
- * 处理进入 WiFi 配网模式的触发回调。
- * 由状态机在用户完成二次确认后调用，切换到 WiFi/BLE 共存的 WiFi 配网流程。
- * 无参数。
- * 返回值：无。
- * 特殊行为：BLE 保持在线继续通知，WiFi 由 coex 时间片仲裁；极端失败时降级为停 BLE + 重启。
- */
 static void on_wifi_trigger(void)
 {
     radio_ctrl_enter_wifi(&s_engine);
 }
 
-/**
- * 处理退出 WiFi 配网模式的回调。
- * 由状态机在配网结束（保存成功或超时）后调用，关闭 HTTP 门户 + SoftAP，射频归还 BLE。
- * 无参数。
- * 返回值：无。
- * 特殊行为：BLE 全程未停，无需重激活；不重启设备。
- */
 static void on_wifi_exit(void)
 {
     radio_ctrl_exit_wifi();
 }
 
-/**
- * WiFi 配网结束回调（保存成功或超时）。
- * 由 wifi_portal 在 esp_timer 任务上下文调用，仅做轻量操作：投递事件给主循环，
- * 实际的 wifi_portal_stop / radio_ctrl_exit_wifi / 状态切换在 app_main 任务上下文串行执行。
- * 无参数。
- * 返回值：无。
- * 特殊行为：BLE 全程未停，事件投递后由主循环统一关闭 WiFi 资源。
- */
-static void on_wifi_done(void)
+static bool on_wifi_done(void)
 {
     app_evt_t e = { .type = APP_EVT_WIFI_DONE, .data = 0 };
     // esp_timer 任务上下文投递事件给主循环。队列满时短暂重试，避免事件丢失导致

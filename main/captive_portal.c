@@ -39,12 +39,6 @@ static const char *TAG = "CAPTIVE";
 static int s_dns_sock = -1;
 static TaskHandle_t s_dns_task = NULL;
 
-/**
- * DNS 劫持任务：监听 UDP 53，把所有 A 记录查询应答为 SoftAP IP。
- * arg：未使用。
- * 返回值：无。
- * 特殊行为：socket 关闭后退出循环并自删任务；不处理非 A/IN 查询（静默丢弃）。
- */
 static void dns_task(void *arg)
 {
     (void)arg;

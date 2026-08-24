@@ -21,12 +21,6 @@ int hr_clamp(int v)
     return clampi(v, HR_MIN, HR_MAX);
 }
 
-/*
- * 初始化心率模型全部内部状态。
- * 参数：st 为待初始化的心率状态对象；initial_hr 为初始心率。
- * 返回值：无。
- * 特殊行为：会同时初始化平滑器、HRV 缓存、发射节流状态和固定用户心率路径的初值。
- */
 void hr_model_init(hr_state_t *st, int initial_hr)
 {
     st->hr_float = (float)initial_hr;
@@ -47,24 +41,12 @@ void hr_model_init(hr_state_t *st, int initial_hr)
     st->last_clamped_hr = 0;
 }
 
-/*
- * 重置心率变异相关状态。
- * 参数：st 为心率状态对象。
- * 返回值：无。
- * 特殊行为：仅清空 HRV tick 和漂移累加，不重置主心率平滑器。
- */
 void hr_model_reset_variation(hr_state_t *st)
 {
     st->hrv_tick = 0;
     st->drift_bpm = 0.0f;
 }
 
-/*
- * 设置固定用户心率并同步更新相关缓存。
- * 参数：st 为心率状态对象；value 为新的用户心率。
- * 返回值：无。
- * 特殊行为：会立即刷新主平滑值、固定心率路径、发射输出和 HRV 累加器，避免模式切换时出现旧值拖尾。
- */
 void hr_model_set_user_hr(hr_state_t *st, int value)
 {
     st->hr_float = (float)value;
@@ -77,12 +59,6 @@ void hr_model_set_user_hr(hr_state_t *st, int value)
     st->drift_bpm = 0.0f;
 }
 
-/*
- * 根据 FTP 分区把功率映射成目标心率。
- * 参数：st 为心率状态对象；power 为当前功率；ftp 为功能阈值功率；thr_hr 为阈值心率。
- * 返回值：返回已钳制到合法范围内的目标心率。
- * 特殊行为：当 ftp 非法时回退到经验线性公式；超过上限时会记录最近一次被钳制的原始心率值。
- */
 int hr_model_ftp_zone(hr_state_t *st, int power, int ftp, int thr_hr)
 {
     if (ftp <= 0) {
@@ -111,12 +87,6 @@ int hr_model_ftp_zone(hr_state_t *st, int power, int ftp, int thr_hr)
     return clamped;
 }
 
-/*
- * 用一阶指数模型把当前心率逼近目标心率。
- * 参数：st 为心率状态对象；target 为目标心率。
- * 返回值：返回平滑后的整数心率值。
- * 特殊行为：上升和下降阶段使用不同时间常数；首次调用若未初始化会直接以目标值作为起点。
- */
 int hr_model_smooth(hr_state_t *st, int target)
 {
     float dt = (float)HR_LOOP_INTERVAL_MS / 1000.0f;
@@ -130,12 +100,6 @@ int hr_model_smooth(hr_state_t *st, int target)
     return (int)st->hr_float;
 }
 
-/*
- * 合成一次心率变异量。
- * 参数：st 为心率状态对象。
- * 返回值：返回当前缓存的 HRV 叠加量。
- * 特殊行为：内部按 20 个循环约 1 秒更新一次缓存，组合 RSA、Mayer 波和慢漂移，并对漂移上限做钳制。
- */
 float hr_model_variation(hr_state_t *st)
 {
     if (!st->hrv_init) {
@@ -161,12 +125,6 @@ float hr_model_variation(hr_state_t *st)
     return st->hrv_cached;
 }
 
-/*
- * 对外输出心率时做台阶保持和限速。
- * 参数：st 为心率状态对象；raw 为原始心率值。
- * 返回值：返回限速后的对外心率值。
- * 特殊行为：当原始值超出死区时每次最多变化 1 BPM，并以低概率注入一次 2 BPM 的随机跳变。
- */
 int hr_model_emit(hr_state_t *st, int raw)
 {
     if (!st->emit_init) {
@@ -194,13 +152,6 @@ int hr_model_emit(hr_state_t *st, int raw)
     return hr;
 }
 
-/*
- * 在固定用户心率模式下生成带小幅波动的平滑心率。
- * 参数：st 为心率状态对象；user_hr 为用户设置的基准心率；amp 为 ± 浮动幅度（0 表示恒定）。
- * 返回值：返回钳制后的整数心率值。
- * 特殊行为：amp=0 时直接输出基准值；否则目标心率在 [base-amp, base+amp] 内周期性重采样并平滑逼近，
- *           结果始终限制在该允许波动区间内。
- */
 int hr_model_steady_user(hr_state_t *st, int user_hr, int amp)
 {
     int base = hr_clamp(user_hr);

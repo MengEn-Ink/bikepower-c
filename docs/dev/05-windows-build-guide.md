@@ -117,7 +117,7 @@ Add-MpPreference -ExclusionPath "$env:USERPROFILE\.espressif"
 
 ### 3.1 ccache（最有效，已启用）
 
-`sdkconfig.defaults` 已启用 `CONFIG_CCACHE_ENABLE=y`。
+ESP-IDF 使用环境变量 `IDF_CCACHE_ENABLE=1` 启用 ccache。项目 PowerShell 构建入口检测到 `ccache` 后会自动设置该变量。
 
 - 首次编译：无加速（填缓存）
 - 后续增量编译：快 50-80%

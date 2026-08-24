@@ -104,15 +104,6 @@ static void configure_captive_portal_dhcp(void)
     }
 }
 
-/**
- * 启动 WiFi SoftAP（共存版：不停 BLE）。
- * 初始化网络栈、事件循环、WiFi 驱动并按配置启动 AP 模式。
- * 失败时逐步回滚已分配的资源，并清理本模块记录的句柄标志。
- * 无参数。
- * 返回值：ESP_OK 表示 AP 已启动，否则为错误码。
- * 特殊行为：BLE 是否在运行由调用方决定；本函数只负责 AP，不触碰 NimBLE。
- *           成功后会记录 netif/init/event_loop 句柄标志，供 radio_ctrl_exit_wifi_coex 按序释放。
- */
 static esp_err_t radio_ctrl_start_wifi_ap(void)
 {
     esp_err_t ret;
@@ -222,13 +213,6 @@ fail:
     return ret;
 }
 
-/**
- * 关闭 WiFi SoftAP 并释放 netif/事件循环资源。
- * 按 WiFi → netif → event_loop → netif_deinit 顺序释放，与启动顺序严格相反。
- * 无参数。
- * 返回值：无。
- * 特殊行为：仅释放本模块自建的资源；不重启设备，不触碰 BLE；可重复调用（幂等）。
- */
 static void radio_ctrl_stop_wifi_ap(void)
 {
     if (s_wifi_inited) {
@@ -256,15 +240,6 @@ bool radio_ctrl_ble_suspended(void)
     return s_ble_suspended;
 }
 
-/**
- * 进入 WiFi 配网模式（共存版：不停 BLE 不重启）。
- * BLE 保持在线继续通知，直接启动 SoftAP + HTTP 配网门户。
- * 失败兜底：仅当 WiFi 资源彻底无法初始化时降级为旧独占方案（停 BLE + esp_restart）。
- * engine：供配网门户读写配置的功率引擎实例。
- * 返回值：无。
- * 特殊行为：本函数在已订阅 TWDT 的 app_main 任务上同步执行，WiFi/netif 初始化为长阻塞步骤，
- *           逐段喂狗避免累计耗时超过 WDT_TIMEOUT_MS 触发误复位。
- */
 void radio_ctrl_enter_wifi(power_engine_t *engine)
 {
     ESP_LOGI(TAG, "进入 WiFi 配网（共存模式）：BLE 保持在线");
@@ -310,13 +285,6 @@ void radio_ctrl_enter_wifi(power_engine_t *engine)
     }
 }
 
-/**
- * 退出 WiFi 配网模式（共存版：关 WiFi 不重启）。
- * 关闭 HTTP 门户（wifi_portal_stop）+ SoftAP + netif，射频归还 BLE。
- * 无参数。
- * 返回值：无。
- * 特殊行为：仅清理 WiFi 侧资源；BLE 全程未停，无需重激活；不重启设备；可重复调用（幂等）。
- */
 void radio_ctrl_exit_wifi(void)
 {
     ESP_LOGI(TAG, "退出 WiFi 配网：关闭 HTTP + DNS + SoftAP，射频归还 BLE");

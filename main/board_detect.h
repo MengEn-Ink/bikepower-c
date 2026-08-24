@@ -20,27 +20,10 @@ typedef struct {
     const char *name;       // 固件包名（如 "generic-c3"）
 } board_desc_t;
 
-/**
- * 检测当前板型。
- * Kconfig 指定板型时直接采用；否则通过 GPIO3 下拉输入电平判断：
- * M5Stamp C3 GPIO3 接按钮上拉（高），通用板 GPIO3 悬空（下拉后读低）。
- * 无参数。
- * 返回值：检测到的板型。
- */
 board_type_t board_detect(void);
 
-/**
- * 获取当前板型（检测后的缓存值）。
- * 无参数。
- * 返回值：当前板型。
- */
 board_type_t board_get_type(void);
 
-/**
- * 获取当前板型的描述。
- * 无参数。
- * 返回值：指向当前板型描述表项的只读指针。
- */
 const board_desc_t *board_get_desc(void);
 
 /**
@@ -50,30 +33,10 @@ const board_desc_t *board_get_desc(void);
  */
 void board_firmware_name(char *out, size_t out_sz);
 
-/**
- * 获取当前板型的按钮引脚。
- * 无参数。
- * 返回值：按钮 GPIO 编号。
- */
 int board_btn_pin(void);
 
-/**
- * 获取当前板型的 LED 引脚。
- * 无参数。
- * 返回值：LED GPIO 编号。
- */
 int board_led_pin(void);
 
-/**
- * 获取当前板型的 LED 驱动类型。
- * 无参数。
- * 返回值：LED 驱动类型枚举。
- */
 led_drv_t board_led_drv(void);
 
-/**
- * 获取普通 GPIO LED 的点亮电平。
- * 无参数。
- * 返回值：LED_ACTIVE_LOW 或 LED_ACTIVE_HIGH；RGB 板会返回描述表值但驱动忽略。
- */
 led_active_level_t board_led_active_level(void);

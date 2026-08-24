@@ -43,11 +43,6 @@ void profile_effective_wkg(const profile_t *p, int *out_low, int *out_high)
     if (out_high) *out_high = high;
 }
 
-/*
- * 设置自定义档 W/kg 范围（×10）。
- * 越界夹紧到 [CUSTOM_WKG_MIN, CUSTOM_WKG_MAX]，并保证 low<=high。
- * 返回值：范围实际变化返回 true，否则 false。
- */
 bool profile_set_custom_wkg(profile_t *p, int low, int high)
 {
     low = clamp_wkg(low);
@@ -59,12 +54,6 @@ bool profile_set_custom_wkg(profile_t *p, int low, int high)
     return true;
 }
 
-/*
- * 设置自定义配速机器人显示昵称。
- * 参数：p 为用户档案对象；name 为目标昵称。
- * 返回值：实际更新成功返回 true，否则返回 false。
- * 特殊行为：空指针和空字符串拒绝；超长字符串截断到 CUSTOM_PACER_NAME_MAX-1。
- */
 bool profile_set_custom_name(profile_t *p, const char *name)
 {
     if (name == NULL || name[0] == '\0') return false;
@@ -74,12 +63,6 @@ bool profile_set_custom_name(profile_t *p, const char *name)
     return true;
 }
 
-/*
- * 初始化用户档案默认值。
- * 参数：p 为待初始化的用户档案对象。
- * 返回值：无。
- * 特殊行为：会统一写入体重、FTP、阈值心率和默认配速机器人索引。
- */
 void profile_init(profile_t *p)
 {
     p->weight = PROFILE_WEIGHT_DEFAULT;
@@ -92,12 +75,6 @@ void profile_init(profile_t *p)
     p->custom_pacer_name[CUSTOM_PACER_NAME_MAX - 1] = '\0';
 }
 
-/*
- * 设置用户体重。
- * 参数：p 为用户档案对象；weight 为目标体重。
- * 返回值：实际更新成功返回 true，否则返回 false。
- * 特殊行为：越界值和与当前值相同的输入都会被拒绝。
- */
 bool profile_set_weight(profile_t *p, int weight)
 {
     if (weight < PROFILE_WEIGHT_MIN || weight > PROFILE_WEIGHT_MAX) return false;
@@ -106,12 +83,6 @@ bool profile_set_weight(profile_t *p, int weight)
     return true;
 }
 
-/*
- * 设置用户 FTP。
- * 参数：p 为用户档案对象；ftp 为目标 FTP。
- * 返回值：实际更新成功返回 true，否则返回 false。
- * 特殊行为：越界值和与当前值相同的输入都会被拒绝。
- */
 bool profile_set_ftp(profile_t *p, int ftp)
 {
     if (ftp < PROFILE_FTP_MIN || ftp > PROFILE_FTP_MAX) return false;
@@ -120,12 +91,6 @@ bool profile_set_ftp(profile_t *p, int ftp)
     return true;
 }
 
-/*
- * 设置用户阈值心率。
- * 参数：p 为用户档案对象；thr_hr 为目标阈值心率。
- * 返回值：实际更新成功返回 true，否则返回 false。
- * 特殊行为：越界值和与当前值相同的输入都会被拒绝。
- */
 bool profile_set_thr_hr(profile_t *p, int thr_hr)
 {
     if (thr_hr < PROFILE_THR_HR_MIN || thr_hr > PROFILE_THR_HR_MAX) return false;
@@ -134,12 +99,6 @@ bool profile_set_thr_hr(profile_t *p, int thr_hr)
     return true;
 }
 
-/*
- * 设置配速机器人索引。
- * 参数：p 为用户档案对象；ride_type 为目标配速机器人索引。
- * 返回值：实际更新成功返回 true，否则返回 false。
- * 特殊行为：非法索引和与当前值相同的输入都会被拒绝。
- */
 bool profile_set_ride_type(profile_t *p, int ride_type)
 {
     if (!PACER_INDEX_IS_VALID(ride_type)) return false;
@@ -148,12 +107,6 @@ bool profile_set_ride_type(profile_t *p, int ride_type)
     return true;
 }
 
-/*
- * 把配速机器人字符串 ID 解析为索引。
- * 参数：id 为配速机器人字符串标识。
- * 返回值：匹配成功返回对应索引，未找到时返回 0。
- * 特殊行为：空指针输入会直接回退到默认索引。
- */
 int profile_ride_type_index(const char *id)
 {
     if (!id) return PACER_INDEX_DEFAULT;
@@ -163,12 +116,6 @@ int profile_ride_type_index(const char *id)
     return PACER_INDEX_DEFAULT;
 }
 
-/*
- * 按字符串 ID 设置配速机器人。
- * 参数：p 为用户档案对象；id 为配速机器人字符串标识。
- * 返回值：设置成功返回 true，否则返回 false。
- * 特殊行为：空字符串或未知 ID 会被拒绝；匹配成功后仍复用索引版 setter 的范围和去重逻辑。
- */
 bool profile_set_ride_type_str(profile_t *p, const char *id)
 {
     if (!id || !id[0]) return false;

@@ -2,7 +2,7 @@
 
 <!-- stability: tier-1 (极稳定，仅随硬件变更) -->
 <!-- rule-id-prefix: HC -->
-> 只记录约束和禁止项，详细行为见 docs/archive/01-cidf-nimble-rewrite.md 对应章节。
+> 只记录硬件约束和禁止项，当前行为见 `docs/dev/01-technical-reference.md`。
 
 ## ESP32-C3 硬件限制
 

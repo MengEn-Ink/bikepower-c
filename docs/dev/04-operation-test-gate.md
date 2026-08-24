@@ -18,7 +18,7 @@
 | ID | 操作/风险 | 自动化门禁 | 人工门禁/说明 |
 |----|-----------|------------|----------------|
 | `OP-MODE-001` | 骑行 fixed/配速机器人/ERG 模式切换；切非 ERG 后旧目标不得残留 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 真机网页切换后观察 App 数据源 |
-| `OP-MODE-002` | 跑步/骑行 profile 切换；RSC 与 CPS/FTMS 服务不能混乱 | `make -C test run`、`python3 tests/ble_selftest.py --profile running` | Zwift/MyWhoosh 跑步入口人工确认 |
+| `OP-MODE-002` | 跑步/骑行 profile 切换；RSC 与 CPS/FTMS 服务不能混乱；已连接时明确等待断开重建 | `make -C test run`、`python3 tests/ble_selftest.py --profile running --control 12` | Zwift/MyWhoosh 跑步入口人工确认 |
 | `OP-MODE-003` | ERG Stop/Pause、Reset、BLE 断开后恢复 fixed 手动调功 | `make -C test run`、`python3 tests/ble_selftest.py` | Zwift ERG 课程退出后人工调功确认 |
 | `OP-SAVE-001` | 骑行数值保存：功率、踏频、心率、心率锁定、浮动、按钮步进 | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` | 真机保存后刷新网页确认 |
 | `OP-SAVE-002` | 跑步数值保存：配速、配速浮动、步频、步频浮动、心率 | `python3 tests/test_portal_config_save.py`、`make -C test run` | MyWhoosh/Zwift 跑步速度显示人工确认 |
@@ -33,9 +33,9 @@
 | `OP-BCAST-002` | BOOT 按钮按启用项选择目标：单项启用时直接调该项，多项启用时骑行优先功率、跑步优先配速/速度；长按 WiFi 确认回滚本次调节 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮在不同开关组合下人工确认 |
 | `OP-BCAST-003` | 广播项开关真实影响 BLE 数据面：关闭功率后 CPS/FTMS 功率停止，只开心率时仅 HRS 持续通知 | `python3 tests/ble_broadcast_monitor.py`、`python3 tests/check_ble_broadcast_monitor.py` | 设备需处于配网态，脚本通过 `/api/config` 切换 `broadcast_mask` |
 | `OP-BLE-001` | BLE 五服务、DIS、通知、FTMS 控制点响应 | `python3 tests/ble_selftest.py` | 第三方 App 扫描设备人工确认 |
-| `OP-BLE-002` | 连接/断开事件、断开后重广播、断开清 ERG | `python3 tests/stage3_conn_test.py`、`python3 tests/ble_selftest.py` | 训练 App 退出后重连人工确认 |
+| `OP-BLE-002` | 两次独立扫描/连接/断开、断开后重广播、断开清 ERG | `python3 tests/stage3_conn_test.py`、`python3 tests/check_ble_reconnect.py`、`python3 tests/ble_selftest.py` | 训练 App 退出后重连人工确认 |
 | `OP-BLE-003` | 本地浏览器监控客户端可连接已授权 BikePower，持续记录通知停更、断连和数值异常 | `python3 tests/check_ble_monitor.py`、`python3 scripts/tools/serve_ble_monitor.py` | Web Bluetooth 首次授权必须人工点击，浏览器页面导出异常报告 |
-| `OP-RUN-001` | 跑步 RSC 速度、步频、步幅、距离单位换算 | `make -C test run`、`python3 tests/ble_selftest.py --profile running` | Zwift/MyWhoosh 跑步数据人工确认 |
+| `OP-RUN-001` | 跑步 RSC/FTMS 标准 payload、暂停冻结、恢复累计、Reset | `make -C test run`、`python3 tests/test_ble_protocol_vectors.py`、`python3 tests/ble_selftest.py --profile running --control 12` | Zwift/MyWhoosh 跑步数据人工确认 |
 | `OP-STAB-001` | NVS schema、常量、板型、任务/WDT、门户结构不漂移 | `python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 tests/check_board_desc.py`、`python3 tests/check_tasks_wdt.py`、`python3 tests/check_operation_coverage.py` | 无 |
 | `OP-STAB-002` | 3 分钟核心流程耐久，覆盖重复保存、模板、关闭 WiFi、host 回归 | `python3 tests/test_core_flow_endurance.py` | 30/90 分钟老化按发版风险追加 |
 | `OP-REL-001` | 发布产物门禁：10 个上传附件、SHA256、manifest、zip 内容、Git ID 和真机证据不漂移 | `python3 scripts/tools/check_release_artifacts.py --require-pushed --require-device-evidence`、`python3 tests/check_release_gate.py`、`python3 tests/test_release_artifacts.py` | 正式发布前必须从已提交并已推送源码重新构建，且当前 Git 的 P0 证据全部通过 |

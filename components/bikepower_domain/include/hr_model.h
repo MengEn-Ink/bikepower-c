@@ -1,8 +1,5 @@
 /**
- * 心率动力学模型（纯 C，可 host 单测）
- * 由 MicroPython ride_modes.py 的心率相关方法移植：
- *   _ftp_zone_heartrate / _smooth_heartrate / _hr_variation /
- *   _emit_heartrate / _steady_user_heartrate
+ * 心率动力学模型（纯 C，可 host 单测）。
  * 模型: HR(t) = HR_old + alpha*(HR_target - HR_old), alpha = 1 - exp(-dt/tau)
  */
 #pragma once

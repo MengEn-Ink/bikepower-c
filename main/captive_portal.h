@@ -19,31 +19,8 @@
 #include "esp_err.h"
 #include "esp_http_server.h"
 
-/**
- * 启动 DNS 劫持服务器。
- * 在 UDP 53 端口监听，把所有 A 记录查询应答为 SoftAP IP（192.168.4.1），
- * 使手机连上 SoftAP 后任意域名都指向配网入口，配合 OS 探测触发自动弹窗。
- * 无参数。
- * 返回值：ESP_OK 表示 DNS 服务器已启动；失败仅记录日志，不阻断配网（降级为手动输 IP）。
- * 特殊行为：内部创建独立任务处理 DNS 查询，可重复调用（幂等，已运行时直接返回）。
- */
 esp_err_t captive_portal_start_dns(void);
 
-/**
- * 停止 DNS 劫持服务器。
- * 关闭 socket 并删除 DNS 任务，释放资源。
- * 无参数。
- * 返回值：无。
- * 特殊行为：可重复调用（幂等）；与 captive_portal_start_dns 配对使用。
- */
 void captive_portal_stop_dns(void);
 
-/**
- * Captive Portal 探测端点统一 HTTP handler。
- * 对各 OS 的连通性探测请求统一返回 303 重定向到配网首页 http://192.168.4.1/，
- * 触发手机系统弹出 Captive Portal 登录窗口。
- * req：HTTP 请求对象。
- * 返回值：ESP_OK。
- * 特殊行为：不续期配网超时（探测请求来自系统后台，不应算作用户活跃）。
- */
 esp_err_t captive_portal_detect_handler(httpd_req_t *req);

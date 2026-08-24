@@ -57,6 +57,6 @@
 
 ## 相关规则
 
-- `.trae/rules/hardware-constraints.md` — ESP32-C3 硬件参数与异常 SOP
-- `docs/archive/01-cidf-nimble-rewrite.md` — 阶段5 软切换方案细节
-- `AGENTS.md` — Hard Rules
+- `.trae/rules/hardware-constraints.md`
+- `docs/dev/01-technical-reference.md`
+- `AGENTS.md`

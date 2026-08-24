@@ -1,6 +1,5 @@
 /**
- * 个人信息（体重/FTP/阈值心率/配速机器人）+ 范围校验
- * 由 MicroPython profile_manager.py 移植。
+ * 个人信息（体重/FTP/阈值心率/配速机器人）与范围校验。
  */
 #pragma once
 

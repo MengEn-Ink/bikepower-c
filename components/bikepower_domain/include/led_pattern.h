@@ -69,23 +69,8 @@ void led_config_defaults(led_config_t *c);
 /* 逐字段夹紧 led_config 的 mode/color/silent 到合法范围，返回是否发生修正。 */
 bool led_config_validate(led_config_t *c);
 
-/**
- * 场景→最终灯效决策（四层优先级链）：
- *   1) 真静默：silent=1 时所有场景一律 OFF。
- *   2) 非静默异常场景强制可见：mode==OFF 时回退为 FAST。
- *   3) 用户配置：取 scenes[scene]。
- *   4) 硬件降级：is_rgb=false 时 BREATH 降级为 SLOW（颜色由驱动忽略）。
- * scene：当前场景；c：配置；is_rgb：是否 RGB 板。
- * 返回值：最终 {mode,color}。
- */
 led_effect_t led_resolve(led_scene_t scene, const led_config_t *c, bool is_rgb);
 
-/**
- * 计算某模式在给定相位的亮度包络（0-255，供驱动缩放颜色/判定亮灭）。
- * mode：灯效模式；phase_ms：模式周期内的相位（0..period）；
- * slow_ms/fast_ms：慢/快闪半周期。
- * 返回值：0-255 强度。OFF=0；SOLID=255；SLOW/FAST 方波；DOUBLE 双脉冲；BREATH 三角包络。
- */
 uint8_t led_mode_scale(led_mode_t mode, uint32_t phase_ms, uint32_t slow_ms, uint32_t fast_ms);
 
 /**

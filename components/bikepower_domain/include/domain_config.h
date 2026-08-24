@@ -1,10 +1,7 @@
 /**
- * 领域层常量（纯 C，不依赖 ESP-IDF，可 host 编译）
- * 由 MicroPython config.py 移植，保持功率/心率/踏频算法位级一致。
+ * 领域层常量（纯 C，不依赖 ESP-IDF，可 host 编译）。
  */
 #pragma once
-
-/* 功率、踏频、心率、模式和用户档案等领域常量定义集中在本头文件。 */
 
 // ===== 功率/踏频/心率范围 =====
 #define POWER_MIN             0

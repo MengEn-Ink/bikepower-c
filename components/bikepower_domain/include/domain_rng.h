@@ -1,6 +1,5 @@
 /**
- * 领域层随机数（可注入种子，便于 host 单测确定性复现）
- * 对应 MicroPython random.randint(a, b)（闭区间）。
+ * 领域层随机数（可注入种子，便于 host 单测确定性复现）。
  */
 #pragma once
 

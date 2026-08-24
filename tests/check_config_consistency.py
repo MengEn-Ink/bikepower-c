@@ -25,13 +25,10 @@ README = ROOT / "README.md"
 PROGRESS = ROOT / "PROGRESS.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
 DOC_INDEX = ROOT / "docs" / "INDEX.md"
-DOCS_SUPERPOWERS = ROOT / "docs" / "superpowers"
 TECH_REF = ROOT / "docs" / "dev" / "01-technical-reference.md"
+RUNNING_MODE_DOC = ROOT / "docs" / "dev" / "03-running-mode-compatibility.md"
 QUICKSTART = ROOT / "docs" / "user" / "01-quickstart.md"
 USER_MANUAL = ROOT / "docs" / "user" / "02-user-manual.md"
-NIMBLE_REWRITE = ROOT / "docs" / "archive" / "01-cidf-nimble-rewrite.md"
-MPY_COMPARISON = ROOT / "docs" / "archive" / "02-micropython-vs-c-comparison.md"
-REVIEW_CHECKLIST = ROOT / "docs" / "archive" / "03-review-checklist.md"
 HW_CONSTRAINTS = ROOT / ".trae" / "rules" / "hardware-constraints.md"
 BUILD_ALL = ROOT / "scripts" / "build_all.sh"
 FLASH_LATEST = ROOT / "scripts" / "flash_latest.sh"
@@ -127,11 +124,9 @@ progress_src = read(PROGRESS)
 changelog_src = read(CHANGELOG)
 doc_index_src = read(DOC_INDEX)
 tech_ref_src = read(TECH_REF)
+running_mode_doc = read(RUNNING_MODE_DOC)
 quickstart_src = read(QUICKSTART)
 user_manual_src = read(USER_MANUAL)
-nimble_rewrite_src = read(NIMBLE_REWRITE)
-mpy_comparison_src = read(MPY_COMPARISON)
-review_checklist_src = read(REVIEW_CHECKLIST)
 hw_src = read(HW_CONSTRAINTS) if HW_CONSTRAINTS.exists() else ""
 build_all_src = read(BUILD_ALL)
 flash_latest_src = read(FLASH_LATEST)
@@ -397,6 +392,10 @@ print(f"\n{TAG} [S4b] 用户文档配网描述一致性")
 
 check(f"v{fw_ver}" in user_manual_src,
       f"docs/user/02-user-manual.md 固件版本 v{fw_ver} 与 FIRMWARE_VERSION 一致")
+check(f'"firmware_version": "{fw_ver}"' in mock_src,
+      f"tests/mock_server.py mock 固件版本与 FIRMWARE_VERSION({fw_ver}) 一致")
+check(f'"fix_version": "{fix_ver}"' in mock_src,
+      f"tests/mock_server.py mock 修复版与 FIRMWARE_FIX_VERSION({fix_ver}) 一致")
 
 legacy_wifi_phrases = [
     "保存并重启",
@@ -415,58 +414,40 @@ for doc_name, doc_src in user_wifi_docs.items():
         check(phrase not in doc_src, f"{doc_name} 不含旧版普通配网短语：{phrase}")
 
 
-# ============================ 4c. 开发者文档配网策略一致性 ============================
-print(f"\n{TAG} [S4c] 开发者文档配网策略一致性")
+# ============================ 4c. 文档结构 ============================
+print(f"\n{TAG} [S4c] 文档结构")
 
-legacy_dev_wifi_phrases = [
-    "默认仍采用“配网时停 BLE”",
-    "默认仍建议配网时停 BLE",
-    "当前项目规则已经把“进入 WiFi 配网前停止 BLE”",
-    "保存重启",
-    "二者不能同时 init",
-    "先停 BLE → 延时 200ms → 启 WiFi",
-]
-dev_wifi_docs = {
-    "docs/archive/01-cidf-nimble-rewrite.md": nimble_rewrite_src,
-    "docs/archive/03-review-checklist.md": review_checklist_src,
+for removed_dir in ("archive", "wiki", "superpowers"):
+    check(not (ROOT / "docs" / removed_dir).exists(),
+          f"docs/{removed_dir} 不应存在，历史统一由 CHANGELOG 和 Git 追溯")
+
+expected_dev_docs = {
+    "01-technical-reference.md",
+    "02-firmware-security.md",
+    "03-running-mode-compatibility.md",
+    "04-operation-test-gate.md",
+    "05-windows-build-guide.md",
 }
-for doc_name, doc_src in dev_wifi_docs.items():
-    for phrase in legacy_dev_wifi_phrases:
-        check(phrase not in doc_src, f"{doc_name} 不含旧版开发者配网结论：{phrase}")
-
-
-# ============================ 4d. 技术栈版本文档一致性 ============================
-print(f"\n{TAG} [S4d] 技术栈版本文档一致性")
-
-check("ESP-IDF v5.5.1" not in mpy_comparison_src,
-      "docs/archive/02-micropython-vs-c-comparison.md 不含过时 ESP-IDF v5.5.1")
-check("ESP-IDF v5.5.4" in mpy_comparison_src,
-      "docs/archive/02-micropython-vs-c-comparison.md 含当前 ESP-IDF v5.5.4")
-check("建议改为 v5.5.4" not in review_checklist_src,
-      "docs/archive/03-review-checklist.md 不再以未完成语气建议修复 sdkconfig 版本注释")
-
-
-# ============================ 4e. 文档索引阶段范围一致性 ============================
-print(f"\n{TAG} [S4e] 文档索引阶段范围一致性")
-
-check("阶段 0-9 完成情况" not in doc_index_src,
-      "docs/INDEX.md 不含过时阶段 0-9 项目进度描述")
-stage_numbers = [int(n) for n in re.findall(r'^\|\s*(\d+)\s*\|', progress_src, re.MULTILINE)]
-max_stage = max(stage_numbers) if stage_numbers else 0
-check(f"阶段 0-{max_stage} 完成情况" in doc_index_src,
-      f"docs/INDEX.md 含阶段 0-{max_stage} 项目进度描述")
-check(not DOCS_SUPERPOWERS.exists(),
-      "docs/superpowers 工作目录已归档，不应重新出现")
-check("archive/10-project-optimization-design.md" in doc_index_src
-      and "archive/11-project-optimization-plan.md" in doc_index_src,
-      "docs/INDEX.md 收录历史项目优化计划归档入口")
+actual_dev_docs = {path.name for path in (ROOT / "docs" / "dev").glob("*.md")}
+check(actual_dev_docs == expected_dev_docs,
+      f"docs/dev 只保留当前 5 篇文档 (实际={sorted(actual_dev_docs)})")
+check("archive/" not in doc_index_src and "wiki/" not in doc_index_src,
+      "docs/INDEX.md 不引用历史 archive/wiki")
+check("CHANGELOG.md" in doc_index_src and "Git 历史" in doc_index_src,
+      "docs/INDEX.md 明确历史追溯入口")
+tracked_reports = [
+    path for path in (ROOT / "tests" / "reports").glob("*.md")
+    if path.is_file()
+]
+check(not tracked_reports,
+      f"tests/reports 不保留历史 Markdown 报告 (实际={[p.name for p in tracked_reports]})")
+check(not (ROOT / "tests" / "logs").exists(),
+      "tests/logs 不应进入源码树")
 
 
 # ============================ 4f. 当前实现事实防漂移 ============================
 print(f"\n{TAG} [S4f] 当前实现事实防漂移")
 
-running_mode_doc = read(ROOT / "docs" / "dev" / "04-running-mode-compatibility.md")
-coverage_doc = read(ROOT / "docs" / "dev" / "03-test-coverage-analysis.md")
 check("内嵌 snprintf HTML 分块发送" not in progress_src,
       "PROGRESS.md 不应把当前门户描述为旧版 C 内嵌 HTML")
 check("前端三件套 `main/web/`" in progress_src and "scripts/inline_static.py" in progress_src,
@@ -476,11 +457,9 @@ check("`/config`" not in progress_src and "`/draft`" not in progress_src and "`/
 check("当前固件升级走电脑端网页烧录" in progress_src and "手机端不支持烧录" in progress_src,
       "PROGRESS.md 必须说明当前升级走电脑端网页烧录且手机端不支持")
 check("尚未实现固件改动" not in running_mode_doc,
-      "docs/dev/04-running-mode-compatibility.md 不应继续标注跑步模式尚未实现")
+      "docs/dev/03-running-mode-compatibility.md 不应继续标注跑步模式尚未实现")
 check(f"当前固件基线：BikePower C v{fw_ver}" in running_mode_doc,
-      f"docs/dev/04-running-mode-compatibility.md 当前固件基线与 FIRMWARE_VERSION({fw_ver}) 一致")
-check(f"版本：v{fw_ver}" in coverage_doc,
-      f"docs/dev/03-test-coverage-analysis.md 版本与 FIRMWARE_VERSION({fw_ver}) 一致")
+      f"docs/dev/03-running-mode-compatibility.md 当前固件基线与 FIRMWARE_VERSION({fw_ver}) 一致")
 check('"diff", "--check"' in quality_gate_src,
       "quality_gate.py 必须检查工作区 whitespace")
 check('"show", "--check", "--format=", "HEAD"' in quality_gate_src,
@@ -574,6 +553,12 @@ check("FTMS_SERVICE_UUID" in ble_bikepower_src.split("running_adv_uuids", 1)[1].
 check("read_gatt_char(FTMS_FEATURE_UUID)" in ble_selftest_src
       and "FTMS Feature" in ble_selftest_src,
       "ble_selftest.py 必须读取并校验 FTMS Feature")
+check('strcmp(id, "erg")' not in wifi_portal_src,
+      "配网页不得把 ERG 会话态作为可持久模式输入")
+check("parse_cps_payload" in ble_selftest_src,
+      "ble_selftest.py 必须复用标准 CPS 解析器")
+check("--profile running --control 12" in read(ROOT / "tests" / "operation_gate.py"),
+      "device 门禁必须执行跑步控制点暂停/恢复测试")
 
 
 # ============================ 9. 板型枚举完整性 ============================
