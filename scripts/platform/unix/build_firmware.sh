@@ -15,6 +15,9 @@ if [ ! -f "$IDF_PATH/export.sh" ]; then
 fi
 
 source "$IDF_PATH/export.sh" > /dev/null 2>&1
+if command -v ccache >/dev/null 2>&1; then
+    export IDF_CCACHE_ENABLE=1
+fi
 
 case "$ACTION" in
     build)

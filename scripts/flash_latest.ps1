@@ -35,7 +35,7 @@ Import-Module (Join-Path $ScriptDir "idf_common.psm1") -Force
 $ProjectDir = $Global:BikePowerProjectDir
 $FlashDefaults = "sdkconfig.flash.tmp"
 $FlashBoardFile = "sdkconfig.flash.board"
-$SdkconfigBackup = $null
+$FlashBuildDir = Join-Path (Join-Path $ProjectDir "build") ("build-flash-" + $Board)
 
 function Run-QuickChecks {
     Write-Log "运行快速静态门禁"
@@ -66,19 +66,12 @@ function Prepare-BoardDefaults {
         default { Die "未知板型: $Board" }
     }
 
-    $sdkconfigPath = Join-Path $ProjectDir "sdkconfig"
-    if (Test-Path $sdkconfigPath -and -not $SdkconfigBackup) {
-        $script:SdkconfigBackup = Join-Path $ProjectDir "sdkconfig.flash.backup"
-        Copy-Item $sdkconfigPath $script:SdkconfigBackup -Force
-    }
-
     $boardFile = Join-Path $ProjectDir $FlashBoardFile
     $defaultsFile = Join-Path $ProjectDir "sdkconfig.defaults"
     $mergedFile = Join-Path $ProjectDir $FlashDefaults
     Set-Content -Path $boardFile -Value $kconfig -Encoding ASCII
     Get-Content $defaultsFile, $boardFile | Set-Content -Path $mergedFile -Encoding ASCII
     Remove-Item $boardFile -Force
-    if (Test-Path $sdkconfigPath) { Remove-Item $sdkconfigPath -Force }
 }
 
 function Cleanup-FlashConfig {
@@ -86,9 +79,6 @@ function Cleanup-FlashConfig {
     $flashBoard = Join-Path $ProjectDir $FlashBoardFile
     if (Test-Path $flashDefaults) { Remove-Item $flashDefaults -Force }
     if (Test-Path $flashBoard) { Remove-Item $flashBoard -Force }
-    if ($SdkconfigBackup -and (Test-Path $SdkconfigBackup)) {
-        Move-Item $SdkconfigBackup (Join-Path $ProjectDir "sdkconfig") -Force
-    }
 }
 
 try {
@@ -130,11 +120,18 @@ try {
         Write-Log "编译固件（board=$Board）"
         Prepare-BoardDefaults
         Clear-StaleBoardCache
+        New-Item -Path $FlashBuildDir -ItemType Directory -Force | Out-Null
+        $buildSdkconfig = Join-Path $FlashBuildDir "sdkconfig"
+        if (Test-Path $buildSdkconfig) { Remove-Item $buildSdkconfig -Force }
         Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @(
+            "-B", $FlashBuildDir,
+            "-D", "SDKCONFIG=$buildSdkconfig",
             "-D", "SDKCONFIG_DEFAULTS=$FlashDefaults",
             "reconfigure"
         )
         Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @(
+            "-B", $FlashBuildDir,
+            "-D", "SDKCONFIG=$buildSdkconfig",
             "-D", "SDKCONFIG_DEFAULTS=$FlashDefaults",
             "build"
         )
@@ -144,11 +141,11 @@ try {
 
     if ($Erase) {
         Write-Log "擦除整片 flash"
-        Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @("-p", $Port, "erase-flash")
+        Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @("-B", $FlashBuildDir, "-p", $Port, "erase-flash")
     }
 
     Write-Log "烧录固件到 $Port"
-    Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @("-p", $Port, "flash")
+    Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @("-B", $FlashBuildDir, "-p", $Port, "flash")
 
     if (-not $NoCapture -and $CaptureSeconds -gt 0) {
         $logsDir = Join-Path $ProjectDir "tests\logs"
@@ -170,7 +167,7 @@ try {
 
     if ($Monitor) {
         Write-Log "进入串口监视器"
-        Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @("-p", $Port, "monitor")
+        Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @("-B", $FlashBuildDir, "-p", $Port, "monitor")
     }
 
     Write-Host ""

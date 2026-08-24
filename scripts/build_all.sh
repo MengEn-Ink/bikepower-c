@@ -171,6 +171,9 @@ if [ ! -f "$IDF_PATH/export.sh" ]; then
 fi
 echo "激活ESP-IDF环境: $IDF_PATH"
 source "$IDF_PATH/export.sh" > /dev/null
+if command -v ccache >/dev/null 2>&1; then
+    export IDF_CCACHE_ENABLE=1
+fi
 
 cd "$PROJECT_DIR"
 
@@ -191,6 +194,7 @@ echo ""
 echo "=== 构建前测试门禁：host / mock / static ==="
 make -C test
 ./test/test_domain
+python3 tests/test_ble_protocol_vectors.py
 python3 tests/test_portal_config_save.py
 python3 tests/test_core_flow_endurance.py \
     --minutes "${CORE_FLOW_MINUTES:-3}" \
@@ -202,12 +206,19 @@ python3 tests/check_nvs_schema.py
 python3 tests/check_tasks_wdt.py
 python3 tests/check_board_desc.py
 python3 tests/check_ble_advertising_fields.py
+python3 tests/check_ble_reconnect.py
+python3 tests/check_wifi_done_reliability.py
+python3 tests/check_control_event_reliability.py
+python3 tests/check_build_isolation.py
+python3 tests/check_project_hygiene.py
+python3 tests/test_operation_gate_evidence.py
 
 # 记录本次生成的固件产物（用于后续 SHA256 / manifest / latest.json）
 PRODUCED_BINS=()
 
 for target in "${TARGETS[@]}"; do
     board_name="$(board_name_of "$target")"
+    BUILD_DIR="$PROJECT_DIR/build/release-work/$target"
     case "$target" in
         generic) kconfig="CONFIG_BOARD_GENERIC_C3=y" ;;
         m5stamp) kconfig="CONFIG_BOARD_M5STAMP_C3=y" ;;
@@ -220,11 +231,14 @@ for target in "${TARGETS[@]}"; do
     echo "$kconfig" > sdkconfig.board
     cat sdkconfig.defaults sdkconfig.board > sdkconfig.board.tmp
 
-    # 删除旧 sdkconfig 强制从 defaults 重新生成
-    rm -f sdkconfig
+    mkdir -p "$BUILD_DIR"
+    rm -f "$BUILD_DIR/sdkconfig"
 
     # 编译
-    idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.board.tmp" build
+    idf.py -B "$BUILD_DIR" \
+        -D SDKCONFIG="$BUILD_DIR/sdkconfig" \
+        -D SDKCONFIG_DEFAULTS="sdkconfig.board.tmp" \
+        build
 
     # 合并固件为单文件
     FW_NAME="$(firmware_file_name "$board_name")"
@@ -232,9 +246,9 @@ for target in "${TARGETS[@]}"; do
         --chip esp32c3 merge_bin \
         -o "$RELEASE_DIR/$FW_NAME" \
         --flash_mode dio --flash_freq 80m --flash_size 4MB \
-        0x0 build/bootloader/bootloader.bin \
-        0x8000 build/partition_table/partition-table.bin \
-        0x10000 build/bikepower-c.bin
+        0x0 "$BUILD_DIR/bootloader/bootloader.bin" \
+        0x8000 "$BUILD_DIR/partition_table/partition-table.bin" \
+        0x10000 "$BUILD_DIR/bikepower-c.bin"
 
     echo "  产物: $RELEASE_DIR/$FW_NAME"
     ls -lh "$RELEASE_DIR/$FW_NAME" | awk '{print "  大小: "$5}'

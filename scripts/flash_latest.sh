@@ -17,6 +17,7 @@ STOP_DAEMON=1
 BOARD_TARGET="${BIKEPOWER_BOARD:-generic}"
 SDKCONFIG_BACKUP=""
 FLASH_DEFAULTS="sdkconfig.flash.tmp"
+FLASH_BUILD_DIR=""
 
 usage() {
     cat <<'EOF'
@@ -192,6 +193,9 @@ activate_idf() {
         log "使用当前 shell 中已激活的 ESP-IDF"
     fi
 
+    if command -v ccache >/dev/null 2>&1; then
+        export IDF_CCACHE_ENABLE=1
+    fi
     idf.py --version
 }
 
@@ -300,18 +304,14 @@ prepare_board_defaults() {
         *) die "未知板型 $BOARD_TARGET" ;;
     esac
 
-    if [ -f "$PROJECT_DIR/sdkconfig" ] && [ -z "$SDKCONFIG_BACKUP" ]; then
-        SDKCONFIG_BACKUP="$PROJECT_DIR/sdkconfig.flash.backup.$$"
-        cp "$PROJECT_DIR/sdkconfig" "$SDKCONFIG_BACKUP"
-    fi
-
     printf '%s\n' "$kconfig" > "$PROJECT_DIR/sdkconfig.flash.board"
     cat "$PROJECT_DIR/sdkconfig.defaults" "$PROJECT_DIR/sdkconfig.flash.board" > "$PROJECT_DIR/$FLASH_DEFAULTS"
-    rm -f "$PROJECT_DIR/sdkconfig.flash.board" "$PROJECT_DIR/sdkconfig"
+    rm -f "$PROJECT_DIR/sdkconfig.flash.board"
 }
 
 IDF_DETECTED="$(detect_idf_path)" || die "找不到 ESP-IDF，请设置 IDF_PATH，或准备 $HOME/esp/esp-idf-v5.5.4、$PROJECT_DIR/../esp32-power/esp-idf、/home/mengen1014/work/esp32-power/esp-idf、$HOME/esp/esp-idf，或先激活 idf.py"
 activate_idf "$IDF_DETECTED"
+FLASH_BUILD_DIR="$PROJECT_DIR/build/flash-$BOARD_TARGET"
 
 if [ -z "$PORT" ]; then
     PORT="$(detect_port)" || die "找不到串口设备，请用 --port 指定"
@@ -332,19 +332,29 @@ if [ "$DO_BUILD" -eq 1 ]; then
     log "编译固件（board=${BOARD_TARGET}, PORTAL_TEST_AUTO_CONFIG=${TEST_AUTO_CONFIG}）"
     prepare_board_defaults
     clear_stale_board_cache
-    idf.py -D SDKCONFIG_DEFAULTS="$FLASH_DEFAULTS" -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" reconfigure
-    idf.py -D SDKCONFIG_DEFAULTS="$FLASH_DEFAULTS" -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" build
+    mkdir -p "$FLASH_BUILD_DIR"
+    rm -f "$FLASH_BUILD_DIR/sdkconfig"
+    idf.py -B "$FLASH_BUILD_DIR" \
+        -D SDKCONFIG="$FLASH_BUILD_DIR/sdkconfig" \
+        -D SDKCONFIG_DEFAULTS="$FLASH_DEFAULTS" \
+        -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" \
+        reconfigure
+    idf.py -B "$FLASH_BUILD_DIR" \
+        -D SDKCONFIG="$FLASH_BUILD_DIR/sdkconfig" \
+        -D SDKCONFIG_DEFAULTS="$FLASH_DEFAULTS" \
+        -DPORTAL_TEST_AUTO_CONFIG="${TEST_AUTO_CONFIG}" \
+        build
 else
     log "跳过显式编译"
 fi
 
 if [ "$DO_ERASE" -eq 1 ]; then
     log "擦除整片 flash"
-    idf.py -p "$PORT" erase-flash
+    idf.py -B "$FLASH_BUILD_DIR" -p "$PORT" erase-flash
 fi
 
 log "烧录固件到 $PORT"
-idf.py -p "$PORT" flash
+idf.py -B "$FLASH_BUILD_DIR" -p "$PORT" flash
 
 if [ "$CAPTURE_SECONDS" -gt 0 ]; then
     mkdir -p tests/logs
@@ -355,7 +365,7 @@ fi
 
 if [ "$DO_MONITOR" -eq 1 ]; then
     log "进入串口监视器"
-    exec idf.py -p "$PORT" monitor
+    exec idf.py -B "$FLASH_BUILD_DIR" -p "$PORT" monitor
 fi
 
 log "烧录完成"

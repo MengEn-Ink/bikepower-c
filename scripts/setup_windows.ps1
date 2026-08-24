@@ -164,7 +164,7 @@ if ($ccacheExe) {
 } else {
     Write-Host "  ccache 未安装" -ForegroundColor Yellow
     Write-Host "  ccache 会随 ESP-IDF 工具链一起安装（install.ps1）" -ForegroundColor Gray
-    Write-Host "  sdkconfig.defaults 已启用 CONFIG_CCACHE_ENABLE=y" -ForegroundColor Gray
+    Write-Host "  安装完成后项目脚本会通过 IDF_CCACHE_ENABLE=1 自动启用" -ForegroundColor Gray
 }
 
 # === 汇总 ===
@@ -183,7 +183,7 @@ Write-Host "  3. 编译固件: .\scripts\dev.ps1 build"
 Write-Host "  4. 完整 release: .\scripts\build_all.ps1"
 Write-Host ""
 Write-Host "编译速度优化已启用：" -ForegroundColor Cyan
-Write-Host "  - ccache（CONFIG_CCACHE_ENABLE=y）"
+Write-Host "  - ccache（检测到后设置 IDF_CCACHE_ENABLE=1）"
 Write-Host "  - Ninja（ESP-IDF 默认）"
 if (-not $SkipDefender -and (Test-Admin)) {
     Write-Host "  - Windows Defender 排除项"

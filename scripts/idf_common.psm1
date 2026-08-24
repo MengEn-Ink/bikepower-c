@@ -153,6 +153,9 @@ function Activate-IdfEnv {
         if (-not (Get-Command "idf.py" -ErrorAction SilentlyContinue)) {
             Die "idf.py 不在 PATH 中，ESP-IDF 环境未激活。请用 -IdfPath 指定 ESP-IDF 安装路径。"
         }
+        if (Get-Command "ccache" -ErrorAction SilentlyContinue) {
+            $env:IDF_CCACHE_ENABLE = "1"
+        }
         Write-Log "使用当前 shell 中已激活的 ESP-IDF"
         return
     }
@@ -175,6 +178,9 @@ function Activate-IdfEnv {
     # 验证激活是否成功
     if (-not $env:IDF_PATH) {
         Die "ESP-IDF 激活失败: IDF_PATH 未设置。可能 Python venv 或工具链未安装。`n  请运行 install.ps1 安装 ESP-IDF 工具链。"
+    }
+    if (Get-Command "ccache" -ErrorAction SilentlyContinue) {
+        $env:IDF_CCACHE_ENABLE = "1"
     }
     Write-Success ("ESP-IDF 已激活: IDF_PATH=" + $env:IDF_PATH)
 }

@@ -112,6 +112,8 @@ function Build-Board {
     $boardName = Get-BoardName $Target
     $fwName = "bikepower-c-" + $boardName + "-v" + $Version + "-stable-fix-g" + $GitSha + ".bin"
     $fwPath = Join-Path $ReleaseDir $fwName
+    $buildDir = Join-Path (Join-Path $ProjectDir "build\release-work") $Target
+    $buildSdkconfig = Join-Path $buildDir "sdkconfig"
 
     Write-Log ("构建板型: " + $boardName)
 
@@ -128,33 +130,25 @@ function Build-Board {
         Set-Content -Path $boardFile -Value $kconfig -Encoding ASCII
         Get-Content $defaultsFile, $boardFile | Set-Content -Path $mergedDefaults -Encoding ASCII
 
-        $cmakeCache = Join-Path (Join-Path $ProjectDir "build") "CMakeCache.txt"
-        if (Test-Path $cmakeCache) {
-            $cacheContent = Get-Content $cmakeCache -Raw
-            if ($cacheContent -match "sdkconfig\.board\.tmp|sdkconfig\.board\.merged\.tmp") {
-                Write-Host "  清理残留的临时板型 CMakeCache" -ForegroundColor Yellow
-                Remove-Item $cmakeCache -Force
-            }
-        }
-
-        $oldSdkconfig = Join-Path $ProjectDir "sdkconfig"
-        if (Test-Path $oldSdkconfig) {
-            $backupPath = Join-Path $ProjectDir "sdkconfig.build_backup"
-            Copy-Item $oldSdkconfig $backupPath -Force
-        }
+        New-Item -Path $buildDir -ItemType Directory -Force | Out-Null
+        if (Test-Path $buildSdkconfig) { Remove-Item $buildSdkconfig -Force }
 
         Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @(
+            "-B", $buildDir,
+            "-D", "SDKCONFIG=" + $buildSdkconfig,
             "-D", "SDKCONFIG_DEFAULTS=" + $mergedDefaults,
             "reconfigure"
         )
         Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @(
+            "-B", $buildDir,
+            "-D", "SDKCONFIG=" + $buildSdkconfig,
             "-D", "SDKCONFIG_DEFAULTS=" + $mergedDefaults,
             "build"
         )
 
-        $bootBin = Join-Path (Join-Path (Join-Path $ProjectDir "build") "bootloader") "bootloader.bin"
-        $partBin = Join-Path (Join-Path (Join-Path $ProjectDir "build") "partition_table") "partition-table.bin"
-        $appBin = Join-Path (Join-Path $ProjectDir "build") "bikepower-c.bin"
+        $bootBin = Join-Path (Join-Path $buildDir "bootloader") "bootloader.bin"
+        $partBin = Join-Path (Join-Path $buildDir "partition_table") "partition-table.bin"
+        $appBin = Join-Path $buildDir "bikepower-c.bin"
 
         foreach ($bin in @($bootBin, $partBin, $appBin)) {
             if (-not (Test-Path $bin)) {
@@ -184,10 +178,6 @@ function Build-Board {
     } finally {
         foreach ($tmp in @($boardFile, $mergedDefaults)) {
             if (Test-Path $tmp) { Remove-Item $tmp -Force }
-        }
-        $backupPath = Join-Path $ProjectDir "sdkconfig.build_backup"
-        if (Test-Path $backupPath) {
-            Move-Item $backupPath (Join-Path $ProjectDir "sdkconfig") -Force
         }
     }
 }
