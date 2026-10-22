@@ -188,6 +188,7 @@ def quick_steps(gate):
     run_step(gate, "Mock 保存回显", "python3 tests/test_portal_config_save.py", 60)
     run_step(gate, "操作覆盖矩阵", "python3 tests/check_operation_coverage.py", 30)
     run_step(gate, "BLE 监控客户端静态门禁", "python3 tests/check_ble_monitor.py", 30)
+    run_step(gate, "网页刷写站点生成回归", "python3 tests/test_prepare_web_flash_site.py", 30)
     run_step(gate, "BLE 广播项监控静态门禁", "python3 tests/check_ble_broadcast_monitor.py", 30)
     run_step(gate, "门户结构", "python3 tests/check_portal_structure.py", 60)
     run_step(gate, "门户 JS", "python3 tests/check_portal_js.py", 60)
@@ -211,7 +212,7 @@ def device_steps(gate, port, run_portal, device_profile):
         run_step(
             gate,
             "串口启动日志",
-            f"python3 tests/serial_capture.py -p {port} -d 12 --check-boot",
+            f"python3 tests/serial_capture.py -p {shlex.quote(port)} -d 12 --check-boot",
             30,
             acceptance_item="serial_boot",
         )

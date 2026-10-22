@@ -70,6 +70,7 @@ source $IDF_PATH/export.sh
 | `check_ble_advertising_fields.py` | BLE 广播字段检查（骑行/跑步服务 UUID 与名字预算） | TC-BLE-ADV | 高 |
 | `check_ftms_control_contract.py` | FTMS 控制点参数校验、应用接纳与 Result Code 静态契约 | TC-BLE-CP | 高 |
 | `check_wifi_done_contract.py` | WiFi 配网完成通知、pending latch 与幂等清理静态契约 | TC-WIFI-DONE | 高 |
+| `test_prepare_web_flash_site.py` | Pages 双板固件选择、SHA256、manifest、降级和路径安全回归 | TC-WEB-FLASH | 高 |
 
 ```bash
 # 一键跑全部静态门禁
@@ -79,6 +80,7 @@ for s in check_portal_js check_portal_structure check_config_consistency \
          check_wifi_done_contract; do
     python3 tests/$s.py || exit 1
 done
+python3 tests/test_prepare_web_flash_site.py
 ```
 
 ### A.1 协议与 harness 离线回归（无需设备）
@@ -134,21 +136,27 @@ python3 tests/operation_gate.py --level full  # 提交前完整无设备门禁
 python3 scripts/tools/device_acceptance.py init --board generic-c3 --operator "验收人"
 ```
 
-### D. BLE 浏览器监控客户端
+### D. BLE 浏览器监控与网页固件刷写
 
 | 文件 | 用途 |
 |------|------|
-| `tools/web/ble-monitor.html` | Web Bluetooth 客户端，解析 CPS/HRS/CSC/FTMS/RSC/DIS，显示实时数据、异常计数和事件日志 |
+| `tools/web/ble-monitor.html` | Web Bluetooth 客户端与 ESP Web Tools 刷写页，显示 BLE 数据以及最新 Release 双板型固件信息 |
 | `scripts/tools/serve_ble_monitor.py` | 从 `tools/web/` 启动无缓存本地 HTTP 服务，默认 `http://127.0.0.1:8766/ble-monitor.html` |
-| `tests/check_ble_monitor.py` | 静态门禁，检查监控客户端、异常检测和门禁接入是否漂移 |
+| `scripts/tools/prepare_web_flash_site.py` | 获取 GitHub/Gitee 最新 Release、验证 merged bin SHA256、生成 Pages 固件索引与 ESP Web Tools manifest |
+| `.github/workflows/deploy-web-tools.yml` | 发布 GitHub Pages；Release 缺失时仍发布 BLE Monitor 并禁用刷写 |
+| `tests/check_ble_monitor.py` | 静态门禁，检查监控、刷写交互、Pages 工作流和门禁接入是否漂移 |
+| `tests/test_prepare_web_flash_site.py` | 离线验证双板选择、SHA256、manifest、Gitee schema、降级和路径安全 |
 
 ```bash
 python3 scripts/tools/serve_ble_monitor.py
 # 用 Chrome / Edge 打开 http://127.0.0.1:8766/ble-monitor.html
 python3 tests/check_ble_monitor.py
+python3 tests/test_prepare_web_flash_site.py
 ```
 
 Web Bluetooth 首次连接必须由用户点击“连接设备”并在浏览器弹窗中授权；授权后可点“连接已授权设备”重连。页面会监控 BLE 断连、通知停更、功率/心率/踏频/跑步速度异常，并可导出 JSON 报告用于排查。
+
+GitHub Pages 部署优先读取当前 GitHub 仓库的最新 Release；没有完整附件时再使用 `GITEE_REPOSITORY` 和 `GITEE_TOKEN` 回退到 Gitee。两个板型的 merged bin 与 `.sha256` 必须成对存在且校验一致，之后才会进入同源 Pages artifact。网页刷写需要 HTTPS、桌面版 Chrome/Edge 和用户主动选择串口。本地 `localhost` 可用于界面检查，但 `tools/web/` 源目录本身没有部署生成的 `firmware/latest.json`。
 
 ### E. BLE 广播项数据面门禁
 

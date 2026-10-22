@@ -3,18 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BikePower BLE 监控</title>
+<title>BikePower BLE 监控与固件刷写</title>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--line:#dfe5ef;--text:#172033;--muted:#667085;--blue:#1769e0;--green:#16803c;--red:#c4262e;--amber:#a15c00}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;padding:16px}.wrap{max-width:980px;margin:0 auto}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}.title h1{font-size:22px;line-height:1.1;margin:0 0 4px}.title p{margin:0;color:var(--muted);font-size:13px;line-height:1.4}.toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn{border:0;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:800;cursor:pointer;background:var(--blue);color:#fff}.btn:disabled{opacity:.45;cursor:not-allowed}.btn.alt{background:#fff;color:var(--blue);border:1px solid rgba(23,105,224,.22)}.btn.danger{background:var(--red)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 6px 22px rgba(16,24,40,.05)}.card h2{margin:0 0 10px;font-size:14px;color:var(--muted);letter-spacing:.02em}.status{display:flex;align-items:center;gap:8px;font-weight:900}.dot{width:11px;height:11px;border-radius:50%;background:#98a2b3}.dot.on{background:var(--green)}.dot.warn{background:var(--amber)}.dot.err{background:var(--red)}.data{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric{border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center;background:#fbfcff}.metric b{display:block;font-size:30px;line-height:1;margin-bottom:5px}.metric span{font-size:12px;color:var(--muted)}.row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #eef2f7;font-size:13px}.row:last-child{border-bottom:0}.row span:first-child{color:var(--muted)}.row span:last-child{font-weight:800;text-align:right;word-break:break-all}.badges{display:flex;gap:6px;flex-wrap:wrap}.badge{border-radius:999px;padding:4px 8px;font-size:12px;font-weight:800;background:#eef4ff;color:var(--blue)}.badge.ok{background:#e8f7ee;color:var(--green)}.badge.warn{background:#fff4e5;color:var(--amber)}.badge.err{background:#ffecec;color:var(--red)}.log{height:260px;overflow:auto;background:#0f172a;color:#dbeafe;border-radius:12px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.45}.log div{margin-bottom:2px}.info{color:#86efac}.data-log{color:#93c5fd}.warn-log{color:#fdba74}.err-log{color:#fca5a5}.hint{font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px}.hidden{display:none}.anomaly-list{display:grid;gap:6px}.anomaly{display:flex;justify-content:space-between;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff}.anomaly b{font-size:13px}.anomaly span{font-size:12px;color:var(--muted)}@media(max-width:760px){body{padding:10px}.top{display:block}.toolbar{justify-content:flex-start;margin-top:10px}.grid,.data{grid-template-columns:1fr}.metric b{font-size:26px}}
 </style>
+<style>
+.flash-grid{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(0,1.2fr);gap:18px;align-items:start}.field{display:grid;gap:6px;margin-bottom:10px}.field label{font-size:12px;color:var(--muted);font-weight:800}.field select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;color:var(--text);font-size:14px}.flash-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}.flash-actions a{text-decoration:none}.flash-sha{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px!important;overflow-wrap:anywhere}.flash-title{display:flex;align-items:center;justify-content:space-between;gap:8px}.flash-title h2{margin-bottom:0}.flash-note{border-left:3px solid var(--amber);padding-left:9px}.release-link{color:var(--blue);font-weight:800;text-decoration:none}.release-link:hover{text-decoration:underline}esp-web-install-button{--esp-tools-button-color:var(--blue);--esp-tools-button-border-radius:10px;display:inline-block}@media(max-width:760px){.flash-grid{grid-template-columns:1fr}}
+</style>
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
 </head>
 <body>
 <div class="wrap">
   <div class="top">
     <div class="title">
-      <h1>BikePower BLE 监控</h1>
-      <p>本地浏览器客户端，用于连接 BikePower 并持续观察 BLE 通知、断连、停更和数值异常。</p>
+      <h1>BikePower BLE 监控与固件刷写</h1>
+      <p>浏览器工具页，用于刷写最新固件，并持续观察 BikePower 的 BLE 通知、断连、停更和数值异常。</p>
     </div>
     <div class="toolbar">
       <button class="btn" id="connect-btn" onclick="connectWithPicker()">连接设备</button>
@@ -26,6 +30,42 @@
 
   <div class="card hidden" id="support-warning">
     当前浏览器不支持 Web Bluetooth API。请使用 Chrome / Edge，并通过本地服务页面打开。
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="flash-title">
+      <h2>固件刷写</h2>
+      <span class="badge warn" id="firmware-status">正在获取最新版本</span>
+    </div>
+    <div class="flash-grid" style="margin-top:10px">
+      <div>
+        <div class="field">
+          <label for="firmware-board">开发板型号</label>
+          <select id="firmware-board" onchange="renderSelectedFirmware()">
+            <option value="generic-c3">通用 ESP32-C3</option>
+            <option value="m5stamp-c3">M5Stamp C3</option>
+          </select>
+        </div>
+        <div class="flash-actions">
+          <esp-web-install-button id="install-button" class="hidden">
+            <button class="btn" id="flash-activate" slot="activate" onclick="prepareForFlash()">连接串口并刷写</button>
+            <span slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
+            <span slot="not-allowed">网页刷写仅能在 HTTPS 或 localhost 页面使用。</span>
+          </esp-web-install-button>
+          <button class="btn" id="install-unavailable" disabled>暂无可刷写固件</button>
+          <a class="btn alt hidden" id="firmware-download" href="#" download>下载固件</a>
+        </div>
+        <div class="hint flash-note" id="flash-message">正在读取由部署流程生成的最新 Release 信息。</div>
+      </div>
+      <div>
+        <div class="row"><span>最新版本</span><span id="firmware-version">--</span></div>
+        <div class="row"><span>发布时间</span><span id="firmware-published">--</span></div>
+        <div class="row"><span>固件文件</span><span id="firmware-filename">--</span></div>
+        <div class="row"><span>SHA256</span><span class="flash-sha" id="firmware-sha256">--</span></div>
+        <div class="row"><span>Release</span><span><a class="release-link hidden" id="firmware-release" href="#" target="_blank" rel="noopener">查看发布说明</a><span id="firmware-release-empty">--</span></span></div>
+      </div>
+    </div>
+    <div class="hint">仅支持电脑端 Chrome / Edge、HTTPS 页面和支持数据传输的 USB 线。点击刷写后仍需在浏览器弹窗中主动选择正确串口；这是 Web Serial 的安全限制，网页无法静默选择设备。刷写过程中不要拔线或关闭页面。</div>
   </div>
 
   <div class="grid">
@@ -97,6 +137,7 @@ const ANOMALY_LIMITS = {
   cadenceMax: 260,
   speedMaxKmh: 35,
 };
+const FIRMWARE_INDEX_URL = "./firmware/latest.json";
 const anomalyLabels = {
   disconnect: "BLE 断连",
   stale: "通知停更",
@@ -117,6 +158,8 @@ let events = [];
 let cscPrev = null;
 let staleOpen = false;
 let anomalyTimer = null;
+let firmwareCatalog = null;
+let webInstallerReady = false;
 
 function $(id) { return document.getElementById(id); }
 function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
@@ -149,6 +192,103 @@ function checkSupport() {
   const ok = !!navigator.bluetooth;
   $("support-warning").classList.toggle("hidden", ok);
   return ok;
+}
+function safeSitePath(value) {
+  if (typeof value !== "string" || !value.startsWith("firmware/") || value.includes("..")) return null;
+  return "./" + value;
+}
+function setFirmwareStatus(text, kind = "warn") {
+  const badge = $("firmware-status");
+  badge.textContent = text;
+  badge.className = "badge" + (kind ? " " + kind : "");
+}
+function resetFirmwareDetails() {
+  setText("firmware-version", "--");
+  setText("firmware-published", "--");
+  setText("firmware-filename", "--");
+  setText("firmware-sha256", "--");
+  $("firmware-download").classList.add("hidden");
+  $("install-button").classList.add("hidden");
+  $("install-unavailable").textContent = "暂无可刷写固件";
+  $("install-unavailable").classList.remove("hidden");
+  $("firmware-release").classList.add("hidden");
+  $("firmware-release-empty").classList.remove("hidden");
+}
+function formatPublishedAt(value) {
+  if (!value) return "--";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+function renderSelectedFirmware() {
+  resetFirmwareDetails();
+  if (!firmwareCatalog || !firmwareCatalog.available) return;
+  const board = $("firmware-board").value;
+  const item = firmwareCatalog.boards && firmwareCatalog.boards[board];
+  if (!item) {
+    setFirmwareStatus("板型固件缺失", "err");
+    setText("flash-message", "最新 Release 未包含当前板型的完整固件与校验文件。");
+    return;
+  }
+  const manifestPath = safeSitePath(item.manifest);
+  const downloadPath = safeSitePath(item.download);
+  if (!manifestPath || !downloadPath) {
+    setFirmwareStatus("索引无效", "err");
+    setText("flash-message", "固件索引包含无效路径，已阻止刷写。");
+    return;
+  }
+  setText("firmware-version", "v" + firmwareCatalog.version);
+  setText("firmware-published", formatPublishedAt(firmwareCatalog.published_at));
+  setText("firmware-filename", item.filename || "--");
+  setText("firmware-sha256", item.sha256 || "--");
+  const download = $("firmware-download");
+  download.href = downloadPath;
+  download.download = item.filename || "";
+  download.classList.remove("hidden");
+  const installer = $("install-button");
+  installer.setAttribute("manifest", manifestPath);
+  if (webInstallerReady) {
+    installer.classList.remove("hidden");
+    $("install-unavailable").classList.add("hidden");
+    setFirmwareStatus("可刷写", "ok");
+    setText("flash-message", "已选择 " + (item.label || board) + "。部署流程已校验固件 SHA256；点击按钮后请选择开发板串口。");
+  } else {
+    $("install-unavailable").textContent = "刷写组件不可用";
+    setFirmwareStatus("仅可下载", "warn");
+    setText("flash-message", "固件已通过 SHA256 校验，但 ESP Web Tools 组件加载失败。请检查网络后刷新，或先下载固件。");
+  }
+  if (typeof firmwareCatalog.release_url === "string" && firmwareCatalog.release_url.startsWith("https://")) {
+    const link = $("firmware-release");
+    link.href = firmwareCatalog.release_url;
+    link.classList.remove("hidden");
+    $("firmware-release-empty").classList.add("hidden");
+  }
+}
+async function loadFirmwareCatalog() {
+  resetFirmwareDetails();
+  webInstallerReady = !!customElements.get("esp-web-install-button");
+  try {
+    const response = await fetch(FIRMWARE_INDEX_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const data = await response.json();
+    if (!data || data.schema_version !== 1) throw new Error("索引格式不受支持");
+    firmwareCatalog = data;
+    if (!data.available) {
+      setFirmwareStatus("暂无固件", "warn");
+      setText("flash-message", data.reason || "部署页面成功，但最新 Release 暂无完整双板型固件。");
+      return;
+    }
+    renderSelectedFirmware();
+  } catch (err) {
+    firmwareCatalog = null;
+    setFirmwareStatus("加载失败", "err");
+    setText("flash-message", "无法读取最新固件索引：" + (err.message || String(err)));
+  }
+}
+function prepareForFlash() {
+  if (server && server.connected) {
+    disconnect();
+    log("开始刷写前已断开 BLE 连接", "warn");
+  }
 }
 async function connectWithPicker() {
   if (!checkSupport()) return;
@@ -433,6 +573,7 @@ function downloadReport() {
 window.addEventListener("load", () => {
   renderAnomalies();
   checkSupport();
+  loadFirmwareCatalog();
   log("监控页面已就绪。");
 });
 </script>

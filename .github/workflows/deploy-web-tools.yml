@@ -1,0 +1,65 @@
+name: Deploy BLE Monitor and Web Flasher
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-web-tools.yml"
+      - "tools/web/**"
+      - "scripts/tools/prepare_web_flash_site.py"
+  release:
+    types: [published]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Prepare verified web flash site
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEE_REPOSITORY: ${{ vars.GITEE_REPOSITORY || 'mengen4jv/bikepower-c' }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          python3 scripts/tools/prepare_web_flash_site.py \
+            --site-dir "${RUNNER_TEMP}/bikepower-pages" \
+            --github-repo "${GITHUB_REPOSITORY}" \
+            --gitee-repo "${GITEE_REPOSITORY}"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ runner.temp }}/bikepower-pages
+
+  deploy:
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

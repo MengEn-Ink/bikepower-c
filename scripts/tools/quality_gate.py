@@ -296,7 +296,9 @@ required_assets = [
     "scripts/tools/device_acceptance.py",
     "scripts/tools/publish_gitee_release.py",
     "scripts/tools/serve_ble_monitor.py",
+    "scripts/tools/prepare_web_flash_site.py",
     "tools/web/ble-monitor.html",
+    ".github/workflows/deploy-web-tools.yml",
     "main/app_main.c",
     "main/ble_bikepower.c",
     "main/wifi_portal.c",
@@ -325,6 +327,7 @@ required_assets = [
     "tests/test_device_acceptance.py",
     "tests/test_operation_gate_evidence.py",
     "tests/test_serial_boot_check.py",
+    "tests/test_prepare_web_flash_site.py",
     "tests/serial_capture.py",
 ]
 for d in required_assets:
@@ -372,6 +375,7 @@ STATIC_CHECKS = [
     ("tests/check_portal_render.py", "门户渲染截图 (TC-3o)"),
     ("tests/check_operation_coverage.py", "操作覆盖矩阵 (TC-3j)"),
     ("tests/check_ble_monitor.py", "BLE 监控客户端 (TC-3k)"),
+    ("tests/test_prepare_web_flash_site.py", "网页刷写站点生成器 (TC-WEB-FLASH)"),
     ("tests/check_ble_advertising_fields.py", "BLE 广播字段 (TC-BLE-ADV)"),
     ("tests/check_ble_broadcast_monitor.py", "BLE 广播项监控脚本 (TC-3l)"),
     ("tests/check_release_gate.py", "Release 产物门禁 (TC-3m)"),

@@ -10,7 +10,7 @@
 | Host 领域层/协议 | 功率、踏频、心率、运行会话、配置 schema、BLE payload golden vectors | `make -C test run`、`python3 tests/test_ble_protocol_vectors.py` |
 | 离线 harness | 双次重连、running 四阶段、profile 全广播测试/恢复、FTMS 接纳和 WiFi done 可靠性契约 | `python3 tests/test_ble_reconnect_harness.py`、`python3 tests/test_ble_running_harness.py`、`python3 tests/test_device_profile_harness.py`、`python3 tests/check_ftms_control_contract.py`、`python3 tests/check_wifi_done_contract.py` |
 | Mock 网页层 | `/api/config` 保存回显、网页核心流程、设备模板、关闭 WiFi | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` |
-| 静态门禁 | 门户结构、JS、常量、NVS、任务/WDT、板型、操作矩阵 | `python3 tests/check_operation_coverage.py` 等 |
+| 静态门禁 | 门户结构、JS、常量、NVS、任务/WDT、板型、操作矩阵、Pages 网页刷写站点 | `python3 tests/check_operation_coverage.py`、`python3 tests/check_ble_monitor.py`、`python3 tests/test_prepare_web_flash_site.py` 等 |
 | 真机自动化 | 串口启动、互斥 cycling/running GATT profile、FTMS ERG/跑步会话、配网门户 HTTP | `python3 tests/ble_selftest.py`、`python3 tests/device_profile_harness.py`、`python3 tests/stage5_portal_test.py` |
 | 人工门禁 | 物理按钮手感、LED 肉眼灯效、手机 Captive Portal、Zwift/MyWhoosh 真实课程 | `scripts/tools/device_acceptance.py` + 本文“人工门禁记录” |
 
@@ -30,6 +30,7 @@
 | `OP-WEB-001` | 网页保存回显与字段映射，不丢字段、不串字段 | `python3 tests/test_portal_config_save.py`、`python3 tests/check_portal_structure.py` | 手机浏览器保存流程人工确认 |
 | `OP-WEB-002` | 越界/非法输入保持旧值或夹紧，不写入危险配置 | `make -C test run`、`python3 tests/test_portal_config_save.py` | 手动输入异常值抽查 |
 | `OP-WEB-003` | 续期、倒计时、保存并关闭 WiFi、设备模板扫描/保存/应用/删除 | `python3 tests/test_core_flow_endurance.py`、`python3 tests/stage5_portal_test.py` | 手机连接 AP 后配网入口人工确认 |
+| `OP-WEB-004` | GitHub Pages 发布 BLE Monitor；自动获取双板最新 Release、验证 SHA256、生成 ESP Web Tools manifest；无完整 Release 时安全禁用刷写 | `python3 tests/check_ble_monitor.py`、`python3 tests/test_prepare_web_flash_site.py` | 首次启用 Pages 后人工确认 HTTPS、串口选择和两个板型各一次真机刷写 |
 | `OP-BCAST-001` | 顶部功率/踏频/心率多选默认全开；取消项隐藏对应窗口且保存后停止对应 BLE 通知；至少保留一项 | `make -C test run`、`python3 tests/test_portal_config_save.py`、`python3 tests/check_portal_structure.py` | Zwift/MyWhoosh 中按开启项观察数据源 |
 | `OP-BCAST-002` | BOOT 按钮按启用项选择目标：单项启用时直接调该项，多项启用时骑行优先功率、跑步优先配速/速度；长按 WiFi 确认回滚本次调节 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮在不同开关组合下人工确认 |
 | `OP-BCAST-003` | 广播项开关真实影响 BLE 数据面：关闭功率后 CPS/FTMS 功率停止，只开心率时仅 HRS 持续通知 | `python3 tests/ble_broadcast_monitor.py`、`python3 tests/check_ble_broadcast_monitor.py` | 设备需处于配网态，脚本通过 `/api/config` 切换 `broadcast_mask` |
@@ -90,6 +91,7 @@ python3 tests/stage3_conn_test.py
 python3 tests/ble_broadcast_monitor.py
 python3 tests/check_ble_broadcast_monitor.py
 python3 tests/check_ble_monitor.py
+python3 tests/test_prepare_web_flash_site.py
 python3 tests/stage5_portal_test.py
 python3 tests/check_config_consistency.py
 python3 tests/check_nvs_schema.py
