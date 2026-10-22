@@ -155,6 +155,7 @@ typedef enum {
 #define TASK_PRIO_BTN           5      // 按钮任务调度优先级
 #define TASK_STACK_LED          2048   // LED任务栈大小（字节）
 #define TASK_PRIO_LED           3      // LED任务调度优先级
+#define TASK_STACK_DNS          3072   // Captive Portal DNS 任务栈大小（字节）
 #define TASK_STACK_HTTPD        12288  // HTTP服务器任务栈大小（字节），BLE扫描/分析handler需大栈空间
 #define TASK_PRIO_NET           5      // 网络辅助任务调度优先级
 
@@ -185,10 +186,20 @@ typedef enum {
 #define HTTP_MAX_BODY_LEN      4096     // HTTP请求体最大长度（字节）
 #define HTTP_RECV_TIMEOUT_RETRIES 3     // httpd_req_recv 超时有限重试次数
 #define HTTP_MAX_URI_HANDLERS  30       // HTTP服务器最大URI路由数（含 Captive Portal 探测端点 + 配置接口）
+#define HTTP_MAX_OPEN_SOCKETS  7        // HTTP服务器最大并发 socket 数
 
 // ===== Captive Portal =====
 #define CAPTIVE_PORTAL_HOST    "192.168.4.1"  // SoftAP 网关 IP，DNS 劫持目标 + 重定向 Location 主机
 #define CAPTIVE_PORTAL_API_PATH "/.well-known/captive-portal"
+#define CAPTIVE_PORTAL_IP_A    192
+#define CAPTIVE_PORTAL_IP_B    168
+#define CAPTIVE_PORTAL_IP_C    4
+#define CAPTIVE_PORTAL_IP_D    1
+#define DNS_SERVER_PORT        53       // Captive Portal DNS 监听端口
+#define DNS_PACKET_MAX_LEN     512      // DNS over UDP 标准报文上限
+#define DNS_ANSWER_TTL_SEC     10       // 短 TTL，退出配网后客户端可尽快恢复正常解析
+#define DNS_STOP_POLL_MS       10       // 停止 DNS 任务时的轮询间隔
+#define DNS_STOP_MAX_POLLS     20       // 最多等待 200ms 让 DNS 任务自行退出
 
 // ===== 射频软切换（radio_ctrl，毫秒） =====
 #define RADIO_BLE_RELEASE_WAIT_MS  200   // 停 BLE 后留给控制器释放射频的时间

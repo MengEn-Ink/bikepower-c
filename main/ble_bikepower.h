@@ -67,7 +67,7 @@ bool ble_bikepower_start_failed(void);
  * 停止通知定时器、终止连接、停止广播并释放 NimBLE 控制器资源。
  * 无参数。
  * 返回值：`true` 表示射频已成功释放，`false` 表示停用失败、射频可能仍被占用。
- * 特殊行为：进入 WiFi 配网前必须先调用，满足 WB-MUTEX-1 射频互斥约束。
+ * 特殊行为：普通 WiFi 配网走 coex 共存，不调用本函数；仅共存初始化失败兜底、profile 重建或 BLE 故障恢复时停用。
  */
 bool ble_bikepower_stop(void);
 

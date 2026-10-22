@@ -65,7 +65,11 @@ static void configure_captive_portal_dhcp(void)
     if (s_ap_netif == NULL) return;
 
     esp_netif_dns_info_t dns = { 0 };
-    IP4_ADDR(&dns.ip.u_addr.ip4, 192, 168, 4, 1);
+    IP4_ADDR(&dns.ip.u_addr.ip4,
+             CAPTIVE_PORTAL_IP_A,
+             CAPTIVE_PORTAL_IP_B,
+             CAPTIVE_PORTAL_IP_C,
+             CAPTIVE_PORTAL_IP_D);
     dns.ip.type = ESP_IPADDR_TYPE_V4;
 
     uint8_t offer_dns = DHCPS_OFFER_DNS;

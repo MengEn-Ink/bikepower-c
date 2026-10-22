@@ -3,8 +3,8 @@
  * 五服务：Cycling Power(0x1818) + Heart Rate(0x180D) + CSC(0x1816)
  *         + FTMS(0x1826) + Device Information(0x180A)
  *
- * 数据格式与 MicroPython ble_service.py 位级兼容：
- *   CPS  Measurement: flags(2)=0x0020 + power(2) + crankRev(2) + crankTime1024(2)
+ * 当前通知数据格式：
+ *   CPS  Measurement: 旧兼容格式 flags(1)=0x20 + power(2) + crankRev(2) + reserved(2) + crankTime1024(2)
  *   HR   Measurement: flags(1)=0x00 + bpm(1)
  *   CSC  Measurement: flags(1)=0x02 + crankRev(2) + crankTime1024(2)
  *   FTMS IndoorBike : flags(2)=0x0044 + speed(2)=cad*30 + cadence(2)=cad*2 + power(2)
@@ -102,7 +102,7 @@ static SemaphoreHandle_t g_notify_lock = NULL;
  * 组装 GAP 广播字段并以通用可连接模式开始对外广播。
  * 无参数。
  * 返回值：0表示启动成功，非0为NimBLE错误码。
- * 特殊行为：广播字段中只声明 CPS 和 HRS 服务 UUID，以兼容旧版发现行为。
+ * 特殊行为：主广播声明当前 profile 的关键服务 UUID，完整设备名放不下时写入 scan response。
  */
 static int start_advertising(void);
 // 发送单个特征通知/indication（定义在通知模块），FTMS 控制点回调需提前用于推送响应。

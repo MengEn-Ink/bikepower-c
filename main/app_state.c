@@ -1,12 +1,12 @@
 /**
- * 应用状态机（对齐 doc 11 §8.1）
+ * BikePower 应用状态机
  *
  * 消费按钮/连接事件，驱动调功、二次确认窗口与 LED。
  * 按钮语义：
  *   短按 <500ms        -> 按当前启用数据项调整主目标 -
  *   长按 >=500ms       -> 每 BTN_AUTO_REPEAT_MS 调整主目标 +（仅 WiFi 确认阈值前）
  *   长按 >=2000ms 释放 -> 回滚本次自动调功，进入确认窗口（LED 按配置切换）
- *   确认窗口内再按      -> 触发 WiFi 配网（阶段5接入，经 wifi_trigger 回调）
+ *   确认窗口内再按      -> 通过 wifi_trigger 回调触发 WiFi 配网
  *   确认窗口 3s 超时    -> 取消，恢复 BLE_ACTIVE
  */
 #include "app_state.h"
@@ -192,7 +192,7 @@ static void trigger_wifi(void)
         apply_led_scene(LED_SCENE_WIFI_CONFIG);
         s_wifi_trigger();
     } else {
-        ESP_LOGW(TAG, "WiFi 配网未就绪（阶段5接入），取消");
+        ESP_LOGW(TAG, "WiFi 配网回调未注册，取消本次请求");
         s_state = ST_BLE_ACTIVE;
         update_idle_led();
     }

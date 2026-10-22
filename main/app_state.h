@@ -1,5 +1,5 @@
 /**
- * 应用状态机（对齐 doc 11 §8.1 状态枚举）
+ * BikePower 应用状态机
  * 运行环境：ESP-IDF v5.5.4
  */
 #pragma once
@@ -17,7 +17,7 @@ typedef enum {
     ST_BOOTING,
     ST_BLE_ACTIVE,      // BLE 广播/连接中（LED 由连接状态决定）
     ST_WIFI_CONFIRM,    // 长按后等待二次确认（LED 快闪）
-    ST_WIFI_CONFIG,     // WiFi 配网模式（阶段5接入）
+    ST_WIFI_CONFIG,     // WiFi 配网模式
     ST_SAVING,
     ST_REBOOTING,
     ST_ERROR_RECOVERY,

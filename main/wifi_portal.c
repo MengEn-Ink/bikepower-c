@@ -1055,7 +1055,7 @@ static esp_err_t start_httpd(void)
     cfg.lru_purge_enable = true;
     cfg.max_uri_handlers = HTTP_MAX_URI_HANDLERS;
     cfg.stack_size = TASK_STACK_HTTPD;
-    cfg.max_open_sockets = 7;
+    cfg.max_open_sockets = HTTP_MAX_OPEN_SOCKETS;
     cfg.keep_alive_enable = false;
 
     esp_err_t ret = httpd_start(&s_httpd, &cfg);

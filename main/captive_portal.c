@@ -10,31 +10,20 @@
  *   - nordesems/esp-captive-portal 的探测端点覆盖列表
  *   - RFC 1035 DNS 报文格式
  */
-#include "captive_portal.h"
-#include "bikepower_config.h"
-#include "esp_log.h"
-#include "esp_system.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "lwip/sockets.h"
-#include "lwip/inet.h"
 #include <string.h>
 
+#include "esp_log.h"
+#include "esp_system.h"
+#include "lwip/inet.h"
+#include "lwip/sockets.h"
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#include "bikepower_config.h"
+#include "captive_portal.h"
+
 static const char *TAG = "CAPTIVE";
-
-// DNS UDP 报文缓冲：DNS over UDP 标准上限 512 字节
-#define DNS_BUF_LEN 512
-// DNS 任务栈：lwip socket + 512 字节缓冲 + 解析逻辑
-#define DNS_TASK_STACK   3072
-// DNS Answer TTL（秒）：短 TTL 避免客户端缓存太久，断网后能重新触发探测；
-// 10s 平衡 DNS 查询频率与探测触发速度，过短（0）会导致每次请求都查增加负担
-#define DNS_ANSWER_TTL   10
-
-// SoftAP 网关 IP（esp_netif_create_default_wifi_ap 默认 192.168.4.1）
-#define AP_IP_ADDR0  192
-#define AP_IP_ADDR1  168
-#define AP_IP_ADDR2  4
-#define AP_IP_ADDR3  1
 
 static int s_dns_sock = -1;
 static TaskHandle_t s_dns_task = NULL;
@@ -48,8 +37,8 @@ static TaskHandle_t s_dns_task = NULL;
 static void dns_task(void *arg)
 {
     (void)arg;
-    uint8_t rx[DNS_BUF_LEN];
-    uint8_t tx[DNS_BUF_LEN];
+    uint8_t rx[DNS_PACKET_MAX_LEN];
+    uint8_t tx[DNS_PACKET_MAX_LEN];
     struct sockaddr_in client;
     socklen_t clen = sizeof(client);
 
@@ -87,12 +76,12 @@ static void dns_task(void *arg)
         tx[qend + 2] = 0x00; tx[qend + 3] = 0x01;  // TYPE = A
         tx[qend + 4] = 0x00; tx[qend + 5] = 0x01;  // CLASS = IN
         tx[qend + 6] = 0x00; tx[qend + 7] = 0x00;  // TTL 高
-        tx[qend + 8] = 0x00; tx[qend + 9] = (uint8_t)DNS_ANSWER_TTL;  // TTL 低
+        tx[qend + 8] = 0x00; tx[qend + 9] = (uint8_t)DNS_ANSWER_TTL_SEC;  // TTL 低
         tx[qend + 10] = 0x00; tx[qend + 11] = 0x04;  // RDLENGTH = 4
-        tx[qend + 12] = AP_IP_ADDR0;  // 192
-        tx[qend + 13] = AP_IP_ADDR1;  // 168
-        tx[qend + 14] = AP_IP_ADDR2;  // 4
-        tx[qend + 15] = AP_IP_ADDR3;  // 1
+        tx[qend + 12] = CAPTIVE_PORTAL_IP_A;
+        tx[qend + 13] = CAPTIVE_PORTAL_IP_B;
+        tx[qend + 14] = CAPTIVE_PORTAL_IP_C;
+        tx[qend + 15] = CAPTIVE_PORTAL_IP_D;
         size_t txlen = qend + 16;
 
         int sent = sendto(s_dns_sock, tx, txlen, 0, (struct sockaddr *)&client, clen);
@@ -127,24 +116,24 @@ esp_err_t captive_portal_start_dns(void)
 
     struct sockaddr_in addr = { 0 };
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(53);
+    addr.sin_port = htons(DNS_SERVER_PORT);
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        ESP_LOGE(TAG, "DNS bind 53 失败 errno=%d", errno);
+        ESP_LOGE(TAG, "DNS bind %d 失败 errno=%d", DNS_SERVER_PORT, errno);
         close(sock);
         return ESP_FAIL;
     }
 
     s_dns_sock = sock;
-    if (xTaskCreate(dns_task, "dns_server", DNS_TASK_STACK, NULL, TASK_PRIO_NET, &s_dns_task) != pdPASS) {
+    if (xTaskCreate(dns_task, "dns_server", TASK_STACK_DNS, NULL, TASK_PRIO_NET, &s_dns_task) != pdPASS) {
         ESP_LOGE(TAG, "DNS 任务创建失败 堆=%lu", (unsigned long)esp_get_free_heap_size());
         close(s_dns_sock);
         s_dns_sock = -1;
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "DNS 劫持服务器已启动 (UDP 53 → 192.168.4.1) 堆=%lu",
-             (unsigned long)esp_get_free_heap_size());
+    ESP_LOGI(TAG, "DNS 劫持服务器已启动 (UDP %d → %s) 堆=%lu",
+             DNS_SERVER_PORT, CAPTIVE_PORTAL_HOST, (unsigned long)esp_get_free_heap_size());
     return ESP_OK;
 }
 
@@ -160,11 +149,12 @@ void captive_portal_stop_dns(void)
     // 用循环等待确保旧任务真正退出，防止下次 start_dns 时任务泄漏导致
     // 重新进入配网后 DNS 劫持服务异常（手机无法自动弹出配网页）
     if (s_dns_task) {
-        for (int i = 0; i < 20 && s_dns_task != NULL; i++) {
-            vTaskDelay(pdMS_TO_TICKS(10));
+        for (int i = 0; i < DNS_STOP_MAX_POLLS && s_dns_task != NULL; i++) {
+            vTaskDelay(pdMS_TO_TICKS(DNS_STOP_POLL_MS));
         }
         if (s_dns_task != NULL) {
-            ESP_LOGW(TAG, "DNS 任务退出超时（200ms），可能泄漏");
+            ESP_LOGW(TAG, "DNS 任务退出超时（%dms），可能泄漏",
+                     DNS_STOP_MAX_POLLS * DNS_STOP_POLL_MS);
         }
     }
     ESP_LOGI(TAG, "DNS 劫持服务器已停止");

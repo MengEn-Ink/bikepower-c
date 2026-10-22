@@ -558,7 +558,7 @@ def run_loop(port_prefer=None, use_color=True, quiet=False,
                     time.sleep(SCAN_INTERVAL)
                     continue
 
-        time.sleep(0.1)  # 主循环节拍 100ms，确保实时性
+        time.sleep(0.1)  # 覆盖至少两个 50ms 主循环节拍，确保状态及时刷新
 
     # 退出清理
     if ser:
