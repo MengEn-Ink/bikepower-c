@@ -8,7 +8,7 @@
 - **运行环境**：ESP-IDF v5.5.4 + NimBLE + FreeRTOS（非 MicroPython）
 - **硬件平台**：合宙 ESP32-C3（RISC-V 单核 160MHz, 400KB SRAM, WiFi+BLE5.0）
 - **当前版本**：v4.1.1
-- **参考仓库**：git@gitee.com:mengen4jv/bikepower-c.git
+- **主仓库**：git@github.com:MengEn-Ink/bikepower-c.git
 - **构建/烧录**：`idf.py build` / `idf.py -p <port> flash monitor`
 
 ## 强制规则

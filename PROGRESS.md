@@ -3,7 +3,7 @@
 > 基线方案：[docs/archive/01-cidf-nimble-rewrite.md](docs/archive/01-cidf-nimble-rewrite.md)
 > 当前固件版本：v4.1.1（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
-> 备用镜像：gitee.com/mengen4jv/bikepower-c（保留既有 Release 发布链路）
+> 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
 ---
 
@@ -26,7 +26,7 @@
 | 12 | 项目结构与文档梳理（v3.2.0） | ✅ 完成 | `test/` 与 `tests/` 合并评估（不合并）+ `tests/README.md` 7 大分类重写 + `docs/INDEX.md` 补全 workflows/domain 规则索引 |
 | 13 | 移除 OTA + 家庭网络 + 网页端精简（v4.0.0） | ✅ 代码完成（真机待确认） | 删 ota_downloader/ota_update/ota_version/ota_selftest + `/api/ota/*`、`/api/wifi/*`、`/api/draft` 路由与前端视图；分区表双 OTA → 单 factory（仍 4MB）；关回滚配置；门户退化为纯 BLE 参数页（方案见 [docs/archive/07-remove-ota-plan.md](docs/archive/07-remove-ota-plan.md)） |
 | 14 | Windows 开发环境适配 | ✅ 完成 | `idf_common.psm1` 共享模块 + `dev.ps1` 统一入口 + `build_all.ps1`/`flash_latest.ps1` 重构去重 + Python 脚本跨平台串口探测 |
-| 15 | BLE Monitor Pages + 网页固件刷写 | ✅ 已上线（双板真机刷写待确认） | Actions 部署静态页；Gitee v4.1.1 双板 merged bin 已同步并通过在线 SHA256；ESP Web Tools 0x0 manifest |
+| 15 | BLE Monitor Pages + 网页固件刷写 | ✅ 已上线（双板真机刷写待确认） | GitHub Release v4.1.1 双板 merged bin 经 Actions 校验并部署；ESP Web Tools 0x0 manifest |
 
 ---
 
@@ -49,7 +49,7 @@
 
 ## 第七轮 P0 真机验收清单（当前交付口径）
 
-本清单用于交付前集中跟踪“代码/自动化已就绪”和“仍需人工真机确认”的边界。未勾选项不得在发版说明中标为已完成；物理按钮、LED、系统级 Captive Portal 弹窗、72h 老化和 Gitee Release 创建均保留人工确认。
+本清单用于交付前集中跟踪“代码/自动化已就绪”和“仍需人工真机确认”的边界。未勾选项不得在发版说明中标为已完成；物理按钮、LED、系统级 Captive Portal 弹窗、72h 老化和浏览器真机刷写均保留人工确认。
 
 ### 就绪交付物
 
@@ -60,9 +60,9 @@
 - [x] 核心数值可配置已就绪：固定/配速机器人模式分段切换、功率/踏频/心率浮动幅度（有界平滑游走）、心率锁定/联动，均经 `/api/config` 持久化到 NVS。
 - [x] 配网入口交互已补强：设备名铅笔编辑、保存成功强反馈、不关闭 WiFi 时可继续修改。
 - [x] 配置导入/导出基础能力已落到领域层：`config_store_serialize` / `config_store_deserialize` 支持 JSON 往返、缺字段默认值和范围夹紧。
-- [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、单一版本号、stable/fix 标识和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 Gitee Release。
+- [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、单一版本号、stable/fix 标识和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 GitHub Release。
 - [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合；`tests/operation_gate.py --level full` 已接入 release 产物门禁和核心流程耐久。
-- [x] 稳定交付证据链已接入：`scripts/tools/device_acceptance.py` 统一记录真机自动项与人工项，`operation_gate.py --level device` 可写入自动结果，正式 Gitee 发布要求当前版本与 Git ID 的 P0 证据全部通过。
+- [x] 稳定交付证据链已接入：`scripts/tools/device_acceptance.py` 统一记录真机自动项与人工项，`operation_gate.py --level device` 可写入自动结果，正式 GitHub 发布要求当前版本与 Git ID 的 P0 证据全部通过。
 - [x] 历史 generic-c3 真机自动化记录：v4.1.1 release 固件曾通过启动、骑行 BLE 与一次连接/断开，详见 `CHANGELOG.md` 的“v4.1.1 通用版真机验收”。该记录不覆盖 2026-10-22 当前工作区；新协议、跑步会话、双次重连、配网门户、广播开关、物理按钮/LED 和 m5stamp-c3 均须按当前 Git ID 重新验收。
 
 ### 待人工确认（P0）
@@ -82,7 +82,7 @@
 
 上述未完成项继续保持待验收状态。执行时按板型写入 `tests/reports/device-acceptance-<板型>.json`；`NOT_RUN` 不视为通过，正式双板发布前必须分别对 generic-c3 与 m5stamp-c3 运行 `python3 scripts/tools/device_acceptance.py validate --strict --file <证据文件>`。
 - [x] Release tag：`v4.1.1` 已创建并推送，指向提交 `a9f127c`。
-- [ ] Release 人工复核：确认 Gitee Release 的 merged bin、manifest、测试报告和总包附件完整；源码仓库本身不把远端附件状态冒充为已验证。
+- [x] GitHub Release `v4.1.1` 已完成原样迁移：10 个顶层附件、双板固件及总包 SHA256、ZIP 结构和历史 manifest 记录均已复核；历史总包只有 generic-c3 证据，不冒充 m5stamp-c3 真机验收。
 
 ---
 
@@ -188,7 +188,7 @@
 - [x] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`（已设为 WARN）
 - [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（generic-c3 真机 `ble_selftest.py 8` 已校验厂商/型号/固件三字段）
 - [x] `v4.1.1` tag 已创建并推送
-- [ ] Gitee Release 附件完整性人工复核
+- [x] GitHub Release 附件完整性复核（10 个顶层附件、三组 SHA256、ZIP 与 manifest）
 
 ---
 
@@ -261,4 +261,4 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 - 配网门户动态测试（stage5_portal_test.py）需本机连 BikePower-XXXXXX 热点；本机不能切换 WiFi 时改用 `tests/mock_server.py` 本地调试，或换另一台机器执行
 - `test/` 与 `tests/` 目录职责不同不合并（评估结论见 [tests/README.md](tests/README.md) 第六章）：`test/` 放 ESP-IDF 约定的 host 单测（纯 C），`tests/` 放所有 Python/Shell 设备测试与静态门禁
 - 当前 P0 协议与可靠性缺陷及实施顺序见 [docs/dev/12-top5-protocol-stability-design.md](docs/dev/12-top5-protocol-stability-design.md) 和 [docs/dev/13-project-review-and-optimization.md](docs/dev/13-project-review-and-optimization.md)。在对应修复和真机验收完成前，不把现有自动化全绿等同于协议正确。
-- GitHub Pages 已启用 Actions 构建并完成首次部署；Gitee v4.1.1 双板固件已同步，在线 SHA256 与 manifest 已自动复核，generic-c3 / m5stamp-c3 浏览器真机刷写仍待确认。
+- GitHub Release、Actions 和 Pages 已收敛为单一链路；v4.1.1 双板固件在线 SHA256 与 manifest 已自动复核，generic-c3 / m5stamp-c3 浏览器真机刷写仍待确认。

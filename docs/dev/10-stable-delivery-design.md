@@ -9,7 +9,7 @@
 - `tests/operation_gate.py --level device` 能运行串口、BLE 和配网测试，但结果只存在 Markdown 报告中。
 - 按钮、LED、手机 Captive Portal 和长时间老化等人工项只能显示为 `SKIP`，没有统一的结构化记录。
 - `build/release/test-report.md` 不读取真机门禁结果。
-- `publish_gitee_release.py` 只验证附件、SHA256、manifest、Git 状态，无法阻止缺少当前版本真机证据的固件发布。
+- 旧发布入口只验证附件、SHA256、manifest、Git 状态，无法阻止缺少当前版本真机证据的固件发布。
 
 本轮目标是建立一条可验证的交付链：
 
@@ -18,7 +18,7 @@
   -> device-acceptance-<板型>.json
   -> 校验版本 / Git ID / 板型 / 必测项
   -> 写入 release 总包、manifest 和 test-report
-  -> Gitee 发布前严格阻断
+  -> GitHub 发布前严格阻断
 ```
 
 ## 二、范围
@@ -29,7 +29,7 @@
 2. 提供初始化、更新和校验证据的命令行工具。
 3. 让 `operation_gate.py --level device` 输出自动测试结果到证据文件。
 4. 让 release 构建按需收录证据，并在测试报告中生成摘要。
-5. 让正式 Gitee 发布强制要求当前 Git 版本的完整 P0 证据。
+5. 让正式 GitHub 发布强制要求当前 Git 版本的完整 P0 证据。
 6. 更新操作矩阵、测试说明、进度与发布文档。
 
 ### 本轮不包含
@@ -38,7 +38,7 @@
 - 不改变 WiFi/BLE 共存和 `radio_ctrl` 边界。
 - 不尝试自动判断 LED 颜色、实体按钮手感或系统 Captive Portal 弹窗。
 - 不恢复设备内 OTA、常驻 WiFi、MQTT 或 Matter。
-- 不改变当前 Gitee Release 的 10 个顶层上传附件约定。
+- 不改变当前 GitHub Release 的 10 个顶层上传附件约定。
 
 ## 三、证据模型
 
@@ -146,12 +146,12 @@ python3 scripts/tools/device_acceptance.py validate --strict
 
 `build_all.sh` 的本地构建仍允许没有真机证据，以支持无设备环境生成预览产物；若默认证据文件存在，则复制到 `build/release/evidence/`，写入 manifest、zip 和 `test-report.md`。
 
-正式发布入口 `publish_gitee_release.py` 必须：
+正式发布入口 `publish_github_release.py` 必须：
 
 1. 使用 release 目录内 generic-c3 与 m5stamp-c3 两份证据。
 2. 严格校验每份证据的版本、Git ID、板型和 P0 状态。
 3. 校验证据已写入 manifest 和 zip。
-4. 校验失败时在调用 Gitee API 前退出。
+4. 校验失败时在调用 GitHub CLI 前退出。
 
 因此保持 10 个顶层附件不变，证据作为总包内部可追溯文件随发布保存。
 

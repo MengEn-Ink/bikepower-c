@@ -142,10 +142,11 @@ python3 scripts/tools/device_acceptance.py init --board generic-c3 --operator "�
 |------|------|
 | `tools/web/ble-monitor.html` | Web Bluetooth 客户端与 ESP Web Tools 刷写页，显示 BLE 数据以及最新 Release 双板型固件信息 |
 | `scripts/tools/serve_ble_monitor.py` | 从 `tools/web/` 启动无缓存本地 HTTP 服务，默认 `http://127.0.0.1:8766/ble-monitor.html` |
-| `scripts/tools/prepare_web_flash_site.py` | 获取 GitHub/Gitee 最新 Release、验证 merged bin SHA256、生成 Pages 固件索引与 ESP Web Tools manifest |
-| `.github/workflows/deploy-web-tools.yml` | 发布 GitHub Pages；Release 缺失时仍发布 BLE Monitor 并禁用刷写 |
+| `scripts/tools/prepare_web_flash_site.py` | 获取 GitHub 最新 Release、验证 merged bin SHA256、生成 Pages 固件索引与 ESP Web Tools manifest |
+| `.github/workflows/deploy-web-tools.yml` | CI 成功或 GitHub Release 发布后部署 Pages；缺失完整固件时阻断覆盖 |
 | `tests/check_ble_monitor.py` | 静态门禁，检查监控、刷写交互、Pages 工作流和门禁接入是否漂移 |
-| `tests/test_prepare_web_flash_site.py` | 离线验证双板选择、SHA256、manifest、Gitee schema、降级和路径安全 |
+| `tests/test_prepare_web_flash_site.py` | 离线验证双板选择、SHA256、manifest、GitHub-only CLI、降级和路径安全 |
+| `tests/check_github_workflows.py` | 校验最小权限、CI→Pages 依赖、治理资产与 GitHub-only 发布契约 |
 
 ```bash
 python3 scripts/tools/serve_ble_monitor.py
@@ -156,7 +157,7 @@ python3 tests/test_prepare_web_flash_site.py
 
 Web Bluetooth 首次连接必须由用户点击“连接设备”并在浏览器弹窗中授权；授权后可点“连接已授权设备”重连。页面会监控 BLE 断连、通知停更、功率/心率/踏频/跑步速度异常，并可导出 JSON 报告用于排查。
 
-GitHub Pages 部署优先读取当前 GitHub 仓库的最新 Release；没有完整附件时再使用 `GITEE_REPOSITORY` 和 `GITEE_TOKEN` 回退到 Gitee。两个板型的 merged bin 与 `.sha256` 必须成对存在且校验一致，之后才会进入同源 Pages artifact。网页刷写需要 HTTPS、桌面版 Chrome/Edge 和用户主动选择串口。本地 `localhost` 可用于界面检查，但 `tools/web/` 源目录本身没有部署生成的 `firmware/latest.json`。
+GitHub Pages 只读取当前 GitHub 仓库的最新 Release。两个板型的 merged bin 与 `.sha256` 必须成对存在且校验一致，之后才会进入同源 Pages artifact；正式部署缺失任一项时失败并保留上一版站点。网页刷写需要 HTTPS、桌面版 Chrome/Edge 和用户主动选择串口。本地 `localhost` 可用于界面检查，但 `tools/web/` 源目录本身没有部署生成的 `firmware/latest.json`。
 
 ### E. BLE 广播项数据面门禁
 
@@ -258,7 +259,7 @@ python3 scripts/tools/device_acceptance.py validate --strict \
   --file tests/reports/device-acceptance-generic-c3.json
 ```
 
-状态限定为 `PASS`、`FAIL`、`NOT_RUN`。`NOT_RUN` 不是通过；严格模式要求证据板型、当前固件版本和 Git ID 匹配，且全部 P0 项为 `PASS`。本地 `build_all.sh` 在证据存在时按板型收录到 release 总包，正式双板 Gitee 发布强制要求 generic-c3 与 m5stamp-c3 两份完整 P0 证据。
+状态限定为 `PASS`、`FAIL`、`NOT_RUN`。`NOT_RUN` 不是通过；严格模式要求证据板型、当前固件版本和 Git ID 匹配，且全部 P0 项为 `PASS`。本地 `build_all.sh` 在证据存在时按板型收录到 release 总包，正式双板 GitHub 发布强制要求 generic-c3 与 m5stamp-c3 两份完整 P0 证据。
 
 ---
 
@@ -346,7 +347,7 @@ idf.py build
 
 `test-report.md` 必须如实记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行的烧录、BLE、配网、按钮或 LED 验证必须写明原因，不能按通过处理。`user-manual.md` 由 `docs/user/` 生成，更新固件交互时必须先同步源文档。总包命名为 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip`，用于一次性分发两个板型固件和随附文档。
 
-若 `tests/reports/device-acceptance-<板型>.json` 存在且匹配当前版本，构建脚本会复制到 `build/release/evidence/`，同时写入 manifest、测试报告和总包。无设备环境允许不带证据完成本地构建；`publish_gitee_release.py` 正式双板发布前会严格阻断任一板型证据缺失、Git ID 不一致或 P0 未通过。
+若 `tests/reports/device-acceptance-<板型>.json` 存在且匹配当前版本，构建脚本会复制到 `build/release/evidence/`，同时写入 manifest、测试报告和总包。无设备环境允许不带证据完成本地构建；`publish_github_release.py` 正式双板发布前会严格阻断任一板型证据缺失、Git ID 不一致、tag 未推送或 P0 未通过。
 
 ### 测试固件（带自动配网，用于配网门户自动化测试）
 

@@ -184,7 +184,7 @@ app_main.c
 | `tools/generate_release_docs.py` | 生成 test-report.md |
 | `tools/device_monitor.py` | 串口设备监控 |
 | `tools/serve_ble_monitor.py` | BLE 监控本地服务器 |
-| `scripts/tools/publish_gitee_release.py` | Gitee Release 发布（复用严格检查） |
+| `scripts/tools/publish_github_release.py` | GitHub Release 发布（严格证据、tag 与附件检查） |
 
 ### `tests/` — 设备测试与门禁
 

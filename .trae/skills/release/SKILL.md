@@ -71,10 +71,10 @@ description: "BikePower C 发版流程。用于准备版本发布、检查测试
   esptool.py --chip esp32c3 -b 460800 write_flash --flash_mode dio --flash_size 4MB --flash_freq 80m 0x0 bikepower-c-generic-c3-vX.Y.Z-stable-fix-gGitID.bin
   ```
 - 总包命名：`bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip`，包内必须包含两个板型固件、校验文件、manifest、测试报告、10 分钟核心流程报告、用户手册和截图目录。
-14. **创建 Gitee Release**
-- 从 `.env` 读取 `GITEE_TOKEN`
-- 通过 `python3 scripts/tools/publish_gitee_release.py` 创建 Release，tag_name 与版本号一致
-- 发布前先运行 `python3 scripts/tools/publish_gitee_release.py --dry-run` 确认附件清单和目标提交
+14. **创建 GitHub Release**
+- 使用 `gh auth` 的系统凭据，不在仓库或 `.env` 保存 token
+- 通过 `python3 scripts/tools/publish_github_release.py` 创建 Release，tag 与版本号一致
+- 发布前先运行 `python3 scripts/tools/publish_github_release.py --dry-run` 确认 tag、双板证据、附件清单和目标提交
 - Release 说明必须包含：
   - **变更内容**：新增/修复/改进，逐条列出
   - **测试报告**：编译结果、host 单测结果、真机测试结果、内存状态
@@ -95,7 +95,7 @@ description: "BikePower C 发版流程。用于准备版本发布、检查测试
 - `build/release/core-flow-endurance.md` 已生成且核心流程耐久通过
 - `build/release/user-manual.md` 已生成
 - `build/release/bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip` 已生成且包含双板型固件、测试报告和用户手册
-- `python3 scripts/tools/publish_gitee_release.py --dry-run` 已通过
+- `python3 scripts/tools/publish_github_release.py --dry-run` 已通过
 - `.trae/rules/` 与 `docs/` 未引用过时脚本名、断言数或常量值
 - 工作区无不应混入发版的临时文件
 - commit/tag/Release 三处版本号一致

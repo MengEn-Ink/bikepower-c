@@ -414,13 +414,13 @@ build_all.sh 执行顺序:
 
 `.github/workflows/deploy-web-tools.yml` 把 `tools/web/ble-monitor.html` 作为 GitHub Pages 首页发布，并在部署阶段调用 `scripts/tools/prepare_web_flash_site.py`：
 
-1. 优先读取当前 GitHub 仓库的最新 Release；没有完整附件时回退到 `GITEE_REPOSITORY`。
+1. 只读取当前 GitHub 仓库的最新 Release，其他托管渠道不参与部署。
 2. 严格选择当前 tag 对应的 generic-c3 / m5stamp-c3 merged bin 和同名 `.sha256`。
 3. 下载后校验 SHA256，再把固件复制进同源 Pages artifact。
 4. 生成 `firmware/latest.json` 与两个 ESP Web Tools manifest，芯片为 `ESP32-C3`，merged bin 从 `offset=0` 刷写。
-5. 没有可用 Release 时生成 `available=false` 索引，BLE Monitor 继续部署，刷写按钮保持禁用。
+5. 本地预览允许生成 `available=false` 索引；正式 Pages 使用 `--require-firmware`，缺失完整 Release 时失败并保留上一版站点。
 
-首次使用需在 GitHub 仓库 `Settings → Pages` 选择 `GitHub Actions`。Release 位于 Gitee 时配置 Actions secret `GITEE_TOKEN`；可选仓库变量 `GITEE_REPOSITORY` 默认 `mengen4jv/bikepower-c`。工作流支持 main 相关改动、GitHub Release 发布、每日同步和手动触发。
+首次使用需在 GitHub 仓库 `Settings → Pages` 选择 `GitHub Actions`，不需要额外 Release token。工作流在 `main` 的 `CI` 成功后部署，并支持 GitHub Release 发布、每日同步和手动触发。
 
 本地离线验证：
 

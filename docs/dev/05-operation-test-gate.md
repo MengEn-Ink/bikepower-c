@@ -160,7 +160,7 @@ python3 scripts/tools/check_release_artifacts.py \
 
 状态只有 `PASS`、`FAIL` 和 `NOT_RUN`。如果人工项未执行，保留 `NOT_RUN` 并在 evidence 中写明原因；`NOT_RUN` 不能冒充自动通过。每份证据的板型、`FIRMWARE_VERSION` 和 Git ID 必须匹配，旧固件或另一板型证据不得复用。
 
-本地 `build_all.sh` 允许没有证据，以便在无设备环境生成预览产物；若证据存在，脚本会按目标板型校验并收录到 release 的 manifest、测试报告和总包。`publish_gitee_release.py` 正式双板发布时强制要求 generic-c3 与 m5stamp-c3 的全部 P0 项通过。
+本地 `build_all.sh` 允许没有证据，以便在无设备环境生成预览产物；若证据存在，脚本会按目标板型校验并收录到 release 的 manifest、测试报告和总包。`publish_github_release.py` 正式双板发布时强制要求 generic-c3 与 m5stamp-c3 的全部 P0 项通过，并验证 tag 已推送。
 
 ## 五、维护规则
 

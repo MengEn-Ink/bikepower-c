@@ -104,12 +104,12 @@ Pages 地址：[https://mengen-ink.github.io/bikepower-c/](https://mengen-ink.gi
 
 网页刷写依赖 HTTPS 和 Web Serial。浏览器出于安全原因必须由用户点击按钮并主动选择串口，网页不能静默选择设备。如果列表里看不到开发板，优先更换一根支持数据传输的 USB 线，再重新插拔开发板并刷新网页。少数开发板需要按住 BOOT 键再点击连接或开始烧录，进度开始后即可松开。
 
-维护者首次部署时需要把仓库镜像/推送到 GitHub，在仓库 `Settings → Pages` 把 Source 设为 `GitHub Actions`，然后手动运行 `Deploy BLE Monitor and Web Flasher`：
+维护者首次部署时在仓库 `Settings → Pages` 把 Source 设为 `GitHub Actions`，然后手动运行 `Deploy BLE Monitor and Web Flasher`：
 
-- GitHub 仓库本身有 Release 时，工作流使用内置 `GITHUB_TOKEN` 获取最新附件。
-- Release 仍发布在 Gitee 时，在 GitHub Actions secrets 配置 `GITEE_TOKEN`；仓库变量 `GITEE_REPOSITORY` 可选，默认是 `mengen4jv/bikepower-c`。
+- 固件唯一来源是当前 GitHub 仓库的最新 Release，工作流使用最小权限的内置 `GITHUB_TOKEN` 获取附件，不需要额外发布凭据。
+- `main` 的 CI 成功后部署页面；GitHub Release 发布后立即刷新固件，另保留每日同步和手动触发。
 - 工作流只接受当前 tag 对应的 generic-c3 / m5stamp-c3 merged bin 和各自 `.sha256`，校验成功后才会放入 Pages artifact。
-- 找不到完整 Release 时仍会部署 BLE Monitor，但网页刷写按钮保持禁用；真实 Pages 地址见 deploy job 的 `page_url`。
+- 正式部署使用严格模式，找不到完整双板 Release 或摘要不匹配时工作流失败，不会用不可刷写站点覆盖已有 Pages。
 
 ### 开发者：本地编译并烧录
 
@@ -166,7 +166,7 @@ python3 scripts/tools/check_release_artifacts.py \
 python3 tests/test_release_artifacts.py
 ```
 
-Gitee 发布脚本会在调用远端 API 前自动复用严格检查，继续保持 10 个顶层上传附件不变。
+正式发布使用 `python3 scripts/tools/publish_github_release.py --dry-run` 预检，再由同一脚本通过已推送 tag 创建 GitHub Release。脚本会自动复用严格检查，要求双板 P0 真机证据并保持 10 个顶层上传附件不变；已存在的 Release 不允许覆盖。
 
 提交前推荐先跑聚合门禁：
 

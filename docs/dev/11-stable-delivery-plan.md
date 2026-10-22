@@ -19,7 +19,7 @@
 - `scripts/build_all.sh`：可选复制证据到 `build/release/evidence/` 并纳入 manifest/zip。
 - `scripts/tools/generate_release_docs.py`：把证据状态写入 `test-report.md`。
 - `scripts/tools/check_release_artifacts.py`：可选或强制校验 release 内证据。
-- `scripts/tools/publish_gitee_release.py`：正式发布必须启用严格证据检查。
+- `scripts/tools/publish_github_release.py`：正式发布必须启用严格证据与已推送 tag 检查。
 - `tests/test_release_artifacts.py`：覆盖有证据、缺证据、Git ID 不一致和 P0 未通过。
 - `tests/check_release_gate.py`：锁定发布入口接线。
 - `scripts/tools/quality_gate.py`：聚合新增功能测试。
@@ -161,7 +161,7 @@ Expected: 功能测试通过，帮助中显示新增参数。
 **Files:**
 - Modify: `scripts/tools/generate_release_docs.py`
 - Modify: `scripts/tools/check_release_artifacts.py`
-- Modify: `scripts/tools/publish_gitee_release.py`
+- Modify: `scripts/tools/publish_github_release.py`
 - Modify: `scripts/build_all.sh`
 - Modify: `tests/test_release_artifacts.py`
 - Modify: `tests/check_release_gate.py`
@@ -200,7 +200,7 @@ Expected: 新增严格证据参数或行为尚不存在，退出码非 0。
 - `manifest.txt` 和 zip 收录证据相对路径。
 - `generate_release_docs.py` 读取证据并列出 P0/P1 通过、失败、未执行数量。
 - `check_release_artifacts.py` 增加 `--require-device-evidence`。
-- `publish_gitee_release.py` 始终以严格模式调用 release gate。
+- `publish_github_release.py` 始终以严格模式调用 release gate。
 - 普通 release gate 不要求证据，以兼容本地构建和历史产物。
 
 - [ ] **Step 4：运行 release 功能测试**
