@@ -46,6 +46,8 @@ def main():
           "CI 通过 operation harness 执行 quick 门禁", failures)
     check("pip install" in ci and "requirements-test.txt" in ci,
           "CI 安装 BLE 与串口 Harness 依赖", failures)
+    check("fetch-depth: 2" in ci and "git diff --check HEAD^ HEAD" in ci,
+          "CI 使用两层历史检查本次提交 whitespace", failures)
     check("actions/upload-artifact@" in ci and "if: always()" in ci,
           "CI 始终上传 Harness 报告", failures)
     check("workflow_run:" in deploy and "workflows: [CI]" in deploy,

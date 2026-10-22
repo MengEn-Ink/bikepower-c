@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
 
       - name: Setup Python
         uses: actions/setup-python@v7
@@ -41,7 +43,7 @@ jobs:
           --report "${RUNNER_TEMP}/operation-gate-quick.md"
 
       - name: Check commit whitespace
-        run: git show --check --format= HEAD
+        run: git diff --check HEAD^ HEAD
 
       - name: Upload harness report
         if: always()
