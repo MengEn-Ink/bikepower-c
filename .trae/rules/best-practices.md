@@ -35,7 +35,7 @@
 | 板级代码（依赖 ESP-IDF） | `main/` | 入口、状态机、外设、BLE、WiFi |
 | 领域层（纯 C，可 host 单测） | `components/bikepower_domain/` | 功率/心率/踏频/配置算法 |
 | AI 规则 | `.trae/rules/` | 约束层 + 治理规则 |
-| host 单测 | `test/test_domain` | 领域层单元测试 |
+| host 单测 | `test/build/test_domain` | 领域层单元测试 |
 | 设备测试脚本 | `tests/` | bleak 自测 + 串口抓取 |
 | 人类文档 | `docs/` | 重写方案、部署指南 |
 | 进度 / 变更 | PROGRESS.md / CHANGELOG.md | 阶段进度 + 变更记录 |

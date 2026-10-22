@@ -57,7 +57,7 @@
 
 | 层 | 入口 | 覆盖对象 | 状态 |
 |----|------|---------|------|
-| TC-1 host 单测 | `test/test_domain` | 领域层 13 个生产源文件 | ✅ 全绿（5892 断言 / 0 失败，含 running 会话、ERG 非持久化、配置映射、按钮场景、随机功率心率随动和设备分析） |
+| TC-1 host 单测 | `test/build/test_domain` | 领域层 13 个生产源文件 | ✅ 全绿（5892 断言 / 0 失败，含 running 会话、ERG 非持久化、配置映射、按钮场景、随机功率心率随动和设备分析） |
 | TC-3a JS 静态 | `tests/check_portal_js.py` | `main/web/app.js` node --check | ✅ |
 | TC-3c 常量一致性 | `tests/check_config_consistency.py` | config 头文件 ↔ 文档 | ✅ |
 | TC-3d 门户结构 | `tests/check_portal_structure.py` | 路由表/HTML/前端 API 调用/设备分析详细与原始数据展示 | ✅ |
@@ -121,7 +121,7 @@
   ↓
 3. test/test_domain.c 加测试函数（正常/边界/异常）
   ↓
-4. 跑 TC-1: make -C test && ./test/test_domain  →  全绿
+4. 跑 TC-1: make -C test && ./test/build/test_domain  →  全绿
   ↓
 5. 涉及 wifi_portal / 前端 → 跑 TC-3a (JS) + TC-3d (门户结构)
   ↓

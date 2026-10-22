@@ -18,13 +18,13 @@ description: "ESP32-C3 ESP-IDF 固件真机测试流程。变更分类智能跳�
 | 分类 | 变更类型 | 示例 | 测试范围 |
 |------|---------|------|---------|
 | A | 纯文档/规则 | docs/, .trae/rules/, .trae/templates/, .trae/README.md | 跳过真机，仅检查文档一致性 |
-| B | 领域层逻辑 | components/bikepower_domain/*.c | host 单测（test/test_domain），可跳过烧录 |
+| B | 领域层逻辑 | components/bikepower_domain/*.c | host 单测（test/build/test_domain），可跳过烧录 |
 | C | 非硬件 host 可测模块 | 纯算法/数据结构 | host 单测 |
 | D | 硬件相关 | main/ble_bikepower.c, button.c, led.c, app_state.c, app_main.c, radio_ctrl.c, wifi_portal.c | 完整真机流程 |
 
 ## 当前测试资产
 
-- `test/test_domain`：领域层 host 单测
+- `test/build/test_domain`：领域层 host 单测
 - `tests/test_portal_config_save.py`：mock 配网页保存回显测试
 - `tests/test_core_flow_endurance.py`：3 分钟核心流程耐久测试（按钮/心率/网页编辑/模板/关闭 WiFi）
 - `tests/serial_capture.py`：串口日志抓取
@@ -36,7 +36,7 @@ description: "ESP32-C3 ESP-IDF 固件真机测试流程。变更分类智能跳�
 
 ## 完整真机流程（分类 D）
 
-1. **编译前门禁**：`make -C test && ./test/test_domain`、`python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py`、相关静态检查必须通过。
+1. **编译前门禁**：`make -C test && ./test/build/test_domain`、`python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py`、相关静态检查必须通过。
 2. **编译**：`idf.py build`，确认 0 error。
 3. **烧录**：`idf.py -p <port> flash`（串口自动扫描）。
 4. **串口确认**：`idf.py -p <port> monitor` 或 `tests/serial_capture.py`，检查启动日志（任务启动、state、空闲堆）。

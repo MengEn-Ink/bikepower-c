@@ -127,7 +127,7 @@ Expected behavior:
 Run per batch:
 
 - `python3 tests/check_config_consistency.py`
-- `make -C test clean && make -C test && ./test/test_domain`
+- `make -C test clean && make -C test && ./test/build/test_domain`
 - `python3 scripts/tools/quality_gate.py` when the batch affects gates, code, or docs.
 
 Run before final handoff:

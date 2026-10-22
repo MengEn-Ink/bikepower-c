@@ -109,7 +109,7 @@ def run_host_gate(rec):
     rec.check(make.returncode == 0, "host make", tail(make.stdout))
     if make.returncode != 0:
         return
-    test = run_cmd(["./test/test_domain"], timeout=60)
+    test = run_cmd(["./test/build/test_domain"], timeout=60)
     rec.check(test.returncode == 0 and "0 失败" in test.stdout, "host domain", tail(test.stdout))
 
 

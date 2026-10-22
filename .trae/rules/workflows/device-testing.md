@@ -8,7 +8,7 @@
 ## 标准流程
 
 1. `DT-1`：编译前门禁
-- 运行 `make -C test && ./test/test_domain`
+- 运行 `make -C test && ./test/build/test_domain`
 - 运行 `python3 tests/test_portal_config_save.py`
 - 运行 `python3 tests/test_core_flow_endurance.py`
 - 运行相关静态门禁：`check_config_consistency.py` / `check_portal_js.py` / `check_portal_structure.py` / `check_nvs_schema.py` / `check_tasks_wdt.py` / `check_board_desc.py`

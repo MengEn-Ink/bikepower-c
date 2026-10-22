@@ -24,7 +24,7 @@ description: "BikePower C 发版流程。用于准备版本发布、检查测试
 - 要求 0 error
 4. **host 单测**
 - 运行 `make -C test`
-- 运行 `./test/test_domain`
+- 运行 `./test/build/test_domain`
 5. **mock/静态门禁**
 - 运行 `python3 tests/test_portal_config_save.py`
 - 运行 `python3 tests/test_core_flow_endurance.py`

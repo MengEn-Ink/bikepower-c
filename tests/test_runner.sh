@@ -13,7 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-HOST_TEST="./test/test_domain"
+HOST_TEST="./test/build/test_domain"
 
 # 领域层 host 单测
 run_host_test() {

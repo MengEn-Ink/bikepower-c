@@ -107,7 +107,7 @@ Run:
 
 ```bash
 python3 tests/check_config_consistency.py
-make -C test clean && make -C test && ./test/test_domain
+make -C test clean && make -C test && ./test/build/test_domain
 ```
 
 Expected: both pass.
@@ -205,7 +205,7 @@ Run:
 
 ```bash
 python3 tests/check_config_consistency.py
-make -C test clean && make -C test && ./test/test_domain
+make -C test clean && make -C test && ./test/build/test_domain
 ```
 
 Expected: all pass.
@@ -257,7 +257,7 @@ Run:
 
 ```bash
 python3 tests/check_config_consistency.py
-make -C test clean && make -C test && ./test/test_domain
+make -C test clean && make -C test && ./test/build/test_domain
 python3 scripts/tools/quality_gate.py
 ```
 

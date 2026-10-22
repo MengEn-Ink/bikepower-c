@@ -99,7 +99,7 @@ bikepower-c/
 │   ├── serial_daemon.py      — 串口守护进程
 │   ├── run_stress.sh         — 压力测试
 │   └── README.md             — 测试脚本使用说明
-├── test/test_domain          — host 单测（领域层）
+├── test/build/test_domain          — host 单测（领域层）
 ├── docs/                     — 文档（docs/<category>/NN-kebab-case.md，见文档命名规范）
 │   ├── INDEX.md              — 文档索引（根目录，不编号）
 │   ├── user/                 — 产品使用说明

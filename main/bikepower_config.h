@@ -44,6 +44,7 @@ typedef enum {
 #define SK6812_T1H_NS        600     // 1 码高电平时间 ns
 #define SK6812_T1L_NS        600     // 1 码低电平时间 ns
 #define SK6812_RESET_US      80      // 复位低电平时间 us
+#define SK6812_SEND_TIMEOUT_MS  50    // RMT 发送等待超时（ms）
 #define SK6812_BRIGHTNESS    0x30    // LED全局亮度（0-0xFF）
 // RMT 驱动配置
 #define RMT_CLK_HZ           (10 * 1000 * 1000)  // RMT时钟频率：10MHz → 100ns分辨率

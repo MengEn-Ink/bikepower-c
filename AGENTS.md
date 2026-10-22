@@ -37,7 +37,7 @@
 ## Validation
 
 - C 代码改动：`idf.py build` 必须通过。
-- 领域层（components/bikepower_domain）改动：运行 host 单测（`test/test_domain`）。
+- 领域层（components/bikepower_domain）改动：运行 host 单测（`test/build/test_domain`）。
 - 设备行为改动：编译 → 烧录 → 串口确认 → BLE 自测脚本（`tests/`）。
 - 物理按钮/LED 灯效无法远程触发，需人工确认（见 PROGRESS.md 待确认清单）。
 

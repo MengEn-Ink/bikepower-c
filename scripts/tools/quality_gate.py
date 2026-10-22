@@ -3,7 +3,7 @@
 
 扫描范围：
 1. 编译检查 — idf.py build 是否通过
-2. Host 单测 — test/test_domain 断言是否全过
+2. Host 单测 — test/build/test_domain 断言是否全过
 3. 常量一致性 — bikepower_config.h vs domain_config.h 重复定义冲突
 4. 必备资产 — 关键文档/测试脚本是否存在
 5. Git 工作区 — 未提交/未推送统计
@@ -218,7 +218,7 @@ else:
     if rc_build != 0:
         fail("host 单测编译失败")
     else:
-        test_bin = os.path.join(test_dir, "test_domain.exe" if IS_WINDOWS else "test_domain")
+        test_bin = os.path.join(test_dir, "build", "test_domain.exe" if IS_WINDOWS else "test_domain")
         out, rc = run_cmd([test_bin], cwd=test_dir)
         m = re.search(r'(\d+) 通过.*?(\d+) 失败', out)
         if m:

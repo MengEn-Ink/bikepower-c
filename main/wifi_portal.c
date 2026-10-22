@@ -539,7 +539,9 @@ static esp_err_t h_captive_portal_api(httpd_req_t *req)
 static esp_err_t h_api_state(httpd_req_t *req)
 {
     arm_deadline();
-    power_engine_t *e = s_engine;
+    power_engine_t snapshot;
+    app_main_lock_engine(); memcpy(&snapshot, s_engine, sizeof(power_engine_t)); app_main_unlock_engine();
+    power_engine_t *e = &snapshot;
 
     char dn_esc[DEVICE_NAME_MAX * 2 + 1] = {0};
     json_escape(e->device_name, dn_esc, sizeof(dn_esc));
@@ -665,29 +667,36 @@ static esp_err_t h_api_config(httpd_req_t *req)
 
     /* 写临时副本：NVS 失败时丢弃，s_engine 完全不变，BLE 不会读到中间值 */
     power_engine_t next;
-    memcpy(&next, s_engine, sizeof(power_engine_t));
+    app_main_lock_engine(); memcpy(&next, s_engine, sizeof(power_engine_t)); app_main_unlock_engine();
     bool sport_changed = apply_json_fields(&next, body, true);
     free(body);
 
     if (nvs_store_save(&next)) {
+        app_main_lock_engine();
         bool name_changed = strcmp(s_engine->device_name, next.device_name) != 0;
         memcpy(s_engine, &next, sizeof(power_engine_t));
         power_engine_clear_dirty(s_engine);
+        app_main_unlock_engine();
         if (sport_changed) {
             s_ble_restart_requested = true;
         }
-        if (name_changed) ble_bikepower_refresh_device_name();
+        if (name_changed) {
+            ble_bikepower_set_device_name(next.device_name);
+            ble_bikepower_refresh_device_name();
+        }
+        app_main_lock_engine();
         app_state_refresh_led();
+        app_main_unlock_engine();
         ESP_LOGI(TAG, "配置已保存 sport=%d bmask=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d",
-                 (int)s_engine->sport_profile,
-                 s_engine->broadcast_mask,
-                 s_engine->base_power, s_engine->cadence_base,
-                 (int)s_engine->mode, s_engine->device_name,
-                 s_engine->power_step,
-                 s_engine->power_float, s_engine->cadence_float, s_engine->hr_float,
-                 s_engine->profile.ride_type,
-                 s_engine->running.speed_x100_kmh, s_engine->running.cadence_spm,
-                 s_engine->running.cadence_float_spm);
+                 (int)next.sport_profile,
+                 next.broadcast_mask,
+                 next.base_power, next.cadence_base,
+                 (int)next.mode, next.device_name,
+                 next.power_step,
+                 next.power_float, next.cadence_float, next.hr_float,
+                 next.profile.ride_type,
+                 next.running.speed_x100_kmh, next.running.cadence_spm,
+                 next.running.cadence_float_spm);
         send_json(req, "{\"ok\":true}");
     } else {
         ESP_LOGE(TAG, "配置保存失败，s_engine 保持原值");
@@ -721,29 +730,36 @@ static esp_err_t h_api_close_wifi(httpd_req_t *req)
     }
 
     power_engine_t next;
-    memcpy(&next, s_engine, sizeof(power_engine_t));
+    app_main_lock_engine(); memcpy(&next, s_engine, sizeof(power_engine_t)); app_main_unlock_engine();
     bool sport_changed = apply_json_fields(&next, body, true);
     free(body);
 
     if (nvs_store_save(&next)) {
+        app_main_lock_engine();
         bool name_changed = strcmp(s_engine->device_name, next.device_name) != 0;
         memcpy(s_engine, &next, sizeof(power_engine_t));
         power_engine_clear_dirty(s_engine);
+        app_main_unlock_engine();
         if (sport_changed) {
             s_ble_restart_requested = true;
         }
-        if (name_changed) ble_bikepower_refresh_device_name();
+        if (name_changed) {
+            ble_bikepower_set_device_name(next.device_name);
+            ble_bikepower_refresh_device_name();
+        }
+        app_main_lock_engine();
         app_state_refresh_led();
+        app_main_unlock_engine();
         ESP_LOGI(TAG, "配置已保存并准备关闭 WiFi sport=%d bmask=%d p=%dW c=%dRPM mode=%d name=%s p_step=%d p_float=%d c_float=%d hr_float=%d ride=%d run=%d/%d/%d",
-                 (int)s_engine->sport_profile,
-                 s_engine->broadcast_mask,
-                 s_engine->base_power, s_engine->cadence_base,
-                 (int)s_engine->mode, s_engine->device_name,
-                 s_engine->power_step,
-                 s_engine->power_float, s_engine->cadence_float, s_engine->hr_float,
-                 s_engine->profile.ride_type,
-                 s_engine->running.speed_x100_kmh, s_engine->running.cadence_spm,
-                 s_engine->running.cadence_float_spm);
+                 (int)next.sport_profile,
+                 next.broadcast_mask,
+                 next.base_power, next.cadence_base,
+                 (int)next.mode, next.device_name,
+                 next.power_step,
+                 next.power_float, next.cadence_float, next.hr_float,
+                 next.profile.ride_type,
+                 next.running.speed_x100_kmh, next.running.cadence_spm,
+                 next.running.cadence_float_spm);
         /* 5s 收尾窗口：让前端切到 #/closing 页面后关闭 WiFi */
         s_closing = true;
         s_deadline_sec = now_sec() + WIFI_PORTAL_REBOOT_DELAY_SEC;
@@ -913,13 +929,18 @@ static esp_err_t h_api_device_template_apply(httpd_req_t *req)
         return ESP_OK;
     }
     power_engine_t next;
-    memcpy(&next, s_engine, sizeof(power_engine_t));
+    app_main_lock_engine(); memcpy(&next, s_engine, sizeof(power_engine_t)); app_main_unlock_engine();
     power_engine_set_device_name(&next, name);
     if (nvs_store_save(&next)) {
+        app_main_lock_engine();
         bool name_changed = strcmp(s_engine->device_name, next.device_name) != 0;
         memcpy(s_engine, &next, sizeof(power_engine_t));
         power_engine_clear_dirty(s_engine);
-        if (name_changed) ble_bikepower_refresh_device_name();
+        app_main_unlock_engine();
+        if (name_changed) {
+            ble_bikepower_set_device_name(next.device_name);
+            ble_bikepower_refresh_device_name();
+        }
         send_json(req, "{\"ok\":true}");
     } else {
         send_json(req, "{\"ok\":false,\"error\":\"NVS 保存失败\"}");

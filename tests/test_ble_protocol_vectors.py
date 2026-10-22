@@ -20,7 +20,7 @@ from ble_protocol import (
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURE = ROOT / "tests" / "fixtures" / "ble_protocol_vectors.json"
-CLI = ROOT / "test" / ("ble_codec_cli.exe" if os.name == "nt" else "ble_codec_cli")
+CLI = ROOT / "test" / "build" / ("ble_codec_cli.exe" if os.name == "nt" else "ble_codec_cli")
 PARSER_ONLY_FLAG = "--parser-only"
 PARSER_ONLY = PARSER_ONLY_FLAG in sys.argv
 if PARSER_ONLY:
@@ -79,7 +79,7 @@ class BleProtocolVectorTest(unittest.TestCase):
         cls.vectors = json.loads(FIXTURE.read_text(encoding="utf-8"))["vectors"]
         if not PARSER_ONLY:
             subprocess.run(
-                ["make", "-C", "test", "ble_codec_cli"],
+                ["make", "-C", "test", "build/ble_codec_cli"],
                 cwd=ROOT,
                 check=True,
                 text=True,

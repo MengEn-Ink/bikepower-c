@@ -9,6 +9,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "driver/rmt_tx.h"
+#include "esp_timer.h"
 #include "esp_log.h"
 #include "esp_task_wdt.h"
 #include "bikepower_config.h"
@@ -40,7 +41,15 @@ static void sk6812_send(const uint8_t pixel[3])
         .flags = { .eot_level = 0 },
     };
     rmt_transmit(s_rmt_chan, s_rmt_enc, pixel, 3, &tx_cfg);
-    rmt_tx_wait_all_done(s_rmt_chan, -1);
+    esp_err_t err = rmt_tx_wait_all_done(s_rmt_chan, SK6812_SEND_TIMEOUT_MS);
+    if (err != ESP_OK) {
+        static uint32_t last_log = 0;
+        uint32_t now = (uint32_t)(esp_timer_get_time() / 1000000);
+        if (now - last_log >= 5) {
+            ESP_LOGW(TAG, "RMT wait done failed or timeout ret=%d", err);
+            last_log = now;
+        }
+    }
 }
 
 /**

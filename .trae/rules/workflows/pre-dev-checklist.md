@@ -18,7 +18,7 @@
 
 ## 影响面检查
 
-5. `PDC-5`：是否触及 `components/bikepower_domain/`？如果是，至少准备 `test/test_domain`。
+5. `PDC-5`：是否触及 `components/bikepower_domain/`？如果是，至少准备 `test/build/test_domain`。
 6. `PDC-6`：是否触及 `main/ble_bikepower.c` 或 BLE 常量？如果是，至少准备 `tests/ble_selftest.py`。
 7. `PDC-7`：是否触及 `main/wifi_portal.c`、`main/radio_ctrl.c` 或按钮进入配网链路？如果是，至少准备 `tests/stage5_portal_test.py` 并复核射频互斥。
 8. `PDC-8`：是否引入新常量、新配置项或新路由？如果是，确认落点集中且文档同步。

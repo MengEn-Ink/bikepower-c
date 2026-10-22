@@ -72,7 +72,7 @@ idf.py -p /dev/ttyACM0 flash monitor
 
 ```bash
 # Host 单元测试（领域层）
-make -C test && ./test/test_domain
+make -C test && ./test/build/test_domain
 
 # 静态门禁检查
 python3 tests/check_config_consistency.py
@@ -250,7 +250,7 @@ BikePower C 采用多层测试策略：
 
 | 测试层级 | 工具/命令 | 覆盖范围 | 依赖硬件 |
 |---------|----------|---------|---------|
-| Host 单元测试 | `make -C test && ./test/test_domain` | 领域层算法（功率/心率/配速/配置/按钮逻辑/LED 模式） | 无 |
+| Host 单元测试 | `make -C test && ./test/build/test_domain` | 领域层算法（功率/心率/配速/配置/按钮逻辑/LED 模式） | 无 |
 | 静态门禁 | `tests/check_*.py` | 代码结构、常量一致性、schema 完整性 | 无 |
 | Mock 测试 | `tests/test_portal_config_save.py`、`test_core_flow_endurance.py` | Portal JSON 解析、配置流（mock server） | 无 |
 | BLE 自测 | `tests/ble_selftest.py` | 五服务发现、通知格式、FTMS 控制点 | 需要设备 |
@@ -283,7 +283,7 @@ SRCS := test_domain.c \
 
 运行：
 ```bash
-make -C test && ./test/test_domain
+make -C test && ./test/build/test_domain
 ```
 
 ### 静态门禁脚本
@@ -360,7 +360,7 @@ python3 tests/mock_server.py
 build_all.sh 执行顺序:
   1. 提取版本元信息（从 bikepower_config.h）
   2. 运行构建前测试门禁（必须全部通过）
-     ├─ make -C test && ./test/test_domain
+     ├─ make -C test && ./test/build/test_domain
      ├─ python3 tests/test_portal_config_save.py
      ├─ python3 tests/test_core_flow_endurance.py --minutes 3
      └─ python3 tests/check_*.py（7 个静态门禁）
@@ -489,7 +489,7 @@ python3 scripts/tools/device_acceptance.py validate \
 
 | 命令 | 场景 |
 |------|------|
-| `make -C test && ./test/test_domain` | 领域层单元测试 |
+| `make -C test && ./test/build/test_domain` | 领域层单元测试 |
 | `python3 tests/check_config_consistency.py` | 配置一致性检查 |
 | `python3 tests/mock_server.py` | 启动前端 mock 服务器 |
 | `python3 tests/ble_selftest.py` | （需设备）BLE 服务自测 |

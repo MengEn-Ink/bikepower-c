@@ -11,7 +11,7 @@
 
 | 目录 | 用途 | 内容 |
 |------|------|------|
-| `test/` | 领域层 host 单测（纯 C） | `test_domain.c` + `Makefile`，产物 `test/test_domain` 已 gitignore |
+| `test/` | 领域层 host 单测（纯 C） | `test_domain.c` + `Makefile`，产物 `test/build/test_domain` 已 gitignore |
 | `tests/` | 设备测试 + 静态门禁 + mock + 工具（本目录） | Python / Shell 脚本 |
 
 `test/` 由 ESP-IDF 生态约定保留给 host 单测；`tests/` 放所有需要外部依赖（Python/bleak/pyserial/Node）的脚本。
@@ -288,7 +288,7 @@ done
 ### 场景 3：领域层（components/bikepower_domain）改动
 
 ```bash
-make -C test && ./test/test_domain    # host 单测，不在本目录
+make -C test && ./test/build/test_domain    # host 单测，不在本目录
 python3 tests/test_portal_config_save.py  # 如涉及配网页保存字段，同步跑 mock 保存回显
 python3 tests/test_core_flow_endurance.py --cycles 1  # 如涉及按钮/心率/网页核心流程，先快速验证
 ```
@@ -420,7 +420,7 @@ python3 tests/ble_selftest.py
 
 ### 当前分工
 
-- `test/` — 领域层 host 单测（纯 C）：`test_domain.c` + `Makefile`，产物 `test/test_domain` 已 gitignore
+- `test/` — 领域层 host 单测（纯 C）：`test_domain.c` + `Makefile`，产物 `test/build/test_domain` 已 gitignore
 - `tests/` — 设备测试 + 静态门禁 + mock + 工具（Python/Shell，本目录）
 
 ### 评估过的方案
@@ -436,12 +436,12 @@ python3 tests/ble_selftest.py
 1. **ESP-IDF 生态约定**：`test/` 是 ESP-IDF 官方约定放 host 单测的目录，与 `tests/`（设备测试脚本）语义不同
 2. **Makefile 路径复杂化**：当前 `test/Makefile` 用 `../components/...` 引用领域层；合并后要改成 `../../components/...`，反而不直观
 3. **影响范围大**：合并需修改 15+ 文件中的路径引用（规则、文档、CHANGELOG、skill、quality_gate.py、test_runner.sh、.gitignore 等），改动风险高于收益
-4. **现有配置已正确**：`.gitignore` 已正确忽略 `test/test_domain` 产物，无冲突
+4. **现有配置已正确**：`.gitignore` 已正确忽略 `test/build/test_domain` 产物，无冲突
 
 ### 影响路径清单（若未来仍要合并，需同步修改）
 
-- `.gitignore`：`test/test_domain` → `tests/host/test_domain`
-- `tests/test_runner.sh`：`HOST_TEST="./test/test_domain"` 与 `make -C test`
+- `.gitignore`：`test/build/test_domain` → `tests/host/test_domain`
+- `tests/test_runner.sh`：`HOST_TEST="./test/build/test_domain"` 与 `make -C test`
 - `scripts/tools/quality_gate.py`：3 处路径引用
 - `.trae/rules/best-practices.md`、`general-rules.md`、`workflows/test-coverage.md`、`workflows/pre-dev-checklist.md`、`workflows/context-engineering.md`
 - `.trae/skills/release/SKILL.md`、`.trae/skills/real-device-test/SKILL.md`

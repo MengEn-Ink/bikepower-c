@@ -13,6 +13,8 @@
 #include "freertos/queue.h"
 #include "esp_log.h"
 #include "esp_task_wdt.h"
+#include "esp_random.h"
+#include "domain_rng.h"
 #include "nvs_flash.h"
 #include "bikepower_config.h"
 #include "ble_bikepower.h"
@@ -29,6 +31,7 @@
 static const char *TAG = "APP";
 
 static power_engine_t s_engine;
+static SemaphoreHandle_t s_engine_mutex = NULL;
 static QueueHandle_t s_app_queue;
 // ERG 控制点队列满时的兜底缓存：正常路径使用 app_queue 保序，避免 Stop/Pause 被旧目标覆盖。
 static volatile int s_pending_erg_target = 0;
@@ -128,6 +131,16 @@ static void on_wifi_exit(void)
     radio_ctrl_exit_wifi();
 }
 
+void app_main_lock_engine(void)
+{
+    if (s_engine_mutex) xSemaphoreTake(s_engine_mutex, portMAX_DELAY);
+}
+
+void app_main_unlock_engine(void)
+{
+    if (s_engine_mutex) xSemaphoreGive(s_engine_mutex);
+}
+
 /**
  * WiFi 配网结束回调（保存成功或超时）。
  * 由 wifi_portal 在 esp_timer 任务上下文调用，仅做轻量操作：投递事件给主循环，
@@ -162,6 +175,14 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "NVS 初始化完成");
+
+    s_engine_mutex = xSemaphoreCreateMutex();
+    if (!s_engine_mutex) {
+        ESP_LOGE(TAG, "创建引擎互斥锁失败");
+        esp_restart();
+    }
+
+    domain_rng_seed(esp_random());
 
     power_engine_init(&s_engine);
     nvs_store_load(&s_engine);
@@ -227,7 +248,7 @@ void app_main(void)
     while (1) {
         // 消费按钮/事件队列（非阻塞批量）
         while (xQueueReceive(s_app_queue, &e, 0) == pdTRUE) {
-            app_state_handle_event(&e);
+            app_main_lock_engine(); app_state_handle_event(&e); app_main_unlock_engine();
         }
         // 队列满时的 WiFi 完成保底必须在任何 BLE-not-ready continue 之前消费，
         // 否则独占降级路径停掉 BLE 后会同时阻断 WiFi 资源回收。
@@ -240,7 +261,7 @@ void app_main(void)
         portENABLE_INTERRUPTS();
         if (has_wifi_done) {
             app_evt_t wifi_done = { .type = APP_EVT_WIFI_DONE, .data = 0 };
-            app_state_handle_event(&wifi_done);
+            app_main_lock_engine(); app_state_handle_event(&wifi_done); app_main_unlock_engine();
         }
         // 处理待处理的ERG目标：关中断原子复制目标+清标志，避免竞态丢新目标（单核C3足够）
         int erg_target = 0;
@@ -254,7 +275,7 @@ void app_main(void)
         portENABLE_INTERRUPTS();
         if (has_erg) {
             app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = erg_target };
-            app_state_handle_event(&e);
+            app_main_lock_engine(); app_state_handle_event(&e); app_main_unlock_engine();
         }
         int erg_clear_reason = 0;
         bool has_erg_clear = false;
@@ -267,7 +288,7 @@ void app_main(void)
         portENABLE_INTERRUPTS();
         if (has_erg_clear) {
             app_evt_t e = { .type = APP_EVT_ERG_CLEAR, .data = erg_clear_reason };
-            app_state_handle_event(&e);
+            app_main_lock_engine(); app_state_handle_event(&e); app_main_unlock_engine();
         }
 
         // WiFi 配网模式（共存）：BLE 保持在线继续通知，主循环继续生成快照推 BLE；
@@ -319,7 +340,9 @@ void app_main(void)
         if (conn != last_conn) {
             last_conn = conn;
             app_evt_t ce = { .type = APP_EVT_CONN_CHANGED, .data = conn };
+            app_main_lock_engine();
             app_state_handle_event(&ce);
+            app_main_unlock_engine();
         }
 
         if (wifi_portal_ble_restart_requested()) {
@@ -348,17 +371,25 @@ void app_main(void)
             }
         }
 
+        app_main_lock_engine();
         app_state_tick();
-
         snapshot_t s = s_engine.snapshot;
-        ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
-        if (s_engine.sport_profile == SPORT_PROFILE_RUNNING) {
-            running_snapshot_t rs = running_engine_snapshot(&s_engine.running, HR_LOOP_INTERVAL_MS);
-            int running_hr = power_engine_running_heartrate(&s_engine, rs.speed_x100_kmh);
-            s.heartrate = running_hr;
-            ble_bikepower_set_running_data(rs, (uint8_t)running_hr);
+        int mask = s_engine.broadcast_mask;
+        int profile = s_engine.sport_profile;
+        running_snapshot_t rs;
+        bool is_running = (profile == SPORT_PROFILE_RUNNING);
+        if (is_running) {
+            rs = running_engine_snapshot(&s_engine.running, HR_LOOP_INTERVAL_MS);
+            s.heartrate = power_engine_running_heartrate(&s_engine, rs.speed_x100_kmh);
         } else {
             s = power_engine_snapshot(&s_engine);
+        }
+        app_main_unlock_engine();
+
+        ble_bikepower_set_broadcast_mask(mask);
+        if (is_running) {
+            ble_bikepower_set_running_data(rs, (uint8_t)s.heartrate);
+        } else {
             ble_bikepower_set_data((uint16_t)s.power, (uint8_t)s.heartrate, (uint16_t)s.cadence);
         }
 
@@ -367,13 +398,14 @@ void app_main(void)
             hb_count++;
             uint32_t heap = esp_get_free_heap_size();
             uint32_t min_heap = esp_get_minimum_free_heap_size();
+            uint32_t stack_water = uxTaskGetStackHighWaterMark(NULL);
             const char *mode_str = (s.mode == RIDE_MODE_STEADY) ? "steady"
                                 : (s.mode == RIDE_MODE_ROAD) ? "road"
                                 : (s.mode == RIDE_MODE_ERG) ? "erg" : "?";
 
-            ESP_LOGI(TAG, "遥测 #%d 堆=%lu/%lu p=%dW(%d) c=%dRPM hr=%dBPM m=%s step=%d conn=%d state=%d",
+            ESP_LOGI(TAG, "遥测 #%d 堆=%lu/%lu 栈=%lu p=%dW(%d) c=%dRPM hr=%dBPM m=%s step=%d conn=%d state=%d",
                      hb_count,
-                     (unsigned long)heap, (unsigned long)min_heap,
+                     (unsigned long)heap, (unsigned long)min_heap, (unsigned long)stack_water,
                      s.power, s_engine.base_power,
                      s.cadence, s.heartrate,
                      mode_str, s_engine.power_step,
@@ -394,10 +426,19 @@ void app_main(void)
             }
 
             // 配置脏标记则周期落盘（调功/改配置后断电可恢复）
-            if (power_engine_is_dirty(&s_engine)) {
+            app_main_lock_engine();
+            bool dirty = power_engine_is_dirty(&s_engine);
+            app_main_unlock_engine();
+            if (dirty) {
                 ESP_LOGI(TAG, "心跳触发 NVS 落盘");
-                if (nvs_store_save(&s_engine)) {
+                power_engine_t snap;
+                app_main_lock_engine();
+                memcpy(&snap, &s_engine, sizeof(power_engine_t));
+                app_main_unlock_engine();
+                if (nvs_store_save(&snap)) {
+                    app_main_lock_engine();
                     power_engine_clear_dirty(&s_engine);
+                    app_main_unlock_engine();
                 }
             }
         }

@@ -39,7 +39,7 @@ description: BikePower C 跑步模式或配置字段变更流程。用于新增/
 
 ```bash
 make -C test
-./test/test_domain
+./test/build/test_domain
 python3 tests/check_portal_structure.py
 python3 tests/test_portal_config_save.py
 python3 tests/check_config_consistency.py

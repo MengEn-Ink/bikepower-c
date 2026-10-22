@@ -1028,7 +1028,7 @@ python3 scripts/tools/check_release_artifacts.py \
 
 领域层测试位于：
 
-- `test/test_domain`
+- `test/build/test_domain`
 - `test/test_domain.c`
 
 该测试覆盖 `power_engine`、`running_engine`、`hr_model`、`profile`、`config_store` 等纯 C 逻辑；协议 payload 另由生产使用的 `ble_payload_codec`、固定 JSON vectors 和 `test/ble_codec_cli` 交叉验证。

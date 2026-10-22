@@ -51,6 +51,12 @@ void app_state_handle_event(const app_evt_t *e);
 void app_state_tick(void);
 
 /**
+ * 引擎一致性锁：用于跨任务（httpd/BLE）访问全局 s_engine。
+ */
+void app_main_lock_engine(void);
+void app_main_unlock_engine(void);
+
+/**
  * 按当前状态和连接状态重新应用 LED 灯效。
  * 用于网页保存 LED 配置后立即刷新当前场景。
  * 无参数。

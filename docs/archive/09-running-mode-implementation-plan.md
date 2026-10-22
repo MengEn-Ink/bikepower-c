@@ -20,7 +20,7 @@
 
 | 批次 | 目标 | 提交类型 | 必过验证 |
 |------|------|----------|----------|
-| 1 | 领域层、配置 schema v10、NVS key | `feat(running): 增加跑步模板配置模型` | `make -C test && ./test/test_domain`、`python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py` |
+| 1 | 领域层、配置 schema v10、NVS key | `feat(running): 增加跑步模板配置模型` | `make -C test && ./test/build/test_domain`、`python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py` |
 | 2 | 网页、API、mock 保存回显 | `feat(portal): 增加跑步输出来源配置` | `python3 tests/test_portal_config_save.py`、`python3 tests/check_portal_structure.py`、`python3 tests/check_portal_js.py` |
 | 3 | FTMS Treadmill Data | `feat(ble): 增加跑步FTMS跑步机数据` | `python3 scripts/tools/quality_gate.py`、`idf.py build`、running BLE selftest |
 | 4 | FTMS 跑步控制点 | `feat(ble): 支持跑步FTMS控制点` | cycling/running BLE selftest、ERG 回归 |
@@ -88,7 +88,7 @@ Model: GPT-5.5/2026-07-10
 运行并确认 RED：
 
 ```bash
-make -C test && ./test/test_domain
+make -C test && ./test/build/test_domain
 ```
 
 预期：编译或测试失败，失败点指向新增类型、字段或函数尚未实现。
@@ -126,7 +126,7 @@ make -C test && ./test/test_domain
 
 ```bash
 make -C test
-./test/test_domain
+./test/build/test_domain
 python3 tests/check_config_consistency.py
 python3 tests/check_nvs_schema.py
 ```
@@ -307,7 +307,7 @@ BIKEPOWER_EXPECT_BOARD=generic-c3 python3 tests/ble_selftest.py --profile runnin
 运行并确认 RED：
 
 ```bash
-make -C test && ./test/test_domain
+make -C test && ./test/build/test_domain
 BIKEPOWER_EXPECT_BOARD=generic-c3 python3 tests/ble_selftest.py --profile running --control
 ```
 
@@ -340,7 +340,7 @@ BIKEPOWER_EXPECT_BOARD=generic-c3 python3 tests/ble_selftest.py --profile runnin
 
 ```bash
 make -C test
-./test/test_domain
+./test/build/test_domain
 python3 scripts/tools/quality_gate.py
 . /Users/bytedance/esp/esp-idf-v5.5.4/export.sh >/dev/null 2>&1 && idf.py build
 ./scripts/flash_latest.sh --board generic --capture-seconds 25

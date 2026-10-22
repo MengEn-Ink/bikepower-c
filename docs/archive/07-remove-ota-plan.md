@@ -164,7 +164,7 @@ OTA 移除后，以下组件无其它消费者，可从 CMake 依赖中裁掉以
 6. 改 `CMakeLists.txt` 删源文件与 OTA 专属组件依赖。
 7. 清理常量、注释、文档索引、PROGRESS.md 过时描述。
 8. 验证：
-   - host 单测（`test/test_domain`）通过。
+   - host 单测（`test/build/test_domain`）通过。
    - `idf.py build` 通过，确认 app 适配单 factory。
    - 门户静态检查脚本通过（删 OTA/WiFi 断言后）。
    - 真机：`erase_flash` + 全量烧录 → BLE 五服务 + 配网保存参数 + 回 BLE。

@@ -10,7 +10,7 @@
 ### `TC-1`：host 单测
 
 - 目标：覆盖领域层纯 C 逻辑
-- 入口：`test/test_domain`
+- 入口：`test/build/test_domain`
 - 源文件：`test/test_domain.c`
 - 覆盖对象：
 - `profile.c`
@@ -131,7 +131,7 @@
 ## 选择规则
 
 - `TC-4`：纯治理文档或规则改动可不跑测试，但要做一致性复核。
-- `TC-5`：领域层改动至少跑 `test/test_domain`。
+- `TC-5`：领域层改动至少跑 `test/build/test_domain`。
 - `TC-6`：BLE payload 改动必须跑 `tests/test_ble_protocol_vectors.py`；BLE 行为改动还必须按实际 profile 跑 `tests/ble_selftest.py`。running 会话使用 `--control`，断开重广播使用 `stage3_conn_test.py` 两轮独立扫描；无设备时必须明确真机项 `NOT_RUN`。
 - `TC-7`：配网改动至少跑 `tests/stage5_portal_test.py`，并复核 BLE/WiFi 射频互斥链路。
 - `TC-7a`：**任何 `main/wifi_portal.c` 改动必须先跑 `tests/check_portal_js.py`，JS 语法全绿才能继续**。这是硬性前置门，避免 `}}}` 类低级 bug 烧录后才发现。
@@ -188,7 +188,7 @@
 1. **识别纯逻辑**：改动涉及的函数中，哪些是不依赖 ESP-IDF / 硬件的纯计算（版本比较、JSON 解析、范围校验、状态转换表）。
 2. **抽取到领域层**：把纯逻辑移到 `components/bikepower_domain/`，main/ 改为 include 调用。
 3. **补 host 单测**：在 `test/test_domain.c` 加测试函数，覆盖正常 / 边界 / 异常路径。
-4. **跑 TC-1**：`make -C test && ./test/test_domain`，断言全绿。
+4. **跑 TC-1**：`make -C test && ./test/build/test_domain`，断言全绿。
 5. **跑 TC-3a/3c/3d**：涉及 wifi_portal / 前端 / 常量时跑对应静态脚本。
 6. **跑 TC-3h**：涉及网页保存字段时跑 mock 保存回显测试。
 7. **跑离线协议/harness**：涉及 BLE payload、控制点、重连或 profile 编排时跑对应 vectors/静态契约/fake harness。

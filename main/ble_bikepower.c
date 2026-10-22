@@ -27,6 +27,7 @@
 #include "domain_config.h"
 #include "running_engine.h"
 #include "ble_bikepower.h"
+#define CHECK_ENCODE(r, name) do { static uint32_t _l=0; if((r)==0){ uint32_t _n=(uint32_t)(esp_timer_get_time()/1000000); if(_n-_l>=5){ ESP_LOGW(TAG, "%s encode failed", (name)); _l=_n; } } } while(0)
 #include "board_detect.h"
 
 static const char *TAG = "BLE";
@@ -636,10 +637,10 @@ static void pack_all(void)
     g_last_crank_ms = adjusted_ms;
 
     // 基于踏频推演曲柄累计量，统一驱动 CPS 和 CSC 的 rev/time 字段。
-    (void)ble_payload_encode_cps(g_cps_buf, sizeof(g_cps_buf),
-                                 (int16_t)power, rev, time_1024);
-    (void)ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), g_hr_bpm);
-    (void)ble_payload_encode_csc(g_csc_buf, sizeof(g_csc_buf), rev, time_1024);
+    size_t r_cps = ble_payload_encode_cps(g_cps_buf, sizeof(g_cps_buf),
+                                 (int16_t)power, rev, time_1024); CHECK_ENCODE(r_cps, "CPS");
+    size_t r_hr = ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), g_hr_bpm); CHECK_ENCODE(r_hr, "HRS");
+    size_t r_csc = ble_payload_encode_csc(g_csc_buf, sizeof(g_csc_buf), rev, time_1024); CHECK_ENCODE(r_csc, "CSC");
 
     bool cadence_enabled = (g_broadcast_mask & BROADCAST_FIELD_CADENCE) != 0;
     bool power_enabled = (g_broadcast_mask & BROADCAST_FIELD_POWER) != 0;
@@ -656,10 +657,10 @@ static void pack_running(void)
     uint32_t elapsed = g_run_elapsed_s;
     bool running = g_run_running;
 
-    (void)ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), g_hr_bpm);
+    size_t r_hr = ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), g_hr_bpm); CHECK_ENCODE(r_hr, "HRS");
     uint32_t distance_dm = distance > UINT32_MAX / 10u ? UINT32_MAX : distance * 10u;
-    (void)ble_payload_encode_rsc(g_rsc_buf, sizeof(g_rsc_buf), running,
-                                 speed, g_run_cadence, stride, distance_dm);
+    size_t r_rsc = ble_payload_encode_rsc(g_rsc_buf, sizeof(g_rsc_buf), running,
+                                 speed, g_run_cadence, stride, distance_dm); CHECK_ENCODE(r_rsc, "RSC");
 
     uint16_t ftms_speed = (uint16_t)(((uint32_t)speed * 360u + 128u) / 256u);
     uint16_t elapsed16 = elapsed > 0xFFFFu ? 0xFFFFu : (uint16_t)elapsed;

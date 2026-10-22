@@ -190,7 +190,7 @@ rm -rf "$RELEASE_DIR/evidence"
 echo ""
 echo "=== 构建前测试门禁：host / mock / static ==="
 make -C test
-./test/test_domain
+./test/build/test_domain
 python3 tests/test_portal_config_save.py
 python3 tests/test_core_flow_endurance.py \
     --minutes "${CORE_FLOW_MINUTES:-3}" \
