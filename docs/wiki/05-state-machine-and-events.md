@@ -6,7 +6,7 @@
 
 ## 状态机概览
 
-状态机定义在 [app_state.h](file:///Users/bytedance/work/bikepower-c/main/app_state.h)，是应用层高层行为的唯一决策中心。
+状态机定义在 [app_state.h](../../main/app_state.h)，是应用层高层行为的唯一决策中心。
 
 ### 状态枚举
 
@@ -52,7 +52,7 @@ ST_ERROR_RECOVERY ← (BLE 启动失败) → (BLE 重试成功) → ST_BLE_ACTIV
 
 ## 按钮事件语义
 
-按钮物理层见 [button.c](file:///Users/bytedance/work/bikepower-c/main/button.c)，语义层由状态机处理。
+按钮物理层见 [button.c](../../main/button.c)，语义层由状态机处理。
 
 ### 时间阈值
 

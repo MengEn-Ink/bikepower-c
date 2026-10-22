@@ -29,7 +29,7 @@
 ## HTTP 服务与路由
 
 - `WIFI-12`：配网门户使用 `esp_http_server`。
-- `WIFI-13`：当前 HTTP 服务注册 17 个业务路由 + 10 个 Captive Portal 探测路由，并注册 404 兜底重定向处理未知系统探测路径；新增或删除路由都必须同步更新规则、自测脚本和技术文档。
+- `WIFI-13`：当前 HTTP 服务注册 18 个业务路由 + 10 个 Captive Portal 探测路由，并注册 404 兜底重定向处理未知系统探测路径；新增或删除路由都必须同步更新规则、自测脚本和技术文档。
 - v4.0.0 起路由契约（前后端分离，全部走 `/api/xxx` JSON；已移除 OTA 与家庭网络路由）：
 - `GET /`（返回内联 HTML 整页，CSS/JS 由 `scripts/inline_static.py` 在编译时内联到 `index.html`）
 - `GET /favicon.ico`（204）

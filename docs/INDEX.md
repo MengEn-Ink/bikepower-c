@@ -2,6 +2,8 @@
 
 项目文档按维度分目录管理：`user/` 产品使用、`dev/` 开发与技术、`wiki/` Code Wiki（代码级完整参考）、`archive/` 历史归档、`images/` 配图。
 
+权威顺序：`PROGRESS.md` 负责当前进度和待验收项，`dev/01-technical-reference.md` 负责当前实现行为，`.trae/rules/` 负责可强制执行约束；`wiki/` 是便于浏览的代码级展开，发生冲突时必须回到源码和上述权威文档核对。`archive/` 只用于历史追溯，不作为当前实现依据。
+
 ---
 
 ## 📚 wiki/ — Code Wiki（代码级完整参考）
@@ -10,7 +12,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [Code Wiki 首页](wiki/00-HOME.md) | Wiki 目录、代码结构速览、关键设计原则、运行时架构图 |
+| [Code Wiki 首页](wiki/00-home.md) | Wiki 目录、代码结构速览、关键设计原则、运行时架构图 |
 | [整体架构](wiki/01-architecture.md) | 三层架构概览、模块依赖 DAG、任务模型、目录详解、编译时资源处理、分区表 |
 | [应用层模块](wiki/02-app-layer.md) | app_main、app_state、button、led、board_detect、radio_ctrl、captive_portal、nvs_store、device_template_store、ble_scanner |
 | [领域层模块](wiki/03-domain-layer.md) | power_engine（三模式）、hr_model（四层心率）、running_engine、profile（配速机器人）、config_store（schema v11）、json_miniparse、button_logic、led_pattern |
@@ -18,7 +20,7 @@
 | [状态机与事件](wiki/05-state-machine-and-events.md) | 7 态状态迁移图、10 种事件类型、按钮语义阈值、交互流程、长按回滚机制 |
 | [运行时数据流](wiki/06-runtime-flow.md) | 14 步启动流程、主循环 50ms 节拍、BLE 通知双时间尺度、配网完整时序、脏标记落盘、11 种异常恢复路径 |
 | [BLE 服务详解](wiki/07-ble-services.md) | 5+1 服务 UUID、两种运动 profile GATT 表、6 种数据包格式、FTMS 控制点 OpCode/Result Code、广播参数、双时间尺度通知、g_notify_lock 线程安全、DIS 字段 |
-| [WiFi 配网门户](wiki/08-wifi-portal.md) | HTTP 路由表（29 条）、超时状态机、JSON API 详解（50+字段）、Captive Portal 三层弹窗、临时副本原子替换、BLE 扫描/设备模板 API、前端内联 |
+| [WiFi 配网门户](wiki/08-wifi-portal.md) | HTTP 路由表（28 条）、超时状态机、JSON API 详解（50+字段）、Captive Portal 三层弹窗、临时副本原子替换、BLE 扫描/设备模板 API、前端内联 |
 | [构建与测试](wiki/09-build-and-test.md) | idf.py 构建流程、CMake 配置、flash_latest.sh 一键烧录、build_all.sh 双板型发布、host 单测、静态门禁脚本、BLE 自测、mock server、产物校验 |
 | [硬件约束与平台限制](wiki/10-hardware-constraints.md) | ESP32-C3 规格、双板型 GPIO 分配、内存预算（80KB/20KB 告警线）、WiFi/BLE 共存硬约束、ISR 安全规则、FreeRTOS 任务模型、WDT 配置、禁止事项 |
 
@@ -50,10 +52,12 @@
 | [智能家居平台接入调研](dev/09-smart-home-integration.md) | 米家官方接入、Matter、Home Assistant/MQTT 网关等路径对比与分阶段建议 |
 | [稳定交付证据链设计](dev/10-stable-delivery-design.md) | 真机自动测试、人工确认、release 报告与正式发布阻断的证据模型 |
 | [稳定交付证据链实施计划](dev/11-stable-delivery-plan.md) | 按证据模型、device 门禁采集、release 强校验分批实施的测试驱动计划 |
+| [Top 5 协议稳定性设计](dev/12-top5-protocol-stability-design.md) | CPS/FTMS 编码、跑步会话、ERG 持久化边界、WiFi 完成可靠性和 P0 真机门禁修复设计 |
+| [项目复审与优化清单](dev/13-project-review-and-optimization.md) | 2026-10-22 全仓代码审查、源码卫生、文档治理结果与分级优化 backlog |
 
 ## 🗄️ archive/ — 历史 / 归档（仅供追溯）
 
-以下文档对应历史版本或已完成的一次性工作，**不代表 v4.0.0 当前实现**，仅作背景追溯。
+以下文档对应历史版本或已完成的一次性工作，**不代表 v4.1.1 当前实现**，仅作背景追溯。
 
 | 文档 | 说明 |
 |------|------|

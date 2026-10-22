@@ -384,4 +384,4 @@ v3.1.5 满负载：                    117 KB
 |------|------|
 | [内存与新功能评估](04-memory-and-feature-assessment.md) | v3.1.5 内存基线与可行性分析 |
 | [技术参考](../dev/01-technical-reference.md) | BLE 服务与数据格式详解 |
-| [OTA 落地方案](05-ota-implementation-plan.md) | OTA 实现细节 |
+| [OTA 移除方案](07-remove-ota-plan.md) | 原 OTA 实施文档已随 v4.0.0 清理；当前仅保留移除范围与历史背景 |

@@ -91,7 +91,7 @@ python3 tests/test_portal_config_save.py
 
 ### 顶层 CMakeLists.txt
 
-[CMakeLists.txt](file:///Users/bytedance/work/bikepower-c/CMakeLists.txt) 定义项目级配置：
+[CMakeLists.txt](../../CMakeLists.txt) 定义项目级配置：
 
 ```cmake
 cmake_minimum_required(VERSION 3.16)
@@ -166,7 +166,7 @@ wifi_portal.c: #include "web_index_html.h"
 
 ### 分区表
 
-分区表在 [partitions.csv](file:///Users/bytedance/work/bikepower-c/partitions.csv) 定义，为单 factory 布局（无 OTA 双分区）：
+分区表在 [partitions.csv](../../partitions.csv) 定义，为单 factory 布局（无 OTA 双分区）：
 
 | 分区 | 地址 | 大小 | 说明 |
 |------|------|------|------|
@@ -180,7 +180,7 @@ wifi_portal.c: #include "web_index_html.h"
 
 ### sdkconfig.defaults
 
-[sdkconfig.defaults](file:///Users/bytedance/work/bikepower-c/sdkconfig.defaults) 包含默认配置：
+[sdkconfig.defaults](../../sdkconfig.defaults) 包含默认配置：
 
 - `CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y`：WiFi/BLE 共存启用
 - `CONFIG_BT_NIMBLE_ENABLED=y`：使用 NimBLE host（非 Bluedroid）
@@ -204,7 +204,7 @@ idf.py -p <port> flash
 
 ### flash_latest.sh（开发推荐）
 
-[flash_latest.sh](file:///Users/bytedance/work/bikepower-c/scripts/flash_latest.sh) 提供一键式开发烧录：
+[flash_latest.sh](../../scripts/flash_latest.sh) 提供一键式开发烧录：
 
 | 选项 | 说明 |
 |------|------|
@@ -232,7 +232,7 @@ idf.py -p <port> flash
 
 ```bash
 python3 esptool.py --chip esp32c3 merge_bin \
-    -o bikepower-c-generic-c3-v4.1.0-stable-fix-gXXXXXXX.bin \
+    -o bikepower-c-generic-c3-v4.1.1-stable-fix-gXXXXXXX.bin \
     --flash_mode dio --flash_freq 80m --flash_size 4MB \
     0x0 build/bootloader/bootloader.bin \
     0x8000 build/partition_table/partition-table.bin \
@@ -260,7 +260,7 @@ BikePower C 采用多层测试策略：
 
 ### Host 单元测试
 
-[test/Makefile](file:///Users/bytedance/work/bikepower-c/test/Makefile) 使用 clang 直接编译领域层（纯 C，无 ESP-IDF 依赖）：
+[test/Makefile](../../test/Makefile) 使用 clang 直接编译领域层（纯 C，无 ESP-IDF 依赖）：
 
 ```makefile
 CC ?= clang
@@ -299,7 +299,7 @@ make -C test && ./test/test_domain
 
 ### BLE 自测脚本
 
-[ble_selftest.py](file:///Users/bytedance/work/bikepower-c/tests/ble_selftest.py) 使用 `bleak` 库连接设备验证：
+[ble_selftest.py](../../tests/ble_selftest.py) 使用 `bleak` 库连接设备验证：
 
 1. 扫描并连接设备
 2. 发现 GATT 服务，确认 CPS/HRS/CSC/FTMS/DIS（或 RSC/HRS/FTMS/DIS）五/四服务存在
@@ -314,7 +314,7 @@ python3 tests/ble_selftest.py
 
 ### 门户自测脚本
 
-[stage5_portal_test.py](file:///Users/bytedance/work/bikepower-c/tests/stage5_portal_test.py) 在设备进入配网模式后验证：
+[stage5_portal_test.py](../../tests/stage5_portal_test.py) 在设备进入配网模式后验证：
 
 1. 连接 BikePower 热点
 2. 访问首页、验证内联 HTML
@@ -331,7 +331,7 @@ python3 tests/stage5_portal_test.py
 
 ### Mock Server（前端开发）
 
-[mock_server.py](file:///Users/bytedance/work/bikepower-c/tests/mock_server.py) 在 PC 上启动 mock HTTP 服务器，模拟设备 `/api/xxx` 接口，前端开发无需烧录设备：
+[mock_server.py](../../tests/mock_server.py) 在 PC 上启动 mock HTTP 服务器，模拟设备 `/api/xxx` 接口，前端开发无需烧录设备：
 
 ```bash
 python3 tests/mock_server.py
@@ -344,7 +344,7 @@ python3 tests/mock_server.py
 
 ### build_all.sh（Release 构建）
 
-[build_all.sh](file:///Users/bytedance/work/bikepower-c/scripts/build_all.sh) 执行完整的 release 构建流程：
+[build_all.sh](../../scripts/build_all.sh) 执行完整的 release 构建流程：
 
 ```
 ./scripts/build_all.sh [板型...] [选项]
@@ -397,7 +397,7 @@ build_all.sh 执行顺序:
 从 `main/bikepower_config.h` 提取：
 
 ```c
-#define FIRMWARE_VERSION       "4.1.0"
+#define FIRMWARE_VERSION       "4.1.1"
 #define FIRMWARE_STABLE_VERSION "4.1"
 #define FIRMWARE_FIX_VERSION   "0"
 ```
@@ -405,7 +405,7 @@ build_all.sh 执行顺序:
 产物文件名格式：
 `bikepower-c-<board>-v<VERSION>-stable-fix-g<GIT_SHA>.bin`
 
-示例：`bikepower-c-generic-c3-v4.1.0-stable-fix-ga1b2c3d.bin`
+示例：`bikepower-c-generic-c3-v4.1.1-stable-fix-ga1b2c3d.bin`
 
 ---
 
@@ -418,7 +418,7 @@ build_all.sh 执行顺序:
 ```bash
 python3 scripts/tools/check_release_artifacts.py \
     --release-dir build/release \
-    --version 4.1.0 \
+    --version 4.1.1 \
     --git-sha <sha>
 ```
 
@@ -435,7 +435,7 @@ python3 scripts/tools/check_release_artifacts.py \
 ```bash
 python3 scripts/tools/device_acceptance.py validate \
     --file tests/reports/device-acceptance-generic-c3.json \
-    --firmware-version 4.1.0 \
+    --firmware-version 4.1.1 \
     --git-sha <sha> \
     --board generic-c3
 ```
@@ -444,7 +444,7 @@ python3 scripts/tools/device_acceptance.py validate \
 
 ### quality_gate.py（综合质量门禁）
 
-[quality_gate.py](file:///Users/bytedance/work/bikepower-c/scripts/tools/quality_gate.py) 是发版前的综合检查入口，运行所有静态门禁+测试+产物校验。
+[quality_gate.py](../../scripts/tools/quality_gate.py) 是发版前的综合检查入口，运行所有静态门禁+测试+产物校验。
 
 ---
 

@@ -249,11 +249,13 @@ GAP 事件回调为 `gap_event_cb()`：
 
 共享缓冲区全部静态预分配，避免运行时动态分配大缓冲：
 
-- `g_cps_buf[8]`
+- `g_cps_buf[9]`（当前旧兼容布局；标准 8 字节修复见下方已知缺陷）
 - `g_hr_buf[2]`
 - `g_csc_buf[5]`
 - `g_ftms_bike_buf[8]`
 - `g_ftms_resp_buf[3]`
+
+> 已知协议缺陷：当前 CPS 使用 1 字节 flags 并发送 9 字节旧兼容布局，FTMS Bike/Treadmill 的部分 flags 与实际 payload 也存在不一致。现有自测曾复制同一偏移，不能作为协议正确性的独立证据。修复边界和 golden vectors 方案见 [12-top5-protocol-stability-design.md](12-top5-protocol-stability-design.md)，审查优先级见 [13-project-review-and-optimization.md](13-project-review-and-optimization.md)。
 
 ### 4.3 CPS / HRS / CSC / FTMS / DIS 特征
 
@@ -278,7 +280,7 @@ DIS 读取内容来自编译期常量：
 - `FIRMWARE_STABLE_VERSION = "4.0.0"`
 - `FIRMWARE_FIX_VERSION = "4.1.1"`
 - `BIKEPOWER_GIT_SHA` 由 `main/CMakeLists.txt` 在构建时注入最后一次 Git 短提交 ID
-- DIS 固件字段与门户完整版本名使用 `board_firmware_name()` 生成，格式为 `板型-v版本-stable稳定版-fix修复版-gGitID`，例如 `generic-c3-v4.1.0-stable4.0.0-fix4.1.0-g6e90860`
+- DIS 固件字段与门户完整版本名使用 `board_firmware_name()` 生成，格式为 `板型-v版本-stable稳定版-fix修复版-gGitID`，例如 `generic-c3-v4.1.1-stable4.0.0-fix4.1.1-g6e90860`
 
 测试脚本 `tests/ble_selftest.py` 也会校验这三项。
 
@@ -509,7 +511,7 @@ DIS 读取内容来自编译期常量：
 5. 如果原先不在 `RIDE_MODE_ERG`，自动切到 `ERG`
 6. 置 `dirty = true`
 
-因此 FTMS 下发目标功率会改变后续持久化结果，不只是一次性的临时控制。
+因此当前实现中 FTMS 下发目标功率会改变后续持久化结果，不只是一次性的临时控制。这是已确认的 P0 会话态/持久化边界缺陷，目标行为见 [12-top5-protocol-stability-design.md](12-top5-protocol-stability-design.md)。
 
 ## 第七章：心率模型
 
@@ -649,9 +651,10 @@ v3.2.0 起配网门户前后端分离：
 - `cfg.lru_purge_enable = true`
 - `cfg.max_uri_handlers = HTTP_MAX_URI_HANDLERS`（当前 30）
 - `cfg.stack_size = TASK_STACK_HTTPD`（当前 12288）
+- `cfg.max_open_sockets = HTTP_MAX_OPEN_SOCKETS`（当前 7）
 - `cfg.keep_alive_enable = false`
 
-已注册业务路由 17 个，另有 10 个 Captive Portal 探测路由：
+已注册业务路由 18 个，另有 10 个 Captive Portal 探测路由：
 
 - `GET /`（返回内联 HTML 整页）
 - `GET /favicon.ico`（204）
@@ -959,7 +962,7 @@ idf.py build
 
 根据项目规则，C 代码改动后 `idf.py build` 必须通过。
 
-发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行会先跑 host 单测、mock 配网页保存测试、3 分钟核心流程耐久测试和静态门禁，再为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip。脚本不会打 git tag，也不会创建 Gitee Release。合并固件文件名格式为 `bikepower-c-板型-v版本-stable-fix-gGitID.bin`，例如 `bikepower-c-generic-c3-v4.1.0-stable-fix-g6d7eaaf.bin`，版本号只出现一次；总包文件名格式为 `bikepower-c-release-v版本-stable-fix-gGitID.zip`。
+发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行会先跑 host 单测、mock 配网页保存测试、3 分钟核心流程耐久测试和静态门禁，再为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip。脚本不会打 git tag，也不会创建 Gitee Release。合并固件文件名格式为 `bikepower-c-板型-v版本-stable-fix-gGitID.bin`，例如 `bikepower-c-generic-c3-v4.1.1-stable-fix-g6d7eaaf.bin`，版本号只出现一次；总包文件名格式为 `bikepower-c-release-v版本-stable-fix-gGitID.zip`。
 
 每次生成可分发固件时，`build/release/` 必须同时包含：
 

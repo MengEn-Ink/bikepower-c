@@ -25,7 +25,7 @@
 
 ### 根因
 - `esp_http_server` 把**请求行 + 全部请求头**读入一块 scratch 缓冲，大小 = `CONFIG_HTTPD_MAX_REQ_HDR_LEN`。
-- 当前 [sdkconfig.defaults#L46](file:///Users/bytedance/work/bikepower-c/sdkconfig.defaults#L46) 设为 **1024 字节**。
+- 当前 [sdkconfig.defaults#L46](../../sdkconfig.defaults#L46) 设为 **1024 字节**。
 - 手机浏览器（iOS Safari / Android Chrome）真实请求头里 `User-Agent` + `Accept` + `Accept-Language` + `Accept-Encoding` + `Origin` + `Upgrade-Insecure-Requests` 等加起来很容易超过 1024 字节 → 服务端返回 **HTTP 431**，页面显示 "Header fields are too long"。
 - 与 POST body 大小无关（body 走 `httpd_req_recv` 单独读取），所以放大 body 限制无效。
 
@@ -42,10 +42,10 @@
 ## B. 多板型支持可扩展性评估（未来支持更多板型）
 
 ### 现状
-- 板型枚举 [bikepower_config.h#L7-L11](file:///Users/bytedance/work/bikepower-c/main/bikepower_config.h#L7-L11)：`BOARD_GENERIC_C3` / `BOARD_M5STAMP_C3`。
-- 引脚选择 [board_detect.c#L62-L70](file:///Users/bytedance/work/bikepower-c/main/board_detect.c#L62-L70) 用**三元运算符** `(s_board==M5STAMP)?A:B`。
-- Kconfig 选择 [Kconfig.projbuild](file:///Users/bytedance/work/bikepower-c/main/Kconfig.projbuild)：auto / generic / m5stamp。
-- 构建脚本 [build_all.sh#L38-L52](file:///Users/bytedance/work/bikepower-c/scripts/build_all.sh#L38-L52) 用 case 分支。
+- 板型枚举 [bikepower_config.h#L7-L11](../../main/bikepower_config.h#L7-L11)：`BOARD_GENERIC_C3` / `BOARD_M5STAMP_C3`。
+- 引脚选择 [board_detect.c#L62-L70](../../main/board_detect.c#L62-L70) 用**三元运算符** `(s_board==M5STAMP)?A:B`。
+- Kconfig 选择 [Kconfig.projbuild](../../main/Kconfig.projbuild)：auto / generic / m5stamp。
+- 构建脚本 [build_all.sh#L38-L52](../../scripts/build_all.sh#L38-L52) 用 case 分支。
 
 ### 可扩展性短板（加第 3 个板会痛的地方）
 1. **三元运算符不可扩展**：`board_btn_pin()` / `board_led_pin()` 每加一个板都要改三元链。建议改为**板型描述表**（`static const board_desc_t s_boards[] = {...}`，含 led_pin/btn_pin/led_type/name），按枚举下标取值。
@@ -61,7 +61,7 @@
 ## C. 发行版多板型固件包流程验证
 
 ### 现状判断
-- [build_all.sh](file:///Users/bytedance/work/bikepower-c/scripts/build_all.sh) 逻辑正确：逐板型生成 `sdkconfig.board.tmp` → `idf.py build` → `esptool merge_bin` 合并 bootloader+分区表+app → 输出 `bikepower-c-3.1.0-{board}.bin`。符合"包名含板型 + 单文件量产"要求。
+- [build_all.sh](../../scripts/build_all.sh) 逻辑正确：逐板型生成 `sdkconfig.board.tmp` → `idf.py build` → `esptool merge_bin` 合并 bootloader+分区表+app → 输出 `bikepower-c-3.1.0-{board}.bin`。符合"包名含板型 + 单文件量产"要求。
 - 待**实跑验证**：是否两板型都成功产出、版本号解析正确、merge_bin 参数（flash 2MB/dio/80m）与分区表一致。
 
 ### 建议
@@ -73,12 +73,12 @@
 
 | 编号 | 位置 | 问题 | 严重度 | 建议 |
 |------|------|------|--------|------|
-| D1 | [wifi_portal.c#L274](file:///Users/bytedance/work/bikepower-c/main/wifi_portal.c#L274) | 注释写"2048 字节"但代码 [L280](file:///Users/bytedance/work/bikepower-c/main/wifi_portal.c#L280) 限制 4096 | 低（文档drift） | 改注释为 4096 |
-| D2 | [h_config](file:///Users/bytedance/work/bikepower-c/main/wifi_portal.c#L625-L657) | 仅 `steady` 模式应用 power/cadence/hr，符合 WIFI-20 规则 | 正常 | 无 |
-| D3 | [start_softap#L1042](file:///Users/bytedance/work/bikepower-c/main/wifi_portal.c#L1042) | `max_connection=3`，与硬件约束"1-2 连接"注释略宽 | 低 | 可保留或降为 2，待确认 |
-| D4 | 路由表 [L1071-L1083](file:///Users/bytedance/work/bikepower-c/main/wifi_portal.c#L1071-L1083) | 11 路由与 WIFI-13 规则一致 | 正常 | 无 |
+| D1 | [wifi_portal.c#L274](../../main/wifi_portal.c#L274) | 注释写"2048 字节"但代码 [L280](../../main/wifi_portal.c#L280) 限制 4096 | 低（文档drift） | 改注释为 4096 |
+| D2 | [h_config](../../main/wifi_portal.c#L625-L657) | 仅 `steady` 模式应用 power/cadence/hr，符合 WIFI-20 规则 | 正常 | 无 |
+| D3 | [start_softap#L1042](../../main/wifi_portal.c#L1042) | `max_connection=3`，与硬件约束"1-2 连接"注释略宽 | 低 | 可保留或降为 2，待确认 |
+| D4 | 路由表 [L1071-L1083](../../main/wifi_portal.c#L1071-L1083) | 11 路由与 WIFI-13 规则一致 | 正常 | 无 |
 
-> 网页功能需进入配网模式后用 [stage5_portal_test.py](file:///Users/bytedance/work/bikepower-c/tests/stage5_portal_test.py) + 真机浏览器实测（执行阶段做）。
+> 网页功能需进入配网模式后用 [stage5_portal_test.py](../../tests/stage5_portal_test.py) + 真机浏览器实测（执行阶段做）。
 
 ---
 
@@ -88,8 +88,8 @@
 
 | 模块 | 结论 |
 |------|------|
-| [radio_ctrl.c](file:///Users/bytedance/work/bikepower-c/main/radio_ctrl.c) | 普通配网经 `radio_ctrl` 启用 coex，BLE 保持在线；OTA 独占 STA / 共存失败兜底才停 BLE，符合当前 WB-MUTEX 规则 |
-| [board_detect.c](file:///Users/bytedance/work/bikepower-c/main/board_detect.c) | Kconfig 优先 + GPIO 自动检测回退，逻辑正常 |
+| [radio_ctrl.c](../../main/radio_ctrl.c) | 普通配网经 `radio_ctrl` 启用 coex，BLE 保持在线；OTA 独占 STA / 共存失败兜底才停 BLE，符合当前 WB-MUTEX 规则 |
+| [board_detect.c](../../main/board_detect.c) | Kconfig 优先 + GPIO 自动检测回退，逻辑正常 |
 | body/字段缓冲 | recv_body≤4096，device_name≤64，无溢出风险 |
 
 ---
@@ -98,8 +98,8 @@
 
 | 位置 | 问题 | 建议 |
 |------|------|------|
-| [sdkconfig.defaults#L1](file:///Users/bytedance/work/bikepower-c/sdkconfig.defaults#L1) | 历史发现已修复：头注释已从 v5.5.1 对齐到 v5.5.4 | 已完成 |
-| [board_detect.h#L11-L12](file:///Users/bytedance/work/bikepower-c/main/board_detect.h#L11-L12) | 注释只提 GPIO 检测，未提 Kconfig 优先 | 补充说明 |
+| [sdkconfig.defaults#L1](../../sdkconfig.defaults#L1) | 历史发现已修复：头注释已从 v5.5.1 对齐到 v5.5.4 | 已完成 |
+| [board_detect.h#L11-L12](../../main/board_detect.h#L11-L12) | 注释只提 GPIO 检测，未提 Kconfig 优先 | 补充说明 |
 
 ---
 

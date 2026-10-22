@@ -16,7 +16,7 @@
 
 ## power_engine.c — 功率/踏频/心率快照引擎
 
-**头文件**：[power_engine.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/power_engine.h)
+**头文件**：[power_engine.h](../../components/bikepower_domain/include/power_engine.h)
 
 核心对象 `power_engine_t` 保存了所有运行时状态，详见 [04-关键数据结构](04-key-data-structures.md)。
 
@@ -75,7 +75,7 @@ output_hr = 有用户心率 ? hr_model_steady_user(user_hr, hr_float)
 
 ## hr_model.c — 心率模型
 
-**头文件**：[hr_model.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/hr_model.h)
+**头文件**：[hr_model.h](../../components/bikepower_domain/include/hr_model.h)
 
 心率不是简单的功率×系数，而是四层叠加：
 
@@ -130,7 +130,7 @@ dt = 0.05s（50ms 节拍）
 
 ## running_engine.c — 跑步模式引擎
 
-**头文件**：[running_engine.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/running_engine.h)
+**头文件**：[running_engine.h](../../components/bikepower_domain/include/running_engine.h)
 
 跑步模式独立于骑行功率引擎，生成 RSC（Running Speed and Cadence）数据。
 
@@ -161,7 +161,7 @@ dt = 0.05s（50ms 节拍）
 
 ## profile.c — 用户档案与配速机器人
 
-**头文件**：[profile.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/profile.h)
+**头文件**：[profile.h](../../components/bikepower_domain/include/profile.h)
 
 ### profile_t 字段
 
@@ -198,7 +198,7 @@ dt = 0.05s（50ms 节拍）
 
 ## config_store.c — 配置 Schema 管理
 
-**头文件**：[config_store.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/config_store.h)
+**头文件**：[config_store.h](../../components/bikepower_domain/include/config_store.h)
 
 负责配置的默认值、校验、schema 迁移和 JSON 序列化。
 
@@ -235,7 +235,7 @@ dt = 0.05s（50ms 节拍）
 
 ## json_miniparse.c — 轻量 JSON 解析
 
-**头文件**：[json_miniparse.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/json_miniparse.h)
+**头文件**：[json_miniparse.h](../../components/bikepower_domain/include/json_miniparse.h)
 
 专为 HTTP 请求体解析设计，**无动态内存分配**，顺序扫描提取字段。
 
@@ -285,7 +285,7 @@ LED 模式与颜色映射纯逻辑：
 
 ## 常量中心：domain_config.h
 
-领域层所有常量集中在 [domain_config.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/domain_config.h)，bikepower_config.h 通过 `#include "domain_config.h"` 引用：
+领域层所有常量集中在 [domain_config.h](../../components/bikepower_domain/include/domain_config.h)，bikepower_config.h 通过 `#include "domain_config.h"` 引用：
 
 | 类别 | 常量 |
 |------|------|

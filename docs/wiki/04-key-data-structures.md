@@ -8,7 +8,7 @@
 
 ### app_evt_t — 应用事件
 
-**定义位置**：[app_events.h](file:///Users/bytedance/work/bikepower-c/main/app_events.h)
+**定义位置**：[app_events.h](../../main/app_events.h)
 
 ```c
 typedef enum {
@@ -35,7 +35,7 @@ typedef struct {
 
 ### board_desc_t — 板型描述
 
-**定义位置**：[board_detect.c](file:///Users/bytedance/work/bikepower-c/main/board_detect.c)
+**定义位置**：[board_detect.c](../../main/board_detect.c)
 
 ```c
 typedef struct {
@@ -53,7 +53,7 @@ typedef struct {
 
 ### power_engine_t — 功率引擎核心状态
 
-**定义位置**：[power_engine.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/power_engine.h#L47-L74)
+**定义位置**：[power_engine.h](../../components/bikepower_domain/include/power_engine.h#L47-L74)
 
 这是全局唯一的运行时状态对象，保存在 `app_main.c` 的 `s_engine` 静态变量中。
 
@@ -114,7 +114,7 @@ typedef struct {
 
 ### profile_t — 用户档案
 
-**定义位置**：[profile.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/profile.h)
+**定义位置**：[profile.h](../../components/bikepower_domain/include/profile.h)
 
 | 字段 | 类型 | 范围 | 默认 | 说明 |
 |------|------|------|------|------|
@@ -128,13 +128,13 @@ typedef struct {
 
 ### hr_state_t — 心率模型状态
 
-**定义位置**：[hr_model.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/hr_model.h)
+**定义位置**：[hr_model.h](../../components/bikepower_domain/include/hr_model.h)
 
 包含内部平滑值、HRV 相位、漂移量、对外输出值等，不对外暴露字段细节，通过 `hr_model_*` 函数操作。
 
 ### running_engine_t — 跑步引擎状态
 
-**定义位置**：[running_engine.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/running_engine.h)
+**定义位置**：[running_engine.h](../../components/bikepower_domain/include/running_engine.h)
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -163,7 +163,7 @@ typedef struct {
 
 ### config_t — NVS/JSON 配置中间结构
 
-**定义位置**：[config_store.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/config_store.h)
+**定义位置**：[config_store.h](../../components/bikepower_domain/include/config_store.h)
 
 这是持久化和序列化用的结构，包含所有需要保存的字段（schema_ver、功率、踏频、模式、心率、体重、FTP、阈值心率、ride_type、自定义W/kg、设备名、LED 配置、运动 profile、广播掩码、跑步参数等），约 40 个字段。
 
@@ -171,13 +171,13 @@ typedef struct {
 
 ### led_config_t — LED 自定义配置
 
-**定义位置**：[led_pattern.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/led_pattern.h)
+**定义位置**：[led_pattern.h](../../components/bikepower_domain/include/led_pattern.h)
 
 每个场景（silent/wait/conn/wifi/confirm/error）有 `mode`（慢闪/快闪/常亮/熄灭）和 `color`（RGB 三元组，仅 SK6812 生效）。
 
 ### device_template_t — BLE 设备信息模板
 
-**定义位置**：[device_template.h](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/include/device_template.h)
+**定义位置**：[device_template.h](../../components/bikepower_domain/include/device_template.h)
 
 | 字段 | 说明 |
 |------|------|

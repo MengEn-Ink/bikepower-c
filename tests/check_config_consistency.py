@@ -26,6 +26,12 @@ PROGRESS = ROOT / "PROGRESS.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
 DOC_INDEX = ROOT / "docs" / "INDEX.md"
 DOCS_SUPERPOWERS = ROOT / "docs" / "superpowers"
+DOCS_ROOT = ROOT / "docs"
+PROJECT_CONTEXT = ROOT / ".trae" / "memory" / "project-context.md"
+WIFI_RULES = ROOT / ".trae" / "rules" / "domain" / "wifi.md"
+WIKI_HOME = ROOT / "docs" / "wiki" / "00-home.md"
+PROTOCOL_DESIGN = ROOT / "docs" / "dev" / "12-top5-protocol-stability-design.md"
+REVIEW_AND_OPTIMIZATION = ROOT / "docs" / "dev" / "13-project-review-and-optimization.md"
 TECH_REF = ROOT / "docs" / "dev" / "01-technical-reference.md"
 QUICKSTART = ROOT / "docs" / "user" / "01-quickstart.md"
 USER_MANUAL = ROOT / "docs" / "user" / "02-user-manual.md"
@@ -126,6 +132,8 @@ readme_src = read(README)
 progress_src = read(PROGRESS)
 changelog_src = read(CHANGELOG)
 doc_index_src = read(DOC_INDEX)
+project_context_src = read(PROJECT_CONTEXT)
+wifi_rules_src = read(WIFI_RULES)
 tech_ref_src = read(TECH_REF)
 quickstart_src = read(QUICKSTART)
 user_manual_src = read(USER_MANUAL)
@@ -180,6 +188,8 @@ check(f"当前固件版本：v{fw_ver}" in progress_src,
       f"PROGRESS.md 当前固件版本与 FIRMWARE_VERSION({fw_ver}) 一致")
 check(f"当前固件版本为 `v{fw_ver}`" in tech_ref_src,
       f"技术参考当前固件版本与 FIRMWARE_VERSION({fw_ver}) 一致")
+check(f"当前固件 v{fw_ver}" in project_context_src,
+      f"project-context.md 当前固件版本与 FIRMWARE_VERSION({fw_ver}) 一致")
 
 # DEVICE_NAME 一致性
 device_name_cfg = extract_define(config_src, "DEVICE_NAME")
@@ -457,6 +467,31 @@ check(f"阶段 0-{max_stage} 完成情况" in doc_index_src,
       f"docs/INDEX.md 含阶段 0-{max_stage} 项目进度描述")
 check(not DOCS_SUPERPOWERS.exists(),
       "docs/superpowers 工作目录已归档，不应重新出现")
+check(WIKI_HOME.is_file() and "wiki/00-home.md" in doc_index_src,
+      "Code Wiki 首页使用小写 kebab-case 路径并已收录索引")
+check(PROTOCOL_DESIGN.is_file() and "dev/12-top5-protocol-stability-design.md" in doc_index_src,
+      "Top 5 协议稳定性设计位于规范 dev 目录并已收录索引")
+check(REVIEW_AND_OPTIMIZATION.is_file() and "dev/13-project-review-and-optimization.md" in doc_index_src,
+      "项目复审与优化清单位于规范 dev 目录并已收录索引")
+docs_with_local_urls = []
+broken_doc_links = []
+for markdown_path in DOCS_ROOT.rglob("*.md"):
+    markdown_src = read(markdown_path)
+    if re.search(r"\]\(\s*file://", markdown_src):
+        docs_with_local_urls.append(str(markdown_path.relative_to(ROOT)))
+    for raw_target in re.findall(r"!?\[[^]]*\]\(([^)]+)\)", markdown_src):
+        target = raw_target.strip().strip("<>")
+        if not target or target.startswith(("#", "http://", "https://", "mailto:")):
+            continue
+        relative_target = target.split("#", 1)[0].split("?", 1)[0]
+        if relative_target and not (markdown_path.parent / relative_target).resolve().exists():
+            broken_doc_links.append(
+                f"{markdown_path.relative_to(ROOT)} -> {raw_target}"
+            )
+check(not docs_with_local_urls,
+      f"docs Markdown 不含本机 file:// 链接 (实际={docs_with_local_urls})")
+check(not broken_doc_links,
+      f"docs Markdown 仓库内相对链接目标存在 (失效={broken_doc_links})")
 check("archive/10-project-optimization-design.md" in doc_index_src
       and "archive/11-project-optimization-plan.md" in doc_index_src,
       "docs/INDEX.md 收录历史项目优化计划归档入口")
@@ -481,6 +516,17 @@ check(f"当前固件基线：BikePower C v{fw_ver}" in running_mode_doc,
       f"docs/dev/04-running-mode-compatibility.md 当前固件基线与 FIRMWARE_VERSION({fw_ver}) 一致")
 check(f"版本：v{fw_ver}" in coverage_doc,
       f"docs/dev/03-test-coverage-analysis.md 版本与 FIRMWARE_VERSION({fw_ver}) 一致")
+routes_match = re.search(r"httpd_uri_t routes\[\]\s*=\s*\{(.*?)\n\s*\};", wifi_portal_src, re.DOTALL)
+route_table_src = routes_match.group(1) if routes_match else ""
+route_count = route_table_src.count(".uri =")
+captive_route_count = route_table_src.count(".handler = captive_portal_detect_handler")
+business_route_count = route_count - captive_route_count
+check(route_count == 28 and business_route_count == 18 and captive_route_count == 10,
+      f"wifi_portal.c 路由数为 18 个业务 + 10 个 Captive (实际={business_route_count}+{captive_route_count})")
+check("已注册业务路由 18 个，另有 10 个 Captive Portal 探测路由" in tech_ref_src,
+      "技术参考路由计数与实现一致")
+check("18 个业务路由 + 10 个 Captive Portal 探测路由" in wifi_rules_src,
+      "WiFi 规则路由计数与实现一致")
 check('"diff", "--check"' in quality_gate_src,
       "quality_gate.py 必须检查工作区 whitespace")
 check('"show", "--check", "--format=", "HEAD"' in quality_gate_src,
@@ -514,7 +560,7 @@ if hw_src:
 # ============================ 7. 任务栈大小合理性 ============================
 print(f"\n{TAG} [S7] 任务栈大小合理性")
 
-for stk_name in ["TASK_STACK_BTN", "TASK_STACK_LED", "TASK_STACK_HTTPD"]:
+for stk_name in ["TASK_STACK_BTN", "TASK_STACK_LED", "TASK_STACK_DNS", "TASK_STACK_HTTPD"]:
     v = extract_int(config_src, stk_name)
     check(v is not None and v >= 1024, f"{stk_name} >= 1024 (实际={v})")
 

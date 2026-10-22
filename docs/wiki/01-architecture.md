@@ -102,10 +102,10 @@ app_main.c
 
 | 任务名 | 创建位置 | 栈大小 | 优先级 | 职责 |
 |--------|----------|--------|--------|------|
-| `app_main_task` | [app_main.c](file:///Users/bytedance/work/bikepower-c/main/app_main.c) 的 `app_main()` | 系统默认 | 1（main） | 50ms 节拍主循环：事件消费、快照生成、BLE 数据更新、WDT 喂狗 |
+| `app_main_task` | [app_main.c](../../main/app_main.c) 的 `app_main()` | 系统默认 | 1（main） | 50ms 节拍主循环：事件消费、快照生成、BLE 数据更新、WDT 喂狗 |
 | `nimble_host` | `ble_bikepower_start()` 内部 | NimBLE 默认 | 5 | NimBLE 协议栈主机任务、GATT 回调、通知打包 |
-| `button_task` | [button.c](file:///Users/bytedance/work/bikepower-c/main/button.c) | 2560B | 5 | GPIO 中断信号量等待、去抖、长按自动重复、事件投递 |
-| `led_task` | [led.c](file:///Users/bytedance/work/bikepower-c/main/led.c) | 2048B | 3 | LED 模式/颜色/闪烁节拍驱动（GPIO 或 SK6812 RMT） |
+| `button_task` | [button.c](../../main/button.c) | 2560B | 5 | GPIO 中断信号量等待、去抖、长按自动重复、事件投递 |
+| `led_task` | [led.c](../../main/led.c) | 2048B | 3 | LED 模式/颜色/闪烁节拍驱动（GPIO 或 SK6812 RMT） |
 | `httpd` | `wifi_portal_start()` 内部 | 12288B | 5 | HTTP 服务器任务，处理 /api/xxx 请求 |
 | `sys_evt` | ESP-IDF 系统事件 | 默认 | — | WiFi/IP 事件处理 |
 | `tiT` | ESP-IDF 定时器 | 默认 | — | esp_timer 回调（BLE 通知、配网超时检查） |
@@ -136,38 +136,38 @@ app_main.c
 
 | 文件 | 行数(约) | 核心职责 |
 |------|----------|----------|
-| [app_main.c](file:///Users/bytedance/work/bikepower-c/main/app_main.c) | ~390 | 入口、初始化顺序、50ms 主循环、WDT、堆监控、事件分发、BLE 重试 |
-| [app_state.c/h](file:///Users/bytedance/work/bikepower-c/main/app_state.c) | ~300 | 7 态高层状态机：按钮语义消费、确认窗口计时、配网触发/退出、LED 协调 |
-| [app_events.h](file:///Users/bytedance/work/bikepower-c/main/app_events.h) | ~50 | 事件类型枚举 `app_evt_t` |
-| [button.c/h](file:///Users/bytedance/work/bikepower-c/main/button.c) | ~200 | GPIO 中断配置、button_task 去抖、短按/长按/自动重复检测 |
-| [led.c/h](file:///Users/bytedance/work/bikepower-c/main/led.c) | ~350 | LED 任务、GPIO 普通 LED / SK6812 RGB 双驱动、闪烁节拍 |
-| [board_detect.c/h](file:///Users/bytedance/work/bikepower-c/main/board_detect.c) | ~150 | 启动时板型检测（GPIO3 下拉读电平）、板型描述表、固件名生成 |
-| [ble_bikepower.c/h](file:///Users/bytedance/work/bikepower-c/main/ble_bikepower.c) | ~900 | NimBLE 五服务 GATT 定义、广播、通知定时器、FTMS 控制点、profile 切换 |
-| [ble_scanner.c/h](file:///Users/bytedance/work/bikepower-c/main/ble_scanner.c) | ~700 | BLE Central/Observer 扫描、GATT 读取、运动数据短时采样分析 |
-| [radio_ctrl.c/h](file:///Users/bytedance/work/bikepower-c/main/radio_ctrl.c) | ~250 | BLE/WiFi 射频软切换唯一入口、coex 共存/失败兜底、SoftAP 启动停止 |
-| [wifi_portal.c/h](file:///Users/bytedance/work/bikepower-c/main/wifi_portal.c) | ~1200 | HTTP 服务器、17+10 路由、JSON API、超时/续期/收尾、前端内联 HTML 输出 |
-| [captive_portal.c/h](file:///Users/bytedance/work/bikepower-c/main/captive_portal.c) | ~100 | UDP 53 DNS 劫持，把所有 A 记录指向 192.168.4.1 |
-| [nvs_store.c/h](file:///Users/bytedance/work/bikepower-c/main/nvs_store.c) | ~350 | NVS namespace `bikepower` 读写、schema 迁移调用、脏标记桥接 |
-| [device_template_store.c/h](file:///Users/bytedance/work/bikepower-c/main/device_template_store.c) | ~250 | NVS namespace `ble_tpl` 模板槽位管理（最多 5 个） |
-| [bikepower_config.h](file:///Users/bytedance/work/bikepower-c/main/bikepower_config.h) | ~220 | 应用层常量：引脚、UUID、阈值、超时、任务栈、内存告警线 |
+| [app_main.c](../../main/app_main.c) | ~390 | 入口、初始化顺序、50ms 主循环、WDT、堆监控、事件分发、BLE 重试 |
+| [app_state.c/h](../../main/app_state.c) | ~300 | 7 态高层状态机：按钮语义消费、确认窗口计时、配网触发/退出、LED 协调 |
+| [app_events.h](../../main/app_events.h) | ~50 | 事件类型枚举 `app_evt_t` |
+| [button.c/h](../../main/button.c) | ~200 | GPIO 中断配置、button_task 去抖、短按/长按/自动重复检测 |
+| [led.c/h](../../main/led.c) | ~350 | LED 任务、GPIO 普通 LED / SK6812 RGB 双驱动、闪烁节拍 |
+| [board_detect.c/h](../../main/board_detect.c) | ~150 | 启动时板型检测（GPIO3 下拉读电平）、板型描述表、固件名生成 |
+| [ble_bikepower.c/h](../../main/ble_bikepower.c) | ~900 | NimBLE 五服务 GATT 定义、广播、通知定时器、FTMS 控制点、profile 切换 |
+| [ble_scanner.c/h](../../main/ble_scanner.c) | ~700 | BLE Central/Observer 扫描、GATT 读取、运动数据短时采样分析 |
+| [radio_ctrl.c/h](../../main/radio_ctrl.c) | ~250 | BLE/WiFi 射频软切换唯一入口、coex 共存/失败兜底、SoftAP 启动停止 |
+| [wifi_portal.c/h](../../main/wifi_portal.c) | ~1200 | HTTP 服务器、18+10 路由、JSON API、超时/续期/收尾、前端内联 HTML 输出 |
+| [captive_portal.c/h](../../main/captive_portal.c) | ~100 | UDP 53 DNS 劫持，把所有 A 记录指向 192.168.4.1 |
+| [nvs_store.c/h](../../main/nvs_store.c) | ~350 | NVS namespace `bikepower` 读写、schema 迁移调用、脏标记桥接 |
+| [device_template_store.c/h](../../main/device_template_store.c) | ~250 | NVS namespace `ble_tpl` 模板槽位管理（最多 5 个） |
+| [bikepower_config.h](../../main/bikepower_config.h) | ~220 | 应用层常量：引脚、UUID、阈值、超时、任务栈、内存告警线 |
 | `web/` | — | 前端 SPA 三件套，编译时由 `scripts/inline_static.py` 内联为 `web_index_html.h` |
 
 ### `components/bikepower_domain/` — 领域层（纯 C，可 host 单测）
 
 | 文件 | 核心职责 |
 |------|----------|
-| [power_engine.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/power_engine.c) | 功率/踏频/心率快照生成、Steady/Road/ERG 三种模式、平滑随机游走浮动 |
-| [hr_model.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/hr_model.c) | FTP 6 区心率映射、一阶指数平滑（tau 升 30s/降 60s）、HRV（RSA+Mayer+漂移）、输出限速 |
-| [running_engine.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/running_engine.c) | 跑步模式：速度/配速/步频生成、配速机器人、RSC 数据 |
-| [profile.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/profile.c) | 用户档案（体重/FTP/阈值心率）、配速机器人表（Coco/Yumi/Jacques/Genie/Constance/自定义） |
-| [config_store.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/config_store.c) | 配置 schema 版本（当前 v11）、defaults、validate（夹紧）、migrate（v6-v10 升级）、serialize/deserialize JSON |
-| [json_miniparse.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/json_miniparse.c) | 轻量 JSON 字段提取器（无动态分配，用于 HTTP 请求解析） |
-| [button_logic.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/button_logic.c) | 按钮按压语义纯逻辑（短按/长按/自动重复/确认窗口） |
-| [button_debounce.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/button_debounce.c) | 去抖与长按节拍纯逻辑 |
-| [led_pattern.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/led_pattern.c) | LED 模式（慢闪/快闪/常亮/熄灭/WiFi）与颜色映射纯逻辑 |
-| [device_template.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/device_template.c) | 设备信息模板数据结构、默认值、校验 |
-| [device_analysis.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/device_analysis.c) | 外部 BLE 设备运动数据解析与能力摘要 |
-| [domain_rng.c](file:///Users/bytedance/work/bikepower-c/components/bikepower_domain/domain_rng.c) | 领域层随机数（不直接用 esp_random，保持 host 可测） |
+| [power_engine.c](../../components/bikepower_domain/power_engine.c) | 功率/踏频/心率快照生成、Steady/Road/ERG 三种模式、平滑随机游走浮动 |
+| [hr_model.c](../../components/bikepower_domain/hr_model.c) | FTP 6 区心率映射、一阶指数平滑（tau 升 30s/降 60s）、HRV（RSA+Mayer+漂移）、输出限速 |
+| [running_engine.c](../../components/bikepower_domain/running_engine.c) | 跑步模式：速度/配速/步频生成、配速机器人、RSC 数据 |
+| [profile.c](../../components/bikepower_domain/profile.c) | 用户档案（体重/FTP/阈值心率）、配速机器人表（Coco/Yumi/Jacques/Genie/Constance/自定义） |
+| [config_store.c](../../components/bikepower_domain/config_store.c) | 配置 schema 版本（当前 v11）、defaults、validate（夹紧）、migrate（v6-v10 升级）、serialize/deserialize JSON |
+| [json_miniparse.c](../../components/bikepower_domain/json_miniparse.c) | 轻量 JSON 字段提取器（无动态分配，用于 HTTP 请求解析） |
+| [button_logic.c](../../components/bikepower_domain/button_logic.c) | 按钮按压语义纯逻辑（短按/长按/自动重复/确认窗口） |
+| [button_debounce.c](../../components/bikepower_domain/button_debounce.c) | 去抖与长按节拍纯逻辑 |
+| [led_pattern.c](../../components/bikepower_domain/led_pattern.c) | LED 模式（慢闪/快闪/常亮/熄灭/WiFi）与颜色映射纯逻辑 |
+| [device_template.c](../../components/bikepower_domain/device_template.c) | 设备信息模板数据结构、默认值、校验 |
+| [device_analysis.c](../../components/bikepower_domain/device_analysis.c) | 外部 BLE 设备运动数据解析与能力摘要 |
+| [domain_rng.c](../../components/bikepower_domain/domain_rng.c) | 领域层随机数（不直接用 esp_random，保持 host 可测） |
 | `include/` | 公开头文件 + `domain_config.h`（领域层常量中心） |
 
 ### `scripts/` — 构建与工具脚本
@@ -184,7 +184,7 @@ app_main.c
 | `tools/generate_release_docs.py` | 生成 test-report.md |
 | `tools/device_monitor.py` | 串口设备监控 |
 | `tools/serve_ble_monitor.py` | BLE 监控本地服务器 |
-| `tools/publish_gitee_release.py` | Gitee Release 发布（复用严格检查） |
+| `scripts/tools/publish_gitee_release.py` | Gitee Release 发布（复用严格检查） |
 
 ### `tests/` — 设备测试与门禁
 
@@ -208,7 +208,7 @@ app_main.c
 | 文件 | 说明 |
 |------|------|
 | `Makefile` | host 单测构建（gcc，不依赖 ESP-IDF） |
-| [test_domain.c](file:///Users/bytedance/work/bikepower-c/test/test_domain.c) | 领域层单元测试（power_engine/hr_model/profile/config_store 等） |
+| [test_domain.c](../../test/test_domain.c) | 领域层单元测试（power_engine/hr_model/profile/config_store 等） |
 
 ---
 
@@ -242,7 +242,7 @@ main/web/app.js      ─┘                                               ↓
 
 ## 分区表
 
-[partitions.csv](file:///Users/bytedance/work/bikepower-c/partitions.csv) 使用单 factory 布局（v4.0.0 起移除 OTA）：
+[partitions.csv](../../partitions.csv) 使用单 factory 布局（v4.0.0 起移除 OTA）：
 
 | 分区 | 大小 | 说明 |
 |------|------|------|
@@ -251,4 +251,4 @@ main/web/app.js      ─┘                                               ↓
 | `factory` | 3.25MB | 固件（bootloader + partition-table + app 合并为单 bin） |
 | `coredump` | 64KB | coredump 分区（写 flash） |
 
-参考：[sdkconfig.defaults](file:///Users/bytedance/work/bikepower-c/sdkconfig.defaults) 中 `CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y`、`CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y`。
+参考：[sdkconfig.defaults](../../sdkconfig.defaults) 中 `CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y`、`CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y`。

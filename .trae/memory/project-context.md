@@ -12,7 +12,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 
 - BikePower 从 MicroPython（仓库 esp32-power）**完全重写**为 C + ESP-IDF + NimBLE。
 - 用户授权"全程你来设计开发"，分阶段（0-6）推进，每阶段编译 → 烧录 → 真机验证后提交推送。
-- 项目位置 `/home/mengen1014/work/bikepower-c`，ESP-IDF v5.5.4 本地工具链，当前固件 v4.0.1。
+- 项目根目录以当前 Git 工作区为准，不在规则中绑定单台机器路径；ESP-IDF v5.5.4，当前固件 v4.1.1。
 - MicroPython 专有约束（mpremote/gc/_thread/const/.mpy/部署 .py）**不适用**本项目。
 
 ---
@@ -107,7 +107,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 ### 工具环境
 - [WARNING] [2026-06-12] macOS 无 `timeout` 命令，串口抓取改用纯 Python 脚本。
 - [CRITICAL] [2026-06-12] heredoc（`python - <<'PY'`）在工具执行环境被注入污染导致 SyntaxError，必须写成脚本文件再运行。
-- [INFO] [2026-06-26] ESP-IDF 本地路径 `/home/mengen1014/work/esp32-power/esp-idf`（非 `~/esp/esp-idf`），source 其 `export.sh` 后才可用 `idf.py`。
+- [INFO] [2026-10-22] ESP-IDF 路径按 `IDF_PATH` → 当前平台标准目录 → 相邻项目目录 → 历史 Linux 目录探测；文档和命令不得假设单一用户目录。
 
 ### 跑步模式 / 配置 schema
 - [INFO] [2026-07-07] 跑步模式可用性的最低闭环是速度/配速，不是坡度或 FTMS 控制；新增跑步能力先保持 RSC 路径简单，FTMS Treadmill Data / Control Point 只在目标 App 明确需要时再做。

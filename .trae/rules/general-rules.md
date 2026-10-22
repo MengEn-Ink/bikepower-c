@@ -26,15 +26,18 @@
 
 | 规则 | 说明 |
 |------|------|
-| 分类子目录 | `docs/user/`（产品使用）、`docs/dev/`（开发与技术）、`docs/archive/`（历史归档，仅供追溯） |
-| 格式 `NN-名称.md` | NN 为两位数字前缀（01-99），**在所属子目录内**决定排列顺序 |
+| 分类子目录 | `docs/user/`（产品使用）、`docs/dev/`（开发与技术）、`docs/wiki/`（代码级展开）、`docs/archive/`（历史归档，仅供追溯） |
+| 格式 `NN-名称.md` | NN 为两位数字前缀；`user/dev/archive` 使用 01-99，`wiki` 首页允许从 00 开始 |
 | kebab-case | 名称用小写+连字符（如 `ota-user-guide`） |
-| 编号连续递增 | 新增文档取所属子目录当前最大编号 +1，不跳号、不复用已删除编号 |
+| 编号单调递增 | 新增文档取所属子目录当前最大编号 +1，不回填历史空号、不复用已删除编号 |
 | 过时不删除 | 过时/已完成文档移入 `docs/archive/` 并在顶部加归档标注，不物理删除 |
 | 例外：`INDEX.md` | 索引文件留在 `docs/` 根，不加编号 |
 | 例外：`images/` 子目录 | 图片资源留在 `docs/images/`，不编号 |
 | 移动/重命名同步 | 必须同步更新 INDEX.md、跨文件交叉引用，以及门禁脚本（`tests/check_config_consistency.py`、`scripts/tools/quality_gate.py`）中硬编码的文档路径 |
 | 禁止无编号文档 | 禁止在分类子目录放无编号的 .md |
+| 禁止本机链接 | 文档链接必须使用仓库相对路径，禁止 `file://`、用户目录和工作区绝对路径 |
+
+当前事实的权威顺序为：源码/配置 → `PROGRESS.md`（进度与待验收）→ `docs/dev/01-technical-reference.md`（实现行为）→ `docs/wiki/`（展开说明）。`docs/archive/` 不参与当前事实判定；发现冲突时修正低优先级文档并补门禁。
 
 当前目录划分与编号分配见 [docs/INDEX.md](../../docs/INDEX.md)。
 
@@ -106,7 +109,8 @@ bikepower-c/
 │   ├── dev/                  — 开发与技术
 │   │   ├── 01-technical-reference.md — 技术参考（当前实现权威规格）
 │   │   ├── 02-firmware-security.md   — 固件安全
-│   │   └── 03-test-coverage-analysis.md — 测试覆盖率分析
+│   │   └── NN-*.md                    — 当前设计、测试与开发指南
+│   ├── wiki/                 — 代码级展开说明（00-home.md 为入口）
 │   ├── archive/              — 历史归档（仅供追溯）
 │   │   ├── 01-cidf-nimble-rewrite.md — 基线重写方案
 │   │   ├── 02-micropython-vs-c-comparison.md — 技术栈对比

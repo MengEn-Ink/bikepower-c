@@ -248,6 +248,8 @@ required_assets = [
     "docs/dev/03-test-coverage-analysis.md",
     "docs/dev/10-stable-delivery-design.md",
     "docs/dev/11-stable-delivery-plan.md",
+    "docs/dev/12-top5-protocol-stability-design.md",
+    "docs/dev/13-project-review-and-optimization.md",
     "docs/archive/01-cidf-nimble-rewrite.md",
     "docs/archive/02-micropython-vs-c-comparison.md",
     "scripts/tools/generate_release_docs.py",

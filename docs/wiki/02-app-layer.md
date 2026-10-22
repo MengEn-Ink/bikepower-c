@@ -6,7 +6,7 @@
 
 ## app_main.c — 入口与主循环
 
-**文件**：[app_main.c](file:///Users/bytedance/work/bikepower-c/main/app_main.c)
+**文件**：[app_main.c](../../main/app_main.c)
 **TAG**：`"APP"`
 
 ### 全局状态
@@ -75,7 +75,7 @@
 
 ## app_state.c — 高层状态机
 
-**文件**：[app_state.c](file:///Users/bytedance/work/bikepower-c/main/app_state.c) / [app_state.h](file:///Users/bytedance/work/bikepower-c/main/app_state.h)
+**文件**：[app_state.c](../../main/app_state.c) / [app_state.h](../../main/app_state.h)
 
 ### 状态枚举
 
@@ -122,7 +122,7 @@
 
 ## button.c — 按钮驱动
 
-**文件**：[button.c](file:///Users/bytedance/work/bikepower-c/main/button.c) / [button.h](file:///Users/bytedance/work/bikepower-c/main/button.h)
+**文件**：[button.c](../../main/button.c) / [button.h](../../main/button.h)
 **TAG**：`"BTN"`
 
 ### 硬件连接
@@ -165,7 +165,7 @@ button_task()（独立任务）
 
 ### 按钮时间阈值
 
-定义在 [bikepower_config.h](file:///Users/bytedance/work/bikepower-c/main/bikepower_config.h)：
+定义在 [bikepower_config.h](../../main/bikepower_config.h)：
 
 | 宏 | 值 | 含义 |
 |----|-----|------|
@@ -180,7 +180,7 @@ button_task()（独立任务）
 
 ## led.c — LED 驱动
 
-**文件**：[led.c](file:///Users/bytedance/work/bikepower-c/main/led.c) / [led.h](file:///Users/bytedance/work/bikepower-c/main/led.h)
+**文件**：[led.c](../../main/led.c) / [led.h](../../main/led.h)
 **TAG**：`"LED"`
 
 ### 双驱动架构
@@ -220,7 +220,7 @@ button_task()（独立任务）
 
 ## board_detect.c — 板型检测
 
-**文件**：[board_detect.c](file:///Users/bytedance/work/bikepower-c/main/board_detect.c) / [board_detect.h](file:///Users/bytedance/work/bikepower-c/main/board_detect.h)
+**文件**：[board_detect.c](../../main/board_detect.c) / [board_detect.h](../../main/board_detect.h)
 **TAG**：`"BOARD"`
 
 ### 检测原理
@@ -262,7 +262,7 @@ static const board_desc_t s_board_desc[BOARD_TYPE_COUNT] = {
 
 ## radio_ctrl.c — BLE/WiFi 射频控制
 
-**文件**：[radio_ctrl.c](file:///Users/bytedance/work/bikepower-c/main/radio_ctrl.c) / [radio_ctrl.h](file:///Users/bytedance/work/bikepower-c/main/radio_ctrl.h)
+**文件**：[radio_ctrl.c](../../main/radio_ctrl.c) / [radio_ctrl.h](../../main/radio_ctrl.h)
 **TAG**：`"RADIO"`
 
 > ⚠️ **这是 WiFi/BLE 射频操作的唯一入口**，禁止其他模块直接调用 `esp_wifi_*` 或 `ble_bikepower_stop()`。
@@ -315,7 +315,7 @@ radio_ctrl_enter_wifi(engine)
 
 ## captive_portal.c — DNS 劫持
 
-**文件**：[captive_portal.c](file:///Users/bytedance/work/bikepower-c/main/captive_portal.c) / [captive_portal.h](file:///Users/bytedance/work/bikepower-c/main/captive_portal.c)
+**文件**：[captive_portal.c](../../main/captive_portal.c) / [captive_portal.h](../../main/captive_portal.c)
 **TAG**：`"CAPTIVE"`
 
 ### 功能
@@ -333,13 +333,13 @@ radio_ctrl_enter_wifi(engine)
 
 ## nvs_store.c — NVS 配置桥接
 
-**文件**：[nvs_store.c](file:///Users/bytedance/work/bikepower-c/main/nvs_store.c) / [nvs_store.h](file:///Users/bytedance/work/bikepower-c/main/nvs_store.h)
+**文件**：[nvs_store.c](../../main/nvs_store.c) / [nvs_store.h](../../main/nvs_store.h)
 **TAG**：`"NVS"`
 
 ### Namespace 与键
 
 - Namespace：`NVS_NAMESPACE = "bikepower"`
-- 键定义在 [bikepower_config.h](file:///Users/bytedance/work/bikepower-c/main/bikepower_config.h)，约 40 个键（功率、模式、体重、FTP、LED、跑步参数等）
+- 键定义在 [bikepower_config.h](../../main/bikepower_config.h)，约 40 个键（功率、模式、体重、FTP、LED、跑步参数等）
 
 ### 加载流程
 
@@ -372,7 +372,7 @@ nvs_store_load(engine)
 
 ## device_template_store.c — 设备模板存储
 
-**文件**：[device_template_store.c](file:///Users/bytedance/work/bikepower-c/main/device_template_store.c) / [device_template_store.h](file:///Users/bytedance/work/bikepower-c/main/device_template_store.h)
+**文件**：[device_template_store.c](../../main/device_template_store.c) / [device_template_store.h](../../main/device_template_store.h)
 **TAG**：`"TPL"`
 
 管理 BLE 设备信息模板库（最多 5 个），独立 namespace `ble_tpl`，键 `tpl0`-`tpl4`，每个槽位存一个 blob。
@@ -390,7 +390,7 @@ nvs_store_load(engine)
 
 ## ble_scanner.c — BLE Central/Observer
 
-**文件**：[ble_scanner.c](file:///Users/bytedance/work/bikepower-c/main/ble_scanner.c) / [ble_scanner.h](file:///Users/bytedance/work/bikepower-c/main/ble_scanner.h)
+**文件**：[ble_scanner.c](../../main/ble_scanner.c) / [ble_scanner.h](../../main/ble_scanner.h)
 **TAG**：`"SCAN"`
 
 用于设备信息模板库功能：扫描附近 BLE 设备、连接读取 DIS/GATT、短时采样运动数据。

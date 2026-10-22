@@ -136,15 +136,17 @@ static uint16_t g_ftms_status_handle;   // (共享) Status
 
 所有多字节字段均采用**小端字节序**（Little-Endian），符合蓝牙 SIG 规范。
 
-### CPS Power Measurement（9 字节）
+### CPS Power Measurement（当前 9 字节旧兼容布局）
 
 | 偏移 | 长度 | 字段 | 值/说明 |
 |------|------|------|---------|
-| 0 | 2 | flags | `0x0020`（bit5=Crank Data Present） |
-| 2 | 2 | Instantaneous Power | 功率值（W，sint16） |
-| 4 | 2 | Cumulative Crank Revs | 累计曲柄转数（uint16，每次通知 +2） |
-| 6 | 2 | (保留) | `0x0000` |
-| 8 | 2 | Last Crank Event Time | 上次曲柄事件时间（1/1024s 单位） |
+| 0 | 1 | flags | `0x20`（当前错误地只写 1 字节） |
+| 1 | 2 | Instantaneous Power | 功率值（W，当前按 uint16 写入） |
+| 3 | 2 | Cumulative Crank Revs | 累计曲柄转数（uint16，每次通知 +2） |
+| 5 | 2 | 保留 | `0x0000` |
+| 7 | 2 | Last Crank Event Time | 上次曲柄事件时间（1/1024s 单位） |
+
+> 该布局不符合标准 CPS Measurement。目标布局为 2 字节 flags + sint16 power + uint16 crank rev + uint16 crank time，共 8 字节；修复和独立 golden vectors 见 [Top 5 协议稳定性设计](../dev/12-top5-protocol-stability-design.md)。
 
 **曲柄推演算法**：基于当前踏频 `cadence` 计算每转时间，每次通知累加 2 转，保持与旧版 MicroPython 协议位级兼容。
 
@@ -206,7 +208,7 @@ time_1024 = (adjusted_ms * 1024 / 1000) & 0xFFFF;
 - speed = cadence * 30（模拟 90RPM → 27.0 km/h）
 - ftms_cad = cadence * 2（FTMS 单位为 0.5 RPM）
 
-### FTMS Treadmill Data（12 字节，跑步模式）
+### FTMS Treadmill Data（当前实际 10 字节，跑步模式）
 
 | 偏移 | 长度 | 字段 | 值/说明 |
 |------|------|------|---------|
@@ -215,6 +217,8 @@ time_1024 = (adjusted_ms * 1024 / 1000) & 0xFFFF;
 | 4 | 3 | Total Distance | 总距离（m，uint24，注意 3 字节） |
 | 7 | 1 | Heart Rate | 心率（bpm） |
 | 8 | 2 | Elapsed Time | 已用时间（s，uint16，超 0xFFFF 截断） |
+
+> 当前 flags `0x0306` 与上述字段不一致，标准目标值为 `0x0504`；这是与 CPS 一并修复的 P0 协议项。
 
 ### FTMS Feature（8 字节，静态）
 
@@ -249,9 +253,9 @@ FTMS Control Point 采用写+指示（Indication）模式，客户端写命令�
 |--------|----|------|------|
 | Request Control | `0x00` | 无 | 请求控制权 |
 | Set Target Power | `0x05` | sint16 target (W) | 设置 ERG 目标功率 |
-| Set Target Speed | `0x03` | uint16 target (0.01km/h) | 设置跑步目标速度（跑步模式） |
-| Start/Resume | `0x06` | 无 | 开始/恢复运动 |
-| Stop/Pause | `0x07` | 无 | 暂停运动 |
+| Set Target Speed | `0x02` | uint16 target (0.01km/h) | 设置跑步目标速度（跑步模式） |
+| Start/Resume | `0x07` | 无 | 开始/恢复运动 |
+| Stop/Pause | `0x08` | 无 | 暂停运动 |
 | Reset | `0x01` | 无 | 重置 |
 
 > 未支持的 OpCode 返回 `Response Code + Not Supported (0x02)`，不静默吞掉。
@@ -293,15 +297,15 @@ FTMS Control Point 采用写+指示（Indication）模式，客户端写命令�
 | 参数 | 值 | 说明 |
 |------|----|------|
 | 模式 | `BLE_GAP_CONN_MODE_UND` + `BLE_GAP_DISC_MODE_GEN` | 通用可连接、可发现 |
-| 间隔 | `BLE_ADVERTISING_INTERVAL_MS`（100ms） | 换算为 0.625ms 单位写入 |
+| 间隔 | `BLE_ADVERTISING_INTERVAL_MS`（500ms） | 换算为 0.625ms 单位写入 |
 | 超时 | `BLE_HS_FOREVER` | 无限时长广播，直到连接或停止 |
 | 标志 | `BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP` | 通用发现，不支持 BR/EDR |
 
 ### 设备名处理
 
 - 设备名存于 `g_device_name[]`（最多 `DEVICE_NAME_MAX-1` 个字符）
-- 长度 ≤ `BLE_ADV_NAME_MAX_LEN`（20字节）时完整放入广播包
-- 超过 20 字节时截断放入广播包，完整名放入 Scan Response
+- 长度 ≤ `BLE_ADV_NAME_MAX_LEN`（18 字节）时完整放入广播包
+- 超过 18 字节时截断放入广播包，完整名放入 Scan Response
 - 通过 `ble_bikepower_set_device_name()` 设置，`ble_bikepower_refresh_device_name()` 热更新（已连接时不重启广播）
 
 ### 连接事件处理

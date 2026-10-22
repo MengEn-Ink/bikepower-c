@@ -4,6 +4,14 @@
 
 ## [未发布]
 
+### 项目复审、源码卫生与文档治理
+- `main/bikepower_config.h`、`main/captive_portal.c`、`main/radio_ctrl.c`、`main/wifi_portal.c`：集中 DNS/HTTP 任务栈、报文、TTL、网关地址、socket 上限和停止等待参数，移除平台实现中的散落魔法数；设备行为保持不变。
+- `main/app_main.c`、`main/app_state.c/.h`、`main/ble_bikepower.c`：移除未使用 include，清理“阶段5接入”等过期注释，并让 BLE 顶部格式说明与当前真实 9 字节旧兼容 CPS 布局一致。
+- `docs/dev/12-top5-protocol-stability-design.md`、`docs/dev/13-project-review-and-optimization.md`：恢复规范目录，记录 P0 协议/状态可靠性修复设计和本轮分级优化清单。
+- `docs/INDEX.md`、`docs/wiki/`、`.trae/rules/`、`.trae/memory/`、`PROGRESS.md`：建立文档权威顺序，修复本机绝对链接、版本、路由数、FTMS OpCode、广播间隔、设备名预算和发布状态漂移。
+- `tests/check_config_consistency.py`、`scripts/tools/quality_gate.py`：把规范目录、可移植链接、当前版本、路由计数和新增治理文档纳入静态门禁。
+- 验证：`python3 scripts/tools/quality_gate.py` 通过（63 pass / 2 个预期 dirty-worktree warning / 0 fail，含 `idf.py build` 与 5841 条 host 断言）；`python3 tests/operation_gate.py --level quick` 通过；`python3 -m unittest tests/test_serial_daemon.py tests/test_serial_boot_check.py` 3 项通过；`git diff --check` 通过。
+
 ### 真机测试修复（v4.1.1 发布后）
 - `tests/serial_capture.py`：`--check-boot` 的 coredump 致命标志原用裸词大小写不敏感子串匹配，会命中分区表标签行 `3 coredump Unknown data`，导致任何正常启动都误报致命异常。改为逐行扫描并跳过 `boot:`/`esp_image:` 分区表行，致命词收敛为真实崩溃日志短语（`Saving core dump`/`Coredump to`/`espcoredump`）。
 - `tests/ble_selftest.py`：`parse_cps` 原用 `<HH`（2 字节 flags）解析，与固件实际 1 字节 flags + 有符号 int16 功率的 CPS 包错位，造成功率读数为垃圾值（2561/7680W）、ERG 收敛误判失败。改为 `flags=data[0]` + 有符号 `<h` 功率，与 `parse_rsc` 对齐。

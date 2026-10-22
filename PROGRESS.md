@@ -34,7 +34,7 @@
 
 ### 就绪交付物
 
-- [x] 固件版本统一为 `v4.1.0`，DIS 固件字段与门户展示包含板型、版本号、稳定版、修复版和最后 Git 短提交 ID，`tests/ble_selftest.py` 会校验厂商/型号/固件三字段。
+- [x] 固件版本统一为 `v4.1.1`，DIS 固件字段与门户展示包含板型、版本号、稳定版、修复版和最后 Git 短提交 ID，`tests/ble_selftest.py` 会校验厂商/型号/固件三字段。
 - [x] 普通配网链路走 `radio_ctrl` + coex 共存：长按二次确认进入配网，BLE 默认不停，保存或超时后关闭 WiFi 原地回 `ST_BLE_ACTIVE`。
 - [x] 配网门户路由与前端校验已具备自动化覆盖：`tests/stage5_portal_test.py`、`tests/check_portal_structure.py`、`tests/check_portal_js.py`。
 - [x] Captive Portal DNS 与 10 个系统探测端点已实现：Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 探测路由统一 303 到首页，并注册 404 兜底覆盖未知探测路径。
@@ -44,7 +44,7 @@
 - [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、单一版本号、stable/fix 标识和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 Gitee Release。
 - [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合；`tests/operation_gate.py --level full` 已接入 release 产物门禁和核心流程耐久。
 - [x] 稳定交付证据链已接入：`scripts/tools/device_acceptance.py` 统一记录真机自动项与人工项，`operation_gate.py --level device` 可写入自动结果，正式 Gitee 发布要求当前版本与 Git ID 的 P0 证据全部通过。
-- [x] 最近一次 generic-c3 真机自动化验证记录：历史 v4.0.4 记录见 `CHANGELOG.md` 归档；当前 v4.1.0 代码侧已通过 `python3 scripts/tools/quality_gate.py`（含 `idf.py build`、host 单测、静态门禁、门户渲染、BLE 广播字段和 release 产物门禁）。当前 v4.1.0 真机烧录、BLE cycling/running 自测和配网流程仍需重跑后更新本项。
+- [x] 最近一次 generic-c3 真机自动化验证记录：v4.1.1 已通过启动、骑行 BLE 与一次连接/断开验证，详见 `CHANGELOG.md` 的“v4.1.1 通用版真机验收”；跑步会话、配网门户、广播开关、物理按钮/LED 和 m5stamp-c3 仍保持待验收。
 
 ### 待人工确认（P0）
 
@@ -62,7 +62,8 @@
 - [ ] 72h 老化：长时间运行无 coredump、无 WDT、无堆持续下降；建议周期性跑 `tests/ble_selftest.py` 和 `tests/stage5_portal_test.py` 采样。
 
 上述未完成项继续保持待验收状态。执行时按板型写入 `tests/reports/device-acceptance-<板型>.json`；`NOT_RUN` 不视为通过，正式双板发布前必须分别对 generic-c3 与 m5stamp-c3 运行 `python3 scripts/tools/device_acceptance.py validate --strict --file <证据文件>`。
-- [ ] Release 人工步骤：从已提交并已推送源码执行 `scripts/build_all.sh`，校验 SHA256，打 `v4.1.1` tag，创建 Gitee Release 并上传 merged bin/manifest。
+- [x] Release tag：`v4.1.1` 已创建并推送，指向提交 `a9f127c`。
+- [ ] Release 人工复核：确认 Gitee Release 的 merged bin、manifest、测试报告和总包附件完整；源码仓库本身不把远端附件状态冒充为已验证。
 
 ---
 
@@ -85,7 +86,7 @@
 | 短按 | <500ms | 功率 -20W |
 | 长按调功 | ≥500ms | 每 200ms 功率 +20W（仅 steady 模式） |
 | 长按确认 | ≥2000ms 释放 | 回滚本次自动调功，进入确认窗口（LED 快闪） |
-| 二次确认 | 窗口内再按 | 触发 WiFi 配网（阶段5接入 wifi_trigger 回调） |
+| 二次确认 | 窗口内再按 | 通过 `wifi_trigger` 回调触发 WiFi 配网 |
 | 窗口超时 | 3000ms | 取消，恢复 BLE_ACTIVE |
 
 ### 真机验证（已通过）
@@ -142,7 +143,7 @@
 
 ### 待人工确认（需配网真机流程）
 
-- [ ] 长按 + 二次确认 → 进入配网，手机连 `BikePower` 热点
+- [ ] 长按 + 二次确认 → 进入配网，手机连 `BikePower-XXXXXX` 热点
 - [ ] 浏览器访问 `192.168.4.1` → 修改参数 → 保存并关闭 WiFi → BLE 保持/恢复在线且参数生效
 - [ ] 180s 无操作 → 自动超时关闭 WiFi 回到 BLE
 - [ ] 连上热点后跑 `python3 tests/stage5_portal_test.py` 校验 HTTP 路由（首页、`/api/state`、`/api/time`、`/api/config`、`/api/renew`、`/api/close-wifi`、Captive Portal 探测与 404 兜底）
@@ -167,7 +168,8 @@
 - [ ] 72h 老化测试：长时间运行无 coredump、无堆持续下降（跑 `tests/stage5_portal_test.py` / `ble_selftest.py` 辅助）
 - [x] 发版前 `sdkconfig.defaults` 日志级别改 `CONFIG_LOG_DEFAULT_LEVEL_WARN`（已设为 WARN）
 - [x] DIS 固件版本号与 `FIRMWARE_VERSION` 同步确认（generic-c3 真机 `ble_selftest.py 8` 已校验厂商/型号/固件三字段）
-- [ ] 打 tag v4.1.1 + Gitee Release
+- [x] `v4.1.1` tag 已创建并推送
+- [ ] Gitee Release 附件完整性人工复核
 
 ---
 
@@ -239,3 +241,4 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 - 物理按钮/LED 灯效需人工确认，自动化测试只能覆盖 BLE 连接驱动的状态迁移
 - 配网门户动态测试（stage5_portal_test.py）需本机连 BikePower-XXXXXX 热点；本机不能切换 WiFi 时改用 `tests/mock_server.py` 本地调试，或换另一台机器执行
 - `test/` 与 `tests/` 目录职责不同不合并（评估结论见 [tests/README.md](tests/README.md) 第六章）：`test/` 放 ESP-IDF 约定的 host 单测（纯 C），`tests/` 放所有 Python/Shell 设备测试与静态门禁
+- 当前 P0 协议与可靠性缺陷及实施顺序见 [docs/dev/12-top5-protocol-stability-design.md](docs/dev/12-top5-protocol-stability-design.md) 和 [docs/dev/13-project-review-and-optimization.md](docs/dev/13-project-review-and-optimization.md)。在对应修复和真机验收完成前，不把现有自动化全绿等同于协议正确。

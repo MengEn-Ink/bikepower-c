@@ -42,7 +42,7 @@ WiFi 配网门户基于 `esp_http_server` 实现，在 SoftAP 模式下提供 HT
 
 ## HTTP 路由表
 
-路由注册集中在 `start_httpd()` 函数中，共注册 **19 个业务路由** + **10 个 Captive Portal 探测端点** + 1 个 404 兜底处理。
+路由注册集中在 `start_httpd()` 函数中，共注册 **18 个业务路由** + **10 个 Captive Portal 探测端点** + 1 个 404 兜底处理。
 
 ### 静态资源
 
@@ -176,7 +176,7 @@ wifi_portal_start(engine)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `device_name` | string | 设备名（JSON 转义） |
-| `firmware_version` | string | 固件版本号（如 `"4.1.0"`） |
+| `firmware_version` | string | 固件版本号（如 `"4.1.1"`） |
 | `firmware_name` | string | 完整固件名（含板型+Git SHA） |
 | `board` | string | 板型名称（如 `"ESP32-C3"` / `"M5StampC3"`） |
 | `stable_version` / `fix_version` | string | 版本信息 |

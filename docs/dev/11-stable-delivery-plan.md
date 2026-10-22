@@ -40,7 +40,7 @@
 测试创建临时 JSON，要求以下行为：
 
 ```python
-record = new_record("4.1.0", "abc1234", "generic-c3", "tester", now="2026-07-22T12:00:00+08:00")
+record = new_record("9.9.9", "abc1234", "generic-c3", "tester", now="2026-07-22T12:00:00+08:00")
 assert record["schema_version"] == 1
 assert record["items"]["serial_boot"]["status"] == "NOT_RUN"
 ```
@@ -48,9 +48,9 @@ assert record["items"]["serial_boot"]["status"] == "NOT_RUN"
 同时覆盖：
 
 ```python
-validate_record(record, expected_version="4.1.0", expected_git_sha="abc1234", strict=False)
+validate_record(record, expected_version="9.9.9", expected_git_sha="abc1234", strict=False)
 set_item(record, "serial_boot", "PASS", "12 秒启动日志无异常")
-validate_record(record, expected_version="4.1.0", expected_git_sha="abc1234", strict=True)
+validate_record(record, expected_version="9.9.9", expected_git_sha="abc1234", strict=True)
 ```
 
 严格模式应在其他 P0 仍为 `NOT_RUN` 时失败；版本、Git ID、未知 item、非法状态也必须失败。
