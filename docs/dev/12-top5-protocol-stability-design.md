@@ -1,8 +1,10 @@
 # Top 5 缺陷与 BLE 协议稳定性设计规格
 
+> 实施状态（2026-10-22）：Top 5 源码修复、生产 codec、golden vectors 和离线 harness 已落地；host 5892/0、10 组 vectors、配置一致性和 `idf.py build` 已通过。整合后的完整门禁仍需提交前再跑，generic-c3/m5stamp-c3 双板真机与标准客户端验收保持 `NOT_RUN`。
+
 ## 1. 背景
 
-2026-08-21 全仓审查确认项目当前可以稳定编译，质量门禁和领域层单测均通过，但存在五项高优先级缺陷：
+2026-08-21 全仓审查确认项目当时可以稳定编译，质量门禁和领域层单测均通过，但存在五项高优先级缺陷：
 
 1. CPS Measurement 编码和真机自测共同使用错误字段偏移。
 2. 跑步 FTMS Start/Resume、Stop/Pause 返回成功，却没有实际启停会话。
@@ -214,6 +216,8 @@ bool running_engine_set_running(running_engine_t *e, bool running);
 
 Start/Stop/Reset 只有在应用事件成功进入可靠处理通道后才返回 Success。事件未接受时统一返回 FTMS Operation Failed（`0x04`），不提前更新 FTMS Status。Invalid Parameter（`0x03`）只用于带参数命令的值域错误。
 
+Fitness Machine Status 不镜像 Control Point OpCode：Reset、Stopped/Paused by User、Started/Resumed by User 分别使用 `0x01/0x02/0x03`。这三种状态不带参数，通知长度固定为 1 字节。
+
 本轮不等待主循环同步执行完成；“成功”表示命令已被应用层可靠接受，符合当前异步架构。
 
 ## 8. ERG 会话态与持久化边界
@@ -237,7 +241,7 @@ Start/Stop/Reset 只有在应用事件成功进入可靠处理通道后才返回
 
 ### 8.2 保存规范化
 
-即使用户在 ERG 会话中修改了其他持久配置并触发保存，`engine_to_config()` 也必须将运行时 ERG 规范化为 `RIDE_MODE_STEADY`，并保存原有 `base_power`。
+即使用户在 ERG 会话中修改了其他持久配置并触发保存，生产映射 `config_store_from_engine()` 也必须将运行时 ERG 规范化为 `RIDE_MODE_STEADY`，并保存原有 `base_power`；`main/nvs_store.c` 复用该映射，不再维护第二套手写转换。
 
 ### 8.3 旧 NVS 兼容
 
@@ -306,10 +310,12 @@ HTTP 或 timer 初始化失败时，同样使用上述可靠完成通道。不�
 
 running profile 自测增加：
 
-- 启动后 RSC 有非零速度并累计距离。
-- Stop/Pause 响应成功后，速度归零且距离、用时在观察窗口内冻结。
-- Start/Resume 响应成功后，速度恢复且累计继续增长。
-- Reset 后累计清零，并保持 Reset 前的运行/暂停状态。
+- profile harness 测试阶段强制 `broadcast_mask=7`，并在 `finally` 恢复原 profile/mask 和全部 running 持久配置。
+- 每个控制 opcode 都等待与请求码匹配的 indication，不能依赖固定 sleep 猜测响应。
+- moving 阶段 RSC/Treadmill 至少两个实际样本，速度非零且累计严格增长。
+- Stop/Pause 响应成功后进入独立 paused 窗口，速度归零且距离、用时多样本严格冻结。
+- 暂停态 Reset 后累计清零，并在多样本窗口内继续保持暂停与冻结。
+- Start/Resume 后进入独立 resumed 窗口，速度恢复且累计重新严格增长。
 
 ## 11. 测试策略
 
@@ -328,6 +334,7 @@ running profile 自测增加：
 
 - operation gate 单测确认 P0 BLE 失败进入 failures。
 - 重连脚本结构门禁确认存在第二次扫描和第二次连接。
+- running 离线 harness 确认 opcode indication 等待、严格增长/冻结 helper 与 moving/pause/reset/resume 四阶段结构。
 - WiFi 完成回调签名、成功后置 done 标志和 pending fallback 契约测试。
 
 ### 11.3 集成
@@ -358,28 +365,30 @@ running profile 自测增加：
 - `tests/README.md`：golden vectors 和重连测试说明。
 - `CHANGELOG.md`、`PROGRESS.md`：代码修改与验证结果。
 
-## 13. 分批交付
+## 13. 分批交付与当前状态
 
 按项目提交规则拆分：
 
-1. 设计文档批：本规格。
-2. 协议测试批：golden fixture、Python parser、host codec runner，先形成 RED。
-3. 协议实现批：纯 C codec、CPS/FTMS 修复。
-4. 跑步与 ERG 领域修复批：会话状态和持久化边界。
-5. WiFi 生命周期修复批：可靠完成通知和幂等清理。
-6. 门禁工具批：P0 required、真实重连与跑步验收。
-7. 文档同步批：规则、技术文档、CHANGELOG、PROGRESS。
+1. ✅ 设计文档批：本规格。
+2. ✅ 协议测试批：golden fixture、无 bleak Python parser、host codec runner。
+3. ✅ 协议实现批：纯 C codec、CPS/CSC/FTMS/RSC 修复，生产 BLE 路径已复用。
+4. ✅ 跑步与 ERG 领域修复批：会话状态、暂停/Reset 语义和持久化边界。
+5. ✅ WiFi 生命周期修复批：可靠完成通知、pending latch 和幂等清理。
+6. 🟡 门禁工具批：P0 required、双次重连、profile-aware running 控制和静态契约已实现；整合后的 full/device 门禁仍须最终执行。
+7. ✅ 文档同步批：规则、技术文档、CHANGELOG、PROGRESS 已按源码契约同步。
+8. ⬜ 双板自动真机批：cycling、running `--control`、双次重连、广播开关、配网退出，当前未执行。
+9. ⬜ 人工/标准客户端批：CPS 标准客户端、按钮/LED、系统 Captive Portal 与长时间老化，当前未执行。
 
 每批使用指定路径暂存，完成对应测试后提交并推送，不混入无关重构。
 
 ## 14. 验收标准
 
-- 所有 golden vectors 对 C codec 和 Python parser 均通过。
-- CPS payload 精确为 8 字节，标准偏移功率正确。
-- FTMS Bike/Treadmill flags 与实际 payload 长度一致。
-- 跑步启动即运行；Stop 冻结；Start 恢复；Reset 语义稳定。
-- ERG 目标变化不触发配置 dirty，NVS 永不保存 ERG 模式。
-- WiFi 完成事件在队列满时最终仍能触发幂等资源清理。
-- `ble_running` 或 `ble_reconnect` 执行失败时 device gate 返回非零。
-- 全量 host、静态门禁和 ESP-IDF 编译通过。
-- 两板型真机证据未完成时明确保留 `NOT_RUN`，不伪造通过。
+- [x] 所有 golden vectors 对 C codec 和 Python parser 均通过。
+- [x] CPS payload 精确为 8 字节，标准偏移功率正确。
+- [x] FTMS Bike/Treadmill flags 与实际 payload 长度一致。
+- [x] 跑步领域层启动即运行；Stop 冻结；Start 恢复；Reset 语义稳定。
+- [x] ERG 目标变化不触发配置 dirty，NVS 映射不保存 ERG 模式。
+- [x] WiFi 完成事件具备队列满 pending latch 和幂等资源清理契约。
+- [x] `ble_running` 或 `ble_reconnect` 执行失败会进入 device gate failure。
+- [ ] 整合后的全量 host、静态门禁和 ESP-IDF 编译在最终提交前再次通过。
+- [ ] generic-c3 与 m5stamp-c3 当前 Git ID 对应真机证据完成；未完成前明确保留 `NOT_RUN`。

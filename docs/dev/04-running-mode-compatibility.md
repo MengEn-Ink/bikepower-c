@@ -1,8 +1,8 @@
 # 跑步模式兼容性调研与适配方案
 
-> 状态：协议调研与实现追踪。P0 RSC + HRS 跑步传感器路径已落地；FTMS Treadmill Data / Control Point 仍作为后续兼容增强评估。
+> 状态：协议调研与实现追踪。RSC + HRS + FTMS Treadmill Data、Set Target Speed 和 Start/Stop/Reset 会话语义已落地；标准客户端真机兼容仍待双板验收。
 > 目标软件：Zwift Run、MyWhoosh Running。  
-> 当前固件基线：BikePower C v4.1.1，NimBLE peripheral；骑行模式提供 CPS + HRS + CSC + FTMS Indoor Bike + DIS，跑步模式提供 RSC + HRS + DIS。
+> 当前固件基线：BikePower C v4.1.1，NimBLE peripheral；骑行模式提供 CPS + HRS + CSC + FTMS Indoor Bike + DIS，跑步模式提供 RSC + HRS + FTMS Treadmill + DIS。
 
 ---
 
@@ -10,16 +10,13 @@
 
 跑步模式不能只复用当前 Cycling Power / CSC / FTMS Indoor Bike 数据。Zwift 和 MyWhoosh 的跑步入口首先需要一个“跑步速度来源”：Footpod、跑步手表、智能鞋、跑步机传感器或智能跑步机。对 BLE 设备来说，最稳妥的首版协议面是 **Running Speed and Cadence Service, RSC, UUID 0x1814**，它提供跑步速度和步频；心率继续使用现有 **Heart Rate Service, HRS, UUID 0x180D**。
 
-建议按三阶段落地：
+当前实现按互斥 profile 落地：
 
-1. **P0：跑步传感器模式**  
-   新增 RSC 服务，广播 RSC + HRS，输出速度、步频、可选步幅和累计距离。目标是被 Zwift/MyWhoosh 作为 footpod / running sensor 配对，并驱动跑步配速。
-2. **P1：FTMS 跑步机数据模式**  
-   在 Fitness Machine Service 下新增 Treadmill Data, UUID 0x2ACD，输出跑带速度、累计距离、坡度、心率、用时。目标是兼容 Runn NPE / 智能跑步机一类软件路径。
-3. **P2：跑步机控制点**  
-   扩展 Fitness Machine Control Point，支持 Request Control、Set Target Speed、Set Target Inclination、Start/Resume、Stop/Pause。目标是让支持控制的 App 下发目标速度/坡度；这一步需要更谨慎，因为当前设备只是模拟器，没有真实跑带执行机构。
+1. **跑步传感器数据**：RSC 输出速度、步频、步幅和累计距离，HRS 输出心率。
+2. **跑步机数据**：FTMS Treadmill Data 输出速度、累计距离、心率和用时；当前不再包含未落地的坡度字段。
+3. **跑步会话控制**：支持 Request Control、Set Target Speed、Start/Resume、Stop/Pause、Reset；Stop 冻结累计，Start 恢复，Reset 清零并保持原运行/暂停态。
 
-首版推荐做 P0，不建议一开始把自行车服务和跑步服务全部同时广播。跑步软件和骑行软件的设备筛选逻辑不同，同时暴露 CPS/CSC/RSC/FTMS Bike/FTMS Treadmill 容易被 App 归类到错误运动类型。
+不同时广播自行车和跑步全部服务。跑步软件和骑行软件的设备筛选逻辑不同，混合 CPS/CSC/RSC/FTMS Bike/FTMS Treadmill 容易被 App 归类到错误运动类型。
 
 ---
 
@@ -99,7 +96,7 @@ RSC Measurement 建议格式：
 | Instantaneous Speed | `uint16` | 1/256 m/s | 必做，由目标配速换算 |
 | Instantaneous Cadence | `uint8` | step/min | 必做，建议 160-190 spm |
 | Instantaneous Stride Length | `uint16` | 1/100 m | 建议做，可由速度和步频反推 |
-| Total Distance | `uint32` | m | 建议做，用 1s tick 累加 |
+| Total Distance | `uint32` | 0.1m | 已实现；领域层按米累计，BLE 边界乘 10 |
 
 推荐 P0 flags：包含步幅、累计距离，跑步状态置 1。这样 App 可以同时拿到速度、步频、距离，行为更接近 RunPod / Stryd。
 
@@ -112,6 +109,7 @@ cadence_spm = configured_spm
 stride_length_m = speed_mps * 60 / cadence_spm
 rsc_stride = round(stride_length_m * 100)
 total_distance_m += speed_mps * dt_seconds
+rsc_total_distance = round(total_distance_m * 10)
 ```
 
 ### 4.2 HRS 服务，P0 复用
@@ -124,33 +122,31 @@ total_distance_m += speed_mps * dt_seconds
 
 跑步模式可直接复用现有心率模型和通知打包。MyWhoosh 明确支持 Garmin HRM 等心率来源，Zwift 跑步配对页也有 Heart Rate 传感器入口，因此 HRS 应保留。
 
-### 4.3 FTMS Treadmill Data，P1 增强
+### 4.3 FTMS Treadmill Data，已实现
 
 服务与特征：
 
 | 项 | UUID | 属性 | 说明 |
 |----|------|------|------|
-| Fitness Machine Service | `0x1826` | Primary Service | 当前已有，但内容是 Indoor Bike |
-| Fitness Machine Feature | `0x2ACC` | Read | 需要区分 Bike/Treadmill 能力位 |
+| Fitness Machine Service | `0x1826` | Primary Service | running profile 注册 treadmill 能力 |
+| Fitness Machine Feature | `0x2ACC` | Read | cycling/running 分别声明能力 |
 | Treadmill Data | `0x2ACD` | Notify | 跑步机训练数据 |
-| Fitness Machine Status | `0x2ADA` | Notify/Read | 控制点存在时建议保留 |
-| Fitness Machine Control Point | `0x2AD9` | Write + Indicate | P2 才建议打开控制 |
+| Fitness Machine Status | `0x2ADA` | Notify/Read | 会话状态 |
+| Fitness Machine Control Point | `0x2AD9` | Write + Indicate | 跑步会话控制 |
 | Training Status | `0x2AD3` | Read/Notify | 可选，结构化训练状态 |
 
-Treadmill Data 首版字段建议：
+当前 Treadmill Data 固定 `flags=0x0504`、10 字节：
 
 | 字段 | 单位 | 建议 |
 |------|------|------|
-| Instantaneous Speed | 0.01 km/h | 必做，flags bit0=0 表示本包包含速度 |
-| Total Distance | m，通常为 `uint24` | 建议做 |
-| Inclination | 0.1% | P1 建议做，默认 0.0% |
-| Ramp Angle Setting | 0.1 degree | 如果置 Inclination present，按规范通常要同时给出 |
-| Heart Rate | bpm | 可做；已有 HRS 时也可重复输出 |
-| Elapsed Time | s | 建议做，便于 App 显示训练时长 |
+| Instantaneous Speed | 0.01 km/h | flags bit0=0，本包包含速度 |
+| Total Distance | m，`uint24` | 与领域层米值一致 |
+| Heart Rate | bpm | 与 HRS 同源 |
+| Elapsed Time | s | 暂停时冻结 |
 
 FTMS Treadmill Data 的 flags 语义与 RSC 不同，尤其 bit0 是 More Data：单包传完整数据时应让 Instantaneous Speed 出现在本包。实现时不要复用 Indoor Bike 的 flags `0x0044`。
 
-### 4.4 FTMS Control Point，P2 谨慎实现
+### 4.4 FTMS Control Point，已实现子集
 
 当前固件已经支持 FTMS Control Point 的自行车 ERG 子集：
 
@@ -161,43 +157,31 @@ FTMS Treadmill Data 的 flags 语义与 RSC 不同，尤其 bit0 是 More Data�
 - Stop/Pause `0x08`
 - Response Code `0x80`
 
-跑步机控制需要新增：
+running profile 额外支持：
 
 | OpCode | 参数 | 说明 |
 |--------|------|------|
 | Set Target Speed `0x02` | `uint16`，0.01 km/h | App 下发目标跑带速度 |
-| Set Target Inclination `0x03` | `sint16`，0.1% | App 下发目标坡度 |
+| Start/Resume `0x07` | 无 | 恢复跑步会话 |
+| Stop/Pause `0x08` | 无 | 暂停并冻结累计 |
+| Reset `0x01` | 无 | 清零累计并保持运行/暂停态 |
 
-注意：FTMS 规范要求 Control Point 响应用 indication，而当前代码把 `0x2AD9` 设置为 notify。自行车 ERG 目前能跑通，不代表跑步机控制也会被 Zwift/MyWhoosh 接受。P2 如果要做，应把控制点 CCCD/响应语义按 FTMS 规范补齐，并确认不会破坏现有 ERG 兼容性。
+控制点响应使用 indication。命令只有在应用事件已被可靠接收时返回 Success；队列未接收返回 Operation Failed，且不提前更新 Status。当前不实现 Set Target Inclination，也不宣称能控制真实跑带。
 
 ---
 
 ## 5. 当前固件影响范围
 
-当前 BLE 实现集中在 `main/ble_bikepower.c`：
+当前实现范围：
 
-- `gatt_svcs[]` 静态注册 CPS、HRS、CSC、FTMS、DIS。
-- `start_advertising()` 当前只广播 CPS `0x1818` 和 HRS `0x180D`。
-- `notify_tick()` 每 1s 通知 CPS、HRS、CSC、FTMS Indoor Bike。
-- 通知缓冲区是静态数组，符合当前零动态大分配策略。
-- `sdkconfig.defaults` 中 `CONFIG_BT_NIMBLE_MAX_CCCDS=8`。
-
-跑步模式涉及的文件预计为：
-
-| 文件 | 改动 |
+| 文件 | 职责 |
 |------|------|
-| `main/bikepower_config.h` | 新增 RSC/Treadmill UUID、跑步范围常量、控制点 opcode |
-| `main/ble_bikepower.c/.h` | 拆分 BLE profile，新增 RSC/Treadmill 打包、广播 UUID 选择、跑步控制点回调 |
-| `components/bikepower_domain/include/domain_config.h` | 新增速度、步频、坡度、步幅范围与默认值 |
-| `components/bikepower_domain/power_engine.c/.h` | 增加跑步快照或独立 running_engine，避免把功率字段硬塞成速度 |
-| `components/bikepower_domain/config_store.c/.h` | 持久化运动类型、跑步速度、步频、坡度等配置 |
-| `main/nvs_store.c` | 新增 NVS key，schema 版本升级 |
-| `main/wifi_portal.c` 与 `main/web/*` | 配网页增加“骑行/跑步”运动类型与跑步参数 |
-| `tests/ble_selftest.py` | 增加跑步 profile 扫描、RSC/FTMS Treadmill 通知解析 |
-| `tests/check_config_consistency.py` | 增加 UUID、通知间隔、NVS key、CCCD 数量检查 |
-| `docs/dev/01-technical-reference.md` | 实现后同步 BLE 服务章节 |
-
-如果 P0 同时保留现有 6 个 notify/indicate 特征并新增 RSC Measurement，`CONFIG_BT_NIMBLE_MAX_CCCDS=8` 仍接近上限；如果再加 Treadmill Data、Training Status 或更多控制点能力，需要提高 CCCD 上限并实测堆内存。
+| `running_engine.c/.h` | 跑步配置、会话运行态、距离/用时累计与暂停冻结 |
+| `ble_payload_codec.c/.h` | RSC/FTMS 等标准 payload 纯 C 编码 |
+| `main/ble_bikepower.c/.h` | cycling/running GATT 表、通知、Control Point |
+| `main/app_main.c`、`main/app_state.c` | 控制点事件可靠投递与 Start/Stop/Reset 应用 |
+| `config_store.c/.h`、`main/nvs_store.c` | 仅持久化跑步配置，不持久化 running 会话态 |
+| `tests/ble_selftest.py` | profile 感知的 RSC/FTMS 通知和会话验证 |
 
 ---
 
@@ -216,9 +200,9 @@ FTMS Treadmill Data 的 flags 语义与 RSC 不同，尤其 bit0 是 More Data�
 缺点：
 
 - 切换运动类型时需要 BLE 断开重连。
-- 当前 `ble_bikepower.c` 需要从“固定五服务”改为 profile 化服务注册。
+- profile 切换必须等待 GATT 表重建，测试脚本也必须按当前 profile 判断服务集合。
 
-推荐采用。
+项目已采用该方案。
 
 ### 方案 B：单固件同时暴露 Cycling + Running 所有服务
 
@@ -256,21 +240,21 @@ FTMS Treadmill Data 的 flags 语义与 RSC 不同，尤其 bit0 是 More Data�
 
 ---
 
-## 7. 推荐落地路线
+## 7. 已落地路线与后续边界
 
-### 阶段 P0：RSC 跑步传感器
+### 已落地：RSC 跑步传感器
 
 目标：Zwift/MyWhoosh 能在跑步配对页发现设备，并通过速度/步频/心率驱动跑步。
 
 实现要点：
 
-1. 在领域层新增 `running_snapshot_t`，字段包含 `speed_x100_kmh`、`cadence_spm`、`stride_cm`、`distance_m`、`heartrate_bpm`。
-2. 新增 `sport_profile` 配置，默认仍为 `cycling`，避免影响现有用户。
-3. BLE 启动时根据 `sport_profile` 注册 cycling 或 running GATT 表。
-4. running GATT 表至少包含 RSC + HRS + DIS。
-5. running 广播只放 RSC + HRS，不放 CPS/CSC。
-6. `notify_tick()` 在 running profile 下打包 RSC Measurement 和 HR Measurement。
-7. `tests/ble_selftest.py` 增加 `--profile running`，校验 RSC/HRS/DIS、速度单位、步频范围、累计距离递增。
+1. 领域层 `running_snapshot_t` 输出 `speed_x100_kmh`、`cadence_spm`、`stride_cm`、`total_distance_m`、`elapsed_time_s`、RSC 速度与非持久化 `running` 状态。
+2. `sport_profile` 取 `cycling` 或 `running`，默认 cycling。
+3. BLE 启动时根据 `sport_profile` 注册互斥的 cycling 或 running GATT 表。
+4. running GATT 表包含 RSC + HRS + FTMS Treadmill + DIS。
+5. running 主广播放 RSC + FTMS，Scan Response 放 HRS，不携带 CPS/CSC。
+6. `notify_tick()` 在 running profile 下经生产 codec 打包 RSC、HRS 和 FTMS Treadmill。
+7. `tests/ble_selftest.py --profile running --control` 校验服务、单位、累计值与会话控制。
 
 P0 建议默认参数：
 
@@ -278,31 +262,30 @@ P0 建议默认参数：
 |------|--------|------|
 | 跑步速度 | 10.0 km/h | 3.0-25.0 km/h |
 | 步频 | 170 spm | 120-220 spm |
-| 坡度 | 0.0% | -5.0%-15.0%，P0 先存配置但不广播 |
 | 心率 | 150 bpm 或沿用当前模型 | 40-220 bpm |
 
-### 阶段 P1：FTMS Treadmill 数据
+### 已落地：FTMS Treadmill 数据
 
-目标：提高对 Runn / 智能跑步机路径的兼容概率，提供坡度和训练时长。
+目标：提高对 Runn / 智能跑步机路径的兼容概率，提供速度、距离、心率和训练时长。
 
 实现要点：
 
-1. 在 running GATT 表增加 FTMS Service。
-2. `0x2ACC` Feature 按 treadmill 能力重写，不能复用当前 Indoor Bike feature。
-3. 新增 `0x2ACD` Treadmill Data 通知，1s 周期输出速度、距离、坡度、心率、用时。
-4. 如果同一 profile 同时有 RSC 和 FTMS，广播优先放 FTMS + HRS，RSC 可通过 GATT 发现；也可增加配置 `running_ble_mode=rsc|treadmill|both` 做 A/B 验证。
-5. 提高或校验 `CONFIG_BT_NIMBLE_MAX_CCCDS`，避免 CCCD 数不足导致服务注册失败。
+1. running GATT 表注册独立 FTMS Service。
+2. `0x2ACC` Feature 按 treadmill 能力声明，不复用 Indoor Bike feature。
+3. `0x2ACD` Treadmill Data 以 1s 周期输出速度、距离、心率、用时。
+4. running 主广播同时放 RSC + FTMS，HRS 位于 Scan Response；不引入额外 `running_ble_mode` 分支。
+5. `CONFIG_BT_NIMBLE_MAX_CCCDS` 必须覆盖当前特征订阅数量。
 
-### 阶段 P2：FTMS 跑步机控制
+### 已落地子集：FTMS 跑步机控制
 
-目标：支持 App 下发目标速度/坡度，模拟智能跑步机。
+目标：支持 App 下发目标速度并控制模拟跑步会话。
 
 实现要点：
 
 1. Control Point 属性改为标准的 Write + Indicate，确认自行车 ERG 兼容性是否受影响。
-2. 新增 Set Target Speed `0x02` 和 Set Target Inclination `0x03`。
-3. Request Control 成功后才接受速度/坡度控制。
-4. Start/Resume、Stop/Pause 更新训练状态，Stop 后速度输出归零或保持配置值需明确。
+2. 新增 Set Target Speed `0x02`；不实现 Set Target Inclination。
+3. Start/Resume、Stop/Pause、Reset 通过应用事件驱动非持久会话状态。
+4. Stop 后速度、步频、步幅归零且累计冻结；Start 恢复；Reset 清零且保持原状态。
 5. 控制点只改变模拟输出，不宣称能控制真实跑带；配网页和用户手册要写清楚。
 
 ---
@@ -312,16 +295,19 @@ P0 建议默认参数：
 ### 8.1 自动化
 
 - `idf.py build` 通过。
-- host 单测覆盖跑步速度、步频、步幅、距离、坡度范围夹紧。
-- `tests/ble_selftest.py --profile running`：
+- host 单测覆盖跑步速度、步频、步幅、距离、暂停/恢复/Reset 和配置持久化边界。
+- `python3 tests/test_ble_protocol_vectors.py` 校验 RSC running/paused 固定字节和 0.1m 距离单位。
+- `tests/ble_selftest.py --profile running --control`：
   - 扫描到设备名。
   - GATT 发现 RSC `0x1814`、HRS `0x180D`、DIS `0x180A`。
   - 订阅 RSC Measurement，连续 5 包速度在配置值 ±0.1 km/h 内。
   - 步频在配置值 ±2 spm 内。
-  - Total Distance 单调递增。
+  - Total Distance 按 0.1m 解码并单调递增。
   - HRS 通知正常。
-- P1 增加 FTMS Treadmill Data 解析，确认速度、坡度、用时单位正确。
-- P2 增加 Control Point 写入用例，确认响应码和输出值变化。
+  - FTMS Treadmill Data flags、长度、速度、距离和用时单位正确。
+  - Stop 冻结、Start 恢复、Reset 清零并保持会话状态。
+
+`tests/device_profile_harness.py` 在配网态临时切换 profile，并在测试阶段强制 `broadcast_mask=7`，避免用户原配置关闭字段导致假失败；结束时无论成功或异常，都在 `finally` 恢复原 profile、原广播掩码与完整 running 持久配置，避免 SetTargetSpeed 污染用户 NVS。running `--control` 会逐个等待对应 opcode 的 indication，并按 moving → Stop 冻结 → paused Reset 清零且保持暂停 → Resume 恢复四阶段采集独立多样本窗口，严格判断 RSC/Treadmill 累计增长或冻结。当前改动的双板真机执行结果仍待补录，离线 harness 通过不能替代真实 App 验收。
 
 ### 8.2 真机软件验证
 
@@ -332,7 +318,7 @@ Zwift：
 3. 连接后确认速度显示接近配置值。
 4. 连接 HRS 后确认心率显示。
 5. 开始跑步，确认 avatar 按速度移动。
-6. P1/P2 阶段再验证坡度和 controllable 是否被识别。
+6. 验证 FTMS Treadmill 和 Start/Stop/Reset 是否被标准客户端接受；坡度不在当前能力声明中。
 
 MyWhoosh：
 
@@ -347,19 +333,13 @@ MyWhoosh：
 
 如果能配对但速度不动，优先检查 RSC Measurement 单位。RSC speed 是 1/256 m/s；FTMS Treadmill speed 是 0.01 km/h。两者不能混用。
 
-如果 P2 控制点无响应，优先检查 Control Point CCCD 是否按 indication 配置。当前自行车 ERG 的 notify 响应在部分 App 可工作，但不是完整 FTMS 控制点语义。
+如果控制点无响应，优先检查 Control Point CCCD 是否已启用 indication，以及应用事件是否被队列可靠接收。
 
 ---
 
 ## 9. 本次建议的实施边界
 
-先做 P0，不同时做 P1/P2。理由：
-
-- P0 的协议面小，主要是新增 RSC 打包和 profile 选择，便于快速用 Zwift/MyWhoosh 真机验证方向。
-- 跑步 App 的最低闭环是速度，不是坡度或控制。
-- P1/P2 会改 FTMS feature、control point、CCCD 上限和更多 App 行为，容易把首版验证复杂化。
-
-P0 完成并确认 Zwift/MyWhoosh 都能驱动跑步后，再做 P1 的 FTMS Treadmill Data。P2 只有在确认目标软件确实会对通用 FTMS treadmill 下发速度/坡度控制时再实现。
+当前边界固定为 RSC + HRS + FTMS Treadmill Data 和速度/会话控制，不加入坡度、Training Status 或真实跑带执行能力。下一步不是继续扩大协议面，而是先完成 generic-c3、m5stamp-c3 以及 Zwift/MyWhoosh 的真机识别、会话和重连验收；未完成前保持证据为 `NOT_RUN`。
 
 ---
 

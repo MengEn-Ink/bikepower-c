@@ -5,17 +5,19 @@
 > 基线：BikePower C v4.1.1，提交 `d0ecc8e` 之后的工作区
 >
 > 范围：`main/`、`components/bikepower_domain/`、`test/`、`tests/`、构建/发布脚本、`docs/` 与 `.trae/` 治理资产
+>
+> 跟进状态（2026-10-22）：P0-1～P0-5 源码与离线门禁均已实现；host 5892/0、10 组协议 vectors、配置一致性和 `idf.py build` 已通过。当前 Git 工作区尚未完成双板烧录、标准客户端和人工验收，因此不能视为发布验收完成。
 
 ## 一、结论
 
-项目当前具备可重复构建、领域层回归、静态门禁、真机证据和 release 产物校验链路。审查基线结果为：
+项目在审查基线时已具备可重复构建、领域层回归、静态门禁、真机证据和 release 产物校验链路。审查基线结果为：
 
 - `idf.py build` 通过。
 - host 单测 5841 条断言通过。
 - RF、ISR、日志和开机 WiFi 硬约束未发现直接违规。
 - 质量门禁唯一即时失败是 `docs/superpowers` 工作目录被重新引入，违反已生效的文档治理规则。
 
-但“构建和现有测试全绿”不能证明 BLE 协议正确。源码复核确认 5 项 P0 缺陷仍真实存在，其中 CPS 问题同时暴露了“生产实现与真机解析器复制同一错误”的测试同源风险。详细修复设计见 [12-top5-protocol-stability-design.md](12-top5-protocol-stability-design.md)。
+但“构建和现有测试全绿”不能证明 BLE 协议正确。源码复核当时确认 5 项 P0 缺陷真实存在，其中 CPS 问题同时暴露了“生产实现与真机解析器复制同一错误”的测试同源风险。5 项现已按 [12-top5-protocol-stability-design.md](12-top5-protocol-stability-design.md) 完成实现，剩余边界是整合门禁与真机验收。
 
 ## 二、本轮已治理
 
@@ -25,7 +27,7 @@
 - `captive_portal.c`、`radio_ctrl.c`、`wifi_portal.c` 改为引用集中常量，数值和设备行为不变。
 - 移除 `app_main.c` 未使用的标准库 include。
 - 清理状态机中“阶段5接入”等已过期注释和日志。
-- 修正 `ble_bikepower.c` 顶部注释，使其如实描述当前 9 字节旧兼容 CPS 布局；这只是事实修正，不把缺陷标记为已解决。
+- 审查阶段曾修正 `ble_bikepower.c` 顶部注释，使其如实描述当时的 9 字节旧 CPS 布局；后续 P0-1 已用生产 8 字节 codec 取代该布局。
 
 ### 2.2 文档治理
 
@@ -33,7 +35,7 @@
 - Wiki 首页统一为小写 `00-home.md`。
 - 清理文档中的本机绝对 URI，改为仓库相对路径。
 - 修正 v4.1.0/v4.0.1 版本残留、18+10 路由数、FTMS OpCode、500ms 广播间隔和 18 字节广播名预算。
-- 移除覆盖率文档中易漂移的手工行数，补齐当前 12 个领域层和 12 个板级生产源文件。
+- 移除覆盖率文档中易漂移的手工行数；审查时为 12 个领域层和 12 个板级生产源文件，P0 codec 落地后领域层现为 13 个。
 - 明确文档权威顺序：源码/配置 → `PROGRESS.md` → 技术参考 → Wiki；归档文档不参与当前事实判定。
 - 静态门禁新增规范目录、可移植链接、项目记忆版本、路由计数和本审查文档检查。
 
@@ -44,17 +46,27 @@
 - `python3 -m unittest tests/test_serial_daemon.py tests/test_serial_boot_check.py`：3 项通过。
 - `git diff --check`：通过。
 
-本轮没有烧录或执行真机测试，因为修改范围不改变设备运行行为；P0 协议修复完成后必须按第六节顺序跑双板真机验收。
+审查与纯治理阶段没有烧录或执行真机测试；随后的 P0 协议/会话修复已改变设备行为，必须按第六节顺序在当前 Git ID 上重新跑双板真机验收。
 
-## 三、P0：发版前必须修复
+### 2.4 P0 修复后的增量验证
+
+- `make -C test run`：5892 条断言通过 / 0 失败。
+- `python3 tests/test_ble_protocol_vectors.py`：3 项通过，覆盖 10 组固定协议向量。
+- `python3 tests/check_config_consistency.py`：269 项通过 / 0 失败。
+- 两项 BLE 静态检查与 `idf.py build`：通过。
+- 未执行：generic-c3/m5stamp-c3 cycling、running `--control`、双次重连、广播开关、配网退出、标准客户端、物理按钮/LED。
+
+## 三、P0：实现已完成，真机验收待完成
 
 ### P0-1 BLE payload 标准兼容与独立真值
 
-现状证据：
+状态：✅ 源码与离线 vectors 已实现；🟡 双板通知链路和标准客户端待验。
+
+审查时证据：
 
 - `ble_bikepower.c::pack_all()` 将 CPS flags 写入 1 字节，后接 power/rev/reserved/time，共发送 9 字节；标准目标应为 2 字节 flags + power + rev + time，共 8 字节。
 - FTMS Indoor Bike 在仅踏频场景仍可能声明 power present。
-- FTMS Treadmill 当前 flags 为 `0x0306`，与实际 distance/heart-rate/elapsed-time 字段不一致，目标为 `0x0504`。
+- FTMS Treadmill 审查时 flags 为 `0x0306`，与实际 distance/heart-rate/elapsed-time 字段不一致，目标为 `0x0504`。
 - 现有 Python 自测曾按同一错误偏移解析 CPS，因此不能作为独立证据。
 
 优化内容：
@@ -68,7 +80,9 @@
 
 ### P0-2 跑步 FTMS 会话语义
 
-现状证据：
+状态：✅ 领域层与控制点接纳语义已实现；🟡 running `--control` 真机待验。
+
+审查时证据：
 
 - `Start/Resume`、`Stop/Pause` 和 `Reset` 会向客户端返回 Success。
 - 应用事件处理没有运行/暂停状态；`APP_EVT_RUN_START` 和 `APP_EVT_RUN_STOP` 只记录日志。
@@ -84,10 +98,12 @@
 
 ### P0-3 ERG 会话态与持久配置分离
 
-现状证据：
+状态：✅ 源码与 host 回归已实现；🟡 cycling ERG 真机待验。
+
+审查时证据：
 
 - `power_engine_set_erg_target()` 当前同步覆盖 `base_power`、切换持久模式并置 dirty。
-- `nvs_store::engine_to_config()` 直接保存当前 `mode`。
+- `nvs_store` 当时的私有 engine-to-config 映射直接保存当前 `mode`；现已统一改为 `config_store_from_engine()`。
 - 设备可能在无控制端的重启后恢复为 ERG 模式。
 
 优化内容：
@@ -100,7 +116,9 @@
 
 ### P0-4 WiFi 配网完成事件最终可达
 
-现状证据：
+状态：✅ pending latch、bool 接纳和静态契约已实现；🟡 满队列/错误态配网退出真机证据待补。
+
+审查时证据：
 
 - `on_wifi_done()` 只做有限次数队列投递。
 - 全部失败后门户已进入 closing/done 状态，不再重试，设备可永久停在 `ST_WIFI_CONFIG`。
@@ -115,7 +133,9 @@
 
 ### P0-5 真机门禁不得把 P0 失败降级为 SKIP
 
-现状证据：
+状态：✅ required device gate、双次重连和 profile-aware harness 已实现；🟡 双板 device gate 尚未执行。
+
+审查时证据：
 
 - `operation_gate.py` 将跑步 BLE 和连接事件步骤设置为 `required=False`。
 - `stage3_conn_test.py` 只做一次连接/断开，并把本地主动断开直接视为成功，没有第二次扫描和重连。
@@ -155,14 +175,14 @@
 
 ## 六、推荐实施顺序
 
-1. P0-1 codec + golden vectors。
-2. P0-2 跑步会话状态。
-3. P0-3 ERG 持久化边界。
-4. P0-4 WiFi 完成事件可靠性。
-5. P0-5 device gate 和双次重连。
-6. 无设备全量门禁。
-7. generic-c3 真机 P0。
-8. m5stamp-c3 真机 P0。
-9. 物理按钮/LED、Captive Portal 多系统弹窗和 72h 老化。
+1. ✅ P0-1 codec + golden vectors。
+2. ✅ P0-2 跑步会话状态。
+3. ✅ P0-3 ERG 持久化边界。
+4. ✅ P0-4 WiFi 完成事件可靠性。
+5. ✅ P0-5 device gate、profile harness 和双次重连。
+6. 🟡 整合后的无设备全量门禁（各专项已通过，提交前仍需最终聚合复跑）。
+7. ⬜ generic-c3 真机 P0。
+8. ⬜ m5stamp-c3 真机 P0。
+9. ⬜ 标准客户端、物理按钮/LED、Captive Portal 多系统弹窗和 72h 老化。
 
 每个 P0 单独提交并记录真实测试结果。协议修复不得与文档目录整理或纯格式化混在同一提交中。

@@ -7,10 +7,11 @@
 
 | 层级 | 用途 | 入口 |
 |------|------|------|
-| Host 领域层 | 功率、踏频、心率、模式、按钮分类、配置 schema、LED 纯逻辑 | `make -C test run` |
+| Host 领域层/协议 | 功率、踏频、心率、运行会话、配置 schema、BLE payload golden vectors | `make -C test run`、`python3 tests/test_ble_protocol_vectors.py` |
+| 离线 harness | 双次重连、running 四阶段、profile 全广播测试/恢复、FTMS 接纳和 WiFi done 可靠性契约 | `python3 tests/test_ble_reconnect_harness.py`、`python3 tests/test_ble_running_harness.py`、`python3 tests/test_device_profile_harness.py`、`python3 tests/check_ftms_control_contract.py`、`python3 tests/check_wifi_done_contract.py` |
 | Mock 网页层 | `/api/config` 保存回显、网页核心流程、设备模板、关闭 WiFi | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` |
 | 静态门禁 | 门户结构、JS、常量、NVS、任务/WDT、板型、操作矩阵 | `python3 tests/check_operation_coverage.py` 等 |
-| 真机自动化 | 串口启动、BLE 五服务、FTMS ERG、配网门户 HTTP | `python3 tests/ble_selftest.py`、`python3 tests/stage5_portal_test.py` |
+| 真机自动化 | 串口启动、互斥 cycling/running GATT profile、FTMS ERG/跑步会话、配网门户 HTTP | `python3 tests/ble_selftest.py`、`python3 tests/device_profile_harness.py`、`python3 tests/stage5_portal_test.py` |
 | 人工门禁 | 物理按钮手感、LED 肉眼灯效、手机 Captive Portal、Zwift/MyWhoosh 真实课程 | `scripts/tools/device_acceptance.py` + 本文“人工门禁记录” |
 
 ## 二、操作覆盖矩阵
@@ -18,8 +19,8 @@
 | ID | 操作/风险 | 自动化门禁 | 人工门禁/说明 |
 |----|-----------|------------|----------------|
 | `OP-MODE-001` | 骑行 fixed/配速机器人/ERG 模式切换；切非 ERG 后旧目标不得残留 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 真机网页切换后观察 App 数据源 |
-| `OP-MODE-002` | 跑步/骑行 profile 切换；RSC 与 CPS/FTMS 服务不能混乱 | `make -C test run`、`python3 tests/ble_selftest.py --profile running` | Zwift/MyWhoosh 跑步入口人工确认 |
-| `OP-MODE-003` | ERG Stop/Pause、Reset、BLE 断开后恢复 fixed 手动调功 | `make -C test run`、`python3 tests/ble_selftest.py` | Zwift ERG 课程退出后人工调功确认 |
+| `OP-MODE-002` | 跑步/骑行 profile 切换；RSC 与 CPS/FTMS 服务不能混乱；测试期间强制 mask=7，结束恢复原 profile/mask 和完整 running 持久配置 | `python3 tests/test_device_profile_harness.py`、`python3 tests/device_profile_harness.py --profile running` | Zwift/MyWhoosh 跑步入口人工确认 |
+| `OP-MODE-003` | ERG Stop/Pause、Reset、BLE 断开后恢复 fixed；目标不改 base power/dirty/NVS | `make -C test run`、`python3 tests/ble_selftest.py --profile cycling` | Zwift ERG 课程退出后人工调功确认 |
 | `OP-SAVE-001` | 骑行数值保存：功率、踏频、心率、心率锁定、浮动、按钮步进 | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` | 真机保存后刷新网页确认 |
 | `OP-SAVE-002` | 跑步数值保存：配速、配速浮动、步频、步频浮动、心率 | `python3 tests/test_portal_config_save.py`、`make -C test run` | MyWhoosh/Zwift 跑步速度显示人工确认 |
 | `OP-SAVE-003` | 用户资料与自定义机器人：体重、FTP、阈值心率、功体比上下限、昵称 | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` | 真机网页自定义机器人 UI 人工确认 |
@@ -32,10 +33,12 @@
 | `OP-BCAST-001` | 顶部功率/踏频/心率多选默认全开；取消项隐藏对应窗口且保存后停止对应 BLE 通知；至少保留一项 | `make -C test run`、`python3 tests/test_portal_config_save.py`、`python3 tests/check_portal_structure.py` | Zwift/MyWhoosh 中按开启项观察数据源 |
 | `OP-BCAST-002` | BOOT 按钮按启用项选择目标：单项启用时直接调该项，多项启用时骑行优先功率、跑步优先配速/速度；长按 WiFi 确认回滚本次调节 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮在不同开关组合下人工确认 |
 | `OP-BCAST-003` | 广播项开关真实影响 BLE 数据面：关闭功率后 CPS/FTMS 功率停止，只开心率时仅 HRS 持续通知 | `python3 tests/ble_broadcast_monitor.py`、`python3 tests/check_ble_broadcast_monitor.py` | 设备需处于配网态，脚本通过 `/api/config` 切换 `broadcast_mask` |
-| `OP-BLE-001` | BLE 五服务、DIS、通知、FTMS 控制点响应 | `python3 tests/ble_selftest.py` | 第三方 App 扫描设备人工确认 |
-| `OP-BLE-002` | 连接/断开事件、断开后重广播、断开清 ERG | `python3 tests/stage3_conn_test.py`、`python3 tests/ble_selftest.py` | 训练 App 退出后重连人工确认 |
+| `OP-BLE-001` | CPS 8B、FTMS flags、RSC 0.1m/Feature 与控制点响应 | `python3 tests/test_ble_protocol_vectors.py`、`python3 tests/ble_selftest.py` | 标准客户端扫描与字段显示人工确认 |
+| `OP-BLE-002` | 两轮独立扫描/连接/断开；断开后重广播并清 ERG | `python3 tests/test_ble_reconnect_harness.py`、`python3 tests/stage3_conn_test.py` | 训练 App 退出后重连人工确认 |
 | `OP-BLE-003` | 本地浏览器监控客户端可连接已授权 BikePower，持续记录通知停更、断连和数值异常 | `python3 tests/check_ble_monitor.py`、`python3 scripts/tools/serve_ble_monitor.py` | Web Bluetooth 首次授权必须人工点击，浏览器页面导出异常报告 |
-| `OP-RUN-001` | 跑步 RSC 速度、步频、步幅、距离单位换算 | `make -C test run`、`python3 tests/ble_selftest.py --profile running` | Zwift/MyWhoosh 跑步数据人工确认 |
+| `OP-RUN-001` | 跑步 RSC 速度、步频、步幅、0.1m 距离单位与 running/paused flags | `make -C test run`、`python3 tests/test_ble_protocol_vectors.py`、`python3 tests/ble_selftest.py --profile running --control` | Zwift/MyWhoosh 跑步数据人工确认 |
+| `OP-RUN-002` | 逐 opcode 等待 indication；moving 累计增长 → Stop 冻结 → paused Reset 清零且保持暂停 → Resume 恢复增长；队列拒绝返回 Operation Failed | `make -C test run`、`python3 tests/test_ble_running_harness.py`、`python3 tests/ble_selftest.py --profile running --control` | 每阶段至少两个独立样本；标准跑步客户端控制点人工确认 |
+| `OP-WIFI-001` | WiFi done 队列满时 pending latch 最终可达；重复完成事件幂等清理 | `python3 tests/check_wifi_done_contract.py` | 真机队列压力与配网退出待验收 |
 | `OP-STAB-001` | NVS schema、常量、板型、任务/WDT、门户结构不漂移 | `python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 tests/check_board_desc.py`、`python3 tests/check_tasks_wdt.py`、`python3 tests/check_operation_coverage.py` | 无 |
 | `OP-STAB-002` | 3 分钟核心流程耐久，覆盖重复保存、模板、关闭 WiFi、host 回归 | `python3 tests/test_core_flow_endurance.py` | 30/90 分钟老化按发版风险追加 |
 | `OP-REL-001` | 发布产物门禁：10 个上传附件、SHA256、manifest、zip 内容、Git ID 和真机证据不漂移 | `python3 scripts/tools/check_release_artifacts.py --require-pushed --require-device-evidence`、`python3 tests/check_release_gate.py`、`python3 tests/test_release_artifacts.py` | 正式发布前必须从已提交并已推送源码重新构建，且当前 Git 的 P0 证据全部通过 |
@@ -65,13 +68,25 @@ python3 tests/operation_gate.py --level device \
   --run-portal
 ```
 
+`--run-portal` 会使用 profile harness 依次验证 cycling/running：每次测试先强制 `broadcast_mask=7`，避免原配置关闭功率/踏频/心率导致假失败，随后在 `finally` 恢复原 profile、原广播掩码和完整 running 持久配置。running 自测逐 opcode 等待 indication，并按 moving → Stop → paused Reset → Resume 四阶段分别采集多样本窗口。若不运行门户，必须通过 `--device-profile cycling|running` 明确当前固件 GATT profile；另一 profile 保持 `NOT_RUN`，不能用于正式双 profile 发布结论。
+
 手工拆分命令：
 
 ```bash
 make -C test run
+python3 tests/test_ble_protocol_vectors.py
+python3 tests/test_ble_reconnect_harness.py
+python3 tests/test_ble_running_harness.py
+python3 tests/test_device_profile_harness.py
+python3 tests/check_ftms_control_contract.py
+python3 tests/check_wifi_done_contract.py
 python3 tests/test_portal_config_save.py
 python3 tests/test_core_flow_endurance.py
-python3 tests/ble_selftest.py
+python3 tests/ble_selftest.py --profile cycling
+python3 tests/ble_selftest.py --profile running --control
+python3 tests/device_profile_harness.py --profile cycling
+python3 tests/device_profile_harness.py --profile running
+python3 tests/stage3_conn_test.py
 python3 tests/ble_broadcast_monitor.py
 python3 tests/check_ble_broadcast_monitor.py
 python3 tests/check_ble_monitor.py

@@ -221,7 +221,7 @@
 - 主循环每 50ms 更新共享变量（写）
 - BLE 通知定时器每 1s 读取共享变量打包发送（读）
 - 通过 `BLE_NOTIFY_LOCK_WAIT_MS(10ms)` 短互斥锁保护（锁持有时间微秒级）
-- 缓冲区全部静态预分配（当前旧兼容 CPS 使用 `g_cps_buf[9]`），不在通知回调内 malloc；标准 8 字节修复见 `docs/dev/12-top5-protocol-stability-design.md`
+- 缓冲区按 `ble_payload_codec.h` 的标准长度常量静态预分配（CPS 为 8 字节），不在通知回调内 malloc；运动 payload 统一由生产路径调用纯 C codec 编码
 
 ---
 

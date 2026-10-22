@@ -12,7 +12,7 @@
 |------|------|------|------|
 | 0 | 工程骨架（CMake/分区/sdkconfig） | ✅ 完成 | 空工程启动日志 |
 | 1 | NimBLE CPS 单服务最小闭环 | ✅ 完成 | 手机搜到 BikePower 看到功率 |
-| 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测持续扩展（当前 5841 断言） |
+| 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测持续扩展（本轮基线 5892 断言） |
 | 3 | GPIO 中断按钮 + LED 任务 + 状态机 | ✅ 代码完成（物理按钮待人工确认） | 短/中/长按 + 二次确认 + LED 各态 |
 | 4 | 配置持久化（NVS load/save/migrate） | ✅ 完成 | 调功后断电重启功率由260W恢复为200W，host 单测持续覆盖 |
 | 5 | WiFi 配网（radio_ctrl 共存 + AP + HTTP，设备不重启） | ✅ 代码完成（配网真机流程待人工确认） | 长按确认→配网→保存→关 WiFi 回到 BLE，BLE 全程不断 |
@@ -25,6 +25,23 @@
 | 12 | 项目结构与文档梳理（v3.2.0） | ✅ 完成 | `test/` 与 `tests/` 合并评估（不合并）+ `tests/README.md` 7 大分类重写 + `docs/INDEX.md` 补全 workflows/domain 规则索引 |
 | 13 | 移除 OTA + 家庭网络 + 网页端精简（v4.0.0） | ✅ 代码完成（真机待确认） | 删 ota_downloader/ota_update/ota_version/ota_selftest + `/api/ota/*`、`/api/wifi/*`、`/api/draft` 路由与前端视图；分区表双 OTA → 单 factory（仍 4MB）；关回滚配置；门户退化为纯 BLE 参数页（方案见 [docs/archive/07-remove-ota-plan.md](docs/archive/07-remove-ota-plan.md)） |
 | 14 | Windows 开发环境适配 | ✅ 完成 | `idf_common.psm1` 共享模块 + `dev.ps1` 统一入口 + `build_all.ps1`/`flash_latest.ps1` 重构去重 + Python 脚本跨平台串口探测 |
+
+---
+
+## 2026-10-22 P0 协议与会话稳定性收口
+
+当前工作区已完成源码修复与离线门禁，尚未形成新的双板真机验收结论：
+
+- [x] CPS/CSC、FTMS Bike/Treadmill、RSC/HRS 统一经生产 `ble_payload_codec` 编码；独立 JSON golden vectors 同时验证 C encoder 与 Python parser。
+- [x] RSC 距离单位修正为 0.1m，RSC Feature 修正为 2 字节 `0x0007`；FTMS Treadmill flags 修正为 `0x0504`。
+- [x] 跑步 Start/Stop/Reset 接入非持久化 running 会话；暂停归零瞬时运动量并冻结距离/用时，Reset 清累计量且保持运行/暂停态。
+- [x] ERG 改为非持久化会话；设定/清除目标不污染基础功率，持久化映射统一由 `config_store_from_engine()` 规范化，旧 NVS ERG 值加载时回退 steady。
+- [x] WiFi 完成通知增加 pending latch 与可确认回调，主循环可靠消费，错误态退出仍统一幂等清理 HTTP/DNS/SoftAP。
+- [x] 无设备门禁增加控制点接纳/标准 Status 契约、双次同设备重连、running 四阶段、profile-aware fake harness 与 WiFi done 静态契约；真机 profile harness 测试时强制 mask=7 并恢复原 profile/mask 与完整 running 持久配置，running 自测按四阶段逐 opcode indication + 多样本严格判定。
+- [x] 整合后执行完整 `quality_gate.py`：81 PASS、2 个预期 dirty-worktree WARN、0 FAIL；包含 `idf.py build`、5892/0 host 断言与全部离线协议/harness 门禁。
+- [ ] generic-c3 与 m5stamp-c3 分别执行 cycling、running `--control`、双次独立重连、广播开关、配网退出和标准客户端验证；结果写入当前 Git ID 对应证据。
+
+历史 release/tag 的 PASS 只说明当时固件，不覆盖上述当前工作区。离线 vectors 与 fake harness 也不能替代 NimBLE GATT 和物理链路验收。
 
 ---
 
@@ -44,7 +61,7 @@
 - [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、单一版本号、stable/fix 标识和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 Gitee Release。
 - [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合；`tests/operation_gate.py --level full` 已接入 release 产物门禁和核心流程耐久。
 - [x] 稳定交付证据链已接入：`scripts/tools/device_acceptance.py` 统一记录真机自动项与人工项，`operation_gate.py --level device` 可写入自动结果，正式 Gitee 发布要求当前版本与 Git ID 的 P0 证据全部通过。
-- [x] 最近一次 generic-c3 真机自动化验证记录：v4.1.1 已通过启动、骑行 BLE 与一次连接/断开验证，详见 `CHANGELOG.md` 的“v4.1.1 通用版真机验收”；跑步会话、配网门户、广播开关、物理按钮/LED 和 m5stamp-c3 仍保持待验收。
+- [x] 历史 generic-c3 真机自动化记录：v4.1.1 release 固件曾通过启动、骑行 BLE 与一次连接/断开，详见 `CHANGELOG.md` 的“v4.1.1 通用版真机验收”。该记录不覆盖 2026-10-22 当前工作区；新协议、跑步会话、双次重连、配网门户、广播开关、物理按钮/LED 和 m5stamp-c3 均须按当前 Git ID 重新验收。
 
 ### 待人工确认（P0）
 
@@ -123,7 +140,7 @@
 
 - 首刷启动用默认值并回写：`p=260W c=90RPM mode=0 hr=150 w=70 ftp=300 thr=190 ride=0`
 - 短按 3 次（每次 -20W）→ 等待落盘 → 断电重启 → 功率恢复为 `p=200W`，证明持久化生效
-- host 单测 5841 断言全过（覆盖 config_store、跑步配置、设备模板、按钮与 LED 领域逻辑）
+- 当时 host 单测 5841 断言全过（阶段 4 历史记录）；2026-10-22 本轮基线为 5892 断言，最终提交以最新完整执行结果为准。
 
 ---
 

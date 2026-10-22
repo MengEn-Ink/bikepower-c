@@ -17,31 +17,42 @@
 - `domain_rng.c`
 - `hr_model.c`
 - `power_engine.c`
+- `running_engine.c`
 - `config_store.c`
+- `device_template.c`
+- `device_analysis.c`
+- `ble_payload_codec.c`（CPS/CSC/HRS/FTMS/RSC 生产 payload 编码）
 - `json_miniparse.c`（配网请求体 JSON 字段提取）
 - `button_logic.c`
 - `button_debounce.c`
 - `led_pattern.c`
-- 当前断言规模：`5841` 条
+- 当前断言规模：`5892` 条（2026-10-22 本轮基线，0 失败）
 - 适用改动：
 - `components/bikepower_domain/` 下的逻辑变更
 - 配置 schema、范围校验、模式计算、心率模型变更
 - JSON 解析、按钮语义、LED 映射等纯逻辑变更
 
-### `TC-2`：BLE 自测
+### `TC-2`：BLE 协议与真机自测
 
-- 目标：验证对外 BLE 协议面
-- 入口：`tests/ble_selftest.py`
+- 目标：分层验证对外 BLE payload、互斥 GATT profile、控制点会话和断开重广播
+- 离线入口：`tests/test_ble_protocol_vectors.py`、`tests/test_ble_reconnect_harness.py`、`tests/test_ble_running_harness.py`、`tests/test_device_profile_harness.py`、`tests/check_ftms_control_contract.py`
+- 真机入口：`tests/ble_selftest.py`、`tests/device_profile_harness.py`、`tests/stage3_conn_test.py`
 - 覆盖内容：
 - 扫描并连接 `BikePower`
-- 发现五服务 `CPS/HRS/CSC/FTMS/DIS`
+- cycling 发现 `CPS/HRS/CSC/FTMS/DIS`；running 发现 `RSC/HRS/FTMS/DIS`，不得要求互斥 profile 同时出现
 - 读取 DIS 厂商、型号、固件版本
-- 接收功率相关通知
-- 发送 FTMS 控制点并观察 ERG 行为
+- 用独立 golden vectors 验证生产 C encoder 与无 bleak Python parser，包括 CPS 8B、FTMS 可变长度、RSC 0.1m 和 Treadmill 10B
+- cycling 接收功率相关通知并观察 ERG 会话；running 使用 `--control` 覆盖 SetSpeed、Start/Stop/Reset
+- `stage3_conn_test.py` 执行两次独立扫描 → 连接 → 显式断开，第二轮不得复用第一次扫描结果且必须命中同一设备 identifier
+- `--run-portal` 时通过 profile harness 切换两种 GATT 表，测试阶段强制 `broadcast_mask=7`，并在 finally 恢复原 profile/mask 和完整 running 持久配置
+- running `--control` 逐 opcode 等待 indication，按 moving → Stop → paused Reset → Resume 四阶段采集多样本，严格检查 RSC/Treadmill 累计增长与冻结
 - 适用改动：
 - `main/ble_bikepower.c`
+- `components/bikepower_domain/ble_payload_codec.c/.h`
 - `app_main.c` 中 BLE 相关接线
 - `bikepower_config.h` 中 BLE UUID、设备名、版本号等常量
+
+离线 vectors/fake harness 只证明编码和编排契约，不能替代 NimBLE GATT、射频链路或标准客户端真机验收。
 
 ### `TC-3`：配网自测
 
@@ -57,6 +68,7 @@
 - 适用改动：
 - `main/wifi_portal.c`
 - `main/radio_ctrl.c`
+- `main/app_main.c` / `main/app_state.c` 中 WiFi done 接纳与清理链路
 - 按钮进入配网的状态机链路
 
 ### `TC-3a`：门户 JS 静态检查（**最高优先级，每次改动必跑**）
@@ -120,10 +132,11 @@
 
 - `TC-4`：纯治理文档或规则改动可不跑测试，但要做一致性复核。
 - `TC-5`：领域层改动至少跑 `test/test_domain`。
-- `TC-6`：BLE 行为改动至少跑 `tests/ble_selftest.py`，涉及设备行为时再走完整真机流程。
+- `TC-6`：BLE payload 改动必须跑 `tests/test_ble_protocol_vectors.py`；BLE 行为改动还必须按实际 profile 跑 `tests/ble_selftest.py`。running 会话使用 `--control`，断开重广播使用 `stage3_conn_test.py` 两轮独立扫描；无设备时必须明确真机项 `NOT_RUN`。
 - `TC-7`：配网改动至少跑 `tests/stage5_portal_test.py`，并复核 BLE/WiFi 射频互斥链路。
 - `TC-7a`：**任何 `main/wifi_portal.c` 改动必须先跑 `tests/check_portal_js.py`，JS 语法全绿才能继续**。这是硬性前置门，避免 `}}}` 类低级 bug 烧录后才发现。
 - `TC-7c`：**常量一致性检查（每次改动必跑）**：跑 `tests/check_config_consistency.py`，验证 `bikepower_config.h` / `domain_config.h` / `README.md` / `docs/` 之间的常量值（版本号、引脚、阈值、超时、栈大小）一致，防止文档与代码漂移。
+- `TC-7c-1`：修改 FTMS 控制点必须跑 `tests/check_ftms_control_contract.py`；修改 WiFi 完成通知必须跑 `tests/check_wifi_done_contract.py`。静态契约通过后仍须按影响面补真机验证。
 - `TC-7d`：**配网页保存字段改动必须跑 `tests/test_portal_config_save.py`**，确保 mock 保存、状态回显和 custom pacer 展示不漂移。
 - `TC-7e`：**固件生成前必须跑 `tests/test_core_flow_endurance.py`**，默认 3 分钟；如果因时间原因仅快速验证，必须显式写明 `--cycles` 结果不能替代正式固件生成门禁。
 - `TC-7f`：**配置字段增删必须覆盖端到端同步面**：
@@ -166,7 +179,7 @@
 ### 自动化测试覆盖率口径
 
 - **可自动化覆盖率** = （host 单测覆盖行 + 静态脚本覆盖行）/（领域层行 + main/ 纯逻辑行 + main/ 静态可校验行）
-- 不计入分母：纯硬件交互代码（BLE 通知回调、ISR、GPIO、WiFi 连接、HTTP 响应），这些走真机测试（DT 系列）。
+- 不计入分母：纯硬件交互代码（NimBLE GATT 传输、ISR、GPIO、WiFi 连接、HTTP 响应），这些走真机测试（DT 系列）；BLE payload 编解码已由生产 codec + golden vectors 覆盖，不再归入纯真机边界。
 - 当前重点：领域层生产纯逻辑保持 100% host 可测；`main/` 的硬件/网络路径通过静态门禁 + 真机脚本兜底。
 - 目标：不为覆盖率抽取生产代码不用的并行实现；只抽取 `main/` 会真正调用的纯逻辑。
 
@@ -178,7 +191,8 @@
 4. **跑 TC-1**：`make -C test && ./test/test_domain`，断言全绿。
 5. **跑 TC-3a/3c/3d**：涉及 wifi_portal / 前端 / 常量时跑对应静态脚本。
 6. **跑 TC-3h**：涉及网页保存字段时跑 mock 保存回显测试。
-7. **跑 TC-2/3**：涉及 BLE / 配网行为时跑真机脚本。
-8. **生成固件随附文档**：每次生成 release 固件时同步产出测试报告和用户手册。
-9. **更新本文件断言数 + docs/dev/03-test-coverage-analysis.md 矩阵**。
-10. **提交前全绿**：TC-9a 硬性门。
+7. **跑离线协议/harness**：涉及 BLE payload、控制点、重连或 profile 编排时跑对应 vectors/静态契约/fake harness。
+8. **跑 TC-2/3 真机**：涉及 BLE / 配网行为时按 profile 跑真机脚本；重连必须完成两轮独立扫描。
+9. **生成固件随附文档**：每次生成 release 固件时同步产出测试报告和用户手册。
+10. **更新本文件断言数 + docs/dev/03-test-coverage-analysis.md 矩阵**。
+11. **提交前全绿**：TC-9a 硬性门；受设备条件限制的项按 TC-9c 保持 pending。

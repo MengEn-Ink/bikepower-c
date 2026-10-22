@@ -26,7 +26,7 @@ BikePower C 采用 NimBLE host 实现蓝牙 peripheral 角色，暴露标准蓝�
 
 | 原则 | 实现 |
 |------|------|
-| 静态预分配 | 所有通知缓冲区在编译期分配（`g_cps_buf[9]` 等），运行时零 malloc |
+| 静态预分配 | 所有通知缓冲区按 `ble_payload_codec.h` 的长度常量在编译期分配，运行时零 malloc |
 | 句柄缓存 | GATT 特征值句柄在服务注册后缓存到静态全局变量，避免运行时重复查找 |
 | 双时间尺度 | 主循环 50ms 写共享变量，BLE 定时器 1s 读并打包发送 |
 | 单连接模型 | 同一时间只允许一个中心设备连接，断开后自动恢复广播 |
@@ -136,17 +136,16 @@ static uint16_t g_ftms_status_handle;   // (共享) Status
 
 所有多字节字段均采用**小端字节序**（Little-Endian），符合蓝牙 SIG 规范。
 
-### CPS Power Measurement（当前 9 字节旧兼容布局）
+### CPS Power Measurement（8 字节）
 
 | 偏移 | 长度 | 字段 | 值/说明 |
 |------|------|------|---------|
-| 0 | 1 | flags | `0x20`（当前错误地只写 1 字节） |
-| 1 | 2 | Instantaneous Power | 功率值（W，当前按 uint16 写入） |
-| 3 | 2 | Cumulative Crank Revs | 累计曲柄转数（uint16，每次通知 +2） |
-| 5 | 2 | 保留 | `0x0000` |
-| 7 | 2 | Last Crank Event Time | 上次曲柄事件时间（1/1024s 单位） |
+| 0 | 2 | flags | `0x0020`（Crank Revolution Data Present） |
+| 2 | 2 | Instantaneous Power | 功率值（W，sint16） |
+| 4 | 2 | Cumulative Crank Revs | 累计曲柄转数（uint16，每次通知 +2） |
+| 6 | 2 | Last Crank Event Time | 上次曲柄事件时间（1/1024s 单位） |
 
-> 该布局不符合标准 CPS Measurement。目标布局为 2 字节 flags + sint16 power + uint16 crank rev + uint16 crank time，共 8 字节；修复和独立 golden vectors 见 [Top 5 协议稳定性设计](../dev/12-top5-protocol-stability-design.md)。
+打包由生产代码 `ble_payload_codec.c` 负责；`tests/fixtures/ble_protocol_vectors.json` 同时约束 C encoder 和 Python parser，避免自证式测试。
 
 **曲柄推演算法**：基于当前踏频 `cadence` 计算每转时间，每次通知累加 2 转，保持与旧版 MicroPython 协议位级兼容。
 
@@ -180,11 +179,13 @@ time_1024 = (adjusted_ms * 1024 / 1000) & 0xFFFF;
 | 1 | 2 | Instantaneous Speed | 速度（1/256 m/s 单位，uint16） |
 | 3 | 1 | Instantaneous Cadence | 步频（SPM，uint8） |
 | 4 | 2 | Instantaneous Stride Length | 步幅（cm，uint16） |
-| 6 | 4 | Total Distance | 总距离（m，uint32） |
+| 6 | 4 | Total Distance | 总距离（0.1m，uint32）；领域层米值在 BLE 边界乘 10 |
 
-### RSC Feature（4 字节，跑步模式）
+暂停时速度、步频和步幅归零，flags 为 `0x03`；运行时 flags 为 `0x07`。两种状态都保留累计距离字段。
 
-固定值 `{ 0x03, 0x00, 0x00, 0x00 }`，表示支持瞬时步频和总距离。
+### RSC Feature（2 字节，跑步模式）
+
+固定值 `{ 0x07, 0x00 }`（`0x0007`），表示支持瞬时步幅、总距离和 Walking/Running Status。
 
 ### Sensor Location（1 字节，跑步模式）
 
@@ -204,21 +205,27 @@ time_1024 = (adjusted_ms * 1024 / 1000) & 0xFFFF;
 - bit2：Instantaneous Cadence + Speed present
 - bit6：Instantaneous Power present
 
+| 广播字段组合 | flags | 长度 | 负载 |
+|--------------|-------|------|------|
+| 踏频 + 功率 | `0x0044` | 8 字节 | speed + cadence + power |
+| 仅踏频 | `0x0004` | 6 字节 | speed + cadence |
+| 仅功率 | `0x0041` | 4 字节 | power；More Data 置位，不携带 speed |
+
 **速度/踏频换算**：
 - speed = cadence * 30（模拟 90RPM → 27.0 km/h）
 - ftms_cad = cadence * 2（FTMS 单位为 0.5 RPM）
 
-### FTMS Treadmill Data（当前实际 10 字节，跑步模式）
+### FTMS Treadmill Data（10 字节，跑步模式）
 
 | 偏移 | 长度 | 字段 | 值/说明 |
 |------|------|------|---------|
-| 0 | 2 | flags | `0x0306`（Distance + Heart Rate + Elapsed Time） |
+| 0 | 2 | flags | `0x0504`（Total Distance + Heart Rate + Elapsed Time） |
 | 2 | 2 | Instantaneous Speed | 速度（单位转换：rsc_speed * 360 / 256 = 0.01 km/h） |
 | 4 | 3 | Total Distance | 总距离（m，uint24，注意 3 字节） |
 | 7 | 1 | Heart Rate | 心率（bpm） |
 | 8 | 2 | Elapsed Time | 已用时间（s，uint16，超 0xFFFF 截断） |
 
-> 当前 flags `0x0306` 与上述字段不一致，标准目标值为 `0x0504`；这是与 CPS 一并修复的 P0 协议项。
+FTMS Treadmill 的 Total Distance 单位保持米；不要套用 RSC Measurement 的 0.1m 单位。
 
 ### FTMS Feature（8 字节，静态）
 
@@ -234,12 +241,13 @@ time_1024 = (adjusted_ms * 1024 / 1000) & 0xFFFF;
   0x02, 0x00, 0x00, 0x00 }  // Target Speed Setting
 ```
 
-### FTMS Status（7 字节）
+### FTMS Status（当前状态均为 1 字节）
 
 | 偏移 | 长度 | 字段 | 值/说明 |
 |------|------|------|---------|
-| 0 | 1 | Op Code | 0x00=Reset, 0x01=Start/Resume, 0x02=Stop/Pause |
-| 1-6 | 6 | 扩展 | （当前未使用，置 0） |
+| 0 | 1 | Op Code | `0x01`=Reset，`0x02`=Stopped/Paused by User，`0x03`=Started/Resumed by User |
+
+Fitness Machine Status 和 Control Point 是两套独立的 OpCode 编号。当前使用的三种 Status 不带参数，因此通知长度严格为 1 字节；未来支持带参数的 Status 时必须按对应格式编码，不得固定补零。
 
 ---
 
@@ -266,7 +274,7 @@ FTMS Control Point 采用写+指示（Indication）模式，客户端写命令�
 |------|------|------|----|
 | 0 | 1 | Response Code OpCode | `0x80` |
 | 1 | 1 | Request OpCode | 回传请求的 OpCode |
-| 2 | 1 | Result Code | `0x01`=Success, `0x02`=Not Supported, `0x03`=Invalid Parameter |
+| 2 | 1 | Result Code | `0x01`=Success, `0x02`=Not Supported, `0x03`=Invalid Parameter, `0x04`=Operation Failed |
 
 ### Result Code 表
 
@@ -274,7 +282,8 @@ FTMS Control Point 采用写+指示（Indication）模式，客户端写命令�
 |----|------|---------|
 | `0x01` | Success | 命令执行成功 |
 | `0x02` | Not Supported | 未知 OpCode，或跑步模式下请求 SetTargetPower，或骑行模式下请求 SetTargetSpeed |
-| `0x03` | Invalid Parameter | SetTargetPower 回调返回 false（参数超出范围） |
+| `0x03` | Invalid Parameter | 负载长度错误或目标值超出协议/配置范围 |
+| `0x04` | Operation Failed | 参数合法，但应用回调缺失、队列未接纳或状态转换失败 |
 
 ### 控制点处理流程
 
@@ -283,10 +292,12 @@ FTMS Control Point 采用写+指示（Indication）模式，客户端写命令�
   → ftms_cp_cb()（NimBLE host 任务上下文）
     → 解析 op + 负载
     → 骑行模式 SetTargetPower: g_erg_cb(target) → 投递 APP_EVT_ERG_TARGET 到主循环
-    → 跑步模式 SetTargetSpeed: g_run_control_cb(BLE_RUN_CTRL_SPEED, target)
-    → Start/Stop/Reset: 更新 g_ftms_status_buf + 调用对应回调
+    → 跑步模式 SetTargetSpeed: 先校验值域，再调用 g_run_control_cb(BLE_RUN_CTRL_SPEED, target)
+    → running Start/Stop/Reset: 先由应用回调可靠接纳，再更新 g_ftms_status_buf
     → ftms_send_response() → indicate_one() 发送响应
 ```
+
+带应用接纳语义的命令（Set Target Power/Speed 与 running Start/Stop/Reset）只有回调成功时才发送 Success；running 状态命令也只在成功后更新 FTMS Status。参数合法但回调缺失或拒绝时返回 `Operation Failed (0x04)`，不得先制造“已成功”的状态通知。跑步 Start/Resume、Stop/Pause、Reset 分别控制非持久化会话状态：暂停后的 RSC 运动量归零但距离/用时冻结，Reset 清累计量并保持原运行/暂停态。骑行 Set Target Power 进入非持久化 ERG 会话，Stop/Pause 或 Reset 退出 ERG 并恢复原基础功率；ERG 目标和会话模式均不得写入 NVS。
 
 ---
 

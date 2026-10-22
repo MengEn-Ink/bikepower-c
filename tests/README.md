@@ -1,7 +1,7 @@
 # 测试脚本使用说明
 
 > BikePower C 设备测试脚本集合
-> 更新日期：2026-07-03（v4.0.0 契约校准：固件生成同步产出测试报告与用户手册）
+> 更新日期：2026-10-22（v4.1.1 未发布稳定性修复：协议 vectors、profile-aware harness 与双次重连门禁）
 
 ---
 
@@ -68,23 +68,48 @@ source $IDF_PATH/export.sh
 | `check_tasks_wdt.py` | 任务/队列/WDT 静态完整性检查（每个 xTaskCreate 后必须有错误检查） | TC-3g | 高 |
 | `check_operation_coverage.py` | 操作覆盖矩阵检查（关键操作必须绑定自动化或人工门禁） | TC-3j | 高 |
 | `check_ble_advertising_fields.py` | BLE 广播字段检查（骑行/跑步服务 UUID 与名字预算） | TC-BLE-ADV | 高 |
+| `check_ftms_control_contract.py` | FTMS 控制点参数校验、应用接纳与 Result Code 静态契约 | TC-BLE-CP | 高 |
+| `check_wifi_done_contract.py` | WiFi 配网完成通知、pending latch 与幂等清理静态契约 | TC-WIFI-DONE | 高 |
 
 ```bash
 # 一键跑全部静态门禁
 for s in check_portal_js check_portal_structure check_config_consistency \
          check_nvs_schema check_board_desc check_tasks_wdt check_operation_coverage \
-         check_ble_advertising_fields; do
+         check_ble_advertising_fields check_ftms_control_contract \
+         check_wifi_done_contract; do
     python3 tests/$s.py || exit 1
 done
 ```
+
+### A.1 协议与 harness 离线回归（无需设备）
+
+| 脚本 | 用途 |
+|------|------|
+| `test_ble_protocol_vectors.py` | 用独立 JSON golden vectors 同时校验生产 C encoder 与无 bleak Python parser |
+| `test_ble_reconnect_harness.py` | 用 fake scanner/client 断言两轮连接必须各自重新扫描并显式断开 |
+| `test_ble_running_harness.py` | 离线验证逐 opcode indication 等待、严格增长/冻结 helper 与 moving/pause/reset/resume 四阶段结构 |
+| `test_device_profile_harness.py` | 用 fake HTTP/runner 断言测试阶段强制 mask=7、running `--control` 参数和 `finally` 恢复原配置 |
+| `device_profile_harness.py` | 真机 profile 编排器；临时切换 cycling/running 并强制全广播、调用 selftest，最后恢复原 profile/mask 和完整 running 持久配置 |
+
+```bash
+python3 tests/test_ble_protocol_vectors.py
+python3 tests/test_ble_reconnect_harness.py
+python3 tests/test_ble_running_harness.py
+python3 tests/test_device_profile_harness.py
+python3 tests/check_ftms_control_contract.py
+python3 tests/check_wifi_done_contract.py
+```
+
+这些检查证明编码、解析与编排契约在 host 上成立，不等于 NimBLE GATT、断开重广播或标准客户端已经通过真机验收。
 
 ### B. 设备端动态自测（需真机 + 串口/BLE）
 
 | 脚本 | 用途 | 依赖 | 触发方式 |
 |------|------|------|----------|
-| `ble_selftest.py` | BLE 五服务（CPS+HRS+CSC+FTMS+DIS）+ FTMS ERG 控制点 | bleak | 设备启动后直接跑 |
+| `ble_selftest.py` | 按 cycling/running profile 验证互斥 GATT 服务、通知 payload 与 FTMS 控制点；running `--control` 逐 opcode 等待 indication 并分四阶段检查会话 | bleak | 设备启动后直接跑 |
+| `device_profile_harness.py` | 通过配网页 API 临时切换 profile，测试时强制 `broadcast_mask=7`，并在 finally 恢复原配置 | bleak + 设备配网态 HTTP | 设备处于配网态时跑 |
 | `ble_broadcast_monitor.py` | 通过配网页 API 切换广播项，并验证 CPS/HRS/CSC/FTMS 通知是否按开关停止/恢复 | bleak + 设备配网态 HTTP | 设备进入配网态后跑 |
-| `stage3_conn_test.py` | BLE 连接事件驱动状态机验证 | bleak | 设备启动后直接跑 |
+| `stage3_conn_test.py` | 两轮独立扫描 → 连接 → 显式断开，验证每次断开后恢复广播 | bleak，可选 pyserial | 设备启动后直接跑 |
 | `stage5_portal_test.py` | 配网门户 HTTP 路由自测（/api/xxx JSON 接口） | Python3 | 设备进入配网态后跑 |
 | `../scripts/tools/serve_ble_monitor.py` + `../tools/web/ble-monitor.html` | 本地浏览器 BLE 监控，持续记录断连、通知停更和数值异常 | Chrome/Edge Web Bluetooth | 启动本地服务后浏览器手动授权连接 |
 
@@ -142,7 +167,7 @@ python3 tests/operation_gate.py --level device --run-portal \
   --board generic-c3 --operator "验收人" --port /dev/cu.usbmodem101
 ```
 
-脚本结束会尝试恢复原始 `sport_profile` 和 `broadcast_mask`。未传 `--run-portal` 时，`operation_gate.py --level device` 会跳过这项，因为它需要设备处于配网态才能切换网页配置。
+`--run-portal` 会先用 `device_profile_harness.py` 分别验证 cycling 和 running：测试阶段强制 `broadcast_mask=7`，running 强制带 `--control`，逐 opcode 等待 indication，并按 moving → Stop 冻结 → paused Reset 清零且保持暂停 → Resume 恢复四阶段采集实际多样本，严格判断 RSC/Treadmill 累计增长或冻结。之后再执行广播项数据面与门户测试；harness 会在 `finally` 恢复原始 `sport_profile`、`broadcast_mask` 和测试期间可能改写的完整 running 持久配置。广播 monitor 若恢复原配置失败会直接判定 FAIL，不得以已完成数据采样掩盖配置污染。未传 `--run-portal` 时必须用 `--device-profile cycling|running` 声明当前固件实际暴露的 GATT profile，另一 profile 保持 `NOT_RUN`，不得把互斥服务误报为缺失。
 
 ### F. 串口日志工具
 
@@ -194,7 +219,8 @@ bash tests/test_runner.sh -s    # 压力测试
 bash tests/test_runner.sh -l    # 串口日志
 python3 tests/operation_gate.py --level quick
 python3 tests/operation_gate.py --level full --build
-python3 tests/operation_gate.py --level device --port /dev/cu.usbmodem101
+python3 tests/operation_gate.py --level device --device-profile cycling --port /dev/cu.usbmodem101
+python3 tests/operation_gate.py --level device --run-portal --port /dev/cu.usbmodem101
 ```
 
 ### I. 真机验收证据
@@ -266,21 +292,29 @@ python3 tests/test_core_flow_endurance.py
 
 默认跑 3 分钟并生成 `tests/reports/core_flow_endurance_<时间>.md`，覆盖模拟按钮短按/长按调功、功率变化心率随动、网页端首页与设置页编辑、LED 静默模式、设备模板、续期和关闭 WiFi。快速开发验证可用 `--cycles 1`，正式固件生成时由 `scripts/build_all.sh` 自动执行；如需半小时或 90 分钟老化，可传 `--minutes 30` 或 `--minutes 90`。
 
-### 场景 5：完整真机回归（v4.0.0 交付前）
+### 场景 5：完整真机回归
 
 ```bash
 # 1. 烧正式固件
 idf.py -p /dev/ttyACM0 flash
 # 2. 串口确认启动
 python3 tests/serial_capture.py --port /dev/ttyACM0 --duration 12
-# 3. BLE 五服务 + ERG
-python3 tests/ble_selftest.py
-# 4. 烧测试固件进配网态，跑门户自测
+# 3. 当前 profile 的 BLE 服务与控制点（无配网页时分别在对应 profile 下执行）
+python3 tests/ble_selftest.py --profile cycling 12 250
+python3 tests/ble_selftest.py --profile running --control 12
+# 4. 两轮独立扫描/连接/断开；第二轮必须重新发现同一 identifier 的设备
+python3 tests/stage3_conn_test.py --port /dev/ttyACM0
+# 5. 烧测试固件进配网态，跑 profile-aware、广播项和门户自测
 idf.py reconfigure -DPORTAL_TEST_AUTO_CONFIG=ON && idf.py build && idf.py -p /dev/ttyACM0 flash
+python3 tests/device_profile_harness.py --profile cycling
+python3 tests/device_profile_harness.py --profile running
+python3 tests/ble_broadcast_monitor.py --base-url http://192.168.4.1
 python3 tests/stage5_portal_test.py --ip 192.168.4.1
-# 5. 烧回正式固件
+# 6. 烧回正式固件
 idf.py reconfigure -DPORTAL_TEST_AUTO_CONFIG=OFF && idf.py build && idf.py -p /dev/ttyACM0 flash
 ```
+
+还需用标准客户端检查服务发现、订阅与控制点交互。上述命令只有在目标设备实际执行并返回成功时才可记为真机 PASS；离线 vectors/fake harness 不能替代这一步。
 
 ---
 

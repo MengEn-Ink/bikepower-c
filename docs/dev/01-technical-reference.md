@@ -247,15 +247,17 @@ GAP 事件回调为 `gap_event_cb()`：
 - `g_csc_val_handle`
 - `g_ftms_bike_handle`
 
-共享缓冲区全部静态预分配，避免运行时动态分配大缓冲：
+共享缓冲区全部静态预分配，避免运行时动态分配大缓冲；字节布局由生产路径实际调用的 `components/bikepower_domain/ble_payload_codec.c` 编码：
 
-- `g_cps_buf[9]`（当前旧兼容布局；标准 8 字节修复见下方已知缺陷）
+- CPS：8 字节
 - `g_hr_buf[2]`
 - `g_csc_buf[5]`
-- `g_ftms_bike_buf[8]`
+- FTMS Indoor Bike：按广播掩码为 8/6/4 字节
+- FTMS Treadmill：10 字节
+- RSC Measurement：10 字节
 - `g_ftms_resp_buf[3]`
 
-> 已知协议缺陷：当前 CPS 使用 1 字节 flags 并发送 9 字节旧兼容布局，FTMS Bike/Treadmill 的部分 flags 与实际 payload 也存在不一致。现有自测曾复制同一偏移，不能作为协议正确性的独立证据。修复边界和 golden vectors 方案见 [12-top5-protocol-stability-design.md](12-top5-protocol-stability-design.md)，审查优先级见 [13-project-review-and-optimization.md](13-project-review-and-optimization.md)。
+协议字节真值由 `tests/fixtures/ble_protocol_vectors.json` 独立维护；`tests/test_ble_protocol_vectors.py` 同时校验纯 C 编码器与无 bleak Python 解析器，避免固件和自测复制同一错误偏移。
 
 ### 4.3 CPS / HRS / CSC / FTMS / DIS 特征
 
@@ -284,6 +286,14 @@ DIS 读取内容来自编译期常量：
 
 测试脚本 `tests/ble_selftest.py` 也会校验这三项。
 
+当前运动 payload 契约：
+
+- CPS：`flags=0x0020`，2 字节有符号功率、2 字节累计曲柄转数、2 字节曲柄事件时间，总长 8 字节。
+- CSC：`flags=0x02`，crank-only，总长 5 字节。
+- FTMS Indoor Bike：全开 `0x0044/8B`、仅踏频 `0x0004/6B`、仅功率 `0x0041/4B`。
+- FTMS Treadmill：`flags=0x0504`，速度、uint24 米制距离、心率、用时，总长 10 字节。
+- RSC：运行/暂停 flags 分别为 `0x07/0x03`；Total Distance 使用 0.1m 单位，领域层米值在 BLE 边界乘 10；RSC Feature 为 2 字节 `0x0007`。
+
 ### 4.4 FTMS 控制点 OpCode 状态机
 
 控制点写回调是 `ftms_cp_cb()`。
@@ -301,16 +311,20 @@ DIS 读取内容来自编译期常量：
 - `FTMS_OP_RESPONSE_CODE = 0x80`
 - `FTMS_RESULT_SUCCESS = 0x01`
 - `FTMS_RESULT_NOT_SUPPORTED = 0x02`
+- `FTMS_RESULT_INVALID_PARAM = 0x03`
+- `FTMS_RESULT_OPERATION_FAILED = 0x04`
 
 状态更新逻辑：
 
 - `RequestControl`：直接 success
 - `SetTargetPower`：解析 `<h` 16-bit 功率值，调用 `g_erg_cb(target)`
-- `SetTargetSpeed`：解析 `uint16` 速度（km/h*100），投递跑步目标速度事件
-- `StartResume`：`g_ftms_status_buf[0] = 0x01`
-- `StopPause`：`g_ftms_status_buf[0] = 0x02`
-- `Reset`：`g_ftms_status_buf[0] = 0x00`
+- `SetTargetSpeed`：先校验 `uint16` 速度（km/h*100）值域，再投递跑步目标速度事件
+- `StartResume`：可靠投递成功后发送 Fitness Machine Status `Started/Resumed by User = 0x03`
+- `StopPause`：可靠投递成功后发送 Fitness Machine Status `Stopped/Paused by User = 0x02`
+- `Reset`：可靠投递成功后发送 Fitness Machine Status `Reset = 0x01`
 - 其他：返回 not supported
+
+Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述三种状态都只有 1 字节，不发送固定长度补零。running profile 的 SetSpeed/Start/Stop/Reset 若应用回调未注册或事件队列未接收，返回 `Operation Failed`，且不提前修改 FTMS Status；`Invalid Parameter` 只表示带参数命令的值域非法。Success 表示事件已被主循环可靠接收，不代表 GATT 回调同步等待业务执行完成。
 
 应用层注册的 `g_erg_cb` 实际是 `app_main.c` 里的 `on_erg_target()`。
 它不直接写引擎，而是投递 `APP_EVT_ERG_TARGET`，由主循环串行消费。
@@ -491,7 +505,7 @@ DIS 读取内容来自编译期常量：
 
 ### 6.7 模式切换与重置
 
-`power_engine_set_mode()` 在成功切换后会调用 `power_engine_reset_mode_state()`。
+`power_engine_set_mode()` 只接受可持久化的 steady/road；ERG 只能由 FTMS 会话目标进入。成功切换后会调用 `power_engine_reset_mode_state()`。
 
 重置行为：
 
@@ -502,16 +516,26 @@ DIS 读取内容来自编译期常量：
 
 ### 6.8 ERG 目标写入行为
 
-`power_engine_set_erg_target()` 的语义比名字更强：
+`power_engine_set_erg_target()` 只维护运行时会话：
 
 1. 检查目标功率是否在 `POWER_MIN` 到 `POWER_MAX` 之间
 2. 写入 `erg_active_target`
 3. 设置 `has_erg_target = true`
-4. 同步更新 `base_power`
-5. 如果原先不在 `RIDE_MODE_ERG`，自动切到 `ERG`
-6. 置 `dirty = true`
+4. 如果原先不在 `RIDE_MODE_ERG`，自动切到 ERG 运行态
+5. 保持 `base_power` 不变
+6. 不设置配置 `dirty`
 
-因此当前实现中 FTMS 下发目标功率会改变后续持久化结果，不只是一次性的临时控制。这是已确认的 P0 会话态/持久化边界缺陷，目标行为见 [12-top5-protocol-stability-design.md](12-top5-protocol-stability-design.md)。
+Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，清除目标、切回 steady 并恢复原 `base_power`，同样不设置 dirty。`config_store_from_engine()` 在运行时仍处于 ERG 时也只导出 steady/base power；`config_store_validate()` 会把旧 NVS 或导入配置中的 ERG 修正为 steady，沿用现有 fixed 回写路径清理旧值，schema 仍为 v11。
+
+### 6.9 跑步会话状态
+
+`running_engine_t.running` 是非持久化会话状态，初始化以及从 cycling 切入 running profile 时默认为 `true`：
+
+- Start/Resume：置 `running=true`，恢复按当前配速配置生成快照。
+- Stop/Pause：置 `running=false`；后续每个 50ms 周期仍生成 BLE 快照，但速度、步频、步幅为 0，距离和用时冻结。
+- Reset：清零距离和用时，保持 Reset 前的运行/暂停状态。
+
+对应薄封装和 Reset 都不设置配置 dirty；`running_snapshot_t.running` 由 BLE codec 映射到 RSC Walking or Running Status 位。
 
 ## 第七章：心率模型
 
@@ -696,6 +720,7 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 - `s_deadline_sec`（32 位秒级单调时间，避免 64 位变量在 httpd 任务与定时器回调间撕裂误重启）
 - `s_closing`（收尾窗口中不再续期、不再接受配置修改）
 - `s_done_called`（done 回调幂等标志）
+- `s_pending_wifi_done`（应用事件队列满时的单比特完成 latch）
 
 流程为：
 
@@ -703,8 +728,9 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 2. `esp_timer_start_periodic(..., 1000000)` 每秒检查一次
 3. `shutdown_check_cb()` 判断是否超时
 4. 超时或保存并关闭 WiFi 后调用 `portal_done()`
-5. `portal_done()` 通过 done 回调投递 `APP_EVT_WIFI_DONE`
-6. 状态机在 app_main 上下文调用 `radio_ctrl_exit_wifi()`
+5. `portal_done()` 通过返回 `bool` 的 done 回调投递 `APP_EVT_WIFI_DONE`
+6. 队列满时 `on_wifi_done()` 设置 `s_pending_wifi_done`，由主循环在任何 BLE-not-ready 提前返回前消费
+7. 状态机在 app_main 上下文幂等调用 `radio_ctrl_exit_wifi()`；错误恢复态也会清理 HTTP/DNS/SoftAP，但保持错误状态
 
 所以当前版本的配网退出不重启设备；BLE 在普通配网期间保持在线。v4.0.0 已永久放弃设备内 OTA 与家庭网络配置；普通用户升级统一走网页端在线烧录。
 
@@ -796,6 +822,7 @@ namespace 固定为：
 - 功率 `POWER_MIN` 到 `POWER_MAX`
 - 踏频 `CADENCE_MIN` 到 `CADENCE_MAX`
 - 模式合法性
+- 持久配置中的 `RIDE_MODE_ERG` 规范化为 `RIDE_MODE_STEADY`
 - 固定心率 `HR_MIN` 到 `HR_MAX`，`has_user_hr` 规范化为 0/1
 - 体重 `PROFILE_WEIGHT_MIN` 到 `PROFILE_WEIGHT_MAX`
 - FTP `PROFILE_FTP_MIN` 到 `PROFILE_FTP_MAX`
@@ -822,6 +849,7 @@ namespace 固定为：
 
 - 按钮调功后的断电恢复
 - 配网页面提交时的即时生效
+- ERG 目标和跑步 Start/Stop/Reset 不产生持久化写入；ERG 会话中保存其他配置时仍只保存 steady/base power
 
 ## 第十章：稳定性保障
 
@@ -1003,12 +1031,22 @@ python3 scripts/tools/check_release_artifacts.py \
 - `test/test_domain`
 - `test/test_domain.c`
 
-该测试覆盖 `power_engine`、`hr_model`、`profile`、`config_store` 等纯 C 逻辑。
+该测试覆盖 `power_engine`、`running_engine`、`hr_model`、`profile`、`config_store` 等纯 C 逻辑；协议 payload 另由生产使用的 `ble_payload_codec`、固定 JSON vectors 和 `test/ble_codec_cli` 交叉验证。
 项目规则要求：只要改动了 `components/bikepower_domain/`，就应运行 host 单测。
+
+无需设备的协议与 harness 回归：
+
+```bash
+python3 tests/test_ble_protocol_vectors.py
+python3 tests/test_ble_reconnect_harness.py
+python3 tests/test_ble_running_harness.py
+python3 tests/test_device_profile_harness.py
+python3 tests/check_wifi_done_contract.py
+```
 
 ### 12.3 BLE 真机自测
 
-脚本为 `tests/ble_selftest.py`。
+脚本为 `tests/ble_selftest.py`；若设备保持配网态，可由 `tests/device_profile_harness.py` 临时切换 profile，测试阶段强制 `broadcast_mask=7` 以排除用户关闭字段造成的假失败，并在 `finally` 恢复原 profile、原广播掩码及测试期间可能被 SetTargetSpeed 改写的全部 running 持久配置。
 主要验证：
 
 - 扫描并连接 `BikePower`
@@ -1017,16 +1055,18 @@ python3 scripts/tools/check_release_artifacts.py \
 - CPS/HR/CSC/FTMS 通知是否工作
 - FTMS 控制点是否返回 `0x80`
 - `SetTargetPower` 后功率是否在目标值附近收敛
+- running `--control` 模式逐 opcode 等待对应 indication，按 moving → Stop 冻结 → paused Reset 清零且保持暂停 → Resume 恢复四阶段采集独立多样本窗口，并严格检查 RSC/Treadmill 累计增长或冻结
 
 默认目标功率可通过命令行参数指定。
 
 ### 12.4 连接状态测试
 
 脚本为 `tests/stage3_conn_test.py`。
-作用是连接设备几秒后断开，验证：
+作用是执行两轮独立“扫描 → 连接 → 显式断开”，验证：
 
-- 状态机是否收到 `connected=1`
-- 心跳日志是否正确反映连接状态
+- 第二轮重新扫描而不是复用第一次发现结果，且设备 identifier 必须与首轮一致
+- 两轮连接和断开均成功，证明断开后恢复广播
+- 有串口时辅助观察状态机连接/断开日志；无串口不会伪造串口证据
 
 LED 物理变化仍需人工肉眼确认。
 

@@ -4,9 +4,23 @@
 
 ## [未发布]
 
+### P0 协议、会话与可靠性修复（2026-10-22）
+- `components/bikepower_domain/ble_payload_codec.c/.h`、`main/ble_bikepower.c`：新增生产纯 C BLE codec；CPS 改为标准 8B/flags `0x0020`，CSC 为 5B，FTMS Bike 按广播项输出 8B/6B/4B，Treadmill 改为 `0x0504`/10B，RSC 统一 10B、运行/暂停 flags `0x07/0x03`、距离 0.1m，RSC Feature 改为 2B `0x0007`。
+- `components/bikepower_domain/running_engine.c/.h`、`power_engine.c/.h`、`main/app_state.c`：新增非持久化 running 会话；暂停时速度/步频/步幅归零且距离/用时冻结，Start 恢复累计，Reset 清累计并保持原运行/暂停态。running FTMS Start/Stop/Reset 只有在应用回调接纳后才返回 Success 和更新 Status，合法参数但回调缺失/拒绝返回 `Operation Failed (0x04)`；Fitness Machine Status 改用独立标准操作码 `Reset=0x01`、`Stopped/Paused=0x02`、`Started/Resumed=0x03` 和对应 1B payload。
+- `components/bikepower_domain/power_engine.c`、`config_store.c/.h`、`main/nvs_store.c`：ERG 改为会话态，设定/清除目标不再覆盖 `base_power` 或制造持久化脏标记；禁止通用 mode setter 直接进入 ERG；`config_store_from_engine()` 统一持久化映射，旧 NVS ERG 值加载时规范化为 steady。
+- `main/app_main.c`、`main/app_state.c`、`main/radio_ctrl.c`、`main/wifi_portal.c/.h`：WiFi done callback 改为可确认接纳，队列满时使用 pending latch 由主循环消费；退出配网继续经 `radio_ctrl` 幂等清理 HTTP/DNS/SoftAP，并保留原错误恢复态。
+- `tests/ble_protocol.py`、`tests/fixtures/ble_protocol_vectors.json`、`test/ble_codec_cli.c`、`tests/test_ble_protocol_vectors.py`：新增无 bleak parser、10 组独立 golden vectors 和 C CLI，交叉验证生产 encoder 与测试解析器，拒绝旧 CPS/Treadmill 和字段长度不一致的数据包。
+- `tests/stage3_conn_test.py`、`tests/test_ble_reconnect_harness.py`：重连门禁升级为两轮独立扫描、连接和显式断开，第二轮禁止复用第一次扫描结果且必须命中与首轮相同的设备 identifier。
+- `tests/test_ble_running_harness.py`：新增 running 离线回归，验证控制点按 opcode 等待 indication、增长/冻结 helper 的严格多样本语义，以及 moving/pause/reset/resume 四阶段结构；已接入 quick、quality gate 和双平台构建前门禁。
+- `tests/device_profile_harness.py`、`tests/test_device_profile_harness.py`、`tests/operation_gate.py`：新增 profile-aware 真机编排；配网态分别切换 cycling/running，测试阶段强制 `broadcast_mask=7`，结束后在 `finally` 恢复原 profile/mask 及全部 running 持久配置；running `--control` 逐 opcode 等待 indication，并按 moving → Stop 冻结 → paused Reset 清零保持暂停 → Resume 恢复四阶段采集多样本；无配网态必须声明单一当前 profile，另一 profile 保持 `NOT_RUN`。
+- `tests/check_ftms_control_contract.py`、`tests/check_wifi_done_contract.py`、`tests/check_ble_broadcast_monitor.py`：新增控制点接纳/标准 Status、WiFi 完成可靠性和广播测试配置恢复失败阻断契约；Windows 无 host C 工具链或 `-SkipHostTest` 时 golden vectors 显式降级为 `--parser-only`，不再误调用 `make`。
+- 验证：`python3 scripts/tools/quality_gate.py` 通过（81 PASS / 2 个预期 dirty-worktree WARN / 0 FAIL，包含 `idf.py build` 与 5892/0 host 断言）；完整 BLE vectors 3 项通过（覆盖 10 组 vectors），隐藏 `make` 的 `--parser-only` 为 2 项通过/1 项按预期跳过；配置一致性 269/0，quick operation gate 与全部协议/harness/可靠性契约通过。
+- 环境限制：当前 macOS 环境无 `pwsh`/`powershell`，`scripts/build_all.ps1` 未做 PowerShell 实机执行；已完成 parser-only 行为测试与脚本结构审查。
+- 未执行：本轮改动尚未在 generic-c3/m5stamp-c3 上重新烧录；cycling、running `--control`、双次重连、广播开关、配网退出、标准客户端和物理按钮/LED 均保持 `NOT_RUN`，不得沿用历史 release 证据冒充通过。
+
 ### 项目复审、源码卫生与文档治理
 - `main/bikepower_config.h`、`main/captive_portal.c`、`main/radio_ctrl.c`、`main/wifi_portal.c`：集中 DNS/HTTP 任务栈、报文、TTL、网关地址、socket 上限和停止等待参数，移除平台实现中的散落魔法数；设备行为保持不变。
-- `main/app_main.c`、`main/app_state.c/.h`、`main/ble_bikepower.c`：移除未使用 include，清理“阶段5接入”等过期注释，并让 BLE 顶部格式说明与当前真实 9 字节旧兼容 CPS 布局一致。
+- `main/app_main.c`、`main/app_state.c/.h`、`main/ble_bikepower.c`：移除未使用 include，清理“阶段5接入”等过期注释；此前审查阶段曾如实标记旧 9 字节 CPS 布局，本轮已由标准 8 字节 codec 取代。
 - `docs/dev/12-top5-protocol-stability-design.md`、`docs/dev/13-project-review-and-optimization.md`：恢复规范目录，记录 P0 协议/状态可靠性修复设计和本轮分级优化清单。
 - `docs/INDEX.md`、`docs/wiki/`、`.trae/rules/`、`.trae/memory/`、`PROGRESS.md`：建立文档权威顺序，修复本机绝对链接、版本、路由数、FTMS OpCode、广播间隔、设备名预算和发布状态漂移。
 - `tests/check_config_consistency.py`、`scripts/tools/quality_gate.py`：把规范目录、可移植链接、当前版本、路由计数和新增治理文档纳入静态门禁。
