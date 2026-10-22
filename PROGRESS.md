@@ -2,7 +2,8 @@
 
 > 基线方案：[docs/archive/01-cidf-nimble-rewrite.md](docs/archive/01-cidf-nimble-rewrite.md)
 > 当前固件版本：v4.1.1（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
-> 参考仓库：git@gitee.com:mengen4jv/bikepower-c.git
+> 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
+> 备用镜像：gitee.com/mengen4jv/bikepower-c（保留既有 Release 发布链路）
 
 ---
 

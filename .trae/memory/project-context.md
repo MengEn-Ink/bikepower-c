@@ -39,6 +39,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 5. **测试无误后自动提交并 push（用户已授权，无需逐次询问）**：相关测试（host 单测 / 编译 / 适用时真机）通过即 commit 并立即 `git push`，无需等待确认。
 6. **提交前 diff 自检**：链路完整、无残留调试、文档已同步。
 7. commit message 末尾附 `Co-authored-by: AI <ai@trae>` + `Model:`。
+8. **主仓库**：GitHub `MengEn-Ink/bikepower-c`，本地 `origin` 必须指向 GitHub；Gitee 远端仅以 `gitee` 名称保留为备用镜像和既有 Release 渠道。
 
 ---
 
@@ -55,8 +56,9 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 
 ## 五、凭证信息
 
-- **Gitee Token**：放 `.env`（`GITEE_TOKEN`），脚本 `os.getenv` 读取。
-- **Gitee 仓库**：`mengen4jv/bikepower-c`。
+- **GitHub 主仓库**：`MengEn-Ink/bikepower-c`，通过 GitHub CLI 凭据管理，不在仓库中保存 token。
+- **Gitee Token**：仅供既有 Release 发布脚本使用，放 `.env`（`GITEE_TOKEN`），脚本 `os.getenv` 读取。
+- **Gitee 备用镜像/Release 仓库**：`mengen4jv/bikepower-c`。
 - 不在代码/日志/commit 中明文写凭证。
 
 ---
@@ -73,6 +75,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 | 状态机 | 7 态：BOOTING/BLE_ACTIVE/WIFI_CONFIRM/WIFI_CONFIG/SAVING/REBOOTING/ERROR_RECOVERY | 2026-06-12 |
 | WiFi 射频共用 | 配网默认 coex 共存（BLE 不停、不重启）；v4.0.0 已移除在线 OTA 与家庭网络配置，仅共存初始化失败时由 radio_ctrl 停 BLE 兜底 | 2026-06-28 |
 | 跑步模式核心闭环 | 当前跑步 P0 以 RSC 速度 + 步频 + 心率为核心；坡度不是必要参数，已从当前配置/API/网页/NVS 中移除，未来 FTMS Treadmill 再按需求恢复 | 2026-07-07 |
+| 代码托管 | GitHub `MengEn-Ink/bikepower-c` 为主仓库和 `origin`；Gitee 改为 `gitee` 备用远端，既有 Release 工具暂时保留 | 2026-10-22 |
 
 ---
 

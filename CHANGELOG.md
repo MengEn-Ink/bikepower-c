@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+### 仓库托管迁移（2026-10-22）
+- 主仓库迁移至公开的 GitHub `MengEn-Ink/bikepower-c`，默认分支为 `main`；本地 `origin` 已切换到 GitHub，原 Gitee 远端改名为 `gitee` 保留。
+- 已向 GitHub 上传 5 个本地分支和 14 个历史版本标签，并校验远端 `main` 与本地提交一致。
+- 既有 `publish_gitee_release.py` 和 Gitee Release 证据链暂时保留为发布渠道；本次只迁移源码仓库管理，不把发布渠道迁移与仓库上传混为一项。
+
 ### P0 协议、会话与可靠性修复（2026-10-22）
 - `components/bikepower_domain/ble_payload_codec.c/.h`、`main/ble_bikepower.c`：新增生产纯 C BLE codec；CPS 改为标准 8B/flags `0x0020`，CSC 为 5B，FTMS Bike 按广播项输出 8B/6B/4B，Treadmill 改为 `0x0504`/10B，RSC 统一 10B、运行/暂停 flags `0x07/0x03`、距离 0.1m，RSC Feature 改为 2B `0x0007`。
 - `components/bikepower_domain/running_engine.c/.h`、`power_engine.c/.h`、`main/app_state.c`：新增非持久化 running 会话；暂停时速度/步频/步幅归零且距离/用时冻结，Start 恢复累计，Reset 清累计并保持原运行/暂停态。running FTMS Start/Stop/Reset 只有在应用回调接纳后才返回 Success 和更新 Status，合法参数但回调缺失/拒绝返回 `Operation Failed (0x04)`；Fitness Machine Status 改用独立标准操作码 `Reset=0x01`、`Stopped/Paused=0x02`、`Started/Resumed=0x03` 和对应 1B payload。
