@@ -4,7 +4,7 @@
  *         + FTMS(0x1826) + Device Information(0x180A)
  *
  * 当前通知数据格式：
- *   CPS  Measurement: 旧兼容格式 flags(1)=0x20 + power(2) + crankRev(2) + reserved(2) + crankTime1024(2)
+ *   CPS  Measurement: flags(2)=0x0020 + power(2) + crankRev(2) + crankTime1024(2)
  *   HR   Measurement: flags(1)=0x00 + bpm(1)
  *   CSC  Measurement: flags(1)=0x02 + crankRev(2) + crankTime1024(2)
  *   FTMS IndoorBike : flags(2)=0x0044 + speed(2)=cad*30 + cadence(2)=cad*2 + power(2)
@@ -23,6 +23,7 @@
 #include "services/gatt/ble_svc_gatt.h"
 
 #include "bikepower_config.h"
+#include "ble_payload_codec.h"
 #include "domain_config.h"
 #include "running_engine.h"
 #include "ble_bikepower.h"
@@ -54,22 +55,23 @@ static volatile uint8_t  g_run_cadence = RUN_CADENCE_DEFAULT;
 static volatile uint16_t g_run_stride_cm = 0;
 static volatile uint32_t g_run_distance_m = 0;
 static volatile uint32_t g_run_elapsed_s = 0;
+static volatile bool     g_run_running = true;
 
 // 曲柄累计（CPS/CSC 共用）
 static uint16_t g_crank_rev = 0;
 static uint32_t g_last_crank_ms = 0;
 
 // 预分配通知缓冲区（运行时零 malloc）
-static uint8_t g_cps_buf[9];
-static uint8_t g_hr_buf[2];
-static uint8_t g_csc_buf[5];
-static uint8_t g_rsc_buf[10];
-static uint8_t g_rsc_feature_buf[4] = { 0x03, 0x00, 0x00, 0x00 };
+static uint8_t g_cps_buf[BLE_PAYLOAD_CPS_LEN];
+static uint8_t g_hr_buf[BLE_PAYLOAD_HRS_LEN];
+static uint8_t g_csc_buf[BLE_PAYLOAD_CSC_LEN];
+static uint8_t g_rsc_buf[BLE_PAYLOAD_RSC_LEN];
+static uint8_t g_rsc_feature_buf[2] = { 0x07, 0x00 };
 static uint8_t g_sensor_location = 0x05;
-static uint8_t g_ftms_bike_buf[8];
-static size_t g_ftms_bike_len = 8;
-static uint8_t g_ftms_treadmill_buf[12];
-static size_t g_ftms_treadmill_len = 12;
+static uint8_t g_ftms_bike_buf[BLE_PAYLOAD_FTMS_BIKE_MAX_LEN];
+static size_t g_ftms_bike_len = BLE_PAYLOAD_FTMS_BIKE_MAX_LEN;
+static uint8_t g_ftms_treadmill_buf[BLE_PAYLOAD_FTMS_TREADMILL_LEN];
+static size_t g_ftms_treadmill_len = BLE_PAYLOAD_FTMS_TREADMILL_LEN;
 static uint8_t g_ftms_resp_buf[3];
 
 // FTMS 静态特征值：前 4 字节为 machine feature，后 4 字节为 target setting feature。
@@ -81,7 +83,9 @@ static const uint8_t g_ftms_running_feature_buf[8] = {
     0x04, 0x05, 0x00, 0x00, // distance + heart rate + elapsed time
     0x02, 0x00, 0x00, 0x00, // target speed setting
 };
-static uint8_t g_ftms_status_buf[7]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+// 当前实现使用的 Reset/Stopped/Started 状态均为单字节 OpCode；带参数的
+// Fitness Machine Status 必须按各自格式另行编码，不能用固定长度补零。
+static uint8_t g_ftms_status_buf[1] = { FTMS_STATUS_RESET };
 
 static ble_erg_cb_t g_erg_cb = NULL;
 static ble_erg_clear_cb_t g_erg_clear_cb = NULL;
@@ -278,6 +282,18 @@ static void ftms_send_response(uint8_t request_op, uint8_t result)
 }
 
 /**
+ * 发布无附加参数的 FTMS Fitness Machine Status。
+ * status：Fitness Machine Status 特征自己的操作码，不是 Control Point 操作码。
+ * 返回值：无。
+ * 特殊行为：当前支持的 Reset/Stopped/Started 状态均严格发送 1 字节。
+ */
+static void ftms_send_status(uint8_t status)
+{
+    g_ftms_status_buf[0] = status;
+    notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
+}
+
+/**
  * 处理 FTMS Control Point 写访问。
  * 解析客户端下发的控制点指令，并驱动 ERG 回调、状态更新和响应通知。
  * ch：连接句柄，未使用。
@@ -308,60 +324,75 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
             ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
             break;
         }
-        if (len >= 3) {
-            // Set Target Power 的负载为 signed 16-bit 目标功率（小端）
+        if (len < 3) {
+            ftms_send_response(op, FTMS_RESULT_INVALID_PARAM);
+            break;
+        }
+        {
             int16_t target_s16 = (int16_t)(buf[1] | ((uint16_t)buf[2] << 8));
             int target = (int)target_s16;
             ESP_LOGI(TAG, "ERG目标功率 %dW", target);
-            bool ok = false;
-            if (g_erg_cb) ok = g_erg_cb(target);
-            if (ok) {
-                ftms_send_response(FTMS_OP_SET_TARGET_POWER, FTMS_RESULT_SUCCESS);
+            if (target < POWER_MIN || target > POWER_MAX) {
+                ftms_send_response(op, FTMS_RESULT_INVALID_PARAM);
+            } else if (!g_erg_cb || !g_erg_cb(target)) {
+                ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
             } else {
-                ftms_send_response(FTMS_OP_SET_TARGET_POWER, FTMS_RESULT_INVALID_PARAM);
+                ftms_send_response(op, FTMS_RESULT_SUCCESS);
             }
-        } else {
-            ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
         }
         break;
     case FTMS_OP_SET_TARGET_SPEED:
-        if (g_profile != SPORT_PROFILE_RUNNING || len < 3) {
+        if (g_profile != SPORT_PROFILE_RUNNING) {
             ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
+            break;
+        }
+        if (len < 3) {
+            ftms_send_response(op, FTMS_RESULT_INVALID_PARAM);
             break;
         }
         {
             uint16_t target_speed = (uint16_t)(buf[1] | ((uint16_t)buf[2] << 8));
-            bool ok = false;
-            if (g_run_control_cb) ok = g_run_control_cb(BLE_RUN_CTRL_SPEED, (int)target_speed);
-            ftms_send_response(op, ok ? FTMS_RESULT_SUCCESS : FTMS_RESULT_INVALID_PARAM);
+            if (target_speed < RUN_SPEED_X100_MIN || target_speed > RUN_SPEED_X100_MAX) {
+                ftms_send_response(op, FTMS_RESULT_INVALID_PARAM);
+            } else if (!g_run_control_cb
+                       || !g_run_control_cb(BLE_RUN_CTRL_SPEED, (int)target_speed)) {
+                ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
+            } else {
+                ftms_send_response(op, FTMS_RESULT_SUCCESS);
+            }
         }
         break;
     case FTMS_OP_START_RESUME:
-        g_ftms_status_buf[0] = 0x01;
-        notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
-        if (g_profile == SPORT_PROFILE_RUNNING && g_run_control_cb) {
-            (void)g_run_control_cb(BLE_RUN_CTRL_START, 0);
+        if (g_profile == SPORT_PROFILE_RUNNING
+                && (!g_run_control_cb || !g_run_control_cb(BLE_RUN_CTRL_START, 0))) {
+            ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
+            break;
         }
+        ftms_send_status(FTMS_STATUS_STARTED_RESUMED_BY_USER);
         ftms_send_response(FTMS_OP_START_RESUME, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_STOP_PAUSE:
-        g_ftms_status_buf[0] = 0x02;
-        notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
-        if (g_profile == SPORT_PROFILE_RUNNING) {
-            if (g_run_control_cb) (void)g_run_control_cb(BLE_RUN_CTRL_STOP, 0);
-        } else if (g_erg_clear_cb) {
+        if (g_profile == SPORT_PROFILE_RUNNING
+                && (!g_run_control_cb || !g_run_control_cb(BLE_RUN_CTRL_STOP, 0))) {
+            ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
+            break;
+        }
+        if (g_profile != SPORT_PROFILE_RUNNING && g_erg_clear_cb) {
             g_erg_clear_cb(FTMS_OP_STOP_PAUSE);
         }
+        ftms_send_status(FTMS_STATUS_STOPPED_PAUSED_BY_USER);
         ftms_send_response(FTMS_OP_STOP_PAUSE, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_RESET:
-        g_ftms_status_buf[0] = 0x00;
-        notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
-        if (g_profile == SPORT_PROFILE_RUNNING) {
-            if (g_run_control_cb) (void)g_run_control_cb(BLE_RUN_CTRL_RESET, 0);
-        } else if (g_erg_clear_cb) {
+        if (g_profile == SPORT_PROFILE_RUNNING
+                && (!g_run_control_cb || !g_run_control_cb(BLE_RUN_CTRL_RESET, 0))) {
+            ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
+            break;
+        }
+        if (g_profile != SPORT_PROFILE_RUNNING && g_erg_clear_cb) {
             g_erg_clear_cb(FTMS_OP_RESET);
         }
+        ftms_send_status(FTMS_STATUS_RESET);
         ftms_send_response(FTMS_OP_RESET, FTMS_RESULT_SUCCESS);
         break;
     default:
@@ -583,7 +614,7 @@ static const struct ble_gatt_svc_def *active_gatt_svcs(void)
  * 根据当前运行时快照生成 CPS、HRS、CSC 和 FTMS 的二进制负载。
  * 无参数。
  * 返回值：无。
- * 特殊行为：会推进曲柄累计圈数和时间戳，保持与旧版协议输出兼容。
+ * 特殊行为：会推进曲柄累计圈数和时间戳。
  */
 static void pack_all(void)
 {
@@ -605,44 +636,16 @@ static void pack_all(void)
     g_last_crank_ms = adjusted_ms;
 
     // 基于踏频推演曲柄累计量，统一驱动 CPS 和 CSC 的 rev/time 字段。
-    // CPS: flags=0x20(bit5=crank data present) + power(2) + crank_rev(4) + crank_time(2)
-    g_cps_buf[0] = 0x20;
-    g_cps_buf[1] = power & 0xFF;       g_cps_buf[2] = (power >> 8) & 0xFF;
-    g_cps_buf[3] = rev & 0xFF;         g_cps_buf[4] = (rev >> 8) & 0xFF;
-    g_cps_buf[5] = 0x00;               g_cps_buf[6] = 0x00;
-    g_cps_buf[7] = time_1024 & 0xFF;   g_cps_buf[8] = (time_1024 >> 8) & 0xFF;
-
-    // HR: flags=0x00 + bpm
-    g_hr_buf[0] = 0x00;
-    g_hr_buf[1] = g_hr_bpm;
-
-    // CSC: flags=0x02 + rev + time
-    g_csc_buf[0] = 0x02;
-    g_csc_buf[1] = rev & 0xFF;         g_csc_buf[2] = (rev >> 8) & 0xFF;
-    g_csc_buf[3] = time_1024 & 0xFF;   g_csc_buf[4] = (time_1024 >> 8) & 0xFF;
+    (void)ble_payload_encode_cps(g_cps_buf, sizeof(g_cps_buf),
+                                 (int16_t)power, rev, time_1024);
+    (void)ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), g_hr_bpm);
+    (void)ble_payload_encode_csc(g_csc_buf, sizeof(g_csc_buf), rev, time_1024);
 
     bool cadence_enabled = (g_broadcast_mask & BROADCAST_FIELD_CADENCE) != 0;
     bool power_enabled = (g_broadcast_mask & BROADCAST_FIELD_POWER) != 0;
-    uint16_t ftms_flags = cadence_enabled ? 0x0000 : 0x0001; // More Data=1 omits instantaneous speed.
-    uint8_t off = 2;
-    if (cadence_enabled) {
-        ftms_flags |= 0x0004;
-        uint16_t speed = cadence * 30;
-        g_ftms_bike_buf[off++] = speed & 0xFF;
-        g_ftms_bike_buf[off++] = (speed >> 8) & 0xFF;
-        ftms_flags |= 0x0040;
-        uint16_t ftms_cad = cadence * 2;
-        g_ftms_bike_buf[off++] = ftms_cad & 0xFF;
-        g_ftms_bike_buf[off++] = (ftms_cad >> 8) & 0xFF;
-    }
-    if (power_enabled) {
-        ftms_flags |= 0x0040;
-        g_ftms_bike_buf[off++] = power & 0xFF;
-        g_ftms_bike_buf[off++] = (power >> 8) & 0xFF;
-    }
-    g_ftms_bike_buf[0] = ftms_flags & 0xFF;
-    g_ftms_bike_buf[1] = (ftms_flags >> 8) & 0xFF;
-    g_ftms_bike_len = off;
+    g_ftms_bike_len = ble_payload_encode_ftms_bike(
+        g_ftms_bike_buf, sizeof(g_ftms_bike_buf), cadence_enabled, power_enabled,
+        (uint16_t)(cadence * 30u), (uint16_t)(cadence * 2u), (int16_t)power);
 }
 
 static void pack_running(void)
@@ -651,36 +654,18 @@ static void pack_running(void)
     uint16_t stride = g_run_stride_cm;
     uint32_t distance = g_run_distance_m;
     uint32_t elapsed = g_run_elapsed_s;
+    bool running = g_run_running;
 
-    g_hr_buf[0] = 0x00;
-    g_hr_buf[1] = g_hr_bpm;
-
-    g_rsc_buf[0] = 0x07;
-    g_rsc_buf[1] = speed & 0xFF;
-    g_rsc_buf[2] = (speed >> 8) & 0xFF;
-    g_rsc_buf[3] = g_run_cadence;
-    g_rsc_buf[4] = stride & 0xFF;
-    g_rsc_buf[5] = (stride >> 8) & 0xFF;
-    g_rsc_buf[6] = distance & 0xFF;
-    g_rsc_buf[7] = (distance >> 8) & 0xFF;
-    g_rsc_buf[8] = (distance >> 16) & 0xFF;
-    g_rsc_buf[9] = (distance >> 24) & 0xFF;
+    (void)ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), g_hr_bpm);
+    uint32_t distance_dm = distance > UINT32_MAX / 10u ? UINT32_MAX : distance * 10u;
+    (void)ble_payload_encode_rsc(g_rsc_buf, sizeof(g_rsc_buf), running,
+                                 speed, g_run_cadence, stride, distance_dm);
 
     uint16_t ftms_speed = (uint16_t)(((uint32_t)speed * 360u + 128u) / 256u);
-    uint16_t flags = 0x0306; // distance + heart rate + elapsed time
-    uint8_t off = 2;
-    g_ftms_treadmill_buf[off++] = ftms_speed & 0xFF;
-    g_ftms_treadmill_buf[off++] = (ftms_speed >> 8) & 0xFF;
-    g_ftms_treadmill_buf[off++] = distance & 0xFF;
-    g_ftms_treadmill_buf[off++] = (distance >> 8) & 0xFF;
-    g_ftms_treadmill_buf[off++] = (distance >> 16) & 0xFF;
-    g_ftms_treadmill_buf[off++] = g_hr_bpm;
     uint16_t elapsed16 = elapsed > 0xFFFFu ? 0xFFFFu : (uint16_t)elapsed;
-    g_ftms_treadmill_buf[off++] = elapsed16 & 0xFF;
-    g_ftms_treadmill_buf[off++] = (elapsed16 >> 8) & 0xFF;
-    g_ftms_treadmill_buf[0] = flags & 0xFF;
-    g_ftms_treadmill_buf[1] = (flags >> 8) & 0xFF;
-    g_ftms_treadmill_len = off;
+    g_ftms_treadmill_len = ble_payload_encode_ftms_treadmill(
+        g_ftms_treadmill_buf, sizeof(g_ftms_treadmill_buf),
+        ftms_speed, distance, g_hr_bpm, elapsed16);
 }
 
 /**
@@ -996,6 +981,7 @@ void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartra
     g_run_stride_cm = snapshot.stride_cm;
     g_run_distance_m = snapshot.total_distance_m;
     g_run_elapsed_s = snapshot.elapsed_time_s;
+    g_run_running = snapshot.running;
 }
 
 /**

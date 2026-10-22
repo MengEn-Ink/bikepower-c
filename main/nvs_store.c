@@ -18,51 +18,6 @@ static SemaphoreHandle_t s_save_mutex = NULL;
 static StaticSemaphore_t s_save_mutex_buf;
 
 /**
- * 把运行时引擎状态拷贝成可持久化配置结构。
- * 从 power_engine 与 profile 提取需要保存到 NVS 的字段。
- * e：源功率引擎实例。
- * c：目标配置结构。
- * 返回值：无。
- * 特殊行为：设备名会做长度截断并确保字符串结尾为 `\0`。
- */
-static void engine_to_config(power_engine_t *e, config_data_t *c)
-{
-    c->schema_ver = CONFIG_VERSION;
-    c->power = e->base_power;
-    c->cadence = e->cadence_base;
-    c->mode = (int)e->mode;
-    c->heartrate = e->has_user_hr ? e->user_heartrate : DEFAULT_HEARTRATE;
-    c->has_user_hr = e->has_user_hr ? 1 : 0;
-    c->power_float = e->power_float;
-    c->cadence_float = e->cadence_float;
-    c->hr_float = e->hr_float;
-    c->power_step = e->power_step;
-    c->weight = e->profile.weight;
-    c->ftp = e->profile.ftp;
-    c->thr_hr = e->profile.thr_hr;
-    c->ride_type = e->profile.ride_type;
-    c->custom_wkg_low = e->profile.custom_wkg_low;
-    c->custom_wkg_high = e->profile.custom_wkg_high;
-    strncpy(c->custom_pacer_name, e->profile.custom_pacer_name, CUSTOM_PACER_NAME_MAX - 1);
-    c->custom_pacer_name[CUSTOM_PACER_NAME_MAX - 1] = '\0';
-    c->led = e->led;
-    c->sport_profile = (int)e->sport_profile;
-    c->broadcast_mask = e->broadcast_mask;
-    c->run_speed_x100 = e->running.speed_x100_kmh;
-    c->run_pace_float_sec = e->running.pace_float_sec;
-    c->run_cadence = e->running.cadence_spm;
-    c->run_cadence_float = e->running.cadence_float_spm;
-    c->run_mode = e->running.mode;
-    c->run_pacer_type = e->running.pacer_type;
-    c->run_pace_low_sec = e->running.pace_low_sec;
-    c->run_pace_high_sec = e->running.pace_high_sec;
-    strncpy(c->run_custom_name, e->running.custom_name, RUN_CUSTOM_NAME_MAX - 1);
-    c->run_custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
-    strncpy(c->device_name, e->device_name, DEVICE_NAME_MAX - 1);
-    c->device_name[DEVICE_NAME_MAX - 1] = '\0';
-}
-
-/**
  * 把配置结构应用回运行时引擎。
  * 将 config_data_t 中的持久化字段逐项写回 power_engine 和 profile。
  * c：源配置结构。
@@ -251,7 +206,7 @@ bool nvs_store_save(power_engine_t *e)
     }
 
     config_data_t c;
-    engine_to_config(e, &c);
+    config_store_from_engine(e, &c);
 
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);

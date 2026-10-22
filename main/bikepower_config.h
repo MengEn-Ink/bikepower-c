@@ -144,7 +144,14 @@ typedef enum {
 #define FTMS_RESULT_SUCCESS       0x01
 #define FTMS_RESULT_NOT_SUPPORTED 0x02
 #define FTMS_RESULT_INVALID_PARAM 0x03
+#define FTMS_RESULT_OPERATION_FAILED 0x04
 #define FTMS_CP_BUF_SIZE          20     // FTMS控制点接收缓冲区大小（字节）
+
+// ===== FTMS Fitness Machine Status OpCode（0x2ADA 通知） =====
+// Status OpCode 与 Control Point OpCode 是两套独立编号，不得直接镜像。
+#define FTMS_STATUS_RESET                    0x01
+#define FTMS_STATUS_STOPPED_PAUSED_BY_USER   0x02
+#define FTMS_STATUS_STARTED_RESUMED_BY_USER  0x03
 
 // ===== 应用事件队列 =====
 #define APP_EVENT_QUEUE_LEN          16     // app_main 事件队列深度

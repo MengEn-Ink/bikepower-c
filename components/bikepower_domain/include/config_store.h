@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include "domain_config.h"
 #include "led_pattern.h"
+#include "power_engine.h"
 
 /*
  * 配置持久化数据结构。
@@ -49,6 +50,12 @@ typedef struct {
 
 /* 填充配置对象的出厂默认值。 */
 void config_store_defaults(config_data_t *c);
+
+/**
+ * 将功率引擎中的可持久化字段导出为配置对象。
+ * ERG 与跑步运行/暂停均为会话态：ERG 导出为 steady，功率始终使用 base_power。
+ */
+void config_store_from_engine(const power_engine_t *e, config_data_t *c);
 
 /**
  * 逐字段范围校验并夹紧到合法区间。

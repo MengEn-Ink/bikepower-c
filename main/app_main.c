@@ -35,6 +35,8 @@ static volatile int s_pending_erg_target = 0;
 static volatile bool s_has_pending_erg = false;
 static volatile int s_pending_erg_clear_reason = 0;
 static volatile bool s_has_pending_erg_clear = false;
+// WiFi 完成事件队列满时的单比特保底；事件幂等，无需计数。
+static volatile bool s_pending_wifi_done = false;
 
 /**
  * 处理 FTMS 控制点下发的 ERG 目标功率。
@@ -131,21 +133,22 @@ static void on_wifi_exit(void)
  * 由 wifi_portal 在 esp_timer 任务上下文调用，仅做轻量操作：投递事件给主循环，
  * 实际的 wifi_portal_stop / radio_ctrl_exit_wifi / 状态切换在 app_main 任务上下文串行执行。
  * 无参数。
- * 返回值：无。
- * 特殊行为：BLE 全程未停，事件投递后由主循环统一关闭 WiFi 资源。
+ * 返回值：true 表示事件已入队或已记入 pending latch。
+ * 特殊行为：队列满时仅设置单比特 latch，不在 esp_timer 任务中阻塞等待。
  */
-static void on_wifi_done(void)
+static bool on_wifi_done(void)
 {
     app_evt_t e = { .type = APP_EVT_WIFI_DONE, .data = 0 };
-    // esp_timer 任务上下文投递事件给主循环。队列满时短暂重试，避免事件丢失导致
-    // 永久卡在 ST_WIFI_CONFIG（portal_done 的 s_closing 守卫会阻止后续重试）。
-    for (int i = 0; i < 5; i++) {
-        if (xQueueSend(s_app_queue, &e, pdMS_TO_TICKS(10)) == pdTRUE) {
-            ESP_LOGI(TAG, "APP_EVT_WIFI_DONE 已投递（尝试 %d）", i + 1);
-            return;
-        }
+    if (s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE) {
+        ESP_LOGI(TAG, "APP_EVT_WIFI_DONE 已投递");
+        return true;
     }
-    ESP_LOGE(TAG, "APP_EVT_WIFI_DONE 投递失败，设备将卡在 ST_WIFI_CONFIG，需手动重启");
+
+    portDISABLE_INTERRUPTS();
+    s_pending_wifi_done = true;
+    portENABLE_INTERRUPTS();
+    ESP_LOGW(TAG, "APP_EVT_WIFI_DONE 队列满，已记入 pending latch");
+    return true;
 }
 
 void app_main(void)
@@ -226,6 +229,19 @@ void app_main(void)
         while (xQueueReceive(s_app_queue, &e, 0) == pdTRUE) {
             app_state_handle_event(&e);
         }
+        // 队列满时的 WiFi 完成保底必须在任何 BLE-not-ready continue 之前消费，
+        // 否则独占降级路径停掉 BLE 后会同时阻断 WiFi 资源回收。
+        bool has_wifi_done = false;
+        portDISABLE_INTERRUPTS();
+        if (s_pending_wifi_done) {
+            has_wifi_done = true;
+            s_pending_wifi_done = false;
+        }
+        portENABLE_INTERRUPTS();
+        if (has_wifi_done) {
+            app_evt_t wifi_done = { .type = APP_EVT_WIFI_DONE, .data = 0 };
+            app_state_handle_event(&wifi_done);
+        }
         // 处理待处理的ERG目标：关中断原子复制目标+清标志，避免竞态丢新目标（单核C3足够）
         int erg_target = 0;
         bool has_erg = false;
@@ -255,7 +271,7 @@ void app_main(void)
         }
 
         // WiFi 配网模式（共存）：BLE 保持在线继续通知，主循环继续生成快照推 BLE；
-        // APP_EVT_WIFI_DONE 已在上方队列消费中处理（调用 radio_ctrl_exit_wifi + 切回 ST_BLE_ACTIVE）。
+        // APP_EVT_WIFI_DONE 已在上方队列或 pending latch 消费中处理。
         // 不再 continue 跳过 BLE 通知，确保配网期间骑行 App 仍能收到实时数据。
 
         // BLE 未就绪：周期重试，跳过 BLE 调用，避免假运行

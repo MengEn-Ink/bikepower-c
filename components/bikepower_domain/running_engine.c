@@ -88,11 +88,24 @@ void running_engine_init(running_engine_t *e)
     e->elapsed_ms = 0;
     e->distance_x1000_m = 0;
     e->snapshot = (running_snapshot_t){ 0 };
+    e->running = true;
+    e->snapshot.running = true;
 }
 
 running_snapshot_t running_engine_snapshot(running_engine_t *e, uint32_t dt_ms)
 {
     if (!e) return (running_snapshot_t){ 0 };
+
+    if (!e->running) {
+        e->snapshot.speed_x100_kmh = 0;
+        e->snapshot.cadence_spm = 0;
+        e->snapshot.total_distance_m = e->distance_x1000_m / 1000u;
+        e->snapshot.elapsed_time_s = e->elapsed_ms / 1000u;
+        e->snapshot.rsc_speed_1_256_mps = 0;
+        e->snapshot.stride_cm = 0;
+        e->snapshot.running = false;
+        return e->snapshot;
+    }
 
     e->elapsed_ms += dt_ms;
     int pace_sec;
@@ -129,6 +142,7 @@ running_snapshot_t running_engine_snapshot(running_engine_t *e, uint32_t dt_ms)
     e->snapshot.elapsed_time_s = e->elapsed_ms / 1000u;
     e->snapshot.rsc_speed_1_256_mps = rsc_speed;
     e->snapshot.stride_cm = stride_cm;
+    e->snapshot.running = true;
     return e->snapshot;
 }
 
@@ -251,6 +265,13 @@ bool running_engine_set_custom_pacer(running_engine_t *e, const char *name, int 
     }
     if (changed) running_walk_reset(&e->pacer_pace_walk);
     return changed;
+}
+
+bool running_engine_set_running(running_engine_t *e, bool running)
+{
+    if (!e || e->running == running) return false;
+    e->running = running;
+    return true;
 }
 
 void running_engine_reset_session(running_engine_t *e)

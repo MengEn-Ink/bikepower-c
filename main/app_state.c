@@ -243,11 +243,15 @@ void app_state_handle_event(const app_evt_t *e)
         break;
 
     case APP_EVT_RUN_START:
-        ESP_LOGI(TAG, "跑步 FTMS 开始/恢复");
+        if (power_engine_set_run_running(s_engine, true)) {
+            ESP_LOGI(TAG, "跑步 FTMS 开始/恢复，累计继续推进");
+        }
         break;
 
     case APP_EVT_RUN_STOP:
-        ESP_LOGI(TAG, "跑步 FTMS 暂停/停止");
+        if (power_engine_set_run_running(s_engine, false)) {
+            ESP_LOGI(TAG, "跑步 FTMS 暂停/停止，冻结距离和用时");
+        }
         break;
 
     case APP_EVT_RUN_RESET:
@@ -255,16 +259,25 @@ void app_state_handle_event(const app_evt_t *e)
         ESP_LOGI(TAG, "跑步 FTMS reset，清空距离和用时");
         break;
 
-    case APP_EVT_WIFI_DONE:
-        // 配网结束（保存成功或超时）：先关闭 WiFi 资源（HTTP + SoftAP），再回到 BLE 活动态。
-        // BLE 全程未停，无需重激活；LED 直接根据当前连接状态刷新。
-        if (s_state == ST_WIFI_CONFIG) {
-            if (s_wifi_exit) s_wifi_exit();   // 在主任务上下文串行释放 WiFi 资源
+    case APP_EVT_WIFI_DONE: {
+        // 无论当前高层状态如何都先幂等回收 HTTP/DNS/SoftAP；
+        // 配网期间若 BLE 故障进入错误恢复态，不能因 state 守卫泄漏 WiFi 资源。
+        bool keep_error = s_state == ST_ERROR_RECOVERY;
+        if (s_wifi_exit) {
+            s_wifi_exit();   // 在主任务上下文串行释放 WiFi 资源
+        } else {
+            ESP_LOGE(TAG, "WiFi 退出回调未注册，无法回收射频资源");
+        }
+        if (keep_error) {
+            apply_led_scene(LED_SCENE_ERROR);
+            ESP_LOGW(TAG, "WiFi 配网资源已清理，保持 ST_ERROR_RECOVERY");
+        } else {
             s_state = ST_BLE_ACTIVE;
             update_idle_led();
             ESP_LOGI(TAG, "WiFi 配网结束 -> ST_BLE_ACTIVE");
         }
         break;
+    }
 
     case APP_EVT_BTN_DOWN:
         if (s_state == ST_WIFI_CONFIRM) {

@@ -57,6 +57,44 @@ void config_store_defaults(config_data_t *c)
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
 
+void config_store_from_engine(const power_engine_t *e, config_data_t *c)
+{
+    if (!e || !c) return;
+    c->schema_ver = CONFIG_VERSION;
+    c->power = e->base_power;
+    c->cadence = e->cadence_base;
+    c->mode = e->mode == RIDE_MODE_ERG ? RIDE_MODE_STEADY : (int)e->mode;
+    c->heartrate = e->has_user_hr ? e->user_heartrate : DEFAULT_HEARTRATE;
+    c->has_user_hr = e->has_user_hr ? 1 : 0;
+    c->power_float = e->power_float;
+    c->cadence_float = e->cadence_float;
+    c->hr_float = e->hr_float;
+    c->power_step = e->power_step;
+    c->weight = e->profile.weight;
+    c->ftp = e->profile.ftp;
+    c->thr_hr = e->profile.thr_hr;
+    c->ride_type = e->profile.ride_type;
+    c->custom_wkg_low = e->profile.custom_wkg_low;
+    c->custom_wkg_high = e->profile.custom_wkg_high;
+    strncpy(c->custom_pacer_name, e->profile.custom_pacer_name, CUSTOM_PACER_NAME_MAX - 1);
+    c->custom_pacer_name[CUSTOM_PACER_NAME_MAX - 1] = '\0';
+    c->led = e->led;
+    c->sport_profile = (int)e->sport_profile;
+    c->broadcast_mask = e->broadcast_mask;
+    c->run_speed_x100 = e->running.speed_x100_kmh;
+    c->run_pace_float_sec = e->running.pace_float_sec;
+    c->run_cadence = e->running.cadence_spm;
+    c->run_cadence_float = e->running.cadence_float_spm;
+    c->run_mode = e->running.mode;
+    c->run_pacer_type = e->running.pacer_type;
+    c->run_pace_low_sec = e->running.pace_low_sec;
+    c->run_pace_high_sec = e->running.pace_high_sec;
+    strncpy(c->run_custom_name, e->running.custom_name, RUN_CUSTOM_NAME_MAX - 1);
+    c->run_custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
+    strncpy(c->device_name, e->device_name, DEVICE_NAME_MAX - 1);
+    c->device_name[DEVICE_NAME_MAX - 1] = '\0';
+}
+
 /*
  * 校验并修正配置对象中的各字段范围。
  * 参数：c 为待校验的配置对象。
@@ -69,7 +107,11 @@ bool config_store_validate(config_data_t *c)
 
     c->power = clamp_int(c->power, POWER_MIN, POWER_MAX);
     c->cadence = clamp_int(c->cadence, CADENCE_MIN, CADENCE_MAX);
-    if (c->mode < 0 || c->mode >= RIDE_MODE_COUNT) c->mode = DEFAULT_RIDE_MODE;
+    if (c->mode < 0 || c->mode >= RIDE_MODE_COUNT) {
+        c->mode = DEFAULT_RIDE_MODE;
+    } else if (c->mode == RIDE_MODE_ERG) {
+        c->mode = RIDE_MODE_STEADY;
+    }
     c->heartrate = clamp_int(c->heartrate, HR_MIN, HR_MAX);
     c->has_user_hr = c->has_user_hr ? 1 : 0;
     c->power_float = clamp_int(c->power_float, POWER_FLOAT_MIN, POWER_FLOAT_MAX);

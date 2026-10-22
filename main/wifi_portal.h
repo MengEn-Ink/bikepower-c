@@ -9,8 +9,12 @@
  */
 #pragma once
 
+#include <stdbool.h>
+
 #include "power_engine.h"
 #include "esp_err.h"
+
+typedef bool (*wifi_portal_done_callback_t)(void);
 
 /**
  * 启动 WiFi 配网门户（HTTP 部分）。
@@ -32,12 +36,12 @@ void wifi_portal_stop(void);
 
 /**
  * 注册配网结束回调。
- * 保存成功或超时后会调用 cb，由调用方在 app_main 任务上下文里关闭 WiFi 并切换状态。
- * cb：配网结束回调，可为 NULL。
+ * 保存成功或超时后会调用 cb，由调用方把完成通知可靠交给 app_main 任务。
+ * cb：配网结束回调，返回 true 表示通知已被可靠接受；返回 false 时门户保留重试能力；可为 NULL。
  * 返回值：无。
- * 特殊行为：回调在 esp_timer 任务上下文执行，应仅做轻量操作（如投递事件队列），避免阻塞。
+ * 特殊行为：回调在 esp_timer 任务上下文执行，应仅做非阻塞轻量操作（如投递事件或设置 pending latch）。
  */
-void wifi_portal_set_done_callback(void (*cb)(void));
+void wifi_portal_set_done_callback(wifi_portal_done_callback_t cb);
 
 /**
  * 消费一次 BLE 重启请求。

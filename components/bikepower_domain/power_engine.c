@@ -404,6 +404,7 @@ bool power_engine_set_power_step(power_engine_t *e, int step)
 bool power_engine_set_mode(power_engine_t *e, ride_mode_t mode)
 {
     if (mode < 0 || mode >= RIDE_MODE_COUNT) return false;
+    if (mode == RIDE_MODE_ERG) return false;
     if (e->mode == mode) return false;
     e->mode = mode;
     if (mode != RIDE_MODE_ERG) {
@@ -458,6 +459,9 @@ bool power_engine_set_sport_profile(power_engine_t *e, sport_profile_t profile)
     if (profile < 0 || profile >= SPORT_PROFILE_COUNT) return false;
     if (e->sport_profile == profile) return false;
     e->sport_profile = profile;
+    if (profile == SPORT_PROFILE_RUNNING) {
+        running_engine_set_running(&e->running, true);
+    }
     e->dirty = true;
     return true;
 }
@@ -518,11 +522,16 @@ bool power_engine_set_run_pace_range(power_engine_t *e, int pace_low_sec, int pa
     return changed;
 }
 
+bool power_engine_set_run_running(power_engine_t *e, bool running)
+{
+    if (!e) return false;
+    return running_engine_set_running(&e->running, running);
+}
+
 void power_engine_run_reset(power_engine_t *e)
 {
     if (!e) return;
     running_engine_reset_session(&e->running);
-    e->dirty = true;
 }
 
 int power_engine_running_heartrate(power_engine_t *e, int speed_x100_kmh)
@@ -652,28 +661,24 @@ int power_engine_adjust_control_target(power_engine_t *e, control_target_t targe
  * 设置 FTMS 下发的 ERG 目标功率。
  * 参数：e 为功率引擎对象；target_power 为目标功率。
  * 返回值：成功设置或同值幂等返回 true，功率越界返回 false。
- * 特殊行为：非法功率范围会直接忽略；成功设置后会同步更新 base_power，并在非 ERG 模式下自动切换到 ERG 模式；
- *           已处于 ERG 且目标未变时幂等返回不置 dirty，避免高频同值下发反复落盘。
+ * 特殊行为：非法功率范围会直接忽略；目标只保存在运行时 ERG 会话中，不覆盖 base_power，
+ *           也不设置 dirty，避免训练 App 高频目标变化触发 NVS 落盘。
  */
 bool power_engine_set_erg_target(power_engine_t *e, int target_power)
 {
+    if (!e) return false;
     if (target_power < POWER_MIN || target_power > POWER_MAX) return false;
-    // 同值幂等：训练 App 在 ERG 中会高频(1~2Hz)反复下发相同/缓变目标，
-    // 若每次都置 dirty 会让心跳每 10s 把无意义的 ERG 目标反复写入 NVS，损耗 flash。
-    // 已处于 ERG 且目标未变时直接返回，不置 dirty。
-    if (e->mode == RIDE_MODE_ERG && e->has_erg_target && e->base_power == target_power) {
+    if (e->mode == RIDE_MODE_ERG && e->has_erg_target && e->erg_active_target == target_power) {
         return true;
     }
     ride_mode_t old_mode = e->mode;
     e->erg_active_target = target_power;
     e->has_erg_target = true;
-    e->base_power = target_power;
     e->last_power = target_power;
     if (old_mode != RIDE_MODE_ERG) {
         e->mode = RIDE_MODE_ERG;
         power_engine_reset_mode_state(e);
     }
-    e->dirty = true;
     return true;
 }
 
@@ -681,10 +686,11 @@ bool power_engine_set_erg_target(power_engine_t *e, int target_power)
  * 清除 ERG 目标并恢复到 steady 固定功率模式。
  * 参数：e 为功率引擎对象。
  * 返回值：发生状态变化返回 true，当前未处于 ERG 且无目标时返回 false。
- * 特殊行为：保留当前 base_power（通常为最后一个 ERG 目标），让用户退出训练后从可见功率继续手动调整。
+ * 特殊行为：base_power 始终保留进入 ERG 前的持久配置，退出后恢复该固定功率，不设置 dirty。
  */
 bool power_engine_clear_erg_target(power_engine_t *e)
 {
+    if (!e) return false;
     bool changed = e->has_erg_target || e->erg_active_target != 0 || e->mode == RIDE_MODE_ERG;
     if (!changed) return false;
     e->has_erg_target = false;
@@ -694,7 +700,6 @@ bool power_engine_clear_erg_target(power_engine_t *e)
         power_engine_reset_mode_state(e);
     }
     e->last_power = e->base_power;
-    e->dirty = true;
     return true;
 }
 

@@ -58,9 +58,11 @@ static volatile uint32_t s_deadline_sec = 0;
 static volatile bool s_closing = false;
 // done_cb 幂等标志：true 表示 portal_done 已调用过 done_cb，防止定时器重复触发投递多个事件。
 static volatile bool s_done_called = false;
+// 只记录首次未被接受，避免定时重试时反复刷日志。
+static bool s_done_retry_logged = false;
 static volatile bool s_ble_restart_requested = false;
 // 配网结束回调：保存/超时后由 portal 调用，通知 app_main 投递 APP_EVT_WIFI_DONE 切换状态
-static void (*s_done_cb)(void) = NULL;
+static wifi_portal_done_callback_t s_done_cb = NULL;
 
 // ============================ 超时管理 ============================
 
@@ -96,11 +98,16 @@ static void shutdown_check_cb(void *arg)
 static void portal_done(void)
 {
     if (s_done_called) return;
-    s_done_called = true;
     s_closing = true;
-    ESP_LOGI(TAG, "portal_done 触发，调用 done_cb 投递 APP_EVT_WIFI_DONE");
-    if (s_done_cb) s_done_cb();
-    else ESP_LOGE(TAG, "s_done_cb 为 NULL，APP_EVT_WIFI_DONE 无法投递");
+    bool accepted = s_done_cb && s_done_cb();
+    if (accepted) {
+        s_done_called = true;
+        s_done_retry_logged = false;
+        ESP_LOGI(TAG, "portal_done 通知已被应用层接受");
+    } else if (!s_done_retry_logged) {
+        s_done_retry_logged = true;
+        ESP_LOGW(TAG, "portal_done 通知尚未被接受，保留定时重试");
+    }
 }
 
 bool wifi_portal_consume_ble_restart_requested(void)
@@ -217,7 +224,6 @@ static void send_text(httpd_req_t *req, const char *body)
 static int mode_from_id(const char *id)
 {
     if (strcmp(id, "road") == 0) return RIDE_MODE_ROAD;
-    if (strcmp(id, "erg") == 0) return RIDE_MODE_ERG;
     if (strcmp(id, "steady") == 0) return RIDE_MODE_STEADY;
     return -1;
 }
@@ -1124,6 +1130,7 @@ esp_err_t wifi_portal_start(power_engine_t *engine)
     s_engine = engine;
     s_closing = false;
     s_done_called = false;
+    s_done_retry_logged = false;
     ESP_LOGI(TAG, "配网启动前 堆=%lu", (unsigned long)esp_get_free_heap_size());
 
     esp_err_t ret = start_httpd();
@@ -1171,10 +1178,11 @@ void wifi_portal_stop(void)
     }
     s_closing = false;
     s_done_called = false;
+    s_done_retry_logged = false;
     ESP_LOGI(TAG, "HTTP 配网门户已停止 堆=%lu", (unsigned long)esp_get_free_heap_size());
 }
 
-void wifi_portal_set_done_callback(void (*cb)(void))
+void wifi_portal_set_done_callback(wifi_portal_done_callback_t cb)
 {
     s_done_cb = cb;
 }

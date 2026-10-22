@@ -130,6 +130,9 @@ bool power_engine_set_run_mode(power_engine_t *e, run_mode_t mode);
 bool power_engine_set_run_pacer(power_engine_t *e, run_pacer_type_t pacer);
 bool power_engine_set_run_custom_pacer(power_engine_t *e, const char *name, int pace_low_sec, int pace_high_sec, int cadence_spm);
 bool power_engine_set_run_pace_range(power_engine_t *e, int pace_low_sec, int pace_high_sec);
+/* 设置跑步会话的运行/暂停状态；会话状态不持久化，也不设置 dirty。 */
+bool power_engine_set_run_running(power_engine_t *e, bool running);
+/* 重置跑步会话累计距离和用时；保持运行/暂停状态且不设置 dirty。 */
 void power_engine_run_reset(power_engine_t *e);
 /* 按跑步快照速度生成心率输出；固定用户心率时直接走锁定心率路径。 */
 int power_engine_running_heartrate(power_engine_t *e, int speed_x100_kmh);
@@ -140,10 +143,11 @@ int power_engine_adjust_control_target(power_engine_t *e, control_target_t targe
 int power_engine_control_value(const power_engine_t *e, control_target_t target);
 bool power_engine_set_control_value(power_engine_t *e, control_target_t target, int value);
 
-/* 处理 FTMS 下发的 ERG 目标功率，并在需要时自动切到 ERG 模式。
- * 返回 true 表示设置成功（范围有效并已应用），false 表示超出范围被拒绝。 */
+/* 处理 FTMS 下发的 ERG 会话目标功率，并在需要时自动切到 ERG 运行态。
+ * 返回 true 表示设置成功（范围有效并已应用），false 表示超出范围被拒绝；
+ * 不覆盖 base_power，也不设置 dirty。 */
 bool power_engine_set_erg_target(power_engine_t *e, int target_power);
-/* 清除 ERG 目标并回到 steady 固定功率模式，供 FTMS 停止/复位/断开后恢复手动调功。 */
+/* 清除 ERG 会话目标并回到 steady 固定功率模式；恢复 base_power 且不设置 dirty。 */
 bool power_engine_clear_erg_target(power_engine_t *e);
 
 /* 按当前模式重置内部功率、踏频和心率相关状态。 */
