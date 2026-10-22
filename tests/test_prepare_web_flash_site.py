@@ -7,6 +7,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -116,6 +117,27 @@ class WebFlashSiteTest(unittest.TestCase):
 
         self.assertEqual(version, "4.1.1")
         self.assertEqual(set(selected), {"generic-c3", "m5stamp-c3"})
+
+    def test_gitee_private_release_uses_authenticated_attachment_api(self):
+        release = {"id": 784111, "tag_name": "v4.1.1", "assets": []}
+        attachments = [
+            {"id": 3029137, "name": "firmware.bin"},
+            {"id": 3029138, "name": "firmware.bin.sha256"},
+        ]
+        with mock.patch.object(
+            web_flash, "request_json", side_effect=[release, attachments]
+        ) as request_json:
+            result = web_flash.fetch_gitee_release("owner/repo", "secret-token")
+
+        self.assertEqual(request_json.call_count, 2)
+        self.assertEqual(result["_provider"], "gitee")
+        self.assertEqual(result["assets"][0]["name"], "firmware.bin")
+        self.assertEqual(
+            result["assets"][0]["download_url"],
+            "https://gitee.com/api/v5/repos/owner/repo/releases/784111/"
+            "attach_files/3029137/download",
+        )
+        self.assertNotIn("secret-token", result["assets"][0]["download_url"])
 
     def test_rejects_path_traversal_and_nested_output(self):
         with self.assertRaises(web_flash.ReleaseValidationError):

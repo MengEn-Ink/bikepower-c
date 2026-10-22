@@ -103,6 +103,38 @@ def fetch_gitee_release(repo, token):
         "Gitee",
     )
     if release is not None:
+        release_id = release.get("id")
+        if isinstance(release_id, int) and release_id > 0:
+            attachment_query = urllib.parse.urlencode(
+                {key: value for key, value in (("access_token", token), ("per_page", 100)) if value}
+            )
+            attachments = request_json(
+                f"https://gitee.com/api/v5/repos/{repo}/releases/{release_id}/attach_files?{attachment_query}",
+                {"Accept": "application/json", "User-Agent": "bikepower-web-flash-site"},
+                "Gitee",
+            )
+            if isinstance(attachments, list):
+                api_assets = []
+                for attachment in attachments:
+                    if not isinstance(attachment, dict):
+                        continue
+                    attachment_id = attachment.get("id")
+                    name = attachment.get("name")
+                    if not isinstance(attachment_id, int) or attachment_id <= 0:
+                        continue
+                    if not isinstance(name, str):
+                        continue
+                    api_assets.append(
+                        {
+                            "download_url": (
+                                f"https://gitee.com/api/v5/repos/{repo}/releases/"
+                                f"{release_id}/attach_files/{attachment_id}/download"
+                            ),
+                            "name": name,
+                        }
+                    )
+                if api_assets:
+                    release["assets"] = api_assets
         release["_provider"] = "gitee"
     return release
 
