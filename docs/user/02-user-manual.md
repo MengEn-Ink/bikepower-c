@@ -6,22 +6,23 @@
 
 ## 1. 烧录或更新固件
 
-普通用户统一使用网页端在线烧录。这个方式会自动使用指定固件，不需要手动下载 bin 文件，也不需要安装命令行工具。
+普通用户统一使用电脑端网页烧录。项目 GitHub Pages 会自动显示最新 Release 的两个板型固件，不需要安装命令行工具。
 
-在线烧录入口：[https://easyhey.com/?firmware=MOD220](https://easyhey.com/?firmware=MOD220)
+自建入口：[https://mengen-ink.github.io/bikepower-c/](https://mengen-ink.github.io/bikepower-c/)。Pages 首次部署尚未完成或临时不可用时，可使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)。
 
 BikePower C 已永久放弃设备内 OTA 升级。后续升级、重刷或恢复固件，都按本节网页端在线烧录流程操作。
 
-1. 用 Chrome 或 Edge 打开上面的链接。
+1. 用桌面版 Chrome 或 Edge 打开项目 GitHub Pages 或备用入口。
 2. 用支持数据传输的 USB 线把开发板连接到电脑。
-3. 点击网页里的连接或烧录按钮。
-4. 在浏览器弹出的串口列表里选择开发板端口。
-5. 等待网页提示烧录完成。
-6. 重新上电或按一下 RST 复位键，设备启动。
+3. 选择 `通用 ESP32-C3` 或 `M5Stamp C3`，核对版本和文件名。
+4. 点击“连接串口并刷写”。
+5. 在浏览器弹出的串口列表里选择开发板端口。
+6. 按网页提示确认并等待烧录完成。
+7. 重新上电或按一下 RST 复位键，设备启动。
 
 ![网页端选择串口](../images/web-flash-serial-port.jpg)
 
-串口名称在不同系统上略有差异。macOS 上通常选择类似 `USB JTAG/serial debug unit (cu.usbmodem101)` 的端口，Windows 上通常选择 `COMx`。如果没有看到设备，优先更换一根支持数据传输的 USB 线。
+网页刷写依赖 HTTPS 和 Web Serial，浏览器必须由用户点击并主动选择串口，网页不能静默选择设备。串口名称在不同系统上略有差异。macOS 上通常选择类似 `USB JTAG/serial debug unit (cu.usbmodem101)` 的端口，Windows 上通常选择 `COMx`。如果没有看到设备，优先更换一根支持数据传输的 USB 线。
 
 ## 2. 上电后连接骑行 App
 
@@ -257,7 +258,7 @@ LED 指示页用于给不同运行状态设置灯效和颜色。
 
 ### 如何更新固件
 
-打开 [https://easyhey.com/?firmware=MOD220](https://easyhey.com/?firmware=MOD220)，按第 1 节的网页端在线烧录流程重新烧录即可。
+打开项目 GitHub Pages，按第 1 节的网页烧录流程重新烧录；Pages 尚未上线时使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)。
 
 ## 15. 记住这 4 步
 

@@ -9,6 +9,14 @@
 - 已向 GitHub 上传 5 个本地分支和 14 个历史版本标签，并校验远端 `main` 与本地提交一致。
 - 既有 `publish_gitee_release.py` 和 Gitee Release 证据链暂时保留为发布渠道；本次只迁移源码仓库管理，不把发布渠道迁移与仓库上传混为一项。
 
+### BLE Monitor Pages 与网页固件刷写（2026-10-22）
+- `tools/web/ble-monitor.html`：在原 BLE 数据监控页增加双板型固件刷写卡片，自动读取部署生成的最新版本、发布时间、文件名和 SHA256；集成 ESP Web Tools，通过 Web Serial 由用户选择串口后刷写 ESP32-C3 merged bin。
+- `scripts/tools/prepare_web_flash_site.py`：优先获取 GitHub 最新 Release，必要时持 `GITEE_TOKEN` 回退 Gitee；严格选择当前 tag 的 generic-c3 / m5stamp-c3 固件及旁文件，校验 SHA256 后生成同源固件、`latest.json` 和两个 `offset=0` manifest。没有完整 Release 时继续生成 BLE Monitor，并把刷写状态标为不可用。
+- `.github/workflows/deploy-web-tools.yml`：新增 GitHub Pages 构建与部署，支持 main 相关改动、Release 发布、每日同步和手动触发；使用 Pages artifact 隔离远端下载地址。
+- `tests/test_prepare_web_flash_site.py`、`tests/check_ble_monitor.py`、`tests/operation_gate.py`、`scripts/tools/quality_gate.py`：新增离线生成器回归、网页/Actions 静态契约和统一门禁接线；质量门禁通过 `idf_tools.py export --format=key-value` 激活自动探测到的 ESP-IDF 工具链。
+- `README.md`、`docs/user/`、`docs/wiki/09-build-and-test.md`、`docs/dev/01-technical-reference.md`、`docs/dev/05-operation-test-gate.md`、`tests/README.md`、`PROGRESS.md`：同步 GitHub Pages 入口、浏览器安全边界、Gitee 回退配置、操作覆盖矩阵和首次部署/双板真机待确认项。
+- 验证：`python3 tests/operation_gate.py --level quick` 全绿（含 5892/0 host 断言、协议/running/profile/reconnect harness、网页生成器 6 项回归）；`python3 scripts/tools/quality_gate.py` 通过（85 PASS / 2 个预期 dirty-worktree WARN / 0 FAIL，包含 `idf.py build`）；GitHub Pages 首次在线部署和 generic-c3 / m5stamp-c3 浏览器真机刷写仍待确认。
+
 ### P0 协议、会话与可靠性修复（2026-10-22）
 - `components/bikepower_domain/ble_payload_codec.c/.h`、`main/ble_bikepower.c`：新增生产纯 C BLE codec；CPS 改为标准 8B/flags `0x0020`，CSC 为 5B，FTMS Bike 按广播项输出 8B/6B/4B，Treadmill 改为 `0x0504`/10B，RSC 统一 10B、运行/暂停 flags `0x07/0x03`、距离 0.1m，RSC Feature 改为 2B `0x0007`。
 - `components/bikepower_domain/running_engine.c/.h`、`power_engine.c/.h`、`main/app_state.c`：新增非持久化 running 会话；暂停时速度/步频/步幅归零且距离/用时冻结，Start 恢复累计，Reset 清累计并保持原运行/暂停态。running FTMS Start/Stop/Reset 只有在应用回调接纳后才返回 Success 和更新 Status，合法参数但回调缺失/拒绝返回 `Operation Failed (0x04)`；Fitness Machine Status 改用独立标准操作码 `Reset=0x01`、`Stopped/Paused=0x02`、`Started/Resumed=0x03` 和对应 1B payload。

@@ -26,6 +26,7 @@
 | 12 | 项目结构与文档梳理（v3.2.0） | ✅ 完成 | `test/` 与 `tests/` 合并评估（不合并）+ `tests/README.md` 7 大分类重写 + `docs/INDEX.md` 补全 workflows/domain 规则索引 |
 | 13 | 移除 OTA + 家庭网络 + 网页端精简（v4.0.0） | ✅ 代码完成（真机待确认） | 删 ota_downloader/ota_update/ota_version/ota_selftest + `/api/ota/*`、`/api/wifi/*`、`/api/draft` 路由与前端视图；分区表双 OTA → 单 factory（仍 4MB）；关回滚配置；门户退化为纯 BLE 参数页（方案见 [docs/archive/07-remove-ota-plan.md](docs/archive/07-remove-ota-plan.md)） |
 | 14 | Windows 开发环境适配 | ✅ 完成 | `idf_common.psm1` 共享模块 + `dev.ps1` 统一入口 + `build_all.ps1`/`flash_latest.ps1` 重构去重 + Python 脚本跨平台串口探测 |
+| 15 | BLE Monitor Pages + 网页固件刷写 | ✅ 代码与离线测试完成（首次部署/双板真机刷写待确认） | Actions 部署静态页；GitHub/Gitee 最新 Release 回退；双板 merged bin SHA256 校验；ESP Web Tools 0x0 manifest |
 
 ---
 
@@ -248,7 +249,7 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 
 ### OTA 实施（v3.1.6 引入，v4.0.0 已移除）
 
-在线 OTA（家庭 WiFi + SNTP + HTTPS 拉 `latest.json` + 流式 `esp_ota_write` + 自检回滚 + 防降级）曾在 v3.1.6~v3.1.8 实现，已于 **v4.0.0 整体移除**（连同家庭网络配置与双 OTA 分区表）。移除范围与理由见阶段 13 与 [docs/archive/07-remove-ota-plan.md](docs/archive/07-remove-ota-plan.md)。当前固件升级走电脑端网页烧录，入口为 `https://easyhey.com/?firmware=MOD220`；手机端不支持烧录。分区表变更场景仍需 `erase_flash`。
+在线 OTA（家庭 WiFi + SNTP + HTTPS 拉 `latest.json` + 流式 `esp_ota_write` + 自检回滚 + 防降级）曾在 v3.1.6~v3.1.8 实现，已于 **v4.0.0 整体移除**（连同家庭网络配置与双 OTA 分区表）。移除范围与理由见阶段 13 与 [docs/archive/07-remove-ota-plan.md](docs/archive/07-remove-ota-plan.md)。当前固件升级走电脑端网页烧录：项目自建 GitHub Pages 工作流已就绪，首次部署前仍可使用 `https://easyhey.com/?firmware=MOD220` 备用入口；手机端不支持烧录。分区表变更场景仍需 `erase_flash`。
 
 ---
 
@@ -260,3 +261,4 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 - 配网门户动态测试（stage5_portal_test.py）需本机连 BikePower-XXXXXX 热点；本机不能切换 WiFi 时改用 `tests/mock_server.py` 本地调试，或换另一台机器执行
 - `test/` 与 `tests/` 目录职责不同不合并（评估结论见 [tests/README.md](tests/README.md) 第六章）：`test/` 放 ESP-IDF 约定的 host 单测（纯 C），`tests/` 放所有 Python/Shell 设备测试与静态门禁
 - 当前 P0 协议与可靠性缺陷及实施顺序见 [docs/dev/12-top5-protocol-stability-design.md](docs/dev/12-top5-protocol-stability-design.md) 和 [docs/dev/13-project-review-and-optimization.md](docs/dev/13-project-review-and-optimization.md)。在对应修复和真机验收完成前，不把现有自动化全绿等同于协议正确。
+- GitHub 主仓库与 `origin` 已接通；本次推送后需确认 `Deploy BLE Monitor and Web Flasher` 首次部署成功，并补做 generic-c3 / m5stamp-c3 浏览器真机刷写确认。

@@ -82,24 +82,34 @@ WiFi 配网的射频共用流程可参考（v3.1.3 起为共存模式，BLE 不�
 
 ### 普通用户：网页端在线烧录
 
-普通用户不需要安装 ESP-IDF、esptool 或乐鑫 Flash Download Tool，统一使用网页端在线烧录：
+普通用户不需要安装 ESP-IDF、esptool 或乐鑫 Flash Download Tool。项目自带的 BLE Monitor 会由 GitHub Actions 部署为 GitHub Pages，并在同一页面自动显示最新 Release 的版本、发布时间、固件文件和 SHA256，按板型一键发起刷写。
 
-[https://easyhey.com/?firmware=MOD220](https://easyhey.com/?firmware=MOD220)
+Pages 地址：[https://mengen-ink.github.io/bikepower-c/](https://mengen-ink.github.io/bikepower-c/)。首次部署状态也可在 `Deploy BLE Monitor and Web Flasher` 工作流中确认。
 
-项目已永久放弃设备内 OTA 升级路径。后续固件升级、重刷和恢复出厂固件都统一走这个网页端在线烧录入口。
+在 GitHub Pages 尚未启用或临时不可用时，可继续使用备用入口：[https://easyhey.com/?firmware=MOD220](https://easyhey.com/?firmware=MOD220)。
+
+项目已永久放弃设备内 OTA 升级路径。后续固件升级、重刷和恢复出厂固件统一走电脑端网页烧录；这不会让设备开机连接互联网，也不会恢复设备内 OTA。
 
 操作步骤：
 
-1. 使用 Chrome 或 Edge 打开上面的链接。
+1. 使用桌面版 Chrome 或 Edge 打开项目 GitHub Pages；若 Pages 尚未上线则打开备用入口。
 2. 用支持数据传输的 USB 线把 ESP32-C3 开发板连接到电脑。
-3. 点击网页里的连接或烧录按钮。
-4. 在浏览器弹出的串口列表中，选择类似 `USB JTAG/serial debug unit` 的端口；Windows 上通常显示为 `COMx`，macOS 上通常显示为 `cu.usbmodem*`。
-5. 按网页提示开始烧录，等待进度完成。
-6. 烧录完成后重新上电，或按一下开发板的 RST 复位键。
+3. 选择 `通用 ESP32-C3` 或 `M5Stamp C3`，核对网页显示的最新版本和固件文件名。
+4. 点击“连接串口并刷写”。
+5. 在浏览器弹出的串口列表中，选择类似 `USB JTAG/serial debug unit` 的端口；Windows 上通常显示为 `COMx`，macOS 上通常显示为 `cu.usbmodem*`。
+6. 按网页提示确认并等待烧录完成。
+7. 烧录完成后重新上电，或按一下开发板的 RST 复位键。
 
 ![网页端选择串口](docs/images/web-flash-serial-port.jpg)
 
-如果列表里看不到开发板，优先更换一根支持数据传输的 USB 线，再重新插拔开发板并刷新网页。少数开发板需要按住 BOOT 键再点击连接或开始烧录，进度开始后即可松开。
+网页刷写依赖 HTTPS 和 Web Serial。浏览器出于安全原因必须由用户点击按钮并主动选择串口，网页不能静默选择设备。如果列表里看不到开发板，优先更换一根支持数据传输的 USB 线，再重新插拔开发板并刷新网页。少数开发板需要按住 BOOT 键再点击连接或开始烧录，进度开始后即可松开。
+
+维护者首次部署时需要把仓库镜像/推送到 GitHub，在仓库 `Settings → Pages` 把 Source 设为 `GitHub Actions`，然后手动运行 `Deploy BLE Monitor and Web Flasher`：
+
+- GitHub 仓库本身有 Release 时，工作流使用内置 `GITHUB_TOKEN` 获取最新附件。
+- Release 仍发布在 Gitee 时，在 GitHub Actions secrets 配置 `GITEE_TOKEN`；仓库变量 `GITEE_REPOSITORY` 可选，默认是 `mengen4jv/bikepower-c`。
+- 工作流只接受当前 tag 对应的 generic-c3 / m5stamp-c3 merged bin 和各自 `.sha256`，校验成功后才会放入 Pages artifact。
+- 找不到完整 Release 时仍会部署 BLE Monitor，但网页刷写按钮保持禁用；真实 Pages 地址见 deploy job 的 `page_url`。
 
 ### 开发者：本地编译并烧录
 

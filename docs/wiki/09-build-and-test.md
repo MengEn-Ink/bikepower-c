@@ -11,6 +11,7 @@
 - [固件烧录](#固件烧录)
 - [测试体系](#测试体系)
 - [发布构建](#发布构建)
+- [GitHub Pages 网页刷写](#github-pages-网页刷写)
 - [产物校验](#产物校验)
 - [常用命令速查](#常用命令速查)
 
@@ -409,6 +410,29 @@ build_all.sh 执行顺序:
 
 ---
 
+## GitHub Pages 网页刷写
+
+`.github/workflows/deploy-web-tools.yml` 把 `tools/web/ble-monitor.html` 作为 GitHub Pages 首页发布，并在部署阶段调用 `scripts/tools/prepare_web_flash_site.py`：
+
+1. 优先读取当前 GitHub 仓库的最新 Release；没有完整附件时回退到 `GITEE_REPOSITORY`。
+2. 严格选择当前 tag 对应的 generic-c3 / m5stamp-c3 merged bin 和同名 `.sha256`。
+3. 下载后校验 SHA256，再把固件复制进同源 Pages artifact。
+4. 生成 `firmware/latest.json` 与两个 ESP Web Tools manifest，芯片为 `ESP32-C3`，merged bin 从 `offset=0` 刷写。
+5. 没有可用 Release 时生成 `available=false` 索引，BLE Monitor 继续部署，刷写按钮保持禁用。
+
+首次使用需在 GitHub 仓库 `Settings → Pages` 选择 `GitHub Actions`。Release 位于 Gitee 时配置 Actions secret `GITEE_TOKEN`；可选仓库变量 `GITEE_REPOSITORY` 默认 `mengen4jv/bikepower-c`。工作流支持 main 相关改动、GitHub Release 发布、每日同步和手动触发。
+
+本地离线验证：
+
+```bash
+python3 tests/test_prepare_web_flash_site.py
+python3 tests/check_ble_monitor.py
+```
+
+浏览器刷写必须使用 HTTPS 页面和桌面版 Chrome / Edge；用户仍需在 Web Serial 弹窗中主动选择串口，网页不能静默选择设备。
+
+---
+
 ## 产物校验
 
 ### check_release_artifacts.py
@@ -470,6 +494,7 @@ python3 scripts/tools/device_acceptance.py validate \
 | `python3 tests/mock_server.py` | 启动前端 mock 服务器 |
 | `python3 tests/ble_selftest.py` | （需设备）BLE 服务自测 |
 | `python3 tests/stage5_portal_test.py` | （需设备+配网）门户自测 |
+| `python3 tests/test_prepare_web_flash_site.py` | 网页刷写站点生成器离线回归 |
 
 ### 发布
 
@@ -479,6 +504,7 @@ python3 scripts/tools/device_acceptance.py validate \
 | `./scripts/build_all.sh` | 双板型完整 release 构建 |
 | `./scripts/build_all.sh generic` | 仅编译通用板 |
 | `python3 scripts/tools/check_release_artifacts.py --release-dir build/release --version <ver> --git-sha <sha>` | 产物完整性校验 |
+| `python3 scripts/tools/prepare_web_flash_site.py --site-dir <dir>` | 生成 Pages 预览站点并同步最新 Release |
 
 ### 日志调试
 
@@ -502,5 +528,6 @@ python3 scripts/tools/device_acceptance.py validate \
 | check_release_artifacts.py | `scripts/tools/check_release_artifacts.py` | Release 产物校验 |
 | device_acceptance.py | `scripts/tools/device_acceptance.py` | 真机验收证据校验 |
 | generate_release_docs.py | `scripts/tools/generate_release_docs.py` | 生成 release 文档 |
+| prepare_web_flash_site.py | `scripts/tools/prepare_web_flash_site.py` | 校验 Release 固件并生成 Pages 刷写站点 |
 | device_monitor.py | `scripts/tools/device_monitor.py` | BLE 设备实时监控 |
 | build_firmware.sh | `scripts/platform/unix/build_firmware.sh` | 单固件构建（被 build_all.sh 调用） |

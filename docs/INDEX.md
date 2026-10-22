@@ -21,7 +21,7 @@
 | [运行时数据流](wiki/06-runtime-flow.md) | 14 步启动流程、主循环 50ms 节拍、BLE 通知双时间尺度、配网完整时序、脏标记落盘、11 种异常恢复路径 |
 | [BLE 服务详解](wiki/07-ble-services.md) | 5+1 服务 UUID、两种运动 profile GATT 表、6 种数据包格式、FTMS 控制点 OpCode/Result Code、广播参数、双时间尺度通知、g_notify_lock 线程安全、DIS 字段 |
 | [WiFi 配网门户](wiki/08-wifi-portal.md) | HTTP 路由表（28 条）、超时状态机、JSON API 详解（50+字段）、Captive Portal 三层弹窗、临时副本原子替换、BLE 扫描/设备模板 API、前端内联 |
-| [构建与测试](wiki/09-build-and-test.md) | idf.py 构建流程、CMake 配置、flash_latest.sh 一键烧录、build_all.sh 双板型发布、host 单测、静态门禁脚本、BLE 自测、mock server、产物校验 |
+| [构建与测试](wiki/09-build-and-test.md) | idf.py 构建流程、CMake 配置、flash_latest.sh 一键烧录、build_all.sh 双板型发布、GitHub Pages 网页刷写、host 单测、静态门禁脚本、BLE 自测、mock server、产物校验 |
 | [硬件约束与平台限制](wiki/10-hardware-constraints.md) | ESP32-C3 规格、双板型 GPIO 分配、内存预算（80KB/20KB 告警线）、WiFi/BLE 共存硬约束、ISR 安全规则、FreeRTOS 任务模型、WDT 配置、禁止事项 |
 
 ---
@@ -97,5 +97,5 @@
 
 | 文档 | 说明 |
 |------|------|
-| [项目进度](../PROGRESS.md) | 阶段 0-14 完成情况、第七轮 P0 真机验收清单、待确认项、已知限制 |
+| [项目进度](../PROGRESS.md) | 阶段 0-15 完成情况、第七轮 P0 真机验收清单、待确认项、已知限制 |
 | [更新日志](../CHANGELOG.md) | 版本历史与变更记录 |

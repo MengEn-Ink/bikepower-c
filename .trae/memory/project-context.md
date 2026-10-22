@@ -74,6 +74,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 | 事件总线 | app_queue（Queue）+ button wake（二值信号量） | 2026-06-12 |
 | 状态机 | 7 态：BOOTING/BLE_ACTIVE/WIFI_CONFIRM/WIFI_CONFIG/SAVING/REBOOTING/ERROR_RECOVERY | 2026-06-12 |
 | WiFi 射频共用 | 配网默认 coex 共存（BLE 不停、不重启）；v4.0.0 已移除在线 OTA 与家庭网络配置，仅共存初始化失败时由 radio_ctrl 停 BLE 兜底 | 2026-06-28 |
+| 网页固件刷写 | BLE Monitor 通过 GitHub Pages 部署；Actions 优先取 GitHub Release、可持 token 回退 Gitee，双板 merged bin 经 SHA256 校验后生成 ESP Web Tools 0x0 manifest；不恢复设备内 OTA | 2026-10-22 |
 | 跑步模式核心闭环 | 当前跑步 P0 以 RSC 速度 + 步频 + 心率为核心；坡度不是必要参数，已从当前配置/API/网页/NVS 中移除，未来 FTMS Treadmill 再按需求恢复 | 2026-07-07 |
 | 代码托管 | GitHub `MengEn-Ink/bikepower-c` 为主仓库和 `origin`；Gitee 改为 `gitee` 备用远端，既有 Release 工具暂时保留 | 2026-10-22 |
 

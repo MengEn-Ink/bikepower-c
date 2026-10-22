@@ -16,18 +16,19 @@
 
 普通用户统一使用网页端在线烧录，不需要下载固件文件，也不需要安装 esptool、ESP-IDF 或乐鑫 Flash Download Tool。
 
-BikePower C 已永久放弃设备内 OTA 升级。后续升级、重刷或恢复固件，都按本节网页端在线烧录流程操作。
+BikePower C 已永久放弃设备内 OTA 升级。后续升级、重刷或恢复固件，都按本节电脑端网页烧录流程操作。
 
-1. 使用 Chrome 或 Edge 浏览器打开：[https://easyhey.com/?firmware=MOD220](https://easyhey.com/?firmware=MOD220)。
+1. 使用桌面版 Chrome 或 Edge 打开 [BikePower BLE Monitor / 固件刷写页](https://mengen-ink.github.io/bikepower-c/)；Pages 首次部署尚未完成或临时不可用时，可使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)。
 2. 用支持数据传输的 USB 线把开发板连接到电脑。
-3. 点击网页里的连接或烧录按钮，浏览器会弹出串口选择窗口。
-4. 选择名称类似 `USB JTAG/serial debug unit` 的端口；macOS 上通常会显示为 `USB JTAG/serial debug unit (cu.usbmodem101)`，Windows 上通常显示为 `COMx`。
-5. 按网页提示开始烧录，等待进度完成。
-6. 烧录完成后重新上电或按一下开发板的 RST 复位键，设备启动。
+3. 在“固件刷写”区域选择 `通用 ESP32-C3` 或 `M5Stamp C3`，核对最新版本、文件名和 SHA256。
+4. 点击“连接串口并刷写”，浏览器会弹出串口选择窗口。
+5. 选择名称类似 `USB JTAG/serial debug unit` 的端口；macOS 上通常会显示为 `USB JTAG/serial debug unit (cu.usbmodem101)`，Windows 上通常显示为 `COMx`。
+6. 按网页提示确认并等待烧录完成。
+7. 烧录完成后重新上电或按一下开发板的 RST 复位键，设备启动。
 
 ![网页端选择串口](../images/web-flash-serial-port.jpg)
 
-如果列表里看不到开发板，先确认 USB 线不是纯充电线，再重新插拔开发板并刷新网页。少数开发板需要按住 BOOT 键再点击连接或开始烧录，进度开始后即可松开。
+网页刷写依赖 HTTPS 和 Web Serial，浏览器必须由用户点击按钮并主动选择串口，网页不能静默选择设备。如果列表里看不到开发板，先确认 USB 线不是纯充电线，再重新插拔开发板并刷新网页。少数开发板需要按住 BOOT 键再点击连接或开始烧录，进度开始后即可松开。
 
 开发者仍可使用仓库脚本或 ESP-IDF 从源码编译烧录；这些方式只面向开发和测试，不作为普通用户手册路径。
 
@@ -55,5 +56,5 @@ BikePower C 已永久放弃设备内 OTA 升级。后续升级、重刷或恢复
 ## 5. 下一步
 
 - 完整按钮操作、LED 灯效、配网字段、骑行模式与 FAQ：见 [用户手册](02-user-manual.md)
-- 固件升级：当前 v4.1.1 已永久放弃设备内 OTA，普通用户升级统一走 [网页端在线烧录](https://easyhey.com/?firmware=MOD220)
+- 固件升级：当前 v4.1.1 已永久放弃设备内 OTA，普通用户升级统一走仓库 GitHub Pages；Pages 尚未上线时使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)
 - 硬件接线、供电与排障：见 [硬件指南](03-hardware.md)
