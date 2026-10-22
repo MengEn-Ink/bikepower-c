@@ -17,6 +17,7 @@ import struct
 import sys
 
 from bleak import BleakScanner, BleakClient
+from ble_protocol import parse_cps, parse_rsc, parse_treadmill
 
 DEVICE_NAME = "BikePower"
 CPS_UUID = "00002a63-0000-1000-8000-00805f9b34fb"
@@ -121,74 +122,46 @@ OP_STOP_PAUSE = 0x08
 CP_RESULT_SUCCESS = 0x01
 CP_RESULT_NOT_SUPPORTED = 0x02
 CP_RESULT_INVALID_PARAM = 0x03
+CP_RESULT_OPERATION_FAILED = 0x04
 
 
-def parse_cps(data: bytes):
-    flags = data[0]
-    power = struct.unpack_from("<h", data, 1)[0]
-    return flags, power
+async def write_ftms_cp_and_wait(client, responses, op_code, payload=b"", timeout=3.0):
+    """写入 FTMS 控制点并等待同一操作码的 indication，避免固定 sleep 假绿。"""
+    start = len(responses)
+    await client.write_gatt_char(
+        FTMS_CP_UUID,
+        bytes([op_code]) + payload,
+        response=True,
+    )
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
+        for response in responses[start:]:
+            if len(response) >= 3 and response[0] == 0x80 and response[1] == op_code:
+                return response[2]
+        await asyncio.sleep(0.05)
+    raise TimeoutError(f"FTMS op=0x{op_code:02x} 在 {timeout:.1f}s 内无响应")
 
-def parse_rsc(data: bytes):
-    b = bytes(data)
-    if len(b) < 4:
-        return None
-    flags = b[0]
-    speed = struct.unpack_from("<H", b, 1)[0]
-    cadence = b[3]
-    off = 4
-    stride = None
-    distance = None
-    if flags & 0x01 and len(b) >= off + 2:
-        stride = struct.unpack_from("<H", b, off)[0]
-        off += 2
-    if flags & 0x02 and len(b) >= off + 4:
-        distance = struct.unpack_from("<I", b, off)[0]
-    return {
-        "flags": flags,
-        "speed": speed,
-        "speed_kmh": speed * 3.6 / 256.0,
-        "cadence": cadence,
-        "stride": stride,
-        "distance": distance,
-        "running": bool(flags & 0x04),
-    }
 
-def parse_treadmill(data: bytes):
-    b = bytes(data)
-    if len(b) < 4:
-        return None
-    flags = struct.unpack_from("<H", b, 0)[0]
-    speed = struct.unpack_from("<H", b, 2)[0]
-    off = 4
-    distance = None
-    hr = None
-    elapsed = None
-    if flags & 0x0004:
-        if len(b) < off + 3:
-            return None
-        distance = b[off] | (b[off + 1] << 8) | (b[off + 2] << 16)
-        off += 3
-    if flags & 0x0080:
-        if len(b) < off + 4:
-            return None
-        off += 4
-    if flags & 0x0100:
-        if len(b) < off + 1:
-            return None
-        hr = b[off]
-        off += 1
-    if flags & 0x0200:
-        if len(b) < off + 2:
-            return None
-        elapsed = struct.unpack_from("<H", b, off)[0]
-    return {
-        "flags": flags,
-        "speed_x100": speed,
-        "speed_kmh": speed / 100.0,
-        "distance": distance,
-        "hr": hr,
-        "elapsed": elapsed,
-    }
+async def collect_running_window(rsc_samples, treadmill_samples, seconds, settle_seconds=0.0):
+    """丢弃状态迁移样本后，返回一个独立通知观察窗口。"""
+    if settle_seconds > 0:
+        await asyncio.sleep(settle_seconds)
+    rsc_start = len(rsc_samples)
+    treadmill_start = len(treadmill_samples)
+    await asyncio.sleep(seconds)
+    return rsc_samples[rsc_start:], treadmill_samples[treadmill_start:]
+
+
+def values_strictly_grow(samples, field):
+    return len(samples) >= 2 and all(
+        current[field] > previous[field]
+        for previous, current in zip(samples, samples[1:])
+    )
+
+
+def values_are_frozen(samples, field):
+    return len(samples) >= 2 and all(item[field] == samples[0][field] for item in samples[1:])
 
 
 async def check_ftms_feature(client, found, expected_machine_mask, expected_target_mask):
@@ -237,23 +210,37 @@ async def run_running_profile(client, found):
         expected_machine_mask=0x00000504,
         expected_target_mask=0x00000002,
     )
+    rsc_feature_ok = False
+    if RSC_FEATURE_UUID in found:
+        try:
+            rsc_feature = bytes(await client.read_gatt_char(RSC_FEATURE_UUID))
+            rsc_feature_ok = rsc_feature == bytes.fromhex("0700")
+            print(
+                f"  RSC Feature: {rsc_feature.hex()} "
+                f"{'通过' if rsc_feature_ok else '失败(期望0700)'}"
+            )
+        except Exception as exc:
+            print(f"  RSC Feature: 读取失败 {type(exc).__name__}")
     samples = []
     treadmill_samples = []
     cp_responses = []
+    parse_errors = []
     hr_count = [0]
 
     def cb_rsc(_, data):
-        parsed = parse_rsc(bytes(data))
-        if parsed:
-            samples.append(parsed)
+        try:
+            samples.append(parse_rsc(bytes(data)))
+        except ValueError as exc:
+            parse_errors.append(f"RSC: {exc}")
 
     def cb_hr(_, data):
         hr_count[0] += 1
 
     def cb_treadmill(_, data):
-        parsed = parse_treadmill(bytes(data))
-        if parsed:
-            treadmill_samples.append(parsed)
+        try:
+            treadmill_samples.append(parse_treadmill(bytes(data)))
+        except ValueError as exc:
+            parse_errors.append(f"FTMS Treadmill: {exc}")
 
     def cb_cp(_, data):
         b = bytes(data)
@@ -269,121 +256,180 @@ async def run_running_profile(client, found):
     if FTMS_CP_UUID in found:
         await client.start_notify(FTMS_CP_UUID, cb_cp)
 
-    if RUN_CONTROL and FTMS_CP_UUID in found:
-        print("下发 running RequestControl(0x00)")
-        await client.write_gatt_char(FTMS_CP_UUID, bytes([OP_REQUEST_CONTROL]), response=True)
-        await asyncio.sleep(0.4)
-        print("下发 running StartResume(0x07)")
-        await client.write_gatt_char(FTMS_CP_UUID, bytes([OP_START_RESUME]), response=True)
-        await asyncio.sleep(0.4)
-        print("下发 running SetTargetPower(0x05, 200) — 期望不支持")
-        await client.write_gatt_char(
-            FTMS_CP_UUID,
-            bytes([OP_SET_TARGET_POWER]) + struct.pack("<h", 200),
-            response=True,
-        )
-        await asyncio.sleep(0.4)
-        print("下发 running SetTargetSpeed(0x02, 12.00km/h)")
-        await client.write_gatt_char(
-            FTMS_CP_UUID,
-            bytes([OP_SET_TARGET_SPEED]) + struct.pack("<H", 1200),
-            response=True,
-        )
-        await asyncio.sleep(0.4)
     expected_speed = 12.0 if RUN_CONTROL else 10.0
-    print(f"采集 RSC/HRS/FTMS Treadmill 通知 {DURATION}s ...")
-    await asyncio.sleep(DURATION)
+    control_results = {}
+    control_errors = []
+    moving_rsc = []
+    moving_treadmill = []
+    paused_rsc = []
+    paused_treadmill = []
+    reset_rsc = []
+    reset_treadmill = []
+    resumed_rsc = []
+    resumed_treadmill = []
 
-    ok_notify = len(samples) > 0
-    ok_speed = False
-    ok_cadence = False
-    ok_distance = False
-    ok_flags = False
-    ok_treadmill_notify = len(treadmill_samples) > 0
-    ok_treadmill_speed = False
-    ok_treadmill_distance = False
-    ok_treadmill_hr = False
-    ok_treadmill_elapsed = False
-    if samples:
-        first = samples[0]
-        last = samples[-1]
-        ok_speed = abs(last["speed_kmh"] - expected_speed) <= 0.25
-        ok_cadence = 120 <= last["cadence"] <= 220
-        ok_distance = (
-            first["distance"] is not None
-            and last["distance"] is not None
-            and last["distance"] >= first["distance"]
+    if RUN_CONTROL and FTMS_CP_UUID in found:
+        try:
+            commands = [
+                ("RequestControl", OP_REQUEST_CONTROL, b"", CP_RESULT_SUCCESS),
+                ("StartResume", OP_START_RESUME, b"", CP_RESULT_SUCCESS),
+                (
+                    "SetTargetPower",
+                    OP_SET_TARGET_POWER,
+                    struct.pack("<h", 200),
+                    CP_RESULT_NOT_SUPPORTED,
+                ),
+                (
+                    "SetTargetSpeed",
+                    OP_SET_TARGET_SPEED,
+                    struct.pack("<H", 1200),
+                    CP_RESULT_SUCCESS,
+                ),
+            ]
+            for label, opcode, payload, expected_result in commands:
+                print(f"下发 running {label}(0x{opcode:02x})")
+                result = await write_ftms_cp_and_wait(
+                    client, cp_responses, opcode, payload
+                )
+                control_results[label] = result
+                if result != expected_result:
+                    control_errors.append(
+                        f"{label}=0x{result:02x}, 期望0x{expected_result:02x}"
+                    )
+
+            print(f"采集 moving 阶段通知 {max(DURATION, 3)}s ...")
+            moving_rsc, moving_treadmill = await collect_running_window(
+                samples, treadmill_samples, max(DURATION, 3), settle_seconds=1.1
+            )
+
+            print("下发 running StopPause(0x08)")
+            stop_result = await write_ftms_cp_and_wait(
+                client, cp_responses, OP_STOP_PAUSE
+            )
+            control_results["StopPause"] = stop_result
+            if stop_result != CP_RESULT_SUCCESS:
+                control_errors.append(
+                    f"StopPause=0x{stop_result:02x}, 期望0x{CP_RESULT_SUCCESS:02x}"
+                )
+            paused_rsc, paused_treadmill = await collect_running_window(
+                samples, treadmill_samples, 2.2, settle_seconds=1.1
+            )
+
+            print("下发 running Reset(0x01)，暂停态应保持")
+            reset_result = await write_ftms_cp_and_wait(
+                client, cp_responses, OP_RESET
+            )
+            control_results["Reset"] = reset_result
+            if reset_result != CP_RESULT_SUCCESS:
+                control_errors.append(
+                    f"Reset=0x{reset_result:02x}, 期望0x{CP_RESULT_SUCCESS:02x}"
+                )
+            reset_rsc, reset_treadmill = await collect_running_window(
+                samples, treadmill_samples, 2.2, settle_seconds=1.1
+            )
+
+            print("下发 running StartResume(0x07)，累计应重新推进")
+            resume_result = await write_ftms_cp_and_wait(
+                client, cp_responses, OP_START_RESUME
+            )
+            control_results["Resume"] = resume_result
+            if resume_result != CP_RESULT_SUCCESS:
+                control_errors.append(
+                    f"Resume=0x{resume_result:02x}, 期望0x{CP_RESULT_SUCCESS:02x}"
+                )
+            resumed_rsc, resumed_treadmill = await collect_running_window(
+                samples, treadmill_samples, 3.2, settle_seconds=1.1
+            )
+        except Exception as exc:
+            control_errors.append(f"{type(exc).__name__}: {exc}")
+    elif RUN_CONTROL:
+        control_errors.append("缺少 FTMS Control Point")
+    else:
+        print(f"采集 RSC/HRS/FTMS Treadmill 通知 {max(DURATION, 3)}s ...")
+        moving_rsc, moving_treadmill = await collect_running_window(
+            samples, treadmill_samples, max(DURATION, 3)
         )
-        ok_flags = bool(last["flags"] & 0x01) and bool(last["flags"] & 0x02) and last["running"]
-        print(
-            "RSC 最后样本: speed=%.2fkm/h cadence=%dspm stride=%s distance=%s flags=0x%02x"
-            % (
-                last["speed_kmh"],
-                last["cadence"],
-                str(last["stride"]),
-                str(last["distance"]),
-                last["flags"],
+
+    ok_notify = len(moving_rsc) >= 2
+    ok_speed = ok_notify and abs(moving_rsc[-1]["speed_kmh"] - expected_speed) <= 0.25
+    ok_cadence = ok_notify and 120 <= moving_rsc[-1]["cadence_spm"] <= 220
+    ok_distance = values_strictly_grow(moving_rsc, "total_distance_m")
+    ok_flags = ok_notify and all(item["flags"] == 0x07 and item["running"] for item in moving_rsc)
+    ok_treadmill_notify = len(moving_treadmill) >= 2
+    ok_treadmill_speed = (
+        ok_treadmill_notify
+        and abs(moving_treadmill[-1]["speed_x100_kmh"] / 100.0 - expected_speed) <= 0.25
+    )
+    ok_treadmill_distance = values_strictly_grow(moving_treadmill, "total_distance_m")
+    ok_treadmill_hr = (
+        ok_treadmill_notify
+        and 60 <= moving_treadmill[-1]["heart_rate_bpm"] <= 200
+    )
+    ok_treadmill_elapsed = values_strictly_grow(moving_treadmill, "elapsed_time_s")
+
+    ok_pause = True
+    ok_reset = True
+    ok_resume = True
+    if RUN_CONTROL:
+        ok_pause = (
+            len(paused_rsc) >= 2
+            and len(paused_treadmill) >= 2
+            and all(
+                not item["running"]
+                and item["flags"] == 0x03
+                and item["speed_1_256_mps"] == 0
+                and item["cadence_spm"] == 0
+                and item["stride_cm"] == 0
+                for item in paused_rsc
+            )
+            and values_are_frozen(paused_rsc, "total_distance_dm")
+            and all(item["speed_x100_kmh"] == 0 for item in paused_treadmill)
+            and values_are_frozen(paused_treadmill, "total_distance_m")
+            and values_are_frozen(paused_treadmill, "elapsed_time_s")
+        )
+        ok_reset = (
+            len(reset_rsc) >= 2
+            and len(reset_treadmill) >= 2
+            and all(
+                not item["running"]
+                and item["speed_1_256_mps"] == 0
+                and item["cadence_spm"] == 0
+                and item["stride_cm"] == 0
+                and item["total_distance_dm"] == 0
+                for item in reset_rsc
+            )
+            and all(
+                item["speed_x100_kmh"] == 0
+                and item["total_distance_m"] == 0
+                and item["elapsed_time_s"] == 0
+                for item in reset_treadmill
             )
         )
-    if treadmill_samples:
-        first_tm = treadmill_samples[0]
-        last_tm = treadmill_samples[-1]
-        ok_treadmill_speed = abs(last_tm["speed_kmh"] - expected_speed) <= 0.25
-        ok_treadmill_distance = (
-            first_tm["distance"] is not None
-            and last_tm["distance"] is not None
-            and last_tm["distance"] >= first_tm["distance"]
+        ok_resume = (
+            len(resumed_rsc) >= 2
+            and len(resumed_treadmill) >= 2
+            and all(item["running"] and item["flags"] == 0x07 for item in resumed_rsc)
+            and abs(resumed_rsc[-1]["speed_kmh"] - expected_speed) <= 0.25
+            and values_strictly_grow(resumed_rsc, "total_distance_dm")
+            and resumed_treadmill[-1]["speed_x100_kmh"] > 0
+            and values_strictly_grow(resumed_treadmill, "total_distance_m")
+            and values_strictly_grow(resumed_treadmill, "elapsed_time_s")
         )
-        ok_treadmill_hr = last_tm["hr"] is not None and 60 <= last_tm["hr"] <= 200
-        ok_treadmill_elapsed = (
-            first_tm["elapsed"] is not None
-            and last_tm["elapsed"] is not None
-            and last_tm["elapsed"] >= first_tm["elapsed"]
-        )
-        print(
-            "FTMS Treadmill 最后样本: speed=%.2fkm/h distance=%s hr=%s elapsed=%s flags=0x%04x"
-            % (
-                last_tm["speed_kmh"],
-                str(last_tm["distance"]),
-                str(last_tm["hr"]),
-                str(last_tm["elapsed"]),
-                last_tm["flags"],
-            )
-        )
-    print(f"通知计数: RSC={len(samples)} HR={hr_count[0]} FTMS-Treadmill={len(treadmill_samples)}")
 
     ok_services = not missing
-    ok_cp_control = True
-    ok_reset = True
-    if RUN_CONTROL:
-        def cp_results(op_code):
-            return [r[2] for r in cp_responses if len(r) >= 3 and r[0] == 0x80 and r[1] == op_code]
-        ok_cp_control = (
-            cp_results(OP_REQUEST_CONTROL)[-1:] == [CP_RESULT_SUCCESS]
-            and cp_results(OP_START_RESUME)[-1:] == [CP_RESULT_SUCCESS]
-            and cp_results(OP_SET_TARGET_POWER)[-1:] == [CP_RESULT_NOT_SUPPORTED]
-            and cp_results(OP_SET_TARGET_SPEED)[-1:] == [CP_RESULT_SUCCESS]
-        )
-        if FTMS_CP_UUID in found:
-            print("下发 running Reset(0x01)")
-            before_reset_count = len(treadmill_samples)
-            await client.write_gatt_char(FTMS_CP_UUID, bytes([OP_RESET]), response=True)
-            await asyncio.sleep(2)
-            reset_samples = treadmill_samples[before_reset_count:]
-            reset_responses = cp_results(OP_RESET)
-            ok_reset = bool(reset_responses and reset_responses[-1] == CP_RESULT_SUCCESS)
-            if reset_samples:
-                ok_reset = ok_reset and reset_samples[0]["distance"] is not None and reset_samples[0]["distance"] <= 2
+    ok_cp_control = not RUN_CONTROL or not control_errors
     ok = (
-        ok_services and dis_ok and ftms_feature_ok and ok_notify and ok_speed and ok_cadence and ok_distance and ok_flags
+        ok_services and dis_ok and ftms_feature_ok and rsc_feature_ok
+        and ok_notify and ok_speed and ok_cadence and ok_distance and ok_flags
         and ok_treadmill_notify and ok_treadmill_speed and ok_treadmill_distance
         and ok_treadmill_hr and ok_treadmill_elapsed
-        and ok_cp_control and ok_reset
+        and ok_cp_control and ok_pause and ok_reset and ok_resume and not parse_errors
     )
     print("--- 结果 ---")
     print(f"  跑步服务齐全: {'通过' if ok_services else '失败(' + ','.join(missing) + ')'}")
     print(f"  DIS 设备信息: {'通过' if dis_ok else '失败'}")
     print(f"  FTMS Feature: {'通过' if ftms_feature_ok else '失败'}")
+    print(f"  RSC Feature: {'通过' if rsc_feature_ok else '失败'}")
     print(f"  RSC 通知: {'通过' if ok_notify else '失败'}")
     print(f"  RSC 速度: {'通过' if ok_speed else '失败'}")
     print(f"  RSC 步频: {'通过' if ok_cadence else '失败'}")
@@ -394,8 +440,23 @@ async def run_running_profile(client, found):
     print(f"  FTMS Treadmill 距离: {'通过' if ok_treadmill_distance else '失败'}")
     print(f"  FTMS Treadmill 心率: {'通过' if ok_treadmill_hr else '失败'}")
     print(f"  FTMS Treadmill 用时: {'通过' if ok_treadmill_elapsed else '失败'}")
-    print(f"  FTMS 跑步控制点: {'通过' if ok_cp_control else '失败'}")
-    print(f"  FTMS 跑步 Reset: {'通过' if ok_reset else '失败'}")
+    print(
+        f"  FTMS 跑步控制点: {'通过' if ok_cp_control else '失败(' + '; '.join(control_errors[:3]) + ')'}"
+    )
+    if RUN_CONTROL:
+        print(f"  Stop 后零值/累计冻结: {'通过' if ok_pause else '失败'}")
+        print(f"  暂停态 Reset 清零且保持暂停: {'通过' if ok_reset else '失败'}")
+        print(f"  Resume 后速度/累计恢复: {'通过' if ok_resume else '失败'}")
+        print(
+            "  阶段样本数: moving=%d/%d paused=%d/%d reset=%d/%d resumed=%d/%d"
+            % (
+                len(moving_rsc), len(moving_treadmill),
+                len(paused_rsc), len(paused_treadmill),
+                len(reset_rsc), len(reset_treadmill),
+                len(resumed_rsc), len(resumed_treadmill),
+            )
+        )
+    print(f"  BLE payload 解析: {'通过' if not parse_errors else '失败(' + '; '.join(parse_errors[:3]) + ')'}")
     print("总判定:", "通过" if ok else "失败")
     return 0 if ok else 1
 
@@ -464,11 +525,14 @@ async def main():
         counts = {"cps": 0, "hr": 0, "csc": 0, "ftms": 0}
         last_power = [0]
         cp_responses = []
+        parse_errors = []
 
         def cb_cps(_, data):
             counts["cps"] += 1
-            _, power = parse_cps(bytes(data))
-            last_power[0] = power
+            try:
+                last_power[0] = parse_cps(bytes(data))["power_w"]
+            except ValueError as exc:
+                parse_errors.append(f"CPS: {exc}")
 
         def cb_hr(_, data):
             counts["hr"] += 1
@@ -593,7 +657,8 @@ async def main():
         print(f"  FTMS-CP 响应: {'通过' if ok_cp_resp else '失败(' + cp_detail + ')'}")
         print(f"  ERG 功率收敛: {'通过' if ok_erg else '失败'}")
         print(f"  Stop/Pause 响应: {'通过' if ok_stop_resp else '失败'}")
-        ok = ok_notify and ok_services and ftms_feature_ok and ok_cp_resp and ok_erg and ok_stop_resp and dis_ok
+        print(f"  BLE payload 解析: {'通过' if not parse_errors else '失败(' + '; '.join(parse_errors[:3]) + ')'}")
+        ok = ok_notify and ok_services and ftms_feature_ok and ok_cp_resp and ok_erg and ok_stop_resp and dis_ok and not parse_errors
         print("总判定:", "通过" if ok else "失败")
         return 0 if ok else 1
 

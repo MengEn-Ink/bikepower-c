@@ -223,9 +223,12 @@ check("BIKEPOWER_EXPECT_BOARD" in ble_selftest_src
       and '"generic": "generic-c3"' in ble_selftest_src
       and '"m5stamp": "m5stamp-c3"' in ble_selftest_src,
       "ble_selftest.py 必须支持显式板型期望，避免双板构建后误读 sdkconfig")
-check("client.is_connected" in stage3_conn_src
-      and "未从 WARN 串口日志观察到" in stage3_conn_src,
-      "stage3_conn_test.py 必须兼容生产 WARN 日志，仅将串口连接事件作为增强证据")
+check("for cycle in (1, 2)" in stage3_conn_src
+      and "scan_device(" in stage3_conn_src
+      and "await client.disconnect()" in stage3_conn_src
+      and "client.is_connected" in stage3_conn_src
+      and "无串口时不阻断" in stage3_conn_src,
+      "stage3_conn_test.py 必须执行两次独立扫描/连接/断开，串口日志仅作为增强证据")
 check("CONFIG_BT_NIMBLE_NVS_PERSIST=n" in sdkconfig_defaults_src
       and "CONFIG_BT_NIMBLE_HS_PVCY=n" in sdkconfig_defaults_src,
       "sdkconfig.defaults 必须关闭 NimBLE privacy/RPA，避免关闭 NVS 持久化时 IRK 写入 warning 影响广播")

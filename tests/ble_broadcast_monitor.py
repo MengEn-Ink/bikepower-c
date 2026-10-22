@@ -8,12 +8,18 @@ CPS/HRS/CSC/FTMS 数据面。
 import argparse
 import asyncio
 import json
-import struct
 import sys
 import time
 import urllib.request
 
 from bleak import BleakClient, BleakScanner
+from ble_protocol import (
+    parse_cps,
+    parse_csc,
+    parse_ftms_indoor_bike,
+    parse_hr,
+    parse_rsc,
+)
 
 DEVICE_NAME = "BikePower"
 
@@ -46,25 +52,10 @@ def request_json(base_url, path, payload=None, timeout=5):
     return json.loads(data.decode("utf-8"))
 
 
-def parse_hr(data):
-    if len(data) < 2:
-        return None
-    if data[0] & 0x01:
-        return struct.unpack_from("<H", data, 1)[0] if len(data) >= 3 else None
-    return data[1]
-
-
-def parse_cps(data):
-    if len(data) < 4:
-        return None
-    return struct.unpack_from("<h", data, 2)[0]
-
-
-def parse_csc(data, prev):
-    if len(data) < 5 or not (data[0] & 0x02):
-        return None, prev
-    revs = struct.unpack_from("<H", data, 1)[0]
-    t1024 = struct.unpack_from("<H", data, 3)[0]
+def calculate_csc_cadence(data, prev):
+    parsed = parse_csc(data)
+    revs = parsed["crank_revolutions"]
+    t1024 = parsed["crank_event_time_1024"]
     if prev is None:
         return None, (revs, t1024)
     prev_revs, prev_t1024 = prev
@@ -74,31 +65,6 @@ def parse_csc(data, prev):
         return None, (revs, t1024)
     cadence = round((rev_delta / (time_delta / 1024.0)) * 60.0)
     return cadence, (revs, t1024)
-
-
-def parse_rsc(data):
-    if len(data) < 4:
-        return None
-    speed = struct.unpack_from("<H", data, 1)[0] * 3.6 / 256.0
-    cadence = data[3]
-    return {"speed_kmh": speed, "cadence": cadence}
-
-
-def parse_ftms_indoor_bike(data):
-    if len(data) < 4:
-        return {"power": None, "cadence": None}
-    flags = struct.unpack_from("<H", data, 0)[0]
-    off = 2
-    if not (flags & 0x0001) and len(data) >= off + 2:
-        off += 2
-    cadence = None
-    if (flags & 0x0004) and len(data) >= off + 2:
-        cadence = struct.unpack_from("<H", data, off)[0] / 2.0
-        off += 2
-    power = None
-    if len(data) >= off + 2:
-        power = struct.unpack_from("<h", data, off)[0]
-    return {"power": power, "cadence": cadence}
 
 
 class BleCounters:
@@ -129,21 +95,33 @@ class BleCounters:
 
     def handle_cps(self, _, data):
         self.counts["cps"] += 1
-        power = parse_cps(bytes(data))
+        try:
+            power = parse_cps(bytes(data))["power_w"]
+        except ValueError as exc:
+            self.errors.append(f"CPS 解析失败: {exc}")
+            return
         self.values["power"] = power
-        if power is None or power < 0 or power > 2000:
+        if power < 0 or power > 2000:
             self.errors.append(f"CPS 功率异常: {power}")
 
     def handle_hr(self, _, data):
         self.counts["hr"] += 1
-        hr = parse_hr(bytes(data))
+        try:
+            hr = parse_hr(bytes(data))["heart_rate_bpm"]
+        except ValueError as exc:
+            self.errors.append(f"HRS 解析失败: {exc}")
+            return
         self.values["hr"] = hr
-        if hr is None or hr < 30 or hr > 240:
+        if hr < 30 or hr > 240:
             self.errors.append(f"HRS 心率异常: {hr}")
 
     def handle_csc(self, _, data):
         self.counts["csc"] += 1
-        cadence, self._csc_prev = parse_csc(bytes(data), self._csc_prev)
+        try:
+            cadence, self._csc_prev = calculate_csc_cadence(bytes(data), self._csc_prev)
+        except ValueError as exc:
+            self.errors.append(f"CSC 解析失败: {exc}")
+            return
         if cadence is not None:
             self.values["cadence"] = cadence
             if cadence < 0 or cadence > 260:
@@ -151,24 +129,31 @@ class BleCounters:
 
     def handle_ftms(self, _, data):
         self.counts["ftms"] += 1
-        parsed = parse_ftms_indoor_bike(bytes(data))
-        if parsed["power"] is not None:
+        try:
+            parsed = parse_ftms_indoor_bike(bytes(data))
+        except ValueError as exc:
+            self.errors.append(f"FTMS 解析失败: {exc}")
+            return
+        if parsed["power_w"] is not None:
             self.counts["ftms_power"] += 1
-            self.values["ftms_power"] = parsed["power"]
-            if parsed["power"] < 0 or parsed["power"] > 2000:
-                self.errors.append(f"FTMS 功率异常: {parsed['power']}")
-        if parsed["cadence"] is not None:
+            self.values["ftms_power"] = parsed["power_w"]
+            if parsed["power_w"] < 0 or parsed["power_w"] > 2000:
+                self.errors.append(f"FTMS 功率异常: {parsed['power_w']}")
+        if parsed["cadence_rpm"] is not None:
             self.counts["ftms_cadence"] += 1
-            self.values["ftms_cadence"] = parsed["cadence"]
-            if parsed["cadence"] < 0 or parsed["cadence"] > 260:
-                self.errors.append(f"FTMS 踏频异常: {parsed['cadence']}")
+            self.values["ftms_cadence"] = parsed["cadence_rpm"]
+            if parsed["cadence_rpm"] < 0 or parsed["cadence_rpm"] > 260:
+                self.errors.append(f"FTMS 踏频异常: {parsed['cadence_rpm']}")
 
     def handle_rsc(self, _, data):
         self.counts["rsc"] += 1
-        parsed = parse_rsc(bytes(data))
-        if parsed:
-            self.values["rsc_speed"] = parsed["speed_kmh"]
-            self.values["rsc_cadence"] = parsed["cadence"]
+        try:
+            parsed = parse_rsc(bytes(data))
+        except ValueError as exc:
+            self.errors.append(f"RSC 解析失败: {exc}")
+            return
+        self.values["rsc_speed"] = parsed["speed_kmh"]
+        self.values["rsc_cadence"] = parsed["cadence_spm"]
 
 
 async def find_device(name_prefix, timeout):
@@ -302,7 +287,9 @@ async def run(args):
             post_config(base_url, original_profile, original_mask)
             print(f"[ble-broadcast] 已恢复配置: profile={original_profile} mask={original_mask}")
         except Exception as exc:
-            print(f"[ble-broadcast] WARN 恢复原始配置失败: {exc}")
+            failure = f"restore_config: {type(exc).__name__}: {exc}"
+            all_failures.append(failure)
+            print(f"[ble-broadcast] FAIL 恢复原始配置失败: {exc}")
 
     if all_failures:
         print(f"[ble-broadcast] FAIL: {len(all_failures)} 项失败")

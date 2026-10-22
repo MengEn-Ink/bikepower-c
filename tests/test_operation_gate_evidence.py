@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "tools"))
 sys.path.insert(0, str(ROOT / "tests"))
 
 from device_acceptance import load_record, new_record, set_item, write_record  # noqa: E402
-from operation_gate import prepare_evidence, record_gate_result  # noqa: E402
+from operation_gate import Gate, prepare_evidence, record_gate_result  # noqa: E402
 
 TAG = "[operation-gate-evidence-test]"
 VERSION = "9.8.7"
@@ -17,6 +17,13 @@ GIT_SHA = "abc1234"
 
 
 def main():
+    with tempfile.TemporaryDirectory() as tmp:
+        gate = Gate("device", Path(tmp) / "report.md")
+        gate.record("ble_running", "fake running", 1, "failed", required=True)
+        gate.record("ble_reconnect", "fake reconnect", 1, "failed", required=True)
+        assert len(gate.failures) == 2, "P0 running/reconnect 失败必须阻断 device gate"
+        print(f"{TAG} PASS P0 running/reconnect failures are required")
+
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "device-acceptance.json"
         record = new_record(VERSION, GIT_SHA, "generic-c3", "tester")

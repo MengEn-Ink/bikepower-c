@@ -6,6 +6,7 @@ quick：开发期快速检查；full：提交前无设备完整门禁；device�
 """
 import argparse
 import os
+import shlex
 import subprocess
 import sys
 from datetime import datetime
@@ -178,6 +179,12 @@ def run_step(gate, name, command, timeout=120, required=True, acceptance_item=No
 
 def quick_steps(gate):
     run_step(gate, "Host 领域层单测", "make -C test run", 120)
+    run_step(gate, "BLE 协议 golden vectors", "python3 tests/test_ble_protocol_vectors.py", 60)
+    run_step(gate, "BLE 重连 harness 单测", "python3 tests/test_ble_reconnect_harness.py", 30)
+    run_step(gate, "BLE profile harness 单测", "python3 tests/test_device_profile_harness.py", 30)
+    run_step(gate, "BLE running 分阶段 harness 单测", "python3 tests/test_ble_running_harness.py", 30)
+    run_step(gate, "WiFi 完成事件契约", "python3 tests/check_wifi_done_contract.py", 30)
+    run_step(gate, "FTMS 控制点契约", "python3 tests/check_ftms_control_contract.py", 30)
     run_step(gate, "Mock 保存回显", "python3 tests/test_portal_config_save.py", 60)
     run_step(gate, "操作覆盖矩阵", "python3 tests/check_operation_coverage.py", 30)
     run_step(gate, "BLE 监控客户端静态门禁", "python3 tests/check_ble_monitor.py", 30)
@@ -199,7 +206,7 @@ def full_steps(gate, build):
         run_step(gate, "ESP-IDF 编译", f"{idf_prefix()}idf.py build", 240)
 
 
-def device_steps(gate, port, run_portal):
+def device_steps(gate, port, run_portal, device_profile):
     if port:
         run_step(
             gate,
@@ -210,21 +217,47 @@ def device_steps(gate, port, run_portal):
         )
     else:
         gate.note_skip("串口启动日志", "未传 --port")
-    run_step(
-        gate,
-        "BLE 自测",
-        "python3 tests/ble_selftest.py",
-        60,
-        acceptance_item="ble_cycling",
-    )
-    run_step(
-        gate,
-        "BLE 跑步 profile 自测",
-        "python3 tests/ble_selftest.py --profile running 8",
-        60,
-        required=False,
-        acceptance_item="ble_running",
-    )
+    if run_portal:
+        run_step(
+            gate,
+            "BLE 骑行 profile 自测",
+            "python3 tests/device_profile_harness.py --profile cycling",
+            120,
+            acceptance_item="ble_cycling",
+        )
+        run_step(
+            gate,
+            "BLE 跑步 profile 会话自测",
+            "python3 tests/device_profile_harness.py --profile running",
+            150,
+            acceptance_item="ble_running",
+        )
+    elif device_profile == "cycling":
+        run_step(
+            gate,
+            "BLE 骑行 profile 自测",
+            "python3 tests/ble_selftest.py --profile cycling 12 250",
+            90,
+            acceptance_item="ble_cycling",
+        )
+        gate.note_skip("BLE 跑步 profile 会话自测", "设备当前声明为 cycling；ble_running 保持 NOT_RUN")
+    elif device_profile == "running":
+        gate.note_skip("BLE 骑行 profile 自测", "设备当前声明为 running；ble_cycling 保持 NOT_RUN")
+        run_step(
+            gate,
+            "BLE 跑步 profile 会话自测",
+            "python3 tests/ble_selftest.py --profile running --control 12",
+            120,
+            acceptance_item="ble_running",
+        )
+    else:
+        gate.record(
+            "BLE profile 选择",
+            "--run-portal 或 --device-profile cycling|running",
+            2,
+            "单固件只暴露一个 GATT profile；未提供可验证的 profile 选择",
+            required=True,
+        )
     if run_portal:
         run_step(
             gate,
@@ -235,12 +268,14 @@ def device_steps(gate, port, run_portal):
         )
     else:
         gate.note_skip("BLE 广播项数据面监控", "未传 --run-portal；需要设备处于配网态以便 /api/config 切换 broadcast_mask")
+    reconnect_command = "python3 tests/stage3_conn_test.py"
+    if port:
+        reconnect_command += f" --port {shlex.quote(port)}"
     run_step(
         gate,
-        "BLE 连接事件",
-        "python3 tests/stage3_conn_test.py",
-        60,
-        required=False,
+        "BLE 双次重连",
+        reconnect_command,
+        90,
         acceptance_item="ble_reconnect",
     )
     gate.note_skip("BLE 浏览器监控", "运行 python3 scripts/tools/serve_ble_monitor.py 后用 Chrome/Edge 打开 ble-monitor.html；Web Bluetooth 首次授权必须人工点击")
@@ -262,6 +297,12 @@ def main():
     parser.add_argument("--level", choices=("quick", "full", "device"), default="quick")
     parser.add_argument("--port", default="", help="真机串口，例如 /dev/cu.usbmodem101")
     parser.add_argument("--run-portal", action="store_true", help="device 模式下运行配网门户 HTTP 自测")
+    parser.add_argument(
+        "--device-profile",
+        choices=("cycling", "running"),
+        default="",
+        help="未启用 --run-portal 时声明设备当前 GATT profile；另一 profile 保持 NOT_RUN",
+    )
     parser.add_argument("--build", action="store_true", help="full 模式追加 idf.py build")
     parser.add_argument("--report", default="", help="报告输出路径")
     parser.add_argument("--board", choices=("generic-c3", "m5stamp-c3"), default="",
@@ -304,7 +345,7 @@ def main():
     elif args.level == "full":
         full_steps(gate, args.build)
     else:
-        device_steps(gate, args.port, args.run_portal)
+        device_steps(gate, args.port, args.run_portal, args.device_profile)
 
     gate.write_report()
     if gate.failures:

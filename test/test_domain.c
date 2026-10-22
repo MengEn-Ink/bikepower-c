@@ -150,14 +150,16 @@ static void test_adjust_power(void)
 
 static void test_erg(void)
 {
-    printf("[test] ERG 目标功率自动切模式\n");
+    printf("[test] ERG 会话目标与持久配置隔离\n");
     power_engine_t e;
     power_engine_init(&e);
+    int base_before = e.base_power;
     bool ok = power_engine_set_erg_target(&e, 250);
     CHECK(ok == true, "ERG合法目标返回true");
     CHECK(e.mode == RIDE_MODE_ERG, "ERG下发自动切ERG");
     CHECK(e.has_erg_target && e.erg_active_target == 250, "ERG目标=250");
-    CHECK(e.base_power == 250, "base同步=250");
+    CHECK(e.base_power == base_before, "ERG目标不覆盖持久base功率");
+    CHECK(!power_engine_is_dirty(&e), "首次ERG目标不置dirty");
     // 超范围拒绝（高于上限）
     ok = power_engine_set_erg_target(&e, 9999);
     CHECK(ok == false, "超范围ERG返回false");
@@ -174,25 +176,28 @@ static void test_erg(void)
               "ERG功率在目标±5内");
         CHECK(s.mode == RIDE_MODE_ERG, "快照模式=ERG");
     }
-    // 同值幂等：已在 ERG 且目标未变时不置 dirty，避免高频同值反复落盘
-    power_engine_clear_dirty(&e);
+    // ERG 是运行时会话态：同值和变化目标都不触发 NVS dirty。
     ok = power_engine_set_erg_target(&e, 250);
     CHECK(ok == true, "同值ERG返回true");
     CHECK(!power_engine_is_dirty(&e), "同值ERG不置dirty");
     ok = power_engine_set_erg_target(&e, 260);
     CHECK(ok == true, "新值ERG返回true");
-    CHECK(power_engine_is_dirty(&e), "新值ERG置dirty");
-    CHECK(e.base_power == 260, "新值base同步=260");
+    CHECK(!power_engine_is_dirty(&e), "新值ERG仍不置dirty");
+    CHECK(e.base_power == base_before, "新值ERG仍保留base功率");
 
-    power_engine_clear_dirty(&e);
     CHECK(power_engine_clear_erg_target(&e) == true, "清除ERG目标返回true");
     CHECK(e.mode == RIDE_MODE_STEADY, "清除ERG后回到固定功率模式");
     CHECK(!e.has_erg_target && e.erg_active_target == 0, "清除ERG目标状态");
+    CHECK(e.base_power == base_before && e.last_power == base_before, "清除ERG恢复进入前base功率");
+    CHECK(!power_engine_is_dirty(&e), "清除ERG不置dirty");
     CHECK(power_engine_set_power(&e, 180) == true, "清除ERG后手动设功率恢复生效");
     CHECK(e.base_power == 180 && e.last_power == 180, "清除ERG后功率可更新");
+    power_engine_clear_dirty(&e);
     CHECK(power_engine_clear_erg_target(&e) == false, "重复清除ERG不置变更");
+    CHECK(!power_engine_is_dirty(&e), "重复清除ERG保持clean");
 
     CHECK(power_engine_set_erg_target(&e, 240) == true, "再次进入ERG成功");
+    CHECK(e.base_power == 180 && !power_engine_is_dirty(&e), "再次进入ERG仍保留手动功率且不置dirty");
     CHECK(power_engine_set_mode(&e, RIDE_MODE_STEADY) == true, "切回固定功率成功");
     CHECK(!e.has_erg_target && e.erg_active_target == 0, "切回非ERG清除旧目标");
 }
@@ -206,6 +211,7 @@ static void test_setters_edge(void)
     // set_mode 非法值拒绝
     CHECK(power_engine_set_mode(&e, (ride_mode_t)(-1)) == false, "set_mode 负值拒绝");
     CHECK(power_engine_set_mode(&e, (ride_mode_t)RIDE_MODE_COUNT) == false, "set_mode 越界拒绝");
+    CHECK(power_engine_set_mode(&e, RIDE_MODE_ERG) == false, "set_mode 拒绝持久设置ERG会话态");
     CHECK(power_engine_set_mode(&e, RIDE_MODE_STEADY) == false, "set_mode 同值拒绝");
 
     // set_device_name 空指针/空串拒绝、同名拒绝、超长截断
@@ -239,7 +245,7 @@ static void test_setters_edge(void)
     CHECK(power_engine_set_heartrate(&e, 150) == false, "非steady心率拒绝");
     // 持久化恢复场景：先设置心率再切非STEADY模式，字段保留不丢失，切回STEADY可直接使用
     CHECK(e.has_user_hr && e.user_heartrate == 160, "切到ROAD后固定心率字段保留");
-    power_engine_set_mode(&e, RIDE_MODE_ERG);
+    CHECK(power_engine_set_erg_target(&e, 200), "ERG会话目标设置成功");
     CHECK(e.has_user_hr && e.user_heartrate == 160, "切到ERG后固定心率字段保留");
     power_engine_set_mode(&e, RIDE_MODE_STEADY);
     CHECK(e.has_user_hr && e.user_heartrate == 160, "切回STEADY后固定心率字段保留，可直接使用");
@@ -726,15 +732,17 @@ static void test_engine_blindspots(void)
     power_engine_set_mode(&e, RIDE_MODE_ROAD);
     CHECK(power_engine_set_power(&e, 150) == false, "非 steady set_power 拒绝");
 
-    // set_erg_target 同值幂等：已在 ERG 且目标未变，返回 true 但不置 dirty（防 flash 损耗）
+    // set_erg_target 是纯会话态：首次、同值与变更目标都不影响持久配置 dirty。
     power_engine_init(&e);
+    int persistent_power = e.base_power;
     CHECK(power_engine_set_erg_target(&e, 200) == true, "首次 ERG 目标成功");
-    CHECK(e.mode == RIDE_MODE_ERG && e.dirty, "ERG 切模式并置 dirty");
-    power_engine_clear_dirty(&e);
+    CHECK(e.mode == RIDE_MODE_ERG && !e.dirty, "ERG 切运行态但不置 dirty");
+    CHECK(e.base_power == persistent_power, "首次ERG保留持久base功率");
     CHECK(power_engine_set_erg_target(&e, 200) == true, "同值 ERG 幂等返回 true");
     CHECK(!power_engine_is_dirty(&e), "同值 ERG 不置 dirty");
     CHECK(power_engine_set_erg_target(&e, 210) == true, "变更 ERG 目标成功");
-    CHECK(power_engine_is_dirty(&e), "变更 ERG 置 dirty");
+    CHECK(!power_engine_is_dirty(&e), "变更 ERG 不置 dirty");
+    CHECK(e.base_power == persistent_power, "变更ERG仍保留持久base功率");
 
     // reset_mode_state：ERG 有目标时 last_power=目标，无目标时回退 base_power
     power_engine_init(&e);
@@ -852,6 +860,16 @@ static void test_config_store(void)
     CHECK(b.led.scenes[LED_SCENE_WAIT_CONN].mode == LED_MODE_SLOW, "非法 LED 模式回默认慢闪");
     CHECK(b.led.scenes[LED_SCENE_CONNECTED].color == LED_COLOR_BLUE, "非法 LED 颜色回默认蓝色");
     CHECK(b.led.silent == 1, "LED 静默规范化为1");
+
+    // ERG 仅为会话态，旧 NVS 或导入配置中的 ERG 必须修正为 steady 并触发回写。
+    config_data_t erg;
+    config_store_defaults(&erg);
+    erg.mode = RIDE_MODE_ERG;
+    erg.power = 333;
+    CHECK(config_store_validate(&erg), "持久ERG模式被修正");
+    CHECK(erg.mode == RIDE_MODE_STEADY, "持久ERG归一为steady");
+    CHECK(erg.power == 333, "持久ERG修正保留base功率");
+    CHECK(!config_store_validate(&erg), "ERG修正后二次校验幂等");
 
     // 版本不匹配触发迁移重置
     config_data_t m;
@@ -1392,8 +1410,10 @@ static void test_running_engine_defaults(void)
     printf("[test] 跑步模式默认快照与 RSC 单位换算\n");
     running_engine_t e;
     running_engine_init(&e);
+    CHECK(e.running, "跑步引擎默认处于运行态");
 
     running_snapshot_t first = running_engine_snapshot(&e, 1000);
+    CHECK(first.running, "默认跑步快照标记运行中");
     CHECK(first.speed_x100_kmh == RUN_SPEED_X100_DEFAULT, "默认跑步速度=10.0km/h");
     CHECK(first.cadence_spm == RUN_CADENCE_DEFAULT, "默认跑步步频=170spm");
     CHECK(first.rsc_speed_1_256_mps == 711, "RSC速度单位=1/256m/s");
@@ -1505,9 +1525,85 @@ static void test_running_control_values(void)
 
     running_snapshot_t before_reset = running_engine_snapshot(&e.running, 5000);
     CHECK(before_reset.total_distance_m > 0 && before_reset.elapsed_time_s > 0, "跑步累计距离和用时已推进");
+    power_engine_clear_dirty(&e);
     power_engine_run_reset(&e);
     running_snapshot_t after_reset = running_engine_snapshot(&e.running, 0);
     CHECK(after_reset.total_distance_m == 0 && after_reset.elapsed_time_s == 0, "跑步 reset 清空距离和用时");
+    CHECK(!power_engine_is_dirty(&e), "跑步 reset 不置持久配置dirty");
+}
+
+static void test_running_session_state(void)
+{
+    printf("[test] 跑步会话暂停、恢复与reset语义\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    CHECK(power_engine_set_sport_profile(&e, SPORT_PROFILE_RUNNING), "切换到跑步profile");
+    power_engine_clear_dirty(&e);
+
+    running_snapshot_t active = running_engine_snapshot(&e.running, 2000);
+    CHECK(active.running && active.speed_x100_kmh > 0 && active.cadence_spm > 0, "运行快照输出速度和步频");
+    CHECK(active.total_distance_m > 0 && active.elapsed_time_s == 2, "运行快照推进累计");
+
+    CHECK(power_engine_set_run_running(&e, false), "Stop切换到暂停态");
+    CHECK(!power_engine_is_dirty(&e), "Stop不置dirty");
+    running_snapshot_t paused1 = running_engine_snapshot(&e.running, 5000);
+    running_snapshot_t paused2 = running_engine_snapshot(&e.running, 5000);
+    CHECK(!paused1.running && paused1.speed_x100_kmh == 0, "暂停快照速度归零");
+    CHECK(paused1.cadence_spm == 0 && paused1.stride_cm == 0 && paused1.rsc_speed_1_256_mps == 0,
+          "暂停快照步频步幅和RSC速度归零");
+    CHECK(paused1.total_distance_m == active.total_distance_m && paused1.elapsed_time_s == active.elapsed_time_s,
+          "暂停首次快照冻结累计");
+    CHECK(paused2.total_distance_m == active.total_distance_m && paused2.elapsed_time_s == active.elapsed_time_s,
+          "暂停多次快照持续冻结累计");
+    CHECK(!power_engine_set_run_running(&e, false), "重复Stop幂等");
+
+    power_engine_run_reset(&e);
+    running_snapshot_t paused_reset = running_engine_snapshot(&e.running, 1000);
+    CHECK(!paused_reset.running, "暂停Reset保持暂停态");
+    CHECK(paused_reset.total_distance_m == 0 && paused_reset.elapsed_time_s == 0, "暂停Reset清空累计且不重新推进");
+    CHECK(!power_engine_is_dirty(&e), "暂停Reset不置dirty");
+
+    CHECK(power_engine_set_run_running(&e, true), "Start恢复运行态");
+    running_snapshot_t resumed = running_engine_snapshot(&e.running, 1000);
+    CHECK(resumed.running && resumed.speed_x100_kmh > 0 && resumed.cadence_spm > 0, "恢复后重新输出跑步数据");
+    CHECK(resumed.total_distance_m > 0 && resumed.elapsed_time_s == 1, "恢复后累计继续推进");
+    CHECK(!power_engine_is_dirty(&e), "Start不置dirty");
+
+    power_engine_run_reset(&e);
+    running_snapshot_t active_reset = running_engine_snapshot(&e.running, 0);
+    CHECK(active_reset.running, "运行Reset保持运行态");
+    CHECK(active_reset.total_distance_m == 0 && active_reset.elapsed_time_s == 0, "运行Reset清空累计");
+
+    CHECK(power_engine_set_run_running(&e, false), "profile切换前再次暂停");
+    CHECK(power_engine_set_sport_profile(&e, SPORT_PROFILE_CYCLING), "切回骑行profile");
+    power_engine_clear_dirty(&e);
+    CHECK(power_engine_set_sport_profile(&e, SPORT_PROFILE_RUNNING), "再次切入跑步profile");
+    CHECK(e.running.running, "切入跑步profile默认恢复运行态");
+}
+
+static void test_session_config_export(void)
+{
+    printf("[test] 会话态导出持久配置规范化\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    CHECK(power_engine_set_power(&e, 180), "设置持久base功率");
+    power_engine_clear_dirty(&e);
+    CHECK(power_engine_set_erg_target(&e, 260), "进入ERG会话");
+    CHECK(!power_engine_is_dirty(&e), "ERG会话本身保持clean");
+    CHECK(power_engine_set_power_float(&e, e.power_float + 1), "ERG期间修改其他持久配置");
+
+    config_data_t exported;
+    config_store_from_engine(&e, &exported);
+    CHECK(exported.mode == RIDE_MODE_STEADY, "ERG会话导出为steady");
+    CHECK(exported.power == 180, "ERG会话导出原base功率而非目标功率");
+    CHECK(exported.power_float == e.power_float, "ERG期间其他持久配置正常导出");
+    CHECK(e.mode == RIDE_MODE_ERG && e.erg_active_target == 260, "配置导出不改变ERG运行态");
+
+    CHECK(power_engine_set_sport_profile(&e, SPORT_PROFILE_RUNNING), "导出前切到跑步profile");
+    CHECK(power_engine_set_run_running(&e, false), "导出前暂停跑步会话");
+    config_store_from_engine(&e, &exported);
+    CHECK(exported.sport_profile == SPORT_PROFILE_RUNNING, "跑步profile作为配置正常导出");
+    CHECK(!e.running.running, "配置导出不改变非持久跑步暂停态");
 }
 
 static void test_config_migrate_v9_to_v11_running_fields(void)
@@ -1566,6 +1662,8 @@ int main(void)
     test_running_pacer_templates();
     test_running_custom_pacer_validation();
     test_running_control_values();
+    test_running_session_state();
+    test_session_config_export();
     test_config_migrate_v9_to_v11_running_fields();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

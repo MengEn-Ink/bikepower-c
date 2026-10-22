@@ -202,6 +202,12 @@ python3 tests/check_nvs_schema.py
 python3 tests/check_tasks_wdt.py
 python3 tests/check_board_desc.py
 python3 tests/check_ble_advertising_fields.py
+python3 tests/test_ble_protocol_vectors.py
+python3 tests/test_ble_reconnect_harness.py
+python3 tests/test_ble_running_harness.py
+python3 tests/test_device_profile_harness.py
+python3 tests/check_wifi_done_contract.py
+python3 tests/check_ftms_control_contract.py
 
 # 记录本次生成的固件产物（用于后续 SHA256 / manifest / latest.json）
 PRODUCED_BINS=()
@@ -297,7 +303,7 @@ for target in "${TARGETS[@]}"; do
     fi
 done
 
-TEST_SUMMARY="构建前门禁已通过：make -C test && ./test/test_domain；python3 tests/test_portal_config_save.py；python3 tests/test_core_flow_endurance.py --minutes ${CORE_FLOW_MINUTES:-3}；check_config_consistency.py；check_portal_js.py；check_portal_structure.py；check_nvs_schema.py；check_tasks_wdt.py；check_board_desc.py；check_ble_advertising_fields.py。真机烧录、BLE 自测、配网自测和物理按钮/LED 验证需按测试报告补充执行记录。"
+TEST_SUMMARY="构建前门禁已通过：host 领域层单测；BLE 协议 golden vectors；BLE 重连/running/profile harness；WiFi done/FTMS 控制点契约；门户 mock 与核心流程耐久；配置、门户、NVS、任务/WDT、板型及 BLE 广播静态检查。真机烧录、BLE 自测、配网自测和物理按钮/LED 验证需按测试报告补充执行记录。"
 python3 "$PROJECT_DIR/scripts/tools/generate_release_docs.py" \
     --release-dir "$RELEASE_DIR" \
     --test-summary "$TEST_SUMMARY" \

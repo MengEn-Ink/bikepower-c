@@ -58,12 +58,12 @@ function Run-HostTests {
     Push-Location $testDir
     try {
         if ($clangCmd) {
-            Invoke-SafeCommand -Command "make" -ArgsList @("CC=clang") -WorkingDir $testDir
+            $null = Invoke-SafeCommand -Command "make" -ArgsList @("CC=clang") -WorkingDir $testDir
         } else {
-            Invoke-SafeCommand -Command "make" -ArgsList @() -WorkingDir $testDir
+            $null = Invoke-SafeCommand -Command "make" -ArgsList @() -WorkingDir $testDir
         }
         $testBin = Join-Path $testDir "test_domain.exe"
-        Invoke-SafeCommand -Command $testBin -ArgsList @() -WorkingDir $testDir
+        $null = Invoke-SafeCommand -Command $testBin -ArgsList @() -WorkingDir $testDir
     } finally {
         Pop-Location
     }
@@ -71,6 +71,7 @@ function Run-HostTests {
 }
 
 function Run-StaticChecks {
+    param([bool]$HostCodecAvailable)
     Write-Log "运行静态门禁检查"
     $checks = @(
         "tests\check_config_consistency.py",
@@ -79,12 +80,23 @@ function Run-StaticChecks {
         "tests\check_nvs_schema.py",
         "tests\check_tasks_wdt.py",
         "tests\check_board_desc.py",
-        "tests\check_ble_advertising_fields.py"
+        "tests\check_ble_advertising_fields.py",
+        "tests\test_ble_protocol_vectors.py",
+        "tests\test_ble_reconnect_harness.py",
+        "tests\test_ble_running_harness.py",
+        "tests\test_device_profile_harness.py",
+        "tests\check_wifi_done_contract.py",
+        "tests\check_ftms_control_contract.py"
     )
     foreach ($check in $checks) {
         $fullPath = Join-Path $ProjectDir $check
         if (Test-Path $fullPath) {
-            Invoke-PythonScript -ScriptPath $fullPath
+            $scriptArgs = @()
+            if ($check -eq "tests\test_ble_protocol_vectors.py" -and -not $HostCodecAvailable) {
+                $scriptArgs = @("--parser-only")
+                Write-Host "  host codec 不可用，BLE golden vectors 改跑 parser-only" -ForegroundColor Yellow
+            }
+            Invoke-PythonScript -ScriptPath $fullPath -ScriptArgs $scriptArgs
         }
     }
     Write-Success "静态门禁检查全部通过"
@@ -372,12 +384,13 @@ if (Test-Path $oldEvidenceDir) {
 Activate-IdfEnv -IdfPath $IdfPath
 
 if (-not $SkipChecks) {
+    $hostCodecAvailable = $false
     if (-not $SkipHostTest) {
-        $hostTestPassed = Run-HostTests
+        $hostCodecAvailable = Run-HostTests
     } else {
         Write-Host "  跳过 host 单测 (-SkipHostTest)" -ForegroundColor Yellow
     }
-    Run-StaticChecks
+    Run-StaticChecks -HostCodecAvailable $hostCodecAvailable
     Run-MockTests
 } else {
     Write-Host "  跳过构建前门禁 (-SkipChecks)" -ForegroundColor Yellow
@@ -415,7 +428,7 @@ foreach ($target in $Board) {
 $releaseDocsPy = Join-Path (Join-Path (Join-Path $ScriptDir "tools") "generate_release_docs.py")
 if (Test-Path $releaseDocsPy) {
     Write-Log "生成测试报告与用户文档"
-    $testSummary = "构建前门禁已通过：静态门禁全绿；Mock 测试通过；host 单测按环境可选执行。"
+    $testSummary = "构建前门禁已通过：静态门禁全绿；BLE 协议 golden vectors、重连/running/profile harness、WiFi done/FTMS 控制点契约通过；Mock 测试通过；host 单测按环境可选执行。"
     $notes = "build_all.ps1 生成的是本地 release 产物；正式发版前必须补齐真机验证结果。"
     $docsExit = Invoke-PythonScript -ScriptPath $releaseDocsPy -ScriptArgs @(
         "--release-dir", $ReleaseDir,

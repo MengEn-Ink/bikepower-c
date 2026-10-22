@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "vectors": [
+    {
+      "name": "cps_positive_power",
+      "protocol": "cps",
+      "input": {
+        "power_w": 250,
+        "crank_revolutions": 12,
+        "crank_event_time_1024": 4660
+      },
+      "expected_hex": "2000fa000c003412",
+      "expected_fields": {
+        "flags": 32,
+        "power_w": 250,
+        "crank_revolutions": 12,
+        "crank_event_time_1024": 4660
+      }
+    },
+    {
+      "name": "cps_negative_power_and_wrap",
+      "protocol": "cps",
+      "input": {
+        "power_w": -50,
+        "crank_revolutions": 65535,
+        "crank_event_time_1024": 43981
+      },
+      "expected_hex": "2000ceffffffcdab",
+      "expected_fields": {
+        "flags": 32,
+        "power_w": -50,
+        "crank_revolutions": 65535,
+        "crank_event_time_1024": 43981
+      }
+    },
+    {
+      "name": "csc_crank_only",
+      "protocol": "csc",
+      "input": {
+        "crank_revolutions": 12,
+        "crank_event_time_1024": 4660
+      },
+      "expected_hex": "020c003412",
+      "expected_fields": {
+        "flags": 2,
+        "crank_revolutions": 12,
+        "crank_event_time_1024": 4660
+      }
+    },
+    {
+      "name": "hrs_uint8",
+      "protocol": "hrs",
+      "input": {
+        "heart_rate_bpm": 150
+      },
+      "expected_hex": "0096",
+      "expected_fields": {
+        "flags": 0,
+        "heart_rate_bpm": 150
+      }
+    },
+    {
+      "name": "ftms_bike_all_fields",
+      "protocol": "ftms_bike",
+      "input": {
+        "include_cadence": true,
+        "include_power": true,
+        "speed_x100_kmh": 3000,
+        "cadence_half_rpm": 180,
+        "power_w": 250
+      },
+      "expected_hex": "4400b80bb400fa00",
+      "expected_fields": {
+        "flags": 68,
+        "speed_x100_kmh": 3000,
+        "cadence_half_rpm": 180,
+        "cadence_rpm": 90.0,
+        "power_w": 250
+      }
+    },
+    {
+      "name": "ftms_bike_cadence_only",
+      "protocol": "ftms_bike",
+      "input": {
+        "include_cadence": true,
+        "include_power": false,
+        "speed_x100_kmh": 3000,
+        "cadence_half_rpm": 180,
+        "power_w": 250
+      },
+      "expected_hex": "0400b80bb400",
+      "expected_fields": {
+        "flags": 4,
+        "speed_x100_kmh": 3000,
+        "cadence_half_rpm": 180,
+        "cadence_rpm": 90.0,
+        "power_w": null
+      }
+    },
+    {
+      "name": "ftms_bike_power_only",
+      "protocol": "ftms_bike",
+      "input": {
+        "include_cadence": false,
+        "include_power": true,
+        "speed_x100_kmh": 3000,
+        "cadence_half_rpm": 180,
+        "power_w": 250
+      },
+      "expected_hex": "4100fa00",
+      "expected_fields": {
+        "flags": 65,
+        "speed_x100_kmh": null,
+        "cadence_half_rpm": null,
+        "cadence_rpm": null,
+        "power_w": 250
+      }
+    },
+    {
+      "name": "ftms_treadmill_complete",
+      "protocol": "ftms_treadmill",
+      "input": {
+        "speed_x100_kmh": 1000,
+        "total_distance_m": 12345,
+        "heart_rate_bpm": 150,
+        "elapsed_time_s": 321
+      },
+      "expected_hex": "0405e803393000964101",
+      "expected_fields": {
+        "flags": 1284,
+        "speed_x100_kmh": 1000,
+        "total_distance_m": 12345,
+        "heart_rate_bpm": 150,
+        "elapsed_time_s": 321
+      }
+    },
+    {
+      "name": "rsc_running_distance_decimeters",
+      "protocol": "rsc",
+      "input": {
+        "running": true,
+        "speed_1_256_mps": 711,
+        "cadence_spm": 180,
+        "stride_cm": 100,
+        "total_distance_dm": 1234
+      },
+      "expected_hex": "07c702b46400d2040000",
+      "expected_fields": {
+        "flags": 7,
+        "speed_1_256_mps": 711,
+        "cadence_spm": 180,
+        "stride_cm": 100,
+        "total_distance_dm": 1234,
+        "total_distance_m": 123.4,
+        "running": true
+      }
+    },
+    {
+      "name": "rsc_paused_distance_preserved",
+      "protocol": "rsc",
+      "input": {
+        "running": false,
+        "speed_1_256_mps": 0,
+        "cadence_spm": 0,
+        "stride_cm": 0,
+        "total_distance_dm": 1234
+      },
+      "expected_hex": "030000000000d2040000",
+      "expected_fields": {
+        "flags": 3,
+        "speed_1_256_mps": 0,
+        "cadence_spm": 0,
+        "stride_cm": 0,
+        "total_distance_dm": 1234,
+        "total_distance_m": 123.4,
+        "running": false
+      }
+    }
+  ]
+}

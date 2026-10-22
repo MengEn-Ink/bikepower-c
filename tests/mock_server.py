@@ -219,7 +219,7 @@ LIMITS = {
 
 ENUM_VALUES = {
     "sport_profile": {"cycling", "running"},
-    "mode": {"steady", "road", "erg"},
+    "mode": {"steady", "road"},
     "profile_ride_type": {"coco", "yumi", "jacques", "genie", "constance", "custom"},
     "run_mode": {"fixed", "pacer"},
     "run_pacer_type": {"jog", "aerobic", "tempo", "interval", "custom"},

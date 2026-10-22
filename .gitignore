@@ -28,3 +28,6 @@ compile_commands.json
 
 # Host unit test binary
 test/test_domain
+test/test_domain.exe
+test/ble_codec_cli
+test/ble_codec_cli.exe
