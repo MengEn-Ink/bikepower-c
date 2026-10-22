@@ -189,6 +189,7 @@ def quick_steps(gate):
     run_step(gate, "操作覆盖矩阵", "python3 tests/check_operation_coverage.py", 30)
     run_step(gate, "BLE 监控客户端静态门禁", "python3 tests/check_ble_monitor.py", 30)
     run_step(gate, "网页刷写站点生成回归", "python3 tests/test_prepare_web_flash_site.py", 30)
+    run_step(gate, "GitHub Actions 与仓库治理契约", "python3 tests/check_github_workflows.py", 30)
     run_step(gate, "BLE 广播项监控静态门禁", "python3 tests/check_ble_broadcast_monitor.py", 30)
     run_step(gate, "门户结构", "python3 tests/check_portal_structure.py", 60)
     run_step(gate, "门户 JS", "python3 tests/check_portal_js.py", 60)

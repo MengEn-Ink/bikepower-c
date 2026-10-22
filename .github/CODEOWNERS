@@ -1,0 +1,13 @@
+# 所有变更默认由仓库所有者审阅。
+* @MengEn-Ink
+
+# 固件、安全边界、自动化和发布链路必须由仓库所有者审阅。
+/.github/ @MengEn-Ink
+/main/ @MengEn-Ink
+/components/ @MengEn-Ink
+/scripts/ @MengEn-Ink
+/test/ @MengEn-Ink
+/tests/ @MengEn-Ink
+/tools/ @MengEn-Ink
+/partitions.csv @MengEn-Ink
+/sdkconfig.defaults @MengEn-Ink

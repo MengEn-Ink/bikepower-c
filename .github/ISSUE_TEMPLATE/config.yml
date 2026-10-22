@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞私密报告
+    url: https://github.com/MengEn-Ink/bikepower-c/security/advisories/new
+    about: 禁止在公开 Issue 中披露漏洞细节、凭据或设备唯一信息。
+  - name: 在线 BLE Monitor 与网页刷写
+    url: https://mengen-ink.github.io/bikepower-c/
+    about: 先查看在线工具是否已覆盖对应的连接、诊断或刷写场景。
