@@ -19,6 +19,7 @@ import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 # 项目根目录：脚本位于 scripts/tools/，向上两级即项目根
 PROJECT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -93,17 +94,6 @@ def run(cmd):
         return run_cmd(["bash", "-c", cmd])
 
 
-def idf_ready():
-    """检查 idf.py 是否已在 PATH 中可用。"""
-    if shutil.which("idf.py"):
-        return True
-    if os.environ.get("IDF_PATH"):
-        idf_py = os.path.join(os.environ["IDF_PATH"], "tools", "idf.py")
-        if os.path.exists(idf_py):
-            return True
-    return False
-
-
 def find_idf_python(idf_path):
     """在 ESP-IDF 安装中找到对应的 Python 解释器。"""
     python_env = os.environ.get("IDF_PYTHON_ENV_PATH", "")
@@ -111,24 +101,75 @@ def find_idf_python(idf_path):
         py_exe = os.path.join(python_env, "Scripts", "python.exe") if IS_WINDOWS else os.path.join(python_env, "bin", "python")
         if os.path.exists(py_exe):
             return py_exe
-    for cand in [
-        os.path.join(os.path.expanduser("~"), ".espressif", "python_env", "idf5.5_py3.11_env", "Scripts", "python.exe") if IS_WINDOWS else os.path.join(os.path.expanduser("~"), ".espressif", "python_env", "idf5.5_py3.9_env", "bin", "python"),
-        os.path.join(os.path.expanduser("~"), ".espressif", "python_env", "idf5.5_py3.9_env", "Scripts", "python.exe") if IS_WINDOWS else None,
-    ]:
-        if cand and os.path.exists(cand):
-            return cand
+    env_root = Path(os.path.expanduser("~")) / ".espressif" / "python_env"
+    env_dirs = sorted(
+        env_root.glob("idf5.5_py*_env") if env_root.is_dir() else [],
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for env_dir in env_dirs:
+        candidate = env_dir / ("Scripts/python.exe" if IS_WINDOWS else "bin/python")
+        if candidate.is_file():
+            return str(candidate)
     return find_python()
+
+
+def activate_idf_tools(idf_path, python_exe):
+    """通过 ESP-IDF 官方导出接口补齐工具链 PATH 和运行时环境。"""
+    idf_tools = os.path.join(idf_path, "tools", "idf_tools.py")
+    if not os.path.exists(idf_tools):
+        return False
+    env = os.environ.copy()
+    env["IDF_PATH"] = idf_path
+    try:
+        result = subprocess.run(
+            [python_exe, idf_tools, "export", "--format=key-value"],
+            capture_output=True,
+            text=True,
+            cwd=PROJECT,
+            timeout=30,
+            env=env,
+        )
+    except Exception:
+        return False
+    if result.returncode != 0:
+        return False
+
+    current_path = os.environ.get("PATH", "")
+    exported = {}
+    for raw_line in result.stdout.splitlines():
+        if "=" not in raw_line:
+            continue
+        key, value = raw_line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"')
+        if not key:
+            continue
+        value = value.replace("${PATH}", current_path)
+        value = value.replace("$PATH", current_path).replace("%PATH%", current_path)
+        exported[key] = value
+    if "PATH" not in exported:
+        return False
+    os.environ.update(exported)
+    os.environ["IDF_PATH"] = idf_path
+    return True
 
 
 def ensure_idf():
     """若 idf.py 不可用，则按优先级探测 IDF 路径。
     返回 None 表示未找到可用的 ESP-IDF 环境。
     返回 (idf_path, python_exe) 表示可用的 IDF 根目录和对应 Python。"""
-    if idf_ready():
-        return os.environ.get("IDF_PATH", ""), sys.executable
+    configured_path = os.environ.get("IDF_PATH", "")
+    if configured_path:
+        idf_py = os.path.join(configured_path, "tools", "idf.py")
+        if os.path.exists(idf_py):
+            py_exe = find_idf_python(configured_path)
+            if activate_idf_tools(configured_path, py_exe):
+                return configured_path, py_exe
+    if shutil.which("idf.py"):
+        return "", sys.executable
     # 过滤掉 None/空路径，按顺序探测
     for path in filter(None, IDF_CANDIDATE_PATHS):
-        export_file = os.path.join(path, "export.ps1" if IS_WINDOWS else "export.sh")
         idf_py = os.path.join(path, "tools", "idf.py")
         if not os.path.exists(idf_py):
             continue
@@ -142,8 +183,7 @@ def ensure_idf():
                 cwd=PROJECT,
                 timeout=30,
             )
-            if r.returncode == 0:
-                os.environ["IDF_PATH"] = path
+            if r.returncode == 0 and activate_idf_tools(path, py_exe):
                 return path, py_exe
         except Exception:
             continue
