@@ -7,7 +7,6 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -110,34 +109,17 @@ class WebFlashSiteTest(unittest.TestCase):
         self.assertEqual(disk_latest["boards"], {})
         self.assertIn("GitHub", disk_latest["reason"])
 
-    def test_supports_gitee_attach_files_schema(self):
-        release = self.make_release()
-        release["attach_files"] = release.pop("assets")
-        _, version, selected = web_flash.select_firmware_assets(release)
-
-        self.assertEqual(version, "4.1.1")
-        self.assertEqual(set(selected), {"generic-c3", "m5stamp-c3"})
-
-    def test_gitee_private_release_uses_authenticated_attachment_api(self):
-        release = {"id": 784111, "tag_name": "v4.1.1", "assets": []}
-        attachments = [
-            {"id": 3029137, "name": "firmware.bin"},
-            {"id": 3029138, "name": "firmware.bin.sha256"},
-        ]
-        with mock.patch.object(
-            web_flash, "request_json", side_effect=[release, attachments]
-        ) as request_json:
-            result = web_flash.fetch_gitee_release("owner/repo", "secret-token")
-
-        self.assertEqual(request_json.call_count, 2)
-        self.assertEqual(result["_provider"], "gitee")
-        self.assertEqual(result["assets"][0]["name"], "firmware.bin")
-        self.assertEqual(
-            result["assets"][0]["download_url"],
-            "https://gitee.com/api/v5/repos/owner/repo/releases/784111/"
-            "attach_files/3029137/download",
+    def test_cli_is_github_only_and_can_require_firmware(self):
+        args = web_flash.parse_args(
+            ["--site-dir", str(self.base / "site"), "--require-firmware"]
         )
-        self.assertNotIn("secret-token", result["assets"][0]["download_url"])
+
+        self.assertEqual(args.github_repo, "MengEn-Ink/bikepower-c")
+        self.assertTrue(args.require_firmware)
+        self.assertEqual(
+            set(vars(args)),
+            {"source_dir", "site_dir", "github_repo", "require_firmware", "release_json"},
+        )
 
     def test_rejects_path_traversal_and_nested_output(self):
         with self.assertRaises(web_flash.ReleaseValidationError):

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "tools" / "check_release_artifacts.py"
 BUILD_ALL = ROOT / "scripts" / "build_all.sh"
 BUILD_ALL_PS1 = ROOT / "scripts" / "build_all.ps1"
-PUBLISH = ROOT / "scripts" / "tools" / "publish_gitee_release.py"
+PUBLISH = ROOT / "scripts" / "tools" / "publish_github_release.py"
 README = ROOT / "README.md"
 TECH_REF = ROOT / "docs" / "dev" / "01-technical-reference.md"
 OP_DOC = ROOT / "docs" / "dev" / "05-operation-test-gate.md"
@@ -73,9 +73,11 @@ def main():
           and '"device-acceptance-" + $boardName + ".json"' in build_all_ps1_src,
           "build_all.ps1 校验并收录各板型真机验收证据", failures)
     check("check_release_artifacts" in publish_src,
-          "publish_gitee_release.py 上传前复用 release 产物门禁", failures)
+          "publish_github_release.py 上传前复用 release 产物门禁", failures)
     check("require_device_evidence=True" in publish_src,
-          "publish_gitee_release.py 正式发布强制完整 P0 证据", failures)
+          "publish_github_release.py 正式发布强制完整 P0 证据", failures)
+    check(all(token in publish_src for token in ('"gh"', '"release"', '"create"', '"--verify-tag"')),
+          "publish_github_release.py 通过已推送 tag 创建 GitHub Release", failures)
     check("check_release_artifacts.py" in readme_src,
           "README 记录 release 产物门禁命令", failures)
     check("check_release_artifacts.py" in tech_ref_src,

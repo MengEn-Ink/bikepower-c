@@ -294,7 +294,7 @@ required_assets = [
     "docs/archive/02-micropython-vs-c-comparison.md",
     "scripts/tools/generate_release_docs.py",
     "scripts/tools/device_acceptance.py",
-    "scripts/tools/publish_gitee_release.py",
+    "scripts/tools/publish_github_release.py",
     "scripts/tools/serve_ble_monitor.py",
     "scripts/tools/prepare_web_flash_site.py",
     "tools/web/ble-monitor.html",

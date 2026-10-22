@@ -1044,7 +1044,7 @@ static void test_config_store(void)
 static void test_json_miniparse(void)
 {
     printf("[test] JSON 最小解析\n");
-    const char *json = "{\"version\":\"3.1.8\",\"url\":\"https://gitee.com/x/f.bin\",\"size\":102400,\"changelog\":\"修复 OTA\"}";
+    const char *json = "{\"version\":\"3.1.8\",\"url\":\"https://github.com/x/releases/f.bin\",\"size\":102400,\"changelog\":\"修复 OTA\"}";
     char out[128];
     int n;
 
@@ -1052,7 +1052,7 @@ static void test_json_miniparse(void)
     CHECK(strcmp(out, "3.1.8") == 0, "version 值正确");
 
     CHECK(json_get_str(json, "url", out, sizeof(out)), "提取 url");
-    CHECK(strcmp(out, "https://gitee.com/x/f.bin") == 0, "url 值正确");
+    CHECK(strcmp(out, "https://github.com/x/releases/f.bin") == 0, "url 值正确");
 
     CHECK(json_get_str(json, "changelog", out, sizeof(out)), "提取 changelog");
     CHECK(strcmp(out, "修复 OTA") == 0, "changelog 值正确（中文）");

@@ -50,7 +50,7 @@ usage() {
                                         当前版本各板型真机验收证据（存在时收录）
 
 说明:
-  - 本脚本仅在本地生成产物，不会打 git tag、不会创建 Gitee Release。
+  - 本脚本仅在本地生成产物，不会打 git tag、不会创建 GitHub Release。
   - 永久放弃设备内 OTA，普通用户升级统一走网页端在线烧录（见 README）。
 
 示例:
@@ -393,6 +393,6 @@ echo "⚠️  发布前人工步骤（本脚本不自动执行）："
 echo "   1. 校验各产物 SHA256 与 manifest.txt 一致"
 echo "   2. 补齐真机验证记录，更新 test-report.md"
 echo "   3. 运行 device_acceptance.py validate --strict，确认全部 P0 证据通过"
-echo "   4. 打 git tag、创建 Gitee Release 并上传 release 总包、merged bin、manifest、test-report.md、core-flow-endurance.md、user-manual.md"
-echo "   本脚本不会打 git tag、不会创建 Gitee Release。"
+echo "   4. 推送 git tag，使用 publish_github_release.py 创建 GitHub Release 并上传 10 个标准附件"
+echo "   本脚本不会打 git tag、不会创建 GitHub Release。"
 echo "   永久放弃设备内 OTA：普通用户升级统一走网页端在线烧录。"

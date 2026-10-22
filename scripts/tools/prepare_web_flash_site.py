@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""生成 BikePower BLE Monitor / ESP Web Tools 静态站点。
+"""从 GitHub Release 生成 BikePower BLE Monitor / ESP Web Tools 静态站点。
 
-部署时优先读取 GitHub 最新 Release，必要时回退到 Gitee。脚本只接受当前
-Release 中两个受支持板型的 merged bin，并在复制到站点前验证旁文件 SHA256。
-没有可用 Release 时仍生成可部署站点，但 latest.json 会明确标记不可刷写。
+脚本只接受最新 GitHub Release 中两个受支持板型的 merged bin，并在复制到
+站点前验证旁文件 SHA256。没有可用 Release 时默认保留 BLE Monitor 并明确
+标记不可刷写；正式 Pages 部署使用 ``--require-firmware`` 将该情况升级为失败。
 """
 
 import argparse
@@ -92,55 +92,8 @@ def fetch_github_release(repo, token):
     return release
 
 
-def fetch_gitee_release(repo, token):
-    repo = validate_repo(repo)
-    query = ""
-    if token:
-        query = "?" + urllib.parse.urlencode({"access_token": token})
-    release = request_json(
-        f"https://gitee.com/api/v5/repos/{repo}/releases/latest{query}",
-        {"Accept": "application/json", "User-Agent": "bikepower-web-flash-site"},
-        "Gitee",
-    )
-    if release is not None:
-        release_id = release.get("id")
-        if isinstance(release_id, int) and release_id > 0:
-            attachment_query = urllib.parse.urlencode(
-                {key: value for key, value in (("access_token", token), ("per_page", 100)) if value}
-            )
-            attachments = request_json(
-                f"https://gitee.com/api/v5/repos/{repo}/releases/{release_id}/attach_files?{attachment_query}",
-                {"Accept": "application/json", "User-Agent": "bikepower-web-flash-site"},
-                "Gitee",
-            )
-            if isinstance(attachments, list):
-                api_assets = []
-                for attachment in attachments:
-                    if not isinstance(attachment, dict):
-                        continue
-                    attachment_id = attachment.get("id")
-                    name = attachment.get("name")
-                    if not isinstance(attachment_id, int) or attachment_id <= 0:
-                        continue
-                    if not isinstance(name, str):
-                        continue
-                    api_assets.append(
-                        {
-                            "download_url": (
-                                f"https://gitee.com/api/v5/repos/{repo}/releases/"
-                                f"{release_id}/attach_files/{attachment_id}/download"
-                            ),
-                            "name": name,
-                        }
-                    )
-                if api_assets:
-                    release["assets"] = api_assets
-        release["_provider"] = "gitee"
-    return release
-
-
 def release_assets(release):
-    raw_assets = release.get("assets") or release.get("attach_files") or []
+    raw_assets = release.get("assets") or []
     if not isinstance(raw_assets, list):
         raise ReleaseValidationError("Release 附件列表格式无效")
     assets = []
@@ -211,13 +164,6 @@ def download_bytes(url, token="", provider="", allow_file=False):
             raise ReleaseValidationError("本地测试附件读取失败") from exc
     if parsed.scheme != "https":
         raise ReleaseValidationError("Release 附件必须使用 HTTPS 地址")
-
-    if provider == "gitee" and token:
-        query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-        if not any(key == "access_token" for key, _ in query):
-            query.append(("access_token", token))
-            parsed = parsed._replace(query=urllib.parse.urlencode(query))
-            url = urllib.parse.urlunparse(parsed)
 
     headers = {
         "Accept": "application/octet-stream",
@@ -376,8 +322,15 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="生成 BLE Monitor 与网页刷写站点")
     parser.add_argument("--source-dir", type=Path, default=ROOT / "tools" / "web")
     parser.add_argument("--site-dir", type=Path, required=True)
-    parser.add_argument("--github-repo", default=os.getenv("GITHUB_REPOSITORY", ""))
-    parser.add_argument("--gitee-repo", default=os.getenv("GITEE_REPOSITORY", "mengen4jv/bikepower-c"))
+    parser.add_argument(
+        "--github-repo",
+        default=os.getenv("GITHUB_REPOSITORY", "MengEn-Ink/bikepower-c"),
+    )
+    parser.add_argument(
+        "--require-firmware",
+        action="store_true",
+        help="没有完整双板固件时失败；正式 Pages 部署必须启用",
+    )
     parser.add_argument("--release-json", type=Path, help="离线测试用 Release API 响应")
     return parser.parse_args(argv)
 
@@ -392,31 +345,20 @@ def main(argv=None):
         return 0
 
     github_token = os.getenv("GITHUB_TOKEN", "")
-    gitee_token = os.getenv("GITEE_TOKEN", "")
-    sources = []
-    if args.github_repo:
-        sources.append(
-            ("GitHub", lambda: fetch_github_release(args.github_repo, github_token), github_token)
-        )
-    if args.gitee_repo:
-        sources.append(
-            ("Gitee", lambda: fetch_gitee_release(args.gitee_repo, gitee_token), gitee_token)
-        )
-
     reasons = []
-    for label, fetch, token in sources:
-        try:
-            release = fetch()
-            if release is None:
-                reasons.append(f"{label} 没有可用 Release")
-                continue
-            latest = materialize_release(site_dir, release, token=token)
-            print(
-                f"[web-flash] 已从 {label} 生成 v{latest['version']} 双板型刷写站点"
-            )
+    try:
+        release = fetch_github_release(args.github_repo, github_token)
+        if release is None:
+            reasons.append("GitHub 没有可用 Release")
+        else:
+            latest = materialize_release(site_dir, release, token=github_token)
+            print(f"[web-flash] 已从 GitHub 生成 v{latest['version']} 双板型刷写站点")
             return 0
-        except ReleaseUnavailable as exc:
-            reasons.append(f"{label}: {exc}")
+    except ReleaseUnavailable as exc:
+        reasons.append(f"GitHub: {exc}")
+
+    if args.require_firmware:
+        raise ReleaseUnavailable("；".join(reasons))
 
     write_unavailable(site_dir, reasons)
     print("[web-flash] 未找到完整 Release；BLE Monitor 继续部署，网页刷写已禁用")
