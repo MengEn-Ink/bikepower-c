@@ -34,7 +34,7 @@
 ### Python 依赖
 
 ```bash
-pip install pyserial bleak
+python3 -m pip install -r requirements-test.txt
 ```
 
 | 包 | 用途 | 脚本 |

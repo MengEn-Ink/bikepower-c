@@ -27,6 +27,7 @@ def main():
         ".github/release.yml",
         ".github/workflows/ci.yml",
         ".github/workflows/deploy-web-tools.yml",
+        "requirements-test.txt",
         "SECURITY.md",
     ]
     for relative in required:
@@ -43,6 +44,8 @@ def main():
     check("pull_request:" in ci and "push:" in ci, "CI 覆盖 PR 与 main push", failures)
     check("tests/operation_gate.py" in ci and "--level quick" in ci,
           "CI 通过 operation harness 执行 quick 门禁", failures)
+    check("pip install" in ci and "requirements-test.txt" in ci,
+          "CI 安装 BLE 与串口 Harness 依赖", failures)
     check("actions/upload-artifact@" in ci and "if: always()" in ci,
           "CI 始终上传 Harness 报告", failures)
     check("workflow_run:" in deploy and "workflows: [CI]" in deploy,

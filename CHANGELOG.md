@@ -9,6 +9,7 @@
 - `scripts/tools/prepare_web_flash_site.py` 与 `.github/workflows/deploy-web-tools.yml` 移除旧托管渠道、secret 和回退逻辑；Pages 只消费 GitHub Release，正式部署要求完整双板固件，`main` 的 CI 成功或 Release 发布后刷新。
 - `scripts/tools/publish_github_release.py` 替代旧发布脚本，正式创建 Release 前强制校验当前 HEAD/tag/远端推送状态、10 个标准附件和双板 P0 真机证据，拒绝覆盖既有 Release。
 - 新增 GitHub CI quick harness、Harness 报告 artifact、CODEOWNERS、Issue 表单、PR 模板、Dependabot、自动 Release Notes 与安全政策；工作流契约测试锁定最小权限、超时、CI→Pages 依赖和 GitHub-only 发布边界。
+- `requirements-test.txt` 集中声明 `bleak` 与 `pyserial`，CI 在运行 quick harness 前显式安装，避免干净 runner 在 BLE 重连/running 回归的导入阶段失败。
 - `README.md`、`PROGRESS.md`、`docs/dev/`、`docs/wiki/`、`tests/README.md`、`.trae` 规则与记忆同步为 GitHub Release → Actions → Pages 唯一交付链路；真实双板浏览器刷写仍保持待人工验收。
 
 ### 仓库托管阶段性迁移（2026-10-22，已由单一链路收口取代）

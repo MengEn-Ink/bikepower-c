@@ -288,6 +288,7 @@ required_assets = [
     ".github/dependabot.yml",
     ".github/release.yml",
     ".github/workflows/ci.yml",
+    "requirements-test.txt",
     "docs/INDEX.md",
     "docs/user/01-quickstart.md",
     "docs/user/02-user-manual.md",
