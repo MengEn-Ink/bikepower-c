@@ -12,6 +12,7 @@
 - `requirements-test.txt` 集中声明 `bleak` 与 `pyserial`，CI 在运行 quick harness 前显式安装，避免干净 runner 在 BLE 重连/running 回归的导入阶段失败。
 - CI checkout 固定 `fetch-depth: 2`，提交卫生改为比较 `HEAD^..HEAD`，避免浅克隆环境下 `git show --check` 返回非零而误判已通过 Harness 的提交。
 - `README.md`、`PROGRESS.md`、`docs/dev/`、`docs/wiki/`、`tests/README.md`、`.trae` 规则与记忆同步为 GitHub Release → Actions → Pages 唯一交付链路；真实双板浏览器刷写仍保持待人工验收。
+- 验证：`python3 scripts/tools/quality_gate.py` 99 PASS / 0 WARN / 0 FAIL，包含 `idf.py build`、host 5892/0 和全部 GitHub/网页契约；GitHub CI `39788358395` 成功并上传 Harness 报告，随后自动触发 Pages `39788447410` 成功。线上首页 HTTP 200，`latest.json` 为 `provider=github`、`version=4.1.1`，双板固件下载 SHA256 与 `ESP32-C3` / `offset=0` manifest 均复核一致；真实浏览器连接开发板刷写仍为 `NOT_RUN`。
 
 ### 仓库托管阶段性迁移（2026-10-22，已由单一链路收口取代）
 - 主仓库迁移至公开的 GitHub `MengEn-Ink/bikepower-c`，默认分支为 `main`；本地 `origin` 已切换到 GitHub，原 Gitee 远端改名为 `gitee` 保留。
