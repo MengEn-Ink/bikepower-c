@@ -8,7 +8,7 @@
 
 普通用户统一使用电脑端网页烧录。项目 GitHub Pages 会自动显示最新 Release 的两个板型固件，不需要安装命令行工具。
 
-自建入口：[https://mengen-ink.github.io/bikepower-c/](https://mengen-ink.github.io/bikepower-c/)。Pages 首次部署尚未完成或临时不可用时，可使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)。
+自建入口：[https://mengen-ink.github.io/bikepower-c/](https://mengen-ink.github.io/bikepower-c/)。Pages 临时不可用时，可使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)。
 
 BikePower C 已永久放弃设备内 OTA 升级。后续升级、重刷或恢复固件，都按本节网页端在线烧录流程操作。
 
@@ -258,7 +258,7 @@ LED 指示页用于给不同运行状态设置灯效和颜色。
 
 ### 如何更新固件
 
-打开项目 GitHub Pages，按第 1 节的网页烧录流程重新烧录；Pages 尚未上线时使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)。
+打开项目 GitHub Pages，按第 1 节的网页烧录流程重新烧录；Pages 临时不可用时使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)。
 
 ## 15. 记住这 4 步
 

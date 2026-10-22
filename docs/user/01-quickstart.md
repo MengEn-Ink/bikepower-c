@@ -18,7 +18,7 @@
 
 BikePower C 已永久放弃设备内 OTA 升级。后续升级、重刷或恢复固件，都按本节电脑端网页烧录流程操作。
 
-1. 使用桌面版 Chrome 或 Edge 打开 [BikePower BLE Monitor / 固件刷写页](https://mengen-ink.github.io/bikepower-c/)；Pages 首次部署尚未完成或临时不可用时，可使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)。
+1. 使用桌面版 Chrome 或 Edge 打开 [BikePower BLE Monitor / 固件刷写页](https://mengen-ink.github.io/bikepower-c/)；Pages 临时不可用时，可使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)。
 2. 用支持数据传输的 USB 线把开发板连接到电脑。
 3. 在“固件刷写”区域选择 `通用 ESP32-C3` 或 `M5Stamp C3`，核对最新版本、文件名和 SHA256。
 4. 点击“连接串口并刷写”，浏览器会弹出串口选择窗口。
@@ -56,5 +56,5 @@ BikePower C 已永久放弃设备内 OTA 升级。后续升级、重刷或恢复
 ## 5. 下一步
 
 - 完整按钮操作、LED 灯效、配网字段、骑行模式与 FAQ：见 [用户手册](02-user-manual.md)
-- 固件升级：当前 v4.1.1 已永久放弃设备内 OTA，普通用户升级统一走仓库 GitHub Pages；Pages 尚未上线时使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)
+- 固件升级：当前 v4.1.1 已永久放弃设备内 OTA，普通用户升级统一走仓库 GitHub Pages；Pages 临时不可用时使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)
 - 硬件接线、供电与排障：见 [硬件指南](03-hardware.md)

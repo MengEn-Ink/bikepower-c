@@ -84,7 +84,7 @@ WiFi 配网的射频共用流程可参考（v3.1.3 起为共存模式，BLE 不�
 
 普通用户不需要安装 ESP-IDF、esptool 或乐鑫 Flash Download Tool。项目自带的 BLE Monitor 会由 GitHub Actions 部署为 GitHub Pages，并在同一页面自动显示最新 Release 的版本、发布时间、固件文件和 SHA256，按板型一键发起刷写。
 
-Pages 地址：[https://mengen-ink.github.io/bikepower-c/](https://mengen-ink.github.io/bikepower-c/)。首次部署状态也可在 `Deploy BLE Monitor and Web Flasher` 工作流中确认。
+Pages 地址：[https://mengen-ink.github.io/bikepower-c/](https://mengen-ink.github.io/bikepower-c/)。部署状态可在 `Deploy BLE Monitor and Web Flasher` 工作流中确认。
 
 在 GitHub Pages 尚未启用或临时不可用时，可继续使用备用入口：[https://easyhey.com/?firmware=MOD220](https://easyhey.com/?firmware=MOD220)。
 
@@ -92,7 +92,7 @@ Pages 地址：[https://mengen-ink.github.io/bikepower-c/](https://mengen-ink.gi
 
 操作步骤：
 
-1. 使用桌面版 Chrome 或 Edge 打开项目 GitHub Pages；若 Pages 尚未上线则打开备用入口。
+1. 使用桌面版 Chrome 或 Edge 打开项目 GitHub Pages；若 Pages 临时不可用则打开备用入口。
 2. 用支持数据传输的 USB 线把 ESP32-C3 开发板连接到电脑。
 3. 选择 `通用 ESP32-C3` 或 `M5Stamp C3`，核对网页显示的最新版本和固件文件名。
 4. 点击“连接串口并刷写”。

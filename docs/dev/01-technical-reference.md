@@ -732,7 +732,7 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 6. 队列满时 `on_wifi_done()` 设置 `s_pending_wifi_done`，由主循环在任何 BLE-not-ready 提前返回前消费
 7. 状态机在 app_main 上下文幂等调用 `radio_ctrl_exit_wifi()`；错误恢复态也会清理 HTTP/DNS/SoftAP，但保持错误状态
 
-所以当前版本的配网退出不重启设备；BLE 在普通配网期间保持在线。v4.0.0 已永久放弃设备内 OTA 与家庭网络配置；普通用户升级统一走 GitHub Pages 部署的 BLE Monitor / 固件刷写页，Pages 尚未上线时使用 EasyHey 备用入口。网页刷写只在电脑浏览器中通过 USB 串口写入 merged bin，不会恢复设备内 OTA。
+所以当前版本的配网退出不重启设备；BLE 在普通配网期间保持在线。v4.0.0 已永久放弃设备内 OTA 与家庭网络配置；普通用户升级统一走 GitHub Pages 部署的 BLE Monitor / 固件刷写页，Pages 临时不可用时使用 EasyHey 备用入口。网页刷写只在电脑浏览器中通过 USB 串口写入 merged bin，不会恢复设备内 OTA。
 
 ### 8.5 前端反馈与 JSON 安全
 
