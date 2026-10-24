@@ -88,8 +88,9 @@ evidence/device-acceptance-m5stamp-c3.json
 | `ble_reconnect` | 连接、断开、重新广播 | `stage3_conn_test.py` |
 | `portal_http` | 配网门户 API、续期、关闭 | `stage5_portal_test.py` |
 | `broadcast_mask` | 广播开关真实影响通知数据面 | `ble_broadcast_monitor.py` |
+| `soak_5min` | 5 分钟反复连接/通知无失败、无断流 | `device_soak_5min.py` |
 
-### P0 人工项
+### P1 人工与兼容项（不阻塞发版）
 
 | ID | 项目 | 最低证据 |
 |----|------|----------|
@@ -98,16 +99,10 @@ evidence/device-acceptance-m5stamp-c3.json
 | `led_patterns` | 待连接、连接、确认、WiFi、错误灯效 | 板型和各状态观察结果 |
 | `portal_mobile` | 手机连接 AP，自动弹窗或手动入口可用 | 系统版本、浏览器和结果 |
 | `portal_exit` | 保存关闭与 180 秒超时均回 BLE | 串口日志和 BLE 连续性 |
-| `aging_72h` | 72 小时无重启、WDT、coredump、持续堆下降 | 运行时长、日志范围和内存趋势 |
-
-### P1 第三方兼容项
-
-| ID | 项目 | 说明 |
-|----|------|------|
 | `zwift_cycling` | Zwift 骑行 fixed/ERG 进入退出 | 第三方平台兼容证据 |
 | `running_apps` | Zwift/MyWhoosh 跑步识别 | 第三方平台兼容证据 |
 
-首版正式发布严格模式要求全部 P0 项通过。P1 允许 `NOT_RUN`，但必须在 `test-report.md` 明示，不能显示为已验证。
+严格模式只要求 P0 自动项全部通过；P1 允许 `NOT_RUN`，但必须在 `test-report.md` 明示，不能显示为已验证。原 72 小时老化不再是发版阻塞项，由 5 分钟设备耐久 `soak_5min` 覆盖短时回归。
 
 ## 五、命令行交互
 

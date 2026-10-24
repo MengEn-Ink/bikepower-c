@@ -2,7 +2,7 @@
 
 > 配套规则：[`.trae/rules/workflows/test-coverage.md`](../../.trae/rules/workflows/test-coverage.md)
 > 维护要求：每次抽取纯逻辑到领域层 / 新增测试脚本后，更新本矩阵。
-> 版本：v4.1.1（已永久放弃设备内 OTA + 家庭网络；不再保留"为覆盖率抽取但生产代码未采用"的并行实现）。
+> 版本：v4.1.2（已永久放弃设备内 OTA + 家庭网络；不再保留"为覆盖率抽取但生产代码未采用"的并行实现）。
 
 ## 一、项目模块清单与可测性
 
@@ -88,7 +88,7 @@
 | TC-3 配网自测 | `tests/stage5_portal_test.py` | 首页/倒计时/续期/提交（/api/xxx JSON） | 🟡 当前工作区待重新执行 |
 | DT 真机系列 | `.trae/rules/workflows/device-testing.md` | 按钮/LED/状态机/内存 | 🟡 物理按钮/LED 人工确认 |
 
-历史 release 曾有部分真机 PASS，但不能覆盖 2026-10-22 当前工作区。真机自动测试和人工确认按板型分别写入 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`。每份文件必须匹配板型、当前 `FIRMWARE_VERSION` 和 Git ID；`NOT_RUN` 不算通过。开发期可以只校验结构，正式双板发布要求两个板型的全部 P0 项通过。
+历史 release 曾有部分真机 PASS，但不能覆盖 2026-10-22 当前工作区。真机自动测试按板型分别写入 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`。每份文件必须匹配板型、当前 `FIRMWARE_VERSION` 和 Git ID；`NOT_RUN` 不算通过。开发期可以只校验结构，正式发布要求参与发布板型的全部 P0 自动项通过（含 5 分钟设备耐久），人工项为 P1 不阻塞。
 
 ### 本地 Mock / 串口工具（辅助）
 

@@ -280,6 +280,13 @@ def device_steps(gate, port, run_portal, device_profile):
         90,
         acceptance_item="ble_reconnect",
     )
+    run_step(
+        gate,
+        "5 分钟设备耐久",
+        "python3 tests/device_soak_5min.py --duration 300 --interval 15",
+        400,
+        acceptance_item="soak_5min",
+    )
     gate.note_skip("BLE 浏览器监控", "运行 python3 scripts/tools/serve_ble_monitor.py 后用 Chrome/Edge 打开 ble-monitor.html；Web Bluetooth 首次授权必须人工点击")
     if run_portal:
         run_step(

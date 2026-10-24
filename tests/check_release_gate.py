@@ -49,7 +49,8 @@ def main():
     op_gate_src = OP_GATE.read_text(encoding="utf-8")
 
     required_tokens = [
-        ("EXPECTED_ATTACHMENTS", "集中定义 10 个上传附件"),
+        ("BOARD_ATTACHMENTS", "集中定义板型上传附件"),
+        ("FIXED_ATTACHMENTS", "集中定义固定上传附件"),
         ("hashlib.sha256", "校验 SHA256"),
         ("zipfile.ZipFile", "校验 release zip 内容"),
         ("manifest.txt", "校验 manifest"),

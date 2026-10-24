@@ -63,6 +63,31 @@
 - 证据：`tests/reports/device-acceptance-generic-c3.json`（P0 PASS 3 / NOT_RUN 9），已随 release 总包 `evidence/` 分发。
 - 待验证：m5stamp-c3 真机、物理按钮/LED、手机 Captive Portal 弹窗、配网门户 HTTP、72h 老化。
 
+## [4.1.2] - 2026-10-24
+
+### 协议修复
+- CPS Measurement 改为规范的 8 字节 crank-only 帧（2 字节 flags + 功率 + 曲柄转数 + 曲柄时间），修复 v4.1.1 发布固件用 1 字节 flags 导致标准客户端（码表/Zwift）功率解析错位的问题。
+
+### 验收门禁调整
+- `scripts/tools/device_acceptance.py`：新增 P0 自动项 `soak_5min`（5 分钟设备耐久），移除 `aging_72h` 阻塞项；实体按钮、WiFi 二次确认、LED、手机 Captive Portal、配网退出降为 P1，允许 `NOT_RUN` 且不阻塞发版。
+- 新增 `tests/device_soak_5min.py`：反复扫描/连接/订阅/断开 5 分钟，检查连接失败与通知断流。
+- `tests/operation_gate.py` device 模式接入 5 分钟设备耐久。
+
+### 单板发布支持
+- `scripts/tools/check_release_artifacts.py`：新增 `--boards`，按参与发布板型计算附件与证据要求。
+- `scripts/tools/publish_github_release.py`：新增 `--boards`，默认单板 `generic-c3`，Release 说明按板型生成。
+- `scripts/tools/prepare_web_flash_site.py`：允许 Release 只包含单个受支持板型；完全没有固件时才判定不可刷写。
+- `tests/test_prepare_web_flash_site.py`：改为单板可选、无板型报错。
+
+### 工具与文档
+- `scripts/idf_common.psm1`、`scripts/dev.ps1`、`.gitignore`、`docs/dev/08-windows-build-guide.md`：ccache 缓存目录重定向到项目内，补充 Windows 实测耗时与 `stats` 命令。
+- `README.md`、`PROGRESS.md`、`docs/dev/05-operation-test-gate.md`、`docs/dev/10-stable-delivery-design.md`、`docs/dev/03-test-coverage-analysis.md`、`.trae` 规则与记忆同步新的验收口径与单板发布能力。
+
+### 验证
+- `idf.py build`（ESP-IDF v5.5.1，generic-c3）通过；host 单测 5892 通过 / 0 失败。
+- 真机 COM199：5 服务、DIS、FTMS、CPS/HR/CSC/FTMS 通知、ERG 收敛 201W、双次重连全部通过。
+- Pages/Release/SHA256 三方一致；线上站点 HTTP 200 且包含 ESP Web Tools 刷写组件。
+
 ## [4.1.1] - 2026-08-11
 
 ### 收口修复

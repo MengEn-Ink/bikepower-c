@@ -68,7 +68,7 @@ def evidence_lines(release_dir):
     if not existing:
         return [
             "- 真机验收证据：未收录。",
-            "- 结论：本地构建可继续；正式双板发布前必须补齐两个板型的当前版本 P0 证据。",
+            "- 结论：本地构建可继续；正式发布前必须补齐参与发布板型的当前版本 P0 证据。",
         ]
     lines = []
     for board, rel_path, evidence_path in existing:

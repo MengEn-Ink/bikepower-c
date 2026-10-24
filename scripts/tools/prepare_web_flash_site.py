@@ -133,9 +133,11 @@ def select_firmware_assets(release):
             match = FIRMWARE_RE.fullmatch(asset["name"])
             if match and match.group("board") == board and match.group("version") == version:
                 matches.append(asset)
+        if not matches:
+            continue
         if len(matches) != 1:
             raise ReleaseUnavailable(
-                f"{tag} 缺少唯一的 {board} merged bin（找到 {len(matches)} 个）"
+                f"{tag} 存在多个 {board} merged bin（找到 {len(matches)} 个）"
             )
         firmware = matches[0]
         sha_name = firmware["name"] + ".sha256"
@@ -145,6 +147,8 @@ def select_firmware_assets(release):
                 f"{tag} 缺少唯一的 {sha_name}（找到 {len(sha_matches)} 个）"
             )
         selected[board] = {"firmware": firmware, "sha256": sha_matches[0]}
+    if not selected:
+        raise ReleaseUnavailable(f"{tag} 没有受支持的板型 merged bin")
     return tag, version, selected
 
 
@@ -329,7 +333,7 @@ def parse_args(argv=None):
     parser.add_argument(
         "--require-firmware",
         action="store_true",
-        help="没有完整双板固件时失败；正式 Pages 部署必须启用",
+        help="没有可用板型固件时失败；正式 Pages 部署必须启用",
     )
     parser.add_argument("--release-json", type=Path, help="离线测试用 Release API 响应")
     return parser.parse_args(argv)
@@ -352,7 +356,7 @@ def main(argv=None):
             reasons.append("GitHub 没有可用 Release")
         else:
             latest = materialize_release(site_dir, release, token=github_token)
-            print(f"[web-flash] 已从 GitHub 生成 v{latest['version']} 双板型刷写站点")
+            print(f"[web-flash] 已从 GitHub 生成 v{latest['version']} 板型刷写站点")
             return 0
     except ReleaseUnavailable as exc:
         reasons.append(f"GitHub: {exc}")

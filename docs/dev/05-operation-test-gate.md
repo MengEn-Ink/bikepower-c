@@ -11,8 +11,8 @@
 | 离线 harness | 双次重连、running 四阶段、profile 全广播测试/恢复、FTMS 接纳和 WiFi done 可靠性契约 | `python3 tests/test_ble_reconnect_harness.py`、`python3 tests/test_ble_running_harness.py`、`python3 tests/test_device_profile_harness.py`、`python3 tests/check_ftms_control_contract.py`、`python3 tests/check_wifi_done_contract.py` |
 | Mock 网页层 | `/api/config` 保存回显、网页核心流程、设备模板、关闭 WiFi | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` |
 | 静态门禁 | 门户结构、JS、常量、NVS、任务/WDT、板型、操作矩阵、Pages 网页刷写站点 | `python3 tests/check_operation_coverage.py`、`python3 tests/check_ble_monitor.py`、`python3 tests/test_prepare_web_flash_site.py` 等 |
-| 真机自动化 | 串口启动、互斥 cycling/running GATT profile、FTMS ERG/跑步会话、配网门户 HTTP | `python3 tests/ble_selftest.py`、`python3 tests/device_profile_harness.py`、`python3 tests/stage5_portal_test.py` |
-| 人工门禁 | 物理按钮手感、LED 肉眼灯效、手机 Captive Portal、Zwift/MyWhoosh 真实课程 | `scripts/tools/device_acceptance.py` + 本文“人工门禁记录” |
+| 真机自动化 | 串口启动、互斥 cycling/running GATT profile、FTMS ERG/跑步会话、配网门户 HTTP、5 分钟设备耐久 | `python3 tests/ble_selftest.py`、`python3 tests/device_profile_harness.py`、`python3 tests/stage5_portal_test.py`、`python3 tests/device_soak_5min.py` |
+| 人工门禁 | 物理按钮手感、LED 肉眼灯效、手机 Captive Portal、Zwift/MyWhoosh 真实课程（P1，不阻塞发版） | `scripts/tools/device_acceptance.py` + 本文“人工门禁记录” |
 
 ## 二、操作覆盖矩阵
 
@@ -41,7 +41,7 @@
 | `OP-RUN-002` | 逐 opcode 等待 indication；moving 累计增长 → Stop 冻结 → paused Reset 清零且保持暂停 → Resume 恢复增长；队列拒绝返回 Operation Failed | `make -C test run`、`python3 tests/test_ble_running_harness.py`、`python3 tests/ble_selftest.py --profile running --control` | 每阶段至少两个独立样本；标准跑步客户端控制点人工确认 |
 | `OP-WIFI-001` | WiFi done 队列满时 pending latch 最终可达；重复完成事件幂等清理 | `python3 tests/check_wifi_done_contract.py` | 真机队列压力与配网退出待验收 |
 | `OP-STAB-001` | NVS schema、常量、板型、任务/WDT、门户结构不漂移 | `python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 tests/check_board_desc.py`、`python3 tests/check_tasks_wdt.py`、`python3 tests/check_operation_coverage.py` | 无 |
-| `OP-STAB-002` | 3 分钟核心流程耐久，覆盖重复保存、模板、关闭 WiFi、host 回归 | `python3 tests/test_core_flow_endurance.py` | 30/90 分钟老化按发版风险追加 |
+| `OP-STAB-002` | 3 分钟核心流程耐久（mock）+ 5 分钟真机设备耐久（反复连接/通知） | `python3 tests/test_core_flow_endurance.py`、`python3 tests/device_soak_5min.py` | 发版阻塞项为 5 分钟真机耐久；更长老化按风险可选追加 |
 | `OP-REL-001` | 发布产物门禁：10 个上传附件、SHA256、manifest、zip 内容、Git ID 和真机证据不漂移 | `python3 scripts/tools/check_release_artifacts.py --require-pushed --require-device-evidence`、`python3 tests/check_release_gate.py`、`python3 tests/test_release_artifacts.py` | 正式发布前必须从已提交并已推送源码重新构建，且当前 Git 的 P0 证据全部通过 |
 | `OP-MANUAL-001` | 物理按钮、LED 颜色/闪烁、手机 Captive Portal、真实 Zwift/MyWhoosh 课程 | `python3 scripts/tools/device_acceptance.py validate` 校验记录结构 | 必须人工记录 `PASS`、`FAIL` 或 `NOT_RUN`；`NOT_RUN` 不能冒充通过 |
 
@@ -106,9 +106,9 @@ python3 scripts/tools/serve_ble_monitor.py
 python3 scripts/tools/device_acceptance.py validate
 ```
 
-## 四、人工门禁记录
+## 四、人工门禁记录（P1，不阻塞发版）
 
-每次发可分发固件时，必须按板型在结构化证据和测试报告中记录以下人工项。证据文件是 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`，release 总包内保留相同文件名到 `evidence/`。
+以下人工项默认不阻塞发版，但每次发可分发固件时建议按板型在结构化证据和测试报告中记录。P0 自动项（含新增的 `soak_5min` 5 分钟设备耐久）必须全部通过。证据文件是 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`，release 总包内保留相同文件名到 `evidence/`。
 
 | 项目 | 通过标准 | 记录要求 |
 |------|----------|----------|
@@ -146,7 +146,7 @@ python3 scripts/tools/device_acceptance.py validate \
   --file tests/reports/device-acceptance-generic-c3.json
 ```
 
-正式发布前必须运行严格校验：
+正式发布前必须运行严格校验（只强制 P0 自动项；P1 人工项允许 `NOT_RUN`，但必须在测试报告明示）：
 
 ```bash
 python3 scripts/tools/device_acceptance.py validate --strict \

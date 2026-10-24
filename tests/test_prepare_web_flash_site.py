@@ -135,12 +135,20 @@ class WebFlashSiteTest(unittest.TestCase):
             web_flash.initialize_site(self.source, existing)
         self.assertEqual(sentinel.read_text(encoding="utf-8"), "do not delete")
 
-    def test_requires_both_current_board_assets(self):
+    def test_allows_single_board_release(self):
         release = self.make_release()
         release["assets"] = [
             asset for asset in release["assets"] if "m5stamp-c3" not in asset["name"]
         ]
-        with self.assertRaisesRegex(web_flash.ReleaseUnavailable, "m5stamp-c3"):
+        _, _, selected = web_flash.select_firmware_assets(release)
+        self.assertEqual(set(selected), {"generic-c3"})
+
+    def test_rejects_release_without_supported_board(self):
+        release = self.make_release()
+        release["assets"] = [
+            asset for asset in release["assets"] if "bikepower-c-" not in asset["name"]
+        ]
+        with self.assertRaisesRegex(web_flash.ReleaseUnavailable, "没有受支持的板型"):
             web_flash.select_firmware_assets(release)
 
 

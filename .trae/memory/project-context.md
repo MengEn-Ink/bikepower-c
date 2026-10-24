@@ -12,7 +12,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 
 - BikePower 从 MicroPython（仓库 esp32-power）**完全重写**为 C + ESP-IDF + NimBLE。
 - 用户授权"全程你来设计开发"，分阶段（0-6）推进，每阶段编译 → 烧录 → 真机验证后提交推送。
-- 项目根目录以当前 Git 工作区为准，不在规则中绑定单台机器路径；ESP-IDF v5.5.4，当前固件 v4.1.1。
+- 项目根目录以当前 Git 工作区为准，不在规则中绑定单台机器路径；ESP-IDF v5.5.4，当前固件 v4.1.2。
 - MicroPython 专有约束（mpremote/gc/_thread/const/.mpy/部署 .py）**不适用**本项目。
 
 ---
@@ -24,7 +24,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 3. **串口地址不写死**：自动扫描 ESP32-C3（USB VID/PID 智能识别）。
 4. **跨平台**：macOS / Linux / Windows，注意 macOS 无 `timeout` 命令。
 5. **部署后必须测试**：每阶段烧录后真机验证并记录结果。
-6. **固件产物必须带文档和总包**：每次生成可分发固件时，`build/release/` 必须同时包含双板型 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 release 总包 zip。
+6. **固件产物必须带文档和总包**：每次生成可分发固件时，`build/release/` 必须包含参与发布板型的 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 release 总包 zip。
 7. **测试报告必须真实**：报告需列出编译、host、mock、10 分钟核心流程耐久、静态门禁、真机、人工项结果；未执行项必须写明原因，不得默认通过。
 8. **用户手册随固件更新**：功能或使用流程变化时先更新 `docs/user/`，再由 `scripts/tools/generate_release_docs.py` 生成随附 `user-manual.md`。
 
@@ -73,7 +73,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 | 事件总线 | app_queue（Queue）+ button wake（二值信号量） | 2026-06-12 |
 | 状态机 | 7 态：BOOTING/BLE_ACTIVE/WIFI_CONFIRM/WIFI_CONFIG/SAVING/REBOOTING/ERROR_RECOVERY | 2026-06-12 |
 | WiFi 射频共用 | 配网默认 coex 共存（BLE 不停、不重启）；v4.0.0 已移除在线 OTA 与家庭网络配置，仅共存初始化失败时由 radio_ctrl 停 BLE 兜底 | 2026-06-28 |
-| 网页固件刷写 | BLE Monitor 通过 GitHub Pages 部署；Actions 只取 GitHub Release，双板 merged bin 经 SHA256 校验后生成 ESP Web Tools 0x0 manifest；正式部署缺固件即失败，不恢复设备内 OTA | 2026-10-22 |
+| 网页固件刷写 | BLE Monitor 通过 GitHub Pages 部署；Actions 只取 GitHub Release，参与发布板型的 merged bin 经 SHA256 校验后生成 ESP Web Tools 0x0 manifest；正式部署缺固件即失败，不恢复设备内 OTA | 2026-10-24 |
 | 跑步模式核心闭环 | 当前跑步 P0 以 RSC 速度 + 步频 + 心率为核心；坡度不是必要参数，已从当前配置/API/网页/NVS 中移除，未来 FTMS Treadmill 再按需求恢复 | 2026-07-07 |
 | 代码托管与交付 | GitHub `MengEn-Ink/bikepower-c` 是唯一仓库和 `origin`；Release → Actions → Pages 为唯一固件网页交付链路 | 2026-10-22 |
 

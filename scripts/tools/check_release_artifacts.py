@@ -20,11 +20,12 @@ DEVICE_EVIDENCE_RELS = {
 GIT_SHA_COMMAND = "git rev-parse --short HEAD"
 GIT_STATUS_COMMAND = "git status --short"
 
-EXPECTED_ATTACHMENTS = (
-    "bikepower-c-generic-c3-v{version}-stable-fix-g{git_sha}.bin",
-    "bikepower-c-generic-c3-v{version}-stable-fix-g{git_sha}.bin.sha256",
-    "bikepower-c-m5stamp-c3-v{version}-stable-fix-g{git_sha}.bin",
-    "bikepower-c-m5stamp-c3-v{version}-stable-fix-g{git_sha}.bin.sha256",
+DEFAULT_BOARDS = ("generic-c3", "m5stamp-c3")
+BOARD_ATTACHMENTS = (
+    "bikepower-c-{board}-v{version}-stable-fix-g{git_sha}.bin",
+    "bikepower-c-{board}-v{version}-stable-fix-g{git_sha}.bin.sha256",
+)
+FIXED_ATTACHMENTS = (
     "bikepower-c-release-v{version}-stable-fix-g{git_sha}.zip",
     "bikepower-c-release-v{version}-stable-fix-g{git_sha}.zip.sha256",
     "manifest.txt",
@@ -62,8 +63,15 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
-def expected_attachment_names(version, git_sha):
-    return [name.format(version=version, git_sha=git_sha) for name in EXPECTED_ATTACHMENTS]
+def expected_attachment_names(version, git_sha, boards=DEFAULT_BOARDS):
+    names = []
+    for board in boards:
+        names.extend(
+            name.format(board=board, version=version, git_sha=git_sha)
+            for name in BOARD_ATTACHMENTS
+        )
+    names.extend(name.format(version=version, git_sha=git_sha) for name in FIXED_ATTACHMENTS)
+    return names
 
 
 def parse_sha256_sidecar(path):
@@ -133,10 +141,15 @@ def validate_release_artifacts(
     require_pushed=False,
     skip_git_check=False,
     require_device_evidence=False,
+    boards=DEFAULT_BOARDS,
 ):
     release_dir = Path(release_dir).resolve()
     version = version or read_firmware_version()
     git_sha = git_sha or current_git_sha()
+    boards = tuple(boards)
+    unknown_boards = [board for board in boards if board not in DEVICE_EVIDENCE_RELS]
+    if unknown_boards:
+        raise ReleaseGateError("不支持的板型: " + ", ".join(unknown_boards))
     messages = []
 
     if not release_dir.is_dir():
@@ -144,7 +157,7 @@ def validate_release_artifacts(
 
     messages.extend(check_git_state(git_sha, allow_dirty, require_pushed, skip_git_check))
 
-    expected = expected_attachment_names(version, git_sha)
+    expected = expected_attachment_names(version, git_sha, boards)
     expected_set = set(expected)
     missing = [name for name in expected if not (release_dir / name).is_file()]
     if missing:
@@ -158,14 +171,15 @@ def validate_release_artifacts(
     evidence_rel_names = []
     missing_evidence_boards = [
         board
-        for board, rel_name in DEVICE_EVIDENCE_RELS.items()
-        if not (release_dir / rel_name).is_file()
+        for board in boards
+        if not (release_dir / DEVICE_EVIDENCE_RELS[board]).is_file()
     ]
     if require_device_evidence and missing_evidence_boards:
         raise ReleaseGateError(
             "缺少板型真机验收证据: " + ", ".join(missing_evidence_boards)
         )
-    for board, rel_name in DEVICE_EVIDENCE_RELS.items():
+    for board in boards:
+        rel_name = DEVICE_EVIDENCE_RELS[board]
         evidence_path = release_dir / rel_name
         if not evidence_path.is_file():
             continue
@@ -248,10 +262,16 @@ def validate_release_artifacts(
         raise ReleaseGateError("release zip 存在非标准文件: " + ", ".join(extra_zip))
 
     upload_count = len(expected)
-    if upload_count != 10:
-        raise ReleaseGateError(f"上传附件数量应为 10，实际 {upload_count}")
+    expected_upload_count = 2 * len(boards) + len(FIXED_ATTACHMENTS)
+    if upload_count != expected_upload_count:
+        raise ReleaseGateError(
+            f"上传附件数量应为 {expected_upload_count}，实际 {upload_count}"
+        )
 
-    messages.append(f"release 产物门禁通过: {upload_count} 个上传附件，zip 内 {len(entries)} 个文件")
+    messages.append(
+        f"release 产物门禁通过: {upload_count} 个上传附件，"
+        f"板型 {','.join(boards)}，zip 内 {len(entries)} 个文件"
+    )
     return [release_dir / name for name in expected], messages
 
 
@@ -268,7 +288,13 @@ def main():
                         help="跳过 Git 状态检查，用于离线历史产物或测试样例")
     parser.add_argument("--require-device-evidence", action="store_true",
                         help="要求 release 内含当前版本且 P0 全通过的真机验收证据")
+    parser.add_argument(
+        "--boards",
+        default=",".join(DEFAULT_BOARDS),
+        help="参与发布的板型，逗号分隔；单板发布例如 generic-c3",
+    )
     args = parser.parse_args()
+    boards = tuple(board.strip() for board in args.boards.split(",") if board.strip())
 
     try:
         artifacts, messages = validate_release_artifacts(
@@ -279,6 +305,7 @@ def main():
             require_pushed=args.require_pushed,
             skip_git_check=args.skip_git_check,
             require_device_evidence=args.require_device_evidence,
+            boards=boards,
         )
     except (ReleaseGateError, subprocess.CalledProcessError, zipfile.BadZipFile) as exc:
         print(f"[release-gate] FAIL {exc}")

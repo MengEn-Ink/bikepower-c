@@ -63,7 +63,7 @@ def require_pushed_tag(tag, expected_commit):
         raise RuntimeError(f"origin/{tag} 与当前 HEAD 不一致，拒绝发布")
 
 
-def release_body(version, git_sha, artifacts):
+def release_body(version, git_sha, artifacts, boards=("generic-c3",)):
     artifact_lines = "\n".join(f"- `{path.name}`" for path in artifacts)
     return "\n".join(
         [
@@ -77,7 +77,7 @@ def release_body(version, git_sha, artifacts):
             "",
             "使用 GitHub Pages：<https://mengen-ink.github.io/bikepower-c/>",
             "",
-            "支持 generic-c3 与 m5stamp-c3。请使用桌面版 Chrome 或 Edge，",
+            "支持 " + "、".join(boards) + "。请使用桌面版 Chrome 或 Edge，",
             "确认板型并主动选择串口后再开始刷写。merged bin 从 `0x0` 写入。",
             "",
             "## 开发者命令行兜底",
@@ -88,7 +88,7 @@ def release_body(version, git_sha, artifacts):
             "",
             "## 验证",
             "",
-            "- 发布前已通过 10 个顶层附件、SHA256、manifest、ZIP 和双板 P0 真机证据门禁。",
+            f"- 发布前已通过 {len(artifacts)} 个顶层附件、SHA256、manifest、ZIP 和 {len(boards)} 个板型 P0 真机证据门禁。",
             "- `test-report.md`：发版测试报告。",
             "- `core-flow-endurance.md`：核心流程耐久测试明细。",
             "- `user-manual.md`：用户手册。",
@@ -104,7 +104,13 @@ def main():
     parser.add_argument("--tag", default="")
     parser.add_argument("--release-dir", default=str(ROOT / "build" / "release"))
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--boards",
+        default="generic-c3",
+        help="参与发布的板型，逗号分隔；默认单板 generic-c3",
+    )
     args = parser.parse_args()
+    boards = tuple(board.strip() for board in args.boards.split(",") if board.strip())
 
     validate_repository(args.repository)
     version = args.version or firmware_version()
@@ -119,6 +125,7 @@ def main():
         git_sha=git_sha,
         require_pushed=True,
         require_device_evidence=True,
+        boards=boards,
     )
     for message in messages:
         print(f"[release-gate] {message}")
@@ -129,7 +136,7 @@ def main():
         print(f"  - {path.name} ({path.stat().st_size} bytes)")
 
     if args.dry_run:
-        print("dry-run: tag、推送状态、双板证据和附件已校验；未创建 Release")
+        print("dry-run: tag、推送状态、板型证据和附件已校验；未创建 Release")
         return 0
 
     if shutil.which("gh") is None:
@@ -154,7 +161,7 @@ def main():
         "--title",
         f"BikePower C {tag}",
         "--notes",
-        release_body(version, git_sha, artifacts),
+        release_body(version, git_sha, artifacts, boards),
         *[str(path) for path in artifacts],
     ]
     subprocess.run(command, cwd=ROOT, check=True)

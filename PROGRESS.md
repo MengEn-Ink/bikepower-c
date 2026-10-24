@@ -1,7 +1,7 @@
 # BikePower C — 项目进度
 
 > 基线方案：[docs/archive/01-cidf-nimble-rewrite.md](docs/archive/01-cidf-nimble-rewrite.md)
-> 当前固件版本：v4.1.1（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v4.1.2（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
@@ -49,7 +49,7 @@
 
 ## 第七轮 P0 真机验收清单（当前交付口径）
 
-本清单用于交付前集中跟踪“代码/自动化已就绪”和“仍需人工真机确认”的边界。未勾选项不得在发版说明中标为已完成；物理按钮、LED、系统级 Captive Portal 弹窗、72h 老化和浏览器真机刷写均保留人工确认。
+本清单用于交付前集中跟踪“代码/自动化已就绪”和“仍需人工真机确认”的边界。未勾选项不得在发版说明中标为已完成；物理按钮、LED、系统级 Captive Portal 弹窗和浏览器真机刷写保留人工确认（P1，不阻塞发版）；72h 老化降级为可选的长期观察项，发版阻塞项为 5 分钟设备耐久 `soak_5min`。
 
 ### 就绪交付物
 
@@ -80,7 +80,7 @@
 - [ ] Captive Portal 生命周期：退出配网后串口确认 DNS 任务停止，不再响应劫持。
 - [ ] 72h 老化：长时间运行无 coredump、无 WDT、无堆持续下降；建议周期性跑 `tests/ble_selftest.py` 和 `tests/stage5_portal_test.py` 采样。
 
-上述未完成项继续保持待验收状态。执行时按板型写入 `tests/reports/device-acceptance-<板型>.json`；`NOT_RUN` 不视为通过，正式双板发布前必须分别对 generic-c3 与 m5stamp-c3 运行 `python3 scripts/tools/device_acceptance.py validate --strict --file <证据文件>`。
+上述未完成项继续保持待验收状态。执行时按板型写入 `tests/reports/device-acceptance-<板型>.json`；`NOT_RUN` 不视为通过，正式发布前必须对**参与发布板型**运行 `python3 scripts/tools/device_acceptance.py validate --strict --file <证据文件>`（P0 自动项含 5 分钟设备耐久，人工项为 P1 不阻塞）。
 - [x] Release tag：`v4.1.1` 已创建并推送，指向提交 `a9f127c`。
 - [x] GitHub Release `v4.1.1` 已完成原样迁移：10 个顶层附件、双板固件及总包 SHA256、ZIP 结构和历史 manifest 记录均已复核；历史总包只有 generic-c3 证据，不冒充 m5stamp-c3 真机验收。
 

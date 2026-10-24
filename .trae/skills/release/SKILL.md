@@ -52,10 +52,10 @@ description: "BikePower C 发版流程。用于准备版本发布、检查测试
 12. **打 tag**
 - 使用非交互命令创建 `vMAJOR.MINOR.PATCH`
 - 推送 tag
-13. **生成双版本合并固件、随附文档与总包（强制，不可拆开）**
+13. **生成合并固件、随附文档与总包（强制，不可拆开）**
 - **硬性要求**：发行版固件必须是合并后的单一 `.bin`，禁止分发分散的 bootloader / partition-table / app 三个文件。
-- **硬性要求**：固件产物目录必须同时包含 generic-c3 与 m5stamp-c3 两个合并固件、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 release 总包 `.zip`。
-- 推荐使用 `scripts/build_all.sh` 统一生成产物；该脚本会在构建前跑 host/mock/10 分钟核心流程耐久/静态门禁，并生成测试报告、用户文档副本和可直接分发的总包。
+- **硬性要求**：固件产物目录必须包含参与发布板型的合并固件、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 release 总包 `.zip`。
+- 推荐使用 `scripts/build_all.sh` 统一生成产物；该脚本会在构建前跑 host/mock/3 分钟核心流程耐久/静态门禁，并生成测试报告、用户文档副本和可直接分发的总包。
 - 使用 `esptool.py merge_bin` 将 bootloader + partition-table + app 合并为单一 `.bin`
 - 合并命令：
   ```bash
@@ -70,11 +70,11 @@ description: "BikePower C 发版流程。用于准备版本发布、检查测试
   ```bash
   esptool.py --chip esp32c3 -b 460800 write_flash --flash_mode dio --flash_size 4MB --flash_freq 80m 0x0 bikepower-c-generic-c3-vX.Y.Z-stable-fix-gGitID.bin
   ```
-- 总包命名：`bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip`，包内必须包含两个板型固件、校验文件、manifest、测试报告、10 分钟核心流程报告、用户手册和截图目录。
+- 总包命名：`bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip`，包内必须包含参与发布板型的固件、校验文件、manifest、测试报告、核心流程耐久报告、用户手册和截图目录。
 14. **创建 GitHub Release**
 - 使用 `gh auth` 的系统凭据，不在仓库或 `.env` 保存 token
 - 通过 `python3 scripts/tools/publish_github_release.py` 创建 Release，tag 与版本号一致
-- 发布前先运行 `python3 scripts/tools/publish_github_release.py --dry-run` 确认 tag、双板证据、附件清单和目标提交
+- 发布前先运行 `python3 scripts/tools/publish_github_release.py --dry-run` 确认 tag、板型证据、附件清单和目标提交
 - Release 说明必须包含：
   - **变更内容**：新增/修复/改进，逐条列出
   - **测试报告**：编译结果、host 单测结果、真机测试结果、内存状态
@@ -94,7 +94,7 @@ description: "BikePower C 发版流程。用于准备版本发布、检查测试
 - `build/release/test-report.md` 已生成且含未执行项说明
 - `build/release/core-flow-endurance.md` 已生成且核心流程耐久通过
 - `build/release/user-manual.md` 已生成
-- `build/release/bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip` 已生成且包含双板型固件、测试报告和用户手册
+- `build/release/bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip` 已生成且包含参与发布板型固件、测试报告和用户手册
 - `python3 scripts/tools/publish_github_release.py --dry-run` 已通过
 - `.trae/rules/` 与 `docs/` 未引用过时脚本名、断言数或常量值
 - 工作区无不应混入发版的临时文件

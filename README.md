@@ -109,7 +109,7 @@ Pages 地址：[https://mengen-ink.github.io/bikepower-c/](https://mengen-ink.gi
 - 固件唯一来源是当前 GitHub 仓库的最新 Release，工作流使用最小权限的内置 `GITHUB_TOKEN` 获取附件，不需要额外发布凭据。
 - `main` 的 CI 成功后部署页面；GitHub Release 发布后立即刷新固件，另保留每日同步和手动触发。
 - 工作流只接受当前 tag 对应的 generic-c3 / m5stamp-c3 merged bin 和各自 `.sha256`，校验成功后才会放入 Pages artifact。
-- 正式部署使用严格模式，找不到完整双板 Release 或摘要不匹配时工作流失败，不会用不可刷写站点覆盖已有 Pages。
+- 正式部署使用严格模式，找不到任何受支持板型的固件或摘要不匹配时工作流失败，不会用不可刷写站点覆盖已有 Pages。
 
 ### 开发者：本地编译并烧录
 
@@ -144,16 +144,16 @@ idf.py -p <port> monitor
 
 ### 发行版构建
 
-发版构建使用 `scripts/build_all.sh`。该脚本可编译 generic-c3 / m5stamp-c3 双板型产物，先运行 host、mock、3 分钟核心流程耐久和静态门禁，再生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip；`--dry-run` 只预览，不编译、不写文件、不打 tag、不创建 Release。
+发版构建使用 `scripts/build_all.sh`。该脚本可编译 generic-c3 / m5stamp-c3 双板型产物（也可按板型参数只构建单板），先运行 host、mock、3 分钟核心流程耐久和静态门禁，再生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip；`--dry-run` 只预览，不编译、不写文件、不打 tag、不创建 Release。
 
 ```bash
 ./scripts/build_all.sh --dry-run
 ./scripts/build_all.sh
 ```
 
-每次生成可分发固件时，`build/release/` 必须同时包含两个板型 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip` 总包。测试报告记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行项必须写明原因。
+每次生成可分发固件时，`build/release/` 必须包含参与发布板型的 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip` 总包。测试报告记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行项必须写明原因。
 
-真机自动测试和按钮、LED、手机 Captive Portal 等人工确认按板型分别记录到 `tests/reports/device-acceptance-generic-c3.json` 和 `tests/reports/device-acceptance-m5stamp-c3.json`。本地构建允许没有证据；证据存在且匹配当前版本时，`build_all.sh` 会将其收录到总包 `evidence/`。正式双板上传要求两个板型的当前固件版本、Git ID 和全部 P0 项均为 `PASS`，`NOT_RUN` 不能视为通过。
+真机自动测试按板型分别记录到 `tests/reports/device-acceptance-generic-c3.json` 和 `tests/reports/device-acceptance-m5stamp-c3.json`。本地构建允许没有证据；证据存在且匹配当前版本时，`build_all.sh` 会将其收录到总包 `evidence/`。正式上传要求**参与发布板型**的当前固件版本、Git ID 和 P0 自动项（含 5 分钟设备耐久）全部为 `PASS`；按钮/LED/手机/第三方 App 为 P1，允许 `NOT_RUN` 但必须在测试报告明示。
 
 ```bash
 python3 scripts/tools/device_acceptance.py validate --strict \
@@ -166,7 +166,7 @@ python3 scripts/tools/check_release_artifacts.py \
 python3 tests/test_release_artifacts.py
 ```
 
-正式发布使用 `python3 scripts/tools/publish_github_release.py --dry-run` 预检，再由同一脚本通过已推送 tag 创建 GitHub Release。脚本会自动复用严格检查，要求双板 P0 真机证据并保持 10 个顶层上传附件不变；已存在的 Release 不允许覆盖。
+正式发布使用 `python3 scripts/tools/publish_github_release.py --dry-run` 预检，再由同一脚本通过已推送 tag 创建 GitHub Release。脚本会自动复用严格检查，要求参与发布板型的 P0 真机证据；默认单板 `generic-c3`，可用 `--boards generic-c3,m5stamp-c3` 指定多板。已存在的 Release 不允许覆盖。
 
 提交前推荐先跑聚合门禁：
 

@@ -53,7 +53,7 @@
 - `DT-14`：FTMS `SetTargetPower` 能驱动目标功率行为
 - `DT-15`：配网改动需验证受影响的 HTTP 路由和 Captive Portal 弹窗路径
 - `DT-16`：按钮和 LED 物理表现需人工确认，远程代理不得伪造结果
-- `DT-17`：固件产物目录必须含双板型 merged bin、SHA256、manifest、test-report.md、core-flow-endurance.md、user-manual.md、images/ 和 release 总包 zip
+- `DT-17`：固件产物目录必须含参与发布板型的 merged bin、SHA256、manifest、test-report.md、core-flow-endurance.md、user-manual.md、images/ 和 release 总包 zip
 
 ## 记录要求
 
