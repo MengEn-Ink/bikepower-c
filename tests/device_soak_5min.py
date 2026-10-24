@@ -68,6 +68,9 @@ async def main():
 
     while time.monotonic() - started < args.duration:
         result = await run_cycle(args.name, args.scan_timeout, args.interval)
+        if result["error"] or not result["scan_ok"]:
+            await asyncio.sleep(2)
+            result = await run_cycle(args.name, args.scan_timeout, args.interval)
         cycles += 1
         total_notify += result["notify"]
         if not result["scan_ok"]:
