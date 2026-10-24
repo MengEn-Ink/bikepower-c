@@ -153,7 +153,7 @@ idf.py -p <port> monitor
 
 每次生成可分发固件时，`build/release/` 必须包含参与发布板型的 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip` 总包。测试报告记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行项必须写明原因。
 
-真机自动测试按板型分别记录到 `tests/reports/device-acceptance-generic-c3.json` 和 `tests/reports/device-acceptance-m5stamp-c3.json`。本地构建允许没有证据；证据存在且匹配当前版本时，`build_all.sh` 会将其收录到总包 `evidence/`。正式上传要求**参与发布板型**的当前固件版本、Git ID 和 P0 自动项（含 5 分钟设备耐久）全部为 `PASS`；按钮/LED/手机/第三方 App 为 P1，允许 `NOT_RUN` 但必须在测试报告明示。
+真机自动测试按板型分别记录到 `tests/reports/device-acceptance-generic-c3.json` 和 `tests/reports/device-acceptance-m5stamp-c3.json`。本地构建允许没有证据；证据存在且匹配当前版本时，`build_all.sh` 会将其收录到总包 `evidence/`。正式上传要求**参与发布板型**的当前固件版本、Git ID 和 4 项 P0 自动项（串口启动、骑行 BLE、重连、5 分钟设备耐久）全部为 `PASS`；跑步 profile、配网门户、广播项以及按钮/LED/手机/第三方 App 为 P1，允许 `NOT_RUN` 但必须在测试报告明示。
 
 ```bash
 python3 scripts/tools/device_acceptance.py validate --strict \

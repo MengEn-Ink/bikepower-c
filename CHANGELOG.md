@@ -69,7 +69,7 @@
 - CPS Measurement 改为规范的 8 字节 crank-only 帧（2 字节 flags + 功率 + 曲柄转数 + 曲柄时间），修复 v4.1.1 发布固件用 1 字节 flags 导致标准客户端（码表/Zwift）功率解析错位的问题。
 
 ### 验收门禁调整
-- `scripts/tools/device_acceptance.py`：新增 P0 自动项 `soak_5min`（5 分钟设备耐久），移除 `aging_72h` 阻塞项；实体按钮、WiFi 二次确认、LED、手机 Captive Portal、配网退出降为 P1，允许 `NOT_RUN` 且不阻塞发版。
+- `scripts/tools/device_acceptance.py`：新增 P0 自动项 `soak_5min`（5 分钟设备耐久），移除 `aging_72h` 阻塞项；跑步 profile、配网门户、广播项因需切换测试机网络降为 P1；实体按钮、WiFi 二次确认、LED、手机 Captive Portal、配网退出同为 P1，允许 `NOT_RUN` 且不阻塞发版。
 - 新增 `tests/device_soak_5min.py`：反复扫描/连接/订阅/断开 5 分钟，检查连接失败与通知断流。
 - `tests/operation_gate.py` device 模式接入 5 分钟设备耐久。
 

@@ -108,7 +108,7 @@ python3 scripts/tools/device_acceptance.py validate
 
 ## 四、人工门禁记录（P1，不阻塞发版）
 
-以下人工项默认不阻塞发版，但每次发可分发固件时建议按板型在结构化证据和测试报告中记录。P0 自动项（含新增的 `soak_5min` 5 分钟设备耐久）必须全部通过。证据文件是 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`，release 总包内保留相同文件名到 `evidence/`。
+以下人工项默认不阻塞发版，但每次发可分发固件时建议按板型在结构化证据和测试报告中记录。P0 自动项（串口启动、骑行 BLE、重连、5 分钟设备耐久）必须全部通过；跑步 profile、配网门户和广播项因需要把测试机切到设备热点，归入 P1。证据文件是 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`，release 总包内保留相同文件名到 `evidence/`。
 
 | 项目 | 通过标准 | 记录要求 |
 |------|----------|----------|

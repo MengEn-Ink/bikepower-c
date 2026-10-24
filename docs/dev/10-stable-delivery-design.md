@@ -84,11 +84,16 @@ evidence/device-acceptance-m5stamp-c3.json
 |----|------|------|
 | `serial_boot` | ROM/复位启动标志完整，且无 panic、WDT、Backtrace、coredump | `serial_capture.py --check-boot` |
 | `ble_cycling` | 骑行 BLE 服务、通知、控制点 | `ble_selftest.py` |
-| `ble_running` | 跑步 profile、RSC/FTMS 数据 | `ble_selftest.py --profile running` |
 | `ble_reconnect` | 连接、断开、重新广播 | `stage3_conn_test.py` |
+| `soak_5min` | 5 分钟反复连接/通知无失败、无断流 | `device_soak_5min.py` |
+
+### P1 自动项（需切换测试机网络，不阻塞发版）
+
+| ID | 项目 | 来源 |
+|----|------|------|
+| `ble_running` | 跑步 profile、RSC/FTMS 数据 | `device_profile_harness.py --profile running` |
 | `portal_http` | 配网门户 API、续期、关闭 | `stage5_portal_test.py` |
 | `broadcast_mask` | 广播开关真实影响通知数据面 | `ble_broadcast_monitor.py` |
-| `soak_5min` | 5 分钟反复连接/通知无失败、无断流 | `device_soak_5min.py` |
 
 ### P1 人工与兼容项（不阻塞发版）
 
@@ -102,7 +107,7 @@ evidence/device-acceptance-m5stamp-c3.json
 | `zwift_cycling` | Zwift 骑行 fixed/ERG 进入退出 | 第三方平台兼容证据 |
 | `running_apps` | Zwift/MyWhoosh 跑步识别 | 第三方平台兼容证据 |
 
-严格模式只要求 P0 自动项全部通过；P1 允许 `NOT_RUN`，但必须在 `test-report.md` 明示，不能显示为已验证。原 72 小时老化不再是发版阻塞项，由 5 分钟设备耐久 `soak_5min` 覆盖短时回归。
+严格模式只要求 P0 自动项全部通过（串口启动、骑行 BLE、重连、5 分钟耐久）；P1 允许 `NOT_RUN`，但必须在 `test-report.md` 明示，不能显示为已验证。跑步 profile、配网门户和广播项因需要把测试机切到设备热点，归入 P1；原 72 小时老化不再是发版阻塞项。
 
 ## 五、命令行交互
 

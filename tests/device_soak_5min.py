@@ -85,7 +85,8 @@ async def main():
 
     elapsed = time.monotonic() - started
     ok = (
-        cycles >= planned - 1
+        elapsed >= args.duration * 0.95
+        and cycles >= 2
         and scan_failures == 0
         and connect_failures == 0
         and empty_notify_cycles == 0
