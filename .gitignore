@@ -22,6 +22,13 @@ managed_components/
 .cache/
 .superpowers/
 compile_commands.json
+.ccache/
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.trae-html-share-packages/
 
 # Environment variables (contains tokens)
 .env

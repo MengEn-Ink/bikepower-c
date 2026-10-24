@@ -117,18 +117,33 @@ Add-MpPreference -ExclusionPath "$env:USERPROFILE\.espressif"
 
 ### 3.1 ccache（最有效，已启用）
 
-`sdkconfig.defaults` 已启用 `CONFIG_CCACHE_ENABLE=y`。
+`sdkconfig.defaults` 已启用 `CONFIG_CCACHE_ENABLE=y`。项目脚本（`dev.ps1`、`build_all.ps1`）自动将 `CCACHE_DIR` 重定向到项目目录 `.ccache/`，避免沙箱限制和跨项目缓存污染。
 
-- 首次编译：无加速（填缓存）
-- 后续增量编译：快 50-80%
+- 首次编译：无加速（填缓存），命中率约 42%
+- fullclean + 重建：提速约 48%（实测 5:00 → 2:37），命中率约 63%
+- 增量编译（改 1-2 文件）：快 70-90%
 - 缓存命中条件：源文件内容 + 编译选项不变
+
+**实际测试结果**（ESP32-C3，12 核 CPU，ccache 4.11.2）：
+
+| 场景 | 耗时 | ccache 命中率 | 说明 |
+|------|------|--------------|------|
+| 首次编译（无缓存） | 5:00 | 42.41% | 部分系统组件有缓存 |
+| fullclean + 重建 | 2:37 | 63.32% | 项目代码全命中 |
+| 增量编译 | 40-80s | >90% | 仅编译改动文件 |
 
 验证 ccache 是否生效：
 
 ```powershell
-# 编译后查看 ccache 统计
+# 方式1：用项目脚本查看
+.\scripts\dev.ps1 stats
+
+# 方式2：直接查看（需先激活 ESP-IDF 或设置 CCACHE_DIR）
+$env:CCACHE_DIR = "$PWD\.ccache"
 ccache -s
 ```
+
+**注意**：`CCACHE_DIR` 和 `PYTHONDONTWRITEBYTECODE=1` 已由 `idf_common.psm1` 的 `Initialize-CcacheEnv` 自动设置，无需手动配置。
 
 ### 3.2 Windows Defender 排除项
 
@@ -168,16 +183,21 @@ $env:NINJA_SUMMARIZE_BUILD = "1"
 
 ## 四、编译时间参考
 
-基于 ESP32-C3（RISC-V 单核 160MHz）项目规模（约 50 个源文件）：
+基于 ESP32-C3（RISC-V 单核 160MHz）项目规模（约 50 个源文件），Windows 实测：
 
-| 场景 | Linux 参考时间 | Windows 参考时间 | 说明 |
-|------|---------------|-----------------|------|
-| 首次全量编译 | 3-5 分钟 | 4-7 分钟 | 填 ccache 缓存 |
-| 增量编译（改 1-2 文件） | 30-60 秒 | 40-80 秒 | ccache 命中 |
-| 双板型 Release 全流程 | 8-12 分钟 | 10-15 分钟 | 含门禁+编译+打包 |
-| reconfigure | 20-30 秒 | 25-40 秒 | 重新生成 CMake |
+| 场景 | Windows 实测时间 | ccache 命中率 | 说明 |
+|------|-----------------|--------------|------|
+| 首次全量编译 | 5:00 | 42.41% | 填 ccache 缓存 |
+| fullclean + 重建 | 2:37 | 63.32% | ccache 生效，提速 48% |
+| 增量编译（改 1-2 文件） | 40-80 秒 | >90% | Ninja + ccache 双重加速 |
+| 双板型 Release 全流程 | 10-15 分钟 | - | 含门禁+编译+打包 |
+| reconfigure | 25-40 秒 | - | 重新生成 CMake |
 
-Windows 比 Linux 慢 20-30%，主要受 Windows Defender 影响。
+**关键优化总结**：
+1. ccache 启用 + CCACHE_DIR 重定向到项目目录（避免沙箱限制）
+2. Windows Defender 排除项目目录（加速 20-30%）
+3. Ninja 并行编译（自动按 CPU 核数）
+4. 避免不必要的 fullclean（保持 ccache 缓存）
 
 ## 五、常用命令速查
 
@@ -193,6 +213,7 @@ Windows 比 Linux 慢 20-30%，主要受 Windows Defender 影响。
 | 清理构建 | `.\scripts\dev.ps1 clean` |
 | 重新配置 | `.\scripts\dev.ps1 reconfigure` |
 | 擦除 flash | `.\scripts\dev.ps1 erase` |
+| ccache 统计 | `.\scripts\dev.ps1 stats` |
 | 完整 Release | `.\scripts\build_all.ps1` |
 | 显示帮助 | `.\scripts\dev.ps1 help` |
 

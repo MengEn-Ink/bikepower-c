@@ -154,6 +154,7 @@ function Activate-IdfEnv {
             Die "idf.py 不在 PATH 中，ESP-IDF 环境未激活。请用 -IdfPath 指定 ESP-IDF 安装路径。"
         }
         Write-Log "使用当前 shell 中已激活的 ESP-IDF"
+        Initialize-CcacheEnv
         return
     }
     Write-Log ("激活 ESP-IDF: " + $IdfPath)
@@ -177,6 +178,66 @@ function Activate-IdfEnv {
         Die "ESP-IDF 激活失败: IDF_PATH 未设置。可能 Python venv 或工具链未安装。`n  请运行 install.ps1 安装 ESP-IDF 工具链。"
     }
     Write-Success ("ESP-IDF 已激活: IDF_PATH=" + $env:IDF_PATH)
+    Initialize-CcacheEnv
+}
+
+# 配置 ccache 环境（绕过沙箱限制 + 加速增量编译）
+# - CCACHE_DIR 重定向到项目目录，避免沙箱拦截 C:\Users\...\AppData\Local\ccache
+# - PYTHONDONTWRITEBYTECODE=1 阻止 Python 写 .pyc，避免沙箱拦截
+function Initialize-CcacheEnv {
+    $ccacheDir = Join-Path $Global:BikePowerProjectDir ".ccache"
+    if (-not (Test-Path $ccacheDir)) {
+        New-Item -Path $ccacheDir -ItemType Directory -Force | Out-Null
+    }
+    $env:CCACHE_DIR = $ccacheDir
+    $env:PYTHONDONTWRITEBYTECODE = "1"
+    # 显示 ccache 状态
+    $ccacheExe = Get-Command "ccache" -ErrorAction SilentlyContinue
+    if (-not $ccacheExe) {
+        $ccacheRoot = Join-Path $env:USERPROFILE ".espressif\tools\ccache"
+        if (Test-Path $ccacheRoot) {
+            $ccacheBin = Get-ChildItem -Path $ccacheRoot -Filter "ccache.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($ccacheBin) {
+                $ccacheExe = [PSCustomObject]@{ Source = $ccacheBin.FullName }
+            }
+        }
+    }
+    if ($ccacheExe) {
+        $stats = & $ccacheExe.Source --show-stats 2>$null |
+            Select-String "Cacheable calls|Hits:|Misses:" |
+            ForEach-Object { $_.Line.Trim() }
+        if ($stats) {
+            Write-Host "  ccache 缓存: $ccacheDir" -ForegroundColor Gray
+            Write-Host "  ccache 状态: $($stats[0])" -ForegroundColor Gray
+        }
+    }
+}
+
+# 显示 ccache 统计信息
+function Show-CcacheStats {
+    # 先查 PATH，再扫描 .espressif\tools\ccache
+    $ccacheExe = Get-Command "ccache" -ErrorAction SilentlyContinue
+    if (-not $ccacheExe) {
+        $ccacheRoots = @(
+            (Join-Path $env:USERPROFILE ".espressif\tools\ccache"),
+            "C:\Espressif\tools\ccache"
+        )
+        foreach ($root in $ccacheRoots) {
+            if (-not (Test-Path $root)) { continue }
+            $ccacheBin = Get-ChildItem -Path $root -Filter "ccache.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($ccacheBin) {
+                $ccacheExe = [PSCustomObject]@{ Source = $ccacheBin.FullName }
+                break
+            }
+        }
+    }
+    if (-not $ccacheExe) {
+        Write-Host "  ccache 未安装" -ForegroundColor Yellow
+        return
+    }
+    Write-Host ""
+    Write-Host "=== ccache 统计 ===" -ForegroundColor Cyan
+    & $ccacheExe.Source --show-stats
 }
 
 # === 子进程调用 ===
@@ -372,7 +433,7 @@ function Clear-StaleBoardCache {
 
 # 导出公开函数
 Export-ModuleMember -Function Write-Log, Write-Success, Write-Fail, Write-Warn, Die, `
-    Find-EspIdf, Get-IdfPython, Activate-IdfEnv, `
+    Find-EspIdf, Get-IdfPython, Activate-IdfEnv, Initialize-CcacheEnv, Show-CcacheStats, `
     Invoke-SafeCommand, Invoke-IdfCommand, Invoke-EsptoolCommand, Invoke-PythonScript, `
     Detect-SerialPort, Test-SerialPort, `
     Extract-Define, Get-Sha256, Clear-StaleBoardCache

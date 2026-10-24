@@ -24,7 +24,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("build", "flash", "monitor", "test", "check", "clean", "reconfigure", "erase", "help", "")]
+    [ValidateSet("build", "flash", "monitor", "test", "check", "clean", "reconfigure", "erase", "stats", "help", "")]
     [string]$Action = "help",
 
     [ValidateSet("generic", "m5stamp")]
@@ -64,6 +64,7 @@ function Show-Help {
     Write-Host "  clean        清理构建目录（idf.py fullclean）"
     Write-Host "  reconfigure  重新生成 CMake 配置"
     Write-Host "  erase        擦除整片 flash"
+    Write-Host "  stats        显示 ccache 缓存统计"
     Write-Host "  help         显示此帮助"
     Write-Host ""
     Write-Host "Options:"
@@ -152,6 +153,14 @@ function Do-Build {
 
     $buildDuration = (Get-Date) - $buildStartTime
     Write-Success ("编译完成，耗时 {0:hh\:mm\:ss}" -f $buildDuration)
+    # 显示 ccache 命中率摘要
+    $ccacheExe = Get-Command "ccache" -ErrorAction SilentlyContinue
+    if ($ccacheExe) {
+        $hitLine = & $ccacheExe.Source --show-stats 2>$null | Select-String "Hits:" | Select-Object -First 1
+        if ($hitLine) {
+            Write-Host ("  ccache: " + $hitLine.Line.Trim()) -ForegroundColor Gray
+        }
+    }
 }
 
 # 烧录固件
@@ -310,6 +319,17 @@ if ($Action -eq "check") {
 
 if ($Action -eq "test") {
     Do-Test
+    exit 0
+}
+
+# stats 只需要 ccache，不需要 ESP-IDF
+if ($Action -eq "stats") {
+    $ccacheDir = Join-Path $ProjectDir ".ccache"
+    if (-not (Test-Path $ccacheDir)) {
+        Die "ccache 缓存目录不存在: $ccacheDir`n  请先执行一次编译。"
+    }
+    $env:CCACHE_DIR = $ccacheDir
+    Show-CcacheStats
     exit 0
 }
 
