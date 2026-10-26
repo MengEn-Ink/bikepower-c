@@ -82,26 +82,28 @@ BikePower C 采用 NimBLE host 实现蓝牙 peripheral 角色，暴露标准蓝�
 
 ```c
 typedef enum {
-    SPORT_PROFILE_CYCLING = 0,   // 默认：CPS + HRS + CSC + FTMS(Indoor Bike) + DIS
-    SPORT_PROFILE_RUNNING = 1,   // 跑步：RSC + HRS + FTMS(Treadmill) + DIS
+    SPORT_PROFILE_CYCLING = 0,   // 默认：CPS + HRS + CSC + FTMS(Indoor Bike) + DIS（按 broadcast_mask 过滤）
+    SPORT_PROFILE_RUNNING = 1,   // 跑步：RSC + HRS + FTMS(Treadmill) + DIS（按 broadcast_mask 过滤）
     SPORT_PROFILE_COUNT
 } sport_profile_t;
 ```
 
 ### 切换注意事项
 
-- 切换运动配置文件会触发 BLE 重启请求（`s_ble_restart_requested = true`）
+- 切换运动配置文件或修改 `broadcast_mask`（服务开关）都会触发 BLE 重启请求（`s_ble_restart_requested = true`）
 - 主循环检测到该标志后会调用 `ble_bikepower_stop()` + `ble_bikepower_start()` 重新注册 GATT 表
 - 切换期间会短暂断连，随后新服务集生效
 
 ### 广播字段差异
 
-| 配置 | 广播包 UUID | Scan Response UUID |
-|------|-----------|-------------------|
-| Cycling | CPS + CSC + FTMS (3个) | HRS (1个) |
-| Running | RSC + FTMS (2个) | HRS (1个) |
+广播包 16-bit UUID 按当前 `broadcast_mask` 动态拼装，仅包含已注册服务：
 
-> 广播包空间有限（31字节），主广播只放码表按设备类型过滤时最关键的服务，完整能力由连接后 GATT 发现获取。
+| 配置 | 广播包 UUID（全开时） | Scan Response UUID |
+|------|----------------------|-------------------|
+| Cycling | CPS + CSC + FTMS | HRS（HEARTRATE 启用时） |
+| Running | RSC + FTMS | HRS（HEARTRATE 启用时） |
+
+> 广播包空间有限（31字节），主广播只放码表按设备类型过滤时最关键的服务，完整能力由连接后 GATT 发现获取。若某项服务被关闭，其 UUID 不会出现在广播包中。
 
 ---
 
@@ -365,15 +367,19 @@ ble_bikepower_set_data()            notify_tick()
 
 ### 广播字段掩码
 
-`g_broadcast_mask` 控制哪些服务实际发送通知，可通过配网页或 setter 动态调整：
+`g_broadcast_mask` 同时控制 **GATT 服务注册**与**通知发送**，可通过配网页或 setter 动态调整：
 
-| 位 | 掩码 | 控制的通知 |
-|----|------|-----------|
-| bit0 | `BROADCAST_FIELD_POWER` | CPS Power、FTMS Power |
-| bit1 | `BROADCAST_FIELD_CADENCE` | CSC、FTMS Cadence/Speed |
+| 位 | 掩码 | 控制的服务 / 通知 |
+|----|------|-------------------|
+| bit0 | `BROADCAST_FIELD_POWER` | 骑行 CPS、FTMS Power；跑步 RSC/FTMS Speed |
+| bit1 | `BROADCAST_FIELD_CADENCE` | 骑行 CSC、FTMS Cadence；跑步 RSC/FTMS Cadence |
 | bit2 | `BROADCAST_FIELD_HEARTRATE` | HRS、FTMS Treadmill HR |
 
-mask 为 0 时自动归一化为 `BROADCAST_FIELD_ALL`（全开）。
+- **服务注册**：`build_active_gatt_svcs()` 按 mask 过滤 GATT 服务表，未启用的服务不注册到 GATT（例如只开心率时蓝牙只暴露 HRS + DIS，类似心率带）。FTMS 在 POWER 或 CADENCE 任一启用时注册；DIS 始终注册。
+- **广播 UUID**：广播包 16-bit UUID 列表按已注册服务动态拼装，不声明 GATT 中不存在的服务。
+- **通知**：`notify_one_nolock`/`indicate_one` 以 `handle==0` 守卫跳过未注册服务。
+- mask 为 0 时自动归一化为 `BROADCAST_FIELD_ALL`（全开）。
+- 运行时修改 mask 后，配网页保存会置 `s_ble_restart_requested`，主循环在无连接时 stop→start 重建 GATT 表。
 
 ---
 

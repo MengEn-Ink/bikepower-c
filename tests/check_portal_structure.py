@@ -370,8 +370,8 @@ def main():
           "配网保持打开时也必须能请求 BLE 重启以重建 GATT 服务表")
     app_main_src = (ROOT / "main" / "app_main.c").read_text(encoding="utf-8")
     check('wifi_portal_ble_restart_requested()' in app_main_src
-          and '运动 profile 已切换，重启 BLE 以重建 GATT 服务表' in app_main_src,
-          "app_main 必须在主任务上下文处理运动 profile 切换后的 BLE 重启")
+          and '重启 BLE 以重建 GATT 服务表' in app_main_src,
+          "app_main 必须在主任务上下文处理运动 profile 或服务开关切换后的 BLE 重启")
     check('conn == 0' in app_main_src and '等待 BLE 断开后重建 GATT 服务表' in app_main_src,
           "BLE 已连接时必须等待断开后再重建 GATT，避免强制踢掉客户端")
     check('id="ride-source-picker"' in html, "骑行页缺少固定功率/配速机器人胶囊条容器")

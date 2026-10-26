@@ -324,7 +324,7 @@ void app_main(void)
 
         if (wifi_portal_ble_restart_requested()) {
             if (conn == 0) {
-                ESP_LOGI(TAG, "运动 profile 已切换，重启 BLE 以重建 GATT 服务表");
+                ESP_LOGI(TAG, "运动 profile 或服务开关已变化，重启 BLE 以重建 GATT 服务表");
                 if (ble_bikepower_stop()) {
                     vTaskDelay(pdMS_TO_TICKS(RADIO_BLE_RELEASE_WAIT_MS));
                     ble_bikepower_set_profile(s_engine.sport_profile);
@@ -336,15 +336,15 @@ void app_main(void)
                         last_conn = 0;
                         app_state_clear_error();
                     } else {
-                        ESP_LOGE(TAG, "profile 切换后 BLE 重启失败 ret=%d", r);
+                        ESP_LOGE(TAG, "BLE 重启失败 ret=%d", r);
                         app_state_set_error();
                     }
                 } else {
-                    ESP_LOGE(TAG, "profile 切换时 BLE 停用失败，等待下轮重试");
+                    ESP_LOGE(TAG, "BLE 停用失败，等待下轮重试");
                     app_state_set_error();
                 }
             } else if (tick % 20 == 0) {
-                ESP_LOGW(TAG, "运动 profile 已切换，等待 BLE 断开后重建 GATT 服务表 conn=%d", conn);
+                ESP_LOGW(TAG, "运动 profile 或服务开关已变化，等待 BLE 断开后重建 GATT 服务表 conn=%d", conn);
             }
         }
 

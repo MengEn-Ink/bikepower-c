@@ -602,9 +602,44 @@ static const struct ble_gatt_svc_def running_gatt_svcs[] = {
     { 0 }
 };
 
-static const struct ble_gatt_svc_def *active_gatt_svcs(void)
+// 按当前 g_broadcast_mask 动态构建 GATT 服务表：仅注册被启用的服务，
+// 未启用的服务从 GATT 表中移除（例如只开心率时蓝牙只暴露 HRS，类似心率带）。
+// 最大 5 个服务 + 1 个终止符，预分配静态缓冲避免运行时 malloc。
+static struct ble_gatt_svc_def g_active_svcs[6];
+
+static void build_active_gatt_svcs(void)
 {
-    return g_profile == SPORT_PROFILE_RUNNING ? running_gatt_svcs : cycling_gatt_svcs;
+    int idx = 0;
+    const bool power_on = (g_broadcast_mask & BROADCAST_FIELD_POWER) != 0;
+    const bool cadence_on = (g_broadcast_mask & BROADCAST_FIELD_CADENCE) != 0;
+    const bool hr_on = (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) != 0;
+
+    if (g_profile == SPORT_PROFILE_RUNNING) {
+        if (power_on || cadence_on) g_active_svcs[idx++] = running_gatt_svcs[0]; // RSC
+        if (hr_on)                  g_active_svcs[idx++] = running_gatt_svcs[1]; // HRS
+        if (power_on || cadence_on) g_active_svcs[idx++] = running_gatt_svcs[2]; // FTMS
+        g_active_svcs[idx++] = running_gatt_svcs[3]; // DIS（始终）
+    } else {
+        if (power_on)               g_active_svcs[idx++] = cycling_gatt_svcs[0]; // CPS
+        if (hr_on)                  g_active_svcs[idx++] = cycling_gatt_svcs[1]; // HRS
+        if (cadence_on)             g_active_svcs[idx++] = cycling_gatt_svcs[2]; // CSC
+        if (power_on || cadence_on) g_active_svcs[idx++] = cycling_gatt_svcs[3]; // FTMS
+        g_active_svcs[idx++] = cycling_gatt_svcs[4]; // DIS（始终）
+    }
+    memset(&g_active_svcs[idx], 0, sizeof(g_active_svcs[idx])); // 终止符
+}
+
+// 重置所有特征值句柄，确保未注册服务的通知被 notify 守卫跳过。
+static void reset_svc_handles(void)
+{
+    g_cps_val_handle = 0;
+    g_hr_val_handle = 0;
+    g_csc_val_handle = 0;
+    g_rsc_val_handle = 0;
+    g_ftms_bike_handle = 0;
+    g_ftms_treadmill_handle = 0;
+    g_ftms_cp_handle = 0;
+    g_ftms_status_handle = 0;
 }
 
 // ============================ 数据打包 ============================
@@ -680,6 +715,8 @@ static void pack_running(void)
 static void notify_one_nolock(uint16_t handle, const uint8_t *buf, size_t len)
 {
     if (g_stopping || !g_ready || g_conn_handle == BLE_HS_CONN_HANDLE_NONE) return;
+    // 未注册服务的句柄为 0，跳过通知避免向不存在的特征发通知。
+    if (handle == 0) return;
     struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
     if (om) ble_gatts_notify_custom(g_conn_handle, handle, om);
 }
@@ -704,7 +741,8 @@ static void notify_one(uint16_t handle, const uint8_t *buf, size_t len)
 static void indicate_one(uint16_t handle, const uint8_t *buf, size_t len)
 {
     if (!g_notify_lock || xSemaphoreTake(g_notify_lock, pdMS_TO_TICKS(BLE_NOTIFY_LOCK_WAIT_MS)) != pdTRUE) return;
-    if (!g_stopping && g_ready && g_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+    // 未注册服务的句柄为 0，跳过 indication。
+    if (!g_stopping && g_ready && handle != 0 && g_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
         struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
         if (om) ble_gatts_indicate_custom(g_conn_handle, handle, om);
     }
@@ -821,24 +859,30 @@ static int start_advertising(void)
 
     memset(&fields, 0, sizeof(fields));
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
-    static ble_uuid16_t cycling_adv_uuids[] = {
-        BLE_UUID16_INIT(POWER_SERVICE_UUID),
-        BLE_UUID16_INIT(CSC_SERVICE_UUID),
-        BLE_UUID16_INIT(FTMS_SERVICE_UUID),
-    };
-    static ble_uuid16_t running_adv_uuids[] = {
-        BLE_UUID16_INIT(RSC_SERVICE_UUID),
-        BLE_UUID16_INIT(FTMS_SERVICE_UUID),
-    };
+
+    // 广播包 UUID 仅包含当前已注册的服务，避免声明不存在的服务。
+    const bool power_on = (g_broadcast_mask & BROADCAST_FIELD_POWER) != 0;
+    const bool cadence_on = (g_broadcast_mask & BROADCAST_FIELD_CADENCE) != 0;
+    const bool hr_on = (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) != 0;
+    ble_uuid16_t adv_uuids[3];
+    int adv_uuid_count = 0;
+    if (g_profile == SPORT_PROFILE_RUNNING) {
+        if (power_on || cadence_on) adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(RSC_SERVICE_UUID);
+        if (power_on || cadence_on) adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(FTMS_SERVICE_UUID);
+    } else {
+        if (power_on)               adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(POWER_SERVICE_UUID);
+        if (cadence_on)             adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(CSC_SERVICE_UUID);
+        if (power_on || cadence_on) adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(FTMS_SERVICE_UUID);
+    }
     static ble_uuid16_t scan_rsp_uuids[] = {
         BLE_UUID16_INIT(HR_SERVICE_UUID),
     };
     // 广播包空间有限：主广播放 App/码表按设备类型过滤时最关键的服务，完整能力由连接后 GATT 发现获取。
-    fields.uuids16 = (g_profile == SPORT_PROFILE_RUNNING) ? running_adv_uuids : cycling_adv_uuids;
-    fields.num_uuids16 = (g_profile == SPORT_PROFILE_RUNNING) ? 2 : 3;
+    fields.uuids16 = (adv_uuid_count > 0) ? adv_uuids : NULL;
+    fields.num_uuids16 = adv_uuid_count;
     fields.uuids16_is_complete = 1;
-    // 31 字节广播包预算：flags(3) + 完整 16 位 UUID 列表(2+3×2=8) 占 11 字节，
-    // 留给名字 AD 20 字节即最多 BLE_ADV_NAME_MAX_LEN 个字符。超出部分（完整名）放 scan response，
+    // 31 字节广播包预算：flags(3) + 完整 16 位 UUID 列表(2+N×2) 占 5+2N 字节，
+    // 留给名字 AD 26-2N 字节即最多 BLE_ADV_NAME_MAX_LEN 个字符。超出部分（完整名）放 scan response，
     // 避免 ble_gap_adv_set_fields 因 EMSGSIZE 静默失败导致设备搜不到。
     size_t name_len = strlen(g_device_name);
     fields.name = (uint8_t *)g_device_name;
@@ -855,9 +899,11 @@ static int start_advertising(void)
 
     struct ble_hs_adv_fields rsp_fields;
     memset(&rsp_fields, 0, sizeof(rsp_fields));
-    rsp_fields.uuids16 = scan_rsp_uuids;
-    rsp_fields.num_uuids16 = 1;
-    rsp_fields.uuids16_is_complete = 0;
+    if (hr_on) {
+        rsp_fields.uuids16 = scan_rsp_uuids;
+        rsp_fields.num_uuids16 = 1;
+        rsp_fields.uuids16_is_complete = 0;
+    }
     rsp_fields.name = (uint8_t *)g_device_name;
     rsp_fields.name_len = name_len;
     rsp_fields.name_is_complete = 1;
@@ -1085,14 +1131,15 @@ esp_err_t ble_bikepower_start(void)
     ble_svc_gap_init();
     ble_svc_gatt_init();
 
-    const struct ble_gatt_svc_def *gatt_svcs = active_gatt_svcs();
-    int rc = ble_gatts_count_cfg(gatt_svcs);
+    reset_svc_handles();
+    build_active_gatt_svcs();
+    int rc = ble_gatts_count_cfg(g_active_svcs);
     if (rc != 0) {
         ESP_LOGE(TAG, "gatts_count_cfg 失败 rc=%d", rc);
         nimble_port_deinit();
         return ESP_FAIL;
     }
-    rc = ble_gatts_add_svcs(gatt_svcs);
+    rc = ble_gatts_add_svcs(g_active_svcs);
     if (rc != 0) {
         ESP_LOGE(TAG, "gatts_add_svcs 失败 rc=%d", rc);
         nimble_port_deinit();

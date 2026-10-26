@@ -295,7 +295,8 @@ static bool apply_json_fields(power_engine_t *e, const char *body, bool allow_sp
 {
     char val[64];
     int new_val, old_val;
-    bool sport_changed = false;
+    // 运动 profile 或广播服务开关变化都需要重启 BLE 以重建 GATT 服务表。
+    bool restart_required = false;
 
     if (json_get_str(body, "mode", val, sizeof(val))) {
         int m = mode_from_id(val);
@@ -316,7 +317,7 @@ static bool apply_json_fields(power_engine_t *e, const char *body, bool allow_sp
             sport_profile_t old_sport = e->sport_profile;
             power_engine_set_sport_profile(e, (sport_profile_t)sport);
             if (old_sport != e->sport_profile) {
-                sport_changed = true;
+                restart_required = true;
                 ESP_LOGI(TAG, "  sport: %s → %s", sport_to_id((int)old_sport), sport_to_id(sport));
             }
         }
@@ -325,8 +326,10 @@ static bool apply_json_fields(power_engine_t *e, const char *body, bool allow_sp
         old_val = e->broadcast_mask;
         new_val = json_get_int_def(body, "broadcast_mask", old_val);
         power_engine_set_broadcast_mask(e, new_val);
-        if (old_val != e->broadcast_mask)
+        if (old_val != e->broadcast_mask) {
+            restart_required = true;
             ESP_LOGI(TAG, "  broadcast_mask: %d → %d", old_val, e->broadcast_mask);
+        }
     }
     if (json_get_str(body, "custom_pacer_name", val, sizeof(val))) {
         ESP_LOGI(TAG, "  custom_pacer_name: %s → %s", e->profile.custom_pacer_name, val);
@@ -499,7 +502,7 @@ static bool apply_json_fields(power_engine_t *e, const char *body, bool allow_sp
     APPLY_LED_SCENE("led_error", LED_SCENE_ERROR);
 #undef APPLY_LED_SCENE
     led_config_validate(&e->led);
-    return sport_changed;
+    return restart_required;
 }
 
 // ============================ 静态首页 ============================
@@ -666,14 +669,14 @@ static esp_err_t h_api_config(httpd_req_t *req)
     /* 写临时副本：NVS 失败时丢弃，s_engine 完全不变，BLE 不会读到中间值 */
     power_engine_t next;
     memcpy(&next, s_engine, sizeof(power_engine_t));
-    bool sport_changed = apply_json_fields(&next, body, true);
+    bool restart_required = apply_json_fields(&next, body, true);
     free(body);
 
     if (nvs_store_save(&next)) {
         bool name_changed = strcmp(s_engine->device_name, next.device_name) != 0;
         memcpy(s_engine, &next, sizeof(power_engine_t));
         power_engine_clear_dirty(s_engine);
-        if (sport_changed) {
+        if (restart_required) {
             s_ble_restart_requested = true;
         }
         if (name_changed) ble_bikepower_refresh_device_name();
@@ -722,14 +725,14 @@ static esp_err_t h_api_close_wifi(httpd_req_t *req)
 
     power_engine_t next;
     memcpy(&next, s_engine, sizeof(power_engine_t));
-    bool sport_changed = apply_json_fields(&next, body, true);
+    bool restart_required = apply_json_fields(&next, body, true);
     free(body);
 
     if (nvs_store_save(&next)) {
         bool name_changed = strcmp(s_engine->device_name, next.device_name) != 0;
         memcpy(s_engine, &next, sizeof(power_engine_t));
         power_engine_clear_dirty(s_engine);
-        if (sport_changed) {
+        if (restart_required) {
             s_ble_restart_requested = true;
         }
         if (name_changed) ble_bikepower_refresh_device_name();

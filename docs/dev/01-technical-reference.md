@@ -203,24 +203,27 @@
 ## 第四章：BLE 服务详解
 
 BLE 实现集中在 `main/ble_bikepower.c`。
-模块提供五个 GATT 服务：
+模块可提供以下 GATT 服务（按 `broadcast_mask` 动态过滤注册，DIS 始终注册）：
 
-- `Cycling Power Service`，UUID `0x1818`
-- `Heart Rate Service`，UUID `0x180D`
-- `Cycling Speed and Cadence Service`，UUID `0x1816`
-- `Fitness Machine Service`，UUID `0x1826`
-- `Device Information Service`，UUID `0x180A`
+- `Cycling Power Service`，UUID `0x1818`（骑行，POWER 位）
+- `Heart Rate Service`，UUID `0x180D`（HEARTRATE 位）
+- `Cycling Speed and Cadence Service`，UUID `0x1816`（骑行，CADENCE 位）
+- `Running Speed and Cadence Service`，UUID `0x1814`（跑步，POWER 或 CADENCE 位）
+- `Fitness Machine Service`，UUID `0x1826`（POWER 或 CADENCE 位）
+- `Device Information Service`，UUID `0x180A`（始终）
+
+运行时修改 `broadcast_mask` 会触发 BLE 重启以重建 GATT 表，未启用的服务从 GATT 中移除。
 
 ### 4.1 广播与 GAP 行为
 
 广播入口是 `start_advertising()`。
-骑行模式主广播字段放三个 16-bit UUID，优先兼容码表按功率计、踏频传感器或智能骑行台类型过滤扫描：
+广播包 16-bit UUID 按当前 `broadcast_mask` 动态拼装，仅包含已注册服务：
 
-- `POWER_SERVICE_UUID`
-- `CSC_SERVICE_UUID`
-- `FTMS_SERVICE_UUID`
+- 骑行全开：`POWER_SERVICE_UUID` + `CSC_SERVICE_UUID` + `FTMS_SERVICE_UUID`
+- 跑步全开：`RSC_SERVICE_UUID` + `FTMS_SERVICE_UUID`
+- `HR_SERVICE_UUID` 仅在 HEARTRATE 启用时放入 scan response
 
-跑步模式主广播字段放 `RSC_SERVICE_UUID` 和 `FTMS_SERVICE_UUID`。主广播包空间有限，心率和完整设备名放入 scan response，完整能力仍依赖连接后的 GATT 发现。
+主广播包空间有限，完整设备名放入 scan response，完整能力仍依赖连接后的 GATT 发现。若某项服务被关闭，其 UUID 不会出现在广播包中。
 
 广播参数使用：
 

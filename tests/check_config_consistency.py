@@ -604,7 +604,7 @@ check(ftms_ops["FTMS_OP_SET_TARGET_SPEED"] == 0x02,
       f"FTMS_OP_SET_TARGET_SPEED = 0x02 (实际={ftms_ops['FTMS_OP_SET_TARGET_SPEED']})")
 check(extract_int(config_src, "FTMS_TREADMILL_CHAR_UUID") == 0x2ACD,
       f"FTMS_TREADMILL_CHAR_UUID = 0x2ACD (实际={extract_int(config_src, 'FTMS_TREADMILL_CHAR_UUID')})")
-running_gatt = re.search(r"static const struct ble_gatt_svc_def running_gatt_svcs\[\].*?;\n\nstatic const struct", ble_bikepower_src, re.S)
+running_gatt = re.search(r"static const struct ble_gatt_svc_def running_gatt_svcs\[\].*?;\n\nstatic", ble_bikepower_src, re.S)
 running_gatt_src = running_gatt.group(0) if running_gatt else ""
 check("FTMS_SERVICE_UUID" in running_gatt_src and "FTMS_TREADMILL_CHAR_UUID" in running_gatt_src,
       "running profile GATT 表包含 FTMS Treadmill Data")
@@ -616,10 +616,12 @@ check("FTMS_TREADMILL_UUID" in ble_selftest_src and "parse_treadmill" in ble_sel
       "ble_selftest.py 覆盖 FTMS Treadmill Data 发现和解析")
 check("g_ftms_cycling_feature_buf" in ble_bikepower_src and "g_ftms_running_feature_buf" in ble_bikepower_src,
       "FTMS Feature 必须按 cycling/running profile 分开声明")
-check("FTMS_SERVICE_UUID" in ble_bikepower_src.split("cycling_adv_uuids", 1)[1].split("running_adv_uuids", 1)[0],
-      "cycling 广播 UUID 必须包含 FTMS，便于可控训练器入口发现")
-check("FTMS_SERVICE_UUID" in ble_bikepower_src.split("running_adv_uuids", 1)[1].split("fields.uuids16", 1)[0],
-      "running 广播 UUID 必须包含 FTMS，便于跑步机入口发现")
+adv_block = re.search(r"ble_uuid16_t adv_uuids\[3\];.*?fields\.uuids16", ble_bikepower_src, re.S)
+adv_block_src = adv_block.group(0) if adv_block else ""
+check(adv_block_src.count("BLE_UUID16_INIT(FTMS_SERVICE_UUID)") >= 2,
+      "cycling 与 running 广播 UUID 都必须包含 FTMS，便于可控训练器入口发现")
+check("BLE_UUID16_INIT(HR_SERVICE_UUID)" in adv_block_src,
+      "scan response 广播必须包含 HRS UUID")
 check("read_gatt_char(FTMS_FEATURE_UUID)" in ble_selftest_src
       and "FTMS Feature" in ble_selftest_src,
       "ble_selftest.py 必须读取并校验 FTMS Feature")

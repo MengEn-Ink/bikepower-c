@@ -4,6 +4,16 @@
 
 ## [未发布]
 
+### 服务开关动态控制 BLE GATT 注册（2026-10-26）
+- `main/ble_bikepower.c`：GATT 服务表改为按 `broadcast_mask` 动态构建（`build_active_gatt_svcs`），未启用的服务不再注册到 GATT；例如只开心率时蓝牙只暴露 HRS（+DIS），行为与心率带厂商一致。
+- 服务映射：骑行 CPS↔POWER、CSC↔CADENCE、HRS↔HEARTRATE、FTMS↔POWER|CADENCE；跑步 RSC↔POWER|CADENCE、HRS↔HEARTRATE、FTMS↔POWER|CADENCE；DIS 始终注册。
+- `ble_bikepower_start` 注册前重置全部特征值句柄，`notify_one_nolock`/`indicate_one` 增加 `handle==0` 守卫，未注册服务的通知自动跳过。
+- `start_advertising` 广播包 16-bit UUID 列表改为按已注册服务动态拼装，避免声明 GATT 中不存在的服务。
+- `main/wifi_portal.c`：`apply_json_fields` 返回值由「仅 sport 变化」扩展为「sport 或 broadcast_mask 变化」，保存配置时若服务开关变化同样置 `s_ble_restart_requested`，由主循环在无连接时 stop→start 重建 GATT 表。
+- `main/app_main.c`：BLE 重启日志文案改为涵盖 profile 与服务开关两种触发原因。
+- `tests/check_config_consistency.py`、`tests/check_portal_structure.py`：适配广播 UUID 动态拼装与重启文案变更。
+- 验证：`idf.py build` 通过；`check_portal_structure.py` 238/0、`check_config_consistency.py` 269/0、`check_nvs_schema.py`、`check_tasks_wdt.py`、`check_board_desc.py` 全绿。host 单测与协议向量因环境无 clang/gcc 未运行（codec 未改动）。
+
 ### GitHub 单一交付链路与仓库治理（2026-10-22）
 - `v4.1.1` 的 10 个正式附件已原样迁移到 GitHub Release；双板固件和总包的 SHA256、ZIP 完整性及历史 manifest 30 条记录均通过复核。历史总包仅包含 generic-c3 证据，未补写或冒充 m5stamp-c3 真机验收。
 - `scripts/tools/prepare_web_flash_site.py` 与 `.github/workflows/deploy-web-tools.yml` 移除旧托管渠道、secret 和回退逻辑；Pages 只消费 GitHub Release，正式部署要求完整双板固件，`main` 的 CI 成功或 Release 发布后刷新。

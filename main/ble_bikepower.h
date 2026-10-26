@@ -81,6 +81,13 @@ bool ble_bikepower_stop(void);
  * 特殊行为：这里只更新共享快照，不会立即主动发送通知。
  */
 void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm);
+/**
+ * 设置 BLE 广播字段掩码，同时决定 GATT 服务注册与通知发送。
+ * mask：`BROADCAST_FIELD_*` 位组合，为 0 时归一化为全开。
+ * 返回值：无。
+ * 特殊行为：建议在 ble_bikepower_start() 前调用以决定初始 GATT 表；运行中修改需重启 BLE
+ *           才能重建 GATT 表（未启用的服务会从 GATT 中移除）。
+ */
 void ble_bikepower_set_broadcast_mask(int mask);
 
 /**
