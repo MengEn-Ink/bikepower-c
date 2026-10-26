@@ -2,7 +2,7 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
-## [未发布]
+## [4.1.3] - 2026-10-26
 
 ### 服务开关动态控制 BLE GATT 注册（2026-10-26）
 - `main/ble_bikepower.c`：GATT 服务表改为按 `broadcast_mask` 动态构建（`build_active_gatt_svcs`），未启用的服务不再注册到 GATT；例如只开心率时蓝牙只暴露 HRS（+DIS），行为与心率带厂商一致。
