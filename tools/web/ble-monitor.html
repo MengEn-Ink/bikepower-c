@@ -5,576 +5,1111 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BikePower BLE 监控与固件刷写</title>
 <style>
-:root{--bg:#f5f7fb;--card:#fff;--line:#dfe5ef;--text:#172033;--muted:#667085;--blue:#1769e0;--green:#16803c;--red:#c4262e;--amber:#a15c00}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;padding:16px}.wrap{max-width:980px;margin:0 auto}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}.title h1{font-size:22px;line-height:1.1;margin:0 0 4px}.title p{margin:0;color:var(--muted);font-size:13px;line-height:1.4}.toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn{border:0;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:800;cursor:pointer;background:var(--blue);color:#fff}.btn:disabled{opacity:.45;cursor:not-allowed}.btn.alt{background:#fff;color:var(--blue);border:1px solid rgba(23,105,224,.22)}.btn.danger{background:var(--red)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 6px 22px rgba(16,24,40,.05)}.card h2{margin:0 0 10px;font-size:14px;color:var(--muted);letter-spacing:.02em}.status{display:flex;align-items:center;gap:8px;font-weight:900}.dot{width:11px;height:11px;border-radius:50%;background:#98a2b3}.dot.on{background:var(--green)}.dot.warn{background:var(--amber)}.dot.err{background:var(--red)}.data{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric{border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center;background:#fbfcff}.metric b{display:block;font-size:30px;line-height:1;margin-bottom:5px}.metric span{font-size:12px;color:var(--muted)}.row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #eef2f7;font-size:13px}.row:last-child{border-bottom:0}.row span:first-child{color:var(--muted)}.row span:last-child{font-weight:800;text-align:right;word-break:break-all}.badges{display:flex;gap:6px;flex-wrap:wrap}.badge{border-radius:999px;padding:4px 8px;font-size:12px;font-weight:800;background:#eef4ff;color:var(--blue)}.badge.ok{background:#e8f7ee;color:var(--green)}.badge.warn{background:#fff4e5;color:var(--amber)}.badge.err{background:#ffecec;color:var(--red)}.log{height:260px;overflow:auto;background:#0f172a;color:#dbeafe;border-radius:12px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.45}.log div{margin-bottom:2px}.info{color:#86efac}.data-log{color:#93c5fd}.warn-log{color:#fdba74}.err-log{color:#fca5a5}.hint{font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px}.hidden{display:none}.anomaly-list{display:grid;gap:6px}.anomaly{display:flex;justify-content:space-between;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff}.anomaly b{font-size:13px}.anomaly span{font-size:12px;color:var(--muted)}@media(max-width:760px){body{padding:10px}.top{display:block}.toolbar{justify-content:flex-start;margin-top:10px}.grid,.data{grid-template-columns:1fr}.metric b{font-size:26px}}
-</style>
-<style>
-.flash-grid{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(0,1.2fr);gap:18px;align-items:start}.field{display:grid;gap:6px;margin-bottom:10px}.field label{font-size:12px;color:var(--muted);font-weight:800}.field select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;color:var(--text);font-size:14px}.flash-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}.flash-actions a{text-decoration:none}.flash-sha{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px!important;overflow-wrap:anywhere}.flash-title{display:flex;align-items:center;justify-content:space-between;gap:8px}.flash-title h2{margin-bottom:0}.flash-note{border-left:3px solid var(--amber);padding-left:9px}.release-link{color:var(--blue);font-weight:800;text-decoration:none}.release-link:hover{text-decoration:underline}esp-web-install-button{--esp-tools-button-color:var(--blue);--esp-tools-button-border-radius:10px;display:inline-block}@media(max-width:760px){.flash-grid{grid-template-columns:1fr}}
+:root{
+  --bg:#e9edf4;
+  --bg-grad-1:#eef2f8;
+  --bg-grad-2:#e4eaf3;
+  --card:rgba(255,255,255,0.82);
+  --card-solid:#ffffff;
+  --line:#d6dfe9;
+  --line-soft:#e8edf4;
+  --ink:#0d1424;
+  --ink-soft:#2a3447;
+  --muted:#5e6b7e;
+  --faint:#95a1b3;
+  --accent:#1769e0;
+  --accent-2:#3a8bff;
+  --accent-deep:#103f8a;
+  --accent-soft:#e8f0fe;
+  --green:#0f8a4b;
+  --green-soft:#e6f5ec;
+  --red:#c1282e;
+  --red-soft:#ffecec;
+  --amber:#b45309;
+  --amber-soft:#fff4e5;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue","PingFang SC","Microsoft YaHei",Arial,sans-serif;
+  --radius:16px;
+  --radius-sm:11px;
+  --shadow-sm:0 1px 3px rgba(15,23,41,.05),0 1px 2px rgba(15,23,41,.04);
+  --shadow-md:0 6px 22px rgba(15,23,41,.07);
+  --shadow-lg:0 18px 48px rgba(15,23,41,.1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:
+    radial-gradient(1200px 600px at 80% -10%,rgba(23,105,224,.08),transparent 60%),
+    radial-gradient(900px 500px at -10% 110%,rgba(15,138,75,.05),transparent 55%),
+    linear-gradient(180deg,var(--bg-grad-1),var(--bg-grad-2));
+  background-attachment:fixed;
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:14px;
+  line-height:1.55;
+  padding:26px 22px 42px;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+.wrap{max-width:1180px;margin:0 auto}
+
+.masthead{
+  display:flex;align-items:center;justify-content:space-between;gap:20px;
+  margin-bottom:18px;
+}
+.brand{display:flex;align-items:center;gap:14px}
+.brand-mark{
+  width:46px;height:46px;border-radius:13px;
+  background:linear-gradient(135deg,var(--accent) 0%,var(--accent-2) 55%,#5aa4ff 100%);
+  color:#fff;display:grid;place-items:center;
+  font-weight:900;font-size:17px;letter-spacing:-.04em;
+  box-shadow:0 6px 16px rgba(23,105,224,.32),inset 0 1px 0 rgba(255,255,255,.25);
+  position:relative;
+}
+.brand-mark::after{
+  content:"";position:absolute;inset:0;border-radius:13px;
+  background:radial-gradient(circle at 30% 25%,rgba(255,255,255,.4),transparent 50%);
+  pointer-events:none;
+}
+.brand h1{
+  font-size:22px;line-height:1.1;margin:0;letter-spacing:-.035em;font-weight:800;
+  background:linear-gradient(135deg,var(--ink) 0%,#3a4660 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.brand .sub{display:block;font-size:12.5px;color:var(--muted);margin-top:3px;font-weight:500}
+
+.mode-bar{
+  display:flex;gap:8px;background:var(--card-solid);border:1px solid var(--line);
+  border-radius:var(--radius);padding:6px;box-shadow:var(--shadow-sm);margin-bottom:16px;
+}
+.mode-btn{
+  flex:1;border:0;background:transparent;color:var(--muted);
+  padding:12px 10px;border-radius:10px;cursor:pointer;font-family:var(--sans);
+  font-size:13.5px;font-weight:700;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.mode-btn:hover{color:var(--accent-deep);background:var(--accent-soft)}
+.mode-btn.active{
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  color:#fff;box-shadow:0 4px 12px rgba(23,105,224,.28);
+}
+.mode-btn .ico{font-size:16px;line-height:1}
+
+.btn{
+  border:0;border-radius:var(--radius-sm);padding:10px 16px;
+  font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);
+  transition:transform .08s ease,background .15s,border-color .15s,box-shadow .15s,opacity .15s;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.primary{
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  color:#fff;box-shadow:0 4px 12px rgba(23,105,224,.28);
+}
+.btn.primary:hover:not(:disabled){box-shadow:0 6px 16px rgba(23,105,224,.36);filter:brightness(1.04)}
+.btn.alt{background:var(--card-solid);color:var(--accent);border:1px solid rgba(23,105,224,.22)}
+.btn.alt:hover:not(:disabled){background:var(--accent-soft);border-color:rgba(23,105,224,.35)}
+.btn.danger{background:var(--red);color:#fff;box-shadow:0 4px 12px rgba(193,40,46,.22)}
+.btn.danger:hover:not(:disabled){background:#a82026}
+.btn.ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--line)}
+.btn.ghost:hover:not(:disabled){background:var(--card-solid)}
+.btn.sm{padding:7px 12px;font-size:12px}
+
+.card{
+  background:var(--card);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(214,223,233,.7);
+  border-radius:var(--radius);
+  padding:20px 22px;
+  box-shadow:var(--shadow-md);
+}
+.card + .card{margin-top:16px}
+.card-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-bottom:16px;padding-bottom:13px;border-bottom:1px solid var(--line-soft);
+}
+.card-head h2{
+  margin:0;font-size:13.5px;font-weight:800;color:var(--ink);letter-spacing:.005em;
+  display:flex;align-items:center;gap:8px;
+}
+.card-head h2::before{
+  content:"";width:3px;height:14px;border-radius:2px;background:linear-gradient(180deg,var(--accent),var(--accent-2));
+}
+.card-head .actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  border-radius:999px;padding:4px 11px;font-size:11.5px;font-weight:750;
+  background:var(--accent-soft);color:var(--accent-deep);
+  white-space:nowrap;letter-spacing:.01em;
+}
+.badge.ok{background:var(--green-soft);color:var(--green)}
+.badge.warn{background:var(--amber-soft);color:var(--amber)}
+.badge.err{background:var(--red-soft);color:var(--red)}
+.badge.muted{background:#eef1f6;color:var(--muted)}
+
+.hidden{display:none !important}
+
+.flash-top{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  flex-wrap:wrap;margin-bottom:18px;
+}
+.flash-version{display:flex;align-items:baseline;gap:10px}
+.flash-version b{font-size:22px;letter-spacing:-.03em;font-weight:800;color:var(--ink)}
+.flash-version span{font-size:12px;color:var(--muted);font-weight:500}
+
+.board-seg{
+  display:inline-flex;background:var(--card-solid);border:1px solid var(--line);
+  border-radius:var(--radius-sm);padding:4px;gap:2px;box-shadow:var(--shadow-sm);
+}
+.board-seg select{
+  border:0;background:transparent;color:var(--ink);
+  font-size:12.5px;font-weight:700;padding:7px 28px 7px 12px;border-radius:8px;
+  font-family:var(--sans);cursor:pointer;outline:none;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235e6b7e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;
+}
+.board-seg select:focus{background-color:var(--accent-soft);box-shadow:0 0 0 2px rgba(23,105,224,.18)}
+
+.flash-body{
+  display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:24px;align-items:start;
+}
+.flash-cta{display:flex;flex-direction:column;align-items:flex-start;gap:13px}
+.flash-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.flash-links{display:flex;gap:18px;font-size:12.5px;margin-top:2px}
+.flash-links a{
+  color:var(--accent-deep);font-weight:700;text-decoration:none;
+  border-bottom:1px solid #c7dbff;padding-bottom:1px;transition:border-color .15s;
+}
+.flash-links a:hover{border-bottom-color:var(--accent-deep)}
+.flash-note{
+  border-left:3px solid var(--amber);padding:3px 0 3px 12px;
+  font-size:12px;color:#6b4814;line-height:1.6;background:var(--amber-soft);
+  border-radius:0 8px 8px 0;padding:9px 12px;
+}
+.release-link{color:var(--accent-deep);font-weight:700;text-decoration:none}
+.release-link:hover{text-decoration:underline}
+
+.spec{display:grid;gap:0;margin:0}
+.spec .row{
+  display:flex;justify-content:space-between;gap:14px;
+  padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:13px;
+}
+.spec .row:last-child{border-bottom:0}
+.spec .row span:first-child{color:var(--muted);min-width:90px;font-weight:500}
+.spec .row span:last-child{text-align:right;word-break:break-all;font-weight:700;color:var(--ink-soft)}
+.flash-sha{font-family:var(--mono);font-size:11px !important;color:var(--muted) !important;font-weight:500 !important}
+
+esp-web-install-button{
+  --esp-tools-button-color:var(--accent);
+  --esp-tools-button-border-radius:var(--radius-sm);
+  display:inline-block;
+}
+#flash-activate{min-width:168px}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+
+.row{
+  display:flex;justify-content:space-between;gap:14px;
+  padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px;
+}
+.row:last-child{border-bottom:0}
+.row span:first-child{color:var(--muted);min-width:80px;font-weight:500}
+.row span:last-child{font-weight:700;text-align:right;word-break:break-all;color:var(--ink-soft)}
+
+.svc-list{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.svc-item{
+  border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--card-solid);
+}
+.svc-item .svc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.svc-item .svc-name{font-weight:700;font-size:13px;color:var(--ink-soft)}
+.svc-item .svc-uuid{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.svc-item .chars{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line-soft);display:flex;flex-direction:column;gap:4px}
+.svc-item .char{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.svc-item .char b{color:var(--ink-soft);font-weight:600}
+.svc-item .props{font-size:10.5px;color:var(--faint);font-family:var(--mono)}
+
+.device-card{
+  border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--card-solid);
+  box-shadow:var(--shadow-sm);position:relative;
+}
+.device-card .dc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.device-card .dc-name{font-weight:800;font-size:15px;color:var(--ink)}
+.device-card .dc-meta{font-size:11.5px;color:var(--muted);font-family:var(--mono)}
+.device-card .dc-body{display:grid;gap:0}
+.device-card .dc-foot{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+
+.compare-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+.compare-table th,.compare-table td{
+  padding:10px 12px;text-align:left;border-bottom:1px solid var(--line-soft);vertical-align:top;
+}
+.compare-table th{font-weight:700;color:var(--muted);font-size:12px;background:var(--accent-soft);position:sticky;top:0}
+.compare-table th:first-child{border-radius:8px 0 0 0}
+.compare-table th:last-child{border-radius:0 8px 0 0}
+.compare-table td.field-name{font-weight:600;color:var(--ink-soft);background:#fafbfd;width:130px;white-space:nowrap}
+.compare-table td.diff{background:var(--amber-soft)}
+.compare-table td.same{background:var(--green-soft)}
+.compare-table .cell-val{font-family:var(--mono);font-size:12px;word-break:break-all;color:var(--ink-soft)}
+.compare-table .cell-missing{color:var(--faint);font-style:italic}
+
+.log{
+  height:240px;overflow:auto;
+  background:linear-gradient(180deg,#0c1426,#0f172a);
+  color:#dbeafe;border-radius:var(--radius-sm);padding:13px 15px;
+  font-family:var(--mono);font-size:12px;line-height:1.6;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.log::-webkit-scrollbar{width:8px}
+.log::-webkit-scrollbar-track{background:rgba(255,255,255,.03)}
+.log::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px}
+.log div{margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.info{color:#86efac}
+.data-log{color:#93c5fd}
+.warn-log{color:#fdba74}
+.err-log{color:#fca5a5}
+
+.hint{font-size:12.5px;color:var(--muted);line-height:1.6;margin-top:10px}
+.hint b{color:var(--ink);font-weight:700}
+
+.templates{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.tpl-item{
+  border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--card-solid);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.tpl-item .tpl-info{display:flex;flex-direction:column;gap:2px}
+.tpl-item .tpl-name{font-weight:700;font-size:13px}
+.tpl-item .tpl-sub{font-size:11px;color:var(--muted)}
+.tpl-item .tpl-ops{display:flex;gap:6px}
+
+.empty-state{
+  text-align:center;padding:40px 20px;color:var(--muted);
+}
+.empty-state .big{font-size:42px;margin-bottom:10px;opacity:.5}
+.empty-state p{margin:4px 0;font-size:13px}
+
+@media(max-width:840px){
+  body{padding:16px 14px 30px}
+  .masthead{display:block}
+  .flash-body{grid-template-columns:1fr}
+  .two-col{grid-template-columns:1fr}
+  .mode-btn{font-size:12px;padding:10px 6px}
+  .mode-btn .ico{display:none}
+}
+@media(max-width:480px){
+  .flash-top{display:block}
+  .board-seg{margin-top:12px;width:100%}
+  .board-seg select{width:100%}
+  .row{flex-direction:column;gap:2px}
+  .row span:first-child{min-width:auto}
+  .row span:last-child{text-align:left}
+}
 </style>
 <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
 </head>
 <body>
 <div class="wrap">
-  <div class="top">
-    <div class="title">
-      <h1>BikePower BLE 监控与固件刷写</h1>
-      <p>浏览器工具页，用于刷写最新固件，并持续观察 BikePower 的 BLE 通知、断连、停更和数值异常。</p>
+  <header class="masthead">
+    <div class="brand">
+      <div class="brand-mark">BP</div>
+      <div>
+        <h1>BikePower BLE 工具台</h1>
+        <span class="sub">固件刷写 · 蓝牙设备信息采集 · 多设备一比一比对</span>
+      </div>
     </div>
-    <div class="toolbar">
-      <button class="btn" id="connect-btn" onclick="connectWithPicker()">连接设备</button>
-      <button class="btn alt" id="auto-btn" onclick="connectAuthorized()">连接已授权设备</button>
-      <button class="btn alt" onclick="downloadReport()">导出报告</button>
-      <button class="btn danger" id="disconnect-btn" onclick="disconnect()" disabled>断开</button>
-    </div>
+  </header>
+
+  <div class="mode-bar">
+    <button class="mode-btn active" data-mode="flash" onclick="switchMode('flash')"><span class="ico">⬇</span>刷机</button>
+    <button class="mode-btn" data-mode="connect" onclick="switchMode('connect')"><span class="ico">📶</span>连接蓝牙设备</button>
+    <button class="mode-btn" data-mode="compare" onclick="switchMode('compare')"><span class="ico">⚖</span>多设备比对复制</button>
   </div>
 
   <div class="card hidden" id="support-warning">
-    当前浏览器不支持 Web Bluetooth API。请使用 Chrome / Edge，并通过本地服务页面打开。
+    当前浏览器不支持 Web Bluetooth API。请使用桌面版 Chrome / Edge，并通过 HTTPS 页面打开。
   </div>
 
-  <div class="card" style="margin-bottom:12px">
-    <div class="flash-title">
-      <h2>固件刷写</h2>
-      <span class="badge warn" id="firmware-status">正在获取最新版本</span>
-    </div>
-    <div class="flash-grid" style="margin-top:10px">
-      <div>
-        <div class="field">
-          <label for="firmware-board">开发板型号</label>
-          <select id="firmware-board" onchange="renderSelectedFirmware()">
-            <option value="generic-c3">通用 ESP32-C3</option>
-            <option value="m5stamp-c3">M5Stamp C3</option>
-          </select>
+  <!-- ============ 模式一：刷机 ============ -->
+  <section id="mode-flash">
+    <div class="card">
+      <div class="flash-top">
+        <div class="flash-version">
+          <b>固件刷写</b>
+          <span>从最新 Release 索引读取</span>
         </div>
-        <div class="flash-actions">
-          <esp-web-install-button id="install-button" class="hidden">
-            <button class="btn" id="flash-activate" slot="activate" onclick="prepareForFlash()">连接串口并刷写</button>
-            <span slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
-            <span slot="not-allowed">网页刷写仅能在 HTTPS 或 localhost 页面使用。</span>
-          </esp-web-install-button>
-          <button class="btn" id="install-unavailable" disabled>暂无可刷写固件</button>
-          <a class="btn alt hidden" id="firmware-download" href="#" download>下载固件</a>
+        <span class="badge warn" id="firmware-status">正在获取最新版本</span>
+      </div>
+      <div class="flash-body">
+        <div class="flash-cta">
+          <div class="board-seg">
+            <select id="firmware-board" onchange="renderSelectedFirmware()">
+              <option value="generic-c3">通用 ESP32-C3</option>
+              <option value="m5stamp-c3">M5Stamp C3</option>
+            </select>
+          </div>
+          <div class="flash-actions">
+            <esp-web-install-button id="install-button" class="hidden">
+              <button class="btn primary" id="flash-activate" slot="activate" onclick="prepareForFlash()">连接串口并刷写</button>
+              <span slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
+              <span slot="not-allowed">网页刷写仅能在 HTTPS 或 localhost 页面使用。</span>
+            </esp-web-install-button>
+            <button class="btn" id="install-unavailable" disabled>暂无可刷写固件</button>
+            <a class="btn alt hidden" id="firmware-download" href="#" download>下载固件</a>
+          </div>
+          <div class="hint flash-note" id="flash-message">正在读取由部署流程生成的最新 Release 信息。</div>
         </div>
-        <div class="hint flash-note" id="flash-message">正在读取由部署流程生成的最新 Release 信息。</div>
+        <dl class="spec">
+          <div class="row"><span>最新版本</span><span id="firmware-version">--</span></div>
+          <div class="row"><span>发布时间</span><span id="firmware-published">--</span></div>
+          <div class="row"><span>固件文件</span><span id="firmware-filename">--</span></div>
+          <div class="row"><span>SHA256</span><span class="flash-sha" id="firmware-sha256">--</span></div>
+          <div class="row"><span>Release</span><span><a class="release-link hidden" id="firmware-release" href="#" target="_blank" rel="noopener">查看发布说明</a><span id="firmware-release-empty">--</span></span></div>
+        </dl>
       </div>
-      <div>
-        <div class="row"><span>最新版本</span><span id="firmware-version">--</span></div>
-        <div class="row"><span>发布时间</span><span id="firmware-published">--</span></div>
-        <div class="row"><span>固件文件</span><span id="firmware-filename">--</span></div>
-        <div class="row"><span>SHA256</span><span class="flash-sha" id="firmware-sha256">--</span></div>
-        <div class="row"><span>Release</span><span><a class="release-link hidden" id="firmware-release" href="#" target="_blank" rel="noopener">查看发布说明</a><span id="firmware-release-empty">--</span></span></div>
+      <div class="hint" style="margin-top:16px"><b>环境要求：</b>仅支持电脑端 Chrome / Edge、HTTPS 页面和支持数据传输的 USB 线。点击刷写后仍需在浏览器弹窗中主动选择正确串口；这是 Web Serial 的安全限制，网页无法静默选择设备。刷写过程中不要拔线或关闭页面。</div>
+    </div>
+  </section>
+
+  <!-- ============ 模式二：连接蓝牙设备 ============ -->
+  <section id="mode-connect" class="hidden">
+    <div class="card">
+      <div class="card-head">
+        <h2>连接蓝牙设备</h2>
+        <div class="actions">
+          <button class="btn primary" onclick="connectAnyDevice()">扫描并连接设备</button>
+          <button class="btn alt" onclick="connectAuthorized()">已授权设备</button>
+          <button class="btn alt" onclick="loadTemplates()">已存模板</button>
+        </div>
+      </div>
+      <div class="hint">点击「扫描并连接设备」，在浏览器弹窗中选择任意蓝牙设备（心率带、骑行台、功率计、踏频器、BikePower 开发板等）。连接后自动读取设备信息（DIS）和 GATT 服务列表，并可保存为模板。</div>
+      <div id="connect-empty" class="empty-state">
+        <div class="big">📶</div>
+        <p><b>尚未连接设备</b></p>
+        <p>点击右上角「扫描并连接设备」开始</p>
+      </div>
+      <div id="connect-result" class="hidden">
+        <div class="device-card" id="single-device-card"></div>
       </div>
     </div>
-    <div class="hint">仅支持电脑端 Chrome / Edge、HTTPS 页面和支持数据传输的 USB 线。点击刷写后仍需在浏览器弹窗中主动选择正确串口；这是 Web Serial 的安全限制，网页无法静默选择设备。刷写过程中不要拔线或关闭页面。</div>
-  </div>
 
-  <div class="grid">
-    <div class="card">
-      <h2>连接状态</h2>
-      <div class="status"><i class="dot" id="conn-dot"></i><span id="conn-text">未连接</span></div>
-      <div class="row"><span>设备名</span><span id="device-name">--</span></div>
-      <div class="row"><span>地址</span><span id="device-id">--</span></div>
-      <div class="row"><span>Profile</span><span id="profile">--</span></div>
-      <div class="row"><span>订阅特征</span><span id="notify-count">0</span></div>
-      <div class="hint">Web Bluetooth 首次连接必须点击“连接设备”并授权；授权后可用“连接已授权设备”重连。</div>
+    <div class="card" id="templates-card" style="display:none">
+      <div class="card-head">
+        <h2>已保存模板</h2>
+        <div class="actions">
+          <button class="btn alt sm" onclick="exportAllTemplates()">导出全部 JSON</button>
+          <button class="btn ghost sm" onclick="clearTemplates()">清空</button>
+        </div>
+      </div>
+      <div id="templates-list" class="templates"></div>
     </div>
+  </section>
 
+  <!-- ============ 模式三：多设备比对 ============ -->
+  <section id="mode-compare" class="hidden">
     <div class="card">
-      <h2>设备信息</h2>
-      <div class="row"><span>厂商</span><span id="info-manufacturer">--</span></div>
-      <div class="row"><span>型号</span><span id="info-model">--</span></div>
-      <div class="row"><span>固件</span><span id="info-fw">--</span></div>
-      <div class="row"><span>最后通知</span><span id="last-notify">--</span></div>
+      <div class="card-head">
+        <h2>多设备一比一比对</h2>
+        <div class="actions">
+          <button class="btn primary" onclick="addCompareDevice()">添加设备</button>
+          <button class="btn alt" onclick="renderCompareTable()">刷新比对</button>
+          <button class="btn ghost" onclick="clearCompareDevices()">清空</button>
+        </div>
+      </div>
+      <div class="hint">依次添加多台蓝牙设备，自动比对设备信息（DIS 字段）和 GATT 服务列表。黄色背景表示该字段在设备间存在差异，绿色表示一致。点击设备卡片中的「复制为模板」可将该设备信息保存为模板。</div>
+      <div id="compare-empty" class="empty-state">
+        <div class="big">⚖</div>
+        <p><b>尚未添加设备</b></p>
+        <p>点击「添加设备」连接第一台蓝牙设备</p>
+      </div>
+      <div id="compare-devices"></div>
+      <div id="compare-table-wrap" class="hidden" style="margin-top:16px;overflow-x:auto">
+        <table class="compare-table" id="compare-table"></table>
+      </div>
     </div>
-  </div>
+  </section>
 
-  <div class="card" style="margin-top:12px">
-    <h2>实时数据</h2>
-    <div class="data">
-      <div class="metric"><b id="m-power">--</b><span>CPS 功率 W</span></div>
-      <div class="metric"><b id="m-hr">--</b><span>心率 BPM</span></div>
-      <div class="metric"><b id="m-cadence">--</b><span>踏频 RPM/SPM</span></div>
-      <div class="metric"><b id="m-speed">--</b><span>跑步速度 km/h</span></div>
-    </div>
-    <div class="badges" id="service-badges" style="margin-top:10px"></div>
-  </div>
-
-  <div class="grid" style="margin-top:12px">
-    <div class="card">
-      <h2>异常计数</h2>
-      <div class="anomaly-list" id="anomaly-list"></div>
-    </div>
-    <div class="card">
-      <h2>事件日志</h2>
-      <div class="log" id="log"></div>
-    </div>
+  <div class="card">
+    <div class="card-head"><h2>事件日志</h2><button class="btn ghost sm" onclick="clearLog()">清空</button></div>
+    <div class="log" id="log"></div>
   </div>
 </div>
 
 <script>
+/* ==================== UUID 字典 ==================== */
+const UUID16 = {
+  "1800":"GAP","1801":"GATT","180a":"DIS","180d":"HRS","180f":"BAS",
+  "1816":"CSC","1818":"CPS","1814":"RSC","1826":"FTMS","1819":"Location and Navigation",
+  "1806":"Alert Notification","1802":"Immediate Alert","1803":"Link Loss","1804":"Tx Power",
+  "1807":"Blood Pressure","1808":"Glucose","1809":"Health Thermometer","180b":"Body Composition",
+  "180c":"User Data","180e":"Environmental Sensing","1810":"Weight Scale","1811":"Bond Management",
+  "1812":"HID","1813":"Scan Parameters","1815":"Automation IO","181a":"Environmental Sensing",
+  "181b":"Body Composition","181c":"User Data","181d":"Weight Scale","181e":"Bond Management",
+  "181f":"Continuous Glucose Monitoring","1820":"Internet Protocol Support","1821":"Indoor Positioning",
+  "1822":"Pulse Oximeter","1823":"HTTP Proxy","1824":"Transport Discovery","1825":"Object Transfer",
+  "1827":"Mesh Provisioning","1828":"Mesh Proxy","1829":"Reconnection Configuration",
+};
+const CHAR16 = {
+  "2a29":"Manufacturer Name String","2a24":"Model Number String","2a25":"Serial Number String",
+  "2a27":"Hardware Revision String","2a26":"Firmware Revision String","2a28":"Software Revision String",
+  "2a23":"System ID","2a2a":"IEEE 11073-20601 Regulatory Certification Data List",
+  "2a50":"PnP ID","2a19":"Battery Level","2a00":"Device Name","2a01":"Appearance",
+  "2a63":"Cycling Power Measurement","2a64":"Cycling Power Vector","2a65":"Cycling Power Feature",
+  "2a5b":"CSC Measurement","2a5c":"CSC Feature","2a5d":"Sensor Location",
+  "2a37":"Heart Rate Measurement","2a38":"Body Sensor Location","2a39":"Heart Rate Control Point",
+  "2a53":"RSC Measurement","2a54":"RSC Feature","2a55":"SC Control Point",
+  "2ad2":"Indoor Bike Data","2ad6":"Fitness Machine Feature","2ad9":"Fitness Machine Control Point",
+  "2ada":"Fitness Machine Status","2acd":"Training Status","2ad1":"Supported Power Range",
+  "2a02":"Peripheral Privacy Flag","2a03":"Reconnection Address","2a04":"Peripheral Preferred Connection Parameters",
+  "2a05":"Service Changed","2b29":"Client Supported Features",
+};
+
 const UUIDS = {
-  cpsService: "00001818-0000-1000-8000-00805f9b34fb",
-  hrService: "0000180d-0000-1000-8000-00805f9b34fb",
-  cscService: "00001816-0000-1000-8000-00805f9b34fb",
-  rscService: "00001814-0000-1000-8000-00805f9b34fb",
-  ftmsService: "00001826-0000-1000-8000-00805f9b34fb",
-  disService: "0000180a-0000-1000-8000-00805f9b34fb",
-  cpsMeasurement: "00002a63-0000-1000-8000-00805f9b34fb",
-  hrMeasurement: "00002a37-0000-1000-8000-00805f9b34fb",
-  cscMeasurement: "00002a5b-0000-1000-8000-00805f9b34fb",
-  rscMeasurement: "00002a53-0000-1000-8000-00805f9b34fb",
-  ftmsIndoorBike: "00002ad2-0000-1000-8000-00805f9b34fb",
-  ftmsStatus: "00002ada-0000-1000-8000-00805f9b34fb",
-  manufacturer: "00002a29-0000-1000-8000-00805f9b34fb",
-  model: "00002a24-0000-1000-8000-00805f9b34fb",
-  firmware: "00002a26-0000-1000-8000-00805f9b34fb",
+  cpsService:"00001818-0000-1000-8000-00805f9b34fb",
+  hrService:"0000180d-0000-1000-8000-00805f9b34fb",
+  cscService:"00001816-0000-1000-8000-00805f9b34fb",
+  rscService:"00001814-0000-1000-8000-00805f9b34fb",
+  ftmsService:"00001826-0000-1000-8000-00805f9b34fb",
+  disService:"0000180a-0000-1000-8000-00805f9b34fb",
+  basService:"0000180f-0000-1000-8000-00805f9b34fb",
+  cpsMeasurement:"00002a63-0000-1000-8000-00805f9b34fb",
+  hrMeasurement:"00002a37-0000-1000-8000-00805f9b34fb",
+  cscMeasurement:"00002a5b-0000-1000-8000-00805f9b34fb",
+  rscMeasurement:"00002a53-0000-1000-8000-00805f9b34fb",
+  ftmsIndoorBike:"00002ad2-0000-1000-8000-00805f9b34fb",
+  ftmsStatus:"00002ada-0000-1000-8000-00805f9b34fb",
+  manufacturer:"00002a29-0000-1000-8000-00805f9b34fb",
+  model:"00002a24-0000-1000-8000-00805f9b34fb",
+  serial:"00002a25-0000-1000-8000-00805f9b34fb",
+  hardware:"00002a27-0000-1000-8000-00805f9b34fb",
+  firmware:"00002a26-0000-1000-8000-00805f9b34fb",
+  software:"00002a28-0000-1000-8000-00805f9b34fb",
 };
-const ANOMALY_LIMITS = {
-  staleMs: 3500,
-  powerMax: 1500,
-  hrMin: 30,
-  hrMax: 240,
-  cadenceMax: 260,
-  speedMaxKmh: 35,
-};
+const ALL_OPTIONAL_SERVICES = [
+  UUIDS.cpsService, UUIDS.hrService, UUIDS.cscService, UUIDS.rscService,
+  UUIDS.ftmsService, UUIDS.disService, UUIDS.basService,
+  "00001819-0000-1000-8000-00805f9b34fb",
+  "00001810-0000-1000-8000-00805f9b34fb",
+  "0000181c-0000-1000-8000-00805f9b34fb",
+  "0000181d-0000-1000-8000-00805f9b34fb",
+];
+const DIS_CHARS = [
+  ["manufacturer","厂商","00002a29-0000-1000-8000-00805f9b34fb"],
+  ["model","型号","00002a24-0000-1000-8000-00805f9b34fb"],
+  ["serial","序列号","00002a25-0000-1000-8000-00805f9b34fb"],
+  ["hardware","硬件版本","00002a27-0000-1000-8000-00805f9b34fb"],
+  ["firmware","固件版本","00002a26-0000-1000-8000-00805f9b34fb"],
+  ["software","软件版本","00002a28-0000-1000-8000-00805f9b34fb"],
+];
 const FIRMWARE_INDEX_URL = "./firmware/latest.json";
-const anomalyLabels = {
-  disconnect: "BLE 断连",
-  stale: "通知停更",
-  power: "功率异常",
-  heartrate: "心率异常",
-  cadence: "踏频异常",
-  speed: "速度异常",
-  parse: "数据解析异常",
+const ANOMALY_LIMITS = {
+  staleMs: 3500, powerMax: 1500, hrMin: 30, hrMax: 240, cadenceMax: 260, speedMaxKmh: 35,
 };
-let device = null;
-let server = null;
-let notifyChars = [];
-let latest = { power: null, hr: null, cadence: null, speed: null, ftmsPower: null };
-let lastNotifyAt = 0;
-let startedAt = null;
-let anomalies = {};
-let events = [];
-let cscPrev = null;
-let staleOpen = false;
-let anomalyTimer = null;
+const ANOMALY_LABELS = {
+  disconnect:"BLE 断连", stale:"通知停更", power:"功率异常", heartrate:"心率异常",
+  cadence:"踏频异常", speed:"速度异常", parse:"数据解析异常",
+};
+
+let currentMode = "flash";
 let firmwareCatalog = null;
 let webInstallerReady = false;
+let singleDevice = null;
+let compareDevices = [];
+let events = [];
+let anomalies = {};
+let anomalyTimer = null;
 
-function $(id) { return document.getElementById(id); }
-function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
-function log(message, cls = "info") {
-  const line = { time: new Date().toISOString(), level: cls, message };
-  events.push(line);
-  const div = document.createElement("div");
-  div.className = cls === "error" ? "err-log" : cls === "warn" ? "warn-log" : cls === "data" ? "data-log" : "info";
-  div.textContent = new Date().toLocaleTimeString() + "  " + message;
+function $(id){return document.getElementById(id);}
+function setText(id,value){const el=$(id);if(el)el.textContent=value;}
+function uuidShort(uuid){
+  if(!uuid)return "";
+  const m=uuid.match(/^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i);
+  return m?m[1].toLowerCase():uuid.toLowerCase();
+}
+function svcName(uuid){
+  const s=uuidShort(uuid);
+  return UUID16[s]?UUID16[s]+" (0x"+s+")":s;
+}
+function charName(uuid){
+  const s=uuidShort(uuid);
+  return CHAR16[s]?CHAR16[s]+" (0x"+s+")":s;
+}
+function propFlags(char){
+  const p=char.properties;
+  const flags=[];
+  if(p.broadcast)flags.push("broadcast");
+  if(p.read)flags.push("read");
+  if(p.writeWithoutResponse)flags.push("write-wr");
+  if(p.write)flags.push("write");
+  if(p.notify)flags.push("notify");
+  if(p.indicate)flags.push("indicate");
+  if(p.authenticatedSignedWrites)flags.push("signed");
+  return flags.join("|");
+}
+function log(message,cls="info"){
+  events.push({time:new Date().toISOString(),level:cls,message});
+  const div=document.createElement("div");
+  div.className=cls==="error"?"err-log":cls==="warn"?"warn-log":cls==="data"?"data-log":"info";
+  div.textContent=new Date().toLocaleTimeString()+"  "+message;
   $("log").appendChild(div);
-  $("log").scrollTop = $("log").scrollHeight;
+  $("log").scrollTop=$("log").scrollHeight;
 }
-function recordAnomaly(kind, detail) {
-  anomalies[kind] = (anomalies[kind] || 0) + 1;
-  log((anomalyLabels[kind] || kind) + ": " + detail, "warn");
-  renderAnomalies();
+function clearLog(){$("log").innerHTML="";events=[];}
+
+/* ==================== 实时数据解析与异常检测 ==================== */
+function recordAnomaly(kind, detail){
+  anomalies[kind]=(anomalies[kind]||0)+1;
+  log((ANOMALY_LABELS[kind]||kind)+": "+detail,"warn");
 }
-function renderAnomalies() {
-  const box = $("anomaly-list");
-  box.innerHTML = "";
-  Object.keys(anomalyLabels).forEach((key) => {
-    const item = document.createElement("div");
-    const count = anomalies[key] || 0;
-    item.className = "anomaly";
-    item.innerHTML = "<b>" + anomalyLabels[key] + "</b><span>" + count + " 次</span>";
-    box.appendChild(item);
+function checkAnomalies(){
+  const rec=currentMode==="connect"?singleDevice:null;
+  if(!rec||!rec.server||!rec.server.connected||!rec.lastNotifyAt)return;
+  const gap=Date.now()-rec.lastNotifyAt;
+  if(gap>ANOMALY_LIMITS.staleMs){
+    if(!rec.staleOpen){rec.staleOpen=true;recordAnomaly("stale","超过 "+Math.round(gap)+"ms 未收到通知");}
+  }
+}
+function markNotify(rec){rec.lastNotifyAt=Date.now();rec.staleOpen=false;}
+function parseCyclingPower(view){
+  if(view.byteLength<4)throw new Error("CPS 长度不足");
+  return {flags:view.getUint16(0,true),power:view.getInt16(2,true)};
+}
+function parseHeartRate(view){
+  if(view.byteLength<2)throw new Error("HRS 长度不足");
+  const flags=view.getUint8(0);
+  if(flags&0x01){if(view.byteLength<3)throw new Error("HRS uint16 长度不足");return view.getUint16(1,true);}
+  return view.getUint8(1);
+}
+function parseCsc(view){
+  if(view.byteLength<5)throw new Error("CSC 长度不足");
+  const flags=view.getUint8(0);
+  if(!(flags&0x02))return null;
+  const revs=view.getUint16(1,true);const time=view.getUint16(3,true);
+  if(!rec.cscPrev){rec.cscPrev={revs,time};return null;}
+  const revDelta=(revs-rec.cscPrev.revs+65536)%65536;
+  const timeDeltaRaw=(time-rec.cscPrev.time+65536)%65536;
+  rec.cscPrev={revs,time};
+  if(revDelta<=0||timeDeltaRaw<=0)return null;
+  return Math.round((revDelta/(timeDeltaRaw/1024))*60);
+}
+function parseIndoorBike(view){
+  if(view.byteLength<4)throw new Error("FTMS 长度不足");
+  const flags=view.getUint16(0,true);
+  const result={flags,speed:null,cadence:null,power:null};
+  let offset=2;
+  if(!(flags&0x0001)&&view.byteLength>=offset+2){result.speed=view.getUint16(offset,true)/100;offset+=2;}
+  if((flags&0x0004)&&view.byteLength>=offset+2){result.cadence=view.getUint16(offset,true)/2;offset+=2;}
+  if((flags & 0x0040) && view.byteLength>=offset+2){result.power=view.getInt16(offset,true);}
+  return result;
+}
+function parseRsc(view){
+  if(view.byteLength<4)throw new Error("RSC 长度不足");
+  const flags=view.getUint8(0);
+  let offset=4;
+  const speed=view.getUint16(1,true)*3.6/256;
+  const cadence=view.getUint8(3);
+  let stride=null,distanceDm=null;
+  if(flags&0x01&&view.byteLength>=offset+2){stride=view.getUint16(offset,true);offset+=2;}
+  if(flags&0x02&&view.byteLength>=offset+4)distanceDm=view.getUint32(offset,true);
+  return {speed,cadence,stride,distanceDm,distanceM:distanceDm===null?null:distanceDm / 10,running:!!(flags&0x04)};
+}
+function handleNotify(rec,serviceKey,event){
+  try{
+    markNotify(rec);
+    const view=event.target.value;
+    const latest=rec.latest;
+    if(serviceKey==="cps"){const p=parseCyclingPower(view);latest.power=p.power;renderRealtime(rec);if(p.power<0||p.power>ANOMALY_LIMITS.powerMax)recordAnomaly("power",p.power+" W");}
+    else if(serviceKey==="hr"){const hr=parseHeartRate(view);latest.hr=hr;renderRealtime(rec);if(hr<ANOMALY_LIMITS.hrMin||hr>ANOMALY_LIMITS.hrMax)recordAnomaly("heartrate",hr+" BPM");}
+    else if(serviceKey==="csc"){const c=parseCsc(view);if(c!==null){latest.cadence=c;renderRealtime(rec);if(c>ANOMALY_LIMITS.cadenceMax)recordAnomaly("cadence",c+" RPM");}}
+    else if(serviceKey==="ftms"){const d=parseIndoorBike(view);if(d.cadence!==null&&latest.cadence===null){latest.cadence=Math.round(d.cadence);renderRealtime(rec);}if(d.power!==null){latest.ftmsPower=d.power;if(latest.power===null)renderRealtime(rec);if(d.power<0||d.power>ANOMALY_LIMITS.powerMax)recordAnomaly("power",d.power+" W(FTMS)");}}
+    else if(serviceKey==="rsc"){const d=parseRsc(view);latest.speed=d.speed;latest.cadence=d.cadence;latest.distance=d.distanceM;renderRealtime(rec);if(d.speed>ANOMALY_LIMITS.speedMaxKmh)recordAnomaly("speed",d.speed.toFixed(2)+" km/h");}
+  }catch(err){recordAnomaly("parse",err.message);}
+}
+function renderRealtime(rec){
+  if(currentMode!=="connect"||rec!==singleDevice)return;
+  const l=rec.latest;
+  setText("m-power",l.power===null?"--":l.power);
+  setText("m-hr",l.hr===null?"--":l.hr);
+  setText("m-cadence",l.cadence===null?"--":l.cadence);
+  setText("m-speed",l.speed===null?"--":(typeof l.speed==="number"?l.speed.toFixed(2):"--"));
+}
+function downloadReport(){
+  const report={
+    exported_at:new Date().toISOString(),
+    singleDevice:singleDevice?{name:singleDevice.device.name,id:singleDevice.device.id,info:singleDevice.info,services:singleDevice.services,latest:singleDevice.latest}:null,
+    compareDevices:compareDevices.map(d=>({name:d.device.name,id:d.device.id,info:d.info,services:d.services})),
+    anomalies,events,
+  };
+  const blob=new Blob([JSON.stringify(report,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download="bikepower-ble-report-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";
+  a.click();URL.revokeObjectURL(url);
+}
+
+/* ==================== 模式切换 ==================== */
+function switchMode(mode){
+  currentMode=mode;
+  document.querySelectorAll(".mode-btn").forEach(b=>{
+    b.classList.toggle("active",b.dataset.mode===mode);
   });
+  $("mode-flash").classList.toggle("hidden",mode!=="flash");
+  $("mode-connect").classList.toggle("hidden",mode!=="connect");
+  $("mode-compare").classList.toggle("hidden",mode!=="compare");
+  if(mode==="connect")loadTemplates();
+  if(mode==="compare")renderCompareTable();
 }
-function checkSupport() {
-  const ok = !!navigator.bluetooth;
-  $("support-warning").classList.toggle("hidden", ok);
+
+/* ==================== Web Bluetooth 支持检测 ==================== */
+function checkSupport(){
+  const ok=!!navigator.bluetooth;
+  $("support-warning").classList.toggle("hidden",ok);
   return ok;
 }
-function safeSitePath(value) {
-  if (typeof value !== "string" || !value.startsWith("firmware/") || value.includes("..")) return null;
-  return "./" + value;
+
+/* ==================== 固件刷写 ==================== */
+function safeSitePath(value){
+  if(typeof value!=="string"||!value.startsWith("firmware/")||value.includes(".."))return null;
+  return "./"+value;
 }
-function setFirmwareStatus(text, kind = "warn") {
-  const badge = $("firmware-status");
-  badge.textContent = text;
-  badge.className = "badge" + (kind ? " " + kind : "");
+function setFirmwareStatus(text,kind="warn"){
+  const badge=$("firmware-status");
+  badge.textContent=text;
+  badge.className="badge"+(kind?" "+kind:"");
 }
-function resetFirmwareDetails() {
-  setText("firmware-version", "--");
-  setText("firmware-published", "--");
-  setText("firmware-filename", "--");
-  setText("firmware-sha256", "--");
+function resetFirmwareDetails(){
+  setText("firmware-version","--");
+  setText("firmware-published","--");
+  setText("firmware-filename","--");
+  setText("firmware-sha256","--");
   $("firmware-download").classList.add("hidden");
   $("install-button").classList.add("hidden");
-  $("install-unavailable").textContent = "暂无可刷写固件";
+  $("install-unavailable").textContent="暂无可刷写固件";
   $("install-unavailable").classList.remove("hidden");
   $("firmware-release").classList.add("hidden");
   $("firmware-release-empty").classList.remove("hidden");
 }
-function formatPublishedAt(value) {
-  if (!value) return "--";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+function formatPublishedAt(value){
+  if(!value)return "--";
+  const date=new Date(value);
+  return Number.isNaN(date.getTime())?value:date.toLocaleString();
 }
-function renderSelectedFirmware() {
+function renderSelectedFirmware(){
   resetFirmwareDetails();
-  if (!firmwareCatalog || !firmwareCatalog.available) return;
-  const board = $("firmware-board").value;
-  const item = firmwareCatalog.boards && firmwareCatalog.boards[board];
-  if (!item) {
-    setFirmwareStatus("板型固件缺失", "err");
-    setText("flash-message", "最新 Release 未包含当前板型的完整固件与校验文件。");
-    return;
+  if(!firmwareCatalog||!firmwareCatalog.available)return;
+  const board=$("firmware-board").value;
+  const item=firmwareCatalog.boards&&firmwareCatalog.boards[board];
+  if(!item){setFirmwareStatus("板型固件缺失","err");setText("flash-message","最新 Release 未包含当前板型的完整固件与校验文件。");return;}
+  const manifestPath=safeSitePath(item.manifest);
+  const downloadPath=safeSitePath(item.download);
+  if(!manifestPath||!downloadPath){setFirmwareStatus("索引无效","err");setText("flash-message","固件索引包含无效路径，已阻止刷写。");return;}
+  setText("firmware-version","v"+firmwareCatalog.version);
+  setText("firmware-published",formatPublishedAt(firmwareCatalog.published_at));
+  setText("firmware-filename",item.filename||"--");
+  setText("firmware-sha256",item.sha256||"--");
+  const download=$("firmware-download");
+  download.href=downloadPath;download.download=item.filename||"";download.classList.remove("hidden");
+  const installer=$("install-button");
+  installer.setAttribute("manifest",manifestPath);
+  if(webInstallerReady){
+    installer.classList.remove("hidden");$("install-unavailable").classList.add("hidden");
+    setFirmwareStatus("可刷写","ok");
+    setText("flash-message","已选择 "+(item.label||board)+"。部署流程已校验固件 SHA256；点击按钮后请选择开发板串口。");
+  }else{
+    $("install-unavailable").textContent="刷写组件不可用";
+    setFirmwareStatus("仅可下载","warn");
+    setText("flash-message","固件已通过 SHA256 校验，但 ESP Web Tools 组件加载失败。请检查网络后刷新，或先下载固件。");
   }
-  const manifestPath = safeSitePath(item.manifest);
-  const downloadPath = safeSitePath(item.download);
-  if (!manifestPath || !downloadPath) {
-    setFirmwareStatus("索引无效", "err");
-    setText("flash-message", "固件索引包含无效路径，已阻止刷写。");
-    return;
-  }
-  setText("firmware-version", "v" + firmwareCatalog.version);
-  setText("firmware-published", formatPublishedAt(firmwareCatalog.published_at));
-  setText("firmware-filename", item.filename || "--");
-  setText("firmware-sha256", item.sha256 || "--");
-  const download = $("firmware-download");
-  download.href = downloadPath;
-  download.download = item.filename || "";
-  download.classList.remove("hidden");
-  const installer = $("install-button");
-  installer.setAttribute("manifest", manifestPath);
-  if (webInstallerReady) {
-    installer.classList.remove("hidden");
-    $("install-unavailable").classList.add("hidden");
-    setFirmwareStatus("可刷写", "ok");
-    setText("flash-message", "已选择 " + (item.label || board) + "。部署流程已校验固件 SHA256；点击按钮后请选择开发板串口。");
-  } else {
-    $("install-unavailable").textContent = "刷写组件不可用";
-    setFirmwareStatus("仅可下载", "warn");
-    setText("flash-message", "固件已通过 SHA256 校验，但 ESP Web Tools 组件加载失败。请检查网络后刷新，或先下载固件。");
-  }
-  if (typeof firmwareCatalog.release_url === "string" && firmwareCatalog.release_url.startsWith("https://")) {
-    const link = $("firmware-release");
-    link.href = firmwareCatalog.release_url;
-    link.classList.remove("hidden");
+  if(typeof firmwareCatalog.release_url==="string"&&firmwareCatalog.release_url.startsWith("https://")){
+    const link=$("firmware-release");link.href=firmwareCatalog.release_url;link.classList.remove("hidden");
     $("firmware-release-empty").classList.add("hidden");
   }
 }
-async function loadFirmwareCatalog() {
+async function loadFirmwareCatalog(){
   resetFirmwareDetails();
-  webInstallerReady = !!customElements.get("esp-web-install-button");
-  try {
-    const response = await fetch(FIRMWARE_INDEX_URL, { cache: "no-store" });
-    if (!response.ok) throw new Error("HTTP " + response.status);
-    const data = await response.json();
-    if (!data || data.schema_version !== 1) throw new Error("索引格式不受支持");
-    firmwareCatalog = data;
-    if (!data.available) {
-      setFirmwareStatus("暂无固件", "warn");
-      setText("flash-message", data.reason || "部署页面成功，但最新 Release 暂无完整双板型固件。");
-      return;
-    }
+  webInstallerReady=!!customElements.get("esp-web-install-button");
+  try{
+    const response=await fetch(FIRMWARE_INDEX_URL,{cache:"no-store"});
+    if(!response.ok)throw new Error("HTTP "+response.status);
+    const data=await response.json();
+    if(!data||data.schema_version!==1)throw new Error("索引格式不受支持");
+    firmwareCatalog=data;
+    if(!data.available){setFirmwareStatus("暂无固件","warn");setText("flash-message",data.reason||"部署页面成功，但最新 Release 暂无完整双板型固件。");return;}
     renderSelectedFirmware();
-  } catch (err) {
-    firmwareCatalog = null;
-    setFirmwareStatus("加载失败", "err");
-    setText("flash-message", "无法读取最新固件索引：" + (err.message || String(err)));
+  }catch(err){
+    firmwareCatalog=null;
+    setFirmwareStatus("加载失败","err");
+    setText("flash-message","无法读取最新固件索引："+(err.message||String(err)));
   }
 }
-function prepareForFlash() {
-  if (server && server.connected) {
-    disconnect();
-    log("开始刷写前已断开 BLE 连接", "warn");
+function prepareForFlash(){
+  if(singleDevice&&singleDevice.server&&singleDevice.server.connected){
+    try{singleDevice.server.disconnect();}catch(e){}
+    log("开始刷写前已断开当前 BLE 连接","warn");
   }
 }
-async function connectWithPicker() {
-  if (!checkSupport()) return;
-  const selected = await navigator.bluetooth.requestDevice({
-    filters: [{ namePrefix: "BikePower" }],
-    optionalServices: [UUIDS.cpsService, UUIDS.hrService, UUIDS.cscService, UUIDS.rscService, UUIDS.ftmsService, UUIDS.disService]
-  });
-  await connectDevice(selected);
-}
-async function connectAuthorized() {
-  if (!checkSupport()) return;
-  if (!navigator.bluetooth.getDevices) {
-    log("当前浏览器不支持 getDevices，需点击连接设备重新授权", "warn");
-    return;
-  }
-  const devices = await navigator.bluetooth.getDevices();
-  const candidate = devices.find((d) => (d.name || "").startsWith("BikePower"));
-  if (!candidate) {
-    log("没有已授权的 BikePower 设备，请先点击连接设备", "warn");
-    return;
-  }
-  await connectDevice(candidate);
-}
-async function connectDevice(selected) {
-  disconnect(false);
-  device = selected;
-  startedAt = new Date();
-  latest = { power: null, hr: null, cadence: null, speed: null, ftmsPower: null };
-  lastNotifyAt = 0;
-  cscPrev = null;
-  staleOpen = false;
-  setText("device-name", device.name || "BikePower");
-  setText("device-id", device.id || "--");
-  setConnection("connecting", "连接中");
-  device.addEventListener("gattserverdisconnected", onDisconnected);
-  try {
-    server = await device.gatt.connect();
-    setConnection("connected", "已连接");
-    log("GATT 已连接: " + (device.name || "BikePower"));
-    await readDeviceInfo();
-    const services = await discoverAndSubscribe();
-    renderServices(services);
-    updateProfile(services);
-    setText("notify-count", String(notifyChars.length));
-    if (anomalyTimer) clearInterval(anomalyTimer);
-    anomalyTimer = setInterval(checkAnomalies, 1000);
-    $("disconnect-btn").disabled = false;
-  } catch (err) {
-    recordAnomaly("disconnect", err.message || String(err));
-    setConnection("error", "连接失败");
-    throw err;
-  }
-}
-function disconnect(mark = true) {
-  if (anomalyTimer) clearInterval(anomalyTimer);
-  anomalyTimer = null;
-  notifyChars = [];
-  if (server && server.connected) server.disconnect();
-  server = null;
-  if (mark) setConnection("idle", "未连接");
-  $("disconnect-btn").disabled = true;
-}
-function onDisconnected() {
-  recordAnomaly("disconnect", "设备断开连接");
-  setConnection("error", "已断开");
-  server = null;
-  notifyChars = [];
-  $("disconnect-btn").disabled = true;
-}
-function setConnection(state, text) {
-  const dot = $("conn-dot");
-  dot.className = "dot" + (state === "connected" ? " on" : state === "error" ? " err" : state === "connecting" ? " warn" : "");
-  setText("conn-text", text);
-}
-async function readDeviceInfo() {
-  try {
-    const dis = await server.getPrimaryService(UUIDS.disService);
-    await readString(dis, UUIDS.manufacturer, "info-manufacturer");
-    await readString(dis, UUIDS.model, "info-model");
-    await readString(dis, UUIDS.firmware, "info-fw");
-  } catch (err) {
-    log("DIS 读取失败: " + err.message, "warn");
-  }
-}
-async function readString(service, uuid, target) {
-  const char = await service.getCharacteristic(uuid);
-  const val = await char.readValue();
-  setText(target, new TextDecoder("utf-8").decode(val).replace(/\0/g, "").trim() || "--");
-}
-async function discoverAndSubscribe() {
-  const services = {};
-  await trySubscribe("cps", UUIDS.cpsService, UUIDS.cpsMeasurement, handlePower);
-  await trySubscribe("hr", UUIDS.hrService, UUIDS.hrMeasurement, handleHeartRate);
-  await trySubscribe("csc", UUIDS.cscService, UUIDS.cscMeasurement, handleCsc);
-  await trySubscribe("rsc", UUIDS.rscService, UUIDS.rscMeasurement, handleRsc);
-  await trySubscribe("ftms", UUIDS.ftmsService, UUIDS.ftmsIndoorBike, handleIndoorBike);
-  await trySubscribe("ftmsStatus", UUIDS.ftmsService, UUIDS.ftmsStatus, handleFtmsStatus);
-  notifyChars.forEach((item) => { services[item.name] = true; });
-  return services;
-}
-async function trySubscribe(name, serviceUuid, charUuid, handler) {
-  try {
-    const service = await server.getPrimaryService(serviceUuid);
-    const char = await service.getCharacteristic(charUuid);
-    await char.startNotifications();
-    char.addEventListener("characteristicvaluechanged", handler);
-    notifyChars.push({ name, char });
-    log("已订阅 " + name, "data");
-  } catch (err) {
-    log("未订阅 " + name + ": " + err.message, "warn");
-  }
-}
-function markNotify() {
-  lastNotifyAt = Date.now();
-  staleOpen = false;
-  setText("last-notify", new Date().toLocaleTimeString());
-}
-function parseCyclingPower(view) {
-  if (view.byteLength < 4) throw new Error("CPS 长度不足");
-  return { flags: view.getUint16(0, true), power: view.getInt16(2, true) };
-}
-function parseHeartRate(view) {
-  if (view.byteLength < 2) throw new Error("HRS 长度不足");
-  const flags = view.getUint8(0);
-  if (flags & 0x01) {
-    if (view.byteLength < 3) throw new Error("HRS uint16 长度不足");
-    return view.getUint16(1, true);
-  }
-  return view.getUint8(1);
-}
-function parseCsc(view) {
-  if (view.byteLength < 5) throw new Error("CSC 长度不足");
-  const flags = view.getUint8(0);
-  if (!(flags & 0x02)) return null;
-  const revs = view.getUint16(1, true);
-  const time = view.getUint16(3, true);
-  if (!cscPrev) {
-    cscPrev = { revs, time };
+
+/* ==================== 通用：连接任意 BLE 设备 ==================== */
+async function requestDevice(){
+  if(!checkSupport())return null;
+  try{
+    const device=await navigator.bluetooth.requestDevice({
+      acceptAllDevices:true,
+      optionalServices:ALL_OPTIONAL_SERVICES,
+    });
+    return device;
+  }catch(err){
+    if(err.name==="NotFoundError"){log("用户取消了设备选择","warn");}
+    else{log("设备选择失败: "+err.message,"error");}
     return null;
   }
-  const revDelta = (revs - cscPrev.revs + 65536) % 65536;
-  const timeDeltaRaw = (time - cscPrev.time + 65536) % 65536;
-  cscPrev = { revs, time };
-  if (revDelta <= 0 || timeDeltaRaw <= 0) return null;
-  return Math.round((revDelta / (timeDeltaRaw / 1024)) * 60);
 }
-function parseIndoorBike(view) {
-  if (view.byteLength < 4) throw new Error("FTMS 长度不足");
-  const flags = view.getUint16(0, true);
-  const result = { flags, speed: null, cadence: null, power: null };
-  let offset = 2;
-  if (!(flags & 0x0001) && view.byteLength >= offset + 2) {
-    result.speed = view.getUint16(offset, true) / 100;
-    offset += 2;
-  }
-  if ((flags & 0x0004) && view.byteLength >= offset + 2) {
-    result.cadence = view.getUint16(offset, true) / 2;
-    offset += 2;
-  }
-  if ((flags & 0x0040) && view.byteLength >= offset + 2) {
-    result.power = view.getInt16(offset, true);
-  }
-  return result;
+
+async function readStringValue(service,uuid){
+  try{
+    const char=await service.getCharacteristic(uuid);
+    const val=await char.readValue();
+    return new TextDecoder("utf-8").decode(val).replace(/\0/g,"").trim();
+  }catch(err){return null;}
 }
-function parseRsc(view) {
-  if (view.byteLength < 4) throw new Error("RSC 长度不足");
-  const flags = view.getUint8(0);
-  let offset = 4;
-  const speed = view.getUint16(1, true) * 3.6 / 256;
-  const cadence = view.getUint8(3);
-  let stride = null;
-  let distanceDm = null;
-  if (flags & 0x01 && view.byteLength >= offset + 2) {
-    stride = view.getUint16(offset, true);
-    offset += 2;
-  }
-  if (flags & 0x02 && view.byteLength >= offset + 4) distanceDm = view.getUint32(offset, true);
-  return {
-    speed, cadence, stride, distanceDm,
-    distanceM: distanceDm === null ? null : distanceDm / 10,
-    running: !!(flags & 0x04)
-  };
-}
-function handlePower(event) {
-  try {
-    markNotify();
-    const parsed = parseCyclingPower(event.target.value);
-    latest.power = parsed.power;
-    setText("m-power", parsed.power);
-    if (parsed.power < 0 || parsed.power > ANOMALY_LIMITS.powerMax) recordAnomaly("power", parsed.power + " W");
-  } catch (err) { recordAnomaly("parse", err.message); }
-}
-function handleHeartRate(event) {
-  try {
-    markNotify();
-    const hr = parseHeartRate(event.target.value);
-    latest.hr = hr;
-    setText("m-hr", hr);
-    if (hr < ANOMALY_LIMITS.hrMin || hr > ANOMALY_LIMITS.hrMax) recordAnomaly("heartrate", hr + " BPM");
-  } catch (err) { recordAnomaly("parse", err.message); }
-}
-function handleCsc(event) {
-  try {
-    markNotify();
-    const cadence = parseCsc(event.target.value);
-    if (cadence === null) return;
-    latest.cadence = cadence;
-    setText("m-cadence", cadence);
-    if (cadence > ANOMALY_LIMITS.cadenceMax) recordAnomaly("cadence", cadence + " RPM");
-  } catch (err) { recordAnomaly("parse", err.message); }
-}
-function handleIndoorBike(event) {
-  try {
-    markNotify();
-    const data = parseIndoorBike(event.target.value);
-    if (data.cadence !== null && latest.cadence === null) {
-      latest.cadence = Math.round(data.cadence);
-      setText("m-cadence", Math.round(data.cadence));
+
+async function readDeviceInfo(server){
+  const info={manufacturer:null,model:null,serial:null,hardware:null,firmware:null,software:null};
+  try{
+    const dis=await server.getPrimaryService(UUIDS.disService);
+    for(const [key,label,uuid] of DIS_CHARS){
+      info[key]=await readStringValue(dis,uuid);
     }
-    if (data.power === null) return;
-    latest.ftmsPower = data.power;
-    if (latest.power === null) setText("m-power", data.power);
-    if (data.power < 0 || data.power > ANOMALY_LIMITS.powerMax) recordAnomaly("power", data.power + " W(FTMS)");
-  } catch (err) { recordAnomaly("parse", err.message); }
+  }catch(err){
+    log("DIS 读取失败: "+err.message,"warn");
+  }
+  return info;
 }
-function handleRsc(event) {
-  try {
-    markNotify();
-    const data = parseRsc(event.target.value);
-    latest.speed = data.speed;
-    latest.cadence = data.cadence;
-    setText("m-speed", data.speed.toFixed(2));
-    setText("m-cadence", data.cadence);
-    if (data.speed > ANOMALY_LIMITS.speedMaxKmh) recordAnomaly("speed", data.speed.toFixed(2) + " km/h");
-    if (data.cadence > ANOMALY_LIMITS.cadenceMax) recordAnomaly("cadence", data.cadence + " SPM");
-  } catch (err) { recordAnomaly("parse", err.message); }
+
+async function enumerateServices(server){
+  const services=[];
+  try{
+    const svcs=await server.getPrimaryServices();
+    for(const svc of svcs){
+      const entry={uuid:svc.uuid,name:svcName(svc.uuid),isPrimary:true,characteristics:[]};
+      try{
+        const chars=await svc.getCharacteristics();
+        for(const ch of chars){
+          entry.characteristics.push({
+            uuid:ch.uuid,name:charName(ch.uuid),properties:propFlags(ch),
+          });
+        }
+      }catch(err){
+        entry.characteristics.push({uuid:"",name:"读取特征失败: "+err.message,properties:""});
+      }
+      services.push(entry);
+    }
+  }catch(err){
+    log("GATT 服务枚举失败: "+err.message,"warn");
+  }
+  return services;
 }
-function handleFtmsStatus(event) {
-  const code = event.target.value.getUint8(0);
-  log("FTMS 状态码: " + code, "data");
+
+async function connectAndCollect(device){
+  const rec={device,server:null,info:{},services:[],connectedAt:new Date().toISOString(),
+    latest:{power:null,hr:null,cadence:null,speed:null,ftmsPower:null,distance:null},
+    lastNotifyAt:0,cscPrev:null,staleOpen:false};
+  device.addEventListener("gattserverdisconnected",()=>{
+    log("设备 '"+(device.name||"(无名)")+"' 已断开","warn");
+  });
+  try{
+    rec.server=await device.gatt.connect();
+    log("GATT 已连接: "+(device.name||"(无名)"));
+    rec.info=await readDeviceInfo(rec.server);
+    log("DIS 信息读取完成");
+    rec.services=await enumerateServices(rec.server);
+    log("已枚举 "+rec.services.length+" 个 GATT 服务");
+    await subscribeNotifications(rec);
+    if(anomalyTimer)clearInterval(anomalyTimer);
+    anomalyTimer=setInterval(checkAnomalies,1000);
+  }catch(err){
+    log("连接/读取失败: "+err.message,"error");
+    throw err;
+  }
+  return rec;
 }
-function checkAnomalies() {
-  if (!server || !server.connected || !lastNotifyAt) return;
-  const gap = Date.now() - lastNotifyAt;
-  if (gap > ANOMALY_LIMITS.staleMs && !staleOpen) {
-    staleOpen = true;
-    recordAnomaly("stale", "超过 " + Math.round(gap) + "ms 未收到通知");
+
+async function subscribeNotifications(rec){
+  const map=[
+    ["cps",UUIDS.cpsService,UUIDS.cpsMeasurement],
+    ["hr",UUIDS.hrService,UUIDS.hrMeasurement],
+    ["csc",UUIDS.cscService,UUIDS.cscMeasurement],
+    ["rsc",UUIDS.rscService,UUIDS.rscMeasurement],
+    ["ftms",UUIDS.ftmsService,UUIDS.ftmsIndoorBike],
+  ];
+  for(const [key,svcUuid,charUuid] of map){
+    try{
+      const svc=await rec.server.getPrimaryService(svcUuid);
+      const ch=await svc.getCharacteristic(charUuid);
+      await ch.startNotifications();
+      ch.addEventListener("characteristicvaluechanged",(ev)=>handleNotify(rec,key,ev));
+      log("已订阅 "+key.toUpperCase()+" 通知","data");
+    }catch(err){
+      if(!err.message.includes("not found"))log("未订阅 "+key+": "+err.message,"warn");
+    }
   }
 }
-function renderServices(services) {
-  const names = [
-    ["cps", "CPS"], ["hr", "HRS"], ["csc", "CSC"],
-    ["rsc", "RSC"], ["ftms", "FTMS"], ["ftmsStatus", "FTMS Status"]
-  ];
-  $("service-badges").innerHTML = names.map(([key, label]) => {
-    const cls = services[key] ? "badge ok" : "badge warn";
-    return "<span class=\"" + cls + "\">" + label + "</span>";
+
+async function connectAuthorized(){
+  if(!checkSupport())return;
+  if(!navigator.bluetooth.getDevices){log("当前浏览器不支持 getDevices，需点击扫描并连接设备重新授权","warn");return;}
+  const devices=await navigator.bluetooth.getDevices();
+  const candidate=devices[0];
+  if(!candidate){log("没有已授权的设备，请先点击扫描并连接设备","warn");return;}
+  if(currentMode==="connect"){
+    $("connect-empty").classList.add("hidden");$("connect-result").classList.remove("hidden");
+    $("single-device-card").innerHTML='<div class="dc-head"><span class="badge warn">连接中...</span></div>';
+    try{singleDevice=await connectAndCollect(candidate);renderSingleDevice(singleDevice);}catch(e){$("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+e.message+'</div>';}
+  }else if(currentMode==="compare"){
+    addCompareDeviceFromExisting(candidate);
+  }
+}
+
+/* ==================== 模式二：单设备连接 ==================== */
+async function connectAnyDevice(){
+  const device=await requestDevice();
+  if(!device)return;
+  $("connect-empty").classList.add("hidden");
+  $("connect-result").classList.remove("hidden");
+  $("single-device-card").innerHTML='<div class="dc-head"><span class="badge warn">连接中...</span></div>';
+  try{
+    const rec=await connectAndCollect(device);
+    singleDevice=rec;
+    renderSingleDevice(rec);
+  }catch(err){
+    $("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+err.message+'</div>';
+  }
+}
+
+function renderSingleDevice(rec){
+  const card=$("single-device-card");
+  const info=rec.info;
+  let html='<div class="dc-head">';
+  html+='<div><div class="dc-name">'+(rec.device.name||"(无名设备)")+'</div>';
+  html+='<div class="dc-meta">'+rec.device.id+'</div></div>';
+  html+='<span class="badge ok">已连接</span></div>';
+  html+='<div class="dc-body">';
+  for(const [key,label,uuid] of DIS_CHARS){
+    const val=info[key]||"<span style='color:var(--faint)'>未提供</span>";
+    html+='<div class="row"><span>'+label+'</span><span>'+val+'</span></div>';
+  }
+  html+='</div>';
+  html+='<div class="dc-foot">';
+  html+='<button class="btn primary sm" onclick="saveAsTemplate(singleDevice)">保存为模板</button>';
+  html+='<button class="btn alt sm" onclick="downloadReport()">导出报告</button>';
+  html+='<button class="btn ghost sm" onclick="disconnectSingle()">断开</button>';
+  html+='</div>';
+  html+='<div style="margin-top:14px"><div class="card-head" style="margin-bottom:10px;padding-bottom:8px"><h2>实时数据</h2></div>';
+  html+='<div class="data" style="grid-template-columns:repeat(4,1fr);gap:10px">';
+  html+='<div class="metric"><b id="m-power">--</b><span>CPS/FTMS 功率 W</span></div>';
+  html+='<div class="metric"><b id="m-hr">--</b><span>心率 BPM</span></div>';
+  html+='<div class="metric"><b id="m-cadence">--</b><span>踏频/步频</span></div>';
+  html+='<div class="metric"><b id="m-speed">--</b><span>速度 km/h</span></div>';
+  html+='</div></div>';
+  html+='<div style="margin-top:14px"><div class="card-head" style="margin-bottom:10px;padding-bottom:8px"><h2>GATT 服务列表（'+rec.services.length+'）</h2></div>';
+  html+=renderServiceList(rec.services);
+  html+='</div>';
+  card.innerHTML=html;
+}
+
+function renderServiceList(services){
+  if(!services.length)return '<div class="hint">未枚举到任何 GATT 服务（可能未在 optionalServices 中声明）</div>';
+  let html='<div class="svc-list">';
+  for(const svc of services){
+    html+='<div class="svc-item">';
+    html+='<div class="svc-head"><span class="svc-name">'+svc.name+'</span><span class="svc-uuid">'+svc.uuid+'</span></div>';
+    if(svc.characteristics.length){
+      html+='<div class="chars">';
+      for(const ch of svc.characteristics){
+        html+='<div class="char"><span><b>'+ch.name+'</b> <span class="svc-uuid">'+ch.uuid+'</span></span><span class="props">'+ch.properties+'</span></div>';
+      }
+      html+='</div>';
+    }
+    html+='</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+function disconnectSingle(){
+  if(singleDevice&&singleDevice.server){
+    try{singleDevice.server.disconnect();}catch(e){}
+  }
+  singleDevice=null;
+  $("connect-result").classList.add("hidden");
+  $("connect-empty").classList.remove("hidden");
+}
+
+/* ==================== 模板管理 ==================== */
+const TPL_KEY="bikepower_device_templates";
+function loadTemplates(){
+  let list=[];
+  try{list=JSON.parse(localStorage.getItem(TPL_KEY)||"[]");}catch(e){list=[];}
+  const card=$("templates-card");
+  const box=$("templates-list");
+  if(!list.length){card.style.display="none";return;}
+  card.style.display="";
+  box.innerHTML=list.map((t,i)=>{
+    const sub=[t.info.manufacturer,t.info.model,t.info.firmware].filter(Boolean).join(" · ")||"无设备信息";
+    return '<div class="tpl-item"><div class="tpl-info"><span class="tpl-name">'+(t.name||t.deviceName||"模板 "+(i+1))+'</span><span class="tpl-sub">'+sub+'</span></div><div class="tpl-ops"><button class="btn alt sm" onclick="exportTemplate('+i+')">导出</button><button class="btn ghost sm" onclick="deleteTemplate('+i+')">删除</button></div></div>';
   }).join("");
 }
-function updateProfile(services) {
-  if (services.rsc) setText("profile", "running");
-  else if (services.cps || services.ftms) setText("profile", "cycling");
-  else setText("profile", "unknown");
-}
-function downloadReport() {
-  const report = {
-    started_at: startedAt ? startedAt.toISOString() : null,
-    exported_at: new Date().toISOString(),
-    device: { name: device ? device.name : null, id: device ? device.id : null },
-    latest,
-    anomalies,
-    events,
+function saveAsTemplate(rec){
+  const tpl={
+    name:rec.device.name||"未命名设备",
+    deviceName:rec.device.name,
+    deviceId:rec.device.id,
+    capturedAt:rec.connectedAt,
+    info:{...rec.info},
+    services:rec.services.map(s=>({uuid:s.uuid,name:s.name,characteristics:s.characteristics.map(c=>({uuid:c.uuid,name:c.name,properties:c.properties}))})),
   };
-  const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "bikepower-ble-monitor-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
-  a.click();
-  URL.revokeObjectURL(url);
+  let list=[];
+  try{list=JSON.parse(localStorage.getItem(TPL_KEY)||"[]");}catch(e){list=[];}
+  list.push(tpl);
+  localStorage.setItem(TPL_KEY,JSON.stringify(list));
+  log("已保存模板: "+tpl.name);
+  loadTemplates();
 }
-window.addEventListener("load", () => {
-  renderAnomalies();
+function deleteTemplate(i){
+  let list=[];
+  try{list=JSON.parse(localStorage.getItem(TPL_KEY)||"[]");}catch(e){list=[];}
+  list.splice(i,1);
+  localStorage.setItem(TPL_KEY,JSON.stringify(list));
+  loadTemplates();
+}
+function exportTemplate(i){
+  let list=[];
+  try{list=JSON.parse(localStorage.getItem(TPL_KEY)||"[]");}catch(e){list=[];}
+  const tpl=list[i];
+  if(!tpl)return;
+  const blob=new Blob([JSON.stringify(tpl,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download="bikepower-template-"+(tpl.name||"device")+".json";
+  a.click();URL.revokeObjectURL(url);
+}
+function exportAllTemplates(){
+  let list=[];
+  try{list=JSON.parse(localStorage.getItem(TPL_KEY)||"[]");}catch(e){list=[];}
+  const blob=new Blob([JSON.stringify(list,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download="bikepower-templates-all.json";a.click();URL.revokeObjectURL(url);
+}
+function clearTemplates(){
+  if(!confirm("确定清空所有已保存模板？"))return;
+  localStorage.removeItem(TPL_KEY);
+  loadTemplates();
+}
+
+/* ==================== 模式三：多设备比对 ==================== */
+async function addCompareDevice(){
+  const device=await requestDevice();
+  if(!device)return;
+  addCompareDeviceFromExisting(device);
+}
+
+async function addCompareDeviceFromExisting(device){
+  const card=document.createElement("div");
+  card.className="device-card";
+  card.style.marginTop="12px";
+  card.innerHTML='<div class="dc-head"><span class="badge warn">连接中...</span></div>';
+  $("compare-devices").appendChild(card);
+  $("compare-empty").classList.add("hidden");
+  try{
+    const rec=await connectAndCollect(device);
+    rec._idx=compareDevices.length;
+    compareDevices.push(rec);
+    renderCompareDeviceCard(card,rec);
+    renderCompareTable();
+  }catch(err){
+    card.innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+err.message+'</div>';
+  }
+}
+
+function renderCompareDeviceCard(card,rec){
+  let html='<div class="dc-head">';
+  html+='<div><div class="dc-name">'+(rec.device.name||"(无名设备)")+'</div>';
+  html+='<div class="dc-meta">'+rec.device.id+'</div></div>';
+  html+='<span class="badge ok">已连接</span></div>';
+  html+='<div class="dc-foot">';
+  html+='<button class="btn primary sm" onclick="saveAsTemplate(compareDevices['+rec._idx+'])">复制为模板</button>';
+  html+='<button class="btn alt sm" onclick="removeCompareDevice('+rec._idx+')">移除</button>';
+  html+='</div>';
+  card.innerHTML=html;
+}
+
+function removeCompareDevice(idx){
+  const rec=compareDevices[idx];
+  if(rec&&rec.server){try{rec.server.disconnect();}catch(e){}}
+  compareDevices=compareDevices.filter((_,i)=>i!==idx);
+  compareDevices.forEach((r,i)=>r._idx=i);
+  renderCompareDevices();
+  renderCompareTable();
+}
+
+function renderCompareDevices(){
+  const box=$("compare-devices");
+  box.innerHTML="";
+  if(!compareDevices.length){
+    $("compare-empty").classList.remove("hidden");
+    return;
+  }
+  $("compare-empty").classList.add("hidden");
+  compareDevices.forEach(rec=>{
+    const card=document.createElement("div");
+    card.className="device-card";card.style.marginTop="12px";
+    renderCompareDeviceCard(card,rec);
+    box.appendChild(card);
+  });
+}
+
+function clearCompareDevices(){
+  compareDevices.forEach(rec=>{if(rec.server){try{rec.server.disconnect();}catch(e){}}});
+  compareDevices=[];
+  renderCompareDevices();
+  renderCompareTable();
+}
+
+function renderCompareTable(){
+  const wrap=$("compare-table-wrap");
+  const table=$("compare-table");
+  if(compareDevices.length<1){wrap.classList.add("hidden");table.innerHTML="";return;}
+  wrap.classList.remove("hidden");
+  const fields=[["name","设备名"],...DIS_CHARS.map(c=>[c[0],c[1]])];
+  let html="<thead><tr><th>字段</th>";
+  compareDevices.forEach(rec=>{html+='<th>'+(rec.device.name||"设备")+'</th>';});
+  html+="</tr></thead><tbody>";
+  for(const [key,label] of fields){
+    const vals=compareDevices.map(rec=>key==="name"?(rec.device.name||""):(rec.info[key]||""));
+    const uniq=[...new Set(vals.map(v=>v||""))];
+    const diff=uniq.length>1;
+    html+='<tr><td class="field-name">'+label+'</td>';
+    vals.forEach(v=>{
+      const cls=!v?"cell-missing":(diff?"diff":"same");
+      html+='<td class="'+cls+'"><span class="cell-val">'+(v||"—")+'</span></td>';
+    });
+    html+="</tr>";
+  }
+  html+='<tr><td class="field-name">GATT 服务</td>';
+  compareDevices.forEach(rec=>{
+    const names=rec.services.map(s=>s.name).sort();
+    html+='<td class="cell-val" style="font-size:11px">'+names.join("<br>")+'</td>';
+  });
+  html+="</tr>";
+  html+="</tbody>";
+  table.innerHTML=html;
+}
+
+/* ==================== 启动 ==================== */
+window.addEventListener("load",()=>{
   checkSupport();
   loadFirmwareCatalog();
-  log("监控页面已就绪。");
+  log("BLE 工具台已就绪。");
 });
 </script>
 </body>
