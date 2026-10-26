@@ -78,21 +78,24 @@ body{
 }
 .brand .sub{display:block;font-size:12.5px;color:var(--muted);margin-top:3px;font-weight:500}
 
-.mode-bar{
-  display:flex;gap:8px;background:var(--card-solid);border:1px solid var(--line);
-  border-radius:var(--radius);padding:6px;box-shadow:var(--shadow-sm);margin-bottom:16px;
+.mode-select{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;
 }
 .mode-btn{
-  flex:1;border:0;background:transparent;color:var(--muted);
-  padding:12px 10px;border-radius:10px;cursor:pointer;font-family:var(--sans);
-  font-size:13.5px;font-weight:700;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;
+  display:flex;flex-direction:column;align-items:flex-start;gap:8px;
+  border:1.5px solid var(--line);background:var(--card-solid);color:var(--ink);
+  padding:20px 18px;border-radius:var(--radius);cursor:pointer;font-family:var(--sans);
+  text-align:left;transition:all .18s ease;box-shadow:var(--shadow-sm);
 }
-.mode-btn:hover{color:var(--accent-deep);background:var(--accent-soft)}
+.mode-btn:hover{border-color:var(--accent-2);transform:translateY(-2px);box-shadow:var(--shadow-md)}
 .mode-btn.active{
-  background:linear-gradient(135deg,var(--accent),var(--accent-2));
-  color:#fff;box-shadow:0 4px 12px rgba(23,105,224,.28);
+  border-color:var(--accent);background:linear-gradient(135deg,var(--accent) 0%,var(--accent-2) 100%);
+  color:#fff;box-shadow:0 8px 22px rgba(23,105,224,.28);
 }
-.mode-btn .ico{font-size:16px;line-height:1}
+.mode-btn.active .mode-desc{color:rgba(255,255,255,.82)}
+.mode-btn .ico{font-size:26px;line-height:1}
+.mode-btn .mode-title{font-size:16px;font-weight:800;letter-spacing:-.01em}
+.mode-btn .mode-desc{font-size:12.5px;color:var(--muted);font-weight:500;line-height:1.4}
 
 .btn{
   border:0;border-radius:var(--radius-sm);padding:10px 16px;
@@ -114,6 +117,15 @@ body{
 .btn.ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--line)}
 .btn.ghost:hover:not(:disabled){background:var(--card-solid)}
 .btn.sm{padding:7px 12px;font-size:12px}
+.btn.big{padding:14px 26px;font-size:15px;border-radius:12px}
+
+.flash-step{margin:14px 0;padding:12px 14px;background:var(--accent-soft);border-radius:11px;border-left:3px solid var(--accent)}
+.flash-step b{color:var(--accent-deep);font-size:13.5px}
+.flash-step p{margin:6px 0 0;color:var(--ink-soft);font-size:12.5px;line-height:1.6}
+.flash-details{margin-top:16px}
+.flash-details summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:600;padding:8px 0}
+.flash-details[open] summary{color:var(--accent-deep)}
+.flash-cta{margin:18px 0;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 
 .card{
   background:var(--card);
@@ -150,44 +162,6 @@ body{
 
 .hidden{display:none !important}
 
-.flash-top{
-  display:flex;align-items:center;justify-content:space-between;gap:14px;
-  flex-wrap:wrap;margin-bottom:18px;
-}
-.flash-version{display:flex;align-items:baseline;gap:10px}
-.flash-version b{font-size:22px;letter-spacing:-.03em;font-weight:800;color:var(--ink)}
-.flash-version span{font-size:12px;color:var(--muted);font-weight:500}
-
-.board-seg{
-  display:inline-flex;background:var(--card-solid);border:1px solid var(--line);
-  border-radius:var(--radius-sm);padding:4px;gap:2px;box-shadow:var(--shadow-sm);
-}
-.board-seg select{
-  border:0;background:transparent;color:var(--ink);
-  font-size:12.5px;font-weight:700;padding:7px 28px 7px 12px;border-radius:8px;
-  font-family:var(--sans);cursor:pointer;outline:none;
-  appearance:none;-webkit-appearance:none;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235e6b7e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 10px center;
-}
-.board-seg select:focus{background-color:var(--accent-soft);box-shadow:0 0 0 2px rgba(23,105,224,.18)}
-
-.flash-body{
-  display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:24px;align-items:start;
-}
-.flash-cta{display:flex;flex-direction:column;align-items:flex-start;gap:13px}
-.flash-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.flash-links{display:flex;gap:18px;font-size:12.5px;margin-top:2px}
-.flash-links a{
-  color:var(--accent-deep);font-weight:700;text-decoration:none;
-  border-bottom:1px solid #c7dbff;padding-bottom:1px;transition:border-color .15s;
-}
-.flash-links a:hover{border-bottom-color:var(--accent-deep)}
-.flash-note{
-  border-left:3px solid var(--amber);padding:3px 0 3px 12px;
-  font-size:12px;color:#6b4814;line-height:1.6;background:var(--amber-soft);
-  border-radius:0 8px 8px 0;padding:9px 12px;
-}
 .release-link{color:var(--accent-deep);font-weight:700;text-decoration:none}
 .release-link:hover{text-decoration:underline}
 
@@ -291,15 +265,12 @@ esp-web-install-button{
 @media(max-width:840px){
   body{padding:16px 14px 30px}
   .masthead{display:block}
-  .flash-body{grid-template-columns:1fr}
   .two-col{grid-template-columns:1fr}
-  .mode-btn{font-size:12px;padding:10px 6px}
-  .mode-btn .ico{display:none}
+  .mode-select{grid-template-columns:1fr}
+  .mode-btn{padding:16px}
+  .mode-btn .ico{font-size:22px}
 }
 @media(max-width:480px){
-  .flash-top{display:block}
-  .board-seg{margin-top:12px;width:100%}
-  .board-seg select{width:100%}
   .row{flex-direction:column;gap:2px}
   .row span:first-child{min-width:auto}
   .row span:last-child{text-align:left}
@@ -319,10 +290,22 @@ esp-web-install-button{
     </div>
   </header>
 
-  <div class="mode-bar">
-    <button class="mode-btn active" data-mode="flash" onclick="switchMode('flash')"><span class="ico">⬇</span>刷机</button>
-    <button class="mode-btn" data-mode="connect" onclick="switchMode('connect')"><span class="ico">📶</span>连接蓝牙设备</button>
-    <button class="mode-btn" data-mode="compare" onclick="switchMode('compare')"><span class="ico">⚖</span>多设备比对复制</button>
+  <div class="mode-select">
+    <button class="mode-btn" data-mode="flash" onclick="switchMode('flash')">
+      <span class="ico">⬇</span>
+      <span class="mode-title">固件刷写</span>
+      <span class="mode-desc">把最新固件烧录到开发板</span>
+    </button>
+    <button class="mode-btn" data-mode="connect" onclick="switchMode('connect')">
+      <span class="ico">📶</span>
+      <span class="mode-title">连接蓝牙设备</span>
+      <span class="mode-desc">读取设备信息与实时数据</span>
+    </button>
+    <button class="mode-btn" data-mode="compare" onclick="switchMode('compare')">
+      <span class="ico">⚖</span>
+      <span class="mode-title">多设备比对</span>
+      <span class="mode-desc">并排对比多台设备信息</span>
+    </button>
   </div>
 
   <div class="card hidden" id="support-warning">
@@ -330,42 +313,54 @@ esp-web-install-button{
   </div>
 
   <!-- ============ 模式一：刷机 ============ -->
-  <section id="mode-flash">
+  <section id="mode-flash" class="hidden">
     <div class="card">
-      <div class="flash-top">
-        <div class="flash-version">
-          <b>固件刷写</b>
-          <span>从最新 Release 索引读取</span>
-        </div>
+      <div class="card-head">
+        <h2>固件刷写</h2>
         <span class="badge warn" id="firmware-status">正在获取最新版本</span>
       </div>
-      <div class="flash-body">
-        <div class="flash-cta">
-          <div class="board-seg">
-            <select id="firmware-board" onchange="renderSelectedFirmware()">
-              <option value="generic-c3">通用 ESP32-C3</option>
-              <option value="m5stamp-c3">M5Stamp C3</option>
-            </select>
-          </div>
-          <div class="flash-actions">
-            <esp-web-install-button id="install-button" class="hidden">
-              <button class="btn primary" id="flash-activate" slot="activate" onclick="prepareForFlash()">连接串口并刷写</button>
-              <span slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
-              <span slot="not-allowed">网页刷写仅能在 HTTPS 或 localhost 页面使用。</span>
-            </esp-web-install-button>
-            <button class="btn" id="install-unavailable" disabled>暂无可刷写固件</button>
-            <a class="btn alt hidden" id="firmware-download" href="#" download>下载固件</a>
-          </div>
-          <div class="hint flash-note" id="flash-message">正在读取由部署流程生成的最新 Release 信息。</div>
-        </div>
-        <dl class="spec">
+
+      <div class="flash-step">
+        <b>第 1 步：用数据线连接开发板</b>
+        <p>将 ESP32-C3 开发板通过 USB 线插到电脑。注意：部分"充电线"只能充电不能传数据，请确认使用支持数据传输的线。连接成功后开发板指示灯会亮。</p>
+      </div>
+
+      <div class="flash-step">
+        <b>第 2 步：确认板型</b>
+        <p>本固件仅支持 <b>通用 ESP32-C3</b> 开发板。</p>
+      </div>
+
+      <select id="firmware-board" class="hidden" onchange="renderSelectedFirmware()">
+        <option value="generic-c3" selected>通用 ESP32-C3</option>
+      </select>
+
+      <div class="flash-cta">
+        <esp-web-install-button id="install-button" class="hidden">
+          <button class="btn primary big" id="flash-activate" slot="activate" onclick="prepareForFlash()">连接串口并刷写</button>
+          <span slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
+          <span slot="not-allowed">网页刷写仅能在 HTTPS 或 localhost 页面使用。</span>
+        </esp-web-install-button>
+        <button class="btn" id="install-unavailable" disabled>暂无可刷写固件</button>
+        <a class="btn alt hidden" id="firmware-download" href="#" download>下载固件</a>
+      </div>
+      <div class="hint" id="flash-message">正在读取最新 Release 固件信息。</div>
+
+      <div class="flash-step">
+        <b>第 3 步：在弹窗中选择串口</b>
+        <p>点击上方按钮后，浏览器会弹出串口选择框，请选择开发板对应的串口（Windows 通常是 COM3 / COM4，Mac / Linux 通常是 /dev/ttyUSB* 或 /dev/cu.usbmodem*）。</p>
+      </div>
+
+      <details class="flash-details">
+        <summary>固件详情</summary>
+        <dl class="spec" style="margin-top:10px">
           <div class="row"><span>最新版本</span><span id="firmware-version">--</span></div>
           <div class="row"><span>发布时间</span><span id="firmware-published">--</span></div>
           <div class="row"><span>固件文件</span><span id="firmware-filename">--</span></div>
           <div class="row"><span>SHA256</span><span class="flash-sha" id="firmware-sha256">--</span></div>
           <div class="row"><span>Release</span><span><a class="release-link hidden" id="firmware-release" href="#" target="_blank" rel="noopener">查看发布说明</a><span id="firmware-release-empty">--</span></span></div>
         </dl>
-      </div>
+      </details>
+
       <div class="hint" style="margin-top:16px"><b>环境要求：</b>仅支持电脑端 Chrome / Edge、HTTPS 页面和支持数据传输的 USB 线。点击刷写后仍需在浏览器弹窗中主动选择正确串口；这是 Web Serial 的安全限制，网页无法静默选择设备。刷写过程中不要拔线或关闭页面。</div>
     </div>
   </section>
@@ -381,7 +376,10 @@ esp-web-install-button{
           <button class="btn alt" onclick="loadTemplates()">已存模板</button>
         </div>
       </div>
-      <div class="hint">点击「扫描并连接设备」，在浏览器弹窗中选择任意蓝牙设备（心率带、骑行台、功率计、踏频器、BikePower 开发板等）。连接后自动读取设备信息（DIS）和 GATT 服务列表，并可保存为模板。</div>
+      <div class="flash-step">
+        <b>怎么用</b>
+        <p>点击「扫描并连接设备」，在浏览器弹窗中选择任意蓝牙设备（心率带、骑行台、功率计、踏频器、BikePower 开发板等）。连接后会自动读取设备信息（厂商、型号、序列号、版本等）和 GATT 服务列表，并可保存为模板。</p>
+      </div>
       <div id="connect-empty" class="empty-state">
         <div class="big">📶</div>
         <p><b>尚未连接设备</b></p>
@@ -415,7 +413,10 @@ esp-web-install-button{
           <button class="btn ghost" onclick="clearCompareDevices()">清空</button>
         </div>
       </div>
-      <div class="hint">依次添加多台蓝牙设备，自动比对设备信息（DIS 字段）和 GATT 服务列表。黄色背景表示该字段在设备间存在差异，绿色表示一致。点击设备卡片中的「复制为模板」可将该设备信息保存为模板。</div>
+      <div class="flash-step">
+        <b>怎么用</b>
+        <p>依次点击「添加设备」连接多台蓝牙设备，系统会自动比对各设备的信息字段和 GATT 服务列表。<span style="color:var(--amber)">黄色</span>背景表示该字段在设备间存在差异，<span style="color:var(--green)">绿色</span>表示一致。点击设备卡片中的「复制为模板」可将该设备信息保存为模板。</p>
+      </div>
       <div id="compare-empty" class="empty-state">
         <div class="big">⚖</div>
         <p><b>尚未添加设备</b></p>
@@ -428,10 +429,11 @@ esp-web-install-button{
     </div>
   </section>
 
-  <div class="card">
-    <div class="card-head"><h2>事件日志</h2><button class="btn ghost sm" onclick="clearLog()">清空</button></div>
-    <div class="log" id="log"></div>
-  </div>
+  <details class="card" id="log-panel" style="margin-top:16px">
+    <summary style="cursor:pointer;font-weight:700;color:var(--ink-soft)">事件日志 <span class="hint" style="display:inline;font-weight:400">（展开查看）</span></summary>
+    <div style="display:flex;justify-content:flex-end;margin:8px 0 0"><button class="btn ghost sm" onclick="clearLog()">清空</button></div>
+    <div class="log" id="log" style="margin-top:8px"></div>
+  </details>
 </div>
 
 <script>
@@ -509,7 +511,7 @@ const ANOMALY_LABELS = {
   cadence:"踏频异常", speed:"速度异常", parse:"数据解析异常",
 };
 
-let currentMode = "flash";
+let currentMode = null;
 let firmwareCatalog = null;
 let webInstallerReady = false;
 let singleDevice = null;

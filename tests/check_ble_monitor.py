@@ -79,7 +79,6 @@ def main():
         ('customElements.get("esp-web-install-button")', "刷写组件加载失败时不会保留误导按钮"),
         ("./firmware/latest.json", "自动读取部署生成的最新固件索引"),
         ('value="generic-c3"', "支持通用 ESP32-C3 固件"),
-        ('value="m5stamp-c3"', "支持 M5Stamp C3 固件"),
         ("renderSelectedFirmware", "板型切换会更新刷写 manifest"),
         ("firmware-sha256", "页面展示固件 SHA256"),
         ("firmware-download", "页面提供同源固件下载"),
