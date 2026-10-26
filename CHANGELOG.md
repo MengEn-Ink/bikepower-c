@@ -4,6 +4,14 @@
 
 ## [4.1.3] - 2026-10-26
 
+### Pages BLE 工具台：任意设备连接与多设备比对（2026-10-26）
+- `tools/web/ble-monitor.html`：页面入口改为三模式选择器——刷机 / 连接蓝牙设备 / 多设备比对复制，连接后才展示具体数据。
+- 连接模式使用 `acceptAllDevices:true` + 完整 `optionalServices` 列表，可连接任意骑行 BLE 设备（心率带、智能训练台、功率计、踏频器、BikePower 开发板）；读取 DIS 全部字段（制造商、型号、序列号、硬件/固件/软件版本），枚举 GATT 服务与特征列表，并订阅 CPS/HRS/CSC/FTMS/RSC 通知展示实时功率/心率/踏频/速度。
+- 比对模式支持连接多台设备，并排展示 DIS 字段与 GATT 服务列表，相同项绿色高亮、差异项黄色高亮，单台设备可一键「复制为模板」。
+- 模板管理基于 localStorage：保存为模板、单个/全部 JSON 导出、删除、清空；对比维度仅包含 DIS 字段与 GATT 服务列表，不解析 CPS/CSC/HRS/FTMS payload。
+- 保留原有 `ANOMALY_LIMITS`、`recordAnomaly`/`checkAnomalies`、各 `parse*` 解析函数、`downloadReport` 与 `connectAuthorized`（`getDevices`），新增 `UUID16`/`CHAR16` 友好名称字典。
+- 验证：`tests/check_ble_monitor.py` 全绿（`node --check` 通过）；`tests/test_prepare_web_flash_site.py` 7/7。
+
 ### 服务开关动态控制 BLE GATT 注册（2026-10-26）
 - `main/ble_bikepower.c`：GATT 服务表改为按 `broadcast_mask` 动态构建（`build_active_gatt_svcs`），未启用的服务不再注册到 GATT；例如只开心率时蓝牙只暴露 HRS（+DIS），行为与心率带厂商一致。
 - 服务映射：骑行 CPS↔POWER、CSC↔CADENCE、HRS↔HEARTRATE、FTMS↔POWER|CADENCE；跑步 RSC↔POWER|CADENCE、HRS↔HEARTRATE、FTMS↔POWER|CADENCE；DIS 始终注册。
