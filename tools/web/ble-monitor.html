@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BikePower 实时信号监控与固件刷写</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23f05523' d='M37 4 22 28h11l-8 14 19-22H33z'/%3E%3Cpath fill='none' stroke='%23f4e8d8' stroke-width='6' stroke-linecap='square' d='M13 19a24 24 0 1 0 34 27M7 12a36 36 0 0 1 13-7'/%3E%3Ccircle cx='22' cy='35' r='5' fill='%230a0807' stroke='%23f4e8d8' stroke-width='4'/%3E%3C/svg%3E">
 <style>
 :root{
   --bg:#0a0807;
@@ -49,9 +50,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,su
 }
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
 .brand-mark{
-  width:24px;height:24px;display:grid;place-items:center;background:var(--accent);
-  color:var(--bg);font:900 12px/1 var(--mono);letter-spacing:-.04em;
+  width:30px;height:30px;display:block;flex:0 0 auto;color:var(--strong);
 }
+.brand-mark .logo-accent{fill:var(--accent)}
+.brand-mark .logo-line{fill:none;stroke:currentColor;stroke-width:6;stroke-linecap:square}
+.brand-mark .logo-hub{fill:var(--bg);stroke:currentColor;stroke-width:4}
 .brand h1{font-size:16px;line-height:1;margin:0;font-weight:900;letter-spacing:-.04em;color:var(--strong)}
 .brand h1 span{color:var(--accent)}
 .brand .sub{display:none}
@@ -306,7 +309,11 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
 <div class="wrap">
   <header class="masthead">
     <div class="brand">
-      <div class="brand-mark">BP</div>
+      <svg class="brand-mark" viewBox="0 0 64 64" role="img" aria-label="BikePower 图形标">
+        <path class="logo-accent" d="M37 4 22 28h11l-8 14 19-22H33z"/>
+        <path class="logo-line" d="M13 19a24 24 0 1 0 34 27M7 12a36 36 0 0 1 13-7"/>
+        <circle class="logo-hub" cx="22" cy="35" r="5"/>
+      </svg>
       <div>
         <h1>Bike<span>Power</span></h1>
         <span class="sub">固件刷写 · 蓝牙设备信息采集 · 多设备一比一比对</span>

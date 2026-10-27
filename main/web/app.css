@@ -7,6 +7,10 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:var(--pa
 .bar,.brand,.status,.card .val{display:flex;align-items:center}
 .bar,.status{justify-content:space-between;margin:0 0 6px}
 .brand{gap:6px;font-size:19px;font-weight:800}
+.brand-logo{width:26px;height:26px;flex:0 0 auto;color:#1d1d1f}
+.brand-logo-accent{fill:#f05523}
+.brand-logo-line{fill:none;stroke:currentColor;stroke-width:6;stroke-linecap:square}
+.brand-logo-hub{fill:#fff;stroke:currentColor;stroke-width:4}
 .brand small{font-size:10px;font-weight:600;color:#86868b;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .status{font-size:12px}
 .status .ble{color:#007aff;font-weight:800}
@@ -278,6 +282,8 @@ body{background:linear-gradient(180deg,#f7fbff 0,#f5f5f7 190px);padding:var(--pa
 .view.active{display:block}
 @media(prefers-color-scheme:dark){
   body{background:linear-gradient(180deg,#111827 0,#1c1c1e 190px);color:#f5f5f7}
+  .brand-logo{color:#f5f5f7}
+  .brand-logo-hub{fill:#1c1c1e}
   .settings-head{background:linear-gradient(135deg,#2c2c2e 0,#1e293b 100%);border-color:#334155}
   .card,.note,.result-card{background:#2c2c2e;border-color:#3a3a3c}
   .card .val input{color:#f5f5f7}
