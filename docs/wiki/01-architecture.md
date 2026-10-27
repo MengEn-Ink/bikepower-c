@@ -157,7 +157,7 @@ app_main.c
 | 文件 | 核心职责 |
 |------|----------|
 | [power_engine.c](../../components/bikepower_domain/power_engine.c) | 功率/踏频/心率快照生成、Steady/Road/ERG 三种模式、双时间尺度骑行动态 |
-| [hr_model.c](../../components/bikepower_domain/hr_model.c) | 负荷功率滤波、FTP 6 区映射、心率平滑（tau 升 30s/降 60s）、HRV 与输出限速 |
+| [hr_model.c](../../components/bikepower_domain/hr_model.c) | 负荷功率滤波、FTP 6 区映射与锚点压缩、心率平滑（tau 升 30s/降 60s）、HRV 慢游走与输出限速 |
 | [running_engine.c](../../components/bikepower_domain/running_engine.c) | 跑步模式：速度/配速/步频生成、配速机器人、RSC 数据 |
 | [profile.c](../../components/bikepower_domain/profile.c) | 用户档案（体重/FTP/阈值心率）、配速机器人表（Coco/Yumi/Jacques/Genie/Constance/自定义） |
 | [config_store.c](../../components/bikepower_domain/config_store.c) | 配置 schema 版本（当前 v11）、defaults、validate（夹紧）、migrate（v6-v10 升级）、serialize/deserialize JSON |

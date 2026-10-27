@@ -104,15 +104,18 @@ typedef struct {
 ```c
 typedef struct {
     float slow_value;
+    float slow_start;
     float fast_value;
     int slow_target;
     int slow_hold;
+    int slow_duration;
+    int slow_elapsed;
     int fast_hold;
     bool init;
 } ride_dynamics_t;
 ```
 
-算法：慢层表示 10-30 秒尺度的路况/体力趋势，快层表示每秒踩踏扰动；合成偏移始终夹在 `[-amp, +amp]` 内。
+算法：慢层表示 6-18 秒尺度的连续路况/体力航点，保存起点、目标、时长和已过节拍并用 smoothstep 插值；快层表示每秒相关踩踏扰动；合成偏移始终夹在 `[-amp, +amp]` 内。
 
 ### profile_t — 用户档案
 
@@ -120,9 +123,9 @@ typedef struct {
 
 | 字段 | 类型 | 范围 | 默认 | 说明 |
 |------|------|------|------|------|
-| `weight_kg` | `int` | 20-200 | 70 | 体重（kg），Road 模式计算功率 |
-| `ftp_w` | `int` | 50-500 | 260 | 功能阈值功率（W） |
-| `thr_hr` | `int` | 100-200 | 170 | 阈值心率（BPM） |
+| `weight` | `int` | 40-200 | 70 | 体重（kg），Road 模式计算功率 |
+| `ftp` | `int` | 50-500 | 300 | 功能阈值功率（W） |
+| `thr_hr` | `int` | 100-200 | 190 | 阈值心率（BPM） |
 | `ride_type` | `int` | 0-5 | 0 | 配速机器人索引（0=Coco...5=自定义） |
 | `custom_wkg_low` | `float` | 1.0-7.0 | 2.5 | 自定义 W/kg 下限 |
 | `custom_wkg_high` | `float` | 1.0-7.0 | 3.0 | 自定义 W/kg 上限 |
@@ -132,7 +135,7 @@ typedef struct {
 
 **定义位置**：[hr_model.h](../../components/bikepower_domain/include/hr_model.h)
 
-包含负荷功率、内部心率平滑值、HRV 相位、漂移量和对外输出值等，通过 `hr_model_*` 函数操作。
+包含负荷功率、内部心率平滑值、HRV 相位、漂移量、30-90 秒慢游走航点和对外输出值等，通过 `hr_model_*` 函数操作。
 
 ### running_engine_t — 跑步引擎状态
 

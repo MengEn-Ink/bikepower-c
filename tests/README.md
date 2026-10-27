@@ -1,7 +1,7 @@
 # 测试脚本使用说明
 
 > BikePower C 设备测试脚本集合
-> 更新日期：2026-10-22（v4.1.1 未发布稳定性修复：协议 vectors、profile-aware harness 与双次重连门禁）
+> 更新日期：2026-10-27（v4.1.3 后续开发：真实骑行 FIT 基准、长时与异常仿真）
 
 ---
 
@@ -41,6 +41,7 @@ python3 -m pip install -r requirements-test.txt
 |----|------|------|
 | `pyserial` | 串口通信（设备重启、日志抓取） | serial_capture.py, serial_daemon.py |
 | `bleak` | BLE 五服务自测 | ble_selftest.py, stage3_conn_test.py |
+| `fitparse` | 读取真实骑行 FIT 并复验统计基准 | analyze_fit_reference.py |
 
 ### ESP-IDF 工具链（编译固件时需要）
 
@@ -92,6 +93,7 @@ python3 tests/test_prepare_web_flash_site.py
 | `test_ble_running_harness.py` | 离线验证逐 opcode indication 等待、严格增长/冻结 helper 与 moving/pause/reset/resume 四阶段结构 |
 | `test_device_profile_harness.py` | 用 fake HTTP/runner 断言测试阶段强制 mask=7、running `--control` 参数和 `finally` 恢复原配置 |
 | `device_profile_harness.py` | 真机 profile 编排器；临时切换 cycling/running 并强制全广播、调用 selftest，最后恢复原 profile/mask 和完整 running 持久配置 |
+| `analyze_fit_reference.py` | 提取真实 FIT 的 1Hz 功率/踏频/心率统计，并与固定 SHA-256 基准复验 |
 
 ```bash
 python3 tests/test_ble_protocol_vectors.py
@@ -100,9 +102,13 @@ python3 tests/test_ble_running_harness.py
 python3 tests/test_device_profile_harness.py
 python3 tests/check_ftms_control_contract.py
 python3 tests/check_wifi_done_contract.py
+python3 tests/analyze_fit_reference.py /path/to/ride.fit \
+  --verify tests/fixtures/ride_reference_metrics.json
 ```
 
 这些检查证明编码、解析与编排契约在 host 上成立，不等于 NimBLE GATT、断开重广播或标准客户端已经通过真机验收。
+
+领域层 `test/test_domain.c` 还会运行固定/16 种子 90 分钟统计回归、24 小时等效快照、极值/退化区间、ERG 高频目标、心率锁定切换，以及 1Hz 通知抖动、丢样和重复保持仿真。FIT 文件不提交到仓库；`tests/fixtures/ride_reference_metrics.json` 只保存统计摘要和附件 SHA-256。附件不匹配时 `--verify` 会失败，避免误用其他骑行记录更新基准。
 
 ### B. 设备端动态自测（需真机 + 串口/BLE）
 

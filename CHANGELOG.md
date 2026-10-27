@@ -2,6 +2,20 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
+## [未发布]
+
+### 真实骑行数据模型优化与稳定性收口（2026-10-27）
+- `components/bikepower_domain/power_engine.c/.h`、`domain_config.h`：以 MyWhoosh FIT 中间 5-85 分钟的 4800 个对齐 1Hz 样本为基线，功率慢层改为 6-18 秒随机航点间的 smoothstep 连续过渡，叠加每秒更新的相关快层；默认功率浮动调整为 ±50W、踏频为 ±8rpm，踏频保持与功率的弱正相关，`snapshot_count` 改为 `uint64_t`。
+- `components/bikepower_domain/hr_model.c/.h`：FTP 映射以 85% 阈值心率为锚点压缩到 70% 幅度，并增加 ±7bpm、30-90 秒连续独立游走；重置路径同步清理周期缓存、计数器和游走状态。
+- `main/app_main.c`：BLE 初始化后以 `esp_random()` 播种领域 RNG，避免真机每次上电复现相同轨迹；host 测试仍显式固定种子，保证回归可复现。
+- `main/web/app.js`、`tests/mock_server.py`：前端和 mock 的新配置默认值同步为功率 ±50W、踏频 ±8rpm；既有 NVS 数值保持原值，不做静默迁移。
+- `tests/analyze_fit_reference.py`、`tests/fixtures/ride_reference_metrics.json`、`requirements-test.txt`：新增 FIT 指标提取与 SHA-256 固定基准，可复验均值、标准差、秒差、自相关、功率/踏频相关和功率→心率最佳滞后。
+- `test/test_domain.c`：新增 16 种子 90 分钟统计回归、上下边界最大/零浮动、Road 单点区间、ERG 0/2000W 与一小时每秒换目标、心率极值锁定/解锁、2000 轮模式切换、24 小时等效快照，以及 1Hz 通知抖动、约 2% 丢样和约 3% 重复保持仿真。
+- 开源调研：参考 SmartSpin2k 的加速仿真、多种子/延迟/抖动/丢样与边界 workout 方法，以及 qdomyos-zwift fake bike 的虚拟设备思路；两者分别为 GPL-2.0/GPL-3.0，本项目只独立实现测试方法和统计模型，未复制其源码。
+- 当前固定种子仿真：功率 `189.9±20.3W`、秒差 P50/P95=`4/11W`、AC1/AC5=`0.960/0.708`、功率/踏频相关 `0.277`；心率 `154.0±5.2bpm`，即时/滞后 30 秒相关 `0.153/0.351`。附件参考分别为 `190.7±20.7W`、`3/12W`、`0.955/0.708`、`0.296`、`152.4±5.2bpm` 和 `0.156/0.342`。
+- 验证：FIT 固定基准复验通过；`make -C test clean && make -C test run` 为 6077/0；Clang `-Werror` + ASan/UBSan 6077/0；`operation_gate.py --level full --build` 全绿（含 3 分钟核心流程 6 轮耐久与 ESP-IDF 编译）；`quality_gate.py` 99 PASS / 2 个预期 dirty-worktree WARN / 0 FAIL；`git diff --check` 通过。固件 `0x1163F0`（1,139,696 字节），factory app 分区剩余 2,923,536 字节（71.95%）。
+- 未执行：本轮尚未烧录 generic-c3/m5stamp-c3；真实 NimBLE 1Hz 时序、WiFi/BLE 共存、标准客户端与长时设备运行均保持 `NOT_RUN`，不得用 host 仿真替代。
+
 ## [4.1.3] - 2026-10-26
 
 ### Pages BLE 工具台：任意设备连接与多设备比对（2026-10-26）
@@ -21,15 +35,6 @@
 - `main/app_main.c`：BLE 重启日志文案改为涵盖 profile 与服务开关两种触发原因。
 - `tests/check_config_consistency.py`、`tests/check_portal_structure.py`：适配广播 UUID 动态拼装与重启文案变更。
 - 验证：`idf.py build` 通过；`check_portal_structure.py` 238/0、`check_config_consistency.py` 269/0、`check_nvs_schema.py`、`check_tasks_wdt.py`、`check_board_desc.py` 全绿。host 单测与协议向量因环境无 clang/gcc 未运行（codec 未改动）。
-
-### 真实骑行数据模型优化（2026-10-27）
-- `components/bikepower_domain/power_engine.c/.h`、`domain_config.h`：以 MyWhoosh 90 分钟 FIT 的 1Hz 统计特征为基线，把 Steady/Road/ERG 功率改为慢速趋势 + 秒级踩踏扰动的有界分层动态；Road 不再逐拍独立抽样，ERG 保持相关的目标 ±5W 波动，踏频增加功率弱耦合。
-- `components/bikepower_domain/hr_model.c/.h`：在 FTP 心率映射前增加非对称负荷功率滤波，与原心率平滑组成轻量二阶响应，降低短功率尖峰对心率的直接影响并保留恢复滞后。
-- `main/web/app.js`、`tests/mock_server.py`：新配置默认功率浮动由 ±5W 调整为 ±30W、踏频由 ±2rpm 调整为 ±4rpm；已有 NVS 配置保持原值，不做静默迁移。
-- `test/test_domain.c`：增加 90 分钟、1Hz、固定随机种子的统计仿真，以及 Road 连续性、负荷惯性和心率滞后回归。
-- 仿真结果：192.7±15.2W，功率秒差 P50/P95=4/10W，AC1/AC5=0.935/0.795，功率/踏频相关=0.411，心率 95% 秒差=1bpm，功率与 30 秒后心率相关 0.673（即时 0.259）。
-- 验证：`make -C test clean && make -C test run` 5913/0；配置一致性 269/0、门户结构 238/0、JS 语法和 mock 保存回显通过；rebase 至 v4.1.3 基线后 `idf.py build` 复验通过（固件 `0x116220`，app 分区剩余 72%）；quick operation gate 全绿；完整 `quality_gate.py` 98 PASS / 1 个预期未推送提交 WARN / 0 FAIL。
-- 未执行：本轮尚未烧录 generic-c3/m5stamp-c3，标准骑行客户端的真实 1Hz 时序观察和长时运行保持 `NOT_RUN`。
 
 ### GitHub 单一交付链路与仓库治理（2026-10-22）
 - `v4.1.1` 的 10 个正式附件已原样迁移到 GitHub Release；双板固件和总包的 SHA256、ZIP 完整性及历史 manifest 30 条记录均通过复核。历史总包仅包含 generic-c3 证据，未补写或冒充 m5stamp-c3 真机验收。

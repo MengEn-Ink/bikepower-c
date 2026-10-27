@@ -43,7 +43,7 @@
   <line x1="420" y1="235" x2="420" y2="255" stroke="#666" stroke-width="1" marker-end="url(#arrow)"/>
   <line x1="735" y1="218" x2="760" y2="218" stroke="#ff9800" stroke-width="1" marker-end="url(#arrow)"/>
   <rect x="610" y="178" width="125" height="26" rx="4" fill="#fff8e1" stroke="#ff9800" stroke-width="0.8"/>
-  <text x="672" y="195" text-anchor="middle" font-size="8.5" fill="#e65100">ST_WIFI_CONFIG 时跳过 BLE 快照</text>
+  <text x="672" y="195" text-anchor="middle" font-size="8.5" fill="#e65100">配网共存时继续 BLE 快照</text>
 
   <!-- ===== 步骤 4: 快照生成 ===== -->
   <rect x="100" y="260" width="640" height="35" rx="4" fill="#e8f5e9" stroke="#4caf50" stroke-width="1"/>

@@ -90,12 +90,14 @@
 12. `ble_bikepower_set_erg_callback(on_erg_target)`
 13. `ble_bikepower_set_device_name(s_engine.device_name)`
 14. `ble_bikepower_start()`
-15. `esp_task_wdt_add(NULL)`
-16. 进入永久主循环
+15. `domain_rng_seed(esp_random())` 用硬件随机数播种骑行模型
+16. `esp_task_wdt_add(NULL)`
+17. 进入永久主循环
 
 这里有几个实现上的关键点：
 
 - BLE 设备名并不是固定宏，而是先从 NVS 读配置后再调用 `ble_bikepower_set_device_name()`
+- 领域层 RNG 保持纯 C、可在 host 固定种子复现；真机则在进入主循环前用 `esp_random()` 播种，避免每次上电重复相同轨迹
 - 状态机先启动，再注册 `wifi_trigger`
 - `button.c` 只拿到事件队列句柄，不直接依赖状态机
 - `on_erg_target()` 不直接改领域层，而是先把 `APP_EVT_ERG_TARGET` 投递进队列
@@ -134,16 +136,19 @@
 每拍的执行顺序可以概括为：
 
 1. 非阻塞 drain `s_app_queue`
-2. 如果状态机处于 `ST_WIFI_CONFIG`，只喂狗并 `vTaskDelay(50ms)`，跳过 BLE 快照逻辑
-3. 调用 `ble_bikepower_conn_count()` 轮询连接变化
-4. 如连接状态有变化，构造 `APP_EVT_CONN_CHANGED`
-5. 调用 `app_state_tick()`
-6. 调用 `power_engine_snapshot(&s_engine)`
-7. 调用 `ble_bikepower_set_data()`
-8. 每 200 拍打印一次心跳并检查堆内存
-9. 如 `power_engine_is_dirty()` 为真，则调用 `nvs_store_save()`
-10. `esp_task_wdt_reset()`
-11. `vTaskDelay(50ms)`
+2. 消费 WiFi 完成与 ERG pending latch，避免事件队列满时丢失关键状态
+3. 若 BLE 未就绪则执行受控重试；仅共存失败的独占兜底暂停 BLE 时跳过快照
+4. 调用 `ble_bikepower_conn_count()` 轮询连接变化
+5. 如连接状态有变化，构造 `APP_EVT_CONN_CHANGED`
+6. 调用 `app_state_tick()`
+7. 调用 `power_engine_snapshot(&s_engine)` 或跑步快照路径
+8. 调用 `ble_bikepower_set_data()` / `ble_bikepower_set_running_data()`
+9. 每 200 拍打印一次心跳并检查堆内存
+10. 如 `power_engine_is_dirty()` 为真，则调用 `nvs_store_save()`
+11. `esp_task_wdt_reset()`
+12. `vTaskDelay(50ms)`
+
+普通 `ST_WIFI_CONFIG` 共存模式不会跳过快照：BLE 保持在线，主循环继续更新共享数据，通知定时器照常每秒发送。只有 `radio_ctrl_ble_suspended()` 明确表示共存启动失败并进入独占兜底时，才暂时跳过 BLE 数据路径。
 
 这意味着主循环不是“所有 BLE 发包都在这里做”，而是“这里生成领域快照，BLE 定时器异步取走并通知”。
 
@@ -469,9 +474,9 @@ Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述�
 
 - 功率在 `base_power` 上叠加 `[-power_float, +power_float]` 的双时间尺度有界偏移
 - 踏频在 `cadence_base` 上叠加独立动态和功率弱耦合偏移，结果仍限制在 `[-cadence_float, +cadence_float]`
-- 浮动幅度 `power_float` / `cadence_float` / `hr_float` 可在配网页调整并持久化（新配置默认 ±30 W / ±4 rpm / ±2 bpm，已有 NVS 配置不自动改写）
+- 浮动幅度 `power_float` / `cadence_float` / `hr_float` 可在配网页调整并持久化（新配置默认 ±50 W / ±8 rpm / ±2 bpm，已有 NVS 配置不自动改写）
 - 浮动为 0 时对应量恒定输出基准值
-- 分层动态（`ride_dynamics_step`）：慢层每 10-30 秒重采样路况/体力趋势并按 8 秒时间常数逼近，快层每秒吸收一次踩踏/传感器扰动；两层合成后仍严格限制在浮动带内
+- 分层动态（`ride_dynamics_step`）：慢层占幅度的 80%，每 6-18 秒选择新航点并用 smoothstep 在起点和目标间连续过渡；快层每秒更新一次并以 `alpha=0.65` 吸收踩踏/传感器扰动；两层合成后仍严格限制在浮动带内
 - 如果 `has_user_hr` 为真，则走 `hr_model_steady_user(st, user_hr, hr_float)`（心率按 `hr_float` 幅度平稳波动，`hr_float=0` 恒定）
 - 否则先把瞬时功率转换为带生理惯性的负荷功率，再按 FTP 区间推导目标心率，最后走心率平滑和 HRV
 
@@ -546,7 +551,7 @@ Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，�
 它不是简单的“功率乘一个系数”，而是由五层行为叠加：
 
 1. 功率负荷滤波
-2. FTP 区间映射
+2. FTP 区间映射与锚点压缩
 3. 心率一阶指数平滑
 4. HRV 变异叠加
 5. 对外输出限速
@@ -572,7 +577,7 @@ Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，�
 - `HR_ZONE_RECOVERY_BASE = 42`
 - `HR_ZONE_RECOVERY_SLOPE = 26`
 
-得到的 `hr_pct` 再乘以 `thr_hr`，最后经 `hr_clamp()` 限制到 `HR_MIN=60` 和 `HR_MAX=200`。
+得到的 `hr_pct` 再乘以 `thr_hr`。联动心率路径随后以 `thr_hr * 85%` 为锚点，把映射值相对锚点的偏差压缩为 70%，避免功率和心率瞬时过度耦合；最后经 `hr_clamp()` 限制到 `HR_MIN=60` 和 `HR_MAX=200`。
 
 ### 7.3 一阶指数平滑
 
@@ -600,6 +605,7 @@ Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，�
 - 呼吸性窦性心律变异 `RSA`
 - Mayer wave
 - 慢漂移 `drift_bpm`
+- 独立慢速游走：在 ±7bpm 航点间用 smoothstep 连续过渡，每段 30-90 秒
 
 相关常量：
 
@@ -609,6 +615,10 @@ Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，�
 - `HRV_MAYER_PERIOD_S = 10.0f`
 - `HRV_DRIFT_RATE_BPM_PER_MIN = 0.05f`
 - `HRV_DRIFT_CAP_BPM = 5.0f`
+- `HRV_WANDER_AMPLITUDE = 7`
+- `HRV_WANDER_HOLD_MIN_LOOPS / MAX_LOOPS = 600 / 1800`
+
+`hr_model_reset_variation()` 会同时清除周期缓存、秒计数、漂移和游走状态，模式切换或解除心率锁定后不会带入旧航点。
 
 ### 7.5 对外输出限速
 
@@ -982,7 +992,7 @@ M5Stamp C3 使用：
 
 - `button_task`：`2560`
 - `led_task`：`2048`
-- HTTP server：`8192`
+- HTTP server：`12288`
 
 这些值是当前版本运行下的稳定配置，不建议在无压测前提下随意缩小。
 
@@ -1041,6 +1051,24 @@ python3 scripts/tools/check_release_artifacts.py \
 
 该测试覆盖 `power_engine`、`running_engine`、`hr_model`、`profile`、`config_store` 等纯 C 逻辑；协议 payload 另由生产使用的 `ble_payload_codec`、固定 JSON vectors 和 `test/ble_codec_cli` 交叉验证。
 项目规则要求：只要改动了 `components/bikepower_domain/`，就应运行 host 单测。
+
+真实骑行模型还要求复验附件统计基准：
+
+```bash
+python3 tests/analyze_fit_reference.py \
+  /path/to/MyWhoosh_-_Hudayriyat_Octopus_Loop.fit \
+  --verify tests/fixtures/ride_reference_metrics.json
+```
+
+固定基准绑定附件 SHA-256，并覆盖功率/踏频/心率的均值、标准差、分位数、秒差、自相关和跨信号相关。host 单测另包含 16 种子 90 分钟回归、24 小时等效快照、上下边界最大/零浮动、Road 单点区间、ERG 0/2000W 与高频目标、心率锁定切换、2000 轮模式切换，以及 1Hz 通知抖动、丢样和重复保持仿真。这些测试验证领域层数值稳定性，不替代真实 NimBLE 调度、射频丢包或客户端兼容性验收。
+
+#### 开源方案调研与取舍
+
+- [SmartSpin2k ERG simulator](https://github.com/doudar/SmartSpin2k/tree/develop/scripts/erg_sim) 使用加速模拟时钟、多种子、传感器延迟/抖动/丢样、边界 workout 和生产控制器桥接。BikePower 借鉴其“真实代码 + 确定性场景 + 时序退化 + 指标门限”的测试方法，但当前项目没有阻力执行器，不移植其 ERG 控制器或 plant 模型。
+- [qdomyos-zwift fake bike](https://github.com/cagnulein/qdomyos-zwift/blob/master/src/devices/fakebike/fakebike.cpp) 展示了虚拟骑行设备与 FTMS 桥接结构；其简单独立随机功率/踏频更适合协议联调，不适合作为本项目的真实骑行统计模型。
+- [GoldenCheetah](https://github.com/GoldenCheetah/GoldenCheetah) 适合离线训练负荷与模型分析。若未来积累更多 FIT，可在开发机增加 normalized power、功率分布或 W' 等离线评价，不把重型分析栈放进 ESP32-C3 固件。
+
+上述项目均为 GPL 系列许可证。当前实现只独立采用公开方法和测试思想，没有复制其源码；BikePower 的固件运行时继续保持无动态内存、常量级状态和 50ms 固定节拍。
 
 无需设备的协议与 harness 回归：
 

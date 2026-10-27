@@ -54,8 +54,8 @@ output_hr = 有用户心率 ? hr_model_steady_user(user_hr, hr_float)
 ```
 
 **双时间尺度动态**（`ride_dynamics_step`）：
-- 慢层每 10-30 秒重采样路况/体力趋势，按 8 秒时间常数平滑逼近
-- 快层每秒吸收一次有界踩踏/传感器扰动
+- 慢层占幅度 80%，每 6-18 秒选择新航点并用 smoothstep 连续过渡
+- 快层每秒以 `alpha=0.65` 吸收一次有界踩踏/传感器扰动
 - 两层合成结果始终夹在配置浮动带内，`amp=0` 时严格恒定
 
 ### Road 模式（build_road）
@@ -97,7 +97,7 @@ output_hr = 有用户心率 ? hr_model_steady_user(user_hr, hr_float)
 | 105-120% | 线性插值 | VO2max |
 | >120% | 上限值 | 无氧 |
 
-`hr_pct × thr_hr` 后经 `hr_clamp()` 限制到 `[HR_MIN=60, HR_MAX=200]`。
+`hr_pct × thr_hr` 后，以 `thr_hr × 85%` 为锚点把相对偏差压缩到 70%，再经 `hr_clamp()` 限制到 `[HR_MIN=60, HR_MAX=200]`。该压缩避免瞬时功率和目标心率过度同步。
 
 ### 3. 一阶指数平滑（hr_model_smooth）
 
@@ -117,6 +117,7 @@ dt = 0.05s（50ms 节拍）
 - **RSA**（呼吸性窦性心律不齐）：振幅 `HRV_RSA_AMPLITUDE=2.0 BPM`，频率 `0.12Hz`
 - **Mayer wave**：振幅 `1.0 BPM`，周期 `10s`
 - **慢漂移**：速率 `0.05 BPM/min`，上限 `5 BPM`
+- **独立慢游走**：在 ±7 BPM 随机航点间连续过渡，每段 30-90 秒
 
 ### 5. 输出限速（hr_model_emit）
 
@@ -133,7 +134,7 @@ dt = 0.05s（50ms 节拍）
 | `hr_model_smooth(state, target_hr)` | 非对称心率平滑 |
 | `hr_model_variation(state)` / `hr_model_emit(state, raw)` | HRV 叠加与对外限速 |
 | `hr_model_steady_user(state, user_hr, float_amp)` | 锁定心率路径（带波动） |
-| `hr_model_reset_variation(state)` | 模式切换时重置变异状态 |
+| `hr_model_reset_variation(state)` | 模式切换时重置周期缓存、漂移和慢游走状态 |
 
 ---
 
