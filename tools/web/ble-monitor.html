@@ -3,356 +3,243 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BikePower BLE 监控与固件刷写</title>
+<title>BikePower 实时信号监控与固件刷写</title>
 <style>
 :root{
-  --bg:#0a0e17;
-  --bg-2:#0f1520;
-  --panel:#131a28;
-  --panel-2:#182131;
-  --line:#1f2a3d;
-  --line-soft:#1a2333;
-  --ink:#e6edf6;
-  --ink-soft:#aebacc;
-  --muted:#6b7a93;
-  --faint:#4a5770;
-  --accent:#00d4ff;
-  --accent-2:#3da9fc;
-  --accent-deep:#0099cc;
-  --accent-soft:rgba(0,212,255,.12);
-  --green:#3ddc97;
-  --green-soft:rgba(61,220,151,.12);
-  --red:#ff5c7c;
-  --red-soft:rgba(255,92,124,.12);
-  --amber:#ffb454;
-  --amber-soft:rgba(255,180,84,.12);
-  --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,Consolas,monospace;
-  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-  --radius:12px;
-  --radius-sm:8px;
-  --shadow-sm:0 1px 3px rgba(0,0,0,.3);
-  --shadow-md:0 4px 16px rgba(0,0,0,.35);
-  --shadow-lg:0 12px 40px rgba(0,0,0,.4);
+  --bg:#0a0807;
+  --panel:#17110e;
+  --panel-2:#211711;
+  --panel-3:#2a1c14;
+  --line:#58463a;
+  --line-soft:#35281f;
+  --ink:#d8c7b5;
+  --strong:#f4e8d8;
+  --muted:#aa998c;
+  --faint:#78675b;
+  --accent:#f05523;
+  --accent-dark:#70230f;
+  --accent-soft:rgba(240,85,35,.13);
+  --green:#9fcb71;
+  --green-soft:rgba(159,203,113,.12);
+  --red:#ff765d;
+  --red-soft:rgba(255,118,93,.12);
+  --amber:#e4ad61;
+  --amber-soft:rgba(228,173,97,.12);
+  --violet:#a78bfa;
+  --mono:Menlo,"SFMono-Regular",Consolas,monospace;
+  --sans:"Avenir Next","PingFang SC","Microsoft YaHei",sans-serif;
+  --display:"Bodoni 72",Didot,"Times New Roman",serif;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;background:var(--bg)}
 body{
-  background:var(--bg);
-  color:var(--ink);
-  font-family:var(--sans);
-  font-size:13.5px;
-  line-height:1.55;
-  padding:24px 22px 42px;
-  min-height:100vh;
-  -webkit-font-smoothing:antialiased;
-  -moz-osx-font-smoothing:grayscale;
+  color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;
+  min-height:100vh;-webkit-font-smoothing:antialiased;
 }
-body::before{
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
-  background:
-    radial-gradient(800px 500px at 80% -10%,rgba(0,212,255,.07),transparent 60%),
-    radial-gradient(700px 500px at -10% 110%,rgba(61,220,151,.04),transparent 55%);
-}
-.wrap{max-width:1200px;margin:0 auto;position:relative;z-index:1}
+button,a,select,summary{font:inherit}
+button:focus-visible,a:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.wrap{min-height:100vh}
+.hidden{display:none!important}
 
-/* ===== 顶部 ===== */
+/* ===== 顶部品牌与任务导航 ===== */
 .masthead{
-  display:flex;align-items:center;justify-content:space-between;gap:20px;
-  margin-bottom:20px;
+  min-height:64px;border-bottom:1px solid var(--line);padding:0 22px;
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;
+  background:rgba(10,8,7,.96);position:sticky;top:0;z-index:20;
 }
-.brand{display:flex;align-items:center;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
 .brand-mark{
-  width:44px;height:44px;border-radius:11px;
-  background:linear-gradient(135deg,var(--accent),var(--accent-2));
-  color:#04141f;display:grid;place-items:center;
-  font-weight:900;font-size:16px;letter-spacing:-.03em;
-  font-family:var(--mono);
-  box-shadow:0 0 20px rgba(0,212,255,.35),inset 0 1px 0 rgba(255,255,255,.2);
-  position:relative;
+  width:24px;height:24px;display:grid;place-items:center;background:var(--accent);
+  color:var(--bg);font:900 12px/1 var(--mono);letter-spacing:-.04em;
 }
-.brand-mark::after{
-  content:"";position:absolute;inset:0;border-radius:11px;
-  background:radial-gradient(circle at 30% 25%,rgba(255,255,255,.35),transparent 50%);
-  pointer-events:none;
-}
-.brand h1{
-  font-size:20px;line-height:1.1;margin:0;letter-spacing:-.03em;font-weight:800;
-  color:var(--ink);
-}
-.brand .sub{display:block;font-size:12px;color:var(--muted);margin-top:3px;font-weight:500;font-family:var(--mono)}
-
-.masthead-right{display:flex;align-items:center;gap:10px}
-.chip{
-  display:inline-flex;align-items:center;gap:7px;
-  padding:6px 13px;border-radius:999px;
-  background:var(--green-soft);color:var(--green);
-  font-size:12px;font-weight:700;font-family:var(--mono);
-  border:1px solid rgba(61,220,151,.25);
-}
-.chip .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
-
-/* ===== 模式大卡片 ===== */
-.mode-select{
-  display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;
-}
+.brand h1{font-size:16px;line-height:1;margin:0;font-weight:900;letter-spacing:-.04em;color:var(--strong)}
+.brand h1 span{color:var(--accent)}
+.brand .sub{display:none}
+.masthead-right{justify-self:end}
+.chip{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font:12px/1 var(--mono);white-space:nowrap}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.mode-select{display:flex;align-items:stretch;justify-content:center;border:1px solid var(--line);min-height:40px}
 .mode-btn{
-  display:flex;flex-direction:column;align-items:flex-start;gap:10px;
-  border:1.5px solid var(--line);background:var(--panel);color:var(--ink);
-  padding:22px 20px;border-radius:var(--radius);cursor:pointer;font-family:var(--sans);
-  text-align:left;transition:all .2s ease;box-shadow:var(--shadow-sm);
-  position:relative;overflow:hidden;
+  min-width:132px;min-height:44px;border:0;border-right:1px solid var(--line);
+  padding:0 18px;background:transparent;color:var(--muted);cursor:pointer;
+  display:grid;place-items:center;transition:background .15s,color .15s;
 }
-.mode-btn::before{
-  content:"";position:absolute;top:0;left:0;right:0;height:2px;
-  background:var(--line);transition:all .2s;
-}
-.mode-btn:hover{
-  border-color:var(--accent-2);transform:translateY(-2px);
-  box-shadow:var(--shadow-md);
-}
-.mode-btn:hover::before{background:var(--accent-2)}
-.mode-btn.active{
-  border-color:var(--accent);background:linear-gradient(135deg,rgba(0,212,255,.1),rgba(61,169,252,.08));
-  box-shadow:0 0 24px rgba(0,212,255,.15),var(--shadow-md);
-}
-.mode-btn.active::before{background:var(--accent)}
-.mode-btn.active .mode-desc{color:var(--ink-soft)}
-.mode-btn .ico{
-  font-size:28px;line-height:1;width:44px;height:44px;
-  display:grid;place-items:center;border-radius:10px;
-  background:var(--panel-2);border:1px solid var(--line);
-}
-.mode-btn.active .ico{background:var(--accent-soft);border-color:rgba(0,212,255,.3)}
-.mode-btn .mode-title{font-size:16px;font-weight:800;letter-spacing:-.01em}
-.mode-btn .mode-desc{font-size:12.5px;color:var(--muted);font-weight:500;line-height:1.4}
+.mode-btn:last-child{border-right:0}
+.mode-btn:hover{color:var(--strong);background:var(--panel)}
+.mode-btn.active{background:var(--ink);color:var(--bg);font-weight:900}
+.mode-btn .ico,.mode-btn .mode-desc{display:none}
+.mode-btn .mode-title{font-size:13px;font-weight:800;white-space:nowrap}
 
-/* ===== 按钮 ===== */
+/* ===== 通用控件 ===== */
 .btn{
-  border:1px solid var(--line);border-radius:var(--radius-sm);
-  padding:9px 15px;font-size:12.5px;font-weight:700;cursor:pointer;
-  font-family:var(--sans);color:var(--ink-soft);
-  background:var(--panel-2);transition:all .15s;
-  display:inline-flex;align-items:center;gap:6px;
+  min-height:44px;border:1px solid var(--line);border-radius:0;padding:9px 16px;
+  color:var(--ink);background:transparent;cursor:pointer;font-size:13px;font-weight:800;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background .15s,border-color .15s,color .15s;
 }
-.btn:hover{border-color:var(--accent-2);color:var(--ink)}
+.btn:hover:not(:disabled){border-color:var(--accent);color:var(--strong);background:var(--panel-2)}
 .btn:active:not(:disabled){transform:translateY(1px)}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-.btn.primary{
-  background:var(--accent);color:#04141f;border-color:var(--accent);
-  box-shadow:0 0 14px rgba(0,212,255,.25);
-}
-.btn.primary:hover:not(:disabled){filter:brightness(1.1);color:#04141f}
-.btn.alt{background:transparent;color:var(--accent);border-color:rgba(0,212,255,.3)}
-.btn.alt:hover:not(:disabled){background:var(--accent-soft);border-color:rgba(0,212,255,.5)}
-.btn.danger{background:var(--red);color:#fff;border-color:var(--red)}
-.btn.danger:hover:not(:disabled){background:#e04a68}
-.btn.ghost{background:transparent;color:var(--ink-soft);border-color:var(--line)}
-.btn.ghost:hover:not(:disabled){background:var(--panel-2)}
-.btn.sm{padding:7px 12px;font-size:11.5px}
-.btn.big{padding:13px 24px;font-size:14px;border-radius:10px}
-
-/* ===== 步骤指引 ===== */
-.flash-step{
-  margin:12px 0;padding:14px 16px;
-  background:var(--panel-2);border-radius:var(--radius-sm);
-  border-left:3px solid var(--accent);
-}
-.flash-step b{color:var(--accent);font-size:13.5px}
-.flash-step p{margin:6px 0 0;color:var(--ink-soft);font-size:12.5px;line-height:1.6}
-
-.flash-details{margin-top:16px}
-.flash-details summary{
-  cursor:pointer;color:var(--muted);font-size:13px;font-weight:600;
-  padding:8px 0;user-select:none;
-}
-.flash-details[open] summary{color:var(--accent)}
-
-.flash-cta{margin:18px 0;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-
-/* ===== 卡片/面板 ===== */
-.card{
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  padding:20px 22px;
-  box-shadow:var(--shadow-md);
-}
-.card + .card{margin-top:16px}
-.card-head{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-  margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line);
-}
-.card-head h2{
-  margin:0;font-size:13.5px;font-weight:800;color:var(--ink);letter-spacing:.005em;
-  display:flex;align-items:center;gap:8px;
-}
-.card-head h2::before{
-  content:"";width:2px;height:13px;border-radius:1px;
-  background:var(--accent);box-shadow:0 0 6px var(--accent);
-}
-.card-head .actions{display:flex;gap:8px;flex-wrap:wrap}
-
-/* ===== 徽章 ===== */
-.badge{
-  display:inline-flex;align-items:center;gap:6px;
-  border-radius:999px;padding:4px 12px;font-size:11px;font-weight:700;
-  font-family:var(--mono);letter-spacing:.02em;
-  background:var(--accent-soft);color:var(--accent);
-  border:1px solid rgba(0,212,255,.25);
-}
-.badge.ok{background:var(--green-soft);color:var(--green);border-color:rgba(61,220,151,.3)}
-.badge.warn{background:var(--amber-soft);color:var(--amber);border-color:rgba(255,180,84,.3)}
-.badge.err{background:var(--red-soft);color:var(--red);border-color:rgba(255,92,124,.3)}
-.badge.muted{background:var(--panel-2);color:var(--muted);border-color:var(--line)}
-
-.hidden{display:none !important}
-
-/* ===== 链接 ===== */
-.release-link{color:var(--accent-2);font-weight:700;text-decoration:none}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.btn.primary:hover:not(:disabled){background:#ff7548;border-color:#ff7548;color:var(--bg)}
+.btn.alt{border-color:var(--accent);color:var(--accent)}
+.btn.ghost{color:var(--muted)}
+.btn.danger{background:var(--red);border-color:var(--red);color:var(--bg)}
+.btn.sm{min-height:44px;padding:7px 12px;font-size:12px}
+.btn.big{min-height:50px;padding:12px 22px;font-size:14px}
+.actions,.dc-foot,.flash-cta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.release-link{color:var(--accent);font-weight:800;text-decoration:none}
 .release-link:hover{text-decoration:underline}
 
-/* ===== 信息行 ===== */
+/* ===== 页面与面板 ===== */
+#support-warning{margin:18px auto 0;max-width:1120px;border-color:var(--red);color:var(--red)}
+#mode-flash,#mode-compare{max-width:1120px;margin:24px auto 0;padding:0 20px 40px}
+.card{background:var(--panel);border:1px solid var(--line);padding:22px}
+.card+.card{margin-top:16px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;padding-bottom:15px;border-bottom:1px solid var(--line)}
+.card-head h2{margin:0;color:var(--strong);font-size:20px;line-height:1.2;font-weight:900}
+.card-head .actions{justify-content:flex-end}
+.badge{
+  display:inline-flex;align-items:center;min-height:28px;padding:4px 9px;border:1px solid var(--line);
+  color:var(--muted);font:700 12px/1 var(--mono);letter-spacing:.01em;
+}
+.badge.ok{border-color:var(--green);color:var(--green);background:var(--green-soft)}
+.badge.warn{border-color:var(--amber);color:var(--amber);background:var(--amber-soft)}
+.badge.err{border-color:var(--red);color:var(--red);background:var(--red-soft)}
+.badge.muted{background:var(--panel-2)}
+.flash-step{margin:12px 0;padding:16px;border:1px solid var(--line);background:var(--panel-2)}
+.flash-step b{color:var(--strong);font-size:14px}
+.flash-step p{margin:7px 0 0;color:var(--muted);font-size:14px;line-height:1.65}
+.flash-details{margin-top:16px;border-top:1px solid var(--line);padding-top:6px}
+.flash-details summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--muted);font-weight:800}
+.flash-details[open] summary{color:var(--accent)}
+.flash-cta{margin:18px 0}
+.hint{font-size:13px;color:var(--muted);line-height:1.65;margin-top:10px}
+.hint b{color:var(--strong)}
 .spec{display:grid;gap:0;margin:0}
-.spec .row{
-  display:flex;justify-content:space-between;gap:14px;
-  padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:13px;
-}
-.spec .row:last-child{border-bottom:0}
-.spec .row span:first-child{color:var(--muted);min-width:90px;font-weight:500}
-.spec .row span:last-child{text-align:right;word-break:break-all;font-weight:700;color:var(--ink-soft)}
-.flash-sha{font-family:var(--mono);font-size:11px !important;color:var(--muted) !important;font-weight:500 !important}
-
-/* ===== ESP Web Tools ===== */
-esp-web-install-button{
-  --esp-tools-button-color:var(--accent);
-  --esp-tools-button-border-radius:var(--radius-sm);
-  display:inline-block;
-}
-#flash-activate{min-width:168px}
-
-/* ===== 双栏 ===== */
+.row{display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:14px}
+.row:last-child{border-bottom:0}
+.row span:first-child{color:var(--muted);min-width:90px}
+.row span:last-child{text-align:right;word-break:break-word;color:var(--ink);font-weight:700}
+.flash-sha{font-family:var(--mono);font-size:12px!important;color:var(--muted)!important;font-weight:500!important}
+esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button-border-radius:0;display:inline-block}
+#flash-activate{min-width:190px}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
 
-/* ===== 信息行 ===== */
-.row{
-  display:flex;justify-content:space-between;gap:14px;
-  padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:13px;
-}
-.row:last-child{border-bottom:0}
-.row span:first-child{color:var(--muted);min-width:80px;font-weight:500}
-.row span:last-child{font-weight:700;text-align:right;word-break:break-all;color:var(--ink-soft)}
+/* ===== 信号宣言监控台 ===== */
+#mode-connect{min-height:calc(100vh - 64px)}
+#mode-connect>.card:first-child{border:0;padding:0;background:transparent}
+.monitor-grid{display:grid;grid-template-columns:220px minmax(0,1fr) 272px;min-height:calc(100vh - 64px)}
+.monitor-rail,.evidence{padding:30px 18px;border-right:1px solid var(--line)}
+.evidence{border-right:0;border-left:1px solid var(--line)}
+.eyebrow{color:var(--accent);font:800 12px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.monitor-rail h2,.evidence h2{margin:9px 0 0;color:var(--strong);font-size:24px;line-height:1.22;font-weight:900;letter-spacing:-.03em}
+.device-id{margin-top:7px;color:var(--muted);font:12px/1.6 var(--mono);overflow-wrap:anywhere}
+.link-state{margin:25px 0 18px;padding:17px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.link-state strong{display:block;color:var(--green);font-size:14px}
+.link-state strong::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:8px;background:currentColor}
+.link-state.is-idle strong{color:var(--muted)}
+.link-state span{display:block;margin-top:5px;color:var(--muted);font:12px/1.5 var(--mono)}
+.monitor-rail .actions{display:grid;gap:8px}
+.monitor-rail .actions .btn{width:100%}
+.monitor-note{margin:18px 0 0;color:var(--muted);font-size:13px;line-height:1.65}
+.signal-stage{min-width:0;padding:24px 26px 30px}
+.signal-head{display:flex;justify-content:space-between;gap:16px;padding:7px 0 15px;border-top:1px solid var(--line);font:12px/1.4 var(--mono);color:var(--muted)}
+.hero-readout{display:grid;grid-template-columns:minmax(230px,.95fr) minmax(220px,.8fr);align-items:end;gap:22px;padding:12px 0 20px;border-bottom:1px solid var(--line)}
+.hero-value{color:var(--strong);font:400 clamp(92px,10vw,176px)/.77 var(--display);letter-spacing:-.075em;white-space:nowrap}
+.hero-value small{font:900 clamp(28px,3vw,46px)/1 var(--sans);letter-spacing:-.04em;color:var(--accent)}
+.hero-copy{padding-bottom:4px}
+.hero-copy strong{display:block;color:var(--strong);font-size:18px;line-height:1.35}
+.hero-copy p{margin:8px 0 0;color:var(--muted);font-size:14px;line-height:1.65}
+.trace-panel{margin-top:20px;border:1px solid var(--line);background:var(--panel)}
+.trace-head{min-height:52px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
+.legend{display:flex;align-items:center;gap:18px;flex-wrap:wrap;color:var(--ink);font:12px/1 var(--mono)}
+.legend span{display:inline-flex;align-items:center;gap:8px}.legend i{width:20px;height:2px;display:inline-block}
+.trace-window{position:relative;height:260px;overflow:hidden;background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);background-size:100% 25%,12.5% 100%}
+.trace-window svg{display:block;width:100%;height:100%;overflow:visible}
+.trace-window path{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
+.trace-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font:12px/1.5 var(--mono);text-align:center;padding:18px}
+.signal-foot{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line)}
+.mini-metric{min-width:0;padding:15px;border-right:1px solid var(--line)}
+.mini-metric:last-child{border-right:0}
+.mini-metric span{display:block;color:var(--muted);font:12px/1.4 var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-metric b{display:block;margin-top:4px;color:var(--strong);font:700 28px/1.1 var(--mono);letter-spacing:-.04em}
+.mini-metric em{color:var(--accent);font-size:12px;font-style:normal;letter-spacing:0}
+.evidence h2{font-size:28px}
+.health-score{display:grid;grid-template-columns:70px 1fr;align-items:center;gap:10px;margin-top:18px;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.health-score>b{color:var(--strong);font:400 58px/.9 var(--display)}
+.health-score p{margin:0;color:var(--muted);font-size:12px;line-height:1.45}.health-score strong{color:var(--green);font-size:13px}
+.evidence-list{margin-top:8px}
+.proof-row{min-height:54px;display:grid;grid-template-columns:8px 1fr auto;align-items:center;gap:9px;border-bottom:1px solid var(--line-soft)}
+.proof-row>i{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.proof-row.off>i{background:var(--faint)}.proof-row.warn>i{background:var(--accent)}
+.proof-row b{color:var(--strong);font:800 12px/1.2 var(--mono)}
+.proof-row small{color:var(--muted);font:12px/1.35 var(--mono)}
+.evidence>.actions{margin-top:16px;display:grid;grid-template-columns:1fr 1fr}
+.evidence>.actions .btn{padding-left:8px;padding-right:8px}
+.protocol,.device-details{margin-top:16px;border-top:1px solid var(--line)}
+.protocol summary,.device-details summary{min-height:46px;display:flex;align-items:center;cursor:pointer;color:var(--muted);font-size:13px;font-weight:800}
+.protocol[open] summary,.device-details[open] summary{color:var(--accent)}
+.device-lower{grid-column:1/-1;border-top:1px solid var(--line);padding:22px;display:grid;grid-template-columns:minmax(260px,.7fr) minmax(0,1.3fr);gap:28px;background:var(--panel)}
+.device-lower h3{margin:0 0 10px;color:var(--strong);font-size:16px}
+.device-card{border:1px solid var(--line);padding:16px;background:var(--panel-2)}
+#single-device-card{display:contents}
+.dc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.dc-name{font-weight:900;font-size:16px;color:var(--strong)}
+.dc-meta{font:12px/1.5 var(--mono);color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+.dc-body{display:grid;gap:0}.dc-foot{margin-top:12px}
 
-/* ===== 服务列表 ===== */
-.svc-list{display:flex;flex-direction:column;gap:6px;margin-top:4px}
-.svc-item{
-  border:1px solid var(--line);border-radius:8px;padding:11px 13px;background:var(--panel-2);
-}
-.svc-item .svc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.svc-item .svc-name{font-weight:700;font-size:12.5px;color:var(--ink-soft);font-family:var(--mono)}
-.svc-item .svc-uuid{font-family:var(--mono);font-size:11px;color:var(--faint)}
-.svc-item .chars{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:4px}
-.svc-item .char{font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
-.svc-item .char b{color:var(--ink-soft);font-weight:600}
-.svc-item .props{font-size:10px;color:var(--faint);font-family:var(--mono)}
-
-/* ===== 设备卡片 ===== */
-.device-card{
-  border:1px solid var(--line);border-radius:var(--radius);
-  padding:16px;background:var(--panel-2);
-  box-shadow:var(--shadow-sm);position:relative;
-}
-.device-card .dc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
-.device-card .dc-name{font-weight:800;font-size:14px;color:var(--ink)}
-.device-card .dc-meta{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px}
-.device-card .dc-body{display:grid;gap:0}
-.device-card .dc-foot{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
-
-/* ===== 实时数据指标 ===== */
-.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.metric{
-  background:var(--panel-2);border:1px solid var(--line);
-  border-radius:var(--radius-sm);padding:14px;position:relative;overflow:hidden;
-}
-.metric::before{
-  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
-  background:var(--accent);box-shadow:0 0 8px var(--accent);
-}
-.metric b{
-  display:block;font-size:26px;font-weight:800;color:var(--ink);
-  font-family:var(--mono);letter-spacing:-.03em;line-height:1.1;
-}
-.metric span{display:block;font-size:11px;color:var(--muted);margin-top:5px}
-
-/* ===== 比对表 ===== */
-.compare-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
-.compare-table th,.compare-table td{
-  padding:9px 12px;text-align:left;border-bottom:1px solid var(--line-soft);vertical-align:top;
-}
-.compare-table th{font-weight:700;color:var(--accent);font-size:11px;background:var(--panel-2);font-family:var(--mono);letter-spacing:.02em}
-.compare-table th:first-child{border-radius:8px 0 0 0}
-.compare-table th:last-child{border-radius:0 8px 0 0}
-.compare-table td.field-name{font-weight:600;color:var(--ink-soft);background:var(--panel-2);width:120px;white-space:nowrap;font-family:var(--mono)}
-.compare-table td.diff{background:var(--amber-soft)}
-.compare-table td.same{background:var(--green-soft)}
-.compare-table .cell-val{font-family:var(--mono);font-size:11.5px;word-break:break-all;color:var(--ink-soft)}
+/* ===== GATT、模板、比对、日志 ===== */
+.svc-list{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.svc-item{border:1px solid var(--line);padding:12px;background:var(--panel-2)}
+.svc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.svc-name{font-weight:800;font-size:12px;color:var(--strong);font-family:var(--mono)}
+.svc-uuid{font:12px/1.45 var(--mono);color:var(--faint);overflow-wrap:anywhere;text-align:right}
+.chars{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:7px}
+.char{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:12px}.char b{color:var(--ink)}
+.props{font:12px/1.45 var(--mono);color:var(--faint);white-space:nowrap}
+.compare-table{width:100%;border-collapse:collapse;font-size:13px}
+.compare-table th,.compare-table td{padding:10px 12px;text-align:left;border:1px solid var(--line-soft);vertical-align:top}
+.compare-table th{font-weight:800;color:var(--accent);font:12px/1.4 var(--mono);background:var(--panel-2)}
+.compare-table td.field-name{font-weight:700;color:var(--ink);background:var(--panel-2);width:120px;white-space:nowrap}
+.compare-table td.diff{background:var(--amber-soft)}.compare-table td.same{background:var(--green-soft)}
+.compare-table .cell-val{font:12px/1.5 var(--mono);word-break:break-word;color:var(--ink)}
 .compare-table .cell-missing{color:var(--faint);font-style:italic}
-
-/* ===== 日志 ===== */
-.log{
-  height:220px;overflow:auto;
-  background:#060910;
-  color:#dbeafe;border-radius:var(--radius-sm);padding:13px 16px;
-  font-family:var(--mono);font-size:11.5px;line-height:1.7;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
-  border:1px solid var(--line);
-}
-.log::-webkit-scrollbar{width:8px}
-.log::-webkit-scrollbar-track{background:rgba(255,255,255,.02)}
-.log::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
-.log div{margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.info{color:#7dd3fc}
-.data-log{color:var(--green)}
-.warn-log{color:var(--amber)}
-.err-log{color:var(--red)}
-
-/* ===== 提示 ===== */
-.hint{font-size:12.5px;color:var(--muted);line-height:1.6;margin-top:10px}
-.hint b{color:var(--ink);font-weight:700}
-
-/* ===== 模板 ===== */
 .templates{display:flex;flex-direction:column;gap:8px;margin-top:12px}
-.tpl-item{
-  border:1px solid var(--line);border-radius:8px;padding:11px 13px;background:var(--panel-2);
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-}
-.tpl-item .tpl-info{display:flex;flex-direction:column;gap:2px}
-.tpl-item .tpl-name{font-weight:700;font-size:13px}
-.tpl-item .tpl-sub{font-size:11px;color:var(--muted);font-family:var(--mono)}
-.tpl-item .tpl-ops{display:flex;gap:6px}
+.tpl-item{border:1px solid var(--line);padding:12px;background:var(--panel-2);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tpl-info{display:flex;flex-direction:column;gap:3px}.tpl-name{font-weight:800;color:var(--strong)}.tpl-sub{font:12px/1.45 var(--mono);color:var(--muted)}.tpl-ops{display:flex;gap:6px}
+.empty-state{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty-state .big{font:400 72px/1 var(--display);color:var(--faint);margin-bottom:10px}.empty-state p{margin:5px 0;font-size:14px}
+#templates-card,#log-panel{max-width:1120px;margin:16px auto 0}
+#log-panel{margin-bottom:34px}
+#log-panel>summary{min-height:44px;display:flex;align-items:center}
+.log{height:220px;overflow:auto;background:var(--bg);color:var(--ink);padding:13px 15px;font:12px/1.75 var(--mono);border:1px solid var(--line)}
+.log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.info{color:var(--ink)}.data-log{color:var(--green)}.warn-log{color:var(--amber)}.err-log{color:var(--red)}
 
-/* ===== 空状态 ===== */
-.empty-state{
-  text-align:center;padding:44px 20px;color:var(--muted);
+@media(max-width:1080px){
+  .monitor-grid{grid-template-columns:200px minmax(0,1fr)}
+  .evidence{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+  .evidence>.eyebrow,.evidence>h2{grid-column:1/-1}.evidence-list{margin-top:18px}.evidence>.actions,.protocol{align-self:start}
+  .signal-foot{grid-template-columns:repeat(2,1fr)}.mini-metric:nth-child(2){border-right:0}.mini-metric:nth-child(-n+2){border-bottom:1px solid var(--line)}
 }
-.empty-state .big{font-size:44px;margin-bottom:12px;opacity:.5}
-.empty-state p{margin:4px 0;font-size:13px}
-
-/* ===== 响应式 ===== */
-@media(max-width:840px){
-  body{padding:16px 14px 30px}
-  .masthead{display:block}
-  .masthead-right{margin-top:12px}
-  .two-col{grid-template-columns:1fr}
-  .mode-select{grid-template-columns:1fr}
-  .mode-btn{padding:16px}
-  .mode-btn .ico{font-size:22px;width:38px;height:38px}
-  .metrics{grid-template-columns:repeat(2,1fr)}
+@media(max-width:760px){
+  .masthead{grid-template-columns:1fr auto;min-height:58px;padding:0 14px}.masthead-right{display:none}
+  .mode-select{justify-self:end;max-width:236px;overflow-x:auto}.mode-btn{min-width:78px;padding:0 10px}.mode-btn .mode-title{font-size:12px}
+  #mode-connect{min-height:calc(100vh - 58px)}.monitor-grid{grid-template-columns:1fr;min-height:auto}
+  .monitor-rail{border-right:0;border-bottom:1px solid var(--line);padding:20px 16px}.monitor-rail h2{font-size:28px}.monitor-rail .actions{grid-template-columns:1fr 1fr}.monitor-note{display:none}
+  .signal-stage{padding:18px 14px 24px}.hero-readout{grid-template-columns:1fr;padding-top:7px}.hero-value{font-size:clamp(96px,31vw,140px)}.hero-copy{padding-bottom:2px}
+  .trace-window{height:230px}.evidence{grid-column:auto;grid-template-columns:1fr;padding:22px 16px}.evidence>.eyebrow,.evidence>h2{grid-column:auto}.health-score{margin-top:16px}
+  .device-lower{grid-template-columns:1fr;padding:18px 14px}.two-col{grid-template-columns:1fr}
+  #mode-flash,#mode-compare{margin-top:18px;padding:0 14px 28px}.card{padding:16px}.card-head{align-items:flex-start;flex-direction:column}.card-head .actions{justify-content:flex-start}
+  #templates-card,#log-panel{margin-left:14px;margin-right:14px}.svc-head,.char{flex-direction:column}.svc-uuid{text-align:left}.props{white-space:normal}
 }
 @media(max-width:480px){
-  .row{flex-direction:column;gap:2px}
-  .row span:first-child{min-width:auto}
-  .row span:last-child{text-align:left}
+  .brand-mark{display:none}.brand h1{font-size:14px}.mode-select{max-width:228px}.mode-btn{min-width:74px}
+  .monitor-rail .actions{grid-template-columns:1fr}.signal-head{font-size:12px}.hero-copy strong{font-size:17px}.trace-window{height:205px}
+  .signal-foot{grid-template-columns:1fr 1fr}.mini-metric b{font-size:24px}.evidence>.actions{grid-template-columns:1fr}
+  .row{flex-direction:column;gap:3px}.row span:first-child{min-width:0}.row span:last-child{text-align:left}
+  .tpl-item{align-items:flex-start;flex-direction:column}.tpl-ops{width:100%}.tpl-ops .btn{flex:1}
 }
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 </style>
 <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
 </head>
@@ -362,32 +249,31 @@ esp-web-install-button{
     <div class="brand">
       <div class="brand-mark">BP</div>
       <div>
-        <h1>BikePower BLE 工具台</h1>
+        <h1>Bike<span>Power</span></h1>
         <span class="sub">固件刷写 · 蓝牙设备信息采集 · 多设备一比一比对</span>
       </div>
     </div>
+    <nav class="mode-select" aria-label="工具模式">
+      <button class="mode-btn" data-mode="connect" onclick="switchMode('connect')">
+        <span class="ico" aria-hidden="true">●</span>
+        <span class="mode-title">实时监控</span>
+        <span class="mode-desc">读取设备信息与实时数据</span>
+      </button>
+      <button class="mode-btn" data-mode="flash" onclick="switchMode('flash')">
+        <span class="ico" aria-hidden="true">↓</span>
+        <span class="mode-title">固件刷写</span>
+        <span class="mode-desc">把最新固件烧录到开发板</span>
+      </button>
+      <button class="mode-btn" data-mode="compare" onclick="switchMode('compare')">
+        <span class="ico" aria-hidden="true">＝</span>
+        <span class="mode-title">设备比对</span>
+        <span class="mode-desc">并排对比多台设备信息</span>
+      </button>
+    </nav>
     <div class="masthead-right">
-      <span class="chip"><span class="dot"></span>BLE 就绪</span>
+      <span class="chip"><span class="dot"></span><span id="top-status">等待用户授权</span></span>
     </div>
   </header>
-
-  <div class="mode-select">
-    <button class="mode-btn" data-mode="flash" onclick="switchMode('flash')">
-      <span class="ico">⬇</span>
-      <span class="mode-title">固件刷写</span>
-      <span class="mode-desc">把最新固件烧录到开发板</span>
-    </button>
-    <button class="mode-btn" data-mode="connect" onclick="switchMode('connect')">
-      <span class="ico">📶</span>
-      <span class="mode-title">连接蓝牙设备</span>
-      <span class="mode-desc">读取设备信息与实时数据</span>
-    </button>
-    <button class="mode-btn" data-mode="compare" onclick="switchMode('compare')">
-      <span class="ico">⚖</span>
-      <span class="mode-title">多设备比对</span>
-      <span class="mode-desc">并排对比多台设备信息</span>
-    </button>
-  </div>
 
   <div class="card hidden" id="support-warning">
     当前浏览器不支持 Web Bluetooth API。请使用桌面版 Chrome / Edge，并通过 HTTPS 页面打开。
@@ -448,25 +334,67 @@ esp-web-install-button{
 
   <!-- ============ 模式二：连接蓝牙设备 ============ -->
   <section id="mode-connect" class="hidden">
-    <div class="card">
-      <div class="card-head">
-        <h2>连接蓝牙设备</h2>
+    <div class="monitor-grid">
+      <aside class="monitor-rail">
+        <span class="eyebrow">LIVE / CYCLING</span>
+        <h2 id="monitor-device-name">BikePower</h2>
+        <div class="device-id" id="monitor-device-id">尚未读取设备身份<br>Web Bluetooth / USER GRANT</div>
+        <div class="link-state is-idle" id="link-state">
+          <strong id="link-status">未连接</strong>
+          <span id="last-notify">等待用户主动选择蓝牙设备</span>
+        </div>
         <div class="actions">
           <button class="btn primary" onclick="connectAnyDevice()">扫描并连接设备</button>
           <button class="btn alt" onclick="connectAuthorized()">已授权设备</button>
-          <button class="btn alt" onclick="loadTemplates()">已存模板</button>
+          <button class="btn ghost" onclick="loadTemplates()">查看已存模板</button>
         </div>
-      </div>
-      <div class="flash-step">
-        <b>怎么用</b>
-        <p>点击「扫描并连接设备」，在浏览器弹窗中选择任意蓝牙设备（心率带、骑行台、功率计、踏频器、BikePower 开发板等）。连接后会自动读取设备信息（厂商、型号、序列号、版本等）和 GATT 服务列表，并可保存为模板。</p>
-      </div>
-      <div id="connect-empty" class="empty-state">
-        <div class="big">📶</div>
-        <p><b>尚未连接设备</b></p>
-        <p>点击右上角「扫描并连接设备」开始</p>
-      </div>
-      <div id="connect-result" class="hidden">
+        <div id="connect-empty" class="monitor-note">首次连接会打开浏览器设备选择器；网页不能静默获取附近设备。选择后将读取 DIS、GATT 与实时通知。</div>
+      </aside>
+
+      <main class="signal-stage">
+        <div class="signal-head"><span>CYCLING POWER / CPS + FTMS</span><b id="signal-clock">--:--:--.---</b></div>
+        <div class="hero-readout">
+          <div class="hero-value"><span id="m-power">--</span><small> W</small></div>
+          <div class="hero-copy"><strong id="power-summary">等待真实骑行信号。</strong><p id="power-detail">连接后，功率、踏频与心率会沿同一条时间轴更新。这里不会用演示值替代设备证据。</p></div>
+        </div>
+        <section class="trace-panel" aria-label="实时信号轨迹">
+          <header class="trace-head">
+            <div class="legend"><span><i style="background:var(--accent)"></i>功率</span><span><i style="background:var(--ink)"></i>踏频</span><span><i style="background:var(--violet)"></i>心率</span></div>
+            <span class="eyebrow">LATEST 30 SEC</span>
+          </header>
+          <div class="trace-window">
+            <svg viewBox="0 0 900 260" preserveAspectRatio="none" aria-label="真实 BLE 通知信号曲线">
+              <path id="trace-power" stroke="var(--accent)" stroke-width="3"></path>
+              <path id="trace-cadence" stroke="var(--ink)" stroke-width="2"></path>
+              <path id="trace-hr" stroke="var(--violet)" stroke-width="2"></path>
+            </svg>
+            <div class="trace-empty" id="trace-empty">NO DEVICE TRACE<br>等待真实 BLE 通知</div>
+          </div>
+          <footer class="signal-foot">
+            <div class="mini-metric"><span>CADENCE / CSC</span><b><span id="m-cadence">--</span> <em>rpm</em></b></div>
+            <div class="mini-metric"><span>HEART RATE / HRS</span><b><span id="m-hr">--</span> <em>bpm</em></b></div>
+            <div class="mini-metric"><span>SPEED / RSC</span><b><span id="m-speed">--</span> <em>km/h</em></b></div>
+            <div class="mini-metric"><span>NOTIFICATION GAP</span><b><span id="m-gap">--</span> <em>sec</em></b></div>
+          </footer>
+        </section>
+      </main>
+
+      <aside class="evidence">
+        <span class="eyebrow">SESSION EVIDENCE</span>
+        <h2>信号有据可查。</h2>
+        <div class="health-score"><b id="health-score">--</b><p><strong id="health-label">等待连接</strong><br><span id="health-detail">尚无会话证据</span></p></div>
+        <div class="evidence-list">
+          <div class="proof-row off" id="proof-cps"><i></i><span><b>CPS</b><br><small>CYCLING POWER</small></span><small id="proof-cps-time">—</small></div>
+          <div class="proof-row off" id="proof-hr"><i></i><span><b>HRS</b><br><small>HEART RATE</small></span><small id="proof-hr-time">—</small></div>
+          <div class="proof-row off" id="proof-csc"><i></i><span><b>CSC</b><br><small>CADENCE</small></span><small id="proof-csc-time">—</small></div>
+          <div class="proof-row off" id="proof-rsc"><i></i><span><b>RSC</b><br><small>SPEED + CADENCE</small></span><small id="proof-rsc-time">—</small></div>
+          <div class="proof-row off" id="proof-ftms"><i></i><span><b>FTMS</b><br><small>INDOOR BIKE</small></span><small id="proof-ftms-time">—</small></div>
+        </div>
+        <div class="actions"><button class="btn primary" onclick="downloadReport()">导出报告</button><button class="btn" onclick="saveCurrentTemplate()">保存模板</button></div>
+        <details class="protocol"><summary>会话说明</summary><div class="hint">健康分由连接状态、最近通知间隔与本次异常计数计算。服务行只在订阅成功后点亮；时间为对应服务最近一条真实通知的间隔。</div></details>
+      </aside>
+
+      <div id="connect-result" class="device-lower hidden">
         <div class="device-card" id="single-device-card"></div>
       </div>
     </div>
@@ -499,7 +427,7 @@ esp-web-install-button{
         <p>依次点击「添加设备」连接多台蓝牙设备，系统会自动比对各设备的信息字段和 GATT 服务列表。<span style="color:var(--amber)">黄色</span>背景表示该字段在设备间存在差异，<span style="color:var(--green)">绿色</span>表示一致。点击设备卡片中的「复制为模板」可将该设备信息保存为模板。</p>
       </div>
       <div id="compare-empty" class="empty-state">
-        <div class="big">⚖</div>
+        <div class="big" aria-hidden="true">A/B</div>
         <p><b>尚未添加设备</b></p>
         <p>点击「添加设备」连接第一台蓝牙设备</p>
       </div>
@@ -511,7 +439,7 @@ esp-web-install-button{
   </section>
 
   <details class="card" id="log-panel" style="margin-top:16px">
-    <summary style="cursor:pointer;font-weight:700;color:var(--ink-soft)">事件日志 <span class="hint" style="display:inline;font-weight:400">（展开查看）</span></summary>
+    <summary style="cursor:pointer;font-weight:700;color:var(--ink)">事件日志 <span class="hint" style="display:inline;font-weight:400">（展开查看）</span></summary>
     <div style="display:flex;justify-content:flex-end;margin:8px 0 0"><button class="btn ghost sm" onclick="clearLog()">清空</button></div>
     <div class="log" id="log" style="margin-top:8px"></div>
   </details>
@@ -603,6 +531,14 @@ let anomalyTimer = null;
 
 function $(id){return document.getElementById(id);}
 function setText(id,value){const el=$(id);if(el)el.textContent=value;}
+function escapeHtml(value){
+  return String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);
+}
+function notificationGapText(timestamp){
+  if(!timestamp)return "—";
+  const seconds=Math.max(0,(Date.now()-timestamp)/1000);
+  return seconds<10?seconds.toFixed(1)+"s":Math.round(seconds)+"s";
+}
 function uuidShort(uuid){
   if(!uuid)return "";
   const m=uuid.match(/^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i);
@@ -645,13 +581,20 @@ function recordAnomaly(kind, detail){
 }
 function checkAnomalies(){
   const rec=currentMode==="connect"?singleDevice:null;
-  if(!rec||!rec.server||!rec.server.connected||!rec.lastNotifyAt)return;
+  if(!rec||!rec.server||!rec.server.connected){updateMonitorEvidence(rec);return;}
+  if(!rec.lastNotifyAt){updateMonitorEvidence(rec);return;}
   const gap=Date.now()-rec.lastNotifyAt;
   if(gap>ANOMALY_LIMITS.staleMs){
     if(!rec.staleOpen){rec.staleOpen=true;recordAnomaly("stale","超过 "+Math.round(gap)+"ms 未收到通知");}
   }
+  updateMonitorEvidence(rec);
 }
-function markNotify(rec){rec.lastNotifyAt=Date.now();rec.staleOpen=false;}
+function markNotify(rec,serviceKey){
+  const now=Date.now();
+  rec.lastNotifyAt=now;
+  rec.notifyTimes[serviceKey]=now;
+  rec.staleOpen=false;
+}
 function parseCyclingPower(view){
   if(view.byteLength<4)throw new Error("CPS 长度不足");
   return {flags:view.getUint16(0,true),power:view.getInt16(2,true)};
@@ -662,7 +605,7 @@ function parseHeartRate(view){
   if(flags&0x01){if(view.byteLength<3)throw new Error("HRS uint16 长度不足");return view.getUint16(1,true);}
   return view.getUint8(1);
 }
-function parseCsc(view){
+function parseCsc(rec,view){
   if(view.byteLength<5)throw new Error("CSC 长度不足");
   const flags=view.getUint8(0);
   if(!(flags&0x02))return null;
@@ -697,23 +640,100 @@ function parseRsc(view){
 }
 function handleNotify(rec,serviceKey,event){
   try{
-    markNotify(rec);
+    markNotify(rec,serviceKey);
     const view=event.target.value;
     const latest=rec.latest;
-    if(serviceKey==="cps"){const p=parseCyclingPower(view);latest.power=p.power;renderRealtime(rec);if(p.power<0||p.power>ANOMALY_LIMITS.powerMax)recordAnomaly("power",p.power+" W");}
-    else if(serviceKey==="hr"){const hr=parseHeartRate(view);latest.hr=hr;renderRealtime(rec);if(hr<ANOMALY_LIMITS.hrMin||hr>ANOMALY_LIMITS.hrMax)recordAnomaly("heartrate",hr+" BPM");}
-    else if(serviceKey==="csc"){const c=parseCsc(view);if(c!==null){latest.cadence=c;renderRealtime(rec);if(c>ANOMALY_LIMITS.cadenceMax)recordAnomaly("cadence",c+" RPM");}}
-    else if(serviceKey==="ftms"){const d=parseIndoorBike(view);if(d.cadence!==null&&latest.cadence===null){latest.cadence=Math.round(d.cadence);renderRealtime(rec);}if(d.power!==null){latest.ftmsPower=d.power;if(latest.power===null)renderRealtime(rec);if(d.power<0||d.power>ANOMALY_LIMITS.powerMax)recordAnomaly("power",d.power+" W(FTMS)");}}
-    else if(serviceKey==="rsc"){const d=parseRsc(view);latest.speed=d.speed;latest.cadence=d.cadence;latest.distance=d.distanceM;renderRealtime(rec);if(d.speed>ANOMALY_LIMITS.speedMaxKmh)recordAnomaly("speed",d.speed.toFixed(2)+" km/h");}
+    if(serviceKey==="cps"){const p=parseCyclingPower(view);latest.power=p.power;if(p.power<0||p.power>ANOMALY_LIMITS.powerMax)recordAnomaly("power",p.power+" W");}
+    else if(serviceKey==="hr"){const hr=parseHeartRate(view);latest.hr=hr;if(hr<ANOMALY_LIMITS.hrMin||hr>ANOMALY_LIMITS.hrMax)recordAnomaly("heartrate",hr+" BPM");}
+    else if(serviceKey==="csc"){const c=parseCsc(rec,view);if(c!==null){latest.cadence=c;if(c>ANOMALY_LIMITS.cadenceMax)recordAnomaly("cadence",c+" RPM");}}
+    else if(serviceKey==="ftms"){const d=parseIndoorBike(view);if(d.speed!==null&&latest.speed===null)latest.speed=d.speed;if(d.cadence!==null&&latest.cadence===null)latest.cadence=Math.round(d.cadence);if(d.power!==null){latest.ftmsPower=d.power;if(d.power<0||d.power>ANOMALY_LIMITS.powerMax)recordAnomaly("power",d.power+" W(FTMS)");}}
+    else if(serviceKey==="rsc"){const d=parseRsc(view);latest.speed=d.speed;latest.cadence=d.cadence;latest.distance=d.distanceM;if(d.speed>ANOMALY_LIMITS.speedMaxKmh)recordAnomaly("speed",d.speed.toFixed(2)+" km/h");}
+    appendSignalHistory(rec);
+    renderRealtime(rec);
   }catch(err){recordAnomaly("parse",err.message);}
+}
+function appendSignalHistory(rec){
+  const now=Date.now();
+  if(rec.lastHistoryAt&&now-rec.lastHistoryAt<200)return;
+  rec.lastHistoryAt=now;
+  const latest=rec.latest;
+  rec.history.push({
+    t:now,
+    power:latest.power===null?latest.ftmsPower:latest.power,
+    cadence:latest.cadence,
+    hr:latest.hr,
+  });
+  rec.history=rec.history.filter(sample=>now-sample.t<=30000).slice(-180);
+}
+function signalPath(history,key,min,max){
+  const now=Date.now();
+  const oldest=history.length?history[0].t:now;
+  const windowMs=Math.min(30000,Math.max(1000,now-oldest));
+  const points=history.filter(sample=>typeof sample[key]==="number").map(sample=>{
+    const x=Math.max(0,Math.min(900,900-((now-sample.t)/windowMs)*900));
+    const ratio=Math.max(0,Math.min(1,(sample[key]-min)/(max-min)));
+    return [x,238-ratio*216];
+  });
+  if(points.length<2)return "";
+  return points.map((point,index)=>(index?"L":"M")+point[0].toFixed(1)+" "+point[1].toFixed(1)).join(" ");
+}
+function renderSignalTrace(rec){
+  const history=rec&&rec.history?rec.history:[];
+  $("trace-power").setAttribute("d",signalPath(history,"power",0,600));
+  $("trace-cadence").setAttribute("d",signalPath(history,"cadence",0,160));
+  $("trace-hr").setAttribute("d",signalPath(history,"hr",40,220));
+  const hasTrace=["trace-power","trace-cadence","trace-hr"].some(id=>$(id).getAttribute("d"));
+  $("trace-empty").classList.toggle("hidden",hasTrace);
 }
 function renderRealtime(rec){
   if(currentMode!=="connect"||rec!==singleDevice)return;
   const l=rec.latest;
-  setText("m-power",l.power===null?"--":l.power);
+  const power=l.power===null?l.ftmsPower:l.power;
+  setText("m-power",power===null?"--":power);
   setText("m-hr",l.hr===null?"--":l.hr);
   setText("m-cadence",l.cadence===null?"--":l.cadence);
   setText("m-speed",l.speed===null?"--":(typeof l.speed==="number"?l.speed.toFixed(2):"--"));
+  if(power===null){setText("power-summary","已连接，等待功率通知。");}
+  else{setText("power-summary","当前真实输出 "+power+"W。");}
+  setText("power-detail","数值来自本次浏览器会话收到的 CPS、HRS、CSC、RSC 或 FTMS 通知；断连后不会继续模拟变化。");
+  setText("signal-clock",new Date(rec.lastNotifyAt).toLocaleTimeString("zh-CN",{hour12:false})+"."+String(new Date(rec.lastNotifyAt).getMilliseconds()).padStart(3,"0"));
+  renderSignalTrace(rec);
+  updateMonitorEvidence(rec);
+}
+function updateMonitorEvidence(rec){
+  const connected=!!(rec&&rec.server&&rec.server.connected);
+  if(!connected){
+    setText("top-status","等待用户授权");setText("link-status","未连接");setText("last-notify","等待用户主动选择蓝牙设备");
+    $("link-state").classList.add("is-idle");setText("health-score","--");setText("health-label","等待连接");setText("health-detail","尚无会话证据");setText("m-gap","--");
+  }else{
+    $("link-state").classList.remove("is-idle");setText("top-status","BLE 已连接");setText("link-status","已连接");
+    const gap=rec.lastNotifyAt?Date.now()-rec.lastNotifyAt:null;
+    setText("last-notify",gap===null?"已连接，等待第一条通知":"最后通知 "+notificationGapText(rec.lastNotifyAt)+" 前");
+    setText("m-gap",gap===null?"--":(gap/1000).toFixed(1));
+    let score=gap===null?82:gap<=1500?98:gap<=ANOMALY_LIMITS.staleMs?88:35;
+    score=Math.max(20,score-Math.min(18,Object.values(anomalies).reduce((sum,count)=>sum+count,0)*2));
+    setText("health-score",score);setText("health-label",gap===null?"等待通知":gap<=ANOMALY_LIMITS.staleMs?"连接健康":"通知已停更");
+    setText("health-detail",gap===null?"GATT 已连接":"本次会话 "+Object.values(anomalies).reduce((sum,count)=>sum+count,0)+" 条异常");
+  }
+  for(const key of ["cps","hr","csc","rsc","ftms"]){
+    const row=$("proof-"+key);if(!row)continue;
+    const subscribed=connected&&!!rec.subscriptions[key];
+    const timestamp=subscribed?rec.notifyTimes[key]:0;
+    const stale=timestamp&&Date.now()-timestamp>ANOMALY_LIMITS.staleMs;
+    row.classList.toggle("off",!subscribed);row.classList.toggle("warn",!!stale);
+    setText("proof-"+key+"-time",!subscribed?"—":timestamp?notificationGapText(timestamp):"READY");
+  }
+}
+function resetMonitorSignals(){
+  for(const id of ["m-power","m-hr","m-cadence","m-speed","m-gap"])setText(id,"--");
+  setText("signal-clock","--:--:--.---");setText("power-summary","等待真实骑行信号。");
+  setText("power-detail","连接后，功率、踏频与心率会沿同一条时间轴更新。这里不会用演示值替代设备证据。");
+  for(const id of ["trace-power","trace-cadence","trace-hr"])$(id).setAttribute("d","");
+  $("trace-empty").classList.remove("hidden");updateMonitorEvidence(null);
+}
+function saveCurrentTemplate(){
+  if(!singleDevice||!singleDevice.server||!singleDevice.server.connected){log("尚无可保存的已连接设备","warn");return;}
+  saveAsTemplate(singleDevice);
 }
 function downloadReport(){
   const report={
@@ -810,6 +830,11 @@ function renderSelectedFirmware(){
 async function loadFirmwareCatalog(){
   resetFirmwareDetails();
   webInstallerReady=!!customElements.get("esp-web-install-button");
+  if(location.protocol==="file:"){
+    setFirmwareStatus("需要本地服务","warn");
+    setText("flash-message","直接打开 HTML 时浏览器不能读取同源固件索引。请使用项目的本地监控服务，或访问已部署的 HTTPS Pages 页面。");
+    return;
+  }
   try{
     const response=await fetch(FIRMWARE_INDEX_URL,{cache:"no-store"});
     if(!response.ok)throw new Error("HTTP "+response.status);
@@ -895,9 +920,16 @@ async function enumerateServices(server){
 async function connectAndCollect(device){
   const rec={device,server:null,info:{},services:[],connectedAt:new Date().toISOString(),
     latest:{power:null,hr:null,cadence:null,speed:null,ftmsPower:null,distance:null},
-    lastNotifyAt:0,cscPrev:null,staleOpen:false};
+    lastNotifyAt:0,cscPrev:null,staleOpen:false,subscriptions:{},notifyTimes:{},history:[],lastHistoryAt:0};
   device.addEventListener("gattserverdisconnected",()=>{
     log("设备 '"+(device.name||"(无名)")+"' 已断开","warn");
+    if(singleDevice===rec){
+      recordAnomaly("disconnect","设备连接已关闭");
+      singleDevice=null;
+      $("connect-result").classList.add("hidden");$("connect-empty").classList.remove("hidden");
+      setText("monitor-device-name","BikePower");setText("monitor-device-id","尚未读取设备身份 / Web Bluetooth");
+      resetMonitorSignals();
+    }
   });
   try{
     rec.server=await device.gatt.connect();
@@ -930,6 +962,7 @@ async function subscribeNotifications(rec){
       const ch=await svc.getCharacteristic(charUuid);
       await ch.startNotifications();
       ch.addEventListener("characteristicvaluechanged",(ev)=>handleNotify(rec,key,ev));
+      rec.subscriptions[key]=true;
       log("已订阅 "+key.toUpperCase()+" 通知","data");
     }catch(err){
       if(!err.message.includes("not found"))log("未订阅 "+key+": "+err.message,"warn");
@@ -944,9 +977,12 @@ async function connectAuthorized(){
   const candidate=devices[0];
   if(!candidate){log("没有已授权的设备，请先点击扫描并连接设备","warn");return;}
   if(currentMode==="connect"){
+    if(singleDevice&&singleDevice.server){const previous=singleDevice;singleDevice=null;try{previous.server.disconnect();}catch(e){}}
+    anomalies={};
     $("connect-empty").classList.add("hidden");$("connect-result").classList.remove("hidden");
     $("single-device-card").innerHTML='<div class="dc-head"><span class="badge warn">连接中...</span></div>';
-    try{singleDevice=await connectAndCollect(candidate);renderSingleDevice(singleDevice);}catch(e){$("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+e.message+'</div>';}
+    setText("top-status","正在连接");setText("monitor-device-name",candidate.name||"未命名设备");
+    try{singleDevice=await connectAndCollect(candidate);renderSingleDevice(singleDevice);}catch(e){$("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+escapeHtml(e.message)+'</div>';resetMonitorSignals();}
   }else if(currentMode==="compare"){
     addCompareDeviceFromExisting(candidate);
   }
@@ -956,47 +992,44 @@ async function connectAuthorized(){
 async function connectAnyDevice(){
   const device=await requestDevice();
   if(!device)return;
+  if(singleDevice&&singleDevice.server){const previous=singleDevice;singleDevice=null;try{previous.server.disconnect();}catch(e){}}
+  anomalies={};
   $("connect-empty").classList.add("hidden");
   $("connect-result").classList.remove("hidden");
   $("single-device-card").innerHTML='<div class="dc-head"><span class="badge warn">连接中...</span></div>';
+  setText("top-status","正在连接");setText("monitor-device-name",device.name||"未命名设备");
   try{
     const rec=await connectAndCollect(device);
     singleDevice=rec;
     renderSingleDevice(rec);
   }catch(err){
-    $("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+err.message+'</div>';
+    $("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+escapeHtml(err.message)+'</div>';
+    resetMonitorSignals();
   }
 }
 
 function renderSingleDevice(rec){
   const card=$("single-device-card");
   const info=rec.info;
-  let html='<div class="dc-head">';
-  html+='<div><div class="dc-name">'+(rec.device.name||"(无名设备)")+'</div>';
-  html+='<div class="dc-meta">'+rec.device.id+'</div></div>';
-  html+='<span class="badge ok">已连接</span></div>';
-  html+='<div class="dc-body">';
+  const deviceName=rec.device.name||"(无名设备)";
+  setText("monitor-device-name",deviceName);setText("monitor-device-id",rec.device.id);
+  let html='<section><h3>设备身份</h3><div class="dc-head">';
+  html+='<div><div class="dc-name">'+escapeHtml(deviceName)+'</div>';
+  html+='<div class="dc-meta">'+escapeHtml(rec.device.id)+'</div></div>';
+  html+='<span class="badge ok">已连接</span></div><div class="dc-body">';
   for(const [key,label,uuid] of DIS_CHARS){
-    const val=info[key]||"<span style='color:var(--faint)'>未提供</span>";
-    html+='<div class="row"><span>'+label+'</span><span>'+val+'</span></div>';
+    const val=info[key]?escapeHtml(info[key]):"<span style='color:var(--faint)'>未提供</span>";
+    html+='<div class="row"><span>'+escapeHtml(label)+'</span><span>'+val+'</span></div>';
   }
   html+='</div>';
   html+='<div class="dc-foot">';
   html+='<button class="btn primary sm" onclick="saveAsTemplate(singleDevice)">保存为模板</button>';
   html+='<button class="btn alt sm" onclick="downloadReport()">导出报告</button>';
   html+='<button class="btn ghost sm" onclick="disconnectSingle()">断开</button>';
-  html+='</div>';
-  html+='<div style="margin-top:14px"><div class="card-head" style="margin-bottom:10px;padding-bottom:8px"><h2>实时数据</h2></div>';
-  html+='<div class="metrics">';
-  html+='<div class="metric"><b id="m-power">--</b><span>CPS/FTMS 功率 W</span></div>';
-  html+='<div class="metric"><b id="m-hr">--</b><span>心率 BPM</span></div>';
-  html+='<div class="metric"><b id="m-cadence">--</b><span>踏频/步频</span></div>';
-  html+='<div class="metric"><b id="m-speed">--</b><span>速度 km/h</span></div>';
-  html+='</div></div>';
-  html+='<div style="margin-top:14px"><div class="card-head" style="margin-bottom:10px;padding-bottom:8px"><h2>GATT 服务列表（'+rec.services.length+'）</h2></div>';
-  html+=renderServiceList(rec.services);
-  html+='</div>';
+  html+='</div></section>';
+  html+='<section><h3>GATT 服务列表（'+rec.services.length+'）</h3>'+renderServiceList(rec.services)+'</section>';
   card.innerHTML=html;
+  renderRealtime(rec);updateMonitorEvidence(rec);
 }
 
 function renderServiceList(services){
@@ -1004,11 +1037,11 @@ function renderServiceList(services){
   let html='<div class="svc-list">';
   for(const svc of services){
     html+='<div class="svc-item">';
-    html+='<div class="svc-head"><span class="svc-name">'+svc.name+'</span><span class="svc-uuid">'+svc.uuid+'</span></div>';
+    html+='<div class="svc-head"><span class="svc-name">'+escapeHtml(svc.name)+'</span><span class="svc-uuid">'+escapeHtml(svc.uuid)+'</span></div>';
     if(svc.characteristics.length){
       html+='<div class="chars">';
       for(const ch of svc.characteristics){
-        html+='<div class="char"><span><b>'+ch.name+'</b> <span class="svc-uuid">'+ch.uuid+'</span></span><span class="props">'+ch.properties+'</span></div>';
+        html+='<div class="char"><span><b>'+escapeHtml(ch.name)+'</b> <span class="svc-uuid">'+escapeHtml(ch.uuid)+'</span></span><span class="props">'+escapeHtml(ch.properties)+'</span></div>';
       }
       html+='</div>';
     }
@@ -1025,6 +1058,8 @@ function disconnectSingle(){
   singleDevice=null;
   $("connect-result").classList.add("hidden");
   $("connect-empty").classList.remove("hidden");
+  setText("monitor-device-name","BikePower");setText("monitor-device-id","尚未读取设备身份 / Web Bluetooth");
+  resetMonitorSignals();
 }
 
 /* ==================== 模板管理 ==================== */
@@ -1038,7 +1073,7 @@ function loadTemplates(){
   card.style.display="";
   box.innerHTML=list.map((t,i)=>{
     const sub=[t.info.manufacturer,t.info.model,t.info.firmware].filter(Boolean).join(" · ")||"无设备信息";
-    return '<div class="tpl-item"><div class="tpl-info"><span class="tpl-name">'+(t.name||t.deviceName||"模板 "+(i+1))+'</span><span class="tpl-sub">'+sub+'</span></div><div class="tpl-ops"><button class="btn alt sm" onclick="exportTemplate('+i+')">导出</button><button class="btn ghost sm" onclick="deleteTemplate('+i+')">删除</button></div></div>';
+    return '<div class="tpl-item"><div class="tpl-info"><span class="tpl-name">'+escapeHtml(t.name||t.deviceName||"模板 "+(i+1))+'</span><span class="tpl-sub">'+escapeHtml(sub)+'</span></div><div class="tpl-ops"><button class="btn alt sm" onclick="exportTemplate('+i+')">导出</button><button class="btn ghost sm" onclick="deleteTemplate('+i+')">删除</button></div></div>';
   }).join("");
 }
 function saveAsTemplate(rec){
@@ -1110,14 +1145,14 @@ async function addCompareDeviceFromExisting(device){
     renderCompareDeviceCard(card,rec);
     renderCompareTable();
   }catch(err){
-    card.innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+err.message+'</div>';
+    card.innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+escapeHtml(err.message)+'</div>';
   }
 }
 
 function renderCompareDeviceCard(card,rec){
   let html='<div class="dc-head">';
-  html+='<div><div class="dc-name">'+(rec.device.name||"(无名设备)")+'</div>';
-  html+='<div class="dc-meta">'+rec.device.id+'</div></div>';
+  html+='<div><div class="dc-name">'+escapeHtml(rec.device.name||"(无名设备)")+'</div>';
+  html+='<div class="dc-meta">'+escapeHtml(rec.device.id)+'</div></div>';
   html+='<span class="badge ok">已连接</span></div>';
   html+='<div class="dc-foot">';
   html+='<button class="btn primary sm" onclick="saveAsTemplate(compareDevices['+rec._idx+'])">复制为模板</button>';
@@ -1165,23 +1200,23 @@ function renderCompareTable(){
   wrap.classList.remove("hidden");
   const fields=[["name","设备名"],...DIS_CHARS.map(c=>[c[0],c[1]])];
   let html="<thead><tr><th>字段</th>";
-  compareDevices.forEach(rec=>{html+='<th>'+(rec.device.name||"设备")+'</th>';});
+  compareDevices.forEach(rec=>{html+='<th>'+escapeHtml(rec.device.name||"设备")+'</th>';});
   html+="</tr></thead><tbody>";
   for(const [key,label] of fields){
     const vals=compareDevices.map(rec=>key==="name"?(rec.device.name||""):(rec.info[key]||""));
     const uniq=[...new Set(vals.map(v=>v||""))];
     const diff=uniq.length>1;
-    html+='<tr><td class="field-name">'+label+'</td>';
+    html+='<tr><td class="field-name">'+escapeHtml(label)+'</td>';
     vals.forEach(v=>{
       const cls=!v?"cell-missing":(diff?"diff":"same");
-      html+='<td class="'+cls+'"><span class="cell-val">'+(v||"—")+'</span></td>';
+      html+='<td class="'+cls+'"><span class="cell-val">'+escapeHtml(v||"—")+'</span></td>';
     });
     html+="</tr>";
   }
   html+='<tr><td class="field-name">GATT 服务</td>';
   compareDevices.forEach(rec=>{
     const names=rec.services.map(s=>s.name).sort();
-    html+='<td class="cell-val" style="font-size:11px">'+names.join("<br>")+'</td>';
+    html+='<td class="cell-val" style="font-size:12px">'+names.map(escapeHtml).join("<br>")+'</td>';
   });
   html+="</tr>";
   html+="</tbody>";
@@ -1192,6 +1227,8 @@ function renderCompareTable(){
 window.addEventListener("load",()=>{
   checkSupport();
   loadFirmwareCatalog();
+  switchMode("connect");
+  resetMonitorSignals();
   log("BLE 工具台已就绪。");
 });
 </script>
