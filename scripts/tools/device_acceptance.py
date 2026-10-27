@@ -11,12 +11,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_EVIDENCE_DIR = ROOT / "tests" / "reports"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 VALID_BOARDS = ("generic-c3", "m5stamp-c3")
 VALID_STATUSES = ("PASS", "FAIL", "NOT_RUN")
 
 ITEM_DEFINITIONS = {
     "serial_boot": ("P0", "auto", "串口启动日志"),
+    "ble_config_rw": ("P0", "auto", "BLE 全量配置读写与 NVS 持久化"),
     "ble_cycling": ("P0", "auto", "骑行 BLE 自测"),
     "ble_reconnect": ("P0", "auto", "BLE 连接与重连"),
     "soak_5min": ("P0", "auto", "5 分钟设备耐久"),

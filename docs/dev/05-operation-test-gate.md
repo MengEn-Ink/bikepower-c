@@ -7,11 +7,11 @@
 
 | 层级 | 用途 | 入口 |
 |------|------|------|
-| Host 领域层/协议 | 功率、踏频、心率、运行会话、配置 schema、BLE payload golden vectors | `make -C test run`、`python3 tests/test_ble_protocol_vectors.py` |
+| Host 领域层/协议 | 功率、踏频、心率、运行会话、配置 schema、BLE payload golden vectors、Config E2E 协议帧 | `make -C test run`、`python3 tests/test_ble_protocol_vectors.py`、`python3 tests/test_ble_config_e2e.py` |
 | 离线 harness | 双次重连、running 四阶段、profile 全广播测试/恢复、FTMS 接纳和 WiFi done 可靠性契约 | `python3 tests/test_ble_reconnect_harness.py`、`python3 tests/test_ble_running_harness.py`、`python3 tests/test_device_profile_harness.py`、`python3 tests/check_ftms_control_contract.py`、`python3 tests/check_wifi_done_contract.py` |
 | Mock 网页层 | `/api/config` 保存回显、网页核心流程、设备模板、关闭 WiFi | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` |
 | 静态门禁 | 门户结构、JS、常量、NVS、任务/WDT、板型、操作矩阵、Pages 网页刷写站点 | `python3 tests/check_operation_coverage.py`、`python3 tests/check_ble_monitor.py`、`python3 tests/test_prepare_web_flash_site.py` 等 |
-| 真机自动化 | 串口启动、互斥 cycling/running GATT profile、FTMS ERG/跑步会话、配网门户 HTTP、5 分钟设备耐久 | `python3 tests/ble_selftest.py`、`python3 tests/device_profile_harness.py`、`python3 tests/stage5_portal_test.py`、`python3 tests/device_soak_5min.py` |
+| 真机自动化 | 串口启动、全量配置读写/NVS 持久化/GATT 重建、互斥 cycling/running GATT profile、FTMS ERG/跑步会话、配网门户 HTTP、5 分钟设备耐久 | `python3 tests/ble_config_e2e.py`、`python3 tests/ble_selftest.py`、`python3 tests/device_profile_harness.py`、`python3 tests/stage5_portal_test.py`、`python3 tests/device_soak_5min.py` |
 | 人工门禁 | 物理按钮手感、LED 肉眼灯效、手机 Captive Portal、Zwift/MyWhoosh 真实课程（P1，不阻塞发版） | `scripts/tools/device_acceptance.py` + 本文“人工门禁记录” |
 
 ## 二、操作覆盖矩阵
@@ -24,6 +24,7 @@
 | `OP-SAVE-001` | 骑行数值保存：功率、踏频、心率、心率锁定、浮动、按钮步进 | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` | 真机保存后刷新网页确认 |
 | `OP-SAVE-002` | 跑步数值保存：配速、配速浮动、步频、步频浮动、心率 | `python3 tests/test_portal_config_save.py`、`make -C test run` | MyWhoosh/Zwift 跑步速度显示人工确认 |
 | `OP-SAVE-003` | 用户资料与自定义机器人：体重、FTP、阈值心率、功体比上下限、昵称 | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` | 真机网页自定义机器人 UI 人工确认 |
+| `OP-SAVE-004` | BLE Config Service 五组全量读取/修改、事务错误拒绝、NVS 重启持久化和 GATT 重建；测试后恢复原配置 | `python3 tests/test_ble_config_e2e.py`、`python3 tests/ble_config_e2e.py --port <串口> --board <板型>` | Web Bluetooth 首次授权与页面表单交互仍需人工确认 |
 | `OP-BTN-001` | 短按减功率、长按连续加功率、非 steady 模式拒绝按钮调功 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮手感和重复节拍人工确认 |
 | `OP-BTN-002` | 长按 2 秒进入 WiFi 二次确认窗口，确认后触发配网 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮 + LED 确认窗口人工确认 |
 | `OP-BTN-003` | 确认窗口超时取消，回到 BLE 活动态，不误开 WiFi | `make -C test run` | 实体按钮等待 3 秒人工确认 |
@@ -76,6 +77,7 @@ python3 tests/operation_gate.py --level device \
 ```bash
 make -C test run
 python3 tests/test_ble_protocol_vectors.py
+python3 tests/test_ble_config_e2e.py
 python3 tests/test_ble_reconnect_harness.py
 python3 tests/test_ble_running_harness.py
 python3 tests/test_device_profile_harness.py
@@ -85,6 +87,7 @@ python3 tests/test_portal_config_save.py
 python3 tests/test_core_flow_endurance.py
 python3 tests/ble_selftest.py --profile cycling
 python3 tests/ble_selftest.py --profile running --control
+python3 tests/ble_config_e2e.py --port /dev/cu.usbmodem101 --board generic-c3
 python3 tests/device_profile_harness.py --profile cycling
 python3 tests/device_profile_harness.py --profile running
 python3 tests/stage3_conn_test.py
@@ -108,7 +111,7 @@ python3 scripts/tools/device_acceptance.py validate
 
 ## 四、人工门禁记录（P1，不阻塞发版）
 
-以下人工项默认不阻塞发版，但每次发可分发固件时建议按板型在结构化证据和测试报告中记录。P0 自动项（串口启动、骑行 BLE、重连、5 分钟设备耐久）必须全部通过；跑步 profile、配网门户和广播项因需要把测试机切到设备热点，归入 P1。证据文件是 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`，release 总包内保留相同文件名到 `evidence/`。
+以下人工项默认不阻塞发版，但每次发可分发固件时建议按板型在结构化证据和测试报告中记录。P0 自动项（串口启动、BLE 全量配置读写与 NVS 持久化、骑行 BLE、重连、5 分钟设备耐久）必须全部通过；跑步 profile、配网门户和广播项因需要把测试机切到设备热点，归入 P1。证据文件是 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`，release 总包内保留相同文件名到 `evidence/`。
 
 | 项目 | 通过标准 | 记录要求 |
 |------|----------|----------|

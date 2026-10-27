@@ -25,13 +25,16 @@
 5. `DT-5`：BLE 自测
 - 运行 `python3 tests/ble_selftest.py`
 - 验证五服务、DIS 读值、通知和 FTMS 控制点基本行为
-6. `DT-6`：连接状态测试
+6. `DT-5a`：BLE 全量配置读写与 NVS 持久化
+- 运行 `python3 tests/ble_config_e2e.py --port <port> --board <板型>`
+- 验证五组读取、事务错误拒绝、五组修改、重启持久化、GATT 重建，并确认测试结束后原配置已恢复
+7. `DT-6`：连接状态测试
 - 运行 `python3 tests/stage3_conn_test.py`
 - 验证状态机收到连接和断开事件
-7. `DT-7`：按钮与 LED 人工确认
+8. `DT-7`：按钮与 LED 人工确认
 - 人工执行短按、长按、长按进入确认窗口、二次确认
 - 人工观察 LED 慢闪、常亮、快闪、熄灭是否与状态一致
-8. `DT-8`：测试报告与随附文档
+9. `DT-8`：测试报告与随附文档
 - 每次生成可分发固件时，必须在同一产物目录生成 `test-report.md`、`core-flow-endurance.md`、`user-manual.md` 和 release 总包
 - 未执行的真机/人工项必须在报告中写明原因，不得默认通过
 

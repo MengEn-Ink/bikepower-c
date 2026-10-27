@@ -29,6 +29,7 @@ description: "ESP32-C3 ESP-IDF 固件真机测试流程。变更分类智能跳�
 - `tests/test_core_flow_endurance.py`：3 分钟核心流程耐久测试（按钮/心率/网页编辑/模板/关闭 WiFi）
 - `tests/serial_capture.py`：串口日志抓取
 - `tests/ble_selftest.py`：BLE 五服务 + FTMS ERG 自测
+- `tests/ble_config_e2e.py`：BLE 五组全量配置读写 + NVS 重启持久化 + GATT 重建 + 原配置恢复
 - `tests/stage3_conn_test.py`：连接事件驱动状态机验证
 - `tests/stage5_portal_test.py`：配网门户 HTTP 自测
 - `scripts/tools/generate_release_docs.py`：固件随附测试报告 + 用户文档生成
@@ -41,10 +42,11 @@ description: "ESP32-C3 ESP-IDF 固件真机测试流程。变更分类智能跳�
 3. **烧录**：`idf.py -p <port> flash`（串口自动扫描）。
 4. **串口确认**：`idf.py -p <port> monitor` 或 `tests/serial_capture.py`，检查启动日志（任务启动、state、空闲堆）。
 5. **BLE 自测**：`python tests/ble_selftest.py`（五服务 + 四特征通知 + FTMS ERG 收敛）。
-6. **状态机自测**：`python tests/stage3_conn_test.py`（连接事件驱动状态迁移）。
-7. **配网自测**：涉及 WiFi 门户时运行 `python tests/stage5_portal_test.py`。
-8. **物理验证**（人工）：按钮短/中/长按 + 二次确认 + LED 灯效（远程无法触发，需用户配合）。
-9. **报告产出**：每次生成可分发固件时，`build/release/` 必须同时包含双板型 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 与 release 总包 zip；测试未执行项必须写明原因，不得默认为通过。
+6. **配置服务自测**：`python3 tests/ble_config_e2e.py --port <port> --board <板型>`（五组读取/修改、错误路径、NVS 重启、GATT 重建和原配置恢复）。
+7. **状态机自测**：`python tests/stage3_conn_test.py`（连接事件驱动状态迁移）。
+8. **配网自测**：涉及 WiFi 门户时运行 `python tests/stage5_portal_test.py`。
+9. **物理验证**（人工）：按钮短/中/长按 + 二次确认 + LED 灯效（远程无法触发，需用户配合）。
+10. **报告产出**：每次生成可分发固件时，`build/release/` 必须同时包含双板型 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 与 release 总包 zip；测试未执行项必须写明原因，不得默认为通过。
 
 ## 通过标准
 

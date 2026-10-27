@@ -31,7 +31,7 @@ description: "BikePower C 发版流程。用于准备版本发布、检查测试
 - 运行 `check_config_consistency.py`、`check_portal_js.py`、`check_portal_structure.py`、`check_nvs_schema.py`、`check_tasks_wdt.py`、`check_board_desc.py`
 6. **真机测试**
 - 按 `.trae/rules/workflows/device-testing.md` 执行
-- 至少包含串口观察、`tests/ble_selftest.py`
+- 至少包含串口观察、`tests/ble_selftest.py`、`tests/ble_config_e2e.py`
 - 涉及配网时补 `tests/stage5_portal_test.py`
 7. **测试报告**
 - 生成并更新 `build/release/test-report.md`

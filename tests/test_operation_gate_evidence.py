@@ -57,6 +57,7 @@ def main():
 
         updated = load_record(path)
         assert updated["items"]["serial_boot"]["status"] == "PASS"
+        assert updated["items"]["ble_config_rw"]["status"] == "NOT_RUN"
         assert "serial_capture.py" in updated["items"]["serial_boot"]["evidence"]
         assert updated["items"]["ble_cycling"]["status"] == "FAIL"
         assert "connect timeout" in updated["items"]["ble_cycling"]["evidence"]

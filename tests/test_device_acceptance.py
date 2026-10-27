@@ -45,7 +45,7 @@ def complete_p0(record):
 
 def test_record_model():
     record = new_record(VERSION, GIT_SHA, "generic-c3", "tester", now=NOW)
-    assert record["schema_version"] == 1
+    assert record["schema_version"] == 2
     assert record["firmware_version"] == VERSION
     assert record["git_sha"] == GIT_SHA
     assert record["board"] == "generic-c3"

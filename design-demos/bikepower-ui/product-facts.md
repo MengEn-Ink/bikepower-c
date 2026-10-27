@@ -5,7 +5,7 @@
 ## 产品与版本
 
 - 产品：BikePower C，ESP32-C3 + ESP-IDF + NimBLE 固件。
-- 当前固件：v4.1.3；本轮真机验收绑定 Git `749d7d9`。
+- 当前固件：v4.2.0；正式真机验收必须绑定发布 Git ID。
 - 运动 profile：cycling / running；本次页面设计聚焦 cycling，running 不删除但不抢首屏。
 
 ## 监控页面现有能力

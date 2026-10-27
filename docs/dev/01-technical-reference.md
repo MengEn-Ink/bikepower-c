@@ -4,7 +4,7 @@
 内容基于当前仓库实现撰写，重点对应 `main/`、`components/bikepower_domain/`、`tests/` 和 `docs/images/`。
 阅读顺序建议配合 [architecture.png](../images/architecture.png)、[main-loop-flow.png](../images/main-loop-flow.png)、[button-led-state.png](../images/button-led-state.png) 和 [rf-wifi-flow.png](../images/rf-wifi-flow.png) 一起看。
 
-当前固件版本为 `v4.1.3`。
+当前固件版本为 `v4.2.0`。
 运行环境为 `ESP-IDF v5.5.4 + NimBLE + FreeRTOS`，目标芯片为 `ESP32-C3`。
 
 ## 第一章：项目架构
@@ -287,11 +287,11 @@ DIS 读取内容来自编译期常量：
 
 - `DEVICE_MANUFACTURER = "BikePower"`
 - `DEVICE_MODEL = "ESP32-C3"`
-- `FIRMWARE_VERSION = "4.1.3"`
+- `FIRMWARE_VERSION = "4.2.0"`
 - `FIRMWARE_STABLE_VERSION = "4.0.0"`
-- `FIRMWARE_FIX_VERSION = "4.1.3"`
+- `FIRMWARE_FIX_VERSION = "4.2.0"`
 - `BIKEPOWER_GIT_SHA` 由 `main/CMakeLists.txt` 在构建时注入最后一次 Git 短提交 ID
-- DIS 固件字段与门户完整版本名使用 `board_firmware_name()` 生成，格式为 `板型-v版本-stable稳定版-fix修复版-gGitID`，例如 `generic-c3-v4.1.3-stable4.0.0-fix4.1.3-g6e90860`
+- DIS 固件字段与门户完整版本名使用 `board_firmware_name()` 生成，格式为 `板型-v版本-stable稳定版-fix修复版-gGitID`，例如 `generic-c3-v4.2.0-stable4.0.0-fix4.2.0-gabcdef0`
 
 测试脚本 `tests/ble_selftest.py` 也会校验这三项。
 
@@ -1057,7 +1057,7 @@ idf.py build
 
 `test-report.md` 由 `scripts/tools/generate_release_docs.py` 生成，必须记录已执行测试、未执行项、原因以及真机验收证据摘要；`core-flow-endurance.md` 由 `tests/test_core_flow_endurance.py` 输出，记录按钮、心率随动、网页编辑、模板和关闭 WiFi 等核心流程循环；`user-manual.md` 从 `docs/user/` 生成，要求先更新源用户文档再打包。
 
-真机自动测试与人工确认由 `scripts/tools/device_acceptance.py` 按板型分别写入 `tests/reports/device-acceptance-generic-c3.json` 和 `tests/reports/device-acceptance-m5stamp-c3.json`。证据限定为 `PASS`、`FAIL`、`NOT_RUN`，并绑定 `FIRMWARE_VERSION`、Git ID 和板型。`tests/operation_gate.py --level device --board <板型>` 只更新对应板型实际执行的串口、BLE、重连、配网和广播项结果，不覆盖按钮、LED、手机等人工记录。
+真机自动测试与人工确认由 `scripts/tools/device_acceptance.py` 按板型分别写入 `tests/reports/device-acceptance-generic-c3.json` 和 `tests/reports/device-acceptance-m5stamp-c3.json`。证据限定为 `PASS`、`FAIL`、`NOT_RUN`，并绑定 `FIRMWARE_VERSION`、Git ID 和板型。`tests/operation_gate.py --level device --board <板型>` 只更新对应板型实际执行的串口、BLE 全量配置读写与 NVS 持久化、骑行/跑步、重连、配网和广播项结果，不覆盖按钮、LED、手机等人工记录。
 
 双板型完整构建结束后，`scripts/build_all.sh` 会调用 `python3 scripts/tools/check_release_artifacts.py --allow-dirty` 做本地产物门禁，校验 10 个上传附件、SHA256 旁文件、`manifest.txt` 和 release zip 内容。本地构建允许未提供证据；存在匹配当前版本的证据时，脚本会将其写入 manifest、测试报告和 release 总包。正式创建 GitHub Release 前必须运行：
 
@@ -1105,13 +1105,14 @@ python3 tests/analyze_fit_reference.py \
 
 ```bash
 python3 tests/test_ble_protocol_vectors.py
+python3 tests/test_ble_config_e2e.py
 python3 tests/test_ble_reconnect_harness.py
 python3 tests/test_ble_running_harness.py
 python3 tests/test_device_profile_harness.py
 python3 tests/check_wifi_done_contract.py
 ```
 
-领域层 host 单测同时覆盖 BLE 配置五组全字段往返、小端字节序、协议版本/截断负载拒绝、解码失败不污染、控制点响应，以及完整配置应用和 ERG 会话保持。网页侧 `tests/check_ble_monitor.py` 还会检查配置服务 UUID、读取/保存事务、错误摘要、NVS 成功反馈和 GATT 重建提示，并对内联 JavaScript 执行 `node --check`。
+领域层 host 单测同时覆盖 BLE 配置五组全字段往返、小端字节序、协议版本/截断负载拒绝、解码失败不污染、控制点响应，以及完整配置应用和 ERG 会话保持。`tests/test_ble_config_e2e.py` 离线守护 Python 真机脚本的协议帧和五组变更语义；`tests/ble_config_e2e.py --port <串口> --board <板型>` 在真机上验证五组读取/写入、事务错误路径、NVS 重启持久化、GATT 重建及原配置恢复。网页侧 `tests/check_ble_monitor.py` 还会检查配置服务 UUID、读取/保存事务、错误摘要、NVS 成功反馈和 GATT 重建提示，并对内联 JavaScript 执行 `node --check`。
 
 ### 12.3 BLE 真机自测
 

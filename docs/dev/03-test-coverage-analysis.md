@@ -2,7 +2,7 @@
 
 > 配套规则：[`.trae/rules/workflows/test-coverage.md`](../../.trae/rules/workflows/test-coverage.md)
 > 维护要求：每次抽取纯逻辑到领域层 / 新增测试脚本后，更新本矩阵。
-> 版本：v4.1.3（已永久放弃设备内 OTA + 家庭网络；不再保留"为覆盖率抽取但生产代码未采用"的并行实现）。
+> 版本：v4.2.0（已永久放弃设备内 OTA + 家庭网络；不再保留"为覆盖率抽取但生产代码未采用"的并行实现）。
 
 ## 一、项目模块清单与可测性
 
@@ -72,6 +72,7 @@
 | TC-3s 串口启动判定 | `tests/test_serial_boot_check.py` | 空日志、缺 ROM/复位标志、panic、Backtrace、Task WDT/coredump 拒绝 | ✅ |
 | TC-BLE-ADV 广播字段 | `tests/check_ble_advertising_fields.py` | 骑行/跑步主广播服务 UUID 与广播包名字预算 | ✅ |
 | TC-BLE-VEC 协议 vectors | `tests/test_ble_protocol_vectors.py` | 10 组固定 hex；生产 C encoder 与无 bleak Python parser 独立交叉校验 | ✅ 3 项通过 |
+| TC-BLE-CONFIG 配置 E2E 离线回归 | `tests/test_ble_config_e2e.py` | Meta/Control 小端帧、五组合法修改、非法值和 GATT 掩码变更 | ✅ |
 | TC-BLE-RECON 重连 harness | `tests/test_ble_reconnect_harness.py` | fake scanner/client 验证两轮独立扫描、连接、显式断开 | ✅ |
 | TC-BLE-RUNNING running harness | `tests/test_ble_running_harness.py` | opcode indication 等待、严格增长/冻结 helper 与 moving/pause/reset/resume 四阶段结构 | ✅ |
 | TC-BLE-PROFILE profile harness | `tests/test_device_profile_harness.py` | 切换 profile、测试阶段强制 mask=7、running `--control` 参数与 finally 恢复原配置 | ✅ |
@@ -83,6 +84,7 @@
 | 层 | 入口 | 覆盖对象 | 状态 |
 |----|------|---------|------|
 | TC-2 cycling BLE 自测 | `tests/ble_selftest.py --profile cycling` | CPS/HRS/CSC/FTMS Bike/DIS + ERG 控制 | 🟡 当前工作区待重新执行 |
+| TC-2 Config Service E2E | `tests/ble_config_e2e.py --port <串口> --board <板型>` | 五组全量读写、revision/CANCEL/缺组/非法值、NVS 重启持久化、GATT 重建、原配置恢复 | 🟡 当前工作区待重新执行 |
 | TC-2 running BLE 自测 | `tests/ble_selftest.py --profile running --control` | 逐 opcode indication；moving → Stop 冻结 → paused Reset 清零保持暂停 → Resume 四阶段 RSC/Treadmill 多样本 | 🟡 当前工作区待重新执行 |
 | TC-2 profile 编排 | `tests/device_profile_harness.py` | 配网态切换互斥 GATT profile，测试强制 mask=7，finally 恢复原配置 | 🟡 当前工作区待重新执行 |
 | TC-2 双次重连 | `tests/stage3_conn_test.py` | 两轮各自重新扫描、连接、显式断开与恢复广播 | 🟡 当前工作区待重新执行 |
@@ -101,6 +103,7 @@
 | `tests/serial_daemon.py` | 串口日志持续抓取 + 自动重连 |
 | `tests/serial_capture.py` | 单次抓取；`--check-boot` 模式要求 ROM/复位启动标志完整且无致命异常，BLE 就绪由 `ble_selftest.py` 独立验证 |
 | `tests/device_profile_harness.py` | 配网态临时切换 cycling/running，测试时强制 mask=7，调用对应 selftest，并在 finally 恢复原 profile/mask 和全部 running 持久配置 |
+| `tests/ble_config_e2e.py` | 直接通过 BLE Config Service 验证完整 NVS 读写和 GATT 重建；结束时恢复原配置并重启复核 |
 
 ## 三、覆盖策略
 

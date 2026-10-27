@@ -203,6 +203,7 @@ python3 tests/check_tasks_wdt.py
 python3 tests/check_board_desc.py
 python3 tests/check_ble_advertising_fields.py
 python3 tests/test_ble_protocol_vectors.py
+python3 tests/test_ble_config_e2e.py
 python3 tests/test_ble_reconnect_harness.py
 python3 tests/test_ble_running_harness.py
 python3 tests/test_device_profile_harness.py

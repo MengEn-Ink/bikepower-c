@@ -1,7 +1,7 @@
 # BikePower C — 项目进度
 
 > 基线方案：[docs/archive/01-cidf-nimble-rewrite.md](docs/archive/01-cidf-nimble-rewrite.md)
-> 当前固件版本：v4.1.3（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v4.2.0（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
@@ -114,6 +114,7 @@
 - [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、单一版本号、stable/fix 标识和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 GitHub Release。
 - [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合；`tests/operation_gate.py --level full` 已接入 release 产物门禁和核心流程耐久。
 - [x] 稳定交付证据链已接入：`scripts/tools/device_acceptance.py` 统一记录真机自动项与人工项，`operation_gate.py --level device` 可写入自动结果，正式 GitHub 发布要求当前版本与 Git ID 的 P0 证据全部通过。
+- [x] Config Service 真机 P0 门禁已接入：五组全量读取、事务拒绝路径、五组修改、NVS 重启持久化、广播掩码触发 GATT 重建和 `finally` 原配置恢复由 `tests/ble_config_e2e.py` 自动验证。
 - [x] 历史 generic-c3 真机自动化记录：v4.1.1 release 固件曾通过启动、骑行 BLE 与一次连接/断开，详见 `CHANGELOG.md` 的“v4.1.1 通用版真机验收”。该记录不覆盖 2026-10-22 当前工作区；新协议、跑步会话、双次重连、配网门户、广播开关、物理按钮/LED 和 m5stamp-c3 均须按当前 Git ID 重新验收。
 
 ### 待人工确认（P0）
@@ -131,7 +132,7 @@
 - [ ] Captive Portal 生命周期：退出配网后串口确认 DNS 任务停止，不再响应劫持。
 - [ ] 72h 老化：长时间运行无 coredump、无 WDT、无堆持续下降；建议周期性跑 `tests/ble_selftest.py` 和 `tests/stage5_portal_test.py` 采样。
 
-上述未完成项继续保持待验收状态。执行时按板型写入 `tests/reports/device-acceptance-<板型>.json`；`NOT_RUN` 不视为通过，正式发布前必须对**参与发布板型**运行 `python3 scripts/tools/device_acceptance.py validate --strict --file <证据文件>`（P0 自动项为串口启动、骑行 BLE、重连、5 分钟耐久；跑步/门户/广播与人工项为 P1 不阻塞）。
+上述未完成项继续保持待验收状态。执行时按板型写入 `tests/reports/device-acceptance-<板型>.json`；`NOT_RUN` 不视为通过，正式发布前必须对**参与发布板型**运行 `python3 scripts/tools/device_acceptance.py validate --strict --file <证据文件>`（P0 自动项为串口启动、BLE 全量配置读写与 NVS 持久化、骑行 BLE、重连、5 分钟耐久；跑步/门户/广播与人工项为 P1 不阻塞）。
 - [x] Release tag：`v4.1.1` 已创建并推送，指向提交 `a9f127c`。
 - [x] GitHub Release `v4.1.1` 已完成原样迁移：10 个顶层附件、双板固件及总包 SHA256、ZIP 结构和历史 manifest 记录均已复核；历史总包只有 generic-c3 证据，不冒充 m5stamp-c3 真机验收。
 

@@ -41,7 +41,7 @@
 
 ```python
 record = new_record("9.9.9", "abc1234", "generic-c3", "tester", now="2026-07-22T12:00:00+08:00")
-assert record["schema_version"] == 1
+assert record["schema_version"] == 2
 assert record["items"]["serial_boot"]["status"] == "NOT_RUN"
 ```
 

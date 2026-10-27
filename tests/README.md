@@ -1,7 +1,7 @@
 # 测试脚本使用说明
 
 > BikePower C 设备测试脚本集合
-> 更新日期：2026-10-27（v4.1.3 后续开发：真实骑行 FIT 基准、长时与异常仿真）
+> 更新日期：2026-10-27（v4.2.0：全量配置读写、会话曲线与核心功能 E2E 门禁）
 
 ---
 
@@ -152,6 +152,8 @@ python3 scripts/tools/device_acceptance.py init --board generic-c3 --operator "�
 | `.github/workflows/deploy-web-tools.yml` | CI 成功或 GitHub Release 发布后部署 Pages；缺失完整固件时阻断覆盖 |
 | `tests/check_ble_monitor.py` | 静态门禁，检查监控、刷写交互、Pages 工作流和门禁接入是否漂移 |
 | `tests/test_prepare_web_flash_site.py` | 离线验证双板选择、SHA256、manifest、GitHub-only CLI、降级和路径安全 |
+| `tests/ble_config_e2e.py` | 真机验证五组全量配置读取/修改、事务错误路径、NVS 重启持久化、GATT 重建，并恢复原配置 |
+| `tests/test_ble_config_e2e.py` | 无设备验证 Config Service 小端帧、五组变更和非法输入夹具 |
 | `tests/check_github_workflows.py` | 校验最小权限、CI→Pages 依赖、治理资产与 GitHub-only 发布契约 |
 
 ```bash
@@ -163,7 +165,7 @@ python3 tests/test_prepare_web_flash_site.py
 
 Web Bluetooth 首次连接必须由用户点击“连接设备”并在浏览器弹窗中授权；授权后可点“连接已授权设备”重连。页面会监控 BLE 断连、通知停更、功率/心率/踏频/跑步速度异常；曲线默认显示并保留整次页面连接会话，可切换 30 秒、2 分钟、10 分钟与全程窗口，逐点查看真实数值并导出 CSV 或含历史数据的 JSON 报告。历史只保存在当前页面内，最多 12 小时或 50000 个样本，刷新页面会开始新会话。
 
-固件提供 BikePower Config Service 时，页面会读取 Core、Profile、Running、LED、Identity 五组全部持久配置。修改只保留在浏览器表单，点击“保存到设备”后才执行带 revision 的 BEGIN → 五组写入 → COMMIT 事务；只有设备主循环完成校验并成功提交 NVS 后才显示成功。运动 Profile 或广播掩码变化会提示页面断开，设备随后重建 GATT 并重新广播。旧固件没有配置服务时页面显示降级提示，实时运动数据仍可继续监控。静态门禁不等同真机验证，发布前仍需在真实开发板上检查全量读取、事务写入、断电恢复与重广播。
+固件提供 BikePower Config Service 时，页面会读取 Core、Profile、Running、LED、Identity 五组全部持久配置。修改只保留在浏览器表单，点击“保存到设备”后才执行带 revision 的 BEGIN → 五组写入 → COMMIT 事务；只有设备主循环完成校验并成功提交 NVS 后才显示成功。运动 Profile 或广播掩码变化会提示页面断开，设备随后重建 GATT 并重新广播。旧固件没有配置服务时页面显示降级提示，实时运动数据仍可继续监控。发布前使用 `python3 tests/ble_config_e2e.py --port <串口> --board <板型>` 自动检查全量读取、事务写入、重启持久化、重广播与原配置恢复；浏览器首次授权仍需人工点击。
 
 GitHub Pages 只读取当前 GitHub 仓库的最新 Release。两个板型的 merged bin 与 `.sha256` 必须成对存在且校验一致，之后才会进入同源 Pages artifact；正式部署缺失任一项时失败并保留上一版站点。网页刷写需要 HTTPS、桌面版 Chrome/Edge 和用户主动选择串口。本地 `localhost` 可用于界面检查，但 `tools/web/` 源目录本身没有部署生成的 `firmware/latest.json`。
 

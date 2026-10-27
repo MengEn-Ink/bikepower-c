@@ -4,6 +4,14 @@
 
 ## [未发布]
 
+## [4.2.0] - 2026-10-27
+
+### 核心功能端到端验证与发布门禁
+- `tests/ble_config_e2e.py`：新增 Config Service 真机 P0 测试，自动覆盖 Meta 与五组配置读取、stale revision、CANCEL、缺组、非法值失败不污染、五组合法修改、断开重连、NVS 重启持久化、广播掩码触发 GATT 重建；无论测试成功或失败都在 `finally` 恢复完整原配置并再次重启核对。
+- `tests/test_ble_config_e2e.py`：新增无需设备的协议帧、五组变更、非法值和 GATT 掩码离线回归；接入 quick、full 和 `build_all.sh` 构建前门禁。
+- `tests/operation_gate.py`、`scripts/tools/device_acceptance.py`：把全量配置读写与 NVS 持久化加入 device 聚合流程和 P0 结构化证据，证据 schema 升级为 v2，旧版本/Git/证据结构不能复用；full 构建先用仓库内 `sdkconfig.defaults` 重新配置，自动修复历史临时 SDKCONFIG 路径造成的 CMake 缓存失效。
+- 验证：`operation_gate.py --level quick` 全绿，host `6123/0`，配置 E2E 离线协议回归、BLE vectors、重连/profile/running harness、门户 mock/静态门禁和 Pages 生成器均通过；正式真机结果写入与固件版本、Git ID、板型绑定的 release 证据。
+
 ### Pages 全量 NVS 配置读取与修改（2026-10-27）
 - `components/bikepower_domain/ble_config_codec.c/.h`、`config_store.c/.h`：新增显式小端二进制配置协议，按 Core、Profile、Running、LED、Identity 五组覆盖 `config_data_t` 的全部持久字段；完整配置应用先在引擎副本上校验，失败不污染正式运行态，并保留合法的 ERG 会话目标。
 - `main/ble_bikepower.c/.h`、`bikepower_config.h`：新增始终注册的 BikePower Config Service（`7a5a0000-4c7a-4f2a-9b3e-6d1f4a8c0b21`）及 Meta、五个配置组、Control 共七个特征；写入采用 BEGIN → 分组写入 → COMMIT/CANCEL 事务和 revision 并发保护，NimBLE 回调只投递 mailbox，不直接写 Flash。

@@ -180,6 +180,7 @@ def run_step(gate, name, command, timeout=120, required=True, acceptance_item=No
 def quick_steps(gate):
     run_step(gate, "Host 领域层单测", "make -C test run", 120)
     run_step(gate, "BLE 协议 golden vectors", "python3 tests/test_ble_protocol_vectors.py", 60)
+    run_step(gate, "BLE 配置 E2E 离线协议回归", "python3 tests/test_ble_config_e2e.py", 30)
     run_step(gate, "BLE 重连 harness 单测", "python3 tests/test_ble_reconnect_harness.py", 30)
     run_step(gate, "BLE profile harness 单测", "python3 tests/test_device_profile_harness.py", 30)
     run_step(gate, "BLE running 分阶段 harness 单测", "python3 tests/test_ble_running_harness.py", 30)
@@ -205,10 +206,15 @@ def full_steps(gate, build):
     run_step(gate, "Release 产物门禁功能样例", "python3 tests/test_release_artifacts.py", 30)
     run_step(gate, "核心流程耐久", "python3 tests/test_core_flow_endurance.py", 240)
     if build:
-        run_step(gate, "ESP-IDF 编译", f"{idf_prefix()}idf.py build", 240)
+        run_step(
+            gate,
+            "ESP-IDF 编译",
+            f"{idf_prefix()}idf.py -D SDKCONFIG_DEFAULTS=sdkconfig.defaults reconfigure && idf.py build",
+            300,
+        )
 
 
-def device_steps(gate, port, run_portal, device_profile):
+def device_steps(gate, port, run_portal, device_profile, board):
     if port:
         run_step(
             gate,
@@ -260,6 +266,17 @@ def device_steps(gate, port, run_portal, device_profile):
             "单固件只暴露一个 GATT profile；未提供可验证的 profile 选择",
             required=True,
         )
+    if port:
+        board_arg = f" --board {shlex.quote(board)}" if board else ""
+        run_step(
+            gate,
+            "BLE 全量配置读写与 NVS 持久化",
+            f"python3 tests/ble_config_e2e.py --port {shlex.quote(port)}{board_arg}",
+            240,
+            acceptance_item="ble_config_rw",
+        )
+    else:
+        gate.note_skip("BLE 全量配置读写与 NVS 持久化", "未传 --port，无法执行重启持久化验证")
     if run_portal:
         run_step(
             gate,
@@ -354,7 +371,7 @@ def main():
     elif args.level == "full":
         full_steps(gate, args.build)
     else:
-        device_steps(gate, args.port, args.run_portal, args.device_profile)
+        device_steps(gate, args.port, args.run_portal, args.device_profile, args.board)
 
     gate.write_report()
     if gate.failures:
