@@ -4,6 +4,15 @@
 
 ## [未发布]
 
+### Pages BLE 工具台三模块扩展（2026-10-28）
+- `tools/web/ble-monitor.html`：顶部任务导航新增「通知检查器」「健康检查」「ERG 控制台」三个模块入口，与原有「实时监控／固件刷写／设备比对／用户手册」共用同一套深黑锈橙设计系统（Bodoni 字模、Menlo 工程 mono、方角 1px 边界）。
+- BLE 原始通知检查器（`inspector`）：支持扫描连接任意广播骑行服务的 BLE 设备，或沿用「实时监控」已连接设备；枚举全部 Primary Service 与特征，为所有 `notify` / `indicate` 特征提供复选订阅；右侧滚动日志按毫秒时间戳 + 特征名 + 长度 + Hex 打印原始帧，对 CPS / HRS / CSC / RSC / FTMS Indoor Bike / FTMS Status / FTMS Control Point 自动追加解析摘要；最近 500 帧可按特征筛选、暂停滚动、导出 CSV。
+- 一键健康检查与报告导出（`health`）：按浏览器环境、Web Bluetooth 可用性、GATT 连接、DIS 身份、服务与特征枚举、关键通知订阅、10 秒窗口频率/间隔统计、BikePower 配置服务可用性 8 个步骤顺序验证，每步独立 PASS / WARN / FAIL / SKIP；最终生成的 JSON 报告包含浏览器环境、脱敏后的设备身份（`device_id` 以每次运行生成的盐值 SHA-256 截断为前 32 位哈希）、完整 GATT 服务与特征结构、通知计数与首 5 条样本（仅元数据）、以及每步摘要，可直接导出或在页面内预览。
+- FTMS ERG 控制面板（`erg`）：解析 FTMS Supported Power Range (0x2AD8) 自动夹紧目标功率范围，无该特征时退化为固件默认 `0 – 2000 W`；订阅 Control Point (0x2AD9) indication 与 Fitness Machine Status (0x2ADA) notification；提供 Request Control / Start / Resume / Stop / Pause / Reset / Set Target Power 控件，所有写入统一走全局二次确认弹窗（显示具体字节与十六进制 opcode）；监听 `gattserverdisconnected`，断链时立即清空 Control 授权状态并记录安全日志，防止误以为仍在控制设备；事件流以时间戳 + 类型 + 摘要 + 原始 Hex 滚动追加。
+- 新模块共用的 Guarded 二次确认弹窗支持 ESC 取消、Enter 确认；在 `document.addEventListener` 不可用的测试运行时自动降级，不破坏现有内联 JS 回归。
+- 新增 UUID 字典条目：FTMS Control Point `2ad9`、FTMS Feature `2ad6`、Supported Power Range `2ad8`、修正 `2ad1` 名称为 Supported Resistance Level Range。
+- 验证：`tests/check_ble_monitor.py` 29 项全绿（含 Node 内联 JS `node --check` 与协议小端运行时回归）、`tests/test_prepare_web_flash_site.py` 7/7、`tests/check_portal_structure.py` 238 项全绿、`tests/check_portal_js.py` 通过；1280×900 与 390×900 下 Playwright 对三个新模式完整截图，页面控制台 0 error / 0 warn（除离线环境下 esp-web-tools CDN 预期超时）。未触发真实 Web Bluetooth 授权，真机 FTMS Control Point 写入、Supported Power Range 读取与 10 秒通知窗口统计仍需用户在浏览器中手动连接 BikePower 开发板确认。
+
 ## [4.2.0] - 2026-10-27
 
 ### 核心功能端到端验证与发布门禁

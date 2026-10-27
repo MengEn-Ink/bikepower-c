@@ -446,6 +446,138 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
   .manual-meta>div{border-right:0;margin-right:0;padding-right:0;border-bottom:1px solid var(--line-soft)}
   .m-tldr{grid-template-columns:1fr}
 }
+
+/* ===== 新模块：BLE 原始通知检查器 ===== */
+#mode-inspector,#mode-health,#mode-erg{max-width:1180px;margin:24px auto 0;padding:0 20px 40px}
+.inspector-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:18px 0 14px;padding-bottom:14px;border-bottom:1px solid var(--line-soft)}
+.inspector-filter{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:13px;margin-left:auto}
+.inspector-filter input{accent-color:var(--accent);width:14px;height:14px}
+.inspector-grid{display:grid;grid-template-columns:380px minmax(0,1fr);gap:0;border:1px solid var(--line);background:var(--panel-2);min-height:520px}
+.inspector-tree{border-right:1px solid var(--line);padding:18px;overflow-y:auto;max-height:640px}
+.inspector-head{margin-bottom:14px}
+.inspector-head .eyebrow{display:block;margin-bottom:6px}
+.inspector-head strong{display:block;color:var(--strong);font-size:16px;letter-spacing:-.01em;word-break:break-all}
+.inspector-head small{display:block;margin-top:4px;color:var(--faint);font:600 11px/1.4 var(--mono);letter-spacing:.04em}
+.inspector-svc{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line-soft)}
+.inspector-svc:first-child{border-top:0;padding-top:0;margin-top:0}
+.inspector-svc-head{display:flex;justify-content:space-between;gap:10px;color:var(--strong);font-weight:800;font-size:13px;margin-bottom:8px}
+.inspector-svc-head small{color:var(--faint);font:600 11px/1.4 var(--mono)}
+.inspector-char{display:grid;grid-template-columns:1fr auto;gap:10px;padding:8px 10px;border:1px solid var(--line-soft);background:var(--bg);margin-bottom:6px;align-items:center}
+.inspector-char-name{color:var(--ink);font-weight:700;font-size:13px}
+.inspector-char-uuid{color:var(--faint);font:500 11px/1.3 var(--mono);word-break:break-all}
+.inspector-char-props{color:var(--muted);font:600 10px/1 var(--mono);letter-spacing:.04em;margin-top:3px}
+.inspector-char-sub{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;cursor:pointer;user-select:none}
+.inspector-char-sub input{accent-color:var(--accent);width:14px;height:14px}
+.inspector-char-sub.disabled{opacity:.4;cursor:not-allowed}
+.inspector-char.subscribed{border-color:var(--accent);background:var(--accent-soft)}
+.inspector-char.subscribed .inspector-char-sub{color:var(--accent);font-weight:800}
+.inspector-stream{display:flex;flex-direction:column;min-height:520px}
+.inspector-stream-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+.inspector-stream-head strong{display:block;color:var(--strong);font:700 14px/1 var(--mono);margin-top:4px}
+.inspector-stream-tools{display:flex;gap:8px;align-items:center}
+.inspector-filter-sel{min-height:34px;background:var(--panel);border:1px solid var(--line);color:var(--ink);padding:0 10px;font:600 12px/1 var(--mono)}
+.inspector-stream-body{flex:1;overflow-y:auto;padding:10px 18px;background:var(--bg);font:500 12px/1.55 var(--mono);min-height:360px;max-height:520px}
+.inspector-frame{padding:8px 0;border-bottom:1px dashed var(--line-soft);color:var(--ink)}
+.inspector-frame-head{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.inspector-frame-time{color:var(--accent);font-weight:800;letter-spacing:.02em}
+.inspector-frame-char{color:var(--strong);font-weight:800}
+.inspector-frame-len{color:var(--faint)}
+.inspector-frame-hex{color:var(--ink);word-break:break-all;margin-top:3px;letter-spacing:.04em}
+.inspector-frame-parsed{color:var(--green);margin-top:3px;font-family:var(--sans);font-size:12px;font-weight:600}
+.inspector-stream-foot{display:flex;justify-content:space-between;padding:10px 18px;border-top:1px solid var(--line);color:var(--muted);font:600 11px/1 var(--mono);letter-spacing:.03em}
+.inspector-stream-foot b{color:var(--strong)}
+.inspector-empty{padding:40px 20px;text-align:center;color:var(--faint);font-family:var(--sans)}
+
+/* ===== 新模块：健康检查 ===== */
+.health-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:22px;margin:18px 0 18px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+.health-cta{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.health-summary{display:grid;grid-template-columns:repeat(4,minmax(84px,auto));gap:0;margin:0}
+.health-summary>div{padding:0 18px;border-left:1px solid var(--line-soft);text-align:right}
+.health-summary>div:first-child{border-left:0}
+.health-summary dt{color:var(--muted);font:700 10px/1.4 var(--mono);letter-spacing:.08em;margin:0}
+.health-summary dd{margin:4px 0 0;color:var(--strong);font:400 32px/1 var(--display)}
+.health-steps{list-style:none;margin:0;padding:0;counter-reset:healthstep}
+.health-steps li{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:16px;padding:16px 0;border-bottom:1px solid var(--line-soft);align-items:start}
+.health-steps li:last-child{border-bottom:0}
+.health-steps li::before{counter-increment:healthstep;content:"0"counter(healthstep);color:var(--faint);font:400 24px/1 var(--display);align-self:start;margin-top:2px}
+.health-step-body strong{display:block;color:var(--strong);font-size:14px;font-weight:800}
+.health-step-body p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.6}
+.health-step-body code{font:500 12px/1.4 var(--mono);color:var(--ink);background:var(--panel-2);padding:0 4px;border:1px solid var(--line-soft)}
+.health-step-stat{color:var(--faint);font:600 11px/1.3 var(--mono);letter-spacing:.04em;margin-top:5px}
+.health-step-badge{min-width:70px;text-align:center;padding:4px 8px;font:700 11px/1 var(--mono);letter-spacing:.08em;border:1px solid var(--line);color:var(--muted)}
+.health-step-badge.pending{color:var(--muted)}
+.health-step-badge.running{color:var(--amber);border-color:var(--amber);background:var(--amber-soft);animation:healthpulse 1.1s linear infinite}
+.health-step-badge.pass{color:var(--green);border-color:var(--green);background:var(--green-soft)}
+.health-step-badge.warn{color:var(--amber);border-color:var(--amber);background:var(--amber-soft)}
+.health-step-badge.fail{color:var(--red);border-color:var(--red);background:var(--red-soft)}
+.health-step-badge.skip{color:var(--faint)}
+@keyframes healthpulse{0%,100%{opacity:1}50%{opacity:.45}}
+.health-report-pre{max-height:360px;overflow:auto;background:var(--bg);color:var(--ink);padding:14px;border:1px solid var(--line-soft);font:500 12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-all;margin:10px 0 0}
+
+/* ===== 新模块：ERG 控制 ===== */
+.erg-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+.erg-pane{border:1px solid var(--line);background:var(--panel-2);padding:20px}
+.erg-pane-wide{grid-column:1/-1}
+.erg-pane .eyebrow{display:block;margin-bottom:12px}
+.erg-state{display:grid;grid-template-columns:repeat(2,1fr);gap:0;border:1px solid var(--line-soft);margin-bottom:16px}
+.erg-state-block{padding:14px 16px;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);background:var(--bg)}
+.erg-state-block:nth-child(2n){border-right:0}
+.erg-state-block:nth-last-child(-n+2){border-bottom:0}
+.erg-state-block small{display:block;color:var(--muted);font:700 10px/1.4 var(--mono);letter-spacing:.08em;margin-bottom:5px}
+.erg-state-block b{color:var(--strong);font:800 17px/1.2 var(--sans)}
+.erg-state-block b em{color:var(--muted);font-style:normal;font:600 11px/1.2 var(--mono);margin-left:4px}
+.erg-actions{display:flex;flex-wrap:wrap;gap:8px}
+.erg-target-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:center;margin-bottom:16px}
+.erg-target-value b{color:var(--strong);font:400 72px/1 var(--display);letter-spacing:-.03em}
+.erg-target-value em{color:var(--muted);font-style:normal;font:600 14px/1 var(--mono);margin-left:5px}
+.erg-target-hint strong{display:block;color:var(--strong);font-size:14px;font-weight:800}
+.erg-target-hint p{margin:5px 0 0;color:var(--muted);font-size:13px;line-height:1.55}
+.erg-slider{-webkit-appearance:none;appearance:none;width:100%;height:4px;background:var(--line);outline:none;margin:12px 0}
+.erg-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;background:var(--accent);border:2px solid var(--bg);cursor:pointer}
+.erg-slider::-moz-range-thumb{width:18px;height:18px;background:var(--accent);border:2px solid var(--bg);cursor:pointer;border-radius:0}
+.erg-input-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.erg-input-row label{color:var(--muted);font:700 11px/1 var(--mono);letter-spacing:.06em}
+.erg-input-row input[type=number]{width:88px;min-height:38px;background:var(--bg);border:1px solid var(--line);color:var(--strong);padding:0 10px;font:800 15px/1 var(--mono);text-align:right}
+.erg-presets{display:flex;gap:4px;margin-left:auto;margin-right:auto}
+.erg-events{max-height:260px;overflow-y:auto;background:var(--bg);border:1px solid var(--line-soft);padding:12px;font:500 12px/1.55 var(--mono);color:var(--ink)}
+.erg-events-head{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.erg-events-head small{color:var(--faint);font:500 11px/1.4 var(--mono)}
+.erg-event{padding:6px 0;border-bottom:1px dashed var(--line-soft)}
+.erg-event:last-child{border-bottom:0}
+.erg-event-time{color:var(--accent);font-weight:800;margin-right:10px}
+.erg-event-kind{color:var(--strong);font-weight:800;margin-right:8px}
+.erg-event-detail{color:var(--muted)}
+.erg-event.ok .erg-event-kind{color:var(--green)}
+.erg-event.err .erg-event-kind{color:var(--red)}
+
+/* ===== 全局确认弹窗 ===== */
+.confirm-mask{position:fixed;inset:0;background:rgba(10,8,7,.82);z-index:120;display:grid;place-items:center;padding:24px}
+.confirm-box{width:min(420px,100%);background:var(--panel);border:1px solid var(--accent);padding:24px}
+.confirm-box strong{display:block;color:var(--strong);font-size:18px;font-weight:900;letter-spacing:-.01em}
+.confirm-box p{margin:10px 0 20px;color:var(--ink);font-size:14px;line-height:1.6}
+.confirm-box p b{color:var(--accent);font-family:var(--mono);font-size:15px}
+.confirm-actions{display:flex;gap:10px;justify-content:flex-end}
+
+/* 新模块响应式 */
+@media(max-width:960px){
+  .inspector-grid{grid-template-columns:1fr}
+  .inspector-tree{border-right:0;border-bottom:1px solid var(--line);max-height:320px}
+  .erg-grid{grid-template-columns:1fr}
+  .health-top{grid-template-columns:1fr}
+  .health-summary{grid-template-columns:repeat(4,1fr)}
+  .erg-target-head{grid-template-columns:1fr}
+  .erg-presets{margin:0;flex-wrap:wrap}
+}
+@media(max-width:760px){
+  #mode-inspector,#mode-health,#mode-erg{margin-top:18px;padding:0 14px 28px}
+  .mode-select{max-width:420px}
+  .health-steps li{grid-template-columns:36px minmax(0,1fr);gap:10px}
+  .health-steps li::before{font-size:20px}
+  .health-step-badge{grid-column:1/-1;justify-self:start;margin-top:4px}
+  .erg-state{grid-template-columns:1fr}
+  .erg-state-block{border-right:0;border-bottom:1px solid var(--line-soft)}
+  .erg-state-block:last-child{border-bottom:0}
+}
 </style>
 <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
 </head>
@@ -478,6 +610,21 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
         <span class="ico" aria-hidden="true">＝</span>
         <span class="mode-title">设备比对</span>
         <span class="mode-desc">并排对比多台设备信息</span>
+      </button>
+      <button class="mode-btn" data-mode="inspector" onclick="switchMode('inspector')">
+        <span class="ico" aria-hidden="true">⟡</span>
+        <span class="mode-title">通知检查器</span>
+        <span class="mode-desc">订阅任意特征、查看原始 BLE 通知 Hex</span>
+      </button>
+      <button class="mode-btn" data-mode="health" onclick="switchMode('health')">
+        <span class="ico" aria-hidden="true">◉</span>
+        <span class="mode-title">健康检查</span>
+        <span class="mode-desc">一键环境/GATT/通知诊断并导出报告</span>
+      </button>
+      <button class="mode-btn" data-mode="erg" onclick="switchMode('erg')">
+        <span class="ico" aria-hidden="true">▲</span>
+        <span class="mode-title">ERG 控制台</span>
+        <span class="mode-desc">FTMS 智能骑行台目标功率与会话控制</span>
       </button>
       <button class="mode-btn" data-mode="manual" onclick="switchMode('manual')">
         <span class="ico" aria-hidden="true">¶</span>
@@ -1303,6 +1450,177 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
     </div>
   </section>
 
+  <!-- ============ 模式五：BLE 原始通知检查器 ============ -->
+  <section id="mode-inspector" class="hidden">
+    <div class="card">
+      <div class="card-head">
+        <h2>BLE 原始通知检查器</h2>
+        <span class="badge muted" id="inspector-badge">未连接</span>
+      </div>
+      <div class="flash-step">
+        <b>怎么用</b>
+        <p>连接任意广播骑行服务的 BLE 设备后，页面会枚举全部 GATT 服务与特征；勾选 <code>notify</code> 或 <code>indicate</code> 特征即可订阅，右侧滚动日志会按原始字节 Hex 打印每一条通知帧。已知特征（CPS、HRS、CSC、RSC、FTMS Indoor Bike、FTMS Status 等）会在同一行追加解析摘要。所有数据只在当前浏览器会话内留存，不上报任何服务器。</p>
+      </div>
+
+      <div class="inspector-actions">
+        <button class="btn primary" onclick="inspectorConnect()">连接并枚举</button>
+        <button class="btn alt" onclick="inspectorReuseConnected()">沿用已连接设备</button>
+        <button class="btn ghost" onclick="inspectorDisconnect()">断开</button>
+        <button class="btn ghost sm" onclick="inspectorExportHex()">导出 Hex 日志</button>
+        <button class="btn ghost sm" onclick="inspectorClearHex()">清空日志</button>
+        <label class="inspector-filter">
+          <input type="checkbox" id="inspector-only-sub" checked onchange="renderInspectorFrames()">
+          仅显示已订阅特征
+        </label>
+      </div>
+
+      <div class="inspector-grid">
+        <aside class="inspector-tree" aria-label="GATT 服务与特征树">
+          <div class="inspector-head">
+            <span class="eyebrow">GATT TREE</span>
+            <strong id="inspector-device">未连接</strong>
+            <small id="inspector-stats">0 服务 · 0 特征 · 0 可订阅</small>
+          </div>
+          <div id="inspector-tree-body">
+            <div class="hint" style="padding:14px 0">尚未枚举设备。点击「连接并枚举」或「沿用已连接设备」。</div>
+          </div>
+        </aside>
+
+        <main class="inspector-stream" aria-label="原始通知帧流">
+          <header class="inspector-stream-head">
+            <div>
+              <span class="eyebrow">RAW FRAMES</span>
+              <strong id="inspector-count">0 帧 · 0 B</strong>
+            </div>
+            <div class="inspector-stream-tools">
+              <button class="trace-tool-btn" id="inspector-pause-btn" onclick="toggleInspectorPause()">暂停滚动</button>
+              <select class="inspector-filter-sel" id="inspector-filter-char" onchange="renderInspectorFrames()">
+                <option value="">全部特征</option>
+              </select>
+            </div>
+          </header>
+          <div class="inspector-stream-body" id="inspector-frames"></div>
+          <div class="inspector-stream-foot">
+            <span>保留最近 <b>500</b> 帧 · 本页会话内有效</span>
+            <span id="inspector-sub-summary">0 个订阅活动中</span>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 模式六：一键健康检查 ============ -->
+  <section id="mode-health" class="hidden">
+    <div class="card">
+      <div class="card-head">
+        <h2>一键健康检查</h2>
+        <span class="badge muted" id="health-badge">等待运行</span>
+      </div>
+      <div class="flash-step">
+        <b>怎么用</b>
+        <p>点击「开始检查」后，页面将按步骤验证：浏览器环境 → Web Bluetooth 可用性 → 设备选择与 GATT 连接 → 设备身份读取 → GATT 服务与特征枚举 → 关键通知订阅 → 最少 10 秒通知窗口的频率与丢帧统计 → 配置服务可用性。完成后点击「导出报告」保存脱敏后的 JSON 诊断报告（设备 ID 已被盐值哈希，原始通知样本按最多 5 条截取）。</p>
+      </div>
+
+      <div class="health-top">
+        <div class="health-cta">
+          <button class="btn primary big" id="health-run-btn" onclick="runHealthCheck()">开始检查</button>
+          <button class="btn alt" id="health-export-btn" onclick="exportHealthReport()" disabled>导出报告 JSON</button>
+          <button class="btn ghost" onclick="resetHealthCheck()">重置</button>
+        </div>
+        <dl class="health-summary">
+          <div><dt>PASS</dt><dd id="health-pass">0</dd></div>
+          <div><dt>WARN</dt><dd id="health-warn">0</dd></div>
+          <div><dt>FAIL</dt><dd id="health-fail">0</dd></div>
+          <div><dt>通知样本</dt><dd id="health-samples">0</dd></div>
+        </dl>
+      </div>
+
+      <ol class="health-steps" id="health-steps"></ol>
+
+      <details class="flash-details" id="health-report-wrap" style="display:none">
+        <summary>报告预览（JSON）</summary>
+        <pre class="health-report-pre" id="health-report-pre"></pre>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ 模式七：FTMS ERG 控制面板 ============ -->
+  <section id="mode-erg" class="hidden">
+    <div class="card">
+      <div class="card-head">
+        <h2>FTMS ERG 控制面板</h2>
+        <span class="badge muted" id="erg-badge">未连接 FTMS</span>
+      </div>
+      <div class="flash-step">
+        <b>安全策略：Guarded 写入</b>
+        <p>每次写入 Control Point 都会二次确认；目标功率受 <b id="erg-range-text">0 – 2000 W</b> 范围限制（由 FTMS Supported Power Range 决定，无该特征时退化为固件默认 0 – 2000 W）；监听 <code>gattserverdisconnected</code>，一旦链路断开，会自动把 ERG 目标在本地标记为失效，防止误以为仍在控制设备；重连后需要再次申请 Control。</p>
+      </div>
+
+      <div class="erg-grid">
+        <section class="erg-pane" aria-label="控制状态">
+          <span class="eyebrow">CONTROL STATE</span>
+          <div class="erg-state">
+            <div class="erg-state-block"><small>Request Control</small><b id="erg-state-control">未申请</b></div>
+            <div class="erg-state-block"><small>Session</small><b id="erg-state-session">—</b></div>
+            <div class="erg-state-block"><small>目标功率</small><b><span id="erg-state-target">—</span><em> W</em></b></div>
+            <div class="erg-state-block"><small>最后响应</small><b id="erg-state-resp">—</b></div>
+          </div>
+          <div class="erg-actions">
+            <button class="btn primary" id="erg-connect-btn" onclick="ergConnectFlow()">连接 FTMS 并订阅</button>
+            <button class="btn alt" id="erg-request-btn" onclick="ergRequestControl()" disabled>申请 Control</button>
+            <button class="btn" id="erg-start-btn" onclick="ergStart()" disabled>Start / Resume</button>
+            <button class="btn" id="erg-stop-btn" onclick="ergStop()" disabled>Stop / Pause</button>
+            <button class="btn ghost" id="erg-reset-btn" onclick="ergReset()" disabled>Reset</button>
+          </div>
+        </section>
+
+        <section class="erg-pane" aria-label="目标功率">
+          <span class="eyebrow">SET TARGET POWER · 0x05</span>
+          <div class="erg-target-head">
+            <div class="erg-target-value"><b id="erg-pending">150</b><em>W</em></div>
+            <div class="erg-target-hint">
+              <strong>Set Target Power</strong>
+              <p>拖动滑块或直接输入数值；点击「写入」会弹出二次确认框并校验范围。设备未申请 Control 时按钮不可用。</p>
+            </div>
+          </div>
+          <input type="range" min="0" max="2000" step="5" value="150" id="erg-slider" oninput="ergSliderChange(this.value)" aria-label="ERG 目标功率滑块" class="erg-slider">
+          <div class="erg-input-row">
+            <label for="erg-input">输入 W</label>
+            <input type="number" min="0" max="2000" step="1" value="150" id="erg-input" oninput="ergInputChange(this.value)">
+            <div class="erg-presets" role="group" aria-label="预设功率">
+              <button class="btn sm" onclick="ergSetPending(100)">100</button>
+              <button class="btn sm" onclick="ergSetPending(150)">150</button>
+              <button class="btn sm" onclick="ergSetPending(200)">200</button>
+              <button class="btn sm" onclick="ergSetPending(250)">250</button>
+              <button class="btn sm" onclick="ergSetPending(300)">300</button>
+            </div>
+            <button class="btn primary" id="erg-write-btn" onclick="ergWriteTargetConfirm()" disabled>写入目标功率</button>
+          </div>
+        </section>
+
+        <section class="erg-pane erg-pane-wide" aria-label="FTMS 事件流">
+          <div class="erg-events-head">
+            <span class="eyebrow">FTMS EVENTS</span>
+            <small>Fitness Machine Status (0x2ADA) + Control Point Response · 实时追加</small>
+          </div>
+          <div class="erg-events" id="erg-events"></div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- 全局二次确认弹窗（ERG 等 Guarded 写入） -->
+  <div class="confirm-mask hidden" id="confirm-mask" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="confirm-box">
+      <strong id="confirm-title">写入确认</strong>
+      <p id="confirm-body">确认此操作？</p>
+      <div class="confirm-actions">
+        <button class="btn ghost" onclick="dismissConfirm(false)">取消</button>
+        <button class="btn primary" id="confirm-ok" onclick="dismissConfirm(true)">确认写入</button>
+      </div>
+    </div>
+  </div>
+
   <details class="card" id="log-panel" style="margin-top:16px">
     <summary style="cursor:pointer;font-weight:700;color:var(--ink)">事件日志 <span class="hint" style="display:inline;font-weight:400">（展开查看）</span></summary>
     <div style="display:flex;justify-content:flex-end;margin:8px 0 0"><button class="btn ghost sm" onclick="clearLog()">清空</button></div>
@@ -1334,7 +1652,7 @@ const CHAR16 = {
   "2a37":"Heart Rate Measurement","2a38":"Body Sensor Location","2a39":"Heart Rate Control Point",
   "2a53":"RSC Measurement","2a54":"RSC Feature","2a55":"SC Control Point",
   "2ad2":"Indoor Bike Data","2ad6":"Fitness Machine Feature","2ad9":"Fitness Machine Control Point",
-  "2ada":"Fitness Machine Status","2acd":"Training Status","2ad1":"Supported Power Range",
+  "2ada":"Fitness Machine Status","2acd":"Training Status","2ad1":"Supported Resistance Level Range","2ad8":"Supported Power Range",
   "2a02":"Peripheral Privacy Flag","2a03":"Reconnection Address","2a04":"Peripheral Preferred Connection Parameters",
   "2a05":"Service Changed","2b29":"Client Supported Features",
 };
@@ -1353,6 +1671,9 @@ const UUIDS = {
   rscMeasurement:"00002a53-0000-1000-8000-00805f9b34fb",
   ftmsIndoorBike:"00002ad2-0000-1000-8000-00805f9b34fb",
   ftmsStatus:"00002ada-0000-1000-8000-00805f9b34fb",
+  ftmsControlPoint:"00002ad9-0000-1000-8000-00805f9b34fb",
+  ftmsFeature:"00002ad6-0000-1000-8000-00805f9b34fb",
+  ftmsSupportedPowerRange:"00002ad8-0000-1000-8000-00805f9b34fb",
   manufacturer:"00002a29-0000-1000-8000-00805f9b34fb",
   model:"00002a24-0000-1000-8000-00805f9b34fb",
   serial:"00002a25-0000-1000-8000-00805f9b34fb",
@@ -2199,9 +2520,15 @@ function switchMode(mode){
   $("mode-flash").classList.toggle("hidden",mode!=="flash");
   $("mode-connect").classList.toggle("hidden",mode!=="connect");
   $("mode-compare").classList.toggle("hidden",mode!=="compare");
+  $("mode-inspector").classList.toggle("hidden",mode!=="inspector");
+  $("mode-health").classList.toggle("hidden",mode!=="health");
+  $("mode-erg").classList.toggle("hidden",mode!=="erg");
   $("mode-manual").classList.toggle("hidden",mode!=="manual");
   if(mode==="connect")loadTemplates();
   if(mode==="compare")renderCompareTable();
+  if(mode==="inspector")refreshInspectorFromCurrent();
+  if(mode==="health")renderHealthSteps();
+  if(mode==="erg")ergRefreshFromCurrent();
   if(mode==="manual")initManualOnce();
 }
 
@@ -2781,6 +3108,712 @@ function closeManualLightbox(){
   document.removeEventListener("keydown",manualLightboxKey);
 }
 function manualLightboxKey(e){if(e.key==="Escape")closeManualLightbox();}
+
+/* ==================== 模式五：BLE 原始通知检查器 ==================== */
+const INSPECTOR_MAX_FRAMES = 500;
+const inspectorState = {
+  rec: null,
+  services: [],
+  frames: [],
+  frameSeq: 0,
+  subscriptions: new Map(), // key: uuid lower -> {char, handler, service}
+  paused: false,
+  totalBytes: 0,
+};
+
+function inspectorBadge(text, kind){
+  const el=$("inspector-badge"); if(!el) return;
+  el.textContent=text;
+  el.className="badge "+(kind||"muted");
+}
+function hexDump(bytes){
+  const out=[]; for(let i=0;i<bytes.length;i++) out.push(bytes[i].toString(16).padStart(2,"0").toUpperCase());
+  return out.join(" ");
+}
+function uuidShortKey(uuid){ return (uuid||"").toLowerCase(); }
+
+function parseKnownFrame(uuid, dataView){
+  const u=uuidShortKey(uuid);
+  try{
+    if(u===UUIDS.cpsMeasurement){ const p=parseCyclingPower(dataView); return "CPS · power="+p.power+"W (flags=0x"+p.flags.toString(16)+")"; }
+    if(u===UUIDS.hrMeasurement){ const hr=parseHeartRate(dataView); return "HRS · HR="+hr+"bpm"; }
+    if(u===UUIDS.cscMeasurement){ const flags=dataView.getUint8(0); return "CSC · flags=0x"+flags.toString(16)+" raw"; }
+    if(u===UUIDS.rscMeasurement){ const r=parseRsc(dataView); return "RSC · speed="+r.speed.toFixed(2)+"km/h cad="+r.cadence+"spm"; }
+    if(u===UUIDS.ftmsIndoorBike){ const d=parseIndoorBike(dataView); const parts=[]; if(d.speed!=null)parts.push("v="+d.speed.toFixed(2)+"km/h"); if(d.cadence!=null)parts.push("cad="+Math.round(d.cadence)+"rpm"); if(d.power!=null)parts.push("P="+d.power+"W"); return "FTMS IndoorBike · "+(parts.join(" ")||"flags only"); }
+    if(u===UUIDS.ftmsStatus){ return "FTMS Status · op=0x"+dataView.getUint8(0).toString(16).padStart(2,"0"); }
+    if(u===UUIDS.ftmsControlPoint){ const op=dataView.getUint8(0); if(op===0x80 && dataView.byteLength>=3){ return "FTMS CP Response · reqOp=0x"+dataView.getUint8(1).toString(16).padStart(2,"0")+" result=0x"+dataView.getUint8(2).toString(16).padStart(2,"0"); } return "FTMS CP · op=0x"+op.toString(16).padStart(2,"0"); }
+  }catch(err){ return "解析失败: "+err.message; }
+  return null;
+}
+
+function recordInspectorFrame(serviceUuid, charUuid, dataView){
+  const bytes=new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+  const frame={
+    seq: ++inspectorState.frameSeq,
+    time: Date.now(),
+    serviceUuid, charUuid,
+    hex: hexDump(bytes), length: bytes.length,
+    parsed: parseKnownFrame(charUuid, dataView),
+  };
+  inspectorState.frames.push(frame);
+  inspectorState.totalBytes += bytes.length;
+  if(inspectorState.frames.length>INSPECTOR_MAX_FRAMES){ inspectorState.frames.splice(0, inspectorState.frames.length-INSPECTOR_MAX_FRAMES); }
+  renderInspectorFrames();
+}
+
+async function inspectorConnect(){
+  const device=await requestDevice();
+  if(!device) return;
+  inspectorBadge("连接中…","warn");
+  try{
+    if(inspectorState.rec && inspectorState.rec.server){ try{inspectorState.rec.server.disconnect();}catch(e){} }
+    const rec={device, server:null, services:[], info:{}, latest:{}, subscriptions:{}, notifyTimes:{}, history:[]};
+    rec.server=await device.gatt.connect();
+    rec.info=await readDeviceInfo(rec.server);
+    rec.services=await enumerateServices(rec.server);
+    device.addEventListener("gattserverdisconnected", ()=>{
+      inspectorBadge("已断开","err"); inspectorState.subscriptions.clear(); renderInspectorTree();
+      log("[inspector] 设备已断开","warn");
+    });
+    inspectorState.rec=rec; inspectorState.services=rec.services; inspectorState.subscriptions.clear();
+    inspectorBadge("已连接","ok");
+    log("[inspector] 已连接 "+(device.name||"(无名)")+"，枚举 "+rec.services.length+" 个服务","data");
+    renderInspectorTree();
+  }catch(err){
+    inspectorBadge("连接失败","err");
+    log("[inspector] 连接失败: "+err.message,"error");
+  }
+}
+async function inspectorReuseConnected(){
+  if(singleDevice && singleDevice.server && singleDevice.server.connected){
+    inspectorState.rec=singleDevice;
+    inspectorState.services=singleDevice.services;
+    inspectorState.subscriptions.clear();
+    inspectorBadge("已连接 · 沿用","ok");
+    log("[inspector] 沿用监控台已连接设备","data");
+    renderInspectorTree();
+  }else{
+    inspectorBadge("无可沿用的设备","warn");
+    log("[inspector] 没有可沿用的已连接设备，请先在实时监控里连接","warn");
+  }
+}
+function inspectorDisconnect(){
+  if(inspectorState.rec && inspectorState.rec.server){ try{inspectorState.rec.server.disconnect();}catch(e){} }
+  inspectorState.rec=null; inspectorState.services=[]; inspectorState.subscriptions.clear();
+  inspectorBadge("未连接","muted");
+  renderInspectorTree();
+}
+function refreshInspectorFromCurrent(){ renderInspectorTree(); renderInspectorFrames(); }
+
+function renderInspectorTree(){
+  const dev=inspectorState.rec;
+  if(!dev){
+    setText("inspector-device","未连接");
+    setText("inspector-stats","0 服务 · 0 特征 · 0 可订阅");
+    $("inspector-tree-body").innerHTML='<div class="hint" style="padding:14px 0">尚未枚举设备。点击「连接并枚举」或「沿用已连接设备」。</div>';
+    rebuildInspectorFilterSelect();
+    setText("inspector-sub-summary","0 个订阅活动中");
+    return;
+  }
+  setText("inspector-device",dev.device.name||"(无名设备)");
+  const svcs=inspectorState.services||[];
+  let totalChars=0, totalNotify=0;
+  svcs.forEach(s=>{ totalChars+=s.characteristics.length; s.characteristics.forEach(c=>{ if(c.properties.includes("notify")||c.properties.includes("indicate")) totalNotify++; }); });
+  setText("inspector-stats",svcs.length+" 服务 · "+totalChars+" 特征 · "+totalNotify+" 可订阅");
+
+  let html="";
+  svcs.forEach(svc=>{
+    html+='<div class="inspector-svc">';
+    html+='<div class="inspector-svc-head"><span>'+escapeHtml(svc.name)+'</span><small>'+escapeHtml(uuidShort(svc.uuid))+'</small></div>';
+    svc.characteristics.forEach(ch=>{
+      const canSubscribe = ch.properties.includes("notify")||ch.properties.includes("indicate");
+      const subscribed = inspectorState.subscriptions.has(uuidShortKey(ch.uuid));
+      const classes = ["inspector-char"]; if(subscribed) classes.push("subscribed");
+      html+='<div class="'+classes.join(" ")+'" data-char="'+escapeHtml(ch.uuid)+'">';
+      html+='<div><div class="inspector-char-name">'+escapeHtml(ch.name)+'</div>';
+      html+='<div class="inspector-char-uuid">'+escapeHtml(ch.uuid)+'</div>';
+      html+='<div class="inspector-char-props">'+escapeHtml(ch.properties||"—")+'</div></div>';
+      if(canSubscribe){
+        html+='<label class="inspector-char-sub"><input type="checkbox" '+(subscribed?"checked":"")+' onchange="toggleInspectorSubscribe(\''+escapeAttr(svc.uuid)+'\',\''+escapeAttr(ch.uuid)+'\',this.checked)">订阅</label>';
+      }else{
+        html+='<span class="inspector-char-sub disabled">不可订阅</span>';
+      }
+      html+='</div>';
+    });
+    html+='</div>';
+  });
+  $("inspector-tree-body").innerHTML=html||'<div class="hint">该设备没有可枚举的 GATT 服务。</div>';
+  rebuildInspectorFilterSelect();
+  setText("inspector-sub-summary",inspectorState.subscriptions.size+" 个订阅活动中");
+}
+
+function escapeAttr(s){ return (s||"").replace(/'/g,"&#39;").replace(/"/g,"&quot;"); }
+
+function rebuildInspectorFilterSelect(){
+  const sel=$("inspector-filter-char"); if(!sel) return;
+  const prev=sel.value;
+  let opts='<option value="">全部特征</option>';
+  const seen=new Set();
+  (inspectorState.services||[]).forEach(svc=>{
+    svc.characteristics.forEach(ch=>{
+      if(seen.has(ch.uuid)) return; seen.add(ch.uuid);
+      opts+='<option value="'+escapeAttr(ch.uuid)+'">'+escapeHtml(ch.name)+'</option>';
+    });
+  });
+  sel.innerHTML=opts;
+  if(prev && Array.from(sel.options).some(o=>o.value===prev)) sel.value=prev;
+}
+
+async function toggleInspectorSubscribe(serviceUuid, charUuid, enable){
+  if(!inspectorState.rec||!inspectorState.rec.server){ log("[inspector] 请先连接设备","warn"); renderInspectorTree(); return; }
+  const key=uuidShortKey(charUuid);
+  if(enable){
+    try{
+      const svc=await inspectorState.rec.server.getPrimaryService(serviceUuid);
+      const ch=await svc.getCharacteristic(charUuid);
+      const handler=(ev)=>recordInspectorFrame(serviceUuid, charUuid, ev.target.value);
+      await ch.startNotifications();
+      ch.addEventListener("characteristicvaluechanged",handler);
+      inspectorState.subscriptions.set(key,{char:ch,handler,service:serviceUuid});
+      log("[inspector] 已订阅 "+charName(charUuid),"data");
+    }catch(err){
+      log("[inspector] 订阅失败 "+charUuid+": "+err.message,"error");
+    }
+  }else{
+    const entry=inspectorState.subscriptions.get(key);
+    if(entry){
+      try{ entry.char.removeEventListener("characteristicvaluechanged",entry.handler); await entry.char.stopNotifications(); }catch(err){ log("[inspector] 取消订阅失败: "+err.message,"warn"); }
+      inspectorState.subscriptions.delete(key);
+      log("[inspector] 已取消订阅 "+charName(charUuid),"warn");
+    }
+  }
+  renderInspectorTree();
+}
+
+function toggleInspectorPause(){
+  inspectorState.paused=!inspectorState.paused;
+  const btn=$("inspector-pause-btn");
+  if(btn){ btn.textContent=inspectorState.paused?"继续滚动":"暂停滚动"; btn.classList.toggle("active",inspectorState.paused); }
+  renderInspectorFrames();
+}
+function inspectorClearHex(){ inspectorState.frames=[]; inspectorState.totalBytes=0; renderInspectorFrames(); }
+function inspectorExportHex(){
+  if(!inspectorState.frames.length){ log("[inspector] 当前没有可导出的 Hex 日志","warn"); return; }
+  const rows=["seq,timestamp_iso,service_uuid,characteristic_uuid,length,hex,parsed"];
+  for(const f of inspectorState.frames){
+    rows.push([f.seq,new Date(f.time).toISOString(),f.serviceUuid,f.charUuid,f.length,'"'+f.hex+'"','"'+(f.parsed?f.parsed.replace(/"/g,'""'):"")+'"'].join(","));
+  }
+  const blob=new Blob(["\ufeff"+rows.join("\n")],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download="bikepower-ble-raw-frames-"+new Date().toISOString().replace(/[:.]/g,"-")+".csv";
+  a.click(); URL.revokeObjectURL(url);
+  log("[inspector] 已导出 "+inspectorState.frames.length+" 条帧","data");
+}
+
+function renderInspectorFrames(){
+  const box=$("inspector-frames"); if(!box) return;
+  const filterChar=($("inspector-filter-char")||{value:""}).value||"";
+  const onlySub=($("inspector-only-sub")||{checked:true}).checked;
+  const subscribedUuids=new Set(Array.from(inspectorState.subscriptions.keys()));
+
+  const visible=inspectorState.frames.filter(f=>{
+    if(filterChar && uuidShortKey(f.charUuid)!==uuidShortKey(filterChar)) return false;
+    if(onlySub && !subscribedUuids.has(uuidShortKey(f.charUuid))) return false;
+    return true;
+  });
+
+  setText("inspector-count",inspectorState.frames.length+" 帧 · "+inspectorState.totalBytes+" B");
+  setText("inspector-sub-summary",inspectorState.subscriptions.size+" 个订阅活动中");
+
+  if(!visible.length){ box.innerHTML='<div class="inspector-empty">尚无通知。先在左侧勾选 notify / indicate 特征订阅。</div>'; return; }
+
+  // Render newest at bottom (append), auto-scroll if not paused
+  const tail=visible.slice(-200); // never render more than 200 rows at once
+  let html="";
+  for(const f of tail){
+    const d=new Date(f.time);
+    const timeStr=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")+":"+String(d.getSeconds()).padStart(2,"0")+"."+String(d.getMilliseconds()).padStart(3,"0");
+    html+='<div class="inspector-frame">';
+    html+='<div class="inspector-frame-head">';
+    html+='<span class="inspector-frame-time">'+timeStr+'</span>';
+    html+='<span class="inspector-frame-char">'+escapeHtml(charName(f.charUuid))+'</span>';
+    html+='<span class="inspector-frame-len">#'+f.seq+' · '+f.length+' B</span>';
+    html+='</div>';
+    html+='<div class="inspector-frame-hex">'+escapeHtml(f.hex||"(empty)")+'</div>';
+    if(f.parsed){ html+='<div class="inspector-frame-parsed">⟶ '+escapeHtml(f.parsed)+'</div>'; }
+    html+='</div>';
+  }
+  box.innerHTML=html;
+  if(!inspectorState.paused){ box.scrollTop=box.scrollHeight; }
+}
+
+/* ==================== 模式六：一键健康检查 ==================== */
+const HEALTH_STEPS = [
+  {id:"env", title:"浏览器环境与安全上下文", desc:"检测 UA、HTTPS/localhost、Web Bluetooth API 可用性。"},
+  {id:"support", title:"Web Bluetooth 可用性", desc:"调用 navigator.bluetooth.getAvailability() 验证蓝牙硬件可用。"},
+  {id:"device", title:"设备选择与 GATT 连接", desc:"弹出设备选择器，连接后记录连接耗时。"},
+  {id:"dis", title:"设备身份读取 (DIS)", desc:"读取 Manufacturer / Model / Firmware 等 Device Information Service。"},
+  {id:"gatt", title:"GATT 服务与特征枚举", desc:"枚举全部 Primary Service 与特征，统计 notify/read/write。"},
+  {id:"sub", title:"关键通知订阅", desc:"订阅 CPS / HRS / CSC / RSC / FTMS 中可用的通知。"},
+  {id:"window", title:"10 秒通知窗口统计", desc:"在 10 秒窗口内统计每条通知的频率、间隔分布与丢帧。"},
+  {id:"config", title:"BikePower 配置服务", desc:"检测 Config Service 是否存在、读取 Meta 并验证 revision。"},
+];
+const healthState = {
+  running:false, results:{}, samples:[], report:null, device:null, server:null, services:[], info:{}, subs:[],
+};
+
+function healthResetSummary(){
+  setText("health-pass","0"); setText("health-warn","0"); setText("health-fail","0"); setText("health-samples","0");
+  const b=$("health-badge"); b.textContent="等待运行"; b.className="badge muted";
+  $("health-export-btn").disabled=true; $("health-report-wrap").style.display="none";
+}
+function renderHealthSteps(){
+  const box=$("health-steps"); if(!box) return;
+  let html="";
+  for(const step of HEALTH_STEPS){
+    const r=healthState.results[step.id]||{status:"pending",detail:step.desc,stat:""};
+    const badgeCls=r.status||"pending";
+    const badgeText={pending:"PENDING",running:"RUNNING",pass:"PASS",warn:"WARN",fail:"FAIL",skip:"SKIP"}[badgeCls]||"—";
+    html+='<li>';
+    html+='<div class="health-step-body"><strong>'+escapeHtml(step.title)+'</strong>';
+    html+='<p>'+r.detail+'</p>';
+    if(r.stat) html+='<div class="health-step-stat">'+escapeHtml(r.stat)+'</div>';
+    html+='</div>';
+    html+='<span class="health-step-badge '+badgeCls+'">'+badgeText+'</span>';
+    html+='</li>';
+  }
+  box.innerHTML=html;
+  const counts={pass:0,warn:0,fail:0};
+  Object.values(healthState.results).forEach(r=>{ if(counts[r.status]!=null) counts[r.status]++; });
+  setText("health-pass",counts.pass); setText("health-warn",counts.warn); setText("health-fail",counts.fail);
+  setText("health-samples",healthState.samples.length);
+}
+function setHealthStep(id,status,detail,stat){
+  healthState.results[id]={status,detail:detail||"",stat:stat||""};
+  renderHealthSteps();
+}
+function resetHealthCheck(){
+  if(healthState.running){ log("[health] 正在运行，无法重置","warn"); return; }
+  healthState.results={}; healthState.samples=[]; healthState.report=null;
+  healthState.device=null; healthState.server=null; healthState.services=[]; healthState.info={}; healthState.subs=[];
+  healthResetSummary();
+  renderHealthSteps();
+}
+
+async function sha256Hex(input){
+  const enc=new TextEncoder().encode(input);
+  const buf=await crypto.subtle.digest("SHA-256",enc);
+  const bytes=new Uint8Array(buf);
+  return Array.from(bytes).map(b=>b.toString(16).padStart(2,"0")).join("").slice(0,32);
+}
+
+async function runHealthCheck(){
+  if(healthState.running){ log("[health] 已在运行","warn"); return; }
+  resetHealthCheck();
+  healthState.running=true;
+  const btn=$("health-run-btn"); btn.disabled=true; btn.textContent="检查中…";
+  const badge=$("health-badge"); badge.textContent="运行中"; badge.className="badge warn";
+
+  try{
+    // Step 1: env
+    setHealthStep("env","running","正在收集浏览器环境信息…");
+    const ua=navigator.userAgent; const secure=window.isSecureContext;
+    const envDetail="UA = <code>"+escapeHtml(ua.slice(0,160))+"</code>；安全上下文 = "+(secure?"是":"否")+"；协议 = "+location.protocol;
+    if(!secure){ setHealthStep("env","fail",envDetail+"。Web Bluetooth 要求 HTTPS 或 localhost。"); healthFinalize(false); return; }
+    setHealthStep("env","pass",envDetail);
+
+    // Step 2: support
+    setHealthStep("support","running","检查 navigator.bluetooth…");
+    if(!navigator.bluetooth){ setHealthStep("support","fail","当前浏览器不支持 Web Bluetooth（navigator.bluetooth = undefined）。请使用桌面 Chrome / Edge。"); healthFinalize(false); return; }
+    let avail=true;
+    try{ if(navigator.bluetooth.getAvailability) avail=await navigator.bluetooth.getAvailability(); }catch(e){ avail=true; }
+    if(!avail){ setHealthStep("support","warn","navigator.bluetooth 存在，但 getAvailability() 返回 false（蓝牙适配器可能被禁用）。"); }
+    else{ setHealthStep("support","pass","Web Bluetooth 可用；navigator.bluetooth.getAvailability() = true"); }
+
+    // Step 3: device + connect
+    setHealthStep("device","running","请在弹窗中选择 BikePower 或其他骑行设备…");
+    const device=await requestDevice();
+    if(!device){ setHealthStep("device","fail","未选择设备或权限被拒绝。"); healthFinalize(false); return; }
+    const t0=performance.now();
+    healthState.device=device;
+    device.addEventListener("gattserverdisconnected", ()=>{ log("[health] 设备在检查期间断开","warn"); });
+    const server=await device.gatt.connect();
+    healthState.server=server;
+    const connectMs=Math.round(performance.now()-t0);
+    setHealthStep("device","pass","已连接 <code>"+escapeHtml(device.name||"(无名)")+"</code>","连接耗时 "+connectMs+" ms · deviceId 已哈希");
+
+    // Step 4: DIS
+    setHealthStep("dis","running","读取 DIS 特征…");
+    const info=await readDeviceInfo(server);
+    healthState.info=info;
+    const filled=Object.values(info).filter(v=>v).length;
+    if(filled===0){ setHealthStep("dis","warn","设备未提供可读的 DIS 特征。"); }
+    else{ setHealthStep("dis","pass",["厂商="+(info.manufacturer||"—"),"型号="+(info.model||"—"),"固件="+(info.firmware||"—")].map(escapeHtml).join(" · "),filled+" / 6 字段已读取"); }
+
+    // Step 5: GATT enum
+    setHealthStep("gatt","running","枚举 Primary Services…");
+    const services=await enumerateServices(server);
+    healthState.services=services;
+    let totalChars=0, notifyChars=0, readChars=0, writeChars=0;
+    services.forEach(s=>s.characteristics.forEach(c=>{ totalChars++; if(c.properties.includes("notify")||c.properties.includes("indicate")) notifyChars++; if(c.properties.includes("read")) readChars++; if(c.properties.includes("write")) writeChars++; }));
+    if(!services.length){ setHealthStep("gatt","fail","未枚举到任何 Primary Service。"); }
+    else{ setHealthStep("gatt","pass",services.length+" 服务 · "+totalChars+" 特征（notify "+notifyChars+" · read "+readChars+" · write "+writeChars+"）",services.map(s=>s.name).join(" · ")); }
+
+    // Step 6: subscribe
+    setHealthStep("sub","running","订阅 CPS / HRS / CSC / RSC / FTMS…");
+    const subMap=[
+      ["cps",UUIDS.cpsService,UUIDS.cpsMeasurement],
+      ["hr",UUIDS.hrService,UUIDS.hrMeasurement],
+      ["csc",UUIDS.cscService,UUIDS.cscMeasurement],
+      ["rsc",UUIDS.rscService,UUIDS.rscMeasurement],
+      ["ftms",UUIDS.ftmsService,UUIDS.ftmsIndoorBike],
+    ];
+    const subs=[];
+    for(const [key,su,cu] of subMap){
+      try{
+        const svc=await server.getPrimaryService(su);
+        const ch=await svc.getCharacteristic(cu);
+        const handler=(ev)=>{
+          healthState.samples.push({ t:Date.now(), key, len:ev.target.value.byteLength, uuid:cu });
+          setText("health-samples",healthState.samples.length);
+        };
+        await ch.startNotifications();
+        ch.addEventListener("characteristicvaluechanged",handler);
+        subs.push({key,ch,handler});
+      }catch(e){ /* ignore missing */ }
+    }
+    healthState.subs=subs;
+    if(!subs.length){ setHealthStep("sub","fail","未能订阅任何关键通知；该设备可能不是支持的骑行设备。"); healthFinalize(false); return; }
+    setHealthStep("sub","pass","已订阅 "+subs.map(s=>s.key.toUpperCase()).join(" · "),subs.length+" / "+subMap.length+" 关键通知可用");
+
+    // Step 7: 10s window
+    setHealthStep("window","running","采集 10 秒通知窗口…");
+    const startN=healthState.samples.length;
+    const startT=Date.now();
+    const WINDOW_MS=10000;
+    await new Promise(r=>setTimeout(r,WINDOW_MS));
+    const endN=healthState.samples.length;
+    const window=healthState.samples.slice(startN,endN);
+    const stats={};
+    subs.forEach(s=>{ stats[s.key]={count:0,gaps:[]}; });
+    let prev={};
+    for(const sample of window){
+      if(!stats[sample.key]) continue;
+      stats[sample.key].count++;
+      if(prev[sample.key]!=null){ stats[sample.key].gaps.push(sample.t-prev[sample.key]); }
+      prev[sample.key]=sample.t;
+    }
+    const lines=[];
+    let status="pass";
+    for(const key of Object.keys(stats)){
+      const s=stats[key]; const hz=(s.count/(WINDOW_MS/1000)).toFixed(2);
+      const avgGap=s.gaps.length?Math.round(s.gaps.reduce((a,b)=>a+b,0)/s.gaps.length):null;
+      const maxGap=s.gaps.length?Math.max(...s.gaps):null;
+      lines.push(key.toUpperCase()+"="+s.count+"帧 ("+hz+"Hz, 平均"+(avgGap||"—")+"ms / 最大"+(maxGap||"—")+"ms)");
+      if(s.count===0) status="fail"; else if(maxGap && maxGap>ANOMALY_LIMITS.staleMs) status=status==="fail"?"fail":"warn";
+    }
+    setHealthStep("window",status,"10 秒窗口共 "+(endN-startN)+" 帧",lines.join(" · "));
+
+    // Step 8: config service
+    setHealthStep("config","running","查询 BikePower 配置服务…");
+    try{
+      const svc=await server.getPrimaryService(UUIDS.configService);
+      const metaChar=await svc.getCharacteristic(UUIDS.configMeta);
+      const meta=parseConfigMeta(await metaChar.readValue());
+      setHealthStep("config","pass","配置服务可用","protocol="+meta.protocol+" schema="+meta.schema+" rev="+meta.revision+" groupMask=0x"+meta.groupMask.toString(16));
+    }catch(err){
+      setHealthStep("config","warn","未发现 BikePower 配置服务（旧固件或第三方设备常见）：<code>"+escapeHtml(err.message||String(err))+"</code>");
+    }
+
+    await healthFinalize(true);
+  }catch(err){
+    log("[health] 异常: "+err.message,"error");
+    setHealthStep("device","fail","异常终止："+err.message);
+    await healthFinalize(false);
+  }
+}
+
+async function healthFinalize(success){
+  // cleanup subscriptions
+  for(const s of healthState.subs){
+    try{ s.ch.removeEventListener("characteristicvaluechanged",s.handler); await s.ch.stopNotifications(); }catch(e){}
+  }
+  healthState.subs=[];
+
+  // Build desensitized report
+  const salt=Math.random().toString(36).slice(2,14)+"-"+Date.now().toString(16);
+  const idHash=healthState.device? await sha256Hex(salt+"|"+healthState.device.id) : null;
+  const sample=healthState.samples.slice(0,5).map(s=>({t:s.t,key:s.key,len:s.len,uuid:s.uuid}));
+
+  const report={
+    schema_version:1,
+    exported_at:new Date().toISOString(),
+    environment:{
+      user_agent:navigator.userAgent,
+      is_secure_context:window.isSecureContext,
+      protocol:location.protocol,
+      origin:location.origin,
+      language:navigator.language,
+      platform:navigator.platform,
+    },
+    device:healthState.device?{
+      name:healthState.device.name||null,
+      device_id_sha256_prefix:idHash,
+      device_id_salt:salt,
+      info:healthState.info,
+    }:null,
+    gatt:{
+      service_count:healthState.services.length,
+      characteristic_count:healthState.services.reduce((n,s)=>n+s.characteristics.length,0),
+      services:healthState.services.map(s=>({
+        uuid:s.uuid, name:s.name,
+        characteristics:s.characteristics.map(c=>({uuid:c.uuid,name:c.name,properties:c.properties})),
+      })),
+    },
+    notifications:{
+      total_samples:healthState.samples.length,
+      per_key:(function(){
+        const g={};
+        for(const s of healthState.samples){ g[s.key]=(g[s.key]||0)+1; }
+        return g;
+      })(),
+      first_samples:sample,
+    },
+    steps:HEALTH_STEPS.map(step=>{
+      const r=healthState.results[step.id]||{status:"pending",detail:""};
+      return {id:step.id,title:step.title,status:r.status,detail:(r.detail||"").replace(/<[^>]*>/g,""),stat:r.stat||""};
+    }),
+    overall:success?"ok":"issues",
+  };
+  healthState.report=report;
+
+  const b=$("health-badge");
+  if(success){ b.textContent="检查完成"; b.className="badge ok"; }
+  else{ b.textContent="检查中止"; b.className="badge err"; }
+  $("health-export-btn").disabled=false;
+  $("health-report-wrap").style.display="";
+  $("health-report-pre").textContent=JSON.stringify(report,null,2);
+
+  const btn=$("health-run-btn"); btn.disabled=false; btn.textContent="重新开始";
+  healthState.running=false;
+
+  // disconnect if we opened the connection (don't disconnect reused devices)
+  if(healthState.device && healthState.server){
+    try{ healthState.server.disconnect(); }catch(e){}
+  }
+}
+
+function exportHealthReport(){
+  if(!healthState.report){ log("[health] 没有可导出的报告","warn"); return; }
+  const blob=new Blob([JSON.stringify(healthState.report,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download="bikepower-health-report-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";
+  a.click(); URL.revokeObjectURL(url);
+  log("[health] 已导出健康检查报告","data");
+}
+
+/* ==================== 模式七：FTMS ERG 控制面板 ==================== */
+const ergState = {
+  rec:null, controlPointChar:null, statusChar:null, controlGranted:false, session:"stopped",
+  pending:150, lastTarget:null, lastResponse:"—", range:{min:0,max:2000,inc:1},
+  listener:null, statusListener:null,
+};
+
+function ergBadge(text,kind){ const b=$("erg-badge"); b.textContent=text; b.className="badge "+(kind||"muted"); }
+function ergLog(kind,detail,cls){
+  const list=$("erg-events"); if(!list) return;
+  const d=new Date();
+  const row=document.createElement("div");
+  row.className="erg-event"+(cls?" "+cls:"");
+  row.innerHTML='<span class="erg-event-time">'+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")+":"+String(d.getSeconds()).padStart(2,"0")+'</span><span class="erg-event-kind">'+escapeHtml(kind)+'</span><span class="erg-event-detail">'+escapeHtml(detail||"")+'</span>';
+  list.appendChild(row); list.scrollTop=list.scrollHeight;
+  if(list.children.length>200) list.removeChild(list.firstChild);
+}
+function ergRender(){
+  setText("erg-state-control",ergState.controlGranted?"✓ 已授权":"未申请");
+  setText("erg-state-session",ergState.session);
+  setText("erg-state-target",ergState.lastTarget==null?"—":ergState.lastTarget);
+  setText("erg-state-resp",ergState.lastResponse);
+  setText("erg-range-text",ergState.range.min+" – "+ergState.range.max+" W");
+  const slider=$("erg-slider"); const input=$("erg-input");
+  if(slider){ slider.min=ergState.range.min; slider.max=ergState.range.max; slider.step=ergState.range.inc||1; }
+  if(input){ input.min=ergState.range.min; input.max=ergState.range.max; }
+  const connected=!!(ergState.rec && ergState.rec.server && ergState.rec.server.connected);
+  const hasCP=!!ergState.controlPointChar;
+  $("erg-request-btn").disabled=!(connected && hasCP);
+  $("erg-start-btn").disabled=!(connected && hasCP && ergState.controlGranted);
+  $("erg-stop-btn").disabled=!(connected && hasCP && ergState.controlGranted);
+  $("erg-reset-btn").disabled=!(connected && hasCP && ergState.controlGranted);
+  $("erg-write-btn").disabled=!(connected && hasCP && ergState.controlGranted);
+}
+function ergRefreshFromCurrent(){
+  if(singleDevice && singleDevice.server && singleDevice.server.connected && !ergState.rec){
+    ergBadge("可沿用监控台连接","warn");
+  }else if(!ergState.rec){
+    ergBadge("未连接 FTMS","muted");
+  }
+  ergRender();
+}
+function ergSetPending(v){
+  v=Math.max(ergState.range.min,Math.min(ergState.range.max,parseInt(v,10)||0));
+  ergState.pending=v;
+  setText("erg-pending",v);
+  $("erg-slider").value=v; $("erg-input").value=v;
+}
+function ergSliderChange(v){ ergSetPending(v); }
+function ergInputChange(v){ ergSetPending(v); }
+
+async function ergConnectFlow(){
+  // Prefer reusing current singleDevice if connected AND exposes FTMS CP
+  let rec=null; let device=null;
+  if(singleDevice && singleDevice.server && singleDevice.server.connected){
+    rec=singleDevice; device=rec.device;
+    ergBadge("沿用已连接设备","warn");
+  }else{
+    device=await requestDevice(); if(!device) return;
+    ergBadge("连接中…","warn");
+    const r={device,server:null,info:{},services:[],subscriptions:{},notifyTimes:{},latest:{},history:[]};
+    try{ r.server=await device.gatt.connect(); r.services=await enumerateServices(r.server); }catch(e){ ergBadge("连接失败","err"); ergLog("CONNECT","失败: "+e.message,"err"); return; }
+    rec=r;
+  }
+  await ergBindFtms(rec);
+}
+async function ergBindFtms(rec){
+  try{
+    const svc=await rec.server.getPrimaryService(UUIDS.ftmsService);
+    const cp=await svc.getCharacteristic(UUIDS.ftmsControlPoint);
+    ergState.rec=rec; ergState.controlPointChar=cp;
+    // Supported Power Range (optional)
+    try{
+      const prChar=await svc.getCharacteristic(UUIDS.ftmsSupportedPowerRange);
+      const prView=await prChar.readValue();
+      if(prView.byteLength>=6){
+        const min=prView.getInt16(0,true), max=prView.getInt16(2,true), inc=prView.getUint16(4,true);
+        ergState.range={min:Math.max(0,min),max,inc:Math.max(1,inc)};
+        ergLog("RANGE","Supported Power Range min="+min+" max="+max+" inc="+inc,"ok");
+      }
+    }catch(e){ /* feature-less firmware; keep defaults */ }
+    // Status char (optional)
+    try{
+      const stChar=await svc.getCharacteristic(UUIDS.ftmsStatus);
+      await stChar.startNotifications();
+      const stListener=(ev)=>{
+        const v=ev.target.value; if(!v.byteLength) return;
+        const op=v.getUint8(0); const bytes=new Uint8Array(v.buffer,v.byteOffset,v.byteLength);
+        const map={0x01:"RESET",0x02:"STOPPED_BY_USER",0x03:"STARTED_BY_USER",0x08:"TARGET_POWER_CHANGED"};
+        if(op===0x02) ergState.session="stopped";
+        else if(op===0x03) ergState.session="running";
+        else if(op===0x01) ergState.session="reset";
+        ergLog("STATUS",(map[op]||("0x"+op.toString(16)))+" · ["+hexDump(bytes)+"]","ok");
+        ergRender();
+      };
+      stChar.addEventListener("characteristicvaluechanged",stListener);
+      ergState.statusChar=stChar; ergState.statusListener=stListener;
+    }catch(e){ ergLog("STATUS","未订阅 FTMS Status: "+e.message,"err"); }
+    // CP indications
+    await cp.startNotifications();
+    const cpListener=(ev)=>{
+      const v=ev.target.value; const bytes=new Uint8Array(v.buffer,v.byteOffset,v.byteLength);
+      if(bytes.length>=3 && bytes[0]===0x80){
+        const reqOp=bytes[1], result=bytes[2];
+        const resultMap={0x01:"SUCCESS",0x02:"NOT_SUPPORTED",0x03:"INVALID_PARAM",0x04:"OPERATION_FAILED",0x05:"CONTROL_NOT_PERMITTED"};
+        const opMap={0x00:"RequestControl",0x01:"Reset",0x05:"SetTargetPower",0x07:"Start/Resume",0x08:"Stop/Pause"};
+        const resultText=resultMap[result]||("0x"+result.toString(16));
+        ergState.lastResponse=(opMap[reqOp]||"0x"+reqOp.toString(16))+" → "+resultText;
+        if(reqOp===0x00 && result===0x01) ergState.controlGranted=true;
+        ergLog("RESP",ergState.lastResponse+" · ["+hexDump(bytes)+"]",result===0x01?"ok":"err");
+      }else{
+        ergLog("RESP","unexpected · ["+hexDump(bytes)+"]","err");
+      }
+      ergRender();
+    };
+    cp.addEventListener("characteristicvaluechanged",cpListener);
+    ergState.listener=cpListener;
+
+    rec.device.addEventListener("gattserverdisconnected",ergHandleDisconnect);
+    ergBadge("FTMS 已就绪","ok");
+    ergLog("CONNECT","FTMS 服务已订阅，可以申请 Control","ok");
+    ergSetPending(ergState.pending);
+    ergRender();
+  }catch(err){
+    ergBadge("FTMS 不可用","err");
+    ergLog("CONNECT","该设备不包含 FTMS 服务或 Control Point: "+err.message,"err");
+  }
+}
+function ergHandleDisconnect(){
+  ergState.controlGranted=false; ergState.session="stopped"; ergState.lastTarget=null;
+  ergState.lastResponse="已断连，Control 已失效";
+  ergBadge("已断开 · Control 已清","err");
+  ergLog("SAFETY","监听到 gattserverdisconnected：ERG 目标已标记为失效，重连后需重新申请 Control","err");
+  ergRender();
+}
+
+async function ergWriteOp(bytes, label){
+  if(!ergState.controlPointChar){ ergLog("WRITE","Control Point 未就绪","err"); return false; }
+  try{
+    if(ergState.controlPointChar.writeValueWithResponse) await ergState.controlPointChar.writeValueWithResponse(bytes);
+    else await ergState.controlPointChar.writeValue(bytes);
+    ergLog("WRITE",label+" · ["+hexDump(bytes)+"]","ok");
+    return true;
+  }catch(err){ ergLog("WRITE",label+" 失败: "+err.message,"err"); return false; }
+}
+async function ergRequestControl(){
+  const ok=await showConfirm("申请 FTMS Control", "将向 Control Point 写入 <b>0x00 RequestControl</b>。成功后你将获得对此设备的 ERG 控制权。");
+  if(!ok) return;
+  await ergWriteOp(new Uint8Array([0x00]),"RequestControl 0x00");
+}
+async function ergStart(){
+  const ok=await showConfirm("Start / Resume 会话", "将写入 <b>0x07 Start/Resume</b>，设备进入 Started 状态并开始接受 Set Target Power。");
+  if(!ok) return;
+  await ergWriteOp(new Uint8Array([0x07]),"Start/Resume 0x07");
+}
+async function ergStop(){
+  const ok=await showConfirm("Stop / Pause 会话", "将写入 <b>0x08 Stop/Pause</b>，设备清除 ERG 目标并回到 steady。");
+  if(!ok) return;
+  await ergWriteOp(new Uint8Array([0x08]),"Stop/Pause 0x08");
+}
+async function ergReset(){
+  const ok=await showConfirm("Reset Fitness Machine", "将写入 <b>0x01 Reset</b>，设备会重置会话。");
+  if(!ok) return;
+  await ergWriteOp(new Uint8Array([0x01]),"Reset 0x01");
+}
+async function ergWriteTargetConfirm(){
+  const target=parseInt(ergState.pending,10);
+  if(!Number.isFinite(target)){ ergLog("WRITE","目标功率无效","err"); return; }
+  if(target<ergState.range.min||target>ergState.range.max){
+    ergLog("SAFETY","拒绝写入：目标 "+target+" W 超出范围 "+ergState.range.min+"-"+ergState.range.max+" W","err");
+    return;
+  }
+  if(!ergState.controlGranted){ ergLog("SAFETY","拒绝写入：尚未申请 Control","err"); return; }
+  const ok=await showConfirm("写入目标功率", "将向 FTMS Control Point 写入 <b>Set Target Power = "+target+" W</b> (op 0x05)。请确认该功率在你当前的训练能力范围内。");
+  if(!ok) return;
+  const u8=new Uint8Array(3); u8[0]=0x05;
+  const dv=new DataView(u8.buffer); dv.setInt16(1,target,true);
+  const sent=await ergWriteOp(u8,"SetTargetPower 0x05 target="+target+"W");
+  if(sent){ ergState.lastTarget=target; ergRender(); }
+}
+
+/* ==================== 全局 Guarded 二次确认弹窗 ==================== */
+let confirmResolver=null;
+function showConfirm(title, bodyHtml){
+  return new Promise(resolve=>{
+    confirmResolver=resolve;
+    $("confirm-title").textContent=title;
+    $("confirm-body").innerHTML=bodyHtml;
+    $("confirm-mask").classList.remove("hidden");
+    setTimeout(()=>{ try{ $("confirm-ok").focus(); }catch(e){} },30);
+  });
+}
+function dismissConfirm(result){
+  $("confirm-mask").classList.add("hidden");
+  const r=confirmResolver; confirmResolver=null;
+  if(r) r(!!result);
+}
+document.addEventListener&&document.addEventListener("keydown",(e)=>{
+  if(!$("confirm-mask")||$("confirm-mask").classList.contains("hidden")) return;
+  if(e.key==="Escape"){ e.preventDefault(); dismissConfirm(false); }
+  if(e.key==="Enter"){ e.preventDefault(); dismissConfirm(true); }
+});
 
 /* ==================== 启动 ==================== */
 window.addEventListener("load",()=>{
