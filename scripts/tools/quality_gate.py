@@ -320,6 +320,8 @@ required_assets = [
     "test/test_domain.c",
     "test/ble_codec_cli.c",
     "tests/fixtures/ble_protocol_vectors.json",
+    "tests/fixtures/ride_reference_metrics.json",
+    "tests/analyze_fit_reference.py",
     "tests/ble_protocol.py",
     "tests/test_ble_protocol_vectors.py",
     "tests/test_ble_reconnect_harness.py",

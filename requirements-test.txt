@@ -1,3 +1,4 @@
 # Python harness dependencies. Keep hardware-facing libraries out of firmware builds.
 bleak>=0.22,<2
+fitparse>=1.2,<2
 pyserial>=3.5,<4

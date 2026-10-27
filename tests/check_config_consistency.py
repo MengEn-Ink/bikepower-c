@@ -9,6 +9,7 @@ TC-3c 常量一致性静态检查（无需设备）
     python3 tests/check_config_consistency.py
 退出码: 0 全绿, 1 有失败
 """
+import json
 import re
 import sys
 from pathlib import Path
@@ -19,7 +20,11 @@ RADIO_CTRL = ROOT / "main" / "radio_ctrl.c"
 DOMAIN_H = ROOT / "components" / "bikepower_domain" / "include" / "domain_config.h"
 CONFIG_STORE_C = ROOT / "components" / "bikepower_domain" / "config_store.c"
 APP_JS = ROOT / "main" / "web" / "app.js"
+APP_MAIN_C = ROOT / "main" / "app_main.c"
 MOCK_SERVER = ROOT / "tests" / "mock_server.py"
+FIT_ANALYZER = ROOT / "tests" / "analyze_fit_reference.py"
+FIT_REFERENCE = ROOT / "tests" / "fixtures" / "ride_reference_metrics.json"
+REQUIREMENTS_TEST = ROOT / "requirements-test.txt"
 AGENTS = ROOT / "AGENTS.md"
 README = ROOT / "README.md"
 PROGRESS = ROOT / "PROGRESS.md"
@@ -126,7 +131,11 @@ radio_ctrl_src = read(RADIO_CTRL)
 domain_src = read(DOMAIN_H)
 config_store_src = read(CONFIG_STORE_C)
 app_js_src = read(APP_JS)
+app_main_src = read(APP_MAIN_C)
 mock_src = read(MOCK_SERVER)
+fit_analyzer_src = read(FIT_ANALYZER)
+fit_reference = json.loads(read(FIT_REFERENCE))
+requirements_test_src = read(REQUIREMENTS_TEST)
 agents_src = read(AGENTS)
 readme_src = read(README)
 progress_src = read(PROGRESS)
@@ -232,6 +241,10 @@ check("for cycle in (1, 2)" in stage3_conn_src
 check("CONFIG_BT_NIMBLE_NVS_PERSIST=n" in sdkconfig_defaults_src
       and "CONFIG_BT_NIMBLE_HS_PVCY=n" in sdkconfig_defaults_src,
       "sdkconfig.defaults 必须关闭 NimBLE privacy/RPA，避免关闭 NVS 持久化时 IRK 写入 warning 影响广播")
+check('#include "esp_random.h"' in app_main_src
+      and '#include "domain_rng.h"' in app_main_src
+      and "domain_rng_seed(esp_random())" in app_main_src,
+      "app_main.c 必须用 ESP32 硬件随机数播种领域 RNG，避免每次启动重复同一骑行轨迹")
 
 # WIFI_SSID_PREFIX 与 DEVICE_NAME 关系（AP 名沿用设备名前缀，运行时追加 MAC 后缀）
 wifi_ssid_prefix = extract_define(config_src, "WIFI_SSID_PREFIX")
@@ -330,6 +343,33 @@ for js_key, domain_key in js_ranges.items():
     actual = extract_js_range(app_js_src, js_key)
     expected = range_expectations[domain_key]
     check(actual == expected, f"main/web/app.js FLOAT_RANGE.{js_key} == {expected} (实际={actual})")
+
+power_float_default = extract_int(domain_src, "POWER_FLOAT_DEFAULT")
+cadence_float_default = extract_int(domain_src, "CADENCE_FLOAT_DEFAULT")
+check(
+    re.search(rf"power_float:\s*{power_float_default}\s*,\s*cadence_float:\s*{cadence_float_default}", app_js_src)
+    and f"data.power_float != null ? data.power_float : {power_float_default}" in app_js_src
+    and f"data.cadence_float != null ? data.cadence_float : {cadence_float_default}" in app_js_src,
+    "main/web/app.js 的初始值和缺省回退与领域层功率/踏频浮动默认值一致",
+)
+check(
+    re.search(rf'"power_float"\s*:\s*{power_float_default}', mock_src)
+    and re.search(rf'"cadence_float"\s*:\s*{cadence_float_default}', mock_src),
+    "tests/mock_server.py 的功率/踏频浮动默认值与领域层一致",
+)
+check("fitparse>=1.2,<2" in requirements_test_src,
+      "requirements-test.txt 固定声明 FIT 解析依赖")
+check("hashlib.sha256(path.read_bytes()).hexdigest()" in fit_analyzer_src
+      and 'get_messages("record")' in fit_analyzer_src
+      and '"power_heartrate_best_lag_seconds"' in fit_analyzer_src,
+      "FIT 分析脚本固定附件哈希并提取对齐时序与最佳心率滞后")
+check(fit_reference.get("source", {}).get("sha256")
+      == "bffc976d81b9985f688c988a62895d4407758eaba5db08fdb118dc5e0bddc051"
+      and fit_reference.get("source", {}).get("aligned_count") == 4800,
+      "真实骑行参考基准绑定指定 FIT SHA-256 与 4800 个对齐样本")
+check(fit_reference.get("power", {}).get("ac1") == 0.9550639560242542
+      and fit_reference.get("relationships", {}).get("power_heartrate_best_lag_seconds") == 38,
+      "真实骑行参考基准保留功率自相关与38秒最佳心率滞后")
 
 config_version = extract_int(domain_src, "CONFIG_VERSION")
 check(config_version == 11, f"CONFIG_VERSION 必须升级到 11 (实际={config_version})")

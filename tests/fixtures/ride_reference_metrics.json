@@ -1,0 +1,59 @@
+{
+  "cadence": {
+    "delta_p50": 0.0,
+    "delta_p95": 2.0,
+    "max": 104.0,
+    "mean": 94.67,
+    "min": 83.0,
+    "p01": 85.0,
+    "p05": 89.0,
+    "p50": 95.0,
+    "p95": 99.0,
+    "p99": 101.0,
+    "stddev": 3.0862355710476725
+  },
+  "heartrate": {
+    "delta_p50": 0.0,
+    "delta_p95": 2.0,
+    "max": 172.0,
+    "mean": 152.37083333333334,
+    "min": 133.0,
+    "p01": 140.99,
+    "p05": 144.0,
+    "p50": 152.0,
+    "p95": 161.0,
+    "p99": 166.0,
+    "stddev": 5.190735269582611
+  },
+  "power": {
+    "ac1": 0.9550639560242542,
+    "ac5": 0.7083697341885199,
+    "delta_p50": 3.0,
+    "delta_p95": 12.0,
+    "max": 319.0,
+    "mean": 190.678125,
+    "min": 110.0,
+    "p01": 135.0,
+    "p05": 152.0,
+    "p50": 194.0,
+    "p95": 220.0,
+    "p99": 238.0,
+    "stddev": 20.67388501187867
+  },
+  "relationships": {
+    "power_cadence": 0.29607426917393737,
+    "power_heartrate_best_lag_correlation": 0.3516534975756141,
+    "power_heartrate_best_lag_seconds": 38,
+    "power_heartrate_lag30": 0.34200217690885776,
+    "power_heartrate_now": 0.15554031254345455
+  },
+  "source": {
+    "aligned_count": 4800,
+    "end_minute": 85,
+    "filename": "MyWhoosh_-_Hudayriyat_Octopus_Loop.fit",
+    "record_count": 5424,
+    "selected_count": 4800,
+    "sha256": "bffc976d81b9985f688c988a62895d4407758eaba5db08fdb118dc5e0bddc051",
+    "start_minute": 5
+  }
+}
