@@ -248,9 +248,23 @@ def device_steps(gate, port, run_portal, device_profile, board):
             90,
             acceptance_item="ble_cycling",
         )
-        gate.note_skip("BLE 跑步 profile 会话自测", "设备当前声明为 cycling；ble_running 保持 NOT_RUN")
+        board_arg = f" --board {shlex.quote(board)}" if board else ""
+        run_step(
+            gate,
+            "BLE 跑步 profile 会话自测",
+            f"python3 tests/device_profile_ble_harness.py --profile running{board_arg}",
+            180,
+            acceptance_item="ble_running",
+        )
     elif device_profile == "running":
-        gate.note_skip("BLE 骑行 profile 自测", "设备当前声明为 running；ble_cycling 保持 NOT_RUN")
+        run_step(
+            gate,
+            "BLE 骑行 profile 自测",
+            f"python3 tests/device_profile_ble_harness.py --profile cycling"
+            + (f" --board {shlex.quote(board)}" if board else ""),
+            150,
+            acceptance_item="ble_cycling",
+        )
         run_step(
             gate,
             "BLE 跑步 profile 会话自测",

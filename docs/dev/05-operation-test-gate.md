@@ -70,7 +70,7 @@ python3 tests/operation_gate.py --level device \
   --run-portal
 ```
 
-`--run-portal` 会使用 profile harness 依次验证 cycling/running：每次测试先强制 `broadcast_mask=7`，避免原配置关闭功率/踏频/心率导致假失败，随后在 `finally` 恢复原 profile、原广播掩码和完整 running 持久配置。running 自测逐 opcode 等待 indication，并按 moving → Stop → paused Reset → Resume 四阶段分别采集多样本窗口。若不运行门户，必须通过 `--device-profile cycling|running` 明确当前固件 GATT profile；另一 profile 保持 `NOT_RUN`，不能用于正式双 profile 发布结论。
+`--run-portal` 会使用 HTTP profile harness 依次验证 cycling/running：每次测试先强制 `broadcast_mask=7`，避免原配置关闭功率/踏频/心率导致假失败，随后在 `finally` 恢复原 profile、原广播掩码和完整 running 持久配置。running 自测逐 opcode 等待 indication，并按 moving → Stop → paused Reset → Resume 四阶段分别采集多样本窗口。若不运行门户，必须通过 `--device-profile cycling|running` 明确当前固件 GATT profile；门禁验证当前 profile 后，再用 `device_profile_ble_harness.py` 通过 Config Service 临时切换并验证另一 profile，不启动 WiFi，最后恢复五组原配置。
 
 手工拆分命令：
 
@@ -88,6 +88,7 @@ python3 tests/test_core_flow_endurance.py
 python3 tests/ble_selftest.py --profile cycling
 python3 tests/ble_selftest.py --profile running --control
 python3 tests/ble_config_e2e.py --port /dev/cu.usbmodem101 --board generic-c3
+python3 tests/device_profile_ble_harness.py --profile running --board generic-c3
 python3 tests/device_profile_harness.py --profile cycling
 python3 tests/device_profile_harness.py --profile running
 python3 tests/stage3_conn_test.py

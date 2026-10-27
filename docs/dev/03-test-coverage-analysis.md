@@ -104,6 +104,7 @@
 | `tests/serial_capture.py` | 单次抓取；`--check-boot` 模式要求 ROM/复位启动标志完整且无致命异常，BLE 就绪由 `ble_selftest.py` 独立验证 |
 | `tests/device_profile_harness.py` | 配网态临时切换 cycling/running，测试时强制 mask=7，调用对应 selftest，并在 finally 恢复原 profile/mask 和全部 running 持久配置 |
 | `tests/ble_config_e2e.py` | 直接通过 BLE Config Service 验证完整 NVS 读写和 GATT 重建；结束时恢复原配置并重启复核 |
+| `tests/device_profile_ble_harness.py` | 无需 WiFi，临时切换互斥 GATT profile、执行 selftest，并在 finally 恢复五组原配置 |
 
 ## 三、覆盖策略
 

@@ -20,6 +20,7 @@ from ble_config_e2e import (
     parse_response,
     validate_groups,
 )
+from device_profile_ble_harness import make_profile_groups, selftest_command
 
 
 TAG = "[ble-config-e2e-unit]"
@@ -82,9 +83,19 @@ def main():
     rebuilt = make_gatt_rebuild_groups(modified)
     assert bool(rebuilt["core"][14] & 0x04) != bool(modified["core"][14] & 0x04)
     assert rebuilt["profile"] == modified["profile"]
+
+    running = make_profile_groups(original, "running")
+    assert running["core"][13] == 1
+    assert running["core"][14] == 7
+    assert running["running"] == original["running"]
+    cycling = make_profile_groups(running, "cycling")
+    assert cycling["core"][13] == 0
+    assert cycling["core"][14] == 7
+    assert "--control" in selftest_command("running", 12, 250)
+    assert "--control" not in selftest_command("cycling", 12, 250)
     assert PROTOCOL_VERSION == 1
 
-    print(f"{TAG} PASS 元数据、控制帧、五组修改、非法值与 GATT 掩码回归")
+    print(f"{TAG} PASS 元数据、控制帧、五组修改、非法值、GATT 掩码与 profile 回归")
     return 0
 
 

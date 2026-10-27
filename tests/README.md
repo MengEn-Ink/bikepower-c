@@ -154,6 +154,7 @@ python3 scripts/tools/device_acceptance.py init --board generic-c3 --operator "�
 | `tests/test_prepare_web_flash_site.py` | 离线验证双板选择、SHA256、manifest、GitHub-only CLI、降级和路径安全 |
 | `tests/ble_config_e2e.py` | 真机验证五组全量配置读取/修改、事务错误路径、NVS 重启持久化、GATT 重建，并恢复原配置 |
 | `tests/test_ble_config_e2e.py` | 无设备验证 Config Service 小端帧、五组变更和非法输入夹具 |
+| `tests/device_profile_ble_harness.py` | 不启动 WiFi，通过 Config Service 临时切换另一 GATT profile，执行 selftest 后恢复五组原配置 |
 | `tests/check_github_workflows.py` | 校验最小权限、CI→Pages 依赖、治理资产与 GitHub-only 发布契约 |
 
 ```bash
@@ -186,7 +187,7 @@ python3 tests/operation_gate.py --level device --run-portal \
   --board generic-c3 --operator "验收人" --port /dev/cu.usbmodem101
 ```
 
-`--run-portal` 会先用 `device_profile_harness.py` 分别验证 cycling 和 running：测试阶段强制 `broadcast_mask=7`，running 强制带 `--control`，逐 opcode 等待 indication，并按 moving → Stop 冻结 → paused Reset 清零且保持暂停 → Resume 恢复四阶段采集实际多样本，严格判断 RSC/Treadmill 累计增长或冻结。之后再执行广播项数据面与门户测试；harness 会在 `finally` 恢复原始 `sport_profile`、`broadcast_mask` 和测试期间可能改写的完整 running 持久配置。广播 monitor 若恢复原配置失败会直接判定 FAIL，不得以已完成数据采样掩盖配置污染。未传 `--run-portal` 时必须用 `--device-profile cycling|running` 声明当前固件实际暴露的 GATT profile，另一 profile 保持 `NOT_RUN`，不得把互斥服务误报为缺失。
+`--run-portal` 会先用 `device_profile_harness.py` 分别验证 cycling 和 running：测试阶段强制 `broadcast_mask=7`，running 强制带 `--control`，逐 opcode 等待 indication，并按 moving → Stop 冻结 → paused Reset 清零且保持暂停 → Resume 恢复四阶段采集实际多样本，严格判断 RSC/Treadmill 累计增长或冻结。之后再执行广播项数据面与门户测试；harness 会在 `finally` 恢复原始 `sport_profile`、`broadcast_mask` 和测试期间可能改写的完整 running 持久配置。广播 monitor 若恢复原配置失败会直接判定 FAIL，不得以已完成数据采样掩盖配置污染。未传 `--run-portal` 时用 `--device-profile cycling|running` 声明当前固件实际 profile；门禁先验证当前 profile，再由 `device_profile_ble_harness.py` 通过 Config Service 临时切换并验证另一 profile，全程不启动 WiFi，最后恢复五组原配置。
 
 ### F. 串口日志工具
 

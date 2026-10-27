@@ -9,6 +9,7 @@
 ### 核心功能端到端验证与发布门禁
 - `tests/ble_config_e2e.py`：新增 Config Service 真机 P0 测试，自动覆盖 Meta 与五组配置读取、stale revision、CANCEL、缺组、非法值失败不污染、五组合法修改、断开重连、NVS 重启持久化、广播掩码触发 GATT 重建；无论测试成功或失败都在 `finally` 恢复完整原配置并再次重启核对。
 - `tests/test_ble_config_e2e.py`：新增无需设备的协议帧、五组变更、非法值和 GATT 掩码离线回归；接入 quick、full 和 `build_all.sh` 构建前门禁。
+- `tests/device_profile_ble_harness.py`：无需进入 WiFi 配网，直接通过 Config Service 临时切换 cycling/running GATT profile，执行真实 BLE 自测后在 `finally` 恢复五组原配置；`operation_gate --device-profile` 因此可自动覆盖互斥的另一 profile。
 - `tests/operation_gate.py`、`scripts/tools/device_acceptance.py`：把全量配置读写与 NVS 持久化加入 device 聚合流程和 P0 结构化证据，证据 schema 升级为 v2，旧版本/Git/证据结构不能复用；full 构建先用仓库内 `sdkconfig.defaults` 重新配置，自动修复历史临时 SDKCONFIG 路径造成的 CMake 缓存失效。
 - 验证：`operation_gate.py --level quick` 全绿，host `6123/0`，配置 E2E 离线协议回归、BLE vectors、重连/profile/running harness、门户 mock/静态门禁和 Pages 生成器均通过；正式真机结果写入与固件版本、Git ID、板型绑定的 release 证据。
 
