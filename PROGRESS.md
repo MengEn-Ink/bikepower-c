@@ -26,7 +26,17 @@
 | 12 | 项目结构与文档梳理（v3.2.0） | ✅ 完成 | `test/` 与 `tests/` 合并评估（不合并）+ `tests/README.md` 7 大分类重写 + `docs/INDEX.md` 补全 workflows/domain 规则索引 |
 | 13 | 移除 OTA + 家庭网络 + 网页端精简（v4.0.0） | ✅ 代码完成（真机待确认） | 删 ota_downloader/ota_update/ota_version/ota_selftest + `/api/ota/*`、`/api/wifi/*`、`/api/draft` 路由与前端视图；分区表双 OTA → 单 factory（仍 4MB）；关回滚配置；门户退化为纯 BLE 参数页（方案见 [docs/archive/07-remove-ota-plan.md](docs/archive/07-remove-ota-plan.md)） |
 | 14 | Windows 开发环境适配 | ✅ 完成 | `idf_common.psm1` 共享模块 + `dev.ps1` 统一入口 + `build_all.ps1`/`flash_latest.ps1` 重构去重 + Python 脚本跨平台串口探测 |
-| 15 | BLE Monitor Pages + 网页固件刷写 | ✅ 已上线（双板真机刷写待确认） | GitHub Release v4.1.1 双板 merged bin 经 Actions 校验并部署；ESP Web Tools 0x0 manifest |
+| 15 | BLE Monitor Pages + 网页固件刷写 | ✅ 已上线（双板真机刷写待确认） | GitHub Release v4.1.1 双板 merged bin 经 Actions 校验并部署；ESP Web Tools 0x0 manifest；刷写引导/主题弹窗与骑行设备过滤已完成 |
+
+---
+
+## 2026-10-27 Pages 刷写引导与骑行设备过滤
+
+- [x] 刷写页按插线、选串口、等完成重构为三步新手流程，并补充耗时、英文状态、Erase 风险和串口排错说明。
+- [x] ESP Web Tools Installing / 未选择串口网页弹窗适配信号宣言深黑锈橙主题；浏览器原生串口选择窗口保留系统外观。
+- [x] Web Bluetooth 首次授权仅显示广播 CPS、HRS、CSC、FTMS 的设备；RSC 仍可在已入选设备上读取，但仅跑步设备不会进入骑行列表。
+- [x] 已授权设备在 GATT 连接后再次复核运动服务，不符合骑行筛选条件时主动断开并提示。
+- [x] 静态门禁、站点生成器 7 项回归、双视口浏览器检查、真实 ESP Web Tools v10.4.0 弹窗注入和项目级质量门禁均通过；本轮未触发真实 Web Bluetooth / Web Serial 授权或写入硬件。
 
 ---
 

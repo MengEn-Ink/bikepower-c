@@ -109,6 +109,21 @@ button:focus-visible,a:focus-visible,select:focus-visible,summary:focus-visible{
 .flash-step{margin:12px 0;padding:16px;border:1px solid var(--line);background:var(--panel-2)}
 .flash-step b{color:var(--strong);font-size:14px}
 .flash-step p{margin:7px 0 0;color:var(--muted);font-size:14px;line-height:1.65}
+.flash-lead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:22px;align-items:center;padding:20px 0 22px;border-bottom:1px solid var(--line)}
+.flash-lead strong{display:block;color:var(--strong);font-size:22px;line-height:1.25}
+.flash-lead p{margin:7px 0 0;color:var(--muted);font-size:14px;line-height:1.65}
+.flash-time{min-width:116px;border-left:1px solid var(--line);padding-left:18px;color:var(--accent);font:800 12px/1.5 var(--mono)}
+.flash-time b{display:block;color:var(--strong);font:400 36px/1 var(--display)}
+.flash-guide{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}
+.flash-step.guide-step{margin:0;min-height:170px;padding:18px;display:flex;flex-direction:column}
+.step-number{display:block;margin-bottom:22px;color:var(--accent);font:800 12px/1 var(--mono)}
+.flash-step.guide-step p{margin-top:auto;padding-top:14px}
+.flash-expect{display:grid;grid-template-columns:150px 1fr;gap:18px;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.flash-expect>strong{color:var(--strong);font-size:14px}
+.flash-terms{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.flash-term{padding-left:12px;border-left:2px solid var(--line);color:var(--muted);font-size:13px;line-height:1.5}
+.flash-term b{display:block;color:var(--ink);font:700 12px/1.5 var(--mono)}
+.flash-warning{margin:14px 0 0;padding:13px 15px;border:1px solid var(--accent-dark);background:var(--accent-soft);color:var(--ink);font-size:14px;line-height:1.6}
 .flash-details{margin-top:16px;border-top:1px solid var(--line);padding-top:6px}
 .flash-details summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--muted);font-weight:800}
 .flash-details[open] summary{color:var(--accent)}
@@ -121,7 +136,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,summary:focus-visible{
 .row span:first-child{color:var(--muted);min-width:90px}
 .row span:last-child{text-align:right;word-break:break-word;color:var(--ink);font-weight:700}
 .flash-sha{font-family:var(--mono);font-size:12px!important;color:var(--muted)!important;font-weight:500!important}
-esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button-border-radius:0;display:inline-block}
+esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button-text-color:var(--bg);--esp-tools-button-border-radius:0;display:inline-block}
 #flash-activate{min-width:190px}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
 
@@ -230,6 +245,7 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
   .trace-window{height:230px}.evidence{grid-column:auto;grid-template-columns:1fr;padding:22px 16px}.evidence>.eyebrow,.evidence>h2{grid-column:auto}.health-score{margin-top:16px}
   .device-lower{grid-template-columns:1fr;padding:18px 14px}.two-col{grid-template-columns:1fr}
   #mode-flash,#mode-compare{margin-top:18px;padding:0 14px 28px}.card{padding:16px}.card-head{align-items:flex-start;flex-direction:column}.card-head .actions{justify-content:flex-start}
+  .flash-lead{grid-template-columns:1fr}.flash-time{border-left:0;border-top:1px solid var(--line);padding:12px 0 0}.flash-guide{grid-template-columns:1fr}.flash-step.guide-step{min-height:0}.step-number{margin-bottom:12px}.flash-step.guide-step p{margin-top:7px;padding-top:0}.flash-expect{grid-template-columns:1fr}.flash-terms{grid-template-columns:1fr}.flash-step p,.flash-lead p,.flash-warning{font-size:16px}
   #templates-card,#log-panel{margin-left:14px;margin-right:14px}.svc-head,.char{flex-direction:column}.svc-uuid{text-align:left}.props{white-space:normal}
 }
 @media(max-width:480px){
@@ -287,14 +303,15 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
         <span class="badge warn" id="firmware-status">正在获取最新版本</span>
       </div>
 
-      <div class="flash-step">
-        <b>第 1 步：用数据线连接开发板</b>
-        <p>将 ESP32-C3 开发板通过 USB 线插到电脑。注意：部分"充电线"只能充电不能传数据，请确认使用支持数据传输的线。连接成功后开发板指示灯会亮。</p>
+      <div class="flash-lead">
+        <div><strong>第一次刷固件也没关系。</strong><p>准备一根能传数据的 USB 线，按下面三步操作。整个过程都在浏览器里完成，不需要安装命令行工具。</p></div>
+        <div class="flash-time"><b>约 2 分钟</b>写入期间别拔线</div>
       </div>
 
-      <div class="flash-step">
-        <b>第 2 步：确认板型</b>
-        <p>本固件仅支持 <b>通用 ESP32-C3</b> 开发板。</p>
+      <div class="flash-guide">
+        <article class="flash-step guide-step"><span class="step-number">STEP 1 / 插线</span><b>把开发板接到电脑</b><p>必须使用支持数据传输的 USB 线。只有充电功能的线会让电脑看不到串口。</p></article>
+        <article class="flash-step guide-step"><span class="step-number">STEP 2 / 选串口</span><b>点击下方按钮并选择设备</b><p>弹窗里通常会看到 USB Serial、CP210x、CH34x 或 JTAG/Serial。只有一个选项时直接选择即可。</p></article>
+        <article class="flash-step guide-step"><span class="step-number">STEP 3 / 等完成</span><b>保持页面可见，不要拔线</b><p>出现 Installing 或 Wrapping up 都是正常过程；看到 Installation complete 才算完成。</p></article>
       </div>
 
       <select id="firmware-board" class="hidden" onchange="renderSelectedFirmware()">
@@ -303,7 +320,7 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
 
       <div class="flash-cta">
         <esp-web-install-button id="install-button" class="hidden">
-          <button class="btn primary big" id="flash-activate" slot="activate" onclick="prepareForFlash()">连接串口并刷写</button>
+          <button class="btn primary big" id="flash-activate" slot="activate" onclick="prepareForFlash()">开始刷写（选择串口）</button>
           <span slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
           <span slot="not-allowed">网页刷写仅能在 HTTPS 或 localhost 页面使用。</span>
         </esp-web-install-button>
@@ -312,10 +329,16 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
       </div>
       <div class="hint" id="flash-message">正在读取最新 Release 固件信息。</div>
 
-      <div class="flash-step">
-        <b>第 3 步：在弹窗中选择串口</b>
-        <p>点击上方按钮后，浏览器会弹出串口选择框，请选择开发板对应的串口（Windows 通常是 COM3 / COM4，Mac / Linux 通常是 /dev/ttyUSB* 或 /dev/cu.usbmodem*）。</p>
+      <div class="flash-expect">
+        <strong>英文状态对照</strong>
+        <div class="flash-terms"><div class="flash-term"><b>INSTALL / ERASE</b>确认安装；Erase 表示清除旧数据后重装</div><div class="flash-term"><b>INSTALLING</b>正在写入，保持页面打开</div><div class="flash-term"><b>WRAPPING UP / COMPLETE</b>正在收尾 / 已经完成</div></div>
       </div>
+      <div class="flash-warning"><b>重要：</b>如果弹窗提示 Erase device，继续后设备内已保存的参数可能需要重新设置。刷写期间不要拔线、刷新或关闭页面。</div>
+
+      <details class="flash-details">
+        <summary>弹窗里找不到串口怎么办？</summary>
+        <div class="hint">先确认开发板插在当前这台电脑上；换一根确定能传数据的 USB 线；关闭可能占用串口的 Arduino IDE、串口助手或其他开发工具；拔插开发板后再试。系统串口选择窗口由浏览器提供，因此会保持系统外观。</div>
+      </details>
 
       <details class="flash-details">
         <summary>固件详情</summary>
@@ -328,7 +351,7 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
         </dl>
       </details>
 
-      <div class="hint" style="margin-top:16px"><b>环境要求：</b>仅支持电脑端 Chrome / Edge、HTTPS 页面和支持数据传输的 USB 线。点击刷写后仍需在浏览器弹窗中主动选择正确串口；这是 Web Serial 的安全限制，网页无法静默选择设备。刷写过程中不要拔线或关闭页面。</div>
+      <div class="hint" style="margin-top:16px"><b>环境要求：</b>仅支持电脑端 Chrome / Edge、HTTPS 页面和支持数据传输的 USB 线。网页无法替你静默选择串口，这是 Web Serial 的安全限制。</div>
     </div>
   </section>
 
@@ -348,7 +371,7 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
           <button class="btn alt" onclick="connectAuthorized()">已授权设备</button>
           <button class="btn ghost" onclick="loadTemplates()">查看已存模板</button>
         </div>
-        <div id="connect-empty" class="monitor-note">首次连接会打开浏览器设备选择器；网页不能静默获取附近设备。选择后将读取 DIS、GATT 与实时通知。</div>
+        <div id="connect-empty" class="monitor-note">首次连接会打开浏览器设备选择器，只显示广播了骑行功率、心率、骑行速度/踏频或智能骑行台服务的设备。网页不能静默获取附近设备。</div>
       </aside>
 
       <main class="signal-stage">
@@ -495,6 +518,11 @@ const UUIDS = {
   firmware:"00002a26-0000-1000-8000-00805f9b34fb",
   software:"00002a28-0000-1000-8000-00805f9b34fb",
 };
+const CYCLING_SERVICE_UUIDS = [
+  UUIDS.cpsService, UUIDS.hrService, UUIDS.cscService, UUIDS.ftmsService,
+];
+const CYCLING_SERVICE_FILTERS = CYCLING_SERVICE_UUIDS.map(uuid=>({services:[uuid]}));
+const CYCLING_SERVICE_SET = new Set(CYCLING_SERVICE_UUIDS);
 const ALL_OPTIONAL_SERVICES = [
   UUIDS.cpsService, UUIDS.hrService, UUIDS.cscService, UUIDS.rscService,
   UUIDS.ftmsService, UUIDS.disService, UUIDS.basService,
@@ -519,6 +547,26 @@ const ANOMALY_LABELS = {
   disconnect:"BLE 断连", stale:"通知停更", power:"功率异常", heartrate:"心率异常",
   cadence:"踏频异常", speed:"速度异常", parse:"数据解析异常",
 };
+const ESP_DIALOG_SELECTOR = "ewt-install-dialog,ewt-no-port-picked-dialog";
+const ESP_DIALOG_THEME = {
+  "--roboto-font":"Avenir Next, PingFang SC, Microsoft YaHei, sans-serif",
+  "--text-color":"#d8c7b5",
+  "--danger-color":"#ff765d",
+  "--md-sys-color-primary":"#f05523",
+  "--md-sys-color-on-primary":"#0a0807",
+  "--md-sys-color-primary-container":"#70230f",
+  "--md-sys-color-on-surface":"#f4e8d8",
+  "--md-sys-color-on-surface-variant":"#aa998c",
+  "--md-sys-color-surface":"#17110e",
+  "--md-sys-color-surface-container":"#17110e",
+  "--md-sys-color-surface-container-high":"#211711",
+  "--md-sys-color-surface-container-highest":"#2a1c14",
+  "--md-sys-color-secondary-container":"#2a1c14",
+  "--md-sys-color-on-secondary-container":"#f4e8d8",
+  "--md-sys-color-shadow":"#000000",
+  "--md-circular-progress-active-indicator-color":"#f05523",
+};
+const themedDialogObservers = new WeakMap();
 
 let currentMode = null;
 let firmwareCatalog = null;
@@ -538,6 +586,64 @@ function notificationGapText(timestamp){
   if(!timestamp)return "—";
   const seconds=Math.max(0,(Date.now()-timestamp)/1000);
   return seconds<10?seconds.toFixed(1)+"s":Math.round(seconds)+"s";
+}
+function ensureShadowStyle(root,id,css){
+  if(!root||root.getElementById(id))return;
+  const style=document.createElement("style");style.id=id;style.textContent=css;root.appendChild(style);
+}
+function themeEspWebToolsDialog(host){
+  if(!host||!host.matches||!host.matches(ESP_DIALOG_SELECTOR))return;
+  for(const [name,value] of Object.entries(ESP_DIALOG_THEME))host.style.setProperty(name,value);
+  const root=host.shadowRoot;
+  if(!root)return;
+  ensureShadowStyle(root,"bikepower-dialog-theme",`
+    :host{color:#d8c7b5!important}
+    div[slot="headline"]{color:#f4e8d8;font-weight:900;letter-spacing:-.02em}
+    ew-dialog{--md-sys-color-surface:#17110e;--md-sys-color-surface-container:#17110e;--md-sys-color-on-surface:#f4e8d8;--md-sys-color-primary:#f05523}
+    ewt-page-progress{color:#d8c7b5;line-height:1.65}
+    .bikepower-flash-helper{display:block;margin:18px 0 0;padding:14px 15px;border:1px solid #58463a;background:#211711;color:#d8c7b5;font-size:14px;line-height:1.6;text-align:left}
+    .bikepower-flash-helper b{display:block;margin-bottom:4px;color:#f4e8d8}
+    .bikepower-flash-helper span{display:block;color:#aa998c}
+  `);
+  if(!themedDialogObservers.has(root)){
+    const observer=new MutationObserver(()=>{
+      if(!host.isConnected){observer.disconnect();return;}
+      themeEspWebToolsDialog(host);
+    });
+    observer.observe(root,{childList:true,subtree:true});
+    themedDialogObservers.set(root,observer);
+  }
+  const dialog=root.querySelector("ew-dialog");
+  if(!dialog)return;
+  if(dialog.shadowRoot){
+    ensureShadowStyle(dialog.shadowRoot,"bikepower-dialog-surface",`
+      .scrim{background:rgba(10,8,7,.84)!important}
+      dialog{border-radius:0!important}
+      .container{border:1px solid #58463a!important;border-radius:0!important;background:#17110e!important;box-shadow:0 22px 80px rgba(0,0,0,.72)!important}
+      .headline,.content,.actions{color:#d8c7b5!important}
+    `);
+  }
+  const helper=dialog.querySelector(".bikepower-flash-helper");
+  const isInstalling=host.tagName==="EWT-INSTALL-DIALOG"&&host.getAttribute("state")==="INSTALL";
+  const isNoPort=host.tagName==="EWT-NO-PORT-PICKED-DIALOG";
+  if(!isInstalling&&!isNoPort){if(helper)helper.remove();return;}
+  if(helper)return;
+  const note=document.createElement("aside");note.className="bikepower-flash-helper";note.slot="content";
+  if(isInstalling){
+    note.innerHTML="<b>正在把 BikePower 固件写入开发板</b><span>大约需要 2 分钟。Installing / Wrapping up 都是正常状态；保持页面可见，不要拔线、刷新或关闭页面。</span>";
+    dialog.appendChild(note);
+  }else{
+    note.innerHTML="<b>没有看到串口？先别急</b><span>换一根确定能传数据的 USB 线，关闭占用串口的软件，拔插开发板后再试。</span>";
+    const firstContent=dialog.querySelector('[slot="content"]');dialog.insertBefore(note,firstContent);
+  }
+}
+function installEspWebToolsTheme(){
+  const scan=()=>document.querySelectorAll(ESP_DIALOG_SELECTOR).forEach(themeEspWebToolsDialog);
+  const observer=new MutationObserver(scan);observer.observe(document.body,{childList:true,subtree:true});
+  for(const tag of ["ewt-install-dialog","ewt-no-port-picked-dialog"]){
+    customElements.whenDefined(tag).then(()=>requestAnimationFrame(scan));
+  }
+  scan();
 }
 function uuidShort(uuid){
   if(!uuid)return "";
@@ -861,7 +967,7 @@ async function requestDevice(){
   if(!checkSupport())return null;
   try{
     const device=await navigator.bluetooth.requestDevice({
-      acceptAllDevices:true,
+      filters:CYCLING_SERVICE_FILTERS,
       optionalServices:ALL_OPTIONAL_SERVICES,
     });
     return device;
@@ -938,6 +1044,10 @@ async function connectAndCollect(device){
     log("DIS 信息读取完成");
     rec.services=await enumerateServices(rec.server);
     log("已枚举 "+rec.services.length+" 个 GATT 服务");
+    if(!rec.services.some(service=>CYCLING_SERVICE_SET.has(service.uuid.toLowerCase()))){
+      try{rec.server.disconnect();}catch(e){}
+      throw new Error("该设备未提供骑行功率、心率、骑行速度/踏频或智能骑行台服务，已过滤");
+    }
     await subscribeNotifications(rec);
     if(anomalyTimer)clearInterval(anomalyTimer);
     anomalyTimer=setInterval(checkAnomalies,1000);
@@ -1226,6 +1336,7 @@ function renderCompareTable(){
 /* ==================== 启动 ==================== */
 window.addEventListener("load",()=>{
   checkSupport();
+  installEspWebToolsTheme();
   loadFirmwareCatalog();
   switchMode("connect");
   resetMonitorSignals();

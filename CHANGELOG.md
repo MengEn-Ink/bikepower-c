@@ -4,6 +4,14 @@
 
 ## [未发布]
 
+### Pages 刷写引导与骑行设备过滤（2026-10-27）
+- `tools/web/ble-monitor.html`：固件刷写页改为面向第一次使用者的三步流程，补充约 2 分钟耗时、数据线/串口识别、英文进度状态、Erase 数据提醒和找不到串口的排错说明。
+- ESP Web Tools 安装中与未选择串口弹窗增加受控 Shadow DOM 主题兼容层，使用信号宣言的深黑、深棕、锈橙令牌和中文辅助说明；浏览器原生串口选择窗口继续保持系统外观。
+- Web Bluetooth 首次授权由 `acceptAllDevices` 改为 CPS、HRS、CSC、FTMS 广播服务过滤，RSC 保持可选读取但不会让仅跑步设备进入骑行列表；已授权设备连接后再按实际 GATT 服务做二次复核。
+- `tests/check_ble_monitor.py`：新增骑行服务过滤、RSC 排除、GATT 二次复核、ESP Web Tools 主题层和中文帮助门禁，并禁止以任意空白形式恢复 `acceptAllDevices: true`。
+- 视觉验证：1440×900、375×812 均无横向溢出；真实 ESP Web Tools v10.4.0 Installing 弹窗主题注入通过，浏览器控制台 0 error/warn。
+- 回归验证：`tests/check_ble_monitor.py` 全绿，网页刷写站点生成器 7/7，`git diff --check` 通过；`quality_gate.py` 99 PASS / 2 个预期 dirty-worktree WARN / 0 FAIL，包含 ESP-IDF build 与 host 6077/0。
+
 ### 真实骑行数据模型优化与稳定性收口（2026-10-27）
 - `components/bikepower_domain/power_engine.c/.h`、`domain_config.h`：以 MyWhoosh FIT 中间 5-85 分钟的 4800 个对齐 1Hz 样本为基线，功率慢层改为 6-18 秒随机航点间的 smoothstep 连续过渡，叠加每秒更新的相关快层；默认功率浮动调整为 ±50W、踏频为 ±8rpm，踏频保持与功率的弱正相关，`snapshot_count` 改为 `uint64_t`。
 - `components/bikepower_domain/hr_model.c/.h`：FTP 映射以 85% 阈值心率为锚点压缩到 70% 幅度，并增加 ±7bpm、30-90 秒连续独立游走；重置路径同步清理周期缓存、计数器和游走状态。

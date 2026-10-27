@@ -55,6 +55,8 @@ def main():
 
     required_html_tokens = [
         ("navigator.bluetooth.requestDevice", "支持首次授权选择 BikePower 设备"),
+        ("filters:CYCLING_SERVICE_FILTERS", "首次设备选择仅显示广播骑行相关服务的设备"),
+        ("CYCLING_SERVICE_SET.has", "连接后复核设备实际提供骑行相关 GATT 服务"),
         ("navigator.bluetooth.getDevices", "支持已授权设备自动重连"),
         ("setInterval(checkAnomalies", "周期检测通知中断等异常"),
         ("ANOMALY_LIMITS", "集中定义异常阈值"),
@@ -82,6 +84,9 @@ def main():
         ("0000180a-0000-1000-8000-00805f9b34fb", "包含 Device Information Service UUID"),
         ("esp-web-install-button", "集成 ESP Web Tools 刷写组件"),
         ("esp-web-tools@10", "固定 ESP Web Tools 主版本"),
+        ("installEspWebToolsTheme", "ESP Web Tools 动态弹窗接入 BikePower 主题兼容层"),
+        ("bikepower-flash-helper", "安装进度弹窗提供中文小白说明"),
+        ("--md-sys-color-surface", "安装进度弹窗使用 BikePower 暗色表面令牌"),
         ('customElements.get("esp-web-install-button")', "刷写组件加载失败时不会保留误导按钮"),
         ("./firmware/latest.json", "自动读取部署生成的最新固件索引"),
         ('value="generic-c3"', "支持通用 ESP32-C3 固件"),
@@ -93,6 +98,17 @@ def main():
     ]
     for token, message in required_html_tokens:
         check(token in html, message, failures)
+    check(not re.search(r"acceptAllDevices\s*:\s*true", html),
+          "设备选择器不再展示所有无关蓝牙设备", failures)
+    cycling_filter = re.search(
+        r"const CYCLING_SERVICE_UUIDS\s*=\s*\[(.*?)\];", html, flags=re.S
+    )
+    cycling_filter_src = cycling_filter.group(1) if cycling_filter else ""
+    for service_name in ("cpsService", "hrService", "cscService", "ftmsService"):
+        check(service_name in cycling_filter_src,
+              f"设备选择器包含 {service_name} 骑行服务过滤条件", failures)
+    check("rscService" not in cycling_filter_src,
+          "仅 RSC 跑步设备不会进入骑行设备选择列表", failures)
 
     check("ThreadingHTTPServer" in server and "tools/web" in server,
           "本地服务脚本从 tools/web 提供页面", failures)
