@@ -234,7 +234,7 @@ BLE 实现集中在 `main/ble_bikepower.c`。
 
 - `BLE_GAP_CONN_MODE_UND`
 - `BLE_GAP_DISC_MODE_GEN`
-- 广播间隔 `BLE_ADVERTISING_INTERVAL_MS = 500`
+- 广播间隔 `BLE_ADVERTISING_INTERVAL_MS = 100`
 
 GAP 事件回调为 `gap_event_cb()`：
 

@@ -14,7 +14,8 @@
 - 开源调研：参考 SmartSpin2k 的加速仿真、多种子/延迟/抖动/丢样与边界 workout 方法，以及 qdomyos-zwift fake bike 的虚拟设备思路；两者分别为 GPL-2.0/GPL-3.0，本项目只独立实现测试方法和统计模型，未复制其源码。
 - 当前固定种子仿真：功率 `189.9±20.3W`、秒差 P50/P95=`4/11W`、AC1/AC5=`0.960/0.708`、功率/踏频相关 `0.277`；心率 `154.0±5.2bpm`，即时/滞后 30 秒相关 `0.153/0.351`。附件参考分别为 `190.7±20.7W`、`3/12W`、`0.955/0.708`、`0.296`、`152.4±5.2bpm` 和 `0.156/0.342`。
 - 验证：FIT 固定基准复验通过；`make -C test clean && make -C test run` 为 6077/0；Clang `-Werror` + ASan/UBSan 6077/0；`operation_gate.py --level full --build` 全绿（含 3 分钟核心流程 6 轮耐久与 ESP-IDF 编译）；`quality_gate.py` 99 PASS / 2 个预期 dirty-worktree WARN / 0 FAIL；`git diff --check` 通过。固件 `0x1163F0`（1,139,696 字节），factory app 分区剩余 2,923,536 字节（71.95%）。
-- 未执行：本轮尚未烧录 generic-c3/m5stamp-c3；真实 NimBLE 1Hz 时序、WiFi/BLE 共存、标准客户端与长时设备运行均保持 `NOT_RUN`，不得用 host 仿真替代。
+- `main/bikepower_config.h`：generic-c3 真机反复连接发现 500ms 广播间隔会放大 macOS CoreBluetooth 建链延迟，5 分钟基线出现 3 次连接失败；将广播间隔缩短为 100ms 后，同机同脚本 90 秒 A/B 连续 7 轮、72 个 CPS 通知，扫描/连接/空通知均为 0 失败，单轮耗时由最高 47.6 秒降到约 13-18 秒。
+- generic-c3 已完成正式固件烧录、ROM 启动检查、cycling 五服务/DIS/四路 1Hz 通知、FTMS 非法目标拒绝、250W ERG 收敛与 Stop/Pause 恢复、双次独立重连；m5stamp-c3、running profile、WiFi/BLE 共存、标准客户端及物理按钮/LED 仍保持 `NOT_RUN`，不得由 generic-c3 结果代替。
 
 ## [4.1.3] - 2026-10-26
 

@@ -120,7 +120,7 @@ typedef enum {
 #define NVS_TEMPLATE_KEY_PREFIX   "tpl"
 
 // ===== BLE 连接与广播 =====
-#define BLE_ADVERTISING_INTERVAL_MS  500    // 广播间隔
+#define BLE_ADVERTISING_INTERVAL_MS  100    // 广播间隔
 #define BLE_NOTIFY_INTERVAL_MS       1000   // 通知间隔
 #define BLE_RETRY_TICKS              100    // BLE 启动失败重试节拍数（每拍50ms → 5s）
 #define BLE_NOTIFY_LOCK_WAIT_MS      10     // 通知互斥锁短等待上限：锁持有为微秒级，避免阻塞 NimBLE 任务

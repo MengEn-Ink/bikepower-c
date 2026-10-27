@@ -41,7 +41,8 @@
 - [x] 新增 FIT 固定基准提取/复验、16 种子统计回归、24 小时等效快照、极值/退化/模式切换和 1Hz 抖动/丢样/重复保持仿真，当前 6077 断言通过。
 - [x] 调研 SmartSpin2k、qdomyos-zwift 等开源实现，只独立借鉴加速仿真、时序压力和边界场景方法，未复制 GPL 源码。
 - [x] 完整验证通过：Host 6077/0、ASan/UBSan 6077/0、full operation gate、3 分钟核心流程 6 轮耐久、ESP-IDF build、quality gate 99 PASS / 0 FAIL；固件 `0x1163F0`，factory app 分区剩余 71.95%。
-- [ ] generic-c3 / m5stamp-c3 烧录、真实 BLE 1Hz 通知时序、WiFi/BLE 共存、标准客户端和设备长时运行仍待真机验证。
+- [x] generic-c3 完成烧录、启动、cycling 五服务/DIS、四路 1Hz 通知、FTMS ERG 与双次重连；连接压力 A/B 将广播间隔从 500ms 缩短到 100ms 后连续 7 轮无失败。
+- [ ] m5stamp-c3、running profile、WiFi/BLE 共存、标准客户端、物理按钮/LED 和设备长时运行仍待真机验证。
 
 ---
 

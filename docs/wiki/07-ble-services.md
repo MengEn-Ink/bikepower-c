@@ -310,7 +310,7 @@ FTMS Control Point 采用写+指示（Indication）模式，客户端写命令�
 | 参数 | 值 | 说明 |
 |------|----|------|
 | 模式 | `BLE_GAP_CONN_MODE_UND` + `BLE_GAP_DISC_MODE_GEN` | 通用可连接、可发现 |
-| 间隔 | `BLE_ADVERTISING_INTERVAL_MS`（500ms） | 换算为 0.625ms 单位写入 |
+| 间隔 | `BLE_ADVERTISING_INTERVAL_MS`（100ms） | 换算为 0.625ms 单位写入；缩短首次连接与断开重连等待 |
 | 超时 | `BLE_HS_FOREVER` | 无限时长广播，直到连接或停止 |
 | 标志 | `BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP` | 通用发现，不支持 BR/EDR |
 

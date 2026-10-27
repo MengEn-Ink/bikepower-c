@@ -583,7 +583,7 @@ notify_ms = extract_int(config_src, "BLE_NOTIFY_INTERVAL_MS")
 check(notify_ms == 1000, f"BLE_NOTIFY_INTERVAL_MS = 1000 (实际={notify_ms})")
 
 advert_ms = extract_int(config_src, "BLE_ADVERTISING_INTERVAL_MS")
-check(advert_ms == 500, f"BLE_ADVERTISING_INTERVAL_MS = 500 (实际={advert_ms})")
+check(advert_ms == 100, f"BLE_ADVERTISING_INTERVAL_MS = 100 (实际={advert_ms})")
 
 
 # ============================ 7. 内存阈值一致性 ============================
