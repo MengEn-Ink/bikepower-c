@@ -160,7 +160,7 @@ app_main.c
 | [hr_model.c](../../components/bikepower_domain/hr_model.c) | 负荷功率滤波、FTP 6 区映射与锚点压缩、心率平滑（tau 升 30s/降 60s）、HRV 慢游走与输出限速 |
 | [running_engine.c](../../components/bikepower_domain/running_engine.c) | 跑步模式：速度/配速/步频生成、配速机器人、RSC 数据 |
 | [profile.c](../../components/bikepower_domain/profile.c) | 用户档案（体重/FTP/阈值心率）、配速机器人表（Coco/Yumi/Jacques/Genie/Constance/自定义） |
-| [config_store.c](../../components/bikepower_domain/config_store.c) | 配置 schema 版本（当前 v11）、defaults、validate（夹紧）、migrate（v6-v10 升级）、serialize/deserialize JSON |
+| [config_store.c](../../components/bikepower_domain/config_store.c) | 配置 schema 版本（当前 v12）、defaults、validate（夹紧）、migrate（v6-v11 升级）、serialize/deserialize JSON |
 | [json_miniparse.c](../../components/bikepower_domain/json_miniparse.c) | 轻量 JSON 字段提取器（无动态分配，用于 HTTP 请求解析） |
 | [button_logic.c](../../components/bikepower_domain/button_logic.c) | 按钮按压语义纯逻辑（短按/长按/自动重复/确认窗口） |
 | [button_debounce.c](../../components/bikepower_domain/button_debounce.c) | 去抖与长按节拍纯逻辑 |

@@ -44,8 +44,8 @@
 #define RUN_CUSTOM_NAME_DEFAULT "自定义"
 
 // ===== 配置格式版本 =====
-// v11：移除未落地的跑步坡度持久化字段，仅保留速度/步频/配速核心参数。
-#define CONFIG_VERSION        11
+// v12：把仍使用历史默认 ±5W 的配置迁移到当前 FIT 拟合默认值 ±50W。
+#define CONFIG_VERSION        12
 
 // ===== 设备名称（BLE 广播名，可配网修改并持久化） =====
 #define DEVICE_NAME_MAX       24
@@ -121,6 +121,7 @@ typedef enum {
 // amp=0 时输出恒定为基准值。
 #define POWER_FLOAT_MIN          0
 #define POWER_FLOAT_MAX          100
+#define POWER_FLOAT_LEGACY_DEFAULT 5
 #define POWER_FLOAT_DEFAULT      50
 #define CADENCE_FLOAT_MIN        0
 #define CADENCE_FLOAT_MAX        20
@@ -131,11 +132,12 @@ typedef enum {
 
 // ===== 骑行分层动态参数 =====
 // 慢层使用连续航点模拟路况与体力趋势，快层每秒更新一次模拟踩踏及传感器波动；两层合成后仍受浮动幅度约束。
+// 快层跟随系数按 FIT 1Hz 秒差与 AC1 拟合，0.70 可在不扩大总幅度时提高短时变化。
 #define RIDE_DYNAMICS_SLOW_SHARE_PCT       80
 #define RIDE_DYNAMICS_SLOW_HOLD_MIN_LOOPS  120
 #define RIDE_DYNAMICS_SLOW_HOLD_MAX_LOOPS  360
 #define RIDE_DYNAMICS_FAST_UPDATE_LOOPS    20
-#define RIDE_DYNAMICS_FAST_ALPHA           0.65f
+#define RIDE_DYNAMICS_FAST_ALPHA           0.70f
 #define RIDE_CADENCE_COUPLING_DIVISOR       4
 #define RUN_FLUCT_WALK_TAU                   3
 #define RUN_FLUCT_WALK_HOLD_LOOPS           60

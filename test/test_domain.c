@@ -752,6 +752,8 @@ static void test_reference_ride_simulation(void)
           "生产默认功率浮动为±50W");
     CHECK(e.cadence_float == CADENCE_FLOAT_DEFAULT && e.cadence_float == 8,
           "生产默认踏频浮动为±8RPM");
+    CHECK(fabsf(RIDE_DYNAMICS_FAST_ALPHA - 0.70f) < 0.0001f,
+          "功率快层跟随系数使用FIT拟合值0.70");
     CHECK(profile_set_ftp(&e.profile, 250), "仿真FTP设为250W");
     CHECK(profile_set_thr_hr(&e.profile, 180), "仿真阈值心率设为180BPM");
     power_engine_clear_user_hr(&e);
@@ -805,8 +807,8 @@ static void test_reference_ride_simulation(void)
     CHECK(power_mean >= 186.0 && power_mean <= 194.0, "长期平均功率保持基准附近");
     CHECK(power_stddev >= 18.0 && power_stddev <= 23.0, "功率离散度接近真实骑行量级");
     CHECK(power_delta_p50 >= 3 && power_delta_p50 <= 5, "功率秒差中位数接近真实骑行");
-    CHECK(power_delta_p95 >= 9 && power_delta_p95 <= 13, "功率秒差95分位接近真实骑行");
-    CHECK(power_ac1 >= 0.94 && power_ac1 <= 0.98, "功率具有秒级连续性");
+    CHECK(power_delta_p95 == 12, "固定种子功率秒差95分位命中FIT参考");
+    CHECK(power_ac1 >= 0.95 && power_ac1 <= 0.96, "功率秒级连续性命中FIT参考");
     CHECK(power_ac5 >= 0.62 && power_ac5 <= 0.78, "功率具有多秒惯性且不过度平坦");
     CHECK(power_cadence_corr >= 0.18 && power_cadence_corr <= 0.42,
           "踏频与功率保持真实的弱正相关");
@@ -901,6 +903,7 @@ static void test_reference_ride_multiseed(void)
            mean_min, mean_max, stddev_min, stddev_max, delta95_min, delta95_max);
     printf("  16种子 AC1=%.3f..%.3f AC5=%.3f..%.3f P/C=%.3f..%.3f P/HR30=%.3f..%.3f\n",
            ac1_min, ac1_max, ac5_min, ac5_max, pc_min, pc_max, phr_min, phr_max);
+    CHECK(delta95_max >= 12, "多种子功率秒差P95覆盖FIT的12W量级");
 }
 
 static bool snapshot_in_global_range(snapshot_t snapshot)
@@ -1452,6 +1455,15 @@ static void test_config_store(void)
     CHECK(v8.schema_ver == CONFIG_VERSION, "v8 迁移后版本=当前");
     CHECK(v8.broadcast_mask == BROADCAST_FIELD_ALL, "v8 迁移补默认广播项");
 
+    config_data_t v10;
+    config_store_defaults(&v10);
+    v10.schema_ver = 10;
+    v10.power = 324;
+    v10.power_float = 12;
+    CHECK(config_store_migrate(&v10), "v10 配置迁移到当前版本");
+    CHECK(v10.schema_ver == CONFIG_VERSION, "v10 迁移后版本=当前");
+    CHECK(v10.power == 324 && v10.power_float == 12, "v10 迁移保留用户配置");
+
     // 固定心率：启用并设合法值，validate 不修正、值保留（持久化往返关键）
     config_data_t hr;
     config_store_defaults(&hr);
@@ -1989,7 +2001,7 @@ static void test_running_pacer_defaults(void)
     config_data_t c;
     config_store_defaults(&c);
 
-    CHECK(CONFIG_VERSION == 11, "配置 schema 版本升级到 11");
+    CHECK(CONFIG_VERSION == 12, "配置 schema 版本升级到 12");
     CHECK(c.run_mode == RUN_MODE_FIXED, "默认跑步模式为固定配速");
     CHECK(c.run_pacer_type == RUN_PACER_JOG, "默认跑步模板为慢跑");
     CHECK(c.run_pace_low_sec == 390, "默认跑步模板下限=6:30/km");
@@ -2146,9 +2158,9 @@ static void test_session_config_export(void)
     CHECK(!e.running.running, "配置导出不改变非持久跑步暂停态");
 }
 
-static void test_config_migrate_v9_to_v11_running_fields(void)
+static void test_config_migrate_v9_to_current_running_fields(void)
 {
-    printf("[test] v9 到 v11 跑步配置迁移\n");
+    printf("[test] v9 到当前版本跑步配置迁移\n");
     config_data_t c;
     config_store_defaults(&c);
     c.schema_ver = 9;
@@ -2157,7 +2169,7 @@ static void test_config_migrate_v9_to_v11_running_fields(void)
     c.run_pace_float_sec = 12;
     c.run_cadence = 181;
     c.run_cadence_float = 6;
-    CHECK(config_store_migrate(&c), "v9 配置迁移到 v11");
+    CHECK(config_store_migrate(&c), "v9 配置迁移到当前版本");
     CHECK(c.schema_ver == CONFIG_VERSION, "v9 迁移后 schema=当前版本");
     CHECK(c.power == 333, "v9 迁移保留功率");
     CHECK(c.run_speed_x100 == 1234, "v9 迁移保留跑步速度");
@@ -2168,6 +2180,35 @@ static void test_config_migrate_v9_to_v11_running_fields(void)
     CHECK(c.run_pacer_type == RUN_PACER_JOG, "v9 迁移补默认跑步模板");
     CHECK(c.run_pace_low_sec == 390 && c.run_pace_high_sec == 450, "v9 迁移补默认模板区间");
     CHECK(strcmp(c.run_custom_name, RUN_CUSTOM_NAME_DEFAULT) == 0, "v9 迁移补默认自定义跑步名称");
+}
+
+static void test_config_migrate_v11_to_v12_power_float(void)
+{
+    printf("[test] v11 到 v12 功率浮动选择性迁移\n");
+    CHECK(POWER_FLOAT_LEGACY_DEFAULT == 5, "历史功率浮动默认值锁定为 ±5W");
+
+    config_data_t legacy;
+    config_store_defaults(&legacy);
+    legacy.schema_ver = 11;
+    legacy.power = 260;
+    legacy.power_float = POWER_FLOAT_LEGACY_DEFAULT;
+    CHECK(config_store_migrate(&legacy), "v11 历史默认配置执行迁移");
+    CHECK(legacy.schema_ver == CONFIG_VERSION, "v11 历史默认迁移到 v12");
+    CHECK(legacy.power == 260, "v11 迁移保留基础功率");
+    CHECK(legacy.power_float == POWER_FLOAT_DEFAULT, "历史默认 ±5W 迁移为 FIT 默认 ±50W");
+
+    config_data_t custom;
+    config_store_defaults(&custom);
+    custom.schema_ver = 11;
+    custom.power = 275;
+    custom.power_float = 12;
+    CHECK(config_store_migrate(&custom), "v11 用户自定义配置执行迁移");
+    CHECK(custom.schema_ver == CONFIG_VERSION, "v11 用户自定义配置迁移到 v12");
+    CHECK(custom.power == 275, "v11 用户自定义迁移保留基础功率");
+    CHECK(custom.power_float == 12, "用户自定义 ±12W 保持不变");
+
+    CHECK(!config_store_migrate(&custom), "v12 配置重复迁移保持幂等");
+    CHECK(custom.power_float == 12, "v12 幂等迁移不改用户浮动");
 }
 
 int main(void)
@@ -2210,7 +2251,8 @@ int main(void)
     test_running_control_values();
     test_running_session_state();
     test_session_config_export();
-    test_config_migrate_v9_to_v11_running_fields();
+    test_config_migrate_v9_to_current_running_fields();
+    test_config_migrate_v11_to_v12_power_float();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

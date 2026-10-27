@@ -474,9 +474,9 @@ Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述�
 
 - 功率在 `base_power` 上叠加 `[-power_float, +power_float]` 的双时间尺度有界偏移
 - 踏频在 `cadence_base` 上叠加独立动态和功率弱耦合偏移，结果仍限制在 `[-cadence_float, +cadence_float]`
-- 浮动幅度 `power_float` / `cadence_float` / `hr_float` 可在配网页调整并持久化（新配置默认 ±50 W / ±8 rpm / ±2 bpm，已有 NVS 配置不自动改写）
+- 浮动幅度 `power_float` / `cadence_float` / `hr_float` 可在配网页调整并持久化（新配置默认 ±50 W / ±8 rpm / ±2 bpm；schema v12 仅把仍等于历史默认 ±5 W 的功率浮动迁移为 ±50 W，其他自定义值保持不变）
 - 浮动为 0 时对应量恒定输出基准值
-- 分层动态（`ride_dynamics_step`）：慢层占幅度的 80%，每 6-18 秒选择新航点并用 smoothstep 在起点和目标间连续过渡；快层每秒更新一次并以 `alpha=0.65` 吸收踩踏/传感器扰动；两层合成后仍严格限制在浮动带内
+- 分层动态（`ride_dynamics_step`）：慢层占幅度的 80%，每 6-18 秒选择新航点并用 smoothstep 在起点和目标间连续过渡；快层每秒更新一次并以 `alpha=0.70` 吸收踩踏/传感器扰动；该系数按 FIT 的 1Hz 秒差和 AC1 二次拟合，两层合成后仍严格限制在浮动带内
 - 如果 `has_user_hr` 为真，则走 `hr_model_steady_user(st, user_hr, hr_float)`（心率按 `hr_float` 幅度平稳波动，`hr_float=0` 恒定）
 - 否则先把瞬时功率转换为带生理惯性的负荷功率，再按 FTP 区间推导目标心率，最后走心率平滑和 HRV
 
@@ -533,7 +533,7 @@ Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述�
 5. 保持 `base_power` 不变
 6. 不设置配置 `dirty`
 
-Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，清除目标、切回 steady 并恢复原 `base_power`，同样不设置 dirty。`config_store_from_engine()` 在运行时仍处于 ERG 时也只导出 steady/base power；`config_store_validate()` 会把旧 NVS 或导入配置中的 ERG 修正为 steady，沿用现有 fixed 回写路径清理旧值，schema 仍为 v11。
+Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，清除目标、切回 steady 并恢复原 `base_power`，同样不设置 dirty。`config_store_from_engine()` 在运行时仍处于 ERG 时也只导出 steady/base power；`config_store_validate()` 会把旧 NVS 或导入配置中的 ERG 修正为 steady，沿用现有 fixed 回写路径清理旧值。当前 schema 为 v12。
 
 ### 6.9 跑步会话状态
 
@@ -820,18 +820,19 @@ namespace 固定为：
 
 领域层配置版本在 `domain_config.h` 中：
 
-`CONFIG_VERSION = 11`
+`CONFIG_VERSION = 12`
 
 `config_store_migrate()` 负责把旧 `schema_ver` 升级到当前版本。当前策略是：
 
-- v6 -> v11：保留已有配置，补 `run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT`
-- v7 -> v11：保留已有配置，补 `run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT`
-- v8 -> v11：补 `broadcast_mask = BROADCAST_FIELD_ALL`
-- v9 -> v11：保留既有跑步速度、配速浮动、步频、步频浮动，补 `run_mode`、`run_pacer_type`、`run_pace_low_sec`、`run_pace_high_sec`、`run_custom_name`
-- v10 -> v11：移除未落地的跑步坡度持久化字段，保留其他当前字段
+- v6 -> v12：保留已有配置，补 `run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT`，并继续逐级迁移
+- v7 -> v12：保留已有配置，补 `run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT`，并继续逐级迁移
+- v8 -> v12：补 `broadcast_mask = BROADCAST_FIELD_ALL`，并继续逐级迁移
+- v9 -> v12：保留既有跑步速度、配速浮动、步频、步频浮动，补 `run_mode`、`run_pacer_type`、`run_pace_low_sec`、`run_pace_high_sec`、`run_custom_name`
+- v10 -> v12：先进入 v11，保留其他当前字段，再执行 v11 的选择性功率浮动迁移
+- v11 -> v12：仅当 `power_float == POWER_FLOAT_LEGACY_DEFAULT`（±5 W）时改为 `POWER_FLOAT_DEFAULT`（±50 W）；其他值视为用户自定义并保持不变
 - 未知旧版本：回退默认配置
 
-这意味着 v6/v7/v8/v9/v10 升级到当前版本时会保留主要用户配置；更早或无法识别的 schema 会安全回默认，避免异常配置导致新固件启动异常。
+这意味着 v6-v11 升级到当前版本时会保留主要用户配置，并修复历史默认浮动过小的问题；更早或无法识别的 schema 会安全回默认，避免异常配置导致新固件启动异常。
 
 ### 9.3 校验与夹紧
 

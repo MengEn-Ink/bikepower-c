@@ -55,7 +55,7 @@ output_hr = 有用户心率 ? hr_model_steady_user(user_hr, hr_float)
 
 **双时间尺度动态**（`ride_dynamics_step`）：
 - 慢层占幅度 80%，每 6-18 秒选择新航点并用 smoothstep 连续过渡
-- 快层每秒以 `alpha=0.65` 吸收一次有界踩踏/传感器扰动
+- 快层每秒以 `alpha=0.70` 吸收一次有界踩踏/传感器扰动，该值按 FIT 的 1Hz 秒差和 AC1 拟合
 - 两层合成结果始终夹在配置浮动带内，`amp=0` 时严格恒定
 
 ### Road 模式（build_road）
@@ -214,18 +214,19 @@ dt = 0.05s（50ms 节拍）
 
 ### 当前 Schema 版本
 
-`CONFIG_VERSION = 11`
+`CONFIG_VERSION = 12`
 
 ### 迁移路径
 
 | 从版本 | 到版本 | 迁移操作 |
 |--------|--------|----------|
-| v6 | v11 | 补 `run_pace_float_sec` 默认值 |
-| v7 | v11 | 补 `run_cadence_float` 默认值 |
-| v8 | v11 | 补 `broadcast_mask = BROADCAST_FIELD_ALL` |
-| v9 | v11 | 补跑步参数（mode/pacer/pace 范围/custom_name） |
-| v10 | v11 | 移除未落地的跑步坡度字段 |
-| 未知 | v11 | 回退到默认配置 |
+| v6 | v12 | 补 `run_pace_float_sec` 默认值并逐级迁移 |
+| v7 | v12 | 补 `run_cadence_float` 默认值并逐级迁移 |
+| v8 | v12 | 补 `broadcast_mask = BROADCAST_FIELD_ALL` 并逐级迁移 |
+| v9 | v12 | 补跑步参数（mode/pacer/pace 范围/custom_name） |
+| v10 | v12 | 先进入 v11，再执行 v11 的选择性浮动迁移 |
+| v11 | v12 | `power_float=5`（历史默认）改为 50，其他自定义值不变 |
+| 未知 | v12 | 回退到默认配置 |
 
 ### config_t 字段
 
@@ -299,14 +300,14 @@ LED 模式与颜色映射纯逻辑：
 
 | 类别 | 常量 |
 |------|------|
-| 功率 | `POWER_MIN=0`, `POWER_MAX=4000`, `DEFAULT_POWER=260`, `POWER_STEP_DEFAULT=20` |
-| 踏频 | `CADENCE_MIN=0`, `CADENCE_MAX=255`, `DEFAULT_CADENCE=90` |
+| 功率 | `POWER_MIN=0`, `POWER_MAX=2000`, `DEFAULT_POWER=260`, `POWER_STEP_DEFAULT=20` |
+| 踏频 | `CADENCE_MIN=20`, `CADENCE_MAX=120`, `DEFAULT_CADENCE=90` |
 | 心率 | `HR_MIN=60`, `HR_MAX=200`, `DEFAULT_HEARTRATE=150` |
-| 浮动 | `POWER_FLOAT_DEFAULT=30`, `CADENCE_FLOAT_DEFAULT=4`, `HR_FLOAT_DEFAULT=2` |
+| 浮动 | `POWER_FLOAT_LEGACY_DEFAULT=5`, `POWER_FLOAT_DEFAULT=50`, `CADENCE_FLOAT_DEFAULT=8`, `HR_FLOAT_DEFAULT=2` |
 | 心率模型 | `HR_TAU_RISE=30`, `HR_TAU_FALL=60`, `HRV_RSA_AMPLITUDE=2.0` 等 |
 | 随机游走 | `FLUCT_WALK_HOLD_LOOPS=60`, `FLUCT_WALK_TAU=0.8f` |
 | 跑步 | `RUN_SPEED_X100_MIN/MAX`, `RUN_CADENCE_MIN/MAX` 等 |
-| 配置 | `CONFIG_VERSION=11`, `DEVICE_NAME_MAX=24` |
+| 配置 | `CONFIG_VERSION=12`, `DEVICE_NAME_MAX=24` |
 | 节拍 | `HR_LOOP_INTERVAL_MS=50` |
 | 广播 | `BROADCAST_FIELD_POWER/CADENCE/HR/RUNNING`, `BROADCAST_FIELD_ALL` |
 | 运动 profile | `SPORT_PROFILE_CYCLING=0`, `SPORT_PROFILE_RUNNING=1` |

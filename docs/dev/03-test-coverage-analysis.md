@@ -57,7 +57,7 @@
 
 | 层 | 入口 | 覆盖对象 | 状态 |
 |----|------|---------|------|
-| TC-1 host 单测 | `test/test_domain` | 领域层 13 个生产源文件 | ✅ 全绿（6077 断言 / 0 失败，含固定/16 种子 90 分钟统计、24 小时等效快照、极值与模式切换、1Hz 时序退化仿真、二阶心率响应、running 会话、ERG 非持久化和配置映射） |
+| TC-1 host 单测 | `test/test_domain` | 领域层 13 个生产源文件 | ✅ 全绿（6093 断言 / 0 失败，含固定/16 种子 90 分钟统计、24 小时等效快照、极值与模式切换、1Hz 时序退化仿真、二阶心率响应、running 会话、ERG 非持久化、配置映射和 v11→v12 选择性迁移） |
 | TC-1 FIT 基准 | `tests/analyze_fit_reference.py` | 附件 1Hz 功率/踏频/心率统计 | ✅ SHA-256 与 `tests/fixtures/ride_reference_metrics.json` 固定复验 |
 | TC-3a JS 静态 | `tests/check_portal_js.py` | `main/web/app.js` node --check | ✅ |
 | TC-3c 常量一致性 | `tests/check_config_consistency.py` | config 头文件 ↔ 文档 | ✅ |

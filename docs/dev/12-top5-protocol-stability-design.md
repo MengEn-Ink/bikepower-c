@@ -245,7 +245,7 @@ Fitness Machine Status 不镜像 Control Point OpCode：Reset、Stopped/Paused b
 
 ### 8.3 旧 NVS 兼容
 
-`config_store_validate()` 将持久配置中的 `RIDE_MODE_ERG` 规范化为 `RIDE_MODE_STEADY`。现有 schema 字段没有变化，因此 `CONFIG_VERSION` 保持 v11。
+`config_store_validate()` 将持久配置中的 `RIDE_MODE_ERG` 规范化为 `RIDE_MODE_STEADY`。该协议修复本身没有增加字段；后续真实骑行模型优化已将当前 `CONFIG_VERSION` 升到 v12，用于选择性迁移历史默认功率浮动。
 
 加载后若发生该修正，沿用现有 `fixed -> nvs_store_save()` 路径回写，不保留错误 ERG 值。
 

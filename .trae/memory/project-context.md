@@ -76,7 +76,8 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 | 网页固件刷写 | BLE Monitor 通过 GitHub Pages 部署；Actions 只取 GitHub Release，参与发布板型的 merged bin 经 SHA256 校验后生成 ESP Web Tools 0x0 manifest；正式部署缺固件即失败，不恢复设备内 OTA | 2026-10-24 |
 | 跑步模式核心闭环 | 当前跑步 P0 以 RSC 速度 + 步频 + 心率为核心；坡度不是必要参数，已从当前配置/API/网页/NVS 中移除，未来 FTMS Treadmill 再按需求恢复 | 2026-07-07 |
 | 代码托管与交付 | GitHub `MengEn-Ink/bikepower-c` 是唯一仓库和 `origin`；Release → Actions → Pages 为唯一固件网页交付链路 | 2026-10-22 |
-| 真实骑行模型基线 | 以 MyWhoosh FIT 中间 5-85 分钟的 1Hz 指标为固定基准；功率使用 6-18 秒 smoothstep 航点 + 秒级相关扰动，心率使用二阶负荷响应 + 独立慢游走；真机以硬件 RNG 播种，host 固定种子回归 | 2026-10-27 |
+| 真实骑行模型基线 | 以 MyWhoosh FIT 中间 5-85 分钟的 1Hz 指标为固定基准；功率使用 6-18 秒 smoothstep 航点 + `alpha=0.70` 秒级相关扰动，使固定种子秒差 P95=12W、AC1=0.955；心率使用二阶负荷响应 + 独立慢游走；真机以硬件 RNG 播种，host 固定种子回归 | 2026-10-27 |
+| 历史功率浮动迁移 | schema v12 仅将 v11 中仍为历史默认 `power_float=5` 的设备迁移到 FIT 默认 `50`；其他自定义值保留，避免重置用户配置 | 2026-10-27 |
 
 ---
 
@@ -124,4 +125,5 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 
 ### 骑行数据仿真
 - [INFO] [2026-10-27] 真实骑行模型改动必须同时复验 FIT 固定基准、多个随机种子、24 小时等效快照和极值/模式切换；host 仿真不能替代 NimBLE 1Hz 时序与标准客户端真机验收。
+- [WARNING] [2026-10-27] 调大 `POWER_FLOAT_DEFAULT` 不会影响已经保存旧 NVS 的设备；修改默认浮动后必须检查板上 `sv/pfloat`。schema v12 已选择性处理旧默认 `pfloat=5`，用户自定义值不得无条件覆盖。
 - [WARNING] [2026-10-27] SmartSpin2k 与 qdomyos-zwift 分别使用 GPL-2.0/GPL-3.0；可借鉴加速时钟、时序压力、边界 workout 等方法，但不得直接复制源码到本项目。

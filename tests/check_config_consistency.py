@@ -372,7 +372,7 @@ check(fit_reference.get("power", {}).get("ac1") == 0.9550639560242542
       "真实骑行参考基准保留功率自相关与38秒最佳心率滞后")
 
 config_version = extract_int(domain_src, "CONFIG_VERSION")
-check(config_version == 11, f"CONFIG_VERSION 必须升级到 11 (实际={config_version})")
+check(config_version == 12, f"CONFIG_VERSION 必须升级到 12 (实际={config_version})")
 check(f"`CONFIG_VERSION = {config_version}`" in tech_ref_src,
       f"技术参考 schema 版本与 CONFIG_VERSION({config_version}) 一致")
 for macro in [

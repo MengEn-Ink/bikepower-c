@@ -187,7 +187,8 @@ bool config_store_validate(config_data_t *c)
  * 将旧版本配置迁移到当前 schema。
  * 参数：c 为待迁移的配置对象。
  * 返回值：若执行了迁移返回 true，否则返回 false。
- * 特殊行为：当前没有细粒度历史迁移逻辑，schema 不匹配时会直接回退为整套默认配置。
+ * 特殊行为：已知版本逐级迁移并保留用户配置；未知版本回退为整套默认配置。
+ * v11 到 v12 仅替换历史默认的 ±5W，其他功率浮动值视为用户自定义并保留。
  */
 bool config_store_migrate(config_data_t *c)
 {
@@ -216,7 +217,13 @@ bool config_store_migrate(config_data_t *c)
         c->run_custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
     }
     if (c->schema_ver == 10) {
-        c->schema_ver = CONFIG_VERSION;
+        c->schema_ver = 11;
+    }
+    if (c->schema_ver == 11) {
+        c->schema_ver = 12;
+        if (c->power_float == POWER_FLOAT_LEGACY_DEFAULT) {
+            c->power_float = POWER_FLOAT_DEFAULT;
+        }
         config_store_validate(c);
         return true;
     }

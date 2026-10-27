@@ -13,17 +13,18 @@
 - 回归验证：`tests/check_ble_monitor.py` 全绿，网页刷写站点生成器 7/7，`git diff --check` 通过；`quality_gate.py` 99 PASS / 2 个预期 dirty-worktree WARN / 0 FAIL，包含 ESP-IDF build 与 host 6077/0。
 
 ### 真实骑行数据模型优化与稳定性收口（2026-10-27）
-- `components/bikepower_domain/power_engine.c/.h`、`domain_config.h`：以 MyWhoosh FIT 中间 5-85 分钟的 4800 个对齐 1Hz 样本为基线，功率慢层改为 6-18 秒随机航点间的 smoothstep 连续过渡，叠加每秒更新的相关快层；默认功率浮动调整为 ±50W、踏频为 ±8rpm，踏频保持与功率的弱正相关，`snapshot_count` 改为 `uint64_t`。
+- `components/bikepower_domain/power_engine.c/.h`、`domain_config.h`：以 MyWhoosh FIT 中间 5-85 分钟的 4800 个对齐 1Hz 样本为基线，功率慢层使用 6-18 秒随机航点间的 smoothstep 连续过渡，叠加每秒更新的相关快层；快层跟随系数由 `0.65` 提高到 `0.70`，在不扩大 ±50W 总边界的前提下把秒差 P95 从 11W 提高到 12W；默认踏频浮动为 ±8rpm，踏频保持与功率的弱正相关，`snapshot_count` 使用 `uint64_t`。
 - `components/bikepower_domain/hr_model.c/.h`：FTP 映射以 85% 阈值心率为锚点压缩到 70% 幅度，并增加 ±7bpm、30-90 秒连续独立游走；重置路径同步清理周期缓存、计数器和游走状态。
 - `main/app_main.c`：BLE 初始化后以 `esp_random()` 播种领域 RNG，避免真机每次上电复现相同轨迹；host 测试仍显式固定种子，保证回归可复现。
-- `main/web/app.js`、`tests/mock_server.py`：前端和 mock 的新配置默认值同步为功率 ±50W、踏频 ±8rpm；既有 NVS 数值保持原值，不做静默迁移。
+- `main/web/app.js`、`tests/mock_server.py`：前端和 mock 的新配置默认值同步为功率 ±50W、踏频 ±8rpm。
+- `components/bikepower_domain/config_store.c`、`domain_config.h`：配置 schema 升级为 v12；仅把 v11 中仍等于历史默认的 `power_float=5` 迁移为 FIT 拟合默认 `50`，其他用户自定义幅度和基础配置保持不变，v6-v10 继续逐级迁移。
 - `tests/analyze_fit_reference.py`、`tests/fixtures/ride_reference_metrics.json`、`requirements-test.txt`：新增 FIT 指标提取与 SHA-256 固定基准，可复验均值、标准差、秒差、自相关、功率/踏频相关和功率→心率最佳滞后。
-- `test/test_domain.c`：新增 16 种子 90 分钟统计回归、上下边界最大/零浮动、Road 单点区间、ERG 0/2000W 与一小时每秒换目标、心率极值锁定/解锁、2000 轮模式切换、24 小时等效快照，以及 1Hz 通知抖动、约 2% 丢样和约 3% 重复保持仿真。
+- `test/test_domain.c`：新增 16 种子 90 分钟统计回归、上下边界最大/零浮动、Road 单点区间、ERG 0/2000W 与一小时每秒换目标、心率极值锁定/解锁、2000 轮模式切换、24 小时等效快照，以及 1Hz 通知抖动、约 2% 丢样和约 3% 重复保持仿真；补充 v11 历史默认迁移、自定义值保留、旧版本逐级升级和 v12 幂等测试。
 - 开源调研：参考 SmartSpin2k 的加速仿真、多种子/延迟/抖动/丢样与边界 workout 方法，以及 qdomyos-zwift fake bike 的虚拟设备思路；两者分别为 GPL-2.0/GPL-3.0，本项目只独立实现测试方法和统计模型，未复制其源码。
-- 当前固定种子仿真：功率 `189.9±20.3W`、秒差 P50/P95=`4/11W`、AC1/AC5=`0.960/0.708`、功率/踏频相关 `0.277`；心率 `154.0±5.2bpm`，即时/滞后 30 秒相关 `0.153/0.351`。附件参考分别为 `190.7±20.7W`、`3/12W`、`0.955/0.708`、`0.296`、`152.4±5.2bpm` 和 `0.156/0.342`。
-- 验证：FIT 固定基准复验通过；`make -C test clean && make -C test run` 为 6077/0；Clang `-Werror` + ASan/UBSan 6077/0；`operation_gate.py --level full --build` 全绿（含 3 分钟核心流程 6 轮耐久与 ESP-IDF 编译）；`quality_gate.py` 99 PASS / 2 个预期 dirty-worktree WARN / 0 FAIL；`git diff --check` 通过。固件 `0x1163F0`（1,139,696 字节），factory app 分区剩余 2,923,536 字节（71.95%）。
+- 当前固定种子仿真：功率 `189.9±20.4W`、秒差 P50/P95=`4/12W`、AC1/AC5=`0.955/0.704`、功率/踏频相关 `0.276`；心率 `154.0±5.2bpm`，即时/滞后 30 秒相关 `0.153/0.351`。附件参考分别为 `190.7±20.7W`、`3/12W`、`0.955/0.708`、`0.296`、`152.4±5.2bpm` 和 `0.156/0.342`。
+- 验证：FIT 固定基准复验通过；`make -C test clean && make -C test run` 为 6093/0；Clang `-Werror` + ASan/UBSan 6093/0（macOS LeakSanitizer 不支持，未启用 leak 检查）；`operation_gate.py --level full --build` 全绿（含 3 分钟核心流程 6 轮耐久与 ESP-IDF 编译）；`quality_gate.py` 99 PASS / 2 个预期 dirty-worktree WARN / 0 FAIL；`git diff --check` 通过。固件 `0x116410`（1,139,728 字节），factory app 分区剩余 2,923,504 字节（71.95%）。
 - `main/bikepower_config.h`：generic-c3 真机反复连接发现 500ms 广播间隔会放大 macOS CoreBluetooth 建链延迟，5 分钟基线出现 3 次连接失败；将广播间隔缩短为 100ms 后，同机同脚本 90 秒 A/B 连续 7 轮、72 个 CPS 通知，扫描/连接/空通知均为 0 失败，单轮耗时由最高 47.6 秒降到约 13-18 秒。
-- generic-c3 已完成正式固件烧录、ROM 启动检查、cycling 五服务/DIS/四路 1Hz 通知、FTMS 非法目标拒绝、250W ERG 收敛与 Stop/Pause 恢复、双次独立重连；m5stamp-c3、running profile、WiFi/BLE 共存、标准客户端及物理按钮/LED 仍保持 `NOT_RUN`，不得由 generic-c3 结果代替。
+- generic-c3 保留旧 NVS 完成正式固件烧录，板上配置由 `sv=11/pfloat=5` 正确升级为 `sv=12/pfloat=50`；90 秒 steady CPS 为 `226-303W`、`258.7±22.4W`、秒差 P95=`12W`，相比修复前 `258-265W`、标准差 `2.2W`、秒差 P95=`1W` 明显恢复真实浮动。ROM 启动检查、cycling 五服务/DIS/四路 1Hz 通知、FTMS 非法目标拒绝、250W ERG 收敛到 249W 与 Stop/Pause 恢复均通过；m5stamp-c3、running profile、WiFi/BLE 共存、标准客户端及物理按钮/LED 仍保持 `NOT_RUN`，不得由 generic-c3 结果代替。
 
 ## [4.1.3] - 2026-10-26
 

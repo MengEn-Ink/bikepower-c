@@ -13,7 +13,7 @@
 |------|------|------|------|
 | 0 | 工程骨架（CMake/分区/sdkconfig） | ✅ 完成 | 空工程启动日志 |
 | 1 | NimBLE CPS 单服务最小闭环 | ✅ 完成 | 手机搜到 BikePower 看到功率 |
-| 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测持续扩展（本轮基线 6077 断言） |
+| 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测持续扩展（本轮基线 6093 断言） |
 | 3 | GPIO 中断按钮 + LED 任务 + 状态机 | ✅ 代码完成（物理按钮待人工确认） | 短/中/长按 + 二次确认 + LED 各态 |
 | 4 | 配置持久化（NVS load/save/migrate） | ✅ 完成 | 调功后断电重启功率由260W恢复为200W，host 单测持续覆盖 |
 | 5 | WiFi 配网（radio_ctrl 共存 + AP + HTTP，设备不重启） | ✅ 代码完成（配网真机流程待人工确认） | 长按确认→配网→保存→关 WiFi 回到 BLE，BLE 全程不断 |
@@ -44,14 +44,16 @@
 
 - [x] 参考 90 分 23 秒 MyWhoosh FIT 的 1Hz 功率、踏频、心率时序特征，提取秒差、自相关、功率/踏频相关和功率→心率滞后基线。
 - [x] Steady/Road/ERG 功率统一改为 6-18 秒连续航点趋势 + 秒级相关扰动的双时间尺度有界模型；Road 不再逐拍独立取样，ERG 保持目标 ±5W 的相关波动。
+- [x] 按 FIT 1Hz 秒差二次拟合，把快层跟随系数从 0.65 调到 0.70；默认 ±50W 总边界不变，固定种子秒差 P95 从 11W 提高到 12W，AC1 从 0.960 调整到 0.955。
 - [x] 踏频增加与功率偏移的弱耦合，仍严格遵守用户配置的浮动幅度。
 - [x] 联动心率增加 8 秒上升、15 秒下降的负荷功率滤波，以 85% 阈值心率为锚点压缩映射幅度，并增加 ±7bpm、30-90 秒连续独立游走。
-- [x] 新配置默认浮动调整为功率 ±50W、踏频 ±8rpm；既有 NVS 数值不自动迁移或覆盖。
+- [x] 新配置默认浮动调整为功率 ±50W、踏频 ±8rpm；schema v12 仅把仍等于历史默认 ±5W 的功率浮动迁移为 ±50W，其他用户自定义值不覆盖。
 - [x] 真机启动以 `esp_random()` 播种领域 RNG；host 仿真显式固定种子以保持可复现。
-- [x] 新增 FIT 固定基准提取/复验、16 种子统计回归、24 小时等效快照、极值/退化/模式切换和 1Hz 抖动/丢样/重复保持仿真，当前 6077 断言通过。
+- [x] 新增 FIT 固定基准提取/复验、16 种子统计回归、24 小时等效快照、极值/退化/模式切换和 1Hz 抖动/丢样/重复保持仿真，以及 v11 历史默认/用户自定义迁移回归，当前 6093 断言通过。
 - [x] 调研 SmartSpin2k、qdomyos-zwift 等开源实现，只独立借鉴加速仿真、时序压力和边界场景方法，未复制 GPL 源码。
-- [x] 完整验证通过：Host 6077/0、ASan/UBSan 6077/0、full operation gate、3 分钟核心流程 6 轮耐久、ESP-IDF build、quality gate 99 PASS / 0 FAIL；固件 `0x1163F0`，factory app 分区剩余 71.95%。
+- [x] 完整验证通过：Host 6093/0、ASan/UBSan 6093/0、full operation gate、3 分钟核心流程 6 轮耐久、ESP-IDF build、quality gate 99 PASS / 0 FAIL；固件 `0x116410`，factory app 分区剩余 71.95%。
 - [x] generic-c3 完成烧录、启动、cycling 五服务/DIS、四路 1Hz 通知、FTMS ERG 与双次重连；连接压力 A/B 将广播间隔从 500ms 缩短到 100ms 后连续 7 轮无失败。
+- [x] generic-c3 保留旧 NVS 升级后确认 `sv=12/pfloat=50`；90 秒 steady CPS 为 `226-303W`、`258.7±22.4W`、秒差 P95=`12W`，修复前仅 `258-265W`、标准差 `2.2W`、秒差 P95=`1W`。
 - [ ] m5stamp-c3、running profile、WiFi/BLE 共存、标准客户端、物理按钮/LED 和设备长时运行仍待真机验证。
 
 ---
@@ -161,7 +163,7 @@
 | NVS 桥接 | [main/nvs_store.c](main/nvs_store.c) | namespace=bikepower 短key，load（缺失/版本不匹配用默认并回写）+ save（脏标记落盘） |
 | 主循环接入 | [main/app_main.c](main/app_main.c) | 启动 load + clear_dirty，10s 心跳脏标记落盘 |
 
-- NVS namespace `bikepower`，schema v11；短 key 包含 `sv`/`power`/`cadence`/`mode`/`hr`/`hashr`/`pfloat`/`cfloat`/`hrfloat`/`pstep`/`weight`/`ftp`/`thr_hr`/`ride`/`cwkglo`/`cwkghi`/`cname`/`sport`/`bmask`/`rspeed`/`rpacef`/`rcad`/`rcadf`/`rmode`/`rpacer`/`rplo`/`rphi`/`rcname`/`devname` 以及 `led*` 场景配置。
+- NVS namespace `bikepower`，schema v12；短 key 包含 `sv`/`power`/`cadence`/`mode`/`hr`/`hashr`/`pfloat`/`cfloat`/`hrfloat`/`pstep`/`weight`/`ftp`/`thr_hr`/`ride`/`cwkglo`/`cwkghi`/`cname`/`sport`/`bmask`/`rspeed`/`rpacef`/`rcad`/`rcadf`/`rmode`/`rpacer`/`rplo`/`rphi`/`rcname`/`devname` 以及 `led*` 场景配置。v11 中仍为历史默认 `pfloat=5` 的设备会迁移到 `pfloat=50`，其他自定义值保持不变。
 - 旧 MicroPython JSON 配置不迁移，首刷重置为默认
 
 ### 真机验证（已通过）
