@@ -28,7 +28,7 @@
 - `main/web/app.js`、`tests/mock_server.py`：新配置默认功率浮动由 ±5W 调整为 ±30W、踏频由 ±2rpm 调整为 ±4rpm；已有 NVS 配置保持原值，不做静默迁移。
 - `test/test_domain.c`：增加 90 分钟、1Hz、固定随机种子的统计仿真，以及 Road 连续性、负荷惯性和心率滞后回归。
 - 仿真结果：192.7±15.2W，功率秒差 P50/P95=4/10W，AC1/AC5=0.935/0.795，功率/踏频相关=0.411，心率 95% 秒差=1bpm，功率与 30 秒后心率相关 0.673（即时 0.259）。
-- 验证：`make -C test clean && make -C test run` 5913/0；配置一致性 269/0、门户结构 238/0、JS 语法和 mock 保存回显通过；`idf.py build` 通过（固件 `0x116090`，app 分区剩余 72%）；quick operation gate 全绿；完整 `quality_gate.py` 97 PASS / 2 个预期 dirty-worktree WARN / 0 FAIL。
+- 验证：`make -C test clean && make -C test run` 5913/0；配置一致性 269/0、门户结构 238/0、JS 语法和 mock 保存回显通过；rebase 至 v4.1.3 基线后 `idf.py build` 复验通过（固件 `0x116220`，app 分区剩余 72%）；quick operation gate 全绿；完整 `quality_gate.py` 98 PASS / 1 个预期未推送提交 WARN / 0 FAIL。
 - 未执行：本轮尚未烧录 generic-c3/m5stamp-c3，标准骑行客户端的真实 1Hz 时序观察和长时运行保持 `NOT_RUN`。
 
 ### GitHub 单一交付链路与仓库治理（2026-10-22）
