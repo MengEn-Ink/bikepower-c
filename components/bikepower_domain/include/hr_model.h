@@ -26,6 +26,12 @@ typedef struct {
     float drift_bpm;
     float hrv_cached;
     bool  hrv_init;
+    float wander_value;
+    float wander_start;
+    int   wander_target;
+    int   wander_hold;
+    int   wander_duration;
+    int   wander_elapsed;
     // 对外台阶保持
     int   emit_hr;
     bool  emit_init;

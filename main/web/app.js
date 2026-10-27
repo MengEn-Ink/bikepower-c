@@ -17,7 +17,7 @@ var STATE = {
   run_mode: "fixed", run_pacer_type: "jog", run_pace_low_sec: 390, run_pace_high_sec: 450,
   run_custom_name: "自定义",
   mode: "steady",
-  power_float: 30, cadence_float: 4, hr_float: 2,
+  power_float: 50, cadence_float: 8, hr_float: 2,
   power_step: 20,
   profile_weight: 0, profile_ftp: 0, profile_thr_hr: 0, profile_ride_type: "coco",
   custom_wkg_low: 25, custom_wkg_high: 30,
@@ -1699,8 +1699,8 @@ function init() {
       STATE.run_pace_high_sec = data.run_pace_high_sec != null ? data.run_pace_high_sec : 450;
       STATE.run_custom_name = data.run_custom_name || "自定义";
       STATE.mode = data.mode || "steady";
-      STATE.power_float = data.power_float != null ? data.power_float : 30;
-      STATE.cadence_float = data.cadence_float != null ? data.cadence_float : 4;
+      STATE.power_float = data.power_float != null ? data.power_float : 50;
+      STATE.cadence_float = data.cadence_float != null ? data.cadence_float : 8;
       STATE.hr_float = data.hr_float != null ? data.hr_float : 2;
       STATE.power_step = data.power_step != null ? data.power_step : 20;
       STATE.profile_weight = data.profile_weight || 70;

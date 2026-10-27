@@ -35,16 +35,19 @@ static int running_equivalent_power(power_engine_t *e, int speed_x100_kmh)
 static void ride_dynamics_reset(ride_dynamics_t *d)
 {
     d->slow_value = 0.0f;
+    d->slow_start = 0.0f;
     d->fast_value = 0.0f;
     d->slow_target = 0;
     d->slow_hold = 0;
+    d->slow_duration = 0;
+    d->slow_elapsed = 0;
     d->fast_hold = 0;
     d->init = false;
 }
 
 /*
  * 合成有界的双时间尺度骑行偏移。
- * 慢层每 10-30 秒重采样目标并平滑逼近；快层每秒吸收一次有界随机扰动。
+ * 慢层每 6-18 秒选择新航点并连续过渡；快层每秒吸收一次有界相关扰动。
  * amp=0 时严格返回 0，任何 amp 下合成结果都不会越过 [-amp, +amp]。
  */
 static int ride_dynamics_step(ride_dynamics_t *d, int amp)
@@ -63,15 +66,19 @@ static int ride_dynamics_step(ride_dynamics_t *d, int amp)
         d->init = true;
     }
     if (d->slow_hold <= 0) {
+        d->slow_start = d->slow_value;
         d->slow_target = domain_rng_range(-slow_limit, slow_limit);
-        d->slow_hold = domain_rng_range(RIDE_DYNAMICS_SLOW_HOLD_MIN_LOOPS,
-                                         RIDE_DYNAMICS_SLOW_HOLD_MAX_LOOPS);
-    } else {
-        d->slow_hold--;
+        d->slow_duration = domain_rng_range(RIDE_DYNAMICS_SLOW_HOLD_MIN_LOOPS,
+                                             RIDE_DYNAMICS_SLOW_HOLD_MAX_LOOPS);
+        d->slow_elapsed = 0;
+        d->slow_hold = d->slow_duration;
     }
-    float dt = (float)HR_LOOP_INTERVAL_MS / 1000.0f;
-    float slow_alpha = dt / (float)RIDE_DYNAMICS_SLOW_TAU_SEC;
-    d->slow_value += slow_alpha * ((float)d->slow_target - d->slow_value);
+    d->slow_elapsed++;
+    d->slow_hold--;
+    float progress = (float)d->slow_elapsed / (float)d->slow_duration;
+    if (progress > 1.0f) progress = 1.0f;
+    float eased = progress * progress * (3.0f - 2.0f * progress);
+    d->slow_value = d->slow_start + eased * ((float)d->slow_target - d->slow_start);
     if (fast_limit > 0 && d->fast_hold <= 0) {
         float fast_target = (float)domain_rng_range(-fast_limit, fast_limit);
         d->fast_value += RIDE_DYNAMICS_FAST_ALPHA * (fast_target - d->fast_value);
@@ -95,14 +102,16 @@ static int coupled_cadence(power_engine_t *e, int power_offset, int power_amp, i
         ride_dynamics_step(&e->cadence_dynamics, 0);
         return e->cadence_base;
     }
-    int coupling_limit = (cadence_amp + RIDE_CADENCE_COUPLING_DIVISOR - 1)
-                       / RIDE_CADENCE_COUPLING_DIVISOR;
-    int independent_amp = cadence_amp - coupling_limit;
+    float coupling_scale = (float)cadence_amp / (float)RIDE_CADENCE_COUPLING_DIVISOR;
+    int coupling_budget = (cadence_amp + RIDE_CADENCE_COUPLING_DIVISOR - 1)
+                        / RIDE_CADENCE_COUPLING_DIVISOR;
+    if (coupling_budget >= cadence_amp) coupling_budget = cadence_amp - 1;
+    int independent_amp = cadence_amp - coupling_budget;
     int independent = ride_dynamics_step(&e->cadence_dynamics, independent_amp);
     int coupled = 0;
     if (power_amp > 0) {
         float ratio = (float)power_offset / (float)power_amp;
-        float scaled = ratio * (float)coupling_limit;
+        float scaled = ratio * coupling_scale;
         coupled = (int)(scaled >= 0.0f ? scaled + 0.5f : scaled - 0.5f);
     }
     int offset = clampi(independent + coupled, -cadence_amp, cadence_amp);
@@ -153,7 +162,10 @@ void power_engine_init(power_engine_t *e)
 static int linked_heartrate(power_engine_t *e, int power)
 {
     int load_power = hr_model_smooth_load(&e->hr, power);
-    int target_hr = hr_model_ftp_zone(&e->hr, load_power, e->profile.ftp, e->profile.thr_hr);
+    int mapped_hr = hr_model_ftp_zone(&e->hr, load_power, e->profile.ftp, e->profile.thr_hr);
+    int anchor_hr = e->profile.thr_hr * HR_TARGET_ANCHOR_PCT / 100;
+    int target_hr = anchor_hr
+                  + (mapped_hr - anchor_hr) * HR_TARGET_COUPLING_PCT / 100;
     int hr = hr_model_smooth(&e->hr, target_hr);
     return hr_model_emit(&e->hr, hr_clamp((int)(hr + hr_model_variation(&e->hr))));
 }

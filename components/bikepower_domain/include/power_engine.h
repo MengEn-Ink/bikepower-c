@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "domain_config.h"
 #include "profile.h"
 #include "hr_model.h"
@@ -31,9 +32,12 @@ typedef struct {
 /* 骑行分层动态状态：慢层表示路况/体力趋势，快层表示秒级踩踏波动。 */
 typedef struct {
     float slow_value;
+    float slow_start;
     float fast_value;
     int slow_target;
     int slow_hold;
+    int slow_duration;
+    int slow_elapsed;
     int fast_hold;
     bool init;
 } ride_dynamics_t;
@@ -66,7 +70,7 @@ typedef struct {
     int broadcast_mask;
     running_engine_t running;
     snapshot_t snapshot;
-    long snapshot_count;
+    uint64_t snapshot_count;
     bool dirty;
     char device_name[DEVICE_NAME_MAX];
 } power_engine_t;

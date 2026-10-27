@@ -26,6 +26,8 @@ static int g_fail = 0;
 
 #define RIDE_SIM_SECONDS 5400
 #define RIDE_SIM_TICKS_PER_SECOND (1000 / HR_LOOP_INTERVAL_MS)
+#define LONG_RIDE_SIM_HOURS 24
+#define LONG_RIDE_SIM_TICKS ((uint64_t)LONG_RIDE_SIM_HOURS * 60u * 60u * RIDE_SIM_TICKS_PER_SECOND)
 
 static int s_sim_power[RIDE_SIM_SECONDS];
 static int s_sim_cadence[RIDE_SIM_SECONDS];
@@ -363,8 +365,16 @@ static void test_hr_variation_steady(void)
     // HRV 长时间累加后 drift 被 cap，整体波动幅度有界
     float last = 0.0f;
     for (int i = 0; i < 5000; i++) last = hr_model_variation(&st);
-    CHECK(last <= HRV_RSA_AMPLITUDE + HRV_MAYER_AMPLITUDE + HRV_DRIFT_CAP_BPM + 0.01f,
+    float variation_limit = HRV_RSA_AMPLITUDE + HRV_MAYER_AMPLITUDE
+                          + HRV_DRIFT_CAP_BPM + HRV_WANDER_AMPLITUDE;
+    CHECK(last >= -variation_limit - 0.01f && last <= variation_limit + 0.01f,
           "HRV 总波动受 drift cap 限制");
+    hr_model_reset_variation(&st);
+    CHECK(st.hrv_tick == 0 && st.hrv_sec_counter == 0 && st.hrv_cached == 0.0f,
+          "HRV reset 清除周期缓存");
+    CHECK(st.wander_value == 0.0f && st.wander_hold == 0
+          && st.wander_duration == 0 && st.wander_elapsed == 0,
+          "HRV reset 清除慢速游走状态");
 
     // steady_user：输出始终在 base ± 浮动幅度区间内
     hr_model_init(&st, 150);
@@ -727,19 +737,21 @@ static void test_float_effect_scenario(void)
 }
 
 /*
- * FIT 中间 5-85 分钟参考：190.7±20.7W，功率秒差 P50/P95=3/12W，
- * AC1/AC5=0.962/0.741，功率/踏频相关=0.396，心率对功率滞后约 30-90 秒。
+ * FIT 中间 5-85 分钟原始 1Hz 参考：190.7±20.7W，功率秒差 P50/P95=3/12W，
+ * AC1/AC5=0.955/0.708，功率/踏频相关=0.296；心率最佳滞后约 38 秒，相关 0.352。
  */
 static void test_reference_ride_simulation(void)
 {
-    printf("[test] 90分钟真实骑行统计仿真\n");
+    printf("[test] 默认配置90分钟真实骑行统计仿真\n");
     power_engine_t e;
     power_engine_init(&e);
     domain_rng_seed(20261027);
     CHECK(power_engine_set_power(&e, 190), "仿真基准功率设为190W");
     CHECK(power_engine_set_cadence(&e, 95), "仿真基准踏频设为95RPM");
-    CHECK(power_engine_set_power_float(&e, 50), "仿真功率浮动设为±50W");
-    CHECK(power_engine_set_cadence_float(&e, 5), "仿真踏频浮动设为±5RPM");
+    CHECK(e.power_float == POWER_FLOAT_DEFAULT && e.power_float == 50,
+          "生产默认功率浮动为±50W");
+    CHECK(e.cadence_float == CADENCE_FLOAT_DEFAULT && e.cadence_float == 8,
+          "生产默认踏频浮动为±8RPM");
     CHECK(profile_set_ftp(&e.profile, 250), "仿真FTP设为250W");
     CHECK(profile_set_thr_hr(&e.profile, 180), "仿真阈值心率设为180BPM");
     power_engine_clear_user_hr(&e);
@@ -765,6 +777,10 @@ static void test_reference_ride_simulation(void)
 
     double power_mean = series_mean(s_sim_power, RIDE_SIM_SECONDS);
     double power_stddev = series_stddev(s_sim_power, RIDE_SIM_SECONDS, power_mean);
+    double cadence_mean = series_mean(s_sim_cadence, RIDE_SIM_SECONDS);
+    double cadence_stddev = series_stddev(s_sim_cadence, RIDE_SIM_SECONDS, cadence_mean);
+    double hr_mean = series_mean(s_sim_hr, RIDE_SIM_SECONDS);
+    double hr_stddev = series_stddev(s_sim_hr, RIDE_SIM_SECONDS, hr_mean);
     int power_delta_p50 = absolute_delta_percentile(s_sim_power, RIDE_SIM_SECONDS, 50);
     int power_delta_p95 = absolute_delta_percentile(s_sim_power, RIDE_SIM_SECONDS, 95);
     double power_ac1 = series_correlation(s_sim_power, s_sim_power, RIDE_SIM_SECONDS, 1);
@@ -781,20 +797,385 @@ static void test_reference_ride_simulation(void)
            power_ac1, power_ac5);
     printf("  仿真 P/C相关=%.3f HRΔ95=%dBPM P/HR相关 当前=%.3f 滞后30s=%.3f\n",
            power_cadence_corr, hr_delta_p95, power_hr_corr_now, power_hr_corr_lag30);
+    printf("  仿真 C=%.1f±%.1fRPM HR=%.1f±%.1fBPM\n",
+           cadence_mean, cadence_stddev, hr_mean, hr_stddev);
 
     CHECK(min_power >= 140 && max_power <= 240, "90分钟功率始终在190±50W内");
-    CHECK(min_cadence >= 90 && max_cadence <= 100, "90分钟踏频始终在95±5RPM内");
-    CHECK(power_mean >= 185.0 && power_mean <= 195.0, "长期平均功率保持基准附近");
-    CHECK(power_stddev >= 10.0 && power_stddev <= 26.0, "功率离散度接近真实骑行量级");
-    CHECK(power_delta_p50 >= 1 && power_delta_p50 <= 6, "功率秒差中位数接近真实骑行");
-    CHECK(power_delta_p95 >= 5 && power_delta_p95 <= 16, "功率秒差95分位接近真实骑行");
-    CHECK(power_ac1 >= 0.85 && power_ac1 <= 0.99, "功率具有秒级连续性");
-    CHECK(power_ac5 >= 0.45 && power_ac5 <= 0.95, "功率具有多秒惯性且不过度平坦");
-    CHECK(power_cadence_corr >= 0.15 && power_cadence_corr <= 0.75,
+    CHECK(min_cadence >= 87 && max_cadence <= 103, "90分钟踏频始终在95±8RPM内");
+    CHECK(power_mean >= 186.0 && power_mean <= 194.0, "长期平均功率保持基准附近");
+    CHECK(power_stddev >= 18.0 && power_stddev <= 23.0, "功率离散度接近真实骑行量级");
+    CHECK(power_delta_p50 >= 3 && power_delta_p50 <= 5, "功率秒差中位数接近真实骑行");
+    CHECK(power_delta_p95 >= 9 && power_delta_p95 <= 13, "功率秒差95分位接近真实骑行");
+    CHECK(power_ac1 >= 0.94 && power_ac1 <= 0.98, "功率具有秒级连续性");
+    CHECK(power_ac5 >= 0.62 && power_ac5 <= 0.78, "功率具有多秒惯性且不过度平坦");
+    CHECK(power_cadence_corr >= 0.18 && power_cadence_corr <= 0.42,
           "踏频与功率保持真实的弱正相关");
+    CHECK(cadence_stddev >= 2.3 && cadence_stddev <= 3.6,
+          "踏频离散度接近真实骑行量级");
+    CHECK(hr_stddev >= 4.0 && hr_stddev <= 6.5,
+          "心率离散度接近真实骑行量级");
     CHECK(hr_delta_p95 <= 2, "心率95%秒差不超过2BPM");
+    CHECK(power_hr_corr_now >= 0.05 && power_hr_corr_now <= 0.30,
+          "功率与心率即时相关不过度耦合");
+    CHECK(power_hr_corr_lag30 >= 0.25 && power_hr_corr_lag30 <= 0.50,
+          "功率与30秒后心率相关接近真实量级");
     CHECK(power_hr_corr_lag30 > power_hr_corr_now,
           "心率对功率的30秒滞后相关高于即时相关");
+}
+
+static void test_reference_ride_multiseed(void)
+{
+    printf("[test] 默认配置多种子真实骑行统计回归\n");
+    double mean_min = 10000.0, mean_max = -10000.0;
+    double stddev_min = 10000.0, stddev_max = -10000.0;
+    double ac1_min = 10000.0, ac1_max = -10000.0;
+    double ac5_min = 10000.0, ac5_max = -10000.0;
+    double pc_min = 10000.0, pc_max = -10000.0;
+    double phr_min = 10000.0, phr_max = -10000.0;
+    int delta95_min = 10000, delta95_max = -10000;
+
+    for (uint32_t seed = 1; seed <= 16; seed++) {
+        power_engine_t e;
+        power_engine_init(&e);
+        domain_rng_seed(seed * 2654435761u);
+        power_engine_set_power(&e, 190);
+        power_engine_set_cadence(&e, 95);
+        profile_set_ftp(&e.profile, 250);
+        profile_set_thr_hr(&e.profile, 180);
+        power_engine_reset_mode_state(&e);
+
+        for (int second = 0; second < RIDE_SIM_SECONDS; second++) {
+            snapshot_t snapshot = { 0 };
+            for (int tick = 0; tick < RIDE_SIM_TICKS_PER_SECOND; tick++) {
+                snapshot = power_engine_snapshot(&e);
+            }
+            s_sim_power[second] = snapshot.power;
+            s_sim_cadence[second] = snapshot.cadence;
+            s_sim_hr[second] = snapshot.heartrate;
+        }
+
+        double power_mean = series_mean(s_sim_power, RIDE_SIM_SECONDS);
+        double power_stddev = series_stddev(s_sim_power, RIDE_SIM_SECONDS, power_mean);
+        int power_delta_p95 = absolute_delta_percentile(s_sim_power, RIDE_SIM_SECONDS, 95);
+        double power_ac1 = series_correlation(s_sim_power, s_sim_power,
+                                              RIDE_SIM_SECONDS, 1);
+        double power_ac5 = series_correlation(s_sim_power, s_sim_power,
+                                              RIDE_SIM_SECONDS, 5);
+        double power_cadence_corr = series_correlation(s_sim_power, s_sim_cadence,
+                                                        RIDE_SIM_SECONDS, 0);
+        double power_hr_corr_lag30 = series_correlation(s_sim_power, s_sim_hr,
+                                                        RIDE_SIM_SECONDS, 30);
+
+        if (power_mean < mean_min) mean_min = power_mean;
+        if (power_mean > mean_max) mean_max = power_mean;
+        if (power_stddev < stddev_min) stddev_min = power_stddev;
+        if (power_stddev > stddev_max) stddev_max = power_stddev;
+        if (power_delta_p95 < delta95_min) delta95_min = power_delta_p95;
+        if (power_delta_p95 > delta95_max) delta95_max = power_delta_p95;
+        if (power_ac1 < ac1_min) ac1_min = power_ac1;
+        if (power_ac1 > ac1_max) ac1_max = power_ac1;
+        if (power_ac5 < ac5_min) ac5_min = power_ac5;
+        if (power_ac5 > ac5_max) ac5_max = power_ac5;
+        if (power_cadence_corr < pc_min) pc_min = power_cadence_corr;
+        if (power_cadence_corr > pc_max) pc_max = power_cadence_corr;
+        if (power_hr_corr_lag30 < phr_min) phr_min = power_hr_corr_lag30;
+        if (power_hr_corr_lag30 > phr_max) phr_max = power_hr_corr_lag30;
+
+        CHECK(power_mean >= 184.0 && power_mean <= 196.0,
+              "多种子长期平均功率稳定");
+        CHECK(power_stddev >= 17.0 && power_stddev <= 24.0,
+              "多种子功率离散度稳定");
+        CHECK(power_delta_p95 >= 9 && power_delta_p95 <= 13,
+              "多种子功率秒差95分位稳定");
+        CHECK(power_ac1 >= 0.93 && power_ac1 <= 0.98,
+              "多种子功率AC1稳定");
+        CHECK(power_ac5 >= 0.58 && power_ac5 <= 0.80,
+              "多种子功率AC5稳定");
+        CHECK(power_cadence_corr >= 0.12 && power_cadence_corr <= 0.48,
+              "多种子功率踏频弱相关稳定");
+        CHECK(power_hr_corr_lag30 >= 0.15 && power_hr_corr_lag30 <= 0.58,
+              "多种子功率心率滞后相关稳定");
+    }
+
+    printf("  16种子 P均值=%.1f..%.1f SD=%.1f..%.1f ΔP95=%d..%d\n",
+           mean_min, mean_max, stddev_min, stddev_max, delta95_min, delta95_max);
+    printf("  16种子 AC1=%.3f..%.3f AC5=%.3f..%.3f P/C=%.3f..%.3f P/HR30=%.3f..%.3f\n",
+           ac1_min, ac1_max, ac5_min, ac5_max, pc_min, pc_max, phr_min, phr_max);
+}
+
+static bool snapshot_in_global_range(snapshot_t snapshot)
+{
+    return snapshot.power >= POWER_MIN && snapshot.power <= POWER_MAX
+        && snapshot.cadence >= CADENCE_MIN && snapshot.cadence <= CADENCE_MAX
+        && snapshot.heartrate >= HR_MIN && snapshot.heartrate <= HR_MAX
+        && snapshot.mode >= RIDE_MODE_STEADY && snapshot.mode < RIDE_MODE_COUNT;
+}
+
+static void test_ride_model_edge_cases(void)
+{
+    printf("[test] 骑行模型极值、退化区间与模式切换稳定性\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    domain_rng_seed(0xA5A55A5Au);
+
+    CHECK(power_engine_set_power(&e, POWER_MIN), "极值测试功率设到下限");
+    CHECK(power_engine_set_cadence(&e, CADENCE_MIN), "极值测试踏频设到下限");
+    CHECK(power_engine_set_heartrate(&e, HR_MIN), "极值测试心率锁定到下限");
+    CHECK(power_engine_set_power_float(&e, POWER_FLOAT_MAX), "功率浮动设到上限");
+    CHECK(power_engine_set_cadence_float(&e, CADENCE_FLOAT_MAX), "踏频浮动设到上限");
+    CHECK(power_engine_set_hr_float(&e, HR_FLOAT_MAX), "心率浮动设到上限");
+    int invalid = 0;
+    for (int i = 0; i < 10000; i++) {
+        snapshot_t snapshot = power_engine_snapshot(&e);
+        if (!snapshot_in_global_range(snapshot)
+            || snapshot.power > POWER_MIN + POWER_FLOAT_MAX
+            || snapshot.cadence > CADENCE_MIN + CADENCE_FLOAT_MAX
+            || snapshot.heartrate > HR_MIN + HR_FLOAT_MAX) {
+            invalid++;
+        }
+    }
+    CHECK(invalid == 0, "下边界叠加最大浮动仍不越界");
+
+    CHECK(power_engine_set_power(&e, POWER_MAX), "极值测试功率设到上限");
+    CHECK(power_engine_set_cadence(&e, CADENCE_MAX), "极值测试踏频设到上限");
+    CHECK(power_engine_set_heartrate(&e, HR_MAX), "极值测试心率锁定到上限");
+    power_engine_reset_mode_state(&e);
+    invalid = 0;
+    for (int i = 0; i < 10000; i++) {
+        snapshot_t snapshot = power_engine_snapshot(&e);
+        if (!snapshot_in_global_range(snapshot)
+            || snapshot.power < POWER_MAX - POWER_FLOAT_MAX
+            || snapshot.cadence < CADENCE_MAX - CADENCE_FLOAT_MAX
+            || snapshot.heartrate < HR_MAX - HR_FLOAT_MAX) {
+            invalid++;
+        }
+    }
+    CHECK(invalid == 0, "上边界叠加最大浮动仍不越界");
+
+    CHECK(power_engine_set_power_float(&e, 0), "功率浮动归零");
+    CHECK(power_engine_set_cadence_float(&e, 0), "踏频浮动归零");
+    CHECK(power_engine_set_hr_float(&e, 0), "心率浮动归零");
+    for (int i = 0; i < 1000; i++) {
+        snapshot_t snapshot = power_engine_snapshot(&e);
+        if (snapshot.power != POWER_MAX || snapshot.cadence != CADENCE_MAX
+            || snapshot.heartrate != HR_MAX) {
+            invalid++;
+        }
+    }
+    CHECK(invalid == 0, "全部浮动归零后极值输出恒定");
+
+    power_engine_init(&e);
+    CHECK(power_engine_set_cadence_float(&e, 1), "踏频最小非零浮动可设置");
+    int min_small_cadence = e.cadence_base;
+    int max_small_cadence = e.cadence_base;
+    for (int i = 0; i < 10000; i++) {
+        snapshot_t snapshot = power_engine_snapshot(&e);
+        if (snapshot.cadence < min_small_cadence) min_small_cadence = snapshot.cadence;
+        if (snapshot.cadence > max_small_cadence) max_small_cadence = snapshot.cadence;
+        if (snapshot.cadence < e.cadence_base - 1
+            || snapshot.cadence > e.cadence_base + 1) {
+            invalid++;
+        }
+    }
+    CHECK(invalid == 0 && max_small_cadence > min_small_cadence,
+          "踏频±1RPM仍有动态且不被耦合预算吞掉");
+
+    power_engine_init(&e);
+    domain_rng_seed(0x13572468u);
+    CHECK(power_engine_set_pacer_index(&e, PACER_INDEX_CUSTOM), "Road 退化测试切自定义档");
+    CHECK(profile_set_custom_wkg(&e.profile, 33, 33), "Road 自定义区间设为单点");
+    CHECK(profile_set_weight(&e.profile, 73), "Road 退化测试体重设为73kg");
+    CHECK(power_engine_set_mode(&e, RIDE_MODE_ROAD), "Road 退化测试进入机器人模式");
+    int degenerate_power = 73 * 33 / 10;
+    invalid = 0;
+    for (int i = 0; i < 10000; i++) {
+        snapshot_t snapshot = power_engine_snapshot(&e);
+        if (!snapshot_in_global_range(snapshot) || snapshot.power != degenerate_power) {
+            invalid++;
+        }
+    }
+    CHECK(invalid == 0, "Road 单点功体比区间保持确定功率且无除零异常");
+
+    power_engine_init(&e);
+    domain_rng_seed(0x24681357u);
+    CHECK(power_engine_set_erg_target(&e, POWER_MIN), "ERG 接受0W边界目标");
+    invalid = 0;
+    for (int i = 0; i < 2000; i++) {
+        snapshot_t snapshot = power_engine_snapshot(&e);
+        if (snapshot.power < POWER_MIN
+            || snapshot.power > POWER_MIN + ERG_POWER_FLOAT) {
+            invalid++;
+        }
+    }
+    CHECK(invalid == 0, "ERG 0W目标波动经全局下限钳制");
+    CHECK(power_engine_set_erg_target(&e, POWER_MAX), "ERG 接受2000W边界目标");
+    for (int i = 0; i < 2000; i++) {
+        snapshot_t snapshot = power_engine_snapshot(&e);
+        if (snapshot.power < POWER_MAX - ERG_POWER_FLOAT
+            || snapshot.power > POWER_MAX) {
+            invalid++;
+        }
+    }
+    CHECK(invalid == 0, "ERG 2000W目标波动经全局上限钳制");
+
+    for (int second = 0; second < 3600; second++) {
+        int target = (second * 7919) % (POWER_MAX + 1);
+        if (!power_engine_set_erg_target(&e, target)) invalid++;
+        for (int tick = 0; tick < RIDE_SIM_TICKS_PER_SECOND; tick++) {
+            snapshot_t snapshot = power_engine_snapshot(&e);
+            int low = target - ERG_POWER_FLOAT;
+            int high = target + ERG_POWER_FLOAT;
+            if (low < POWER_MIN) low = POWER_MIN;
+            if (high > POWER_MAX) high = POWER_MAX;
+            if (!snapshot_in_global_range(snapshot) || snapshot.mode != RIDE_MODE_ERG
+                || snapshot.power < low || snapshot.power > high) {
+                invalid++;
+            }
+        }
+    }
+    CHECK(invalid == 0, "ERG 连续一小时每秒换目标仍有界且不污染模式");
+
+    CHECK(power_engine_clear_erg_target(&e), "模式切换测试先退出ERG");
+    for (int cycle = 0; cycle < 2000; cycle++) {
+        if (e.mode != RIDE_MODE_STEADY) invalid++;
+        snapshot_t steady = power_engine_snapshot(&e);
+        if (!snapshot_in_global_range(steady) || steady.mode != RIDE_MODE_STEADY) invalid++;
+        if (!power_engine_set_mode(&e, RIDE_MODE_ROAD)) invalid++;
+        snapshot_t road = power_engine_snapshot(&e);
+        if (!snapshot_in_global_range(road) || road.mode != RIDE_MODE_ROAD) invalid++;
+        int target = cycle % (POWER_MAX + 1);
+        if (!power_engine_set_erg_target(&e, target)) invalid++;
+        snapshot_t erg = power_engine_snapshot(&e);
+        if (!snapshot_in_global_range(erg) || erg.mode != RIDE_MODE_ERG) invalid++;
+        if (!power_engine_clear_erg_target(&e)) invalid++;
+    }
+    CHECK(invalid == 0, "Steady/Road/ERG 反复切换2000轮状态与输出稳定");
+}
+
+static void test_heartrate_lock_unlock_extremes(void)
+{
+    printf("[test] 心率锁定/解锁极值与重置稳定性\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    domain_rng_seed(0x55AA55AAu);
+    CHECK(power_engine_set_hr_float(&e, HR_FLOAT_MAX), "心率极值测试启用最大浮动");
+    int invalid = 0;
+    for (int cycle = 0; cycle < 500; cycle++) {
+        int target = (cycle & 1) ? HR_MAX : HR_MIN;
+        if (!power_engine_set_heartrate(&e, target)) invalid++;
+        for (int tick = 0; tick < 40; tick++) {
+            snapshot_t snapshot = power_engine_snapshot(&e);
+            int low = target - HR_FLOAT_MAX;
+            int high = target + HR_FLOAT_MAX;
+            if (low < HR_MIN) low = HR_MIN;
+            if (high > HR_MAX) high = HR_MAX;
+            if (snapshot.heartrate < low || snapshot.heartrate > high) invalid++;
+        }
+        power_engine_clear_user_hr(&e);
+        snapshot_t linked = power_engine_snapshot(&e);
+        if (!snapshot_in_global_range(linked) || e.has_user_hr) invalid++;
+    }
+    CHECK(invalid == 0, "心率上下限锁定/解锁500轮无越界或旧锁残留");
+}
+
+static void test_ride_model_24h_equivalent(void)
+{
+    printf("[test] 默认骑行模型24小时等效快照稳定性\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    domain_rng_seed(0xC001D00Du);
+    CHECK(power_engine_set_power(&e, 190), "24小时仿真功率设为190W");
+    CHECK(power_engine_set_cadence(&e, 95), "24小时仿真踏频设为95RPM");
+    CHECK(profile_set_ftp(&e.profile, 250), "24小时仿真FTP设为250W");
+    CHECK(profile_set_thr_hr(&e.profile, 180), "24小时仿真阈值心率设为180BPM");
+    int invalid = 0;
+    int min_power = POWER_MAX;
+    int max_power = POWER_MIN;
+    int min_cadence = CADENCE_MAX;
+    int max_cadence = CADENCE_MIN;
+    int min_hr = HR_MAX;
+    int max_hr = HR_MIN;
+    for (uint64_t tick = 0; tick < LONG_RIDE_SIM_TICKS; tick++) {
+        snapshot_t snapshot = power_engine_snapshot(&e);
+        if (!snapshot_in_global_range(snapshot)
+            || snapshot.power < 190 - POWER_FLOAT_DEFAULT
+            || snapshot.power > 190 + POWER_FLOAT_DEFAULT
+            || snapshot.cadence < 95 - CADENCE_FLOAT_DEFAULT
+            || snapshot.cadence > 95 + CADENCE_FLOAT_DEFAULT) {
+            invalid++;
+        }
+        if (snapshot.power < min_power) min_power = snapshot.power;
+        if (snapshot.power > max_power) max_power = snapshot.power;
+        if (snapshot.cadence < min_cadence) min_cadence = snapshot.cadence;
+        if (snapshot.cadence > max_cadence) max_cadence = snapshot.cadence;
+        if (snapshot.heartrate < min_hr) min_hr = snapshot.heartrate;
+        if (snapshot.heartrate > max_hr) max_hr = snapshot.heartrate;
+    }
+    printf("  24h范围 P=%d..%dW C=%d..%dRPM HR=%d..%dBPM 快照=%llu\n",
+           min_power, max_power, min_cadence, max_cadence, min_hr, max_hr,
+           (unsigned long long)e.snapshot_count);
+    CHECK(invalid == 0, "24小时等效运行全程输出有界");
+    CHECK(e.snapshot_count == LONG_RIDE_SIM_TICKS, "24小时等效快照计数精确");
+    CHECK(max_power > min_power && max_cadence > min_cadence && max_hr > min_hr,
+          "24小时等效运行三路数据均保持动态变化");
+}
+
+static void test_irregular_notification_sampling(void)
+{
+    printf("[test] 1Hz通知抖动、延迟丢样与重复保持仿真\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    domain_rng_seed(0x10293847u);
+    CHECK(power_engine_set_power(&e, 190), "通知仿真功率设为190W");
+    CHECK(power_engine_set_cadence(&e, 95), "通知仿真踏频设为95RPM");
+    CHECK(profile_set_ftp(&e.profile, 250), "通知仿真FTP设为250W");
+    CHECK(profile_set_thr_hr(&e.profile, 180), "通知仿真阈值心率设为180BPM");
+
+    int received = 0;
+    int dropped = 0;
+    int duplicated = 0;
+    int invalid = 0;
+    snapshot_t latest = { 0 };
+    for (int slot = 0; slot < RIDE_SIM_SECONDS; slot++) {
+        int ticks_until_delivery = 17 + (slot * 37) % 7;
+        for (int tick = 0; tick < ticks_until_delivery; tick++) {
+            latest = power_engine_snapshot(&e);
+        }
+        if (slot % 53 == 0) {
+            dropped++;
+            continue;
+        }
+        bool duplicate = slot > 0 && received > 0 && slot % 29 == 0;
+        if (duplicate) {
+            s_sim_power[received] = s_sim_power[received - 1];
+            s_sim_cadence[received] = s_sim_cadence[received - 1];
+            s_sim_hr[received] = s_sim_hr[received - 1];
+            duplicated++;
+        } else {
+            s_sim_power[received] = latest.power;
+            s_sim_cadence[received] = latest.cadence;
+            s_sim_hr[received] = latest.heartrate;
+        }
+        if (!snapshot_in_global_range(latest)) invalid++;
+        received++;
+    }
+
+    double power_mean = series_mean(s_sim_power, received);
+    double power_stddev = series_stddev(s_sim_power, received, power_mean);
+    double power_ac1 = series_correlation(s_sim_power, s_sim_power, received, 1);
+    int power_delta_p95 = absolute_delta_percentile(s_sim_power, received, 95);
+    printf("  接收=%d 丢样=%d 重复=%d P=%.1f±%.1fW ΔP95=%dW AC1=%.3f\n",
+           received, dropped, duplicated, power_mean, power_stddev,
+           power_delta_p95, power_ac1);
+    CHECK(invalid == 0 && received + dropped == RIDE_SIM_SECONDS,
+          "不规则采样期间领域快照始终有效且计数守恒");
+    CHECK(dropped >= 100 && duplicated >= 180,
+          "仿真确实覆盖约2%丢样和约3%重复保持");
+    CHECK(power_mean >= 184.0 && power_mean <= 196.0
+          && power_stddev >= 17.0 && power_stddev <= 24.0,
+          "通知抖动与丢样后功率中心和离散度仍稳定");
+    CHECK(power_delta_p95 >= 9 && power_delta_p95 <= 16 && power_ac1 >= 0.90,
+          "通知抖动与保持后功率跳变和连续性仍在可接受范围");
 }
 
 static void test_web_config_persistence_scenario(void)
@@ -1808,6 +2189,11 @@ int main(void)
     test_linked_hr_follows_pacer_and_running_speed();
     test_float_effect_scenario();
     test_reference_ride_simulation();
+    test_reference_ride_multiseed();
+    test_ride_model_edge_cases();
+    test_heartrate_lock_unlock_extremes();
+    test_ride_model_24h_equivalent();
+    test_irregular_notification_sampling();
     test_web_config_persistence_scenario();
     test_engine_blindspots();
     test_config_store();

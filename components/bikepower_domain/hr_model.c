@@ -38,6 +38,12 @@ void hr_model_init(hr_state_t *st, int initial_hr)
     st->drift_bpm = 0.0f;
     st->hrv_cached = 0.0f;
     st->hrv_init = true;
+    st->wander_value = 0.0f;
+    st->wander_start = 0.0f;
+    st->wander_target = 0;
+    st->wander_hold = 0;
+    st->wander_duration = 0;
+    st->wander_elapsed = 0;
     st->emit_hr = 0;
     st->emit_init = false;
     st->emit_tick = 0;
@@ -73,12 +79,20 @@ int hr_model_smooth_load(hr_state_t *st, int power)
  * 重置心率变异相关状态。
  * 参数：st 为心率状态对象。
  * 返回值：无。
- * 特殊行为：仅清空 HRV tick 和漂移累加，不重置主心率平滑器。
+ * 特殊行为：清空周期 HRV、漂移与独立慢速游走，不重置主心率平滑器。
  */
 void hr_model_reset_variation(hr_state_t *st)
 {
     st->hrv_tick = 0;
+    st->hrv_sec_counter = 0;
     st->drift_bpm = 0.0f;
+    st->hrv_cached = 0.0f;
+    st->wander_value = 0.0f;
+    st->wander_start = 0.0f;
+    st->wander_target = 0;
+    st->wander_hold = 0;
+    st->wander_duration = 0;
+    st->wander_elapsed = 0;
 }
 
 /*
@@ -156,7 +170,8 @@ int hr_model_smooth(hr_state_t *st, int target)
  * 合成一次心率变异量。
  * 参数：st 为心率状态对象。
  * 返回值：返回当前缓存的 HRV 叠加量。
- * 特殊行为：内部按 20 个循环约 1 秒更新一次缓存，组合 RSA、Mayer 波和慢漂移，并对漂移上限做钳制。
+ * 特殊行为：内部按 20 个循环约 1 秒更新一次周期缓存，组合 RSA、Mayer 波、慢漂移和 30-90 秒连续游走，
+ *           并对漂移及游走幅度做钳制。
  */
 float hr_model_variation(hr_state_t *st)
 {
@@ -167,6 +182,22 @@ float hr_model_variation(hr_state_t *st)
         st->hrv_sec_counter = 0;
         st->hrv_init = true;
     }
+    if (st->wander_hold <= 0) {
+        st->wander_start = st->wander_value;
+        st->wander_target = domain_rng_range(-HRV_WANDER_AMPLITUDE,
+                                              HRV_WANDER_AMPLITUDE);
+        st->wander_duration = domain_rng_range(HRV_WANDER_HOLD_MIN_LOOPS,
+                                                HRV_WANDER_HOLD_MAX_LOOPS);
+        st->wander_elapsed = 0;
+        st->wander_hold = st->wander_duration;
+    }
+    st->wander_elapsed++;
+    st->wander_hold--;
+    float progress = (float)st->wander_elapsed / (float)st->wander_duration;
+    if (progress > 1.0f) progress = 1.0f;
+    float eased = progress * progress * (3.0f - 2.0f * progress);
+    st->wander_value = st->wander_start
+                     + eased * ((float)st->wander_target - st->wander_start);
     st->hrv_tick++;
     st->hrv_sec_counter++;
     if (st->hrv_sec_counter >= 20) {
@@ -180,7 +211,7 @@ float hr_model_variation(hr_state_t *st)
         if (st->drift_bpm > HRV_DRIFT_CAP_BPM) st->drift_bpm = HRV_DRIFT_CAP_BPM;
         st->hrv_cached = rsa + mayer + st->drift_bpm;
     }
-    return st->hrv_cached;
+    return st->hrv_cached + st->wander_value;
 }
 
 /*

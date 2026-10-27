@@ -12,10 +12,12 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
+#include "esp_random.h"
 #include "esp_task_wdt.h"
 #include "nvs_flash.h"
 #include "bikepower_config.h"
 #include "ble_bikepower.h"
+#include "domain_rng.h"
 #include "power_engine.h"
 #include "nvs_store.h"
 #include "app_events.h"
@@ -211,6 +213,7 @@ void app_main(void)
         ESP_LOGE(TAG, "BLE 启动失败 ret=%d，进入错误恢复态", ble_ret);
         app_state_set_error();
     }
+    domain_rng_seed(esp_random());
 
     // 看门狗：主循环每拍喂狗（idf 默认已为 IDLE 任务注册 TWDT，这里订阅当前任务）
     esp_err_t wdt_err = esp_task_wdt_add(NULL);

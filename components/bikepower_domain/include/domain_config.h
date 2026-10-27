@@ -121,23 +121,22 @@ typedef enum {
 // amp=0 时输出恒定为基准值。
 #define POWER_FLOAT_MIN          0
 #define POWER_FLOAT_MAX          100
-#define POWER_FLOAT_DEFAULT      30
+#define POWER_FLOAT_DEFAULT      50
 #define CADENCE_FLOAT_MIN        0
 #define CADENCE_FLOAT_MAX        20
-#define CADENCE_FLOAT_DEFAULT    4
+#define CADENCE_FLOAT_DEFAULT    8
 #define HR_FLOAT_MIN             0
 #define HR_FLOAT_MAX             20
 #define HR_FLOAT_DEFAULT         2
 
 // ===== 骑行分层动态参数 =====
-// 慢层模拟路况与体力趋势，快层每秒更新一次模拟踩踏及传感器波动；两层合成后仍受浮动幅度约束。
-#define RIDE_DYNAMICS_SLOW_SHARE_PCT       60
-#define RIDE_DYNAMICS_SLOW_TAU_SEC          8
-#define RIDE_DYNAMICS_SLOW_HOLD_MIN_LOOPS  200
-#define RIDE_DYNAMICS_SLOW_HOLD_MAX_LOOPS  600
+// 慢层使用连续航点模拟路况与体力趋势，快层每秒更新一次模拟踩踏及传感器波动；两层合成后仍受浮动幅度约束。
+#define RIDE_DYNAMICS_SLOW_SHARE_PCT       80
+#define RIDE_DYNAMICS_SLOW_HOLD_MIN_LOOPS  120
+#define RIDE_DYNAMICS_SLOW_HOLD_MAX_LOOPS  360
 #define RIDE_DYNAMICS_FAST_UPDATE_LOOPS    20
-#define RIDE_DYNAMICS_FAST_ALPHA           0.40f
-#define RIDE_CADENCE_COUPLING_DIVISOR       3
+#define RIDE_DYNAMICS_FAST_ALPHA           0.65f
+#define RIDE_CADENCE_COUPLING_DIVISOR       4
 #define RUN_FLUCT_WALK_TAU                   3
 #define RUN_FLUCT_WALK_HOLD_LOOPS           60
 
@@ -146,6 +145,8 @@ typedef enum {
 #define HR_TAU_FALL           60
 #define HR_LOAD_TAU_RISE      8
 #define HR_LOAD_TAU_FALL      15
+#define HR_TARGET_ANCHOR_PCT  85
+#define HR_TARGET_COUPLING_PCT 70
 #define HR_LOOP_INTERVAL_MS   50
 
 // ===== 对外心率台阶保持 =====
@@ -163,6 +164,9 @@ typedef enum {
 #define HRV_MAYER_PERIOD_S      10.0f
 #define HRV_DRIFT_RATE_BPM_PER_MIN  0.05f
 #define HRV_DRIFT_CAP_BPM       5.0f
+#define HRV_WANDER_AMPLITUDE     7
+#define HRV_WANDER_HOLD_MIN_LOOPS 600
+#define HRV_WANDER_HOLD_MAX_LOOPS 1800
 
 // ===== 个人信息范围 =====
 #define PROFILE_WEIGHT_MIN      40
