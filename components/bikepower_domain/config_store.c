@@ -95,6 +95,65 @@ void config_store_from_engine(const power_engine_t *e, config_data_t *c)
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
 }
 
+bool config_store_apply_to_engine(const config_data_t *c, power_engine_t *e)
+{
+    if (!c || !e) return false;
+
+    config_data_t checked = *c;
+    if (config_store_validate(&checked)) return false;
+
+    power_engine_t next = *e;
+    bool restore_erg = next.has_erg_target && checked.mode == RIDE_MODE_STEADY;
+    int erg_target = next.erg_active_target;
+
+    if (next.mode != RIDE_MODE_STEADY) {
+        power_engine_set_mode(&next, RIDE_MODE_STEADY);
+    }
+    power_engine_set_power(&next, checked.power);
+    power_engine_set_cadence(&next, checked.cadence);
+    power_engine_set_power_float(&next, checked.power_float);
+    power_engine_set_cadence_float(&next, checked.cadence_float);
+    power_engine_set_hr_float(&next, checked.hr_float);
+    power_engine_set_power_step(&next, checked.power_step);
+    if (checked.has_user_hr) {
+        power_engine_set_heartrate(&next, checked.heartrate);
+    } else {
+        power_engine_clear_user_hr(&next);
+    }
+
+    profile_set_weight(&next.profile, checked.weight);
+    profile_set_ftp(&next.profile, checked.ftp);
+    profile_set_thr_hr(&next.profile, checked.thr_hr);
+    profile_set_custom_wkg(&next.profile, checked.custom_wkg_low, checked.custom_wkg_high);
+    profile_set_custom_name(&next.profile, checked.custom_pacer_name);
+    profile_set_ride_type(&next.profile, checked.ride_type);
+    next.led = checked.led;
+
+    power_engine_set_sport_profile(&next, (sport_profile_t)checked.sport_profile);
+    power_engine_set_broadcast_mask(&next, checked.broadcast_mask);
+    power_engine_set_run_speed(&next, checked.run_speed_x100);
+    power_engine_set_run_pace_float(&next, checked.run_pace_float_sec);
+    power_engine_set_run_cadence(&next, checked.run_cadence);
+    power_engine_set_run_cadence_float(&next, checked.run_cadence_float);
+    if (checked.run_pacer_type == RUN_PACER_CUSTOM) {
+        power_engine_set_run_custom_pacer(&next, checked.run_custom_name,
+                                          checked.run_pace_low_sec,
+                                          checked.run_pace_high_sec,
+                                          checked.run_cadence);
+    } else {
+        power_engine_set_run_pacer(&next, (run_pacer_type_t)checked.run_pacer_type);
+        power_engine_set_run_pace_range(&next, checked.run_pace_low_sec,
+                                        checked.run_pace_high_sec);
+    }
+    power_engine_set_run_mode(&next, (run_mode_t)checked.run_mode);
+    power_engine_set_device_name(&next, checked.device_name);
+    power_engine_set_mode(&next, (ride_mode_t)checked.mode);
+    if (restore_erg) power_engine_set_erg_target(&next, erg_target);
+    next.dirty = true;
+    *e = next;
+    return true;
+}
+
 /*
  * 校验并修正配置对象中的各字段范围。
  * 参数：c 为待校验的配置对象。

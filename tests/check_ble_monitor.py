@@ -75,6 +75,31 @@ def main():
         ("downloadReport", "支持导出监控报告"),
         ('switchMode("connect")', "默认进入实时监控主任务"),
         ('id="trace-power"', "实时功率轨迹由设备通知驱动"),
+        ("HISTORY_RETENTION_MS", "曲线历史按会话长期保留而非固定 30 秒截断"),
+        ("HISTORY_MAX_SAMPLES", "曲线历史设置浏览器内存上限"),
+        ("TRACE_RANGE_OPTIONS", "支持 30 秒、2 分钟、10 分钟与全程时间范围"),
+        ("renderTraceXAxis", "X 轴随会话时长动态生成刻度"),
+        ("inspectTraceAtPointer", "支持指针查看曲线具体时间点数值"),
+        ("handleTraceKey", "支持键盘逐点检查曲线数值"),
+        ("toggleTracePause", "支持暂停和继续图表跟随"),
+        ("toggleTraceSeries", "支持独立显示或隐藏功率、踏频和心率"),
+        ("summarizeSeries", "显示可见区间最小值、平均值和最大值"),
+        ("downsampleTracePoints", "长会话曲线绘制前执行保峰降采样"),
+        ("downloadSignalCsv", "支持导出完整会话 CSV"),
+        ("7a5a0000-4c7a-4f2a-9b3e-6d1f4a8c0b21", "声明 BikePower 配置服务 UUID"),
+        ("CONFIG_GROUPS", "配置按 Core/Profile/Running/LED/Identity 五组读写"),
+        ("readDeviceConfig", "连接后读取开发板全部配置"),
+        ("saveDeviceConfig", "支持编辑并保存开发板配置"),
+        ("makeConfigBegin", "保存前建立带 revision 的配置事务"),
+        ("makeConfigCommit", "完整写入配置组后提交事务"),
+        ("waitForConfigResponse", "等待设备端事务与 NVS 保存结果"),
+        ("configsEqual", "使用协议编码比较配置脏状态"),
+        ('id="config-error-summary"', "配置校验提供可聚焦错误摘要"),
+        ("保存到设备", "配置编辑器提供显式保存操作"),
+        ("全部配置已写入开发板 NVS", "仅在设备确认 NVS 成功后反馈保存成功"),
+        ("重新连接后才能读取或保存", "断连后禁用设备配置操作并提示重连"),
+        ("服务结构已变化，页面将断开连接", "Profile 或广播变化后提示 GATT 重建断连"),
+        ("已断开 · 历史保留", "设备断开后保留会话曲线和统计"),
         ("notificationGapText", "展示各服务的真实通知新鲜度"),
         ("escapeHtml", "转义蓝牙设备与 GATT 动态字段"),
         ("00001818-0000-1000-8000-00805f9b34fb", "包含 Cycling Power Service UUID"),
@@ -100,6 +125,8 @@ def main():
         check(token in html, message, failures)
     check(not re.search(r"acceptAllDevices\s*:\s*true", html),
           "设备选择器不再展示所有无关蓝牙设备", failures)
+    check("now-sample.t<=30000" not in html,
+          "曲线不再把历史硬裁剪为最近 30 秒", failures)
     cycling_filter = re.search(
         r"const CYCLING_SERVICE_UUIDS\s*=\s*\[(.*?)\];", html, flags=re.S
     )
@@ -131,6 +158,62 @@ def main():
                 print((result.stderr or result.stdout).strip())
         finally:
             Path(tmp_path).unlink(missing_ok=True)
+
+        runtime_prelude = """
+const window = { addEventListener() {} };
+const document = {};
+const navigator = {};
+const customElements = {};
+class MutationObserver {}
+"""
+        runtime_assertions = """
+const fixture = {
+  schema_ver: 12, device_name: "BikePower-C3", sport_profile: 0, mode: 1,
+  power: 260, cadence: 85, has_user_hr: 0, heartrate: 145, power_step: 20,
+  power_float: 50, cadence_float: 8, hr_float: 7, broadcast_mask: 7,
+  weight: 70, ftp: 250, thr_hr: 175, ride_type: 2,
+  custom_wkg_low: 20, custom_wkg_high: 28, custom_pacer_name: "Custom Ride",
+  run_speed_x100: 1000, run_pace_float_sec: 12, run_cadence: 170,
+  run_cadence_float: 5, run_mode: 1, run_pacer_type: 1,
+  run_pace_low_sec: 300, run_pace_high_sec: 420, run_custom_name: "Custom Run",
+  led_silent: 0, led_scenes: [
+    {mode: 2, color: 2}, {mode: 1, color: 1}, {mode: 3, color: 3},
+    {mode: 3, color: 3}, {mode: 4, color: 0},
+  ],
+};
+const merged = {schema_ver: fixture.schema_ver};
+const lengths = [];
+for (const group of CONFIG_GROUPS) {
+  const bytes = encodeConfigGroup(group.key, fixture);
+  lengths.push(bytes.length);
+  Object.assign(merged, parseConfigGroup(
+    group.key, new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  ));
+}
+const expectedCore = [1, 4, 1, 85, 0, 1, 145, 0, 0, 50, 8, 7, 20, 0, 7];
+const actualCore = Array.from(encodeConfigGroup("core", fixture));
+const begin = Array.from(makeConfigBegin(0x01020304, 0x11223344));
+const commit = Array.from(makeConfigCommit(0x01020304));
+if (!configsEqual(fixture, merged)
+    || JSON.stringify(lengths) !== JSON.stringify([15, 22, 24, 12, 14])
+    || JSON.stringify(actualCore) !== JSON.stringify(expectedCore)
+    || JSON.stringify(begin) !== JSON.stringify([1, 1, 4, 3, 2, 1, 68, 51, 34, 17])
+    || JSON.stringify(commit) !== JSON.stringify([2, 4, 3, 2, 1, 31])) {
+  throw new Error("BLE 配置网页协议运行时回归失败");
+}
+"""
+        with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as tmp:
+            tmp.write(runtime_prelude)
+            tmp.write(scripts[0])
+            tmp.write(runtime_assertions)
+            runtime_path = tmp.name
+        try:
+            result = subprocess.run([node, runtime_path], capture_output=True, text=True, timeout=15)
+            check(result.returncode == 0, "网页配置协议小端编码与五组往返正确", failures)
+            if result.returncode != 0:
+                print((result.stderr or result.stdout).strip())
+        finally:
+            Path(runtime_path).unlink(missing_ok=True)
     else:
         check(False, "未找到 node，无法检查监控页内联 JS 语法", failures)
 

@@ -119,7 +119,7 @@ python3 tests/analyze_fit_reference.py /path/to/ride.fit \
 | `ble_broadcast_monitor.py` | 通过配网页 API 切换广播项，并验证 CPS/HRS/CSC/FTMS 通知是否按开关停止/恢复 | bleak + 设备配网态 HTTP | 设备进入配网态后跑 |
 | `stage3_conn_test.py` | 两轮独立扫描 → 连接 → 显式断开，验证每次断开后恢复广播 | bleak，可选 pyserial | 设备启动后直接跑 |
 | `stage5_portal_test.py` | 配网门户 HTTP 路由自测（/api/xxx JSON 接口） | Python3 | 设备进入配网态后跑 |
-| `../scripts/tools/serve_ble_monitor.py` + `../tools/web/ble-monitor.html` | 本地浏览器 BLE 监控，持续记录断连、通知停更和数值异常 | Chrome/Edge Web Bluetooth | 启动本地服务后浏览器手动授权连接 |
+| `../scripts/tools/serve_ble_monitor.py` + `../tools/web/ble-monitor.html` | 本地浏览器 BLE 监控与配置编辑器：保留会话曲线，读取/修改全部持久配置，显示事务保存结果，并记录断连、通知停更和数值异常 | Chrome/Edge Web Bluetooth | 启动本地服务后浏览器手动授权连接 |
 
 ### C. 本地 Mock（无需烧设备调试前端）
 
@@ -146,7 +146,7 @@ python3 scripts/tools/device_acceptance.py init --board generic-c3 --operator "�
 
 | 文件 | 用途 |
 |------|------|
-| `tools/web/ble-monitor.html` | Web Bluetooth 客户端与 ESP Web Tools 刷写页，显示 BLE 数据以及最新 Release 双板型固件信息 |
+| `tools/web/ble-monitor.html` | Web Bluetooth 客户端、全量 NVS 配置编辑器与 ESP Web Tools 刷写页；实时曲线支持四档时间范围、逐点读数、统计、暂停和 CSV 导出 |
 | `scripts/tools/serve_ble_monitor.py` | 从 `tools/web/` 启动无缓存本地 HTTP 服务，默认 `http://127.0.0.1:8766/ble-monitor.html` |
 | `scripts/tools/prepare_web_flash_site.py` | 获取 GitHub 最新 Release、验证 merged bin SHA256、生成 Pages 固件索引与 ESP Web Tools manifest |
 | `.github/workflows/deploy-web-tools.yml` | CI 成功或 GitHub Release 发布后部署 Pages；缺失完整固件时阻断覆盖 |
@@ -161,7 +161,9 @@ python3 tests/check_ble_monitor.py
 python3 tests/test_prepare_web_flash_site.py
 ```
 
-Web Bluetooth 首次连接必须由用户点击“连接设备”并在浏览器弹窗中授权；授权后可点“连接已授权设备”重连。页面会监控 BLE 断连、通知停更、功率/心率/踏频/跑步速度异常，并可导出 JSON 报告用于排查。
+Web Bluetooth 首次连接必须由用户点击“连接设备”并在浏览器弹窗中授权；授权后可点“连接已授权设备”重连。页面会监控 BLE 断连、通知停更、功率/心率/踏频/跑步速度异常；曲线默认显示并保留整次页面连接会话，可切换 30 秒、2 分钟、10 分钟与全程窗口，逐点查看真实数值并导出 CSV 或含历史数据的 JSON 报告。历史只保存在当前页面内，最多 12 小时或 50000 个样本，刷新页面会开始新会话。
+
+固件提供 BikePower Config Service 时，页面会读取 Core、Profile、Running、LED、Identity 五组全部持久配置。修改只保留在浏览器表单，点击“保存到设备”后才执行带 revision 的 BEGIN → 五组写入 → COMMIT 事务；只有设备主循环完成校验并成功提交 NVS 后才显示成功。运动 Profile 或广播掩码变化会提示页面断开，设备随后重建 GATT 并重新广播。旧固件没有配置服务时页面显示降级提示，实时运动数据仍可继续监控。静态门禁不等同真机验证，发布前仍需在真实开发板上检查全量读取、事务写入、断电恢复与重广播。
 
 GitHub Pages 只读取当前 GitHub 仓库的最新 Release。两个板型的 merged bin 与 `.sha256` 必须成对存在且校验一致，之后才会进入同源 Pages artifact；正式部署缺失任一项时失败并保留上一版站点。网页刷写需要 HTTPS、桌面版 Chrome/Edge 和用户主动选择串口。本地 `localhost` 可用于界面检查，但 `tools/web/` 源目录本身没有部署生成的 `firmware/latest.json`。
 

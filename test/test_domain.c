@@ -20,6 +20,7 @@
 #include "device_template.h"
 #include "device_analysis.h"
 #include "running_engine.h"
+#include "ble_config_codec.h"
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -2211,6 +2212,128 @@ static void test_config_migrate_v11_to_v12_power_float(void)
     CHECK(custom.power_float == 12, "v12 幂等迁移不改用户浮动");
 }
 
+static void test_ble_config_codec(void)
+{
+    printf("[test] BLE 配置协议全字段往返与边界\n");
+    config_data_t source;
+    config_store_defaults(&source);
+    source.power = POWER_MAX;
+    source.cadence = CADENCE_MAX;
+    source.mode = RIDE_MODE_ROAD;
+    source.heartrate = HR_MAX;
+    source.has_user_hr = 1;
+    source.power_float = POWER_FLOAT_MAX;
+    source.cadence_float = CADENCE_FLOAT_MAX;
+    source.hr_float = HR_FLOAT_MAX;
+    source.power_step = POWER_STEP_MAX;
+    source.weight = PROFILE_WEIGHT_MAX;
+    source.ftp = PROFILE_FTP_MAX;
+    source.thr_hr = PROFILE_THR_HR_MAX;
+    source.ride_type = PACER_INDEX_CUSTOM;
+    source.custom_wkg_low = 61;
+    source.custom_wkg_high = CUSTOM_WKG_MAX;
+    strcpy(source.custom_pacer_name, "山地-Tempo");
+    source.sport_profile = SPORT_PROFILE_RUNNING;
+    source.broadcast_mask = BROADCAST_FIELD_POWER | BROADCAST_FIELD_HEARTRATE;
+    source.run_speed_x100 = RUN_SPEED_X100_MAX;
+    source.run_pace_float_sec = RUN_PACE_FLOAT_SEC_MAX;
+    source.run_cadence = RUN_CADENCE_MAX;
+    source.run_cadence_float = RUN_CADENCE_FLOAT_MAX;
+    source.run_mode = RUN_MODE_PACER;
+    source.run_pacer_type = RUN_PACER_CUSTOM;
+    source.run_pace_low_sec = RUN_PACE_SEC_MIN;
+    source.run_pace_high_sec = RUN_PACE_SEC_MAX;
+    strcpy(source.run_custom_name, "夜跑-自定义");
+    strcpy(source.device_name, "BikePower-C3");
+    source.led.silent = 1;
+    for (int i = 0; i < LED_SCENE_COUNT; i++) {
+        source.led.scenes[i].mode = (uint8_t)(i % LED_MODE_COUNT);
+        source.led.scenes[i].color = (uint8_t)(i % LED_COLOR_COUNT);
+    }
+
+    uint8_t meta[BLE_CONFIG_META_LEN];
+    CHECK(ble_config_encode_meta(meta, sizeof(meta), 0x78563412u) == BLE_CONFIG_META_LEN,
+          "Meta 固定长度编码");
+    CHECK(meta[0] == BLE_CONFIG_PROTOCOL_VERSION && meta[1] == CONFIG_VERSION,
+          "Meta 携带协议与 schema 版本");
+    CHECK(meta[2] == BLE_CONFIG_GROUP_MASK_ALL && meta[3] == BLE_CONFIG_CAPABILITIES,
+          "Meta 声明全组读写事务能力");
+    CHECK(meta[4] == 0x12 && meta[5] == 0x34 && meta[6] == 0x56 && meta[7] == 0x78,
+          "Meta revision 使用小端");
+
+    config_data_t decoded;
+    config_store_defaults(&decoded);
+    uint8_t payload[BLE_CONFIG_GROUP_MAX_LEN];
+    for (int group = 0; group < BLE_CONFIG_GROUP_COUNT; group++) {
+        memset(payload, 0, sizeof(payload));
+        size_t len = ble_config_encode_group((ble_config_group_t)group, &source,
+                                             payload, sizeof(payload));
+        CHECK(len > 0 && len <= BLE_CONFIG_GROUP_MAX_LEN, "配置组长度适配 MTU 64");
+        CHECK(ble_config_decode_group((ble_config_group_t)group, payload, len, &decoded),
+              "配置组可解码");
+    }
+
+    char source_json[2048];
+    char decoded_json[2048];
+    size_t source_len = config_store_serialize(&source, source_json, sizeof(source_json));
+    size_t decoded_len = config_store_serialize(&decoded, decoded_json, sizeof(decoded_json));
+    CHECK(source_len > 0 && decoded_len == source_len, "全配置往返序列化长度一致");
+    CHECK(strcmp(source_json, decoded_json) == 0, "全部 NVS 配置字段二进制往返一致");
+
+    config_data_t before = decoded;
+    size_t core_len = ble_config_encode_group(BLE_CONFIG_GROUP_CORE, &source,
+                                              payload, sizeof(payload));
+    payload[0] = BLE_CONFIG_PROTOCOL_VERSION + 1;
+    CHECK(!ble_config_decode_group(BLE_CONFIG_GROUP_CORE, payload, core_len, &decoded),
+          "拒绝未知协议版本");
+    CHECK(memcmp(&before, &decoded, sizeof(decoded)) == 0, "解码失败不污染正式配置");
+    payload[0] = BLE_CONFIG_PROTOCOL_VERSION;
+    CHECK(!ble_config_decode_group(BLE_CONFIG_GROUP_CORE, payload, core_len - 1, &decoded),
+          "拒绝截断配置组");
+
+    uint8_t response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
+    CHECK(ble_config_encode_control_response(response, sizeof(response), BLE_CONFIG_OP_COMMIT,
+                                              BLE_CONFIG_RESULT_SUCCESS,
+                                              BLE_CONFIG_RESTART_GATT | BLE_CONFIG_RESTART_NAME,
+                                              0x04030201u, 0x08070605u)
+              == BLE_CONFIG_CONTROL_RESPONSE_LEN,
+          "控制点响应固定长度编码");
+    CHECK(response[0] == BLE_CONFIG_OP_RESPONSE && response[1] == BLE_CONFIG_OP_COMMIT
+              && response[2] == BLE_CONFIG_RESULT_SUCCESS && response[3] == 3,
+          "控制点响应头字段正确");
+    CHECK(response[4] == 1 && response[7] == 4 && response[8] == 5 && response[11] == 8,
+          "控制点 transaction/revision 使用小端");
+}
+
+static void test_config_apply_to_engine(void)
+{
+    printf("[test] 完整配置原子应用与会话保持\n");
+    power_engine_t engine;
+    power_engine_init(&engine);
+    power_engine_set_power(&engine, 222);
+    power_engine_clear_dirty(&engine);
+    CHECK(power_engine_set_erg_target(&engine, 310), "应用测试前进入 ERG 会话");
+
+    config_data_t config;
+    config_store_from_engine(&engine, &config);
+    config.cadence = 101;
+    config.has_user_hr = 0;
+    config.power_float = 17;
+    strcpy(config.device_name, "BikePower-Edit");
+    CHECK(config_store_apply_to_engine(&config, &engine), "合法完整配置应用成功");
+    CHECK(engine.base_power == 222 && engine.cadence_base == 101 && engine.power_float == 17,
+          "基础配置完整应用");
+    CHECK(!engine.has_user_hr, "关闭固定心率会清除运行时锁定");
+    CHECK(engine.mode == RIDE_MODE_ERG && engine.has_erg_target && engine.erg_active_target == 310,
+          "未改变持久模式时保留 ERG 会话");
+    CHECK(strcmp(engine.device_name, "BikePower-Edit") == 0, "设备名同步应用");
+
+    power_engine_t unchanged = engine;
+    config.power = POWER_MAX + 1;
+    CHECK(!config_store_apply_to_engine(&config, &engine), "越界完整配置被拒绝");
+    CHECK(memcmp(&unchanged, &engine, sizeof(engine)) == 0, "应用失败不污染运行时引擎");
+}
+
 int main(void)
 {
     test_profile();
@@ -2253,6 +2376,8 @@ int main(void)
     test_session_config_export();
     test_config_migrate_v9_to_current_running_fields();
     test_config_migrate_v11_to_v12_power_float();
+    test_ble_config_codec();
+    test_config_apply_to_engine();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

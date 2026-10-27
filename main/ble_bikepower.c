@@ -23,6 +23,7 @@
 #include "services/gatt/ble_svc_gatt.h"
 
 #include "bikepower_config.h"
+#include "ble_config_codec.h"
 #include "ble_payload_codec.h"
 #include "domain_config.h"
 #include "running_engine.h"
@@ -44,6 +45,7 @@ static uint16_t g_ftms_bike_handle;
 static uint16_t g_ftms_treadmill_handle;
 static uint16_t g_ftms_cp_handle;
 static uint16_t g_ftms_status_handle;
+static uint16_t g_config_control_handle;
 
 // 当前通知数据（由领域层写入，notify_tick 读取）
 static volatile uint16_t g_power_w   = DEFAULT_POWER;
@@ -90,6 +92,7 @@ static uint8_t g_ftms_status_buf[1] = { FTMS_STATUS_RESET };
 static ble_erg_cb_t g_erg_cb = NULL;
 static ble_erg_clear_cb_t g_erg_clear_cb = NULL;
 static ble_run_control_cb_t g_run_control_cb = NULL;
+static ble_config_commit_cb_t g_config_commit_cb = NULL;
 static sport_profile_t g_profile = DEFAULT_SPORT_PROFILE;
 static char g_device_name[DEVICE_NAME_MAX] = DEVICE_NAME;
 static esp_timer_handle_t g_notify_timer = NULL;
@@ -100,6 +103,31 @@ static volatile bool g_start_failed = false;
 // 通知互斥锁：保证 notify_tick 回调与 ble_bikepower_stop 的 deinit 互斥，
 // stop 在释放 NimBLE 前必须先拿到锁，确保没有 notify 回调正在访问协议栈（消除 UAF 窗口）。
 static SemaphoreHandle_t g_notify_lock = NULL;
+
+static const ble_uuid128_t g_config_service_uuid = BLE_UUID128_INIT(BLE_CONFIG_SERVICE_UUID_BYTES);
+static const ble_uuid128_t g_config_meta_uuid = BLE_UUID128_INIT(BLE_CONFIG_META_UUID_BYTES);
+static const ble_uuid128_t g_config_core_uuid = BLE_UUID128_INIT(BLE_CONFIG_CORE_UUID_BYTES);
+static const ble_uuid128_t g_config_profile_uuid = BLE_UUID128_INIT(BLE_CONFIG_PROFILE_UUID_BYTES);
+static const ble_uuid128_t g_config_running_uuid = BLE_UUID128_INIT(BLE_CONFIG_RUNNING_UUID_BYTES);
+static const ble_uuid128_t g_config_led_uuid = BLE_UUID128_INIT(BLE_CONFIG_LED_UUID_BYTES);
+static const ble_uuid128_t g_config_identity_uuid = BLE_UUID128_INIT(BLE_CONFIG_IDENTITY_UUID_BYTES);
+static const ble_uuid128_t g_config_control_uuid = BLE_UUID128_INIT(BLE_CONFIG_CONTROL_UUID_BYTES);
+
+typedef struct {
+    bool active;
+    bool committing;
+    uint32_t transaction_id;
+    uint32_t base_revision;
+    uint8_t written_mask;
+    config_data_t staging;
+} ble_config_transaction_t;
+
+static portMUX_TYPE g_config_lock = portMUX_INITIALIZER_UNLOCKED;
+static config_data_t g_config_snapshot;
+static bool g_config_snapshot_valid = false;
+static uint32_t g_config_revision = BLE_CONFIG_INITIAL_REVISION;
+static ble_config_transaction_t g_config_transaction;
+static uint8_t g_config_response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
 
 /**
  * 启动 BLE 广播。
@@ -402,6 +430,226 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
     return 0;
 }
 
+static uint32_t config_get_u32(const uint8_t *data)
+{
+    return (uint32_t)data[0]
+         | ((uint32_t)data[1] << 8)
+         | ((uint32_t)data[2] << 16)
+         | ((uint32_t)data[3] << 24);
+}
+
+static bool config_snapshot_equal(const config_data_t *lhs, const config_data_t *rhs)
+{
+    uint8_t lhs_buf[BLE_CONFIG_GROUP_MAX_LEN];
+    uint8_t rhs_buf[BLE_CONFIG_GROUP_MAX_LEN];
+    for (int group = 0; group < BLE_CONFIG_GROUP_COUNT; group++) {
+        size_t lhs_len = ble_config_encode_group((ble_config_group_t)group, lhs,
+                                                 lhs_buf, sizeof(lhs_buf));
+        size_t rhs_len = ble_config_encode_group((ble_config_group_t)group, rhs,
+                                                 rhs_buf, sizeof(rhs_buf));
+        if (lhs_len == 0 || lhs_len != rhs_len || memcmp(lhs_buf, rhs_buf, lhs_len) != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void config_send_response(uint8_t request_opcode, uint8_t result,
+                                 uint8_t restart_flags, uint32_t transaction_id,
+                                 uint32_t revision)
+{
+    uint8_t response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
+    ble_config_encode_control_response(response, sizeof(response), request_opcode, result,
+                                       restart_flags, transaction_id, revision);
+    portENTER_CRITICAL(&g_config_lock);
+    memcpy(g_config_response, response, sizeof(g_config_response));
+    portEXIT_CRITICAL(&g_config_lock);
+    indicate_one(g_config_control_handle, response, sizeof(response));
+}
+
+static int config_meta_access_cb(uint16_t ch, uint16_t ah,
+                                 struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) return BLE_ATT_ERR_UNLIKELY;
+    uint32_t revision;
+    portENTER_CRITICAL(&g_config_lock);
+    revision = g_config_revision;
+    portEXIT_CRITICAL(&g_config_lock);
+    uint8_t payload[BLE_CONFIG_META_LEN];
+    size_t len = ble_config_encode_meta(payload, sizeof(payload), revision);
+    return chr_read_buf(ctxt, payload, len);
+}
+
+static int config_group_access_cb(uint16_t ch, uint16_t ah,
+                                  struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah;
+    ble_config_group_t group = (ble_config_group_t)(uintptr_t)arg;
+    if (group < 0 || group >= BLE_CONFIG_GROUP_COUNT) return BLE_ATT_ERR_UNLIKELY;
+
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        config_data_t snapshot;
+        portENTER_CRITICAL(&g_config_lock);
+        snapshot = g_config_snapshot;
+        portEXIT_CRITICAL(&g_config_lock);
+        uint8_t payload[BLE_CONFIG_GROUP_MAX_LEN];
+        size_t len = ble_config_encode_group(group, &snapshot, payload, sizeof(payload));
+        return len > 0 ? chr_read_buf(ctxt, payload, len) : BLE_ATT_ERR_UNLIKELY;
+    }
+    if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
+
+    uint8_t payload[BLE_CONFIG_GROUP_MAX_LEN];
+    uint16_t len = 0;
+    int rc = ble_hs_mbuf_to_flat(ctxt->om, payload, sizeof(payload), &len);
+    if (rc != 0 || len == 0 || len > sizeof(payload)) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+
+    config_data_t staging;
+    uint32_t transaction_id;
+    portENTER_CRITICAL(&g_config_lock);
+    bool writable = g_config_transaction.active && !g_config_transaction.committing;
+    staging = g_config_transaction.staging;
+    transaction_id = g_config_transaction.transaction_id;
+    portEXIT_CRITICAL(&g_config_lock);
+    if (!writable) return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
+    if (!ble_config_decode_group(group, payload, len, &staging)) {
+        return BLE_ATT_ERR_VALUE_NOT_ALLOWED;
+    }
+
+    portENTER_CRITICAL(&g_config_lock);
+    if (!g_config_transaction.active || g_config_transaction.committing
+            || g_config_transaction.transaction_id != transaction_id) {
+        portEXIT_CRITICAL(&g_config_lock);
+        return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
+    }
+    g_config_transaction.staging = staging;
+    g_config_transaction.written_mask |= (uint8_t)(1u << group);
+    portEXIT_CRITICAL(&g_config_lock);
+    return 0;
+}
+
+static int config_control_access_cb(uint16_t ch, uint16_t ah,
+                                    struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        uint8_t response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
+        portENTER_CRITICAL(&g_config_lock);
+        memcpy(response, g_config_response, sizeof(response));
+        portEXIT_CRITICAL(&g_config_lock);
+        return chr_read_buf(ctxt, response, sizeof(response));
+    }
+    if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
+
+    uint8_t payload[BLE_CONFIG_CONTROL_BUF_SIZE];
+    uint16_t len = 0;
+    int rc = ble_hs_mbuf_to_flat(ctxt->om, payload, sizeof(payload), &len);
+    if (rc != 0 || len == 0 || len > sizeof(payload)) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+
+    uint8_t opcode = payload[0];
+    uint8_t result = BLE_CONFIG_RESULT_SUCCESS;
+    uint32_t transaction_id = 0;
+    uint32_t revision;
+
+    if (opcode == BLE_CONFIG_OP_BEGIN) {
+        if (len != 10) {
+            result = BLE_CONFIG_RESULT_INVALID_LENGTH;
+        } else if (payload[1] != BLE_CONFIG_PROTOCOL_VERSION) {
+            result = BLE_CONFIG_RESULT_PROTOCOL_MISMATCH;
+        } else {
+            transaction_id = config_get_u32(payload + 2);
+            uint32_t expected_revision = config_get_u32(payload + 6);
+            portENTER_CRITICAL(&g_config_lock);
+            revision = g_config_revision;
+            if (g_config_transaction.active || g_config_transaction.committing) {
+                result = BLE_CONFIG_RESULT_BUSY;
+            } else if (transaction_id == 0 || expected_revision != revision) {
+                result = BLE_CONFIG_RESULT_STALE_REVISION;
+            } else {
+                g_config_transaction.active = true;
+                g_config_transaction.transaction_id = transaction_id;
+                g_config_transaction.base_revision = revision;
+                g_config_transaction.written_mask = 0;
+                g_config_transaction.staging = g_config_snapshot;
+            }
+            portEXIT_CRITICAL(&g_config_lock);
+            config_send_response(opcode, result, 0, transaction_id, revision);
+            return 0;
+        }
+    } else if (opcode == BLE_CONFIG_OP_COMMIT) {
+        if (len != 6) {
+            result = BLE_CONFIG_RESULT_INVALID_LENGTH;
+        } else {
+            transaction_id = config_get_u32(payload + 1);
+            uint8_t required_mask = payload[5];
+            config_data_t staged_config;
+            uint32_t base_revision = 0;
+            bool submit = false;
+            portENTER_CRITICAL(&g_config_lock);
+            revision = g_config_revision;
+            if (!g_config_transaction.active) {
+                result = BLE_CONFIG_RESULT_NO_TRANSACTION;
+            } else if (g_config_transaction.transaction_id != transaction_id) {
+                result = BLE_CONFIG_RESULT_TRANSACTION_MISMATCH;
+            } else if (g_config_transaction.base_revision != revision) {
+                result = BLE_CONFIG_RESULT_STALE_REVISION;
+                g_config_transaction.active = false;
+            } else if (required_mask == 0
+                    || (required_mask & ~BLE_CONFIG_GROUP_MASK_ALL) != 0
+                    || (g_config_transaction.written_mask & required_mask) != required_mask) {
+                result = BLE_CONFIG_RESULT_INCOMPLETE;
+            } else {
+                staged_config = g_config_transaction.staging;
+                base_revision = g_config_transaction.base_revision;
+                g_config_transaction.active = false;
+                g_config_transaction.committing = true;
+                submit = true;
+            }
+            portEXIT_CRITICAL(&g_config_lock);
+            if (submit) {
+                if (g_config_commit_cb
+                        && g_config_commit_cb(&staged_config, transaction_id, base_revision)) {
+                    return 0;
+                }
+                portENTER_CRITICAL(&g_config_lock);
+                g_config_transaction.committing = false;
+                portEXIT_CRITICAL(&g_config_lock);
+                result = BLE_CONFIG_RESULT_BUSY;
+            }
+            config_send_response(opcode, result, 0, transaction_id, revision);
+            return 0;
+        }
+    } else if (opcode == BLE_CONFIG_OP_CANCEL) {
+        if (len != 5) {
+            result = BLE_CONFIG_RESULT_INVALID_LENGTH;
+        } else {
+            transaction_id = config_get_u32(payload + 1);
+            portENTER_CRITICAL(&g_config_lock);
+            revision = g_config_revision;
+            if (!g_config_transaction.active) {
+                result = g_config_transaction.committing
+                    ? BLE_CONFIG_RESULT_BUSY : BLE_CONFIG_RESULT_NO_TRANSACTION;
+            } else if (g_config_transaction.transaction_id != transaction_id) {
+                result = BLE_CONFIG_RESULT_TRANSACTION_MISMATCH;
+            } else {
+                g_config_transaction.active = false;
+                g_config_transaction.written_mask = 0;
+            }
+            portEXIT_CRITICAL(&g_config_lock);
+            config_send_response(opcode, result, 0, transaction_id, revision);
+            return 0;
+        }
+    } else {
+        result = BLE_CONFIG_RESULT_PROTOCOL_MISMATCH;
+    }
+
+    portENTER_CRITICAL(&g_config_lock);
+    revision = g_config_revision;
+    portEXIT_CRITICAL(&g_config_lock);
+    config_send_response(opcode, result, 0, transaction_id, revision);
+    return 0;
+}
+
 // ============================ DIS 静态读取 ============================
 
 /**
@@ -602,10 +850,45 @@ static const struct ble_gatt_svc_def running_gatt_svcs[] = {
     { 0 }
 };
 
+static const struct ble_gatt_svc_def config_gatt_svc = {
+    .type = BLE_GATT_SVC_TYPE_PRIMARY,
+    .uuid = &g_config_service_uuid.u,
+    .characteristics = (struct ble_gatt_chr_def[]){
+        { .uuid = &g_config_meta_uuid.u,
+          .access_cb = config_meta_access_cb,
+          .flags = BLE_GATT_CHR_F_READ },
+        { .uuid = &g_config_core_uuid.u,
+          .access_cb = config_group_access_cb,
+          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_CORE,
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
+        { .uuid = &g_config_profile_uuid.u,
+          .access_cb = config_group_access_cb,
+          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_PROFILE,
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
+        { .uuid = &g_config_running_uuid.u,
+          .access_cb = config_group_access_cb,
+          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_RUNNING,
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
+        { .uuid = &g_config_led_uuid.u,
+          .access_cb = config_group_access_cb,
+          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_LED,
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
+        { .uuid = &g_config_identity_uuid.u,
+          .access_cb = config_group_access_cb,
+          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_IDENTITY,
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
+        { .uuid = &g_config_control_uuid.u,
+          .access_cb = config_control_access_cb,
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE,
+          .val_handle = &g_config_control_handle },
+        { 0 }
+    }
+};
+
 // 按当前 g_broadcast_mask 动态构建 GATT 服务表：仅注册被启用的服务，
 // 未启用的服务从 GATT 表中移除（例如只开心率时蓝牙只暴露 HRS，类似心率带）。
-// 最大 5 个服务 + 1 个终止符，预分配静态缓冲避免运行时 malloc。
-static struct ble_gatt_svc_def g_active_svcs[6];
+// 最大 5 个运动/DIS 服务 + 1 个配置服务 + 1 个终止符，预分配静态缓冲避免运行时 malloc。
+static struct ble_gatt_svc_def g_active_svcs[7];
 
 static void build_active_gatt_svcs(void)
 {
@@ -626,6 +909,7 @@ static void build_active_gatt_svcs(void)
         if (power_on || cadence_on) g_active_svcs[idx++] = cycling_gatt_svcs[3]; // FTMS
         g_active_svcs[idx++] = cycling_gatt_svcs[4]; // DIS（始终）
     }
+    g_active_svcs[idx++] = config_gatt_svc; // BikePower 配置服务（所有 profile 始终可用）
     memset(&g_active_svcs[idx], 0, sizeof(g_active_svcs[idx])); // 终止符
 }
 
@@ -640,6 +924,7 @@ static void reset_svc_handles(void)
     g_ftms_treadmill_handle = 0;
     g_ftms_cp_handle = 0;
     g_ftms_status_handle = 0;
+    g_config_control_handle = 0;
 }
 
 // ============================ 数据打包 ============================
@@ -828,6 +1113,12 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "设备已断开 reason=%d", event->disconnect.reason);
         g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+        portENTER_CRITICAL(&g_config_lock);
+        if (g_config_transaction.active) {
+            g_config_transaction.active = false;
+            g_config_transaction.written_mask = 0;
+        }
+        portEXIT_CRITICAL(&g_config_lock);
         rc = start_advertising();
         if (rc != 0 && !g_stopping) mark_start_failed("断开后重广播失败", rc);
         return 0;
@@ -1052,6 +1343,73 @@ void ble_bikepower_set_run_control_callback(ble_run_control_cb_t cb)
     g_run_control_cb = cb;
 }
 
+void ble_bikepower_set_config_commit_callback(ble_config_commit_cb_t cb)
+{
+    g_config_commit_cb = cb;
+}
+
+void ble_bikepower_set_config_snapshot(const power_engine_t *engine)
+{
+    if (!engine) return;
+    config_data_t next;
+    config_store_from_engine(engine, &next);
+
+    portENTER_CRITICAL(&g_config_lock);
+    config_data_t previous = g_config_snapshot;
+    bool was_valid = g_config_snapshot_valid;
+    portEXIT_CRITICAL(&g_config_lock);
+    bool changed = was_valid && !config_snapshot_equal(&previous, &next);
+
+    portENTER_CRITICAL(&g_config_lock);
+    g_config_snapshot = next;
+    if (!was_valid) {
+        g_config_snapshot_valid = true;
+        g_config_revision = BLE_CONFIG_INITIAL_REVISION;
+    } else if (changed) {
+        g_config_revision++;
+        if (g_config_revision == 0) g_config_revision = BLE_CONFIG_INITIAL_REVISION;
+    }
+    portEXIT_CRITICAL(&g_config_lock);
+}
+
+bool ble_bikepower_config_revision_matches(uint32_t revision)
+{
+    portENTER_CRITICAL(&g_config_lock);
+    bool matches = g_config_snapshot_valid && g_config_revision == revision;
+    portEXIT_CRITICAL(&g_config_lock);
+    return matches;
+}
+
+void ble_bikepower_config_commit_result(uint32_t transaction_id, uint8_t result,
+                                        uint8_t restart_flags,
+                                        const config_data_t *applied_config)
+{
+    uint32_t revision;
+    portENTER_CRITICAL(&g_config_lock);
+    if (!g_config_transaction.committing
+            || g_config_transaction.transaction_id != transaction_id) {
+        portEXIT_CRITICAL(&g_config_lock);
+        ESP_LOGW(TAG, "忽略未知配置事务结果 id=%lu", (unsigned long)transaction_id);
+        return;
+    }
+    if (result == BLE_CONFIG_RESULT_SUCCESS && applied_config) {
+        g_config_snapshot = *applied_config;
+        g_config_snapshot_valid = true;
+        g_config_revision++;
+        if (g_config_revision == 0) g_config_revision = BLE_CONFIG_INITIAL_REVISION;
+    } else if (result == BLE_CONFIG_RESULT_SUCCESS) {
+        result = BLE_CONFIG_RESULT_SAVE_FAILED;
+        restart_flags = 0;
+    }
+    g_config_transaction.committing = false;
+    g_config_transaction.written_mask = 0;
+    revision = g_config_revision;
+    portEXIT_CRITICAL(&g_config_lock);
+
+    config_send_response(BLE_CONFIG_OP_COMMIT, result, restart_flags,
+                         transaction_id, revision);
+}
+
 /**
  * 设置 BLE 设备名。
  * 更新内部设备名缓冲区，供广播和 GAP 设备名设置使用。
@@ -1112,6 +1470,14 @@ esp_err_t ble_bikepower_start(void)
 {
     g_stopping = false;
     g_start_failed = false;
+    portENTER_CRITICAL(&g_config_lock);
+    g_config_transaction.active = false;
+    g_config_transaction.committing = false;
+    g_config_transaction.written_mask = 0;
+    ble_config_encode_control_response(g_config_response, sizeof(g_config_response),
+                                       BLE_CONFIG_OP_CANCEL, BLE_CONFIG_RESULT_SUCCESS,
+                                       0, 0, g_config_revision);
+    portEXIT_CRITICAL(&g_config_lock);
     if (!g_notify_lock) {
         g_notify_lock = xSemaphoreCreateMutex();
         if (!g_notify_lock) {

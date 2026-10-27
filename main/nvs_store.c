@@ -17,49 +17,6 @@ static const char *TAG = "NVS";
 static SemaphoreHandle_t s_save_mutex = NULL;
 static StaticSemaphore_t s_save_mutex_buf;
 
-/**
- * 把配置结构应用回运行时引擎。
- * 将 config_data_t 中的持久化字段逐项写回 power_engine 和 profile。
- * c：源配置结构。
- * e：目标功率引擎实例。
- * 返回值：无。
- * 特殊行为：字段写入统一走领域层 setter，保持校验和副作用一致。
- */
-static void config_to_engine(const config_data_t *c, power_engine_t *e)
-{
-    power_engine_set_power(e, c->power);
-    power_engine_set_cadence(e, c->cadence);
-    power_engine_set_power_float(e, c->power_float);
-    power_engine_set_cadence_float(e, c->cadence_float);
-    power_engine_set_hr_float(e, c->hr_float);
-    power_engine_set_power_step(e, c->power_step);
-    // 先恢复固定心率：初始化时engine默认mode为STEADY，set_heartrate可正常生效；
-    // 后续set_mode切换到ROAD/ERG不会清除has_user_hr/user_heartrate字段，切回STEADY时可自动恢复使用
-    if (c->has_user_hr) power_engine_set_heartrate(e, c->heartrate);
-    power_engine_set_mode(e, (ride_mode_t)c->mode);
-    profile_set_weight(&e->profile, c->weight);
-    profile_set_ftp(&e->profile, c->ftp);
-    profile_set_thr_hr(&e->profile, c->thr_hr);
-    profile_set_custom_wkg(&e->profile, c->custom_wkg_low, c->custom_wkg_high);
-    profile_set_custom_name(&e->profile, c->custom_pacer_name);
-    profile_set_ride_type(&e->profile, c->ride_type);
-    e->led = c->led;
-    power_engine_set_sport_profile(e, (sport_profile_t)c->sport_profile);
-    power_engine_set_broadcast_mask(e, c->broadcast_mask);
-    power_engine_set_run_speed(e, c->run_speed_x100);
-    power_engine_set_run_pace_float(e, c->run_pace_float_sec);
-    power_engine_set_run_cadence(e, c->run_cadence);
-    power_engine_set_run_cadence_float(e, c->run_cadence_float);
-    if (c->run_pacer_type == RUN_PACER_CUSTOM) {
-        power_engine_set_run_custom_pacer(e, c->run_custom_name, c->run_pace_low_sec, c->run_pace_high_sec, c->run_cadence);
-    } else {
-        power_engine_set_run_pacer(e, (run_pacer_type_t)c->run_pacer_type);
-        power_engine_set_run_pace_range(e, c->run_pace_low_sec, c->run_pace_high_sec);
-    }
-    power_engine_set_run_mode(e, (run_mode_t)c->run_mode);
-    power_engine_set_device_name(e, c->device_name);
-}
-
 // 读单个 i32，缺失时保留默认值
 /**
  * 从 NVS 读取一个 32 位整数键。
@@ -99,13 +56,13 @@ void nvs_store_load(power_engine_t *e)
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &h);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGI(TAG, "无配置，使用默认值并回写");
-        config_to_engine(&c, e);
+        config_store_apply_to_engine(&c, e);
         if (!nvs_store_save(e)) ESP_LOGW(TAG, "默认值回写 NVS 失败，下次启动将重试");
         return;
     }
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "打开 NVS 失败(%s)，使用默认值", esp_err_to_name(err));
-        config_to_engine(&c, e);
+        config_store_apply_to_engine(&c, e);
         return;
     }
 
@@ -167,7 +124,7 @@ void nvs_store_load(power_engine_t *e)
 
     bool migrated = config_store_migrate(&c);
     bool fixed = config_store_validate(&c);
-    config_to_engine(&c, e);
+    config_store_apply_to_engine(&c, e);
 
     ESP_LOGI(TAG, "配置加载完成 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d kg ftp=%dW thr=%dBPM ride=%d custom=%s pf=%d cf=%d hf=%d step=%d sport=%d bmask=%d run=%d/%d/%d/%d rmode=%d rpacer=%d rpace=%d-%d dn=%s%s%s",
              c.power, c.cadence, c.mode, c.heartrate, c.has_user_hr,

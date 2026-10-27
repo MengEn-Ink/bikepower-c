@@ -22,7 +22,7 @@
 - `board_detect.c`：启动时检测通用 ESP32-C3 / M5Stamp C3
 - `button.c`：中断驱动按钮任务，通用板 `GPIO9`，M5Stamp C3 `GPIO3`
 - `led.c`：独立灯效任务，通用板 `GPIO12` 普通 LED，M5Stamp C3 `GPIO2` SK6812 RGB
-- `ble_bikepower.c`：NimBLE 五服务、通知打包、FTMS 控制点
+- `ble_bikepower.c`：NimBLE 运动服务与配置服务、通知打包、FTMS 和配置事务控制点
 - `radio_ctrl.c`：WiFi/BLE 射频共用唯一入口
 - `wifi_portal.c`：`esp_http_server` 配网页面（SoftAP 由 `radio_ctrl.c` 启动）
 - `nvs_store.c`：NVS 与领域层配置对象桥接
@@ -208,7 +208,7 @@
 ## 第四章：BLE 服务详解
 
 BLE 实现集中在 `main/ble_bikepower.c`。
-模块可提供以下 GATT 服务（按 `broadcast_mask` 动态过滤注册，DIS 始终注册）：
+模块可提供以下 GATT 服务（运动服务按 `broadcast_mask` 动态过滤注册，DIS 和 BikePower Config Service 始终注册）：
 
 - `Cycling Power Service`，UUID `0x1818`（骑行，POWER 位）
 - `Heart Rate Service`，UUID `0x180D`（HEARTRATE 位）
@@ -216,6 +216,7 @@ BLE 实现集中在 `main/ble_bikepower.c`。
 - `Running Speed and Cadence Service`，UUID `0x1814`（跑步，POWER 或 CADENCE 位）
 - `Fitness Machine Service`，UUID `0x1826`（POWER 或 CADENCE 位）
 - `Device Information Service`，UUID `0x180A`（始终）
+- `BikePower Config Service`，UUID `7a5a0000-4c7a-4f2a-9b3e-6d1f4a8c0b21`（始终）
 
 运行时修改 `broadcast_mask` 会触发 BLE 重启以重建 GATT 表，未启用的服务从 GATT 中移除。
 
@@ -336,6 +337,34 @@ Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述�
 
 应用层注册的 `g_erg_cb` 实际是 `app_main.c` 里的 `on_erg_target()`。
 它不直接写引擎，而是投递 `APP_EVT_ERG_TARGET`，由主循环串行消费。
+
+### 4.5 BikePower Config Service
+
+配置服务用于让 GitHub Pages / 本地 Web Bluetooth 页面读取和修改全部 `config_data_t` 持久字段。它不受骑行/跑步 Profile 和 `broadcast_mask` 影响，避免用户关闭某个运动服务后失去配置入口。UUID 如下：
+
+| 特征 | UUID | 属性 | 内容 |
+|------|------|------|------|
+| Service | `7a5a0000-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Primary | BikePower 配置服务 |
+| Meta | `7a5a0001-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read | 协议版本、schema、分组掩码、能力、revision、最大组长度 |
+| Core | `7a5a0002-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 功率、踏频、模式、心率、浮动、步进、Profile、广播掩码 |
+| Profile | `7a5a0003-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 体重、FTP、阈值心率、骑行配速档和自定义名称 |
+| Running | `7a5a0004-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 跑步速度、浮动、步频、模式、配速范围和自定义名称 |
+| LED | `7a5a0005-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 静默开关及五个场景的模式和颜色 |
+| Identity | `7a5a0006-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | BLE 设备名 |
+| Control | `7a5a0007-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write/Indicate | BEGIN、COMMIT、CANCEL 与最终结果 |
+
+协议版本当前为 `1`，所有多字节整数显式使用小端编码，不把 C struct 直接放上线传输。配置按五组拆分，最长 Running 组为 45 字节，适配当前 NimBLE MTU 64。字符串不携带结尾 `\0`，而是使用单字节 UTF-8 长度前缀；设备名最多 23 字节，自定义骑行/跑步名称最多 31 字节。
+
+保存流程如下：
+
+1. 页面读取 Meta 与五组配置，记录当前 revision。
+2. 页面向 Control 写 `BEGIN(protocol, transaction_id, revision)`；设备拒绝旧 revision、零事务号或并发事务。
+3. 页面写入五组完整配置；每组先解码到事务 staging，不改正式引擎，也不写 NVS。
+4. 页面写 `COMMIT(transaction_id, required_mask)`；缺组、事务号不一致或 revision 变化都会失败。
+5. NimBLE host 回调只把 staging 复制到应用 mailbox。主循环先再次确认 base revision 未变化，再做 schema/范围校验，在临时引擎上应用并调用 `nvs_store_save()`。
+6. 只有 NVS commit 成功后才替换 `s_engine`、更新配置快照和 revision，并通过 Control indication 返回成功；失败保留旧引擎和旧 revision。
+
+客户端可在 COMMIT 前发送 CANCEL。客户端断连时活动但尚未提交的事务自动取消。若 Profile 或广播掩码变化，成功响应带 `BLE_CONFIG_RESTART_GATT`，主循环等待客户端断开后重启 BLE 并重建服务表；仅设备名变化带 `BLE_CONFIG_RESTART_NAME`，当前连接保持在线并刷新 GAP 名称。
 
 ## 第五章：状态机
 
@@ -851,14 +880,15 @@ namespace 固定为：
 
 ### 9.4 配置 JSON 序列化
 
-领域层提供 `config_store_serialize()` 和 `config_store_deserialize()`，用于配置导出/导入、备份/恢复和 host 单测。序列化输出包含 schema、功率、踏频、模式、心率、体重、FTP、阈值心率、骑行类型和设备名；设备名按 JSON 规则转义双引号、反斜杠和控制字符。反序列化要求 JSON 至少包含 `schema_ver`，缺失字段先保留默认值，最后复用 `config_store_validate()` 做范围夹紧。
+领域层提供 `config_store_serialize()` 和 `config_store_deserialize()`，用于配置导出/导入、备份/恢复和 host 单测。序列化覆盖 `config_data_t` 的全部持久字段，包括基础功率/踏频/心率、个人参数、骑行与跑步模式、广播掩码、LED 场景和设备名；字符串按 JSON 规则转义双引号、反斜杠和控制字符。反序列化要求 JSON 至少包含 `schema_ver`，缺失字段先保留默认值，最后复用 `config_store_validate()` 做范围夹紧。
 
 ### 9.5 脏标记落盘策略
 
-落盘触发来源有两类：
+落盘触发来源有三类：
 
 1. 主循环每 10 秒心跳时，若 `power_engine_is_dirty()` 为真，则自动保存
 2. WiFi 配网页面点击保存后，`h_config()` 直接 `nvs_store_save()`
+3. BLE 配置事务 COMMIT 后，主循环在临时引擎上校验并立即保存；只有 NVS commit 成功才替换正式引擎并向客户端返回成功
 
 成功保存后会调用：
 
@@ -1080,6 +1110,8 @@ python3 tests/test_ble_running_harness.py
 python3 tests/test_device_profile_harness.py
 python3 tests/check_wifi_done_contract.py
 ```
+
+领域层 host 单测同时覆盖 BLE 配置五组全字段往返、小端字节序、协议版本/截断负载拒绝、解码失败不污染、控制点响应，以及完整配置应用和 ERG 会话保持。网页侧 `tests/check_ble_monitor.py` 还会检查配置服务 UUID、读取/保存事务、错误摘要、NVS 成功反馈和 GATT 重建提示，并对内联 JavaScript 执行 `node --check`。
 
 ### 12.3 BLE 真机自测
 

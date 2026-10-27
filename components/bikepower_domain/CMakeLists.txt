@@ -12,5 +12,6 @@ idf_component_register(
          "led_pattern.c"
          "button_debounce.c"
          "ble_payload_codec.c"
+         "ble_config_codec.c"
     INCLUDE_DIRS "include"
 )

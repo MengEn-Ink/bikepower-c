@@ -1,6 +1,7 @@
 /**
  * BLE 蓝牙功率计模块（NimBLE）
- * 五服务：Cycling Power + Heart Rate + CSC + FTMS + Device Information
+ * 标准运动服务：Cycling Power + Heart Rate + CSC/RSC + FTMS + Device Information
+ * 自定义配置服务：BikePower Config Service（全量持久配置读写）
  */
 #pragma once
 
@@ -9,6 +10,7 @@
 #include "esp_err.h"
 #include "domain_config.h"
 #include "running_engine.h"
+#include "config_store.h"
 
 /**
  * ERG 目标功率回调类型。
@@ -36,6 +38,14 @@ typedef enum {
 } ble_run_control_type_t;
 
 typedef bool (*ble_run_control_cb_t)(ble_run_control_type_t type, int value);
+
+/**
+ * BLE 配置事务提交回调。
+ * 运行在 NimBLE host 任务上下文，只允许把完整配置复制到应用层 mailbox，禁止写 NVS。
+ */
+typedef bool (*ble_config_commit_cb_t)(const config_data_t *config,
+                                       uint32_t transaction_id,
+                                       uint32_t base_revision);
 
 /**
  * 启动 BLE 蓝牙功率计服务。
@@ -126,6 +136,21 @@ void ble_bikepower_set_erg_callback(ble_erg_cb_t cb);
 void ble_bikepower_set_erg_clear_callback(ble_erg_clear_cb_t cb);
 
 void ble_bikepower_set_run_control_callback(ble_run_control_cb_t cb);
+void ble_bikepower_set_config_commit_callback(ble_config_commit_cb_t cb);
+
+/** 从运行时引擎刷新配置服务只读快照；字段实际变化时 revision 自动递增。 */
+void ble_bikepower_set_config_snapshot(const power_engine_t *engine);
+
+/** 检查配置事务基准 revision 是否仍与当前快照一致。 */
+bool ble_bikepower_config_revision_matches(uint32_t revision);
+
+/**
+ * 由应用主循环返回事务最终结果。
+ * result 使用 BLE_CONFIG_RESULT_*；成功时 applied_config 必须为已落盘配置。
+ */
+void ble_bikepower_config_commit_result(uint32_t transaction_id, uint8_t result,
+                                        uint8_t restart_flags,
+                                        const config_data_t *applied_config);
 
 /**
  * 设置 BLE 广播设备名。

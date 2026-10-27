@@ -16,7 +16,8 @@ DOMAIN_SRCS := $(DOMAIN)/profile.c \
         $(DOMAIN)/led_pattern.c \
         $(DOMAIN)/button_debounce.c
 CODEC_SRC := $(DOMAIN)/ble_payload_codec.c
-TEST_SRCS := test_domain.c $(DOMAIN_SRCS) $(CODEC_SRC)
+CONFIG_CODEC_SRC := $(DOMAIN)/ble_config_codec.c
+TEST_SRCS := test_domain.c $(DOMAIN_SRCS) $(CODEC_SRC) $(CONFIG_CODEC_SRC)
 
 .PHONY: all run clean
 all: test_domain ble_codec_cli

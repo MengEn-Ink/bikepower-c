@@ -17,6 +17,7 @@
 #include "nvs_flash.h"
 #include "bikepower_config.h"
 #include "ble_bikepower.h"
+#include "ble_config_codec.h"
 #include "domain_rng.h"
 #include "power_engine.h"
 #include "nvs_store.h"
@@ -39,6 +40,11 @@ static volatile int s_pending_erg_clear_reason = 0;
 static volatile bool s_has_pending_erg_clear = false;
 // WiFi 完成事件队列满时的单比特保底；事件幂等，无需计数。
 static volatile bool s_pending_wifi_done = false;
+static config_data_t s_pending_ble_config;
+static volatile bool s_has_pending_ble_config = false;
+static volatile uint32_t s_pending_ble_config_transaction = 0;
+static volatile uint32_t s_pending_ble_config_revision = 0;
+static bool s_ble_config_restart_pending = false;
 
 /**
  * 处理 FTMS 控制点下发的 ERG 目标功率。
@@ -104,6 +110,104 @@ static bool on_run_control(ble_run_control_type_t type, int value)
         return false;
     }
     return s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE;
+}
+
+static bool on_ble_config_commit(const config_data_t *config,
+                                 uint32_t transaction_id,
+                                 uint32_t base_revision)
+{
+    if (!config || transaction_id == 0) return false;
+    bool accepted = false;
+    portDISABLE_INTERRUPTS();
+    if (!s_has_pending_ble_config) {
+        s_pending_ble_config = *config;
+        s_pending_ble_config_transaction = transaction_id;
+        s_pending_ble_config_revision = base_revision;
+        s_has_pending_ble_config = true;
+        accepted = true;
+    }
+    portENABLE_INTERRUPTS();
+    return accepted;
+}
+
+static void process_pending_ble_config(void)
+{
+    config_data_t requested;
+    uint32_t transaction_id = 0;
+    uint32_t base_revision = 0;
+    bool pending = false;
+
+    portDISABLE_INTERRUPTS();
+    if (s_has_pending_ble_config) {
+        requested = s_pending_ble_config;
+        transaction_id = s_pending_ble_config_transaction;
+        base_revision = s_pending_ble_config_revision;
+        s_has_pending_ble_config = false;
+        pending = true;
+    }
+    portENABLE_INTERRUPTS();
+    if (!pending) return;
+
+    if (!ble_bikepower_config_revision_matches(base_revision)) {
+        ESP_LOGW(TAG, "拒绝 BLE 配置事务 id=%lu rev=%lu：提交前配置已变化",
+                 (unsigned long)transaction_id, (unsigned long)base_revision);
+        ble_bikepower_config_commit_result(transaction_id, BLE_CONFIG_RESULT_STALE_REVISION,
+                                           0, NULL);
+        return;
+    }
+
+    config_data_t checked = requested;
+    if (checked.schema_ver != CONFIG_VERSION || config_store_validate(&checked)) {
+        ESP_LOGW(TAG, "拒绝 BLE 配置事务 id=%lu rev=%lu：字段越界或 schema 不匹配",
+                 (unsigned long)transaction_id, (unsigned long)base_revision);
+        ble_bikepower_config_commit_result(transaction_id, BLE_CONFIG_RESULT_INVALID_VALUE,
+                                           0, NULL);
+        return;
+    }
+
+    config_data_t previous;
+    config_store_from_engine(&s_engine, &previous);
+    power_engine_t next = s_engine;
+    if (!config_store_apply_to_engine(&checked, &next)) {
+        ble_bikepower_config_commit_result(transaction_id, BLE_CONFIG_RESULT_INVALID_VALUE,
+                                           0, NULL);
+        return;
+    }
+    if (!nvs_store_save(&next)) {
+        ESP_LOGW(TAG, "BLE 配置事务 id=%lu 写入 NVS 失败", (unsigned long)transaction_id);
+        ble_bikepower_config_commit_result(transaction_id, BLE_CONFIG_RESULT_SAVE_FAILED,
+                                           0, NULL);
+        return;
+    }
+
+    config_data_t applied;
+    config_store_from_engine(&next, &applied);
+    uint8_t restart_flags = 0;
+    if (previous.sport_profile != applied.sport_profile
+            || previous.broadcast_mask != applied.broadcast_mask) {
+        restart_flags |= BLE_CONFIG_RESTART_GATT;
+    }
+    if (strncmp(previous.device_name, applied.device_name, DEVICE_NAME_MAX) != 0) {
+        restart_flags |= BLE_CONFIG_RESTART_NAME;
+    }
+
+    s_engine = next;
+    power_engine_clear_dirty(&s_engine);
+    app_state_refresh_led();
+    if (restart_flags & BLE_CONFIG_RESTART_NAME) {
+        ble_bikepower_set_device_name(s_engine.device_name);
+        if ((restart_flags & BLE_CONFIG_RESTART_GATT) == 0) {
+            ble_bikepower_refresh_device_name();
+        }
+    }
+    ble_bikepower_config_commit_result(transaction_id, BLE_CONFIG_RESULT_SUCCESS,
+                                       restart_flags, &applied);
+    if (restart_flags & BLE_CONFIG_RESTART_GATT) {
+        s_ble_config_restart_pending = true;
+    }
+    ESP_LOGI(TAG, "BLE 配置事务已保存 id=%lu rev=%lu restart=0x%02x",
+             (unsigned long)transaction_id, (unsigned long)base_revision,
+             restart_flags);
 }
 
 /**
@@ -205,9 +309,11 @@ void app_main(void)
     ble_bikepower_set_erg_callback(on_erg_target);
     ble_bikepower_set_erg_clear_callback(on_erg_clear);
     ble_bikepower_set_run_control_callback(on_run_control);
+    ble_bikepower_set_config_commit_callback(on_ble_config_commit);
     ble_bikepower_set_profile(s_engine.sport_profile);
     ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
     ble_bikepower_set_device_name(s_engine.device_name);
+    ble_bikepower_set_config_snapshot(&s_engine);
     esp_err_t ble_ret = ble_bikepower_start();
     if (ble_ret != ESP_OK) {
         ESP_LOGE(TAG, "BLE 启动失败 ret=%d，进入错误恢复态", ble_ret);
@@ -272,6 +378,9 @@ void app_main(void)
             app_evt_t e = { .type = APP_EVT_ERG_CLEAR, .data = erg_clear_reason };
             app_state_handle_event(&e);
         }
+        ble_bikepower_set_config_snapshot(&s_engine);
+        process_pending_ble_config();
+        ble_bikepower_set_config_snapshot(&s_engine);
 
         // WiFi 配网模式（共存）：BLE 保持在线继续通知，主循环继续生成快照推 BLE；
         // APP_EVT_WIFI_DONE 已在上方队列或 pending latch 消费中处理。
@@ -325,7 +434,8 @@ void app_main(void)
             app_state_handle_event(&ce);
         }
 
-        if (wifi_portal_ble_restart_requested()) {
+        bool wifi_restart_requested = wifi_portal_ble_restart_requested();
+        if (wifi_restart_requested || s_ble_config_restart_pending) {
             if (conn == 0) {
                 ESP_LOGI(TAG, "运动 profile 或服务开关已变化，重启 BLE 以重建 GATT 服务表");
                 if (ble_bikepower_stop()) {
@@ -335,7 +445,8 @@ void app_main(void)
                     ble_bikepower_set_device_name(s_engine.device_name);
                     esp_err_t r = ble_bikepower_start();
                     if (r == ESP_OK) {
-                        wifi_portal_consume_ble_restart_requested();
+                        if (wifi_restart_requested) wifi_portal_consume_ble_restart_requested();
+                        s_ble_config_restart_pending = false;
                         last_conn = 0;
                         app_state_clear_error();
                     } else {

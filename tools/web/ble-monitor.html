@@ -37,7 +37,7 @@ body{
   min-height:100vh;-webkit-font-smoothing:antialiased;
 }
 button,a,select,summary{font:inherit}
-button:focus-visible,a:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .wrap{min-height:100vh}
 .hidden{display:none!important}
 
@@ -166,13 +166,29 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
 .hero-copy strong{display:block;color:var(--strong);font-size:18px;line-height:1.35}
 .hero-copy p{margin:8px 0 0;color:var(--muted);font-size:14px;line-height:1.65}
 .trace-panel{margin-top:20px;border:1px solid var(--line);background:var(--panel)}
-.trace-head{min-height:52px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
-.legend{display:flex;align-items:center;gap:18px;flex-wrap:wrap;color:var(--ink);font:12px/1 var(--mono)}
-.legend span{display:inline-flex;align-items:center;gap:8px}.legend i{width:20px;height:2px;display:inline-block}
-.trace-window{position:relative;height:260px;overflow:hidden;background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);background-size:100% 25%,12.5% 100%}
-.trace-window svg{display:block;width:100%;height:100%;overflow:visible}
+.trace-head{min-height:58px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.legend{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--ink);font:12px/1 var(--mono)}
+.legend-btn,.trace-range-btn,.trace-tool-btn{min-height:44px;border:1px solid transparent;background:transparent;color:var(--ink);padding:7px 9px;cursor:pointer;font:700 12px/1 var(--mono);white-space:nowrap}
+.legend-btn{display:inline-flex;align-items:center;gap:8px}.legend-btn i{width:20px;height:3px;display:inline-block}.legend-btn[aria-pressed="false"]{color:var(--faint);text-decoration:line-through}.legend-btn[aria-pressed="false"] i{opacity:.3}
+.trace-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+.trace-ranges{display:flex;border:1px solid var(--line)}
+.trace-range-btn{min-width:54px;border-right:1px solid var(--line);color:var(--muted)}.trace-range-btn:last-child{border-right:0}.trace-range-btn.active{background:var(--ink);color:var(--bg)}
+.trace-tool-btn{border-color:var(--line);color:var(--muted)}.trace-tool-btn:hover,.legend-btn:hover,.trace-range-btn:hover{color:var(--strong);background:var(--panel-2)}.trace-tool-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.trace-meta{min-height:39px;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line-soft);color:var(--muted);font:12px/1.4 var(--mono)}
+.trace-meta strong{color:var(--accent);font-weight:800}.trace-meta span:last-child{text-align:right}
+.trace-window{position:relative;height:300px;overflow:hidden;touch-action:none;background-image:linear-gradient(var(--line-soft) 1px,transparent 1px);background-size:100% 25%}
+.trace-window:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.trace-window svg{display:block;width:100%;height:100%;overflow:hidden}
 .trace-window path{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
-.trace-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font:12px/1.5 var(--mono);text-align:center;padding:18px}
+.trace-axis line{stroke:var(--line-soft);stroke-width:1;vector-effect:non-scaling-stroke}.trace-axis text{fill:var(--faint);font:11px var(--mono)}
+.trace-crosshair{stroke:var(--strong);stroke-width:1;stroke-dasharray:4 4;vector-effect:non-scaling-stroke;opacity:.8}
+.trace-marker{stroke:var(--panel);stroke-width:2;vector-effect:non-scaling-stroke}
+.trace-tooltip{position:absolute;z-index:3;top:12px;width:214px;padding:10px 12px;border:1px solid var(--line);background:rgba(10,8,7,.94);box-shadow:0 10px 30px rgba(0,0,0,.35);pointer-events:none;font:12px/1.55 var(--mono)}
+.trace-tooltip strong{display:block;margin-bottom:5px;color:var(--strong);font-weight:800}.trace-tooltip-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.trace-tooltip-row span:first-child{color:var(--muted)}.trace-tooltip-row b{color:var(--strong)}
+.trace-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font:12px/1.5 var(--mono);text-align:center;padding:18px;pointer-events:none}
+.trace-stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line)}
+.trace-stat{min-width:0;padding:11px 14px;border-right:1px solid var(--line-soft)}.trace-stat:last-child{border-right:0}.trace-stat span{display:block;color:var(--muted);font:11px/1.4 var(--mono)}.trace-stat b{display:block;margin-top:3px;color:var(--strong);font:700 14px/1.4 var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.trace-stat em{color:var(--accent);font-size:11px;font-style:normal}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .signal-foot{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line)}
 .mini-metric{min-width:0;padding:15px;border-right:1px solid var(--line)}
 .mini-metric:last-child{border-right:0}
@@ -202,6 +218,30 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
 .dc-name{font-weight:900;font-size:16px;color:var(--strong)}
 .dc-meta{font:12px/1.5 var(--mono);color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
 .dc-body{display:grid;gap:0}.dc-foot{margin-top:12px}
+
+/* ===== NVS 配置读取与事务保存 ===== */
+.config-panel{grid-column:1/-1;border:1px solid var(--line);background:var(--panel-2);padding:20px}
+.config-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:15px;border-bottom:1px solid var(--line)}
+.config-head h3{margin:0!important}.config-head p{margin:5px 0 0;color:var(--muted);font-size:13px;line-height:1.6}
+.config-meta{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.config-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:15px 0;flex-wrap:wrap}
+.config-toolbar .actions{justify-content:flex-end}.config-status{min-height:42px;display:flex;align-items:center;flex:1;padding:9px 12px;border:1px solid var(--line);color:var(--muted);font-size:13px;line-height:1.5}
+.config-status.ok{border-color:var(--green);color:var(--green);background:var(--green-soft)}.config-status.warn{border-color:var(--amber);color:var(--amber);background:var(--amber-soft)}.config-status.err{border-color:var(--red);color:var(--red);background:var(--red-soft)}
+.config-error-summary{margin:12px 0;padding:13px 15px;border:1px solid var(--red);background:var(--red-soft);color:var(--red)}
+.config-error-summary strong{display:block;color:var(--strong)}.config-error-summary ul{margin:7px 0 0;padding-left:19px}.config-error-summary a{color:var(--red)}
+.config-groups{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.config-group{border:1px solid var(--line);background:var(--panel)}.config-group[open]{grid-column:1/-1}
+.config-group summary{min-height:48px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;color:var(--strong);font-weight:900}
+.config-group summary::after{content:"展开";color:var(--faint);font:11px/1 var(--mono)}.config-group[open] summary::after{content:"收起";color:var(--accent)}
+.config-fields{padding:15px;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px 14px}
+.form-field{min-width:0}.form-field.span-2{grid-column:span 2}.form-field.span-all{grid-column:1/-1}
+.form-field label,.field-label{display:block;margin-bottom:6px;color:var(--strong);font-size:13px;font-weight:800}
+.form-field input[type="number"],.form-field input[type="text"],.form-field select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:0;background:var(--bg);color:var(--ink);padding:9px 10px;font:14px/1.4 var(--mono)}
+.form-field input[aria-invalid="true"],.form-field select[aria-invalid="true"]{border-color:var(--red);background:var(--red-soft)}
+.field-hint{display:block;margin-top:5px;color:var(--faint);font-size:12px;line-height:1.45}.field-error{display:block;min-height:17px;margin-top:4px;color:var(--red);font-size:12px;line-height:1.4}
+.check-line{min-height:44px;display:flex;align-items:center;gap:9px;border:1px solid var(--line);padding:9px 11px;background:var(--bg);color:var(--ink);cursor:pointer}.check-line input{width:18px;height:18px;accent-color:var(--accent)}
+.check-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.config-save-note{margin-top:13px;padding:11px 13px;border-left:3px solid var(--accent);background:var(--accent-soft);color:var(--muted);font-size:13px;line-height:1.6}
+.config-unavailable{grid-column:1/-1;padding:18px;border:1px solid var(--line);background:var(--panel)}
 
 /* ===== GATT、模板、比对、日志 ===== */
 .svc-list{display:flex;flex-direction:column;gap:7px;margin-top:4px}
@@ -235,6 +275,7 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
   .evidence{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
   .evidence>.eyebrow,.evidence>h2{grid-column:1/-1}.evidence-list{margin-top:18px}.evidence>.actions,.protocol{align-self:start}
   .signal-foot{grid-template-columns:repeat(2,1fr)}.mini-metric:nth-child(2){border-right:0}.mini-metric:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .trace-stats{grid-template-columns:repeat(2,1fr)}.trace-stat:nth-child(2){border-right:0}.trace-stat:nth-child(-n+2){border-bottom:1px solid var(--line-soft)}
 }
 @media(max-width:760px){
   .masthead{grid-template-columns:1fr auto;min-height:58px;padding:0 14px}.masthead-right{display:none}
@@ -242,18 +283,20 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
   #mode-connect{min-height:calc(100vh - 58px)}.monitor-grid{grid-template-columns:1fr;min-height:auto}
   .monitor-rail{border-right:0;border-bottom:1px solid var(--line);padding:20px 16px}.monitor-rail h2{font-size:28px}.monitor-rail .actions{grid-template-columns:1fr 1fr}.monitor-note{display:none}
   .signal-stage{padding:18px 14px 24px}.hero-readout{grid-template-columns:1fr;padding-top:7px}.hero-value{font-size:clamp(96px,31vw,140px)}.hero-copy{padding-bottom:2px}
-  .trace-window{height:230px}.evidence{grid-column:auto;grid-template-columns:1fr;padding:22px 16px}.evidence>.eyebrow,.evidence>h2{grid-column:auto}.health-score{margin-top:16px}
+  .trace-head{align-items:flex-start}.trace-actions{width:100%;justify-content:flex-start}.trace-ranges{max-width:100%;overflow-x:auto}.trace-window{height:260px}.trace-meta{align-items:flex-start;flex-direction:column;gap:2px}.trace-meta span:last-child{text-align:left}.evidence{grid-column:auto;grid-template-columns:1fr;padding:22px 16px}.evidence>.eyebrow,.evidence>h2{grid-column:auto}.health-score{margin-top:16px}
   .device-lower{grid-template-columns:1fr;padding:18px 14px}.two-col{grid-template-columns:1fr}
+  .config-groups{grid-template-columns:1fr}.config-group[open]{grid-column:auto}.config-fields{grid-template-columns:1fr 1fr}.config-toolbar{align-items:stretch}.config-toolbar .actions{width:100%;justify-content:flex-start}
   #mode-flash,#mode-compare{margin-top:18px;padding:0 14px 28px}.card{padding:16px}.card-head{align-items:flex-start;flex-direction:column}.card-head .actions{justify-content:flex-start}
   .flash-lead{grid-template-columns:1fr}.flash-time{border-left:0;border-top:1px solid var(--line);padding:12px 0 0}.flash-guide{grid-template-columns:1fr}.flash-step.guide-step{min-height:0}.step-number{margin-bottom:12px}.flash-step.guide-step p{margin-top:7px;padding-top:0}.flash-expect{grid-template-columns:1fr}.flash-terms{grid-template-columns:1fr}.flash-step p,.flash-lead p,.flash-warning{font-size:16px}
   #templates-card,#log-panel{margin-left:14px;margin-right:14px}.svc-head,.char{flex-direction:column}.svc-uuid{text-align:left}.props{white-space:normal}
 }
 @media(max-width:480px){
   .brand-mark{display:none}.brand h1{font-size:14px}.mode-select{max-width:228px}.mode-btn{min-width:74px}
-  .monitor-rail .actions{grid-template-columns:1fr}.signal-head{font-size:12px}.hero-copy strong{font-size:17px}.trace-window{height:205px}
+  .monitor-rail .actions{grid-template-columns:1fr}.signal-head{font-size:12px}.hero-copy strong{font-size:17px}.trace-window{height:238px}.trace-range-btn{min-width:50px;padding-left:7px;padding-right:7px}.trace-tooltip{width:190px}
   .signal-foot{grid-template-columns:1fr 1fr}.mini-metric b{font-size:24px}.evidence>.actions{grid-template-columns:1fr}
   .row{flex-direction:column;gap:3px}.row span:first-child{min-width:0}.row span:last-child{text-align:left}
   .tpl-item{align-items:flex-start;flex-direction:column}.tpl-ops{width:100%}.tpl-ops .btn{flex:1}
+  .config-panel{padding:15px}.config-head{flex-direction:column}.config-meta{justify-content:flex-start}.config-fields{grid-template-columns:1fr}.form-field.span-2{grid-column:auto}.check-grid{grid-template-columns:1fr}.config-toolbar .actions{display:grid;grid-template-columns:1fr 1fr}.config-toolbar .actions .btn{width:100%}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 </style>
@@ -382,16 +425,51 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
         </div>
         <section class="trace-panel" aria-label="实时信号轨迹">
           <header class="trace-head">
-            <div class="legend"><span><i style="background:var(--accent)"></i>功率</span><span><i style="background:var(--ink)"></i>踏频</span><span><i style="background:var(--violet)"></i>心率</span></div>
-            <span class="eyebrow">LATEST 30 SEC</span>
+            <div class="legend" role="group" aria-label="显示的数据系列">
+              <button class="legend-btn" data-series="power" aria-pressed="true" onclick="toggleTraceSeries('power')"><i style="background:var(--accent)"></i>功率</button>
+              <button class="legend-btn" data-series="cadence" aria-pressed="true" onclick="toggleTraceSeries('cadence')"><i style="background:repeating-linear-gradient(90deg,var(--ink) 0 8px,transparent 8px 12px)"></i>踏频</button>
+              <button class="legend-btn" data-series="hr" aria-pressed="true" onclick="toggleTraceSeries('hr')"><i style="background:repeating-linear-gradient(90deg,var(--violet) 0 3px,transparent 3px 7px)"></i>心率</button>
+            </div>
+            <div class="trace-actions">
+              <div class="trace-ranges" role="group" aria-label="图表时间范围">
+                <button class="trace-range-btn" data-range="30000" onclick="setTraceRange(30000)">30 秒</button>
+                <button class="trace-range-btn" data-range="120000" onclick="setTraceRange(120000)">2 分</button>
+                <button class="trace-range-btn" data-range="600000" onclick="setTraceRange(600000)">10 分</button>
+                <button class="trace-range-btn active" data-range="0" onclick="setTraceRange(0)">全程</button>
+              </div>
+              <button class="trace-tool-btn" id="trace-pause" aria-pressed="false" onclick="toggleTracePause()">暂停跟随</button>
+              <button class="trace-tool-btn" onclick="downloadSignalCsv()">导出 CSV</button>
+              <button class="trace-tool-btn" onclick="clearSignalHistory()">清空</button>
+            </div>
           </header>
-          <div class="trace-window">
+          <div class="trace-meta"><strong id="trace-range-label">SESSION / 等待数据</strong><span id="trace-session-meta">本地会话最多保留 12 小时 · 0 个样本</span></div>
+          <div class="trace-window" id="trace-window" tabindex="0" aria-label="真实 BLE 通知信号曲线。移动指针或使用左右方向键查看具体数值。" aria-describedby="trace-keyboard-help" onpointermove="inspectTraceAtPointer(event)" onpointerdown="inspectTraceAtPointer(event)" onpointerleave="hideTraceInspector(event)" onkeydown="handleTraceKey(event)" onblur="hideTraceInspector()">
             <svg viewBox="0 0 900 260" preserveAspectRatio="none" aria-label="真实 BLE 通知信号曲线">
+              <g id="trace-x-axis" class="trace-axis"></g>
               <path id="trace-power" stroke="var(--accent)" stroke-width="3"></path>
-              <path id="trace-cadence" stroke="var(--ink)" stroke-width="2"></path>
-              <path id="trace-hr" stroke="var(--violet)" stroke-width="2"></path>
+              <path id="trace-cadence" stroke="var(--ink)" stroke-width="2" stroke-dasharray="8 4"></path>
+              <path id="trace-hr" stroke="var(--violet)" stroke-width="2" stroke-dasharray="2 4"></path>
+              <line id="trace-crosshair" class="trace-crosshair hidden" x1="0" x2="0" y1="14" y2="224"></line>
+              <circle id="trace-marker-power" class="trace-marker hidden" r="5" fill="var(--accent)"></circle>
+              <circle id="trace-marker-cadence" class="trace-marker hidden" r="5" fill="var(--ink)"></circle>
+              <circle id="trace-marker-hr" class="trace-marker hidden" r="5" fill="var(--violet)"></circle>
             </svg>
+            <div class="trace-tooltip hidden" id="trace-tooltip" role="tooltip">
+              <strong id="trace-tooltip-time">--</strong>
+              <div class="trace-tooltip-row"><span>功率</span><b id="trace-tooltip-power">--</b></div>
+              <div class="trace-tooltip-row"><span>踏频</span><b id="trace-tooltip-cadence">--</b></div>
+              <div class="trace-tooltip-row"><span>心率</span><b id="trace-tooltip-hr">--</b></div>
+              <div class="trace-tooltip-row"><span>速度</span><b id="trace-tooltip-speed">--</b></div>
+            </div>
             <div class="trace-empty" id="trace-empty">NO DEVICE TRACE<br>等待真实 BLE 通知</div>
+            <span class="sr-only" id="trace-keyboard-help">图表获得焦点后，使用左右方向键逐点查看；Home 和 End 跳到区间首尾；Escape 关闭读数。</span>
+            <span class="sr-only" id="trace-inspector-status" aria-live="polite"></span>
+          </div>
+          <div class="trace-stats" aria-label="当前可见区间统计">
+            <div class="trace-stat"><span>POWER / MIN · AVG · MAX</span><b id="trace-stat-power">--</b><em> W</em></div>
+            <div class="trace-stat"><span>CADENCE / MIN · AVG · MAX</span><b id="trace-stat-cadence">--</b><em> rpm</em></div>
+            <div class="trace-stat"><span>HEART RATE / MIN · AVG · MAX</span><b id="trace-stat-hr">--</b><em> bpm</em></div>
+            <div class="trace-stat"><span>VISIBLE RANGE / SAMPLES</span><b id="trace-stat-session">--</b><em> local</em></div>
           </div>
           <footer class="signal-foot">
             <div class="mini-metric"><span>CADENCE / CSC</span><b><span id="m-cadence">--</span> <em>rpm</em></b></div>
@@ -517,6 +595,24 @@ const UUIDS = {
   hardware:"00002a27-0000-1000-8000-00805f9b34fb",
   firmware:"00002a26-0000-1000-8000-00805f9b34fb",
   software:"00002a28-0000-1000-8000-00805f9b34fb",
+  configService:"7a5a0000-4c7a-4f2a-9b3e-6d1f4a8c0b21",
+  configMeta:"7a5a0001-4c7a-4f2a-9b3e-6d1f4a8c0b21",
+  configCore:"7a5a0002-4c7a-4f2a-9b3e-6d1f4a8c0b21",
+  configProfile:"7a5a0003-4c7a-4f2a-9b3e-6d1f4a8c0b21",
+  configRunning:"7a5a0004-4c7a-4f2a-9b3e-6d1f4a8c0b21",
+  configLed:"7a5a0005-4c7a-4f2a-9b3e-6d1f4a8c0b21",
+  configIdentity:"7a5a0006-4c7a-4f2a-9b3e-6d1f4a8c0b21",
+  configControl:"7a5a0007-4c7a-4f2a-9b3e-6d1f4a8c0b21",
+};
+const CUSTOM_UUID_NAMES = {
+  [UUIDS.configService]:"BikePower Config Service",
+  [UUIDS.configMeta]:"Config Meta",
+  [UUIDS.configCore]:"Core Config",
+  [UUIDS.configProfile]:"Cycling Profile Config",
+  [UUIDS.configRunning]:"Running Config",
+  [UUIDS.configLed]:"LED Config",
+  [UUIDS.configIdentity]:"Device Identity Config",
+  [UUIDS.configControl]:"Config Transaction Control",
 };
 const CYCLING_SERVICE_UUIDS = [
   UUIDS.cpsService, UUIDS.hrService, UUIDS.cscService, UUIDS.ftmsService,
@@ -525,7 +621,7 @@ const CYCLING_SERVICE_FILTERS = CYCLING_SERVICE_UUIDS.map(uuid=>({services:[uuid
 const CYCLING_SERVICE_SET = new Set(CYCLING_SERVICE_UUIDS);
 const ALL_OPTIONAL_SERVICES = [
   UUIDS.cpsService, UUIDS.hrService, UUIDS.cscService, UUIDS.rscService,
-  UUIDS.ftmsService, UUIDS.disService, UUIDS.basService,
+  UUIDS.ftmsService, UUIDS.disService, UUIDS.basService, UUIDS.configService,
   "00001819-0000-1000-8000-00805f9b34fb",
   "00001810-0000-1000-8000-00805f9b34fb",
   "0000181c-0000-1000-8000-00805f9b34fb",
@@ -542,6 +638,33 @@ const DIS_CHARS = [
 const FIRMWARE_INDEX_URL = "./firmware/latest.json";
 const ANOMALY_LIMITS = {
   staleMs: 3500, powerMax: 1500, hrMin: 30, hrMax: 240, cadenceMax: 260, speedMaxKmh: 35,
+};
+const HISTORY_RETENTION_MS = 12*60*60*1000;
+const HISTORY_MAX_SAMPLES = 50000;
+const TRACE_RANGE_OPTIONS = [30000,120000,600000,0];
+const TRACE_RENDER_POINTS = 1600;
+const TRACE_PLOT = {left:48,right:884,top:16,bottom:218,axisY:238};
+const TRACE_SERIES = {
+  power:{min:0,max:600,unit:"W"},
+  cadence:{min:0,max:160,unit:"rpm"},
+  hr:{min:40,max:220,unit:"bpm"},
+};
+const CONFIG_PROTOCOL_VERSION = 1;
+const CONFIG_GROUP_MASK_ALL = 0x1f;
+const CONFIG_GROUPS = [
+  {key:"core",uuid:UUIDS.configCore,bit:1},
+  {key:"profile",uuid:UUIDS.configProfile,bit:2},
+  {key:"running",uuid:UUIDS.configRunning,bit:4},
+  {key:"led",uuid:UUIDS.configLed,bit:8},
+  {key:"identity",uuid:UUIDS.configIdentity,bit:16},
+];
+const CONFIG_RESULTS = {
+  0:"成功",1:"数据长度不正确",2:"协议版本不匹配",3:"设备正忙",4:"配置已被其他操作更新",
+  5:"没有活动事务",6:"事务编号不匹配",7:"配置值不合法",8:"配置组写入不完整",9:"NVS 保存失败",
+};
+const CONFIG_LIMITS = {
+  power:[0,2000],cadence:[20,120],heartrate:[60,200],power_float:[0,100],cadence_float:[0,20],hr_float:[0,20],power_step:[5,50],
+  weight:[40,150],ftp:[50,500],thr_hr:[100,220],custom_wkg:[1,7],run_speed:[3,25],run_pace_float:[0,60],run_cadence:[120,220],run_cadence_float:[0,20],run_pace:[144,1200],
 };
 const ANOMALY_LABELS = {
   disconnect:"BLE 断连", stale:"通知停更", power:"功率异常", heartrate:"心率异常",
@@ -576,6 +699,11 @@ let compareDevices = [];
 let events = [];
 let anomalies = {};
 let anomalyTimer = null;
+let traceRangeMs = 0;
+let tracePaused = false;
+let tracePauseAt = 0;
+let traceSelectedTime = null;
+const traceSeriesVisible = {power:true,cadence:true,hr:true};
 
 function $(id){return document.getElementById(id);}
 function setText(id,value){const el=$(id);if(el)el.textContent=value;}
@@ -651,10 +779,14 @@ function uuidShort(uuid){
   return m?m[1].toLowerCase():uuid.toLowerCase();
 }
 function svcName(uuid){
+  const full=(uuid||"").toLowerCase();
+  if(CUSTOM_UUID_NAMES[full])return CUSTOM_UUID_NAMES[full];
   const s=uuidShort(uuid);
   return UUID16[s]?UUID16[s]+" (0x"+s+")":s;
 }
 function charName(uuid){
+  const full=(uuid||"").toLowerCase();
+  if(CUSTOM_UUID_NAMES[full])return CUSTOM_UUID_NAMES[full];
   const s=uuidShort(uuid);
   return CHAR16[s]?CHAR16[s]+" (0x"+s+")":s;
 }
@@ -768,28 +900,219 @@ function appendSignalHistory(rec){
     power:latest.power===null?latest.ftmsPower:latest.power,
     cadence:latest.cadence,
     hr:latest.hr,
+    speed:latest.speed,
   });
-  rec.history=rec.history.filter(sample=>now-sample.t<=30000).slice(-180);
+  if(!rec.lastHistoryTrimAt||now-rec.lastHistoryTrimAt>=60000||rec.history.length>HISTORY_MAX_SAMPLES){
+    rec.lastHistoryTrimAt=now;
+    rec.history=rec.history.filter(sample=>now-sample.t<=HISTORY_RETENTION_MS).slice(-HISTORY_MAX_SAMPLES);
+  }
 }
-function signalPath(history,key,min,max){
-  const now=Date.now();
-  const oldest=history.length?history[0].t:now;
-  const windowMs=Math.min(30000,Math.max(1000,now-oldest));
-  const points=history.filter(sample=>typeof sample[key]==="number").map(sample=>{
-    const x=Math.max(0,Math.min(900,900-((now-sample.t)/windowMs)*900));
-    const ratio=Math.max(0,Math.min(1,(sample[key]-min)/(max-min)));
-    return [x,238-ratio*216];
+function lowerBoundSample(history,timestamp){
+  let lo=0,hi=history.length;
+  while(lo<hi){const mid=(lo+hi)>>1;if(history[mid].t<timestamp)lo=mid+1;else hi=mid;}
+  return lo;
+}
+function traceWindowFor(rec){
+  const all=rec&&rec.history?rec.history:[];
+  const sessionStart=rec?(rec.sessionStartedAt||(all[0]&&all[0].t)||Date.now()):Date.now();
+  const liveEnd=rec?(rec.sessionEndedAt||Date.now()):Date.now();
+  const end=tracePaused?Math.min(tracePauseAt||liveEnd,liveEnd):liveEnd;
+  const start=traceRangeMs?Math.max(sessionStart,end-traceRangeMs):sessionStart;
+  const from=lowerBoundSample(all,start);
+  const to=lowerBoundSample(all,end+1);
+  return {history:all.slice(from,to),start,end,sessionStart};
+}
+function formatElapsed(ms){
+  const total=Math.max(0,Math.round(ms/1000));
+  const hours=Math.floor(total/3600);const minutes=Math.floor((total%3600)/60);const seconds=total%60;
+  return hours?hours+":"+String(minutes).padStart(2,"0")+":"+String(seconds).padStart(2,"0"):minutes+":"+String(seconds).padStart(2,"0");
+}
+function tracePoint(sample,key,range){
+  const cfg=TRACE_SERIES[key];
+  const duration=Math.max(1000,range.end-range.start);
+  const x=TRACE_PLOT.left+Math.max(0,Math.min(1,(sample.t-range.start)/duration))*(TRACE_PLOT.right-TRACE_PLOT.left);
+  const ratio=Math.max(0,Math.min(1,(sample[key]-cfg.min)/(cfg.max-cfg.min)));
+  const y=TRACE_PLOT.bottom-ratio*(TRACE_PLOT.bottom-TRACE_PLOT.top);
+  return {x,y};
+}
+function downsampleTracePoints(points,maxPoints){
+  if(points.length<=maxPoints)return points;
+  const result=[points[0]];
+  const bucketCount=Math.max(1,Math.floor((maxPoints-2)/2));
+  const bucketSize=Math.ceil((points.length-2)/bucketCount);
+  for(let start=1;start<points.length-1;start+=bucketSize){
+    const bucket=points.slice(start,Math.min(points.length-1,start+bucketSize));
+    if(!bucket.length)continue;
+    let min=bucket[0],max=bucket[0];
+    for(const point of bucket){if(point.value<min.value)min=point;if(point.value>max.value)max=point;}
+    if(min===max)result.push(min);else result.push(...[min,max].sort((a,b)=>a.t-b.t));
+  }
+  result.push(points[points.length-1]);
+  return result;
+}
+function signalPath(history,key,range){
+  const segments=[];let segment=[];let previousTime=0;
+  for(const sample of history){
+    if(typeof sample[key]!=="number"||!Number.isFinite(sample[key]))continue;
+    if(previousTime&&sample.t-previousTime>ANOMALY_LIMITS.staleMs){if(segment.length)segments.push(segment);segment=[];}
+    segment.push({sample,t:sample.t,value:sample[key]});previousTime=sample.t;
+  }
+  if(segment.length)segments.push(segment);
+  if(!segments.length)return "";
+  const segmentBudget=Math.max(24,Math.floor(TRACE_RENDER_POINTS/segments.length));
+  let path="";
+  for(const raw of segments){
+    const points=downsampleTracePoints(raw,segmentBudget);
+    for(let i=0;i<points.length;i++){
+      const pos=tracePoint(points[i].sample,key,range);
+      path+=(i?"L":"M")+pos.x.toFixed(1)+" "+pos.y.toFixed(1)+" ";
+    }
+  }
+  return path.trim();
+}
+function createSvgNode(name,attrs,text){
+  const node=document.createElementNS("http://www.w3.org/2000/svg",name);
+  for(const [key,value] of Object.entries(attrs||{}))node.setAttribute(key,value);
+  if(text!==undefined)node.textContent=text;
+  return node;
+}
+function renderTraceXAxis(range){
+  const axis=$("trace-x-axis");axis.innerHTML="";
+  const duration=Math.max(1000,range.end-range.start);
+  for(let i=0;i<=4;i++){
+    const ratio=i/4;const x=TRACE_PLOT.left+ratio*(TRACE_PLOT.right-TRACE_PLOT.left);
+    axis.appendChild(createSvgNode("line",{x1:x,x2:x,y1:TRACE_PLOT.top,y2:TRACE_PLOT.axisY}));
+    const anchor=i===0?"start":i===4?"end":"middle";
+    const elapsed=range.start+duration*ratio-range.sessionStart;
+    axis.appendChild(createSvgNode("text",{x,y:254,"text-anchor":anchor},formatElapsed(elapsed)));
+  }
+}
+function summarizeSeries(history,key){
+  const values=history.map(sample=>sample[key]).filter(value=>typeof value==="number"&&Number.isFinite(value));
+  if(!values.length)return null;
+  let min=values[0],max=values[0],sum=0;
+  for(const value of values){min=Math.min(min,value);max=Math.max(max,value);sum+=value;}
+  return {min,avg:sum/values.length,max,count:values.length};
+}
+function formatSeriesStats(summary,key){
+  if(!summary)return "--";
+  const digits=key==="power"||key==="cadence"||key==="hr"?0:2;
+  return summary.min.toFixed(digits)+" · "+summary.avg.toFixed(digits)+" · "+summary.max.toFixed(digits);
+}
+function renderTraceStats(range){
+  for(const key of ["power","cadence","hr"])setText("trace-stat-"+key,formatSeriesStats(summarizeSeries(range.history,key),key));
+  setText("trace-stat-session",formatElapsed(range.end-range.start)+" · "+range.history.length+" 点");
+}
+function nearestTraceSample(history,target){
+  if(!history.length)return null;
+  const index=lowerBoundSample(history,target);
+  if(index<=0)return history[0];
+  if(index>=history.length)return history[history.length-1];
+  return target-history[index-1].t<=history[index].t-target?history[index-1]:history[index];
+}
+function renderTraceCursor(rec,sample,range,announce=false){
+  if(!rec||!sample){hideTraceInspector();return;}
+  const base=tracePoint(sample,"power",range).x;
+  const line=$("trace-crosshair");line.setAttribute("x1",base);line.setAttribute("x2",base);line.classList.remove("hidden");
+  for(const key of ["power","cadence","hr"]){
+    const marker=$("trace-marker-"+key);const visible=traceSeriesVisible[key]&&typeof sample[key]==="number"&&Number.isFinite(sample[key]);
+    marker.classList.toggle("hidden",!visible);
+    if(visible){const point=tracePoint(sample,key,range);marker.setAttribute("cx",point.x);marker.setAttribute("cy",point.y);}
+  }
+  const sessionTime=formatElapsed(sample.t-range.sessionStart);
+  const wallTime=new Date(sample.t).toLocaleTimeString("zh-CN",{hour12:false})+"."+String(new Date(sample.t).getMilliseconds()).padStart(3,"0");
+  setText("trace-tooltip-time","会话 "+sessionTime+" · "+wallTime);
+  setText("trace-tooltip-power",typeof sample.power==="number"?sample.power+" W":"—");
+  setText("trace-tooltip-cadence",typeof sample.cadence==="number"?sample.cadence+" rpm":"—");
+  setText("trace-tooltip-hr",typeof sample.hr==="number"?sample.hr+" bpm":"—");
+  setText("trace-tooltip-speed",typeof sample.speed==="number"?sample.speed.toFixed(2)+" km/h":"—");
+  const tooltip=$("trace-tooltip");tooltip.classList.remove("hidden");
+  const rect=$("trace-window").getBoundingClientRect();
+  const tooltipLeft=Math.max(105,Math.min(rect.width-105,(base/900)*rect.width));
+  tooltip.style.left=tooltipLeft+"px";tooltip.style.transform="translateX(-50%)";
+  if(announce)setText("trace-inspector-status","会话 "+sessionTime+"，功率 "+(sample.power??"无")+" 瓦，踏频 "+(sample.cadence??"无")+"，心率 "+(sample.hr??"无"));
+}
+function hideTraceInspector(event){
+  if(event&&event.pointerType&&event.pointerType!=="mouse")return;
+  traceSelectedTime=null;
+  $("trace-crosshair").classList.add("hidden");$("trace-tooltip").classList.add("hidden");
+  for(const key of ["power","cadence","hr"])$("trace-marker-"+key).classList.add("hidden");
+}
+function inspectTraceAtPointer(event){
+  if(!singleDevice||!singleDevice.history.length)return;
+  const range=traceWindowFor(singleDevice);if(!range.history.length)return;
+  const rect=$("trace-window").getBoundingClientRect();
+  const viewX=Math.max(TRACE_PLOT.left,Math.min(TRACE_PLOT.right,((event.clientX-rect.left)/rect.width)*900));
+  const target=range.start+((viewX-TRACE_PLOT.left)/(TRACE_PLOT.right-TRACE_PLOT.left))*(range.end-range.start);
+  const sample=nearestTraceSample(range.history,target);if(!sample)return;
+  traceSelectedTime=sample.t;renderTraceCursor(singleDevice,sample,range,false);
+}
+function handleTraceKey(event){
+  if(!["ArrowLeft","ArrowRight","Home","End","Escape"].includes(event.key))return;
+  event.preventDefault();
+  if(event.key==="Escape"){hideTraceInspector();return;}
+  if(!singleDevice)return;
+  const range=traceWindowFor(singleDevice);if(!range.history.length)return;
+  let index=traceSelectedTime===null?range.history.length-1:lowerBoundSample(range.history,traceSelectedTime);
+  if(event.key==="Home")index=0;else if(event.key==="End")index=range.history.length-1;else if(event.key==="ArrowLeft")index=Math.max(0,index-1);else index=Math.min(range.history.length-1,index+1);
+  const sample=range.history[index];traceSelectedTime=sample.t;renderTraceCursor(singleDevice,sample,range,true);
+}
+function updateTraceControls(){
+  document.querySelectorAll(".trace-range-btn").forEach(button=>{
+    const active=Number(button.dataset.range)===traceRangeMs;
+    button.classList.toggle("active",active);button.setAttribute("aria-pressed",String(active));
   });
-  if(points.length<2)return "";
-  return points.map((point,index)=>(index?"L":"M")+point[0].toFixed(1)+" "+point[1].toFixed(1)).join(" ");
+  const pause=$("trace-pause");pause.classList.toggle("active",tracePaused);pause.setAttribute("aria-pressed",String(tracePaused));pause.textContent=tracePaused?"继续跟随":"暂停跟随";
+  document.querySelectorAll(".legend-btn").forEach(button=>button.setAttribute("aria-pressed",String(traceSeriesVisible[button.dataset.series])));
+}
+function setTraceRange(value){
+  if(!TRACE_RANGE_OPTIONS.includes(value))return;
+  traceRangeMs=value;traceSelectedTime=null;updateTraceControls();renderSignalTrace(singleDevice);
+}
+function toggleTracePause(){
+  if(!singleDevice){log("尚无可暂停的图表会话","warn");return;}
+  tracePaused=!tracePaused;tracePauseAt=tracePaused?(singleDevice.sessionEndedAt||Date.now()):0;traceSelectedTime=null;
+  updateTraceControls();renderSignalTrace(singleDevice);
+}
+function toggleTraceSeries(key){
+  if(!(key in traceSeriesVisible))return;
+  traceSeriesVisible[key]=!traceSeriesVisible[key];traceSelectedTime=null;updateTraceControls();renderSignalTrace(singleDevice);
+}
+function resetTraceInteraction(){
+  tracePaused=false;tracePauseAt=0;traceSelectedTime=null;hideTraceInspector();updateTraceControls();
+}
+function downloadSignalCsv(){
+  if(!singleDevice||!singleDevice.history.length){log("当前会话没有可导出的信号历史","warn");return;}
+  const start=singleDevice.sessionStartedAt;
+  const rows=["timestamp_iso,session_elapsed_ms,power_w,cadence_rpm,heart_rate_bpm,speed_kmh"];
+  for(const sample of singleDevice.history){
+    rows.push([new Date(sample.t).toISOString(),sample.t-start,sample.power??"",sample.cadence??"",sample.hr??"",typeof sample.speed==="number"?sample.speed.toFixed(2):""].join(","));
+  }
+  const blob=new Blob(["\ufeff"+rows.join("\n")],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);const a=document.createElement("a");
+  a.href=url;a.download="bikepower-signal-"+new Date().toISOString().replace(/[:.]/g,"-")+".csv";a.click();URL.revokeObjectURL(url);
+  log("已导出 "+singleDevice.history.length+" 个历史样本为 CSV","data");
+}
+function clearSignalHistory(){
+  if(!singleDevice||!singleDevice.history.length){log("当前会话没有可清空的信号历史","warn");return;}
+  if(!confirm("确定清空当前会话的全部曲线历史？此操作不会断开设备。"))return;
+  singleDevice.history=[];singleDevice.lastHistoryAt=0;singleDevice.lastHistoryTrimAt=0;singleDevice.sessionStartedAt=singleDevice.sessionEndedAt||Date.now();
+  traceSelectedTime=null;renderSignalTrace(singleDevice);log("已清空当前会话曲线历史","warn");
 }
 function renderSignalTrace(rec){
-  const history=rec&&rec.history?rec.history:[];
-  $("trace-power").setAttribute("d",signalPath(history,"power",0,600));
-  $("trace-cadence").setAttribute("d",signalPath(history,"cadence",0,160));
-  $("trace-hr").setAttribute("d",signalPath(history,"hr",40,220));
-  const hasTrace=["trace-power","trace-cadence","trace-hr"].some(id=>$(id).getAttribute("d"));
-  $("trace-empty").classList.toggle("hidden",hasTrace);
+  const range=traceWindowFor(rec);
+  for(const key of ["power","cadence","hr"]){
+    const path=$("trace-"+key);path.setAttribute("d",signalPath(range.history,key,range));path.style.display=traceSeriesVisible[key]?"":"none";
+  }
+  if(rec)renderTraceXAxis(range);else $("trace-x-axis").innerHTML="";
+  renderTraceStats(range);updateTraceControls();
+  const hasData=range.history.some(sample=>["power","cadence","hr"].some(key=>traceSeriesVisible[key]&&typeof sample[key]==="number"));
+  const empty=$("trace-empty");empty.classList.toggle("hidden",hasData);
+  empty.innerHTML=rec&&!Object.values(traceSeriesVisible).some(Boolean)?"ALL SERIES HIDDEN<br>请在上方重新启用数据系列":"NO DEVICE TRACE<br>等待真实 BLE 通知";
+  const sessionDuration=rec?Math.max(0,range.end-range.sessionStart):0;
+  setText("trace-range-label",rec?(traceRangeMs?"VISIBLE "+formatElapsed(range.end-range.start):"SESSION "+formatElapsed(sessionDuration)):"SESSION / 等待数据");
+  setText("trace-session-meta","本地会话最多保留 12 小时 · "+(rec?rec.history.length:0)+" 个样本"+(tracePaused?" · 图表已暂停":""));
+  if(traceSelectedTime!==null&&range.history.length){const sample=nearestTraceSample(range.history,traceSelectedTime);renderTraceCursor(rec,sample,range,false);}else hideTraceInspector();
 }
 function renderRealtime(rec){
   if(currentMode!=="connect"||rec!==singleDevice)return;
@@ -808,9 +1131,14 @@ function renderRealtime(rec){
 }
 function updateMonitorEvidence(rec){
   const connected=!!(rec&&rec.server&&rec.server.connected);
-  if(!connected){
+  if(!connected&&!rec){
     setText("top-status","等待用户授权");setText("link-status","未连接");setText("last-notify","等待用户主动选择蓝牙设备");
     $("link-state").classList.add("is-idle");setText("health-score","--");setText("health-label","等待连接");setText("health-detail","尚无会话证据");setText("m-gap","--");
+  }else if(!connected){
+    setText("top-status","BLE 已断开");setText("link-status","已断开 · 历史保留");
+    setText("last-notify",rec.lastNotifyAt?"最后通知 "+notificationGapText(rec.lastNotifyAt)+" 前":"本次连接未收到运动通知");
+    $("link-state").classList.add("is-idle");setText("health-score","0");setText("health-label","连接已断开");setText("health-detail","曲线、统计和导出数据仍保留在本页");
+    setText("m-gap",rec.lastNotifyAt?((Date.now()-rec.lastNotifyAt)/1000).toFixed(1):"--");
   }else{
     $("link-state").classList.remove("is-idle");setText("top-status","BLE 已连接");setText("link-status","已连接");
     const gap=rec.lastNotifyAt?Date.now()-rec.lastNotifyAt:null;
@@ -823,9 +1151,9 @@ function updateMonitorEvidence(rec){
   }
   for(const key of ["cps","hr","csc","rsc","ftms"]){
     const row=$("proof-"+key);if(!row)continue;
-    const subscribed=connected&&!!rec.subscriptions[key];
+    const subscribed=!!(rec&&rec.subscriptions[key]);
     const timestamp=subscribed?rec.notifyTimes[key]:0;
-    const stale=timestamp&&Date.now()-timestamp>ANOMALY_LIMITS.staleMs;
+    const stale=timestamp&&(!connected||Date.now()-timestamp>ANOMALY_LIMITS.staleMs);
     row.classList.toggle("off",!subscribed);row.classList.toggle("warn",!!stale);
     setText("proof-"+key+"-time",!subscribed?"—":timestamp?notificationGapText(timestamp):"READY");
   }
@@ -834,17 +1162,31 @@ function resetMonitorSignals(){
   for(const id of ["m-power","m-hr","m-cadence","m-speed","m-gap"])setText(id,"--");
   setText("signal-clock","--:--:--.---");setText("power-summary","等待真实骑行信号。");
   setText("power-detail","连接后，功率、踏频与心率会沿同一条时间轴更新。这里不会用演示值替代设备证据。");
-  for(const id of ["trace-power","trace-cadence","trace-hr"])$(id).setAttribute("d","");
-  $("trace-empty").classList.remove("hidden");updateMonitorEvidence(null);
+  resetTraceInteraction();renderSignalTrace(null);updateMonitorEvidence(null);
 }
 function saveCurrentTemplate(){
   if(!singleDevice||!singleDevice.server||!singleDevice.server.connected){log("尚无可保存的已连接设备","warn");return;}
   saveAsTemplate(singleDevice);
 }
 function downloadReport(){
+  const config=singleDevice&&singleDevice.configState&&singleDevice.configState.supported?{
+    meta:{
+      protocol:singleDevice.configState.meta.protocol,
+      schema:singleDevice.configState.meta.schema,
+      groupMask:singleDevice.configState.meta.groupMask,
+      capabilities:singleDevice.configState.meta.capabilities,
+      revision:singleDevice.configState.meta.revision,
+      maxGroupLength:singleDevice.configState.meta.maxGroupLength,
+    },
+    current:JSON.parse(JSON.stringify(singleDevice.configState.current)),
+  }:null;
   const report={
     exported_at:new Date().toISOString(),
-    singleDevice:singleDevice?{name:singleDevice.device.name,id:singleDevice.device.id,info:singleDevice.info,services:singleDevice.services,latest:singleDevice.latest}:null,
+    singleDevice:singleDevice?{
+      name:singleDevice.device.name,id:singleDevice.device.id,info:singleDevice.info,services:singleDevice.services,latest:singleDevice.latest,
+      session:{started_at:new Date(singleDevice.sessionStartedAt).toISOString(),ended_at:singleDevice.sessionEndedAt?new Date(singleDevice.sessionEndedAt).toISOString():null,sample_count:singleDevice.history.length},
+      history:singleDevice.history,config,
+    }:null,
     compareDevices:compareDevices.map(d=>({name:d.device.name,id:d.device.id,info:d.info,services:d.services})),
     anomalies,events,
   };
@@ -853,6 +1195,235 @@ function downloadReport(){
   const a=document.createElement("a");
   a.href=url;a.download="bikepower-ble-report-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";
   a.click();URL.revokeObjectURL(url);
+}
+
+/* ==================== BikePower NVS 配置服务 ==================== */
+function configBytes(view){return new Uint8Array(view.buffer,view.byteOffset,view.byteLength);}
+function configDataView(bytes){return new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);}
+function decodeConfigString(bytes,lengthOffset,valueOffset,maxBytes){
+  if(lengthOffset>=bytes.length)throw new Error("配置字符串长度缺失");
+  const length=bytes[lengthOffset];
+  if(length<1||length>maxBytes||valueOffset+length!==bytes.length)throw new Error("配置字符串长度无效");
+  return new TextDecoder("utf-8",{fatal:true}).decode(bytes.slice(valueOffset,valueOffset+length));
+}
+function parseConfigMeta(value){
+  const bytes=configBytes(value);if(bytes.length!==12)throw new Error("配置 Meta 长度不正确");
+  const view=configDataView(bytes);
+  return {protocol:bytes[0],schema:bytes[1],groupMask:bytes[2],capabilities:bytes[3],revision:view.getUint32(4,true),maxGroupLength:view.getUint16(8,true)};
+}
+function parseConfigGroup(key,value){
+  const bytes=configBytes(value);const view=configDataView(bytes);
+  if(!bytes.length||bytes[0]!==CONFIG_PROTOCOL_VERSION)throw new Error(key+" 配置协议版本不匹配");
+  if(key==="core"){
+    if(bytes.length!==15)throw new Error("Core 配置长度不正确");
+    return {power:view.getUint16(1,true),cadence:view.getUint16(3,true),mode:bytes[5],heartrate:view.getUint16(6,true),has_user_hr:bytes[8],power_float:bytes[9],cadence_float:bytes[10],hr_float:bytes[11],power_step:bytes[12],sport_profile:bytes[13],broadcast_mask:bytes[14]};
+  }
+  if(key==="profile"){
+    if(bytes.length<12)throw new Error("Profile 配置长度不正确");
+    return {weight:view.getUint16(1,true),ftp:view.getUint16(3,true),thr_hr:view.getUint16(5,true),ride_type:bytes[7],custom_wkg_low:bytes[8],custom_wkg_high:bytes[9],custom_pacer_name:decodeConfigString(bytes,10,11,31)};
+  }
+  if(key==="running"){
+    if(bytes.length<15)throw new Error("Running 配置长度不正确");
+    return {run_speed_x100:view.getUint16(1,true),run_pace_float_sec:bytes[3],run_cadence:view.getUint16(4,true),run_cadence_float:bytes[6],run_mode:bytes[7],run_pacer_type:bytes[8],run_pace_low_sec:view.getUint16(9,true),run_pace_high_sec:view.getUint16(11,true),run_custom_name:decodeConfigString(bytes,13,14,31)};
+  }
+  if(key==="led"){
+    if(bytes.length!==12)throw new Error("LED 配置长度不正确");
+    const scenes=[];for(let i=0;i<5;i++)scenes.push({mode:bytes[2+i*2],color:bytes[3+i*2]});
+    return {led_silent:bytes[1],led_scenes:scenes};
+  }
+  if(key==="identity"){
+    if(bytes.length<3)throw new Error("Identity 配置长度不正确");
+    return {device_name:decodeConfigString(bytes,1,2,23)};
+  }
+  throw new Error("未知配置组 "+key);
+}
+function encodeConfigString(prefix,value,maxBytes){
+  const encoded=new TextEncoder().encode(value);
+  if(!encoded.length||encoded.length>maxBytes)throw new Error("字符串 UTF-8 长度超出设备限制");
+  const out=new Uint8Array(prefix.length+1+encoded.length);out.set(prefix);out[prefix.length]=encoded.length;out.set(encoded,prefix.length+1);return out;
+}
+function encodeConfigGroup(key,c){
+  if(key==="core"){
+    const out=new Uint8Array(15),view=configDataView(out);out[0]=CONFIG_PROTOCOL_VERSION;view.setUint16(1,c.power,true);view.setUint16(3,c.cadence,true);out[5]=c.mode;view.setUint16(6,c.heartrate,true);out[8]=c.has_user_hr?1:0;out[9]=c.power_float;out[10]=c.cadence_float;out[11]=c.hr_float;out[12]=c.power_step;out[13]=c.sport_profile;out[14]=c.broadcast_mask;return out;
+  }
+  if(key==="profile"){
+    const prefix=new Uint8Array(10),view=configDataView(prefix);prefix[0]=CONFIG_PROTOCOL_VERSION;view.setUint16(1,c.weight,true);view.setUint16(3,c.ftp,true);view.setUint16(5,c.thr_hr,true);prefix[7]=c.ride_type;prefix[8]=c.custom_wkg_low;prefix[9]=c.custom_wkg_high;return encodeConfigString(prefix,c.custom_pacer_name,31);
+  }
+  if(key==="running"){
+    const prefix=new Uint8Array(13),view=configDataView(prefix);prefix[0]=CONFIG_PROTOCOL_VERSION;view.setUint16(1,c.run_speed_x100,true);prefix[3]=c.run_pace_float_sec;view.setUint16(4,c.run_cadence,true);prefix[6]=c.run_cadence_float;prefix[7]=c.run_mode;prefix[8]=c.run_pacer_type;view.setUint16(9,c.run_pace_low_sec,true);view.setUint16(11,c.run_pace_high_sec,true);return encodeConfigString(prefix,c.run_custom_name,31);
+  }
+  if(key==="led"){
+    const out=new Uint8Array(12);out[0]=CONFIG_PROTOCOL_VERSION;out[1]=c.led_silent?1:0;c.led_scenes.forEach((scene,i)=>{out[2+i*2]=scene.mode;out[3+i*2]=scene.color;});return out;
+  }
+  if(key==="identity")return encodeConfigString(new Uint8Array([CONFIG_PROTOCOL_VERSION]),c.device_name,23);
+  throw new Error("未知配置组 "+key);
+}
+function parseConfigResponse(value){
+  const bytes=configBytes(value);if(bytes.length!==12||bytes[0]!==0x80)throw new Error("配置控制点响应无效");
+  const view=configDataView(bytes);return {request:bytes[1],result:bytes[2],restartFlags:bytes[3],transactionId:view.getUint32(4,true),revision:view.getUint32(8,true)};
+}
+function makeConfigBegin(transactionId,revision){const out=new Uint8Array(10),view=configDataView(out);out[0]=0x01;out[1]=CONFIG_PROTOCOL_VERSION;view.setUint32(2,transactionId,true);view.setUint32(6,revision,true);return out;}
+function makeConfigCommit(transactionId){const out=new Uint8Array(6),view=configDataView(out);out[0]=0x02;view.setUint32(1,transactionId,true);out[5]=CONFIG_GROUP_MASK_ALL;return out;}
+function makeConfigCancel(transactionId){const out=new Uint8Array(5),view=configDataView(out);out[0]=0x03;view.setUint32(1,transactionId,true);return out;}
+async function writeConfigValue(characteristic,value){
+  if(characteristic.writeValueWithResponse)await characteristic.writeValueWithResponse(value);
+  else await characteristic.writeValue(value);
+}
+function waitForConfigResponse(characteristic,request,transactionId,timeoutMs=10000){
+  return new Promise((resolve,reject)=>{
+    const cleanup=()=>{clearTimeout(timer);characteristic.removeEventListener("characteristicvaluechanged",onValue);};
+    const onValue=event=>{try{const response=parseConfigResponse(event.target.value);if(response.request!==request||response.transactionId!==transactionId)return;cleanup();resolve(response);}catch(err){cleanup();reject(err);}};
+    const timer=setTimeout(()=>{cleanup();reject(new Error("等待设备保存结果超时"));},timeoutMs);
+    characteristic.addEventListener("characteristicvaluechanged",onValue);
+  });
+}
+function configResultError(response){
+  const message=CONFIG_RESULTS[response.result]||("未知错误 "+response.result);
+  const error=new Error(message);error.configResponse=response;return error;
+}
+async function readDeviceConfig(rec,announce=false){
+  const previous=rec.configState||{};
+  try{
+    const service=await rec.server.getPrimaryService(UUIDS.configService);
+    const characters={};
+    const metaChar=await service.getCharacteristic(UUIDS.configMeta);
+    const meta=parseConfigMeta(await metaChar.readValue());
+    if(meta.protocol!==CONFIG_PROTOCOL_VERSION)throw new Error("设备配置协议版本 "+meta.protocol+" 暂不支持");
+    if((meta.groupMask&CONFIG_GROUP_MASK_ALL)!==CONFIG_GROUP_MASK_ALL)throw new Error("设备未提供全部配置组");
+    const current={schema_ver:meta.schema};
+    for(const group of CONFIG_GROUPS){
+      const characteristic=await service.getCharacteristic(group.uuid);characters[group.key]=characteristic;
+      Object.assign(current,parseConfigGroup(group.key,await characteristic.readValue()));
+    }
+    characters.control=await service.getCharacteristic(UUIDS.configControl);
+    rec.configState={supported:true,error:null,meta,current,service,characters,saving:false,statusText:announce?"已从开发板重新读取全部 NVS 配置。":(previous.statusText||"已读取开发板当前 NVS 配置，可修改后显式保存。"),statusKind:announce?"ok":(previous.statusKind||"")};
+    if(announce)log("已重新读取 BikePower 全部 NVS 配置（revision "+meta.revision+")","data");
+  }catch(err){
+    rec.configState={supported:false,error:err.message||String(err),meta:null,current:null,saving:false,statusText:"当前固件未提供可读写配置服务。",statusKind:"warn"};
+    if(announce)log("配置读取失败: "+rec.configState.error,"warn");
+  }
+  if(rec===singleDevice&&$("config-editor-shell"))refreshConfigEditor(rec);
+  return rec.configState;
+}
+
+const CONFIG_MODE_OPTIONS=[[0,"固定值"],[1,"道路模拟"]];
+const CONFIG_SPORT_OPTIONS=[[0,"骑行"],[1,"跑步"]];
+const CONFIG_RIDE_OPTIONS=[[0,"Coco"],[1,"Yumi"],[2,"Jacques"],[3,"Genie"],[4,"Constance"],[5,"自定义"]];
+const CONFIG_RUN_MODE_OPTIONS=[[0,"固定速度"],[1,"配速模板"]];
+const CONFIG_RUN_PACER_OPTIONS=[[0,"慢跑"],[1,"有氧"],[2,"节奏"],[3,"间歇"],[4,"自定义"]];
+const CONFIG_LED_MODE_OPTIONS=[[0,"关闭"],[1,"常亮"],[2,"慢闪"],[3,"快闪"],[4,"双闪"],[5,"呼吸"]];
+const CONFIG_LED_COLOR_OPTIONS=[[0,"红"],[1,"绿"],[2,"蓝"],[3,"黄"],[4,"青"],[5,"品红"],[6,"白"]];
+const CONFIG_LED_SCENES=[["wait","待连接"],["connected","已连接"],["wifi","配网中"],["confirm","二次确认"],["error","异常恢复"]];
+function configField(id,label,value,min,max,step,hint="",extra=""){
+  return '<div class="form-field '+extra+'"><label for="'+id+'">'+escapeHtml(label)+'</label><input id="'+id+'" type="number" value="'+escapeHtml(value)+'" min="'+min+'" max="'+max+'" step="'+step+'" aria-describedby="'+id+'-hint '+id+'-error"><span class="field-hint" id="'+id+'-hint">'+escapeHtml(hint)+'</span><span class="field-error" id="'+id+'-error"></span></div>';
+}
+function configTextField(id,label,value,maxLength,hint="",extra=""){
+  return '<div class="form-field '+extra+'"><label for="'+id+'">'+escapeHtml(label)+'</label><input id="'+id+'" type="text" value="'+escapeHtml(value)+'" maxlength="'+maxLength+'" aria-describedby="'+id+'-hint '+id+'-error"><span class="field-hint" id="'+id+'-hint">'+escapeHtml(hint)+'</span><span class="field-error" id="'+id+'-error"></span></div>';
+}
+function configSelect(id,label,value,options,hint="",extra=""){
+  const opts=options.map(([v,t])=>'<option value="'+v+'"'+(Number(value)===v?' selected':'')+'>'+escapeHtml(t)+'</option>').join("");
+  return '<div class="form-field '+extra+'"><label for="'+id+'">'+escapeHtml(label)+'</label><select id="'+id+'" aria-describedby="'+id+'-hint '+id+'-error">'+opts+'</select><span class="field-hint" id="'+id+'-hint">'+escapeHtml(hint)+'</span><span class="field-error" id="'+id+'-error"></span></div>';
+}
+function configCheck(id,label,checked,hint="",extra=""){
+  return '<div class="form-field '+extra+'"><label class="check-line" for="'+id+'"><input id="'+id+'" type="checkbox"'+(checked?' checked':'')+' aria-describedby="'+id+'-hint '+id+'-error"><span>'+escapeHtml(label)+'</span></label><span class="field-hint" id="'+id+'-hint">'+escapeHtml(hint)+'</span><span class="field-error" id="'+id+'-error"></span></div>';
+}
+function renderConfigEditor(rec){
+  const state=rec.configState;
+  if(!state||!state.supported){
+    const detail=state&&state.error?escapeHtml(state.error):"设备未提供 BikePower Config Service";
+    return '<section class="config-unavailable" id="config-editor-shell"><h3>设备配置</h3><div class="config-status warn">'+detail+'。请先刷入支持配置服务的新固件；实时运动数据仍可正常监控。</div></section>';
+  }
+  const c=state.current,m=state.meta;const scenes=c.led_scenes||[];
+  let ledFields=configCheck("cfg-led-silent","静默模式（所有场景灭灯）",!!c.led_silent,"异常场景也会关闭。","span-all");
+  CONFIG_LED_SCENES.forEach(([key,label],index)=>{const scene=scenes[index]||{mode:0,color:0};ledFields+=configSelect("cfg-led-"+key+"-mode",label+"灯效",scene.mode,CONFIG_LED_MODE_OPTIONS,"通用板的呼吸模式会降级为慢闪。");ledFields+=configSelect("cfg-led-"+key+"-color",label+"颜色",scene.color,CONFIG_LED_COLOR_OPTIONS,"仅 RGB 板显示颜色。");});
+  const statusClass=state.statusKind?" "+state.statusKind:"";
+  return '<section class="config-panel" id="config-editor-shell"><div class="config-head"><div><h3>开发板 NVS 配置</h3><p>以下字段全部直接从设备读取。编辑只发生在浏览器中，点击“保存到设备”后才会通过事务写入 NVS。</p></div><div class="config-meta"><span class="badge muted">协议 v'+m.protocol+'</span><span class="badge muted">schema v'+m.schema+'</span><span class="badge ok" id="config-revision">revision '+m.revision+'</span><span class="badge warn" id="config-dirty">未修改</span></div></div>'+
+    '<form id="config-form" onsubmit="saveDeviceConfig(event)" novalidate><div class="config-toolbar"><div class="config-status'+statusClass+'" id="config-status" role="status" aria-live="polite">'+escapeHtml(state.statusText||"已读取设备配置。")+'</div><div class="actions"><button class="btn ghost sm" type="button" data-config-action data-config-device-action onclick="reloadDeviceConfig()">从设备重新读取</button><button class="btn ghost sm" type="button" data-config-action onclick="restoreDeviceConfig()">恢复设备当前值</button><button class="btn alt sm" type="button" data-config-action onclick="downloadDeviceConfig()">导出配置 JSON</button><button class="btn primary sm" id="config-save" type="submit" data-config-action data-config-device-action>保存到设备</button></div></div><div class="config-error-summary hidden" id="config-error-summary" tabindex="-1" role="alert"></div><div class="config-groups">'+
+    '<details class="config-group" open><summary>基础、身份与广播</summary><div class="config-fields">'+configTextField("cfg-device-name","设备名称",c.device_name,23,"UTF-8 最多 23 字节；修改后会刷新 GAP 名称。","span-2")+configSelect("cfg-sport-profile","运动 Profile",c.sport_profile,CONFIG_SPORT_OPTIONS,"改变后保存会暂时断开并重建 GATT。")+configSelect("cfg-mode","骑行模式",c.mode,CONFIG_MODE_OPTIONS,"ERG 是训练会话态，不写入 NVS。")+configField("cfg-power","基础功率",c.power,0,2000,1,"单位 W")+configField("cfg-cadence","基础踏频",c.cadence,20,120,1,"单位 RPM")+configCheck("cfg-hr-lock","锁定固定心率",!!c.has_user_hr,"关闭后心率随负荷联动。")+configField("cfg-heartrate","固定心率",c.heartrate,60,200,1,"单位 BPM；仅锁定时生效。")+configField("cfg-power-step","按钮调功步进",c.power_step,5,50,1,"单位 W")+configField("cfg-power-float","功率浮动",c.power_float,0,100,1,"±W")+configField("cfg-cadence-float","踏频浮动",c.cadence_float,0,20,1,"±RPM")+configField("cfg-hr-float","心率浮动",c.hr_float,0,20,1,"±BPM")+'<div class="form-field span-all"><span class="field-label">广播数据项（至少选择一项）</span><div class="check-grid">'+configCheck("cfg-broadcast-power","功率",!!(c.broadcast_mask&1))+configCheck("cfg-broadcast-cadence","踏频",!!(c.broadcast_mask&2))+configCheck("cfg-broadcast-hr","心率",!!(c.broadcast_mask&4))+'</div></div></div></details>'+
+    '<details class="config-group"><summary>骑行与个人参数</summary><div class="config-fields">'+configField("cfg-weight","体重",c.weight,40,150,1,"单位 kg")+configField("cfg-ftp","FTP",c.ftp,50,500,1,"单位 W")+configField("cfg-thr-hr","阈值心率",c.thr_hr,100,220,1,"单位 BPM")+configSelect("cfg-ride-type","骑行配速档",c.ride_type,CONFIG_RIDE_OPTIONS,"自定义档使用下方 W/kg 范围。")+configField("cfg-custom-wkg-low","自定义 W/kg 下限",(c.custom_wkg_low/10).toFixed(1),1,7,.1,"不能高于上限。")+configField("cfg-custom-wkg-high","自定义 W/kg 上限",(c.custom_wkg_high/10).toFixed(1),1,7,.1,"不能低于下限。")+configTextField("cfg-custom-pacer-name","自定义骑行档名称",c.custom_pacer_name,31,"UTF-8 最多 31 字节。","span-2")+'</div></details>'+
+    '<details class="config-group"><summary>跑步参数</summary><div class="config-fields">'+configField("cfg-run-speed","固定速度",(c.run_speed_x100/100).toFixed(2),3,25,.01,"单位 km/h")+configField("cfg-run-pace-float","配速浮动",c.run_pace_float_sec,0,60,1,"±秒/km")+configField("cfg-run-cadence","步频",c.run_cadence,120,220,1,"steps/min")+configField("cfg-run-cadence-float","步频浮动",c.run_cadence_float,0,20,1,"±steps/min")+configSelect("cfg-run-mode","跑步模式",c.run_mode,CONFIG_RUN_MODE_OPTIONS)+configSelect("cfg-run-pacer-type","配速模板",c.run_pacer_type,CONFIG_RUN_PACER_OPTIONS)+configField("cfg-run-pace-low","配速下限",c.run_pace_low_sec,144,1200,1,"秒/km，数值越小速度越快。")+configField("cfg-run-pace-high","配速上限",c.run_pace_high_sec,144,1200,1,"秒/km，必须不小于下限。")+configTextField("cfg-run-custom-name","自定义跑步档名称",c.run_custom_name,31,"UTF-8 最多 31 字节。","span-2")+'</div></details>'+
+    '<details class="config-group"><summary>LED 灯效</summary><div class="config-fields">'+ledFields+'</div></details></div><div class="config-save-note">保存使用 BEGIN → 分组写入 → COMMIT 事务；只有设备校验并成功提交 NVS 后才显示成功。修改运动 Profile 或广播数据项会在成功后短暂断开 BLE，以便重建服务表。</div></form></section>';
+}
+function refreshConfigEditor(rec){const shell=$("config-editor-shell");if(!shell)return;shell.outerHTML=renderConfigEditor(rec);bindConfigForm(rec);}
+function configNumber(id){return Number($(id).value);}
+function collectConfigForm(){
+  const scenes=CONFIG_LED_SCENES.map(([key])=>({mode:configNumber("cfg-led-"+key+"-mode"),color:configNumber("cfg-led-"+key+"-color")}));
+  return {schema_ver:singleDevice.configState.meta.schema,device_name:$("cfg-device-name").value.trim(),sport_profile:configNumber("cfg-sport-profile"),mode:configNumber("cfg-mode"),power:configNumber("cfg-power"),cadence:configNumber("cfg-cadence"),has_user_hr:$("cfg-hr-lock").checked?1:0,heartrate:configNumber("cfg-heartrate"),power_step:configNumber("cfg-power-step"),power_float:configNumber("cfg-power-float"),cadence_float:configNumber("cfg-cadence-float"),hr_float:configNumber("cfg-hr-float"),broadcast_mask:($("cfg-broadcast-power").checked?1:0)|($("cfg-broadcast-cadence").checked?2:0)|($("cfg-broadcast-hr").checked?4:0),weight:configNumber("cfg-weight"),ftp:configNumber("cfg-ftp"),thr_hr:configNumber("cfg-thr-hr"),ride_type:configNumber("cfg-ride-type"),custom_wkg_low:Math.round(configNumber("cfg-custom-wkg-low")*10),custom_wkg_high:Math.round(configNumber("cfg-custom-wkg-high")*10),custom_pacer_name:$("cfg-custom-pacer-name").value.trim(),run_speed_x100:Math.round(configNumber("cfg-run-speed")*100),run_pace_float_sec:configNumber("cfg-run-pace-float"),run_cadence:configNumber("cfg-run-cadence"),run_cadence_float:configNumber("cfg-run-cadence-float"),run_mode:configNumber("cfg-run-mode"),run_pacer_type:configNumber("cfg-run-pacer-type"),run_pace_low_sec:configNumber("cfg-run-pace-low"),run_pace_high_sec:configNumber("cfg-run-pace-high"),run_custom_name:$("cfg-run-custom-name").value.trim(),led_silent:$("cfg-led-silent").checked?1:0,led_scenes:scenes};
+}
+function validateConfig(config){
+  const errors=[];const add=(id,message)=>errors.push({id,message});
+  const integer=(id,value,[min,max],label)=>{if(!Number.isInteger(value)||value<min||value>max)add(id,label+"必须是 "+min+"–"+max+" 的整数");};
+  integer("cfg-power",config.power,CONFIG_LIMITS.power,"基础功率");integer("cfg-cadence",config.cadence,CONFIG_LIMITS.cadence,"基础踏频");integer("cfg-heartrate",config.heartrate,CONFIG_LIMITS.heartrate,"固定心率");integer("cfg-power-step",config.power_step,CONFIG_LIMITS.power_step,"按钮步进");integer("cfg-power-float",config.power_float,CONFIG_LIMITS.power_float,"功率浮动");integer("cfg-cadence-float",config.cadence_float,CONFIG_LIMITS.cadence_float,"踏频浮动");integer("cfg-hr-float",config.hr_float,CONFIG_LIMITS.hr_float,"心率浮动");
+  if(![0,1].includes(config.sport_profile))add("cfg-sport-profile","运动 Profile 无效");if(![0,1].includes(config.mode))add("cfg-mode","骑行模式无效");if(!config.broadcast_mask)add("cfg-broadcast-power","广播数据项至少选择一项");
+  integer("cfg-weight",config.weight,CONFIG_LIMITS.weight,"体重");integer("cfg-ftp",config.ftp,CONFIG_LIMITS.ftp,"FTP");integer("cfg-thr-hr",config.thr_hr,CONFIG_LIMITS.thr_hr,"阈值心率");if(!Number.isInteger(config.ride_type)||config.ride_type<0||config.ride_type>5)add("cfg-ride-type","骑行配速档无效");
+  if(config.custom_wkg_low<10||config.custom_wkg_low>70)add("cfg-custom-wkg-low","W/kg 下限必须是 1.0–7.0");if(config.custom_wkg_high<10||config.custom_wkg_high>70)add("cfg-custom-wkg-high","W/kg 上限必须是 1.0–7.0");if(config.custom_wkg_low>config.custom_wkg_high)add("cfg-custom-wkg-high","W/kg 上限不能小于下限");
+  const checkText=(id,value,max,label)=>{const length=new TextEncoder().encode(value).length;if(!length)add(id,label+"不能为空");else if(length>max)add(id,label+"的 UTF-8 长度不能超过 "+max+" 字节");};
+  checkText("cfg-device-name",config.device_name,23,"设备名称");checkText("cfg-custom-pacer-name",config.custom_pacer_name,31,"自定义骑行档名称");checkText("cfg-run-custom-name",config.run_custom_name,31,"自定义跑步档名称");
+  const runSpeed=config.run_speed_x100/100;if(!Number.isInteger(config.run_speed_x100)||runSpeed<3||runSpeed>25)add("cfg-run-speed","固定速度必须是 3.00–25.00 km/h");integer("cfg-run-pace-float",config.run_pace_float_sec,CONFIG_LIMITS.run_pace_float,"配速浮动");integer("cfg-run-cadence",config.run_cadence,CONFIG_LIMITS.run_cadence,"跑步步频");integer("cfg-run-cadence-float",config.run_cadence_float,CONFIG_LIMITS.run_cadence_float,"步频浮动");if(![0,1].includes(config.run_mode))add("cfg-run-mode","跑步模式无效");if(!Number.isInteger(config.run_pacer_type)||config.run_pacer_type<0||config.run_pacer_type>4)add("cfg-run-pacer-type","配速模板无效");integer("cfg-run-pace-low",config.run_pace_low_sec,CONFIG_LIMITS.run_pace,"配速下限");integer("cfg-run-pace-high",config.run_pace_high_sec,CONFIG_LIMITS.run_pace,"配速上限");if(config.run_pace_low_sec>config.run_pace_high_sec)add("cfg-run-pace-high","配速上限不能小于下限");
+  config.led_scenes.forEach((scene,index)=>{const key=CONFIG_LED_SCENES[index][0];if(!Number.isInteger(scene.mode)||scene.mode<0||scene.mode>5)add("cfg-led-"+key+"-mode","LED 灯效模式无效");if(!Number.isInteger(scene.color)||scene.color<0||scene.color>6)add("cfg-led-"+key+"-color","LED 颜色无效");});
+  return errors;
+}
+function clearConfigErrors(){document.querySelectorAll("#config-form [aria-invalid]").forEach(el=>el.removeAttribute("aria-invalid"));document.querySelectorAll("#config-form .field-error").forEach(el=>el.textContent="");const summary=$("config-error-summary");if(summary){summary.classList.add("hidden");summary.innerHTML="";}}
+function showConfigErrors(errors,focusSummary=false,onlyId=null){
+  if(!onlyId)clearConfigErrors();const visible=onlyId?errors.filter(error=>error.id===onlyId):errors;
+  visible.forEach(error=>{const field=$(error.id);if(field)field.setAttribute("aria-invalid","true");const output=$(error.id+"-error");if(output)output.textContent=error.message;});
+  if(!onlyId&&errors.length){const summary=$("config-error-summary");summary.innerHTML='<strong>保存前请修正 '+errors.length+' 个问题</strong><ul>'+errors.map(error=>'<li><a href="#'+error.id+'">'+escapeHtml(error.message)+'</a></li>').join("")+'</ul>';summary.classList.remove("hidden");if(focusSummary)summary.focus();}
+}
+function configsEqual(left,right){
+  if(!left||!right)return false;
+  try{
+    return CONFIG_GROUPS.every(group=>{
+      const leftBytes=encodeConfigGroup(group.key,left);const rightBytes=encodeConfigGroup(group.key,right);
+      return leftBytes.length===rightBytes.length&&leftBytes.every((value,index)=>value===rightBytes[index]);
+    });
+  }catch(err){return false;}
+}
+function updateConfigDirty(){
+  if(!singleDevice||!$("config-form"))return;let dirty=true;try{dirty=!configsEqual(collectConfigForm(),singleDevice.configState.current);}catch(err){}
+  const badge=$("config-dirty");badge.textContent=dirty?"有未保存修改":"未修改";badge.className="badge "+(dirty?"warn":"ok");const save=$("config-save");if(save)save.disabled=!dirty||singleDevice.configState.saving||!singleDevice.server||!singleDevice.server.connected;
+}
+function bindConfigForm(rec){
+  const form=$("config-form");if(!form)return;form.addEventListener("input",updateConfigDirty);form.addEventListener("change",updateConfigDirty);form.querySelectorAll("input,select").forEach(field=>field.addEventListener("blur",()=>{let errors=[];try{errors=validateConfig(collectConfigForm());}catch(err){}const output=$(field.id+"-error");if(output)output.textContent="";field.removeAttribute("aria-invalid");showConfigErrors(errors,false,field.id);}));updateConfigDirty();
+}
+function setConfigStatus(message,kind=""){
+  const status=$("config-status");if(status){status.textContent=message;status.className="config-status"+(kind?" "+kind:"");}
+  if(singleDevice&&singleDevice.configState){singleDevice.configState.statusText=message;singleDevice.configState.statusKind=kind;}
+}
+function setConfigBusy(busy){
+  if(!singleDevice||!singleDevice.configState)return;singleDevice.configState.saving=busy;const connected=!!(singleDevice.server&&singleDevice.server.connected);document.querySelectorAll("#config-form input,#config-form select,#config-form [data-config-action]").forEach(el=>{el.disabled=busy||(!connected&&el.hasAttribute("data-config-device-action"));});if(!busy)updateConfigDirty();
+}
+function markConfigDisconnected(rec){
+  if(!rec.configState||!rec.configState.supported)return;
+  const expected=rec.configState.expectedDisconnectMessage;
+  rec.configState.saving=false;rec.configState.statusText=expected||"设备已断开。当前配置仍可查看或导出；重新连接后才能读取或保存。";rec.configState.statusKind=expected?"ok":"err";
+  if(rec!==singleDevice)return;
+  setConfigStatus(rec.configState.statusText,rec.configState.statusKind);
+  document.querySelectorAll("#config-form [data-config-device-action]").forEach(el=>{el.disabled=true;});
+}
+async function reloadDeviceConfig(){if(!singleDevice||!singleDevice.server||!singleDevice.server.connected){log("设备已断开，无法重新读取配置","warn");return;}setConfigBusy(true);setConfigStatus("正在从设备重新读取全部配置…","warn");await readDeviceConfig(singleDevice,true);}
+function restoreDeviceConfig(){if(!singleDevice||!singleDevice.configState.current)return;refreshConfigEditor(singleDevice);setConfigStatus("已恢复为最近一次从设备读取的值，尚未写入。","");}
+function downloadDeviceConfig(){
+  if(!singleDevice||!singleDevice.configState.current)return;const payload={exported_at:new Date().toISOString(),device_id:singleDevice.device.id,revision:singleDevice.configState.meta.revision,schema_version:singleDevice.configState.meta.schema,config:singleDevice.configState.current};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="bikepower-nvs-config-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";a.click();URL.revokeObjectURL(url);
+}
+async function saveDeviceConfig(event){
+  event.preventDefault();const rec=singleDevice;if(!rec||!rec.server||!rec.server.connected){setConfigStatus("设备已断开，无法保存。","err");return;}
+  let config;try{config=collectConfigForm();}catch(err){setConfigStatus("无法读取表单："+err.message,"err");return;}
+  const errors=validateConfig(config);showConfigErrors(errors,true);if(errors.length){setConfigStatus("配置未发送：请先修正表单中的错误。","err");return;}
+  const state=rec.configState;const control=state.characters.control;let transactionId=0;let began=false;let committed=false;
+  try{
+    setConfigBusy(true);setConfigStatus("正在建立配置事务…","warn");await control.startNotifications();
+    transactionId=crypto.getRandomValues(new Uint32Array(1))[0]||1;
+    let responsePromise=waitForConfigResponse(control,0x01,transactionId);await writeConfigValue(control,makeConfigBegin(transactionId,state.meta.revision));let response=await responsePromise;if(response.result!==0)throw configResultError(response);began=true;
+    let written=0;for(const group of CONFIG_GROUPS){setConfigStatus("正在写入配置组 "+(++written)+" / "+CONFIG_GROUPS.length+"…","warn");await writeConfigValue(state.characters[group.key],encodeConfigGroup(group.key,config));}
+    setConfigStatus("设备正在校验并写入 NVS…","warn");responsePromise=waitForConfigResponse(control,0x02,transactionId);await writeConfigValue(control,makeConfigCommit(transactionId));committed=true;response=await responsePromise;if(response.result!==0)throw configResultError(response);
+    state.meta.revision=response.revision;state.current=JSON.parse(JSON.stringify(config));clearConfigErrors();setText("config-revision","revision "+response.revision);updateConfigDirty();
+    const rebuild=!!(response.restartFlags&1);const renamed=!!(response.restartFlags&2);let message="保存成功：全部配置已写入开发板 NVS（revision "+response.revision+"）。";if(rebuild){message+=" 服务结构已变化，页面将断开连接，设备随后自动重新广播。";state.expectedDisconnectMessage="配置已保存成功（revision "+response.revision+"）。设备正在重建 GATT，请等待重新广播后重连。";}else if(renamed)message+=" 新设备名已同步，当前连接保持在线。";
+    setConfigStatus(message,"ok");log(message,"data");
+    if(rebuild)setTimeout(()=>{if(rec.server&&rec.server.connected)rec.server.disconnect();},350);
+  }catch(err){
+    if(began&&!committed&&transactionId){try{await writeConfigValue(control,makeConfigCancel(transactionId));}catch(cancelError){}}
+    const stale=err.configResponse&&err.configResponse.result===4;const message=(stale?"设备配置已变化，请先重新读取。":"保存失败：")+(err.message||String(err));setConfigStatus(message,"err");log(message,"error");
+  }finally{setConfigBusy(false);}
 }
 
 /* ==================== 模式切换 ==================== */
@@ -1026,15 +1597,19 @@ async function enumerateServices(server){
 async function connectAndCollect(device){
   const rec={device,server:null,info:{},services:[],connectedAt:new Date().toISOString(),
     latest:{power:null,hr:null,cadence:null,speed:null,ftmsPower:null,distance:null},
-    lastNotifyAt:0,cscPrev:null,staleOpen:false,subscriptions:{},notifyTimes:{},history:[],lastHistoryAt:0};
+    lastNotifyAt:0,cscPrev:null,staleOpen:false,subscriptions:{},notifyTimes:{},history:[],lastHistoryAt:0,lastHistoryTrimAt:0,
+    sessionStartedAt:Date.now(),sessionEndedAt:0,
+    configState:{supported:false,error:null,meta:null,current:null,saving:false,statusText:"正在读取开发板配置…",statusKind:"warn"}};
   device.addEventListener("gattserverdisconnected",()=>{
+    rec.sessionEndedAt=Date.now();
     log("设备 '"+(device.name||"(无名)")+"' 已断开","warn");
     if(singleDevice===rec){
-      recordAnomaly("disconnect","设备连接已关闭");
-      singleDevice=null;
-      $("connect-result").classList.add("hidden");$("connect-empty").classList.remove("hidden");
-      setText("monitor-device-name","BikePower");setText("monitor-device-id","尚未读取设备身份 / Web Bluetooth");
-      resetMonitorSignals();
+      if(rec.configState&&rec.configState.expectedDisconnectMessage)log("配置保存后的预期断连：设备正在重建 GATT","data");
+      else recordAnomaly("disconnect","设备连接已关闭");
+      const state=$("single-device-state");if(state){state.textContent="已断开";state.className="badge err";}
+      setText("power-summary","连接已断开，当前显示最后收到的真实数值。");
+      setText("power-detail","本次会话的曲线与统计仍保留，可继续检查具体时间点或导出 CSV / JSON 报告。");
+      markConfigDisconnected(rec);renderSignalTrace(rec);updateMonitorEvidence(rec);
     }
   });
   try{
@@ -1048,6 +1623,7 @@ async function connectAndCollect(device){
       try{rec.server.disconnect();}catch(e){}
       throw new Error("该设备未提供骑行功率、心率、骑行速度/踏频或智能骑行台服务，已过滤");
     }
+    await readDeviceConfig(rec);
     await subscribeNotifications(rec);
     if(anomalyTimer)clearInterval(anomalyTimer);
     anomalyTimer=setInterval(checkAnomalies,1000);
@@ -1088,7 +1664,7 @@ async function connectAuthorized(){
   if(!candidate){log("没有已授权的设备，请先点击扫描并连接设备","warn");return;}
   if(currentMode==="connect"){
     if(singleDevice&&singleDevice.server){const previous=singleDevice;singleDevice=null;try{previous.server.disconnect();}catch(e){}}
-    anomalies={};
+    anomalies={};resetTraceInteraction();
     $("connect-empty").classList.add("hidden");$("connect-result").classList.remove("hidden");
     $("single-device-card").innerHTML='<div class="dc-head"><span class="badge warn">连接中...</span></div>';
     setText("top-status","正在连接");setText("monitor-device-name",candidate.name||"未命名设备");
@@ -1103,7 +1679,7 @@ async function connectAnyDevice(){
   const device=await requestDevice();
   if(!device)return;
   if(singleDevice&&singleDevice.server){const previous=singleDevice;singleDevice=null;try{previous.server.disconnect();}catch(e){}}
-  anomalies={};
+  anomalies={};resetTraceInteraction();
   $("connect-empty").classList.add("hidden");
   $("connect-result").classList.remove("hidden");
   $("single-device-card").innerHTML='<div class="dc-head"><span class="badge warn">连接中...</span></div>';
@@ -1126,7 +1702,7 @@ function renderSingleDevice(rec){
   let html='<section><h3>设备身份</h3><div class="dc-head">';
   html+='<div><div class="dc-name">'+escapeHtml(deviceName)+'</div>';
   html+='<div class="dc-meta">'+escapeHtml(rec.device.id)+'</div></div>';
-  html+='<span class="badge ok">已连接</span></div><div class="dc-body">';
+  html+='<span class="badge ok" id="single-device-state">已连接</span></div><div class="dc-body">';
   for(const [key,label,uuid] of DIS_CHARS){
     const val=info[key]?escapeHtml(info[key]):"<span style='color:var(--faint)'>未提供</span>";
     html+='<div class="row"><span>'+escapeHtml(label)+'</span><span>'+val+'</span></div>';
@@ -1135,10 +1711,12 @@ function renderSingleDevice(rec){
   html+='<div class="dc-foot">';
   html+='<button class="btn primary sm" onclick="saveAsTemplate(singleDevice)">保存为模板</button>';
   html+='<button class="btn alt sm" onclick="downloadReport()">导出报告</button>';
-  html+='<button class="btn ghost sm" onclick="disconnectSingle()">断开</button>';
+  html+='<button class="btn ghost sm" onclick="disconnectSingle()">断开并保留历史</button>';
   html+='</div></section>';
   html+='<section><h3>GATT 服务列表（'+rec.services.length+'）</h3>'+renderServiceList(rec.services)+'</section>';
+  html+=renderConfigEditor(rec);
   card.innerHTML=html;
+  bindConfigForm(rec);
   renderRealtime(rec);updateMonitorEvidence(rec);
 }
 
@@ -1165,11 +1743,6 @@ function disconnectSingle(){
   if(singleDevice&&singleDevice.server){
     try{singleDevice.server.disconnect();}catch(e){}
   }
-  singleDevice=null;
-  $("connect-result").classList.add("hidden");
-  $("connect-empty").classList.remove("hidden");
-  setText("monitor-device-name","BikePower");setText("monitor-device-id","尚未读取设备身份 / Web Bluetooth");
-  resetMonitorSignals();
 }
 
 /* ==================== 模板管理 ==================== */

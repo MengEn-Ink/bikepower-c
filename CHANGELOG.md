@@ -4,13 +4,29 @@
 
 ## [未发布]
 
+### Pages 全量 NVS 配置读取与修改（2026-10-27）
+- `components/bikepower_domain/ble_config_codec.c/.h`、`config_store.c/.h`：新增显式小端二进制配置协议，按 Core、Profile、Running、LED、Identity 五组覆盖 `config_data_t` 的全部持久字段；完整配置应用先在引擎副本上校验，失败不污染正式运行态，并保留合法的 ERG 会话目标。
+- `main/ble_bikepower.c/.h`、`bikepower_config.h`：新增始终注册的 BikePower Config Service（`7a5a0000-4c7a-4f2a-9b3e-6d1f4a8c0b21`）及 Meta、五个配置组、Control 共七个特征；写入采用 BEGIN → 分组写入 → COMMIT/CANCEL 事务和 revision 并发保护，NimBLE 回调只投递 mailbox，不直接写 Flash。
+- `main/app_main.c`、`nvs_store.c`：主循环串行校验完整配置，在临时引擎上应用并成功提交 NVS 后才替换正式引擎；失败返回明确结果且保持旧配置。运动 Profile 或广播掩码变化会等待客户端断开后安全重建 GATT，设备名和 LED 配置同步刷新。
+- `tools/web/ble-monitor.html`：连接后读取开发板全部持久配置，提供基础参数、身份与广播、骑行、跑步和五种 LED 场景的编辑表单；支持 UTF-8 字节长度与数值范围校验、可聚焦错误摘要、未保存状态、重新读取、恢复设备值、JSON 导出、保存进度及 NVS 成功/失败反馈。旧固件没有配置服务时降级为只读监控，不影响实时曲线。
+- `tests/check_ble_monitor.py`、`test/test_domain.c`：增加配置 UUID、读写事务、revision、保存反馈、断连和 GATT 重建提示的静态门禁，以及五组全字段往返、小端字节序、长度/版本拒绝、失败不污染、控制响应和完整引擎应用回归。
+- 验证：host 单测 `6123/0`，独立 `build-codex` ESP-IDF 完整构建通过（固件 `0x117740`），BLE 监控静态门禁、内联 JS 语法、网页刷写站点生成器 7/7、`git diff --check` 通过；配置表单与旧固件降级状态完成 1280×720 / 375×812 布局检查。未连接真实开发板执行 Web Bluetooth/NVS 写入，真机事务、重广播和断电恢复仍待验证。
+
+### Pages 实时曲线会话历史与精确读数（2026-10-27）
+- `tools/web/ble-monitor.html`：实时曲线由固定最近 30 秒改为默认保留并展示整次浏览器连接会话，提供 30 秒、2 分钟、10 分钟、全程四档窗口；X 轴按会话经过时间持续增长，通知停更或断连造成的时间空档不会被伪造为连续曲线。
+- 曲线支持指针、触摸与键盘左右键逐点查看时间、功率、踏频、心率和速度；三条线使用不同颜色与线型，可独立显示或隐藏，并显示当前可见区间的最小值、平均值、最大值、时长和样本数。
+- 增加暂停/继续图表跟随、完整会话 CSV 导出、显式清空历史和断连后保留曲线；JSON 监控报告同步包含会话起止时间、样本数和历史数据。
+- 长会话在浏览器内最多保留 12 小时或 50000 个样本，SVG 绘制前按时间分段并做保留极值的降采样，避免长时间运行后节点和路径无限增长。
+- `tests/check_ble_monitor.py`：新增历史保留、动态 X 轴、精确读数、键盘操作、暂停、系列开关、统计、长会话降采样、CSV 和断连保留门禁，并禁止恢复固定 30 秒硬裁剪。
+- 验证：`tests/check_ble_monitor.py` 全绿（含内联 JS `node --check`），网页刷写站点生成器 7/7，`git diff --check` 通过；浏览器以 180 个合成样本验证全程/30 秒窗口、动态 X 轴、统计、指针与键盘读数、暂停状态，1280×720 和 375×812 均无横向溢出，控制台 0 error/warn。未触发真实 Web Bluetooth 授权，真机通知仍需用户在浏览器中手动连接确认。
+
 ### Pages 刷写引导与骑行设备过滤（2026-10-27）
 - `tools/web/ble-monitor.html`：固件刷写页改为面向第一次使用者的三步流程，补充约 2 分钟耗时、数据线/串口识别、英文进度状态、Erase 数据提醒和找不到串口的排错说明。
 - ESP Web Tools 安装中与未选择串口弹窗增加受控 Shadow DOM 主题兼容层，使用信号宣言的深黑、深棕、锈橙令牌和中文辅助说明；浏览器原生串口选择窗口继续保持系统外观。
 - Web Bluetooth 首次授权由 `acceptAllDevices` 改为 CPS、HRS、CSC、FTMS 广播服务过滤，RSC 保持可选读取但不会让仅跑步设备进入骑行列表；已授权设备连接后再按实际 GATT 服务做二次复核。
 - `tests/check_ble_monitor.py`：新增骑行服务过滤、RSC 排除、GATT 二次复核、ESP Web Tools 主题层和中文帮助门禁，并禁止以任意空白形式恢复 `acceptAllDevices: true`。
 - 视觉验证：1440×900、375×812 均无横向溢出；真实 ESP Web Tools v10.4.0 Installing 弹窗主题注入通过，浏览器控制台 0 error/warn。
-- 回归验证：`tests/check_ble_monitor.py` 全绿，网页刷写站点生成器 7/7，`git diff --check` 通过；`quality_gate.py` 99 PASS / 2 个预期 dirty-worktree WARN / 0 FAIL，包含 ESP-IDF build 与 host 6077/0。
+- 回归验证：`tests/check_ble_monitor.py` 全绿，网页刷写站点生成器 7/7，`git diff --check` 通过；`quality_gate.py` 99 PASS / 2 个预期 dirty-worktree WARN / 0 FAIL，包含 ESP-IDF build 与 host 6093/0。
 
 ### 真实骑行数据模型优化与稳定性收口（2026-10-27）
 - `components/bikepower_domain/power_engine.c/.h`、`domain_config.h`：以 MyWhoosh FIT 中间 5-85 分钟的 4800 个对齐 1Hz 样本为基线，功率慢层使用 6-18 秒随机航点间的 smoothstep 连续过渡，叠加每秒更新的相关快层；快层跟随系数由 `0.65` 提高到 `0.70`，在不扩大 ±50W 总边界的前提下把秒差 P95 从 11W 提高到 12W；默认踏频浮动为 ±8rpm，踏频保持与功率的弱正相关，`snapshot_count` 使用 `uint64_t`。

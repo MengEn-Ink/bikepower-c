@@ -58,6 +58,14 @@ void config_store_defaults(config_data_t *c);
 void config_store_from_engine(const power_engine_t *e, config_data_t *c);
 
 /**
+ * 把一份已经通过校验的完整配置应用到运行时引擎。
+ * 应用时会临时切回 steady，避免 road/ERG 模式拒绝基础功率与踏频 setter；
+ * 若当前为 ERG 会话且目标持久模式仍为 steady，则保存后恢复该会话目标。
+ * 返回 false 表示参数为空或配置仍包含越界值；失败时目标引擎保持不变。
+ */
+bool config_store_apply_to_engine(const config_data_t *c, power_engine_t *e);
+
+/**
  * 逐字段范围校验并夹紧到合法区间。
  * 返回是否发生了任何修正（true 表示原始数据有越界字段）。
  */
