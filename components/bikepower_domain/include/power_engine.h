@@ -28,17 +28,15 @@ typedef struct {
     ride_mode_t mode;
 } snapshot_t;
 
-/*
- * 有界平滑随机游走状态。
- * 用途：为固定模式下的功率/踏频提供在 [-amp, +amp] 内平稳变化的偏移量，
- *       周期性在带内重采样目标后一阶指数逼近，输出始终限制在带内（非逐拍随机）。
- */
+/* 骑行分层动态状态：慢层表示路况/体力趋势，快层表示秒级踩踏波动。 */
 typedef struct {
-    float value;   // 当前连续偏移量（相对基准值）
-    int target;    // 当前目标偏移量
-    int hold;      // 目标剩余保持拍数
-    bool init;     // 是否已初始化
-} fluct_walk_t;
+    float slow_value;
+    float fast_value;
+    int slow_target;
+    int slow_hold;
+    int fast_hold;
+    bool init;
+} ride_dynamics_t;
 
 /*
  * 功率引擎运行时状态。
@@ -54,8 +52,8 @@ typedef struct {
     int cadence_float;        // 踏频浮动幅度（±RPM，仅固定模式生效）
     int hr_float;             // 固定心率浮动幅度（±BPM，仅固定模式+锁定心率生效）
     int power_step;           // 物理按钮调功步进（W），可配网修改并持久化
-    fluct_walk_t power_walk;  // 功率平滑游走状态
-    fluct_walk_t cadence_walk;// 踏频平滑游走状态
+    ride_dynamics_t power_dynamics;
+    ride_dynamics_t cadence_dynamics;
     ride_mode_t mode;
     int erg_active_target;    // 有效仅当 has_erg_target
     bool has_erg_target;

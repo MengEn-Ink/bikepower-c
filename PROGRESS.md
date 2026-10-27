@@ -13,7 +13,7 @@
 |------|------|------|------|
 | 0 | 工程骨架（CMake/分区/sdkconfig） | ✅ 完成 | 空工程启动日志 |
 | 1 | NimBLE CPS 单服务最小闭环 | ✅ 完成 | 手机搜到 BikePower 看到功率 |
-| 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测持续扩展（本轮基线 5892 断言） |
+| 2 | 领域层移植 + 五服务 + FTMS ERG | ✅ 完成 | 五服务通知 + ERG 收敛 + host 单测持续扩展（本轮基线 5913 断言） |
 | 3 | GPIO 中断按钮 + LED 任务 + 状态机 | ✅ 代码完成（物理按钮待人工确认） | 短/中/长按 + 二次确认 + LED 各态 |
 | 4 | 配置持久化（NVS load/save/migrate） | ✅ 完成 | 调功后断电重启功率由260W恢复为200W，host 单测持续覆盖 |
 | 5 | WiFi 配网（radio_ctrl 共存 + AP + HTTP，设备不重启） | ✅ 代码完成（配网真机流程待人工确认） | 长按确认→配网→保存→关 WiFi 回到 BLE，BLE 全程不断 |
@@ -27,6 +27,17 @@
 | 13 | 移除 OTA + 家庭网络 + 网页端精简（v4.0.0） | ✅ 代码完成（真机待确认） | 删 ota_downloader/ota_update/ota_version/ota_selftest + `/api/ota/*`、`/api/wifi/*`、`/api/draft` 路由与前端视图；分区表双 OTA → 单 factory（仍 4MB）；关回滚配置；门户退化为纯 BLE 参数页（方案见 [docs/archive/07-remove-ota-plan.md](docs/archive/07-remove-ota-plan.md)） |
 | 14 | Windows 开发环境适配 | ✅ 完成 | `idf_common.psm1` 共享模块 + `dev.ps1` 统一入口 + `build_all.ps1`/`flash_latest.ps1` 重构去重 + Python 脚本跨平台串口探测 |
 | 15 | BLE Monitor Pages + 网页固件刷写 | ✅ 已上线（双板真机刷写待确认） | GitHub Release v4.1.1 双板 merged bin 经 Actions 校验并部署；ESP Web Tools 0x0 manifest |
+
+---
+
+## 2026-10-27 真实骑行数据模型优化
+
+- [x] 参考 90 分 23 秒 MyWhoosh FIT 的 1Hz 功率、踏频、心率时序特征，提取秒差、自相关、功率/踏频相关和功率→心率滞后基线。
+- [x] Steady/Road/ERG 功率统一改为慢速路况/体力趋势 + 秒级踩踏扰动的双时间尺度有界模型；Road 不再逐拍独立取样，ERG 保持目标 ±5W 的相关波动。
+- [x] 踏频增加与功率偏移的弱耦合，仍严格遵守用户配置的浮动幅度。
+- [x] 联动心率增加 8 秒上升、15 秒下降的负荷功率滤波，与原 30/60 秒心率平滑组成轻量二阶响应。
+- [x] 新配置默认浮动调整为功率 ±30W、踏频 ±4rpm；既有 NVS 数值不自动迁移或覆盖。
+- [x] host 单测增加固定种子的 90 分钟、1Hz 真实骑行统计仿真，当前 5913 断言通过；真机标准客户端时序观察仍待本轮构建后验证。
 
 ---
 
@@ -57,7 +68,7 @@
 - [x] 普通配网链路走 `radio_ctrl` + coex 共存：长按二次确认进入配网，BLE 默认不停，保存或超时后关闭 WiFi 原地回 `ST_BLE_ACTIVE`。
 - [x] 配网门户路由与前端校验已具备自动化覆盖：`tests/stage5_portal_test.py`、`tests/check_portal_structure.py`、`tests/check_portal_js.py`。
 - [x] Captive Portal DNS 与 10 个系统探测端点已实现：Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 探测路由统一 303 到首页，并注册 404 兜底覆盖未知探测路径。
-- [x] 核心数值可配置已就绪：固定/配速机器人模式分段切换、功率/踏频/心率浮动幅度（有界平滑游走）、心率锁定/联动，均经 `/api/config` 持久化到 NVS。
+- [x] 核心数值可配置已就绪：固定/配速机器人模式分段切换、功率/踏频双时间尺度动态、心率锁定/二阶联动，均经 `/api/config` 持久化到 NVS。
 - [x] 配网入口交互已补强：设备名铅笔编辑、保存成功强反馈、不关闭 WiFi 时可继续修改。
 - [x] 配置导入/导出基础能力已落到领域层：`config_store_serialize` / `config_store_deserialize` 支持 JSON 往返、缺字段默认值和范围夹紧。
 - [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、单一版本号、stable/fix 标识和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 GitHub Release。

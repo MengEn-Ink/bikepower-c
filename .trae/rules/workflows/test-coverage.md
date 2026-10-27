@@ -26,7 +26,7 @@
 - `button_logic.c`
 - `button_debounce.c`
 - `led_pattern.c`
-- 当前断言规模：`5892` 条（2026-10-22 本轮基线，0 失败）
+- 当前断言规模：`5913` 条（2026-10-27 本轮基线，0 失败）
 - 适用改动：
 - `components/bikepower_domain/` 下的逻辑变更
 - 配置 schema、范围校验、模式计算、心率模型变更

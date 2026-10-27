@@ -15,8 +15,8 @@
 | [Code Wiki 首页](wiki/00-home.md) | Wiki 目录、代码结构速览、关键设计原则、运行时架构图 |
 | [整体架构](wiki/01-architecture.md) | 三层架构概览、模块依赖 DAG、任务模型、目录详解、编译时资源处理、分区表 |
 | [应用层模块](wiki/02-app-layer.md) | app_main、app_state、button、led、board_detect、radio_ctrl、captive_portal、nvs_store、device_template_store、ble_scanner |
-| [领域层模块](wiki/03-domain-layer.md) | power_engine（三模式）、hr_model（四层心率）、running_engine、profile（配速机器人）、config_store（schema v11）、json_miniparse、button_logic、led_pattern |
-| [关键数据结构](wiki/04-key-data-structures.md) | app_evt_t、board_desc_t、power_engine_t（26字段详表）、snapshot_t、fluct_walk_t、profile_t、hr_state_t、running_engine_t、config_t、led_config_t、device_template_t |
+| [领域层模块](wiki/03-domain-layer.md) | power_engine（三模式分层动态）、hr_model（五层心率）、running_engine、profile（配速机器人）、config_store（schema v11）、json_miniparse、button_logic、led_pattern |
+| [关键数据结构](wiki/04-key-data-structures.md) | app_evt_t、board_desc_t、power_engine_t、snapshot_t、ride_dynamics_t、profile_t、hr_state_t、running_engine_t、config_t、led_config_t、device_template_t |
 | [状态机与事件](wiki/05-state-machine-and-events.md) | 7 态状态迁移图、10 种事件类型、按钮语义阈值、交互流程、长按回滚机制 |
 | [运行时数据流](wiki/06-runtime-flow.md) | 14 步启动流程、主循环 50ms 节拍、BLE 通知双时间尺度、配网完整时序、脏标记落盘、11 种异常恢复路径 |
 | [BLE 服务详解](wiki/07-ble-services.md) | 5+1 服务 UUID、两种运动 profile GATT 表、6 种数据包格式、FTMS 控制点 OpCode/Result Code、广播参数、双时间尺度通知、g_notify_lock 线程安全、DIS 字段 |

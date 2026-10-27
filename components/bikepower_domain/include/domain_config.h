@@ -110,11 +110,9 @@ typedef enum {
 #define RIDE_MODE_COUNT       3
 #define DEFAULT_RIDE_MODE     RIDE_MODE_STEADY
 
-// ===== ERG / road 模式实时抖动（训练 App 驱动，非用户可配） =====
-#define STEADY_POWER_FLUCT_LO    (-5)
-#define STEADY_POWER_FLUCT_HI    5
-#define STEADY_CADENCE_FLUCT_LO  (-2)
-#define STEADY_CADENCE_FLUCT_HI  2
+// ===== ERG / road 模式实时动态幅度（训练 App 驱动，非用户可配） =====
+#define ERG_POWER_FLOAT          5
+#define MODE_CADENCE_FLOAT       2
 #define STEADY_USER_HR_TAU       8
 #define STEADY_USER_HR_TARGET_HOLD_LOOPS  100
 
@@ -123,22 +121,31 @@ typedef enum {
 // amp=0 时输出恒定为基准值。
 #define POWER_FLOAT_MIN          0
 #define POWER_FLOAT_MAX          100
-#define POWER_FLOAT_DEFAULT      5
+#define POWER_FLOAT_DEFAULT      30
 #define CADENCE_FLOAT_MIN        0
 #define CADENCE_FLOAT_MAX        20
-#define CADENCE_FLOAT_DEFAULT    2
+#define CADENCE_FLOAT_DEFAULT    4
 #define HR_FLOAT_MIN             0
 #define HR_FLOAT_MAX             20
 #define HR_FLOAT_DEFAULT         2
 
-// ===== 平滑随机游走参数（有界游走，非逐拍随机） =====
-// 每 FLUCT_WALK_HOLD_LOOPS 拍在浮动带内重采样一个目标，再用一阶指数逼近，输出恒在带内。
-#define FLUCT_WALK_TAU           3      // 逼近时间常数（秒）
-#define FLUCT_WALK_HOLD_LOOPS    60     // 目标保持循环数（60*50ms=3s）后重采样
+// ===== 骑行分层动态参数 =====
+// 慢层模拟路况与体力趋势，快层每秒更新一次模拟踩踏及传感器波动；两层合成后仍受浮动幅度约束。
+#define RIDE_DYNAMICS_SLOW_SHARE_PCT       60
+#define RIDE_DYNAMICS_SLOW_TAU_SEC          8
+#define RIDE_DYNAMICS_SLOW_HOLD_MIN_LOOPS  200
+#define RIDE_DYNAMICS_SLOW_HOLD_MAX_LOOPS  600
+#define RIDE_DYNAMICS_FAST_UPDATE_LOOPS    20
+#define RIDE_DYNAMICS_FAST_ALPHA           0.40f
+#define RIDE_CADENCE_COUPLING_DIVISOR       3
+#define RUN_FLUCT_WALK_TAU                   3
+#define RUN_FLUCT_WALK_HOLD_LOOPS           60
 
 // ===== 心率动力学（一阶指数逼近） =====
 #define HR_TAU_RISE           30
 #define HR_TAU_FALL           60
+#define HR_LOAD_TAU_RISE      8
+#define HR_LOAD_TAU_FALL      15
 #define HR_LOOP_INTERVAL_MS   50
 
 // ===== 对外心率台阶保持 =====

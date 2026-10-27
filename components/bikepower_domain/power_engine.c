@@ -1,11 +1,12 @@
 /**
  * 功率数据引擎实现 — 见 power_engine.h
  */
+#include <math.h>
+#include <string.h>
+
 #include "domain_config.h"
 #include "domain_rng.h"
 #include "power_engine.h"
-#include <math.h>
-#include <string.h>
 
 static int clampi(int v, int lo, int hi)
 {
@@ -31,47 +32,81 @@ static int running_equivalent_power(power_engine_t *e, int speed_x100_kmh)
     return clamp_power(ftp * pct / 100);
 }
 
-/*
- * 在浮动带内推进一次有界平滑随机游走，返回相对基准值的整数偏移。
- * 参数：w 为游走状态；amp 为 ± 浮动幅度（<=0 表示恒定，偏移恒为 0）。
- * 返回值：当前偏移量（四舍五入到整数），始终落在 [-amp, +amp] 内。
- * 特殊行为：每 FLUCT_WALK_HOLD_LOOPS 拍在带内重采样目标，再一阶指数逼近，
- *           保证输出平稳变化而非逐拍随机跳变；amp 变化导致越界时会重置到带内。
- */
-static int fluct_walk_step(fluct_walk_t *w, int amp)
+static void ride_dynamics_reset(ride_dynamics_t *d)
 {
-    if (amp <= 0) {
-        w->value = 0.0f;
-        w->target = 0;
-        w->hold = 0;
-        w->init = true;
-        return 0;
-    }
-    if (!w->init || w->value < (float)(-amp) || w->value > (float)amp) {
-        w->value = 0.0f;
-        w->hold = 0;
-        w->init = true;
-    }
-    if (w->hold <= 0) {
-        w->target = domain_rng_range(-amp, amp);
-        w->hold = FLUCT_WALK_HOLD_LOOPS;
-    } else {
-        w->hold--;
-    }
-    float dt = (float)HR_LOOP_INTERVAL_MS / 1000.0f;
-    float alpha = 1.0f - expf(-dt / (float)FLUCT_WALK_TAU);
-    w->value = w->value + alpha * ((float)w->target - w->value);
-    if (w->value < (float)(-amp)) w->value = (float)(-amp);
-    else if (w->value > (float)amp) w->value = (float)amp;
-    return (int)(w->value >= 0 ? w->value + 0.5f : w->value - 0.5f);
+    d->slow_value = 0.0f;
+    d->fast_value = 0.0f;
+    d->slow_target = 0;
+    d->slow_hold = 0;
+    d->fast_hold = 0;
+    d->init = false;
 }
 
-static void fluct_walk_reset(fluct_walk_t *w)
+/*
+ * 合成有界的双时间尺度骑行偏移。
+ * 慢层每 10-30 秒重采样目标并平滑逼近；快层每秒吸收一次有界随机扰动。
+ * amp=0 时严格返回 0，任何 amp 下合成结果都不会越过 [-amp, +amp]。
+ */
+static int ride_dynamics_step(ride_dynamics_t *d, int amp)
 {
-    w->value = 0.0f;
-    w->target = 0;
-    w->hold = 0;
-    w->init = false;
+    if (amp <= 0) {
+        ride_dynamics_reset(d);
+        d->init = true;
+        return 0;
+    }
+    int slow_limit = (amp * RIDE_DYNAMICS_SLOW_SHARE_PCT + 50) / 100;
+    slow_limit = clampi(slow_limit, 1, amp);
+    int fast_limit = amp - slow_limit;
+    if (!d->init || fabsf(d->slow_value) > (float)slow_limit
+        || fabsf(d->fast_value) > (float)fast_limit) {
+        ride_dynamics_reset(d);
+        d->init = true;
+    }
+    if (d->slow_hold <= 0) {
+        d->slow_target = domain_rng_range(-slow_limit, slow_limit);
+        d->slow_hold = domain_rng_range(RIDE_DYNAMICS_SLOW_HOLD_MIN_LOOPS,
+                                         RIDE_DYNAMICS_SLOW_HOLD_MAX_LOOPS);
+    } else {
+        d->slow_hold--;
+    }
+    float dt = (float)HR_LOOP_INTERVAL_MS / 1000.0f;
+    float slow_alpha = dt / (float)RIDE_DYNAMICS_SLOW_TAU_SEC;
+    d->slow_value += slow_alpha * ((float)d->slow_target - d->slow_value);
+    if (fast_limit > 0 && d->fast_hold <= 0) {
+        float fast_target = (float)domain_rng_range(-fast_limit, fast_limit);
+        d->fast_value += RIDE_DYNAMICS_FAST_ALPHA * (fast_target - d->fast_value);
+        d->fast_hold = RIDE_DYNAMICS_FAST_UPDATE_LOOPS - 1;
+    } else if (d->fast_hold > 0) {
+        d->fast_hold--;
+    }
+    if (d->slow_value < (float)(-slow_limit)) d->slow_value = (float)(-slow_limit);
+    else if (d->slow_value > (float)slow_limit) d->slow_value = (float)slow_limit;
+    if (d->fast_value < (float)(-fast_limit)) d->fast_value = (float)(-fast_limit);
+    else if (d->fast_value > (float)fast_limit) d->fast_value = (float)fast_limit;
+    float combined = d->slow_value + d->fast_value;
+    if (combined < (float)(-amp)) combined = (float)(-amp);
+    else if (combined > (float)amp) combined = (float)amp;
+    return (int)(combined >= 0.0f ? combined + 0.5f : combined - 0.5f);
+}
+
+static int coupled_cadence(power_engine_t *e, int power_offset, int power_amp, int cadence_amp)
+{
+    if (cadence_amp <= 0) {
+        ride_dynamics_step(&e->cadence_dynamics, 0);
+        return e->cadence_base;
+    }
+    int coupling_limit = (cadence_amp + RIDE_CADENCE_COUPLING_DIVISOR - 1)
+                       / RIDE_CADENCE_COUPLING_DIVISOR;
+    int independent_amp = cadence_amp - coupling_limit;
+    int independent = ride_dynamics_step(&e->cadence_dynamics, independent_amp);
+    int coupled = 0;
+    if (power_amp > 0) {
+        float ratio = (float)power_offset / (float)power_amp;
+        float scaled = ratio * (float)coupling_limit;
+        coupled = (int)(scaled >= 0.0f ? scaled + 0.5f : scaled - 0.5f);
+    }
+    int offset = clampi(independent + coupled, -cadence_amp, cadence_amp);
+    return clamp_cadence(e->cadence_base + offset);
 }
 
 /*
@@ -91,8 +126,8 @@ void power_engine_init(power_engine_t *e)
     e->cadence_float = CADENCE_FLOAT_DEFAULT;
     e->hr_float = HR_FLOAT_DEFAULT;
     e->power_step = POWER_STEP_DEFAULT;
-    fluct_walk_reset(&e->power_walk);
-    fluct_walk_reset(&e->cadence_walk);
+    ride_dynamics_reset(&e->power_dynamics);
+    ride_dynamics_reset(&e->cadence_dynamics);
     e->mode = DEFAULT_RIDE_MODE;
     e->erg_active_target = 0;
     e->has_erg_target = false;
@@ -115,27 +150,28 @@ void power_engine_init(power_engine_t *e)
     power_engine_reset_mode_state(e);
 }
 
-static int target_heartrate(power_engine_t *e, int power)
+static int linked_heartrate(power_engine_t *e, int power)
 {
-    if (e->has_user_hr && e->mode == RIDE_MODE_STEADY) {
-        return e->user_heartrate;
-    }
-    return hr_model_ftp_zone(&e->hr, power, e->profile.ftp, e->profile.thr_hr);
+    int load_power = hr_model_smooth_load(&e->hr, power);
+    int target_hr = hr_model_ftp_zone(&e->hr, load_power, e->profile.ftp, e->profile.thr_hr);
+    int hr = hr_model_smooth(&e->hr, target_hr);
+    return hr_model_emit(&e->hr, hr_clamp((int)(hr + hr_model_variation(&e->hr))));
 }
 
 /*
  * 按当前模式重置内部功率、踏频和心率变异状态。
  * 参数：e 为功率引擎对象。
  * 返回值：无。
- * 特殊行为：road 模式按配速机器人下限功体比初始化功率，ERG 模式优先使用激活目标功率，并重置 HRV 累加器。
+ * 特殊行为：road 模式按配速机器人功率区间中点初始化，ERG 模式优先使用激活目标功率，并重置负荷与 HRV 状态。
  */
 void power_engine_reset_mode_state(power_engine_t *e)
 {
     if (e->mode == RIDE_MODE_ROAD) {
         int wkg_low, wkg_high;
         profile_effective_wkg(&e->profile, &wkg_low, &wkg_high);
-        (void)wkg_high;
-        e->last_power = e->profile.weight * wkg_low / 10;
+        int low_power = clamp_power(e->profile.weight * wkg_low / 10);
+        int high_power = clamp_power(e->profile.weight * wkg_high / 10);
+        e->last_power = low_power + (high_power - low_power) / 2;
         e->last_cadence = e->cadence_base;
     } else if (e->mode == RIDE_MODE_ERG) {
         e->last_power = e->has_erg_target ? e->erg_active_target : e->base_power;
@@ -144,8 +180,9 @@ void power_engine_reset_mode_state(power_engine_t *e)
         e->last_power = e->base_power;
         e->last_cadence = e->cadence_base;
     }
-    fluct_walk_reset(&e->power_walk);
-    fluct_walk_reset(&e->cadence_walk);
+    ride_dynamics_reset(&e->power_dynamics);
+    ride_dynamics_reset(&e->cadence_dynamics);
+    hr_model_reset_load(&e->hr, e->last_power);
     hr_model_reset_variation(&e->hr);
 }
 
@@ -158,11 +195,11 @@ void power_engine_reset_mode_state(power_engine_t *e)
 static void build_erg(power_engine_t *e, int *po, int *co, int *ho)
 {
     int target = e->has_erg_target ? e->erg_active_target : e->base_power;
-    int power = clamp_power(target + domain_rng_range(STEADY_POWER_FLUCT_LO, STEADY_POWER_FLUCT_HI));
-    int cadence = clamp_cadence(e->cadence_base + domain_rng_range(STEADY_CADENCE_FLUCT_LO, STEADY_CADENCE_FLUCT_HI));
-    int target_hr = target_heartrate(e, power);
-    int hr = hr_model_smooth(&e->hr, target_hr);
-    hr = hr_model_emit(&e->hr, hr_clamp((int)(hr + hr_model_variation(&e->hr))));
+    int power_amp = ERG_POWER_FLOAT;
+    int offset = ride_dynamics_step(&e->power_dynamics, power_amp);
+    int power = clamp_power(target + offset);
+    int cadence = coupled_cadence(e, offset, power_amp, MODE_CADENCE_FLOAT);
+    int hr = linked_heartrate(e, power);
     *po = power; *co = cadence; *ho = hr;
 }
 
@@ -175,16 +212,15 @@ static void build_erg(power_engine_t *e, int *po, int *co, int *ho)
  */
 static void build_steady(power_engine_t *e, int *po, int *co, int *ho)
 {
-    int power = clamp_power(e->base_power + fluct_walk_step(&e->power_walk, e->power_float));
-    int cadence = clamp_cadence(e->cadence_base + fluct_walk_step(&e->cadence_walk, e->cadence_float));
+    int offset = ride_dynamics_step(&e->power_dynamics, e->power_float);
+    int power = clamp_power(e->base_power + offset);
+    int cadence = coupled_cadence(e, offset, e->power_float, e->cadence_float);
     if (e->has_user_hr) {
         *po = power; *co = cadence;
         *ho = hr_model_steady_user(&e->hr, e->user_heartrate, e->hr_float);
         return;
     }
-    int target_hr = target_heartrate(e, power);
-    int hr = hr_model_smooth(&e->hr, target_hr);
-    hr = hr_model_emit(&e->hr, hr_clamp((int)(hr + hr_model_variation(&e->hr))));
+    int hr = linked_heartrate(e, power);
     *po = power; *co = cadence; *ho = hr;
 }
 
@@ -198,13 +234,14 @@ static void build_road(power_engine_t *e, int *po, int *co, int *ho)
 {
     int wkg_low, wkg_high;
     profile_effective_wkg(&e->profile, &wkg_low, &wkg_high);
-    int wkg = domain_rng_range(wkg_low, wkg_high);
-    int raw_power = e->profile.weight * wkg / 10;
-    int power = clamp_power(raw_power);
-    int cadence = clamp_cadence(e->cadence_base + domain_rng_range(STEADY_CADENCE_FLUCT_LO, STEADY_CADENCE_FLUCT_HI));
-    int target_hr = hr_model_ftp_zone(&e->hr, power, e->profile.ftp, e->profile.thr_hr);
-    int hr = hr_model_smooth(&e->hr, target_hr);
-    hr = hr_model_emit(&e->hr, hr_clamp((int)(hr + hr_model_variation(&e->hr))));
+    int low_power = clamp_power(e->profile.weight * wkg_low / 10);
+    int high_power = clamp_power(e->profile.weight * wkg_high / 10);
+    int center = low_power + (high_power - low_power) / 2;
+    int power_amp = (high_power - low_power + 1) / 2;
+    int offset = ride_dynamics_step(&e->power_dynamics, power_amp);
+    int power = clampi(center + offset, low_power, high_power);
+    int cadence = coupled_cadence(e, power - center, power_amp, MODE_CADENCE_FLOAT);
+    int hr = linked_heartrate(e, power);
     *po = power; *co = cadence; *ho = hr;
 }
 
@@ -329,6 +366,7 @@ void power_engine_clear_user_hr(power_engine_t *e)
     if (!e->has_user_hr) return;
     e->has_user_hr = false;
     e->user_heartrate = 0;
+    hr_model_reset_load(&e->hr, e->last_power);
     hr_model_reset_variation(&e->hr);
     e->dirty = true;
 }
@@ -344,7 +382,7 @@ bool power_engine_set_power_float(power_engine_t *e, int amp)
     amp = clampi(amp, POWER_FLOAT_MIN, POWER_FLOAT_MAX);
     if (e->power_float == amp) return false;
     e->power_float = amp;
-    fluct_walk_reset(&e->power_walk);
+    ride_dynamics_reset(&e->power_dynamics);
     e->dirty = true;
     return true;
 }
@@ -360,7 +398,7 @@ bool power_engine_set_cadence_float(power_engine_t *e, int amp)
     amp = clampi(amp, CADENCE_FLOAT_MIN, CADENCE_FLOAT_MAX);
     if (e->cadence_float == amp) return false;
     e->cadence_float = amp;
-    fluct_walk_reset(&e->cadence_walk);
+    ride_dynamics_reset(&e->cadence_dynamics);
     e->dirty = true;
     return true;
 }
@@ -461,7 +499,11 @@ bool power_engine_set_sport_profile(power_engine_t *e, sport_profile_t profile)
     e->sport_profile = profile;
     if (profile == SPORT_PROFILE_RUNNING) {
         running_engine_set_running(&e->running, true);
+        hr_model_reset_load(&e->hr, running_equivalent_power(e, e->running.speed_x100_kmh));
+    } else {
+        hr_model_reset_load(&e->hr, e->last_power);
     }
+    hr_model_reset_variation(&e->hr);
     e->dirty = true;
     return true;
 }
@@ -542,9 +584,7 @@ int power_engine_running_heartrate(power_engine_t *e, int speed_x100_kmh)
         hr = hr_model_steady_user(&e->hr, e->user_heartrate, e->hr_float);
     } else {
         int eq_power = running_equivalent_power(e, speed_x100_kmh);
-        int target_hr = hr_model_ftp_zone(&e->hr, eq_power, e->profile.ftp, e->profile.thr_hr);
-        hr = hr_model_smooth(&e->hr, target_hr);
-        hr = hr_model_emit(&e->hr, hr_clamp((int)(hr + hr_model_variation(&e->hr))));
+        hr = linked_heartrate(e, eq_power);
     }
     e->last_heartrate = hr;
     e->snapshot.heartrate = hr;

@@ -29,6 +29,8 @@ int hr_clamp(int v)
  */
 void hr_model_init(hr_state_t *st, int initial_hr)
 {
+    st->load_power = 0.0f;
+    st->load_power_init = false;
     st->hr_float = (float)initial_hr;
     st->hr_float_init = true;
     st->hrv_tick = 0;
@@ -45,6 +47,26 @@ void hr_model_init(hr_state_t *st, int initial_hr)
     st->user_hr_hold = 0;
     st->user_hr_target_init = false;
     st->last_clamped_hr = 0;
+}
+
+void hr_model_reset_load(hr_state_t *st, int power)
+{
+    st->load_power = (float)power;
+    st->load_power_init = true;
+}
+
+int hr_model_smooth_load(hr_state_t *st, int power)
+{
+    if (!st->load_power_init) {
+        hr_model_reset_load(st, power);
+        return power;
+    }
+    float dt = (float)HR_LOOP_INTERVAL_MS / 1000.0f;
+    float tau = ((float)power > st->load_power)
+              ? (float)HR_LOAD_TAU_RISE : (float)HR_LOAD_TAU_FALL;
+    float alpha = dt / tau;
+    st->load_power += alpha * ((float)power - st->load_power);
+    return (int)(st->load_power + 0.5f);
 }
 
 /*

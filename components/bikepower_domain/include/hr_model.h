@@ -3,7 +3,7 @@
  * 由 MicroPython ride_modes.py 的心率相关方法移植：
  *   _ftp_zone_heartrate / _smooth_heartrate / _hr_variation /
  *   _emit_heartrate / _steady_user_heartrate
- * 模型: HR(t) = HR_old + alpha*(HR_target - HR_old), alpha = 1 - exp(-dt/tau)
+ * 模型: 瞬时功率先经过负荷滤波，再做 FTP 区间映射、非对称心率平滑、HRV 和输出限速。
  */
 #pragma once
 
@@ -15,6 +15,8 @@
  * 用途：保存心率平滑、HRV 变异、对外发射节流和固定用户心率模式所需的全部运行时数据。
  */
 typedef struct {
+    float load_power;
+    bool  load_power_init;
     // 一阶平滑累加器
     float hr_float;
     bool  hr_float_init;
@@ -49,6 +51,12 @@ void hr_model_reset_variation(hr_state_t *st);
 
 /* 直接设置固定用户心率，并同步重置相关内部累加器。 */
 void hr_model_set_user_hr(hr_state_t *st, int value);
+
+/* 重置功率负荷滤波器，用于初始化和模式切换。 */
+void hr_model_reset_load(hr_state_t *st, int power);
+
+/* 将瞬时功率转换为带生理惯性的负荷功率。 */
+int hr_model_smooth_load(hr_state_t *st, int power);
 
 /* 按 FTP 分区把当前功率映射为目标心率，并在返回前做边界钳制。 */
 int hr_model_ftp_zone(hr_state_t *st, int power, int ftp, int thr_hr);

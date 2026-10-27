@@ -467,21 +467,21 @@ Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述�
 
 `build_steady()` 的特点：
 
-- 功率在 `base_power` 上叠加 `[-power_float, +power_float]` 的有界平滑随机游走偏移
-- 踏频在 `cadence_base` 上叠加 `[-cadence_float, +cadence_float]` 的有界平滑随机游走偏移
-- 浮动幅度 `power_float` / `cadence_float` / `hr_float` 可在配网页调整并持久化（默认 ±5 W / ±2 rpm / ±2 bpm，范围见 `domain_config.h` 的 `*_FLOAT_MIN/MAX`）
+- 功率在 `base_power` 上叠加 `[-power_float, +power_float]` 的双时间尺度有界偏移
+- 踏频在 `cadence_base` 上叠加独立动态和功率弱耦合偏移，结果仍限制在 `[-cadence_float, +cadence_float]`
+- 浮动幅度 `power_float` / `cadence_float` / `hr_float` 可在配网页调整并持久化（新配置默认 ±30 W / ±4 rpm / ±2 bpm，已有 NVS 配置不自动改写）
 - 浮动为 0 时对应量恒定输出基准值
-- 平滑游走（`fluct_walk_step`）：每 `FLUCT_WALK_HOLD_LOOPS`（默认 60 拍≈3s）在浮动带内重采样一个目标偏移，再按时间常数 `FLUCT_WALK_TAU` 一阶指数逼近，输出始终限制在带内，因此平稳变化、不逐拍随机跳变
+- 分层动态（`ride_dynamics_step`）：慢层每 10-30 秒重采样路况/体力趋势并按 8 秒时间常数逼近，快层每秒吸收一次踩踏/传感器扰动；两层合成后仍严格限制在浮动带内
 - 如果 `has_user_hr` 为真，则走 `hr_model_steady_user(st, user_hr, hr_float)`（心率按 `hr_float` 幅度平稳波动，`hr_float=0` 恒定）
-- 否则按 FTP 区间推导目标心率，再走平滑和 HRV
+- 否则先把瞬时功率转换为带生理惯性的负荷功率，再按 FTP 区间推导目标心率，最后走心率平滑和 HRV
 
 ### 6.5 Road 模式
 
 `build_road()` 的特点：
 
 - 预设档按当前 `ride_type` 取 `ROAD_PACERS[]`；自定义档 `ride_type=5` 取 profile 中的 `custom_wkg_low/high`
-- 在对应 `wkg_low` 到 `wkg_high` 之间随机取样
-- 计算公式约为 `power = weight * wkg / 10`
+- 将对应 `wkg_low` 到 `wkg_high` 换算成功率上下界
+- 以区间中点为长期中心，复用分层动态生成有连续性的功率，结果始终限制在 W/kg 功率区间内
 - 再按功率推导目标心率
 - 自定义档昵称 `custom_pacer_name` 会持久化，并在网页下拉框中与当前 W/kg 区间一起显示
 
@@ -500,8 +500,8 @@ Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述�
 
 - 若 `has_erg_target` 为真，则目标功率优先取 `erg_active_target`
 - 否则退回 `base_power`
-- 在目标上仍叠加少量功率波动
-- 踏频仍保留小幅随机波动
+- 在目标上叠加 ±5W 的相关分层波动，不再逐拍独立抽样
+- 踏频保留小幅动态，并与功率偏移弱耦合
 - 心率路径仍走目标心率 + 平滑 + HRV + emit
 
 这意味着 ERG 不是硬钉死一个完全平坦的瓦数，而是保留轻微“真实感”波动。
@@ -512,10 +512,10 @@ Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述�
 
 重置行为：
 
-- `RIDE_MODE_ROAD`：按配速机器人下限功体比初始化 `last_power`
+- `RIDE_MODE_ROAD`：按配速机器人功率区间中点初始化 `last_power`
 - `RIDE_MODE_ERG`：优先用 `erg_active_target` 初始化
 - `RIDE_MODE_STEADY`：恢复到 `base_power` / `cadence_base`
-- 所有模式切换后都调用 `hr_model_reset_variation()`
+- 所有模式切换后都重置功率/踏频分层动态、负荷功率状态和 HRV 变异状态
 
 ### 6.8 ERG 目标写入行为
 
@@ -543,14 +543,19 @@ Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，�
 ## 第七章：心率模型
 
 心率模型位于 `components/bikepower_domain/hr_model.c`。
-它不是简单的“功率乘一个系数”，而是由四层行为叠加：
+它不是简单的“功率乘一个系数”，而是由五层行为叠加：
 
-1. FTP 区间映射
-2. 一阶指数平滑
-3. HRV 变异叠加
-4. 对外输出限速
+1. 功率负荷滤波
+2. FTP 区间映射
+3. 心率一阶指数平滑
+4. HRV 变异叠加
+5. 对外输出限速
 
-### 7.1 FTP 6 区映射
+### 7.1 功率负荷滤波
+
+`hr_model_smooth_load()` 在瞬时功率和 FTP 心率映射之间增加生理负荷状态。功率上升时间常数为 8 秒、下降为 15 秒，用于过滤短时踩踏尖峰，并与后续 30/60 秒心率平滑组成轻量二阶响应。
+
+### 7.2 FTP 6 区映射
 
 `hr_model_ftp_zone()` 根据 `power / ftp` 百分比推导 `hr_pct`。
 分段大致如下：
@@ -569,7 +574,7 @@ Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，�
 
 得到的 `hr_pct` 再乘以 `thr_hr`，最后经 `hr_clamp()` 限制到 `HR_MIN=60` 和 `HR_MAX=200`。
 
-### 7.2 一阶指数平滑
+### 7.3 一阶指数平滑
 
 `hr_model_smooth()` 使用公式：
 
@@ -587,7 +592,7 @@ Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，�
 
 这使得升心率比降心率更快，符合真实骑行体感。
 
-### 7.3 HRV 波动
+### 7.4 HRV 波动
 
 `hr_model_variation()` 每秒左右更新一次缓存。
 叠加项包括：
@@ -605,7 +610,7 @@ Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，�
 - `HRV_DRIFT_RATE_BPM_PER_MIN = 0.05f`
 - `HRV_DRIFT_CAP_BPM = 5.0f`
 
-### 7.4 对外输出限速
+### 7.5 对外输出限速
 
 `hr_model_emit()` 不是直接把内部平滑值原样输出。
 它先看与当前对外值的差：
@@ -616,7 +621,7 @@ Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，�
 
 这样设计的目的是让 BLE 心率通知更接近真实设备，而不是每秒跳一大截。
 
-### 7.5 用户固定心率路径
+### 7.6 用户固定心率路径
 
 在 `Steady` 模式下，如果用户设置了心率：
 

@@ -68,8 +68,8 @@ typedef struct {
 | `cadence_float` | `int` | 踏频浮动幅度（±RPM，Steady 模式） |
 | `hr_float` | `int` | 锁定心率浮动幅度（±BPM） |
 | `power_step` | `int` | 物理按钮调功步进（W），默认 20，可配 |
-| `power_walk` | `fluct_walk_t` | 功率平滑游走状态 |
-| `cadence_walk` | `fluct_walk_t` | 踏频平滑游走状态 |
+| `power_dynamics` | `ride_dynamics_t` | 功率双时间尺度动态状态 |
+| `cadence_dynamics` | `ride_dynamics_t` | 踏频双时间尺度动态状态 |
 | `mode` | `ride_mode_t` | 当前骑行模式（Steady/Road/ERG） |
 | `erg_active_target` | `int` | FTMS ERG 目标功率（W） |
 | `has_erg_target` | `bool` | 是否有活跃 ERG 目标 |
@@ -99,18 +99,20 @@ typedef struct {
 
 主循环每 50ms 调用 `power_engine_snapshot()` 更新 `s_engine.snapshot`，BLE 通知定时器每 1s 取最新值发送。
 
-### fluct_walk_t — 有界平滑随机游走
+### ride_dynamics_t — 骑行双时间尺度动态
 
 ```c
 typedef struct {
-    float value;  // 当前连续偏移量（相对基准值）
-    int target;   // 当前目标偏移量（带内随机重采样）
-    int hold;     // 当前目标剩余保持拍数
-    bool init;    // 是否已初始化
-} fluct_walk_t;
+    float slow_value;
+    float fast_value;
+    int slow_target;
+    int slow_hold;
+    int fast_hold;
+    bool init;
+} ride_dynamics_t;
 ```
 
-算法：每 `FLUCT_WALK_HOLD_LOOPS`（60拍≈3s）在 `[-amp, +amp]` 内重采样 target，然后按 `FLUCT_WALK_TAU`（0.8）一阶指数逼近 value，输出始终夹在带内。
+算法：慢层表示 10-30 秒尺度的路况/体力趋势，快层表示每秒踩踏扰动；合成偏移始终夹在 `[-amp, +amp]` 内。
 
 ### profile_t — 用户档案
 
@@ -130,7 +132,7 @@ typedef struct {
 
 **定义位置**：[hr_model.h](../../components/bikepower_domain/include/hr_model.h)
 
-包含内部平滑值、HRV 相位、漂移量、对外输出值等，不对外暴露字段细节，通过 `hr_model_*` 函数操作。
+包含负荷功率、内部心率平滑值、HRV 相位、漂移量和对外输出值等，通过 `hr_model_*` 函数操作。
 
 ### running_engine_t — 跑步引擎状态
 
@@ -148,7 +150,7 @@ typedef struct {
 | `pace_low_sec` | `int` | 配速下限（秒/公里） |
 | `pace_high_sec` | `int` | 配速上限（秒/公里） |
 | `custom_name` | `char[]` | 自定义跑步配速名称 |
-| 游走状态 | `fluct_walk_t` | 速度/步频浮动 |
+| 游走状态 | `running_walk_t` | 速度/步频浮动 |
 
 ### running_snapshot_t — 跑步快照
 

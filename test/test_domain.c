@@ -4,6 +4,7 @@
  * 编译: make -C test  或  clang -I../components/.../include ...
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "domain_config.h"
@@ -23,10 +24,72 @@
 static int g_pass = 0;
 static int g_fail = 0;
 
+#define RIDE_SIM_SECONDS 5400
+#define RIDE_SIM_TICKS_PER_SECOND (1000 / HR_LOOP_INTERVAL_MS)
+
+static int s_sim_power[RIDE_SIM_SECONDS];
+static int s_sim_cadence[RIDE_SIM_SECONDS];
+static int s_sim_hr[RIDE_SIM_SECONDS];
+static int s_sim_delta[RIDE_SIM_SECONDS - 1];
+
 #define CHECK(cond, msg) do { \
     if (cond) { g_pass++; } \
     else { g_fail++; printf("  FAIL: %s (%s:%d)\n", msg, __FILE__, __LINE__); } \
 } while (0)
+
+static int compare_int(const void *a, const void *b)
+{
+    int lhs = *(const int *)a;
+    int rhs = *(const int *)b;
+    return (lhs > rhs) - (lhs < rhs);
+}
+
+static double series_mean(const int *values, int count)
+{
+    double sum = 0.0;
+    for (int i = 0; i < count; i++) sum += values[i];
+    return sum / count;
+}
+
+static double series_stddev(const int *values, int count, double mean)
+{
+    double sum = 0.0;
+    for (int i = 0; i < count; i++) {
+        double delta = values[i] - mean;
+        sum += delta * delta;
+    }
+    return sqrt(sum / count);
+}
+
+static double series_correlation(const int *lhs, const int *rhs, int count, int lag)
+{
+    int pairs = count - lag;
+    double lhs_mean = series_mean(lhs, pairs);
+    double rhs_mean = series_mean(rhs + lag, pairs);
+    double covariance = 0.0;
+    double lhs_variance = 0.0;
+    double rhs_variance = 0.0;
+    for (int i = 0; i < pairs; i++) {
+        double lhs_delta = lhs[i] - lhs_mean;
+        double rhs_delta = rhs[i + lag] - rhs_mean;
+        covariance += lhs_delta * rhs_delta;
+        lhs_variance += lhs_delta * lhs_delta;
+        rhs_variance += rhs_delta * rhs_delta;
+    }
+    if (lhs_variance <= 0.0 || rhs_variance <= 0.0) return 0.0;
+    return covariance / sqrt(lhs_variance * rhs_variance);
+}
+
+static int absolute_delta_percentile(const int *values, int count, int percentile)
+{
+    for (int i = 1; i < count; i++) {
+        int delta = values[i] - values[i - 1];
+        s_sim_delta[i - 1] = delta < 0 ? -delta : delta;
+    }
+    qsort(s_sim_delta, (size_t)(count - 1), sizeof(s_sim_delta[0]), compare_int);
+    int index = (count - 2) * percentile / 100;
+    return s_sim_delta[index];
+}
 
 static void test_profile(void)
 {
@@ -104,6 +167,22 @@ static void test_hr_smooth(void)
     int u_remain = 150 - (int)up.hr_float;
     int d_remain = (int)down.hr_float - 150;
     CHECK(d_remain >= u_remain, "下降残差>=上升残差(tau_fall>tau_rise)");
+
+    hr_state_t load_up, load_down;
+    hr_model_init(&load_up, 100);
+    hr_model_init(&load_down, 100);
+    hr_model_reset_load(&load_up, 100);
+    hr_model_reset_load(&load_down, 200);
+    for (int i = 0; i < RIDE_SIM_TICKS_PER_SECOND; i++) {
+        hr_model_smooth_load(&load_up, 200);
+        hr_model_smooth_load(&load_down, 100);
+    }
+    CHECK(load_up.load_power > 100.0f && load_up.load_power < 200.0f,
+          "负荷功率上升具有惯性");
+    CHECK(load_down.load_power > 100.0f && load_down.load_power < 200.0f,
+          "负荷功率下降具有惯性");
+    CHECK((200.0f - load_down.load_power) < (load_up.load_power - 100.0f),
+          "负荷下降时间常数大于上升时间常数");
 }
 
 static void test_emit_deadband(void)
@@ -172,7 +251,7 @@ static void test_erg(void)
     domain_rng_seed(42);
     for (int i = 0; i < 50; i++) {
         snapshot_t s = power_engine_snapshot(&e);
-        CHECK(s.power >= 250 + STEADY_POWER_FLUCT_LO && s.power <= 250 + STEADY_POWER_FLUCT_HI,
+        CHECK(s.power >= 250 - ERG_POWER_FLOAT && s.power <= 250 + ERG_POWER_FLOAT,
               "ERG功率在目标±5内");
         CHECK(s.mode == RIDE_MODE_ERG, "快照模式=ERG");
     }
@@ -324,6 +403,15 @@ static void test_road_pacer(void)
         snapshot_t s = power_engine_snapshot(&e);
         CHECK(s.power >= lo && s.power <= hi, "coco 功率在功体比范围内");
     }
+    for (int second = 0; second < 120; second++) {
+        snapshot_t s = { 0 };
+        for (int tick = 0; tick < RIDE_SIM_TICKS_PER_SECOND; tick++) {
+            s = power_engine_snapshot(&e);
+        }
+        s_sim_power[second] = s.power;
+    }
+    CHECK(series_correlation(s_sim_power, s_sim_power, 120, 1) > 0.75,
+          "road功率具有秒级连续性而非独立随机跳变");
 
     // 自定义档：切到 custom，设范围 3.0~3.5 W/kg，功率应落在 weight*wkg 区间
     CHECK(power_engine_set_pacer_index(&e, PACER_INDEX_CUSTOM), "可切换到自定义档");
@@ -511,9 +599,9 @@ static void test_random_power_hr_following_scenario(void)
     power_engine_set_cadence_float(&e, 0);
     power_engine_clear_user_hr(&e);
 
-    int low_hr = settle_hr_for_power(&e, 80, 320);
-    int high_hr = settle_hr_for_power(&e, 420, 520);
-    int recovery_hr = settle_hr_for_power(&e, 120, 520);
+    int low_hr = settle_hr_for_power(&e, 80, 900);
+    int high_hr = settle_hr_for_power(&e, 420, 1200);
+    int recovery_hr = settle_hr_for_power(&e, 120, 1800);
 
     CHECK(high_hr > low_hr + 20, "高功率阶段心率显著高于低功率阶段");
     CHECK(recovery_hr < high_hr - 8, "功率回落后心率随动下降");
@@ -582,8 +670,8 @@ static void test_linked_hr_follows_pacer_and_running_speed(void)
     power_engine_set_run_pace_float(&e, 0);
     power_engine_clear_user_hr(&e);
 
-    int slow_run_hr = settle_hr_for_running_speed(&e, 600, 420);
-    int fast_run_hr = settle_hr_for_running_speed(&e, 1600, 620);
+    int slow_run_hr = settle_hr_for_running_speed(&e, 600, 600);
+    int fast_run_hr = settle_hr_for_running_speed(&e, 1600, 1200);
     CHECK(fast_run_hr > slow_run_hr + 10, "跑步配速变快后联动心率上升");
 
     CHECK(power_engine_set_heartrate(&e, 142), "跑步只控心率/锁定心率时可设置直接心率");
@@ -636,6 +724,77 @@ static void test_float_effect_scenario(void)
     CHECK(max_power > min_power, "功率浮动开启后输出不恒定");
     CHECK(max_cadence > min_cadence, "踏频浮动开启后输出不恒定");
     CHECK(max_hr > min_hr, "固定心率浮动开启后输出不恒定");
+}
+
+/*
+ * FIT 中间 5-85 分钟参考：190.7±20.7W，功率秒差 P50/P95=3/12W，
+ * AC1/AC5=0.962/0.741，功率/踏频相关=0.396，心率对功率滞后约 30-90 秒。
+ */
+static void test_reference_ride_simulation(void)
+{
+    printf("[test] 90分钟真实骑行统计仿真\n");
+    power_engine_t e;
+    power_engine_init(&e);
+    domain_rng_seed(20261027);
+    CHECK(power_engine_set_power(&e, 190), "仿真基准功率设为190W");
+    CHECK(power_engine_set_cadence(&e, 95), "仿真基准踏频设为95RPM");
+    CHECK(power_engine_set_power_float(&e, 50), "仿真功率浮动设为±50W");
+    CHECK(power_engine_set_cadence_float(&e, 5), "仿真踏频浮动设为±5RPM");
+    CHECK(profile_set_ftp(&e.profile, 250), "仿真FTP设为250W");
+    CHECK(profile_set_thr_hr(&e.profile, 180), "仿真阈值心率设为180BPM");
+    power_engine_clear_user_hr(&e);
+    power_engine_reset_mode_state(&e);
+
+    int min_power = POWER_MAX;
+    int max_power = POWER_MIN;
+    int min_cadence = CADENCE_MAX;
+    int max_cadence = CADENCE_MIN;
+    for (int second = 0; second < RIDE_SIM_SECONDS; second++) {
+        snapshot_t snapshot = { 0 };
+        for (int tick = 0; tick < RIDE_SIM_TICKS_PER_SECOND; tick++) {
+            snapshot = power_engine_snapshot(&e);
+        }
+        s_sim_power[second] = snapshot.power;
+        s_sim_cadence[second] = snapshot.cadence;
+        s_sim_hr[second] = snapshot.heartrate;
+        if (snapshot.power < min_power) min_power = snapshot.power;
+        if (snapshot.power > max_power) max_power = snapshot.power;
+        if (snapshot.cadence < min_cadence) min_cadence = snapshot.cadence;
+        if (snapshot.cadence > max_cadence) max_cadence = snapshot.cadence;
+    }
+
+    double power_mean = series_mean(s_sim_power, RIDE_SIM_SECONDS);
+    double power_stddev = series_stddev(s_sim_power, RIDE_SIM_SECONDS, power_mean);
+    int power_delta_p50 = absolute_delta_percentile(s_sim_power, RIDE_SIM_SECONDS, 50);
+    int power_delta_p95 = absolute_delta_percentile(s_sim_power, RIDE_SIM_SECONDS, 95);
+    double power_ac1 = series_correlation(s_sim_power, s_sim_power, RIDE_SIM_SECONDS, 1);
+    double power_ac5 = series_correlation(s_sim_power, s_sim_power, RIDE_SIM_SECONDS, 5);
+    double power_cadence_corr = series_correlation(s_sim_power, s_sim_cadence,
+                                                    RIDE_SIM_SECONDS, 0);
+    int hr_delta_p95 = absolute_delta_percentile(s_sim_hr, RIDE_SIM_SECONDS, 95);
+    double power_hr_corr_now = series_correlation(s_sim_power, s_sim_hr,
+                                                   RIDE_SIM_SECONDS, 0);
+    double power_hr_corr_lag30 = series_correlation(s_sim_power, s_sim_hr,
+                                                     RIDE_SIM_SECONDS, 30);
+    printf("  仿真 P=%.1f±%.1fW ΔP50=%dW ΔP95=%dW AC1=%.3f AC5=%.3f\n",
+           power_mean, power_stddev, power_delta_p50, power_delta_p95,
+           power_ac1, power_ac5);
+    printf("  仿真 P/C相关=%.3f HRΔ95=%dBPM P/HR相关 当前=%.3f 滞后30s=%.3f\n",
+           power_cadence_corr, hr_delta_p95, power_hr_corr_now, power_hr_corr_lag30);
+
+    CHECK(min_power >= 140 && max_power <= 240, "90分钟功率始终在190±50W内");
+    CHECK(min_cadence >= 90 && max_cadence <= 100, "90分钟踏频始终在95±5RPM内");
+    CHECK(power_mean >= 185.0 && power_mean <= 195.0, "长期平均功率保持基准附近");
+    CHECK(power_stddev >= 10.0 && power_stddev <= 26.0, "功率离散度接近真实骑行量级");
+    CHECK(power_delta_p50 >= 1 && power_delta_p50 <= 6, "功率秒差中位数接近真实骑行");
+    CHECK(power_delta_p95 >= 5 && power_delta_p95 <= 16, "功率秒差95分位接近真实骑行");
+    CHECK(power_ac1 >= 0.85 && power_ac1 <= 0.99, "功率具有秒级连续性");
+    CHECK(power_ac5 >= 0.45 && power_ac5 <= 0.95, "功率具有多秒惯性且不过度平坦");
+    CHECK(power_cadence_corr >= 0.15 && power_cadence_corr <= 0.75,
+          "踏频与功率保持真实的弱正相关");
+    CHECK(hr_delta_p95 <= 2, "心率95%秒差不超过2BPM");
+    CHECK(power_hr_corr_lag30 > power_hr_corr_now,
+          "心率对功率的30秒滞后相关高于即时相关");
 }
 
 static void test_web_config_persistence_scenario(void)
@@ -1648,6 +1807,7 @@ int main(void)
     test_random_power_hr_following_scenario();
     test_linked_hr_follows_pacer_and_running_speed();
     test_float_effect_scenario();
+    test_reference_ride_simulation();
     test_web_config_persistence_scenario();
     test_engine_blindspots();
     test_config_store();

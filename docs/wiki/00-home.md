@@ -7,7 +7,7 @@
 **BikePower C** 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，基于 ESP-IDF v5.5.4 + NimBLE + FreeRTOS 开发。它将原 MicroPython 版本完整重写为纯 C，支持：
 
 - 标准 BLE 骑行服务（CPS/HRS/CSC/FTMS/DIS/RSC）
-- 功率、踏频、心率数据模拟（含平滑随机游走、HRV）
+- 功率、踏频、心率数据模拟（含双时间尺度骑行动态、负荷心率响应、HRV）
 - FTMS ERG 控制支持
 - 实体按钮操作与 LED 状态提示
 - WiFi 配网门户（BLE/WiFi 共存模式）

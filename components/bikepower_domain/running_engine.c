@@ -44,12 +44,12 @@ static int running_walk_step(running_walk_t *w, int amp)
     }
     if (w->hold <= 0) {
         w->target = domain_rng_range(-amp, amp);
-        w->hold = FLUCT_WALK_HOLD_LOOPS;
+        w->hold = RUN_FLUCT_WALK_HOLD_LOOPS;
     } else {
         w->hold--;
     }
     float dt = (float)HR_LOOP_INTERVAL_MS / 1000.0f;
-    float alpha = 1.0f - expf(-dt / (float)FLUCT_WALK_TAU);
+    float alpha = 1.0f - expf(-dt / (float)RUN_FLUCT_WALK_TAU);
     w->value = w->value + alpha * ((float)w->target - w->value);
     if (w->value < (float)(-amp)) w->value = (float)(-amp);
     else if (w->value > (float)amp) w->value = (float)amp;

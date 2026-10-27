@@ -24,8 +24,8 @@
 
 | 模式 | 枚举值 | 说明 |
 |------|--------|------|
-| `RIDE_MODE_STEADY` | 0 | 固定模式：基准功率 + 平滑随机游走浮动 |
-| `RIDE_MODE_ROAD` | 1 | 配速机器人：按 W/kg 区间随机取样 |
+| `RIDE_MODE_STEADY` | 0 | 固定模式：基准功率 + 双时间尺度有界浮动 |
+| `RIDE_MODE_ROAD` | 1 | 配速机器人：在 W/kg 功率区间内连续变化 |
 | `RIDE_MODE_ERG` | 2 | ERG 模式：FTMS 目标功率（自动切换） |
 
 跑步模式由独立的 `running_engine_t` 处理，通过 `sport_profile` 切换骑行/跑步。
@@ -39,37 +39,38 @@
 | `power_engine_adjust_power(e, delta)` | 短按/自动重复调功（delta = ±power_step） |
 | `power_engine_set_power(e, value)` | 直接设置基准功率 |
 | `power_engine_set_mode(e, mode)` | 切换模式，调用 `reset_mode_state()` |
-| `power_engine_set_erg_target(e, target)` | 设置 ERG 目标（自动切到 ERG 模式，置 dirty） |
+| `power_engine_set_erg_target(e, target)` | 设置非持久 ERG 目标（自动切到 ERG 模式，不置 dirty） |
 | `power_engine_clear_erg_target(e)` | 清除 ERG 目标，回到 Steady |
 | `power_engine_is_dirty(e)` / `clear_dirty(e)` | 脏标记查询/清除（用于 NVS 落盘） |
 
 ### Steady 模式（build_steady）
 
 ```
-output_power = base_power + fluct_walk(&power_walk, power_float)
-output_cadence = cadence_base + fluct_walk(&cadence_walk, cadence_float)
+power_offset = ride_dynamics(&power_dynamics, power_float)
+output_power = base_power + power_offset
+output_cadence = cadence_base + ride_dynamics(&cadence_dynamics) + weak_coupling(power_offset)
 output_hr = 有用户心率 ? hr_model_steady_user(user_hr, hr_float)
-                        : hr_model_from_power(power, ftp, thr_hr) → 平滑+HRV
+                        : 功率负荷滤波 → FTP映射 → 心率平滑+HRV
 ```
 
-**平滑随机游走**（`fluct_walk_step`）：
-- 每 `FLUCT_WALK_HOLD_LOOPS`（默认 60 拍 ≈ 3s）在 `[-amp, +amp]` 内重采样一个目标
-- 然后按时间常数 `FLUCT_WALK_TAU` 一阶指数逼近
-- 输出始终夹在带内，不会逐拍随机跳变
+**双时间尺度动态**（`ride_dynamics_step`）：
+- 慢层每 10-30 秒重采样路况/体力趋势，按 8 秒时间常数平滑逼近
+- 快层每秒吸收一次有界踩踏/传感器扰动
+- 两层合成结果始终夹在配置浮动带内，`amp=0` 时严格恒定
 
 ### Road 模式（build_road）
 
 - 按 `ride_type` 索引 `ROAD_PACERS[]` 表获取 W/kg 区间
 - 自定义档（`ride_type=5`）使用 profile 中的 `custom_wkg_low/high`
-- 功率 = `weight * random_wkg / 10`
+- W/kg 上下界先换算成功率区间，再以区间中点为中心运行分层动态
 - 心率由功率推导（同 Steady 的非锁定心率路径）
 
 ### ERG 模式（build_erg）
 
 - 目标功率优先取 `erg_active_target`，否则退回 `base_power`
-- 叠加少量功率波动（非硬钉死）
-- 踏频保留小幅波动
-- 心率仍走平滑+HRV 路径
+- 叠加目标 ±5W 的相关功率波动（非硬钉死）
+- 踏频保留小幅动态并与功率弱耦合
+- 心率仍走负荷功率 + FTP 映射 + 平滑 + HRV 路径
 
 ---
 
@@ -77,9 +78,15 @@ output_hr = 有用户心率 ? hr_model_steady_user(user_hr, hr_float)
 
 **头文件**：[hr_model.h](../../components/bikepower_domain/include/hr_model.h)
 
-心率不是简单的功率×系数，而是四层叠加：
+心率不是简单的功率×系数，而是五层叠加：
 
-### 1. FTP 6 区映射（hr_model_ftp_zone）
+### 1. 功率负荷滤波（hr_model_smooth_load）
+
+- 上升时间常数 8 秒，下降时间常数 15 秒
+- 先过滤短时踩踏尖峰，再进入 FTP 心率映射
+- 与后续 30/60 秒心率平滑组成轻量二阶响应
+
+### 2. FTP 6 区映射（hr_model_ftp_zone）
 
 | 功率/FTP | hr_pct | 说明 |
 |----------|--------|------|
@@ -92,7 +99,7 @@ output_hr = 有用户心率 ? hr_model_steady_user(user_hr, hr_float)
 
 `hr_pct × thr_hr` 后经 `hr_clamp()` 限制到 `[HR_MIN=60, HR_MAX=200]`。
 
-### 2. 一阶指数平滑（hr_model_smooth）
+### 3. 一阶指数平滑（hr_model_smooth）
 
 ```
 HR(t) = HR_old + alpha × (HR_target - HR_old)
@@ -104,14 +111,14 @@ dt = 0.05s（50ms 节拍）
 - `HR_TAU_RISE = 30s`（升心率快）
 - `HR_TAU_FALL = 60s`（降心率慢，符合真实体感）
 
-### 3. HRV 变异（hr_model_variation）
+### 4. HRV 变异（hr_model_variation）
 
 每秒左右更新一次缓存，叠加项：
 - **RSA**（呼吸性窦性心律不齐）：振幅 `HRV_RSA_AMPLITUDE=2.0 BPM`，频率 `0.12Hz`
 - **Mayer wave**：振幅 `1.0 BPM`，周期 `10s`
 - **慢漂移**：速率 `0.05 BPM/min`，上限 `5 BPM`
 
-### 4. 输出限速（hr_model_emit）
+### 5. 输出限速（hr_model_emit）
 
 - 内外值差超过 `HR_EMIT_DEADBAND=2 BPM` 时，每拍只变动 1 BPM
 - 每 20 拍有低概率跳变 2 BPM（`HR_EMIT_JUMP_BPS=200` 控制概率）
@@ -122,8 +129,10 @@ dt = 0.05s（50ms 节拍）
 | 函数 | 说明 |
 |------|------|
 | `hr_model_init(state, initial_hr)` | 初始化心率状态 |
+| `hr_model_smooth_load(state, power)` | 瞬时功率转生理负荷功率 |
+| `hr_model_smooth(state, target_hr)` | 非对称心率平滑 |
+| `hr_model_variation(state)` / `hr_model_emit(state, raw)` | HRV 叠加与对外限速 |
 | `hr_model_steady_user(state, user_hr, float_amp)` | 锁定心率路径（带波动） |
-| `hr_model_tick(state, target_hr, dt)` | 每拍调用：平滑+HRV+限速 |
 | `hr_model_reset_variation(state)` | 模式切换时重置变异状态 |
 
 ---
@@ -292,7 +301,7 @@ LED 模式与颜色映射纯逻辑：
 | 功率 | `POWER_MIN=0`, `POWER_MAX=4000`, `DEFAULT_POWER=260`, `POWER_STEP_DEFAULT=20` |
 | 踏频 | `CADENCE_MIN=0`, `CADENCE_MAX=255`, `DEFAULT_CADENCE=90` |
 | 心率 | `HR_MIN=60`, `HR_MAX=200`, `DEFAULT_HEARTRATE=150` |
-| 浮动 | `POWER_FLOAT_DEFAULT=5`, `CADENCE_FLOAT_DEFAULT=2`, `HR_FLOAT_DEFAULT=2` |
+| 浮动 | `POWER_FLOAT_DEFAULT=30`, `CADENCE_FLOAT_DEFAULT=4`, `HR_FLOAT_DEFAULT=2` |
 | 心率模型 | `HR_TAU_RISE=30`, `HR_TAU_FALL=60`, `HRV_RSA_AMPLITUDE=2.0` 等 |
 | 随机游走 | `FLUCT_WALK_HOLD_LOOPS=60`, `FLUCT_WALK_TAU=0.8f` |
 | 跑步 | `RUN_SPEED_X100_MIN/MAX`, `RUN_CADENCE_MIN/MAX` 等 |
