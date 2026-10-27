@@ -302,6 +302,150 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
   .config-panel{padding:15px}.config-head{flex-direction:column}.config-meta{justify-content:flex-start}.config-fields{grid-template-columns:1fr}.form-field.span-2{grid-column:auto}.check-grid{grid-template-columns:1fr}.config-toolbar .actions{display:grid;grid-template-columns:1fr 1fr}.config-toolbar .actions .btn{width:100%}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+
+/* ===== 模式四：用户手册 ===== */
+#mode-manual{min-height:calc(100vh - 64px)}
+.manual-grid{display:grid;grid-template-columns:268px minmax(0,1fr) 236px;min-height:calc(100vh - 64px)}
+.manual-toc{border-right:1px solid var(--line);padding:26px 20px 32px;position:sticky;top:64px;align-self:start;max-height:calc(100vh - 64px);overflow-y:auto;overscroll-behavior:contain}
+.manual-toc::-webkit-scrollbar{width:6px}.manual-toc::-webkit-scrollbar-thumb{background:var(--line-soft)}
+.toc-head{padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.toc-title{margin:10px 0 4px;color:var(--strong);font:900 22px/1.1 var(--sans);letter-spacing:-.03em}
+.toc-sub{color:var(--muted);font:12px/1.55 var(--mono)}
+.toc-progress{display:flex;align-items:center;gap:12px;margin:14px 0 16px;padding:12px 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)}
+.toc-ring{position:relative;width:44px;height:44px;flex:0 0 auto}
+.toc-ring svg{transform:rotate(-90deg);display:block}
+.toc-ring .bg{fill:none;stroke:var(--line-soft);stroke-width:4}
+.toc-ring .fg{fill:none;stroke:var(--accent);stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset .4s}
+.toc-ring .num{position:absolute;inset:0;display:grid;place-items:center;font:800 12px/1 var(--mono);color:var(--strong)}
+.toc-progress-text{display:flex;flex-direction:column;gap:2px}
+.toc-progress-text b{color:var(--strong);font:800 12px/1 var(--mono);letter-spacing:.04em}
+.toc-progress-text span{color:var(--muted);font:11px/1.4 var(--mono)}
+.toc-list{list-style:none;margin:0;padding:0}
+.toc-list a{display:grid;grid-template-columns:32px 1fr;align-items:baseline;gap:10px;padding:9px 0;color:var(--muted);text-decoration:none;border-bottom:1px solid var(--line-soft);transition:color .15s}
+.toc-list a:hover{color:var(--strong)}
+.toc-list a.active{color:var(--strong)}
+.toc-list a.active .toc-num{color:var(--accent)}
+.toc-num{font:400 20px/1 var(--display);color:var(--faint);letter-spacing:-.02em}
+.toc-label{font-size:13px;line-height:1.4;font-weight:700}
+.toc-foot{margin-top:18px;padding-top:14px;border-top:1px solid var(--line-soft);font:11px/1.6 var(--mono);color:var(--faint)}
+.toc-foot b{color:var(--muted);display:block;margin-bottom:4px}
+
+.manual-content{min-width:0;padding:44px 56px 80px;background:var(--bg);max-width:920px}
+.manual-hero{padding-bottom:36px;border-bottom:1px solid var(--line);margin-bottom:40px}
+.manual-hero .eye{display:flex;align-items:center;gap:14px;color:var(--muted);font:12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
+.manual-hero .eye i{width:36px;height:1px;background:var(--accent);display:inline-block}
+.manual-hero h1{margin:18px 0 10px;color:var(--strong);font:400 56px/.95 var(--display);letter-spacing:-.03em}
+.manual-hero h1 em{color:var(--accent);font-style:normal}
+.manual-hero p.lead{color:var(--ink);font-size:17px;line-height:1.7;max-width:640px}
+.manual-meta{margin-top:22px;display:grid;grid-template-columns:repeat(4,auto);justify-content:start;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)}
+.manual-meta>div{padding:14px 28px 14px 0;border-right:1px solid var(--line-soft);margin-right:28px}
+.manual-meta>div:last-child{border-right:0;margin-right:0;padding-right:0}
+.manual-meta span{display:block;color:var(--muted);font:11px/1.4 var(--mono);letter-spacing:.05em}
+.manual-meta b{display:block;margin-top:4px;color:var(--strong);font:800 14px/1.3 var(--sans)}
+
+.ch{padding:10px 0 32px;scroll-margin-top:80px}
+.ch+.ch{border-top:1px solid var(--line);padding-top:56px;margin-top:24px}
+.ch-head{display:grid;grid-template-columns:118px 1fr;gap:24px;align-items:start;margin-bottom:28px}
+.ch-num{color:var(--accent);font:400 92px/.85 var(--display);letter-spacing:-.04em;padding-top:6px}
+.ch-meta{padding-top:10px}
+.ch-kicker{color:var(--muted);font:800 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px}
+.ch-title{margin:0 0 10px;color:var(--strong);font:900 28px/1.15 var(--sans);letter-spacing:-.025em}
+.ch-desc{color:var(--ink);font-size:15px;line-height:1.7;max-width:580px;margin:0}
+.ch-body{padding-left:142px}
+.ch-body>*+*{margin-top:20px}
+h3.ch-sub{margin:36px 0 14px;color:var(--strong);font:800 18px/1.3 var(--sans);letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+h3.ch-sub::before{content:"";width:10px;height:10px;background:var(--accent);display:inline-block;flex:0 0 auto}
+.m-steps{list-style:none;padding:0;margin:0;counter-reset:step;display:grid;gap:0;border-top:1px solid var(--line-soft)}
+.m-steps li{counter-increment:step;display:grid;grid-template-columns:50px 1fr;gap:20px;padding:16px 0;border-bottom:1px solid var(--line-soft);align-items:baseline}
+.m-steps li::before{content:counter(step,decimal-leading-zero);color:var(--accent);font:400 24px/1 var(--display);letter-spacing:-.02em}
+.m-steps li p{margin:0;color:var(--ink);font-size:15px;line-height:1.7}
+.m-steps li p b,.m-p b{color:var(--strong);font-weight:800}
+.m-steps li p code,.m-p code{font-family:var(--mono);font-size:13px;color:var(--amber);background:var(--amber-soft);padding:1px 6px;border:1px solid var(--line-soft)}
+.m-p{color:var(--ink);font-size:15px;line-height:1.75}
+.m-callout{padding:16px 18px;border-left:3px solid var(--accent);background:var(--accent-soft);color:var(--ink);font-size:14px;line-height:1.65}
+.m-callout.warn{border-left-color:var(--amber);background:var(--amber-soft)}
+.m-callout b{color:var(--strong);font-weight:800}
+.m-callout code{font-family:var(--mono);font-size:13px;color:var(--strong);background:rgba(10,8,7,.5);padding:1px 6px;border:1px solid var(--line)}
+kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--line);background:var(--panel-2);color:var(--strong);font:700 12px/1.4 var(--mono);text-align:center}
+.m-tbl{width:100%;border-collapse:collapse;font-size:13.5px;margin:6px 0}
+.m-tbl th,.m-tbl td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line-soft);vertical-align:top}
+.m-tbl th{color:var(--accent);font:800 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--line);background:var(--panel)}
+.m-tbl td{color:var(--ink);line-height:1.6}
+.m-tbl td b{color:var(--strong)}
+.m-tbl td code{font-family:var(--mono);font-size:12.5px;color:var(--amber)}
+.m-tbl tr:last-child td{border-bottom:1px solid var(--line)}
+
+.m-fig{margin:24px 0;border:1px solid var(--line);background:var(--panel)}
+.m-fig-head{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--muted);font:11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.m-fig-head b{color:var(--strong);margin-right:8px}
+.m-fig-head .m-fig-tag{padding:3px 8px;background:var(--accent-soft);border:1px solid var(--accent-dark);color:var(--accent);font-weight:800}
+.m-fig-body{padding:24px;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:24px;align-items:start;background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%)}
+.m-fig-body.full{grid-template-columns:1fr}
+.m-phone{justify-self:center;width:100%;max-width:300px;border:1px solid var(--line);background:#e9eef3;padding:10px;box-shadow:0 20px 50px rgba(0,0,0,.4),0 0 0 1px rgba(240,85,35,.08);cursor:zoom-in;position:relative}
+.m-phone img{width:100%;display:block;border:1px solid rgba(0,0,0,.08)}
+.m-wide{width:100%;background:#fdfaf3;padding:18px 20px;border:1px solid var(--line);cursor:zoom-in;position:relative}
+.m-wide img{width:100%;display:block}
+.m-phone::after,.m-wide::after{content:"⤢";position:absolute;top:14px;right:14px;width:24px;height:24px;background:rgba(10,8,7,.75);color:var(--strong);font-family:var(--mono);font-size:14px;display:grid;place-items:center;opacity:0;transition:opacity .15s}
+.m-phone:hover::after,.m-wide:hover::after{opacity:1}
+.m-fig-cap{color:var(--muted);font-size:13px;line-height:1.65}
+.m-fig-cap b{color:var(--strong);font-weight:800;display:block;margin-bottom:6px;font:800 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.m-fig-cap ul{margin:10px 0 0;padding:0;list-style:none;counter-reset:annot}
+.m-fig-cap ul li{padding:7px 0;display:grid;grid-template-columns:24px 1fr;gap:8px;font-size:12.5px;color:var(--ink);border-bottom:1px dashed var(--line-soft)}
+.m-fig-cap ul li:last-child{border-bottom:0}
+.m-fig-cap ul li::before{content:counter(annot);counter-increment:annot;display:inline-grid;place-items:center;width:20px;height:20px;border:1px solid var(--accent);color:var(--accent);font:800 11px/1 var(--mono)}
+
+.m-faq details{border-bottom:1px solid var(--line-soft);padding:14px 0}
+.m-faq summary{cursor:pointer;display:flex;align-items:center;gap:14px;color:var(--strong);font-weight:800;font-size:15px;list-style:none}
+.m-faq summary::-webkit-details-marker{display:none}
+.m-faq summary .q{color:var(--accent);font:400 20px/1 var(--display);min-width:36px;letter-spacing:-.02em}
+.m-faq summary .plus{color:var(--accent);font:12px var(--mono);margin-left:auto}
+.m-faq details[open] summary .plus::before{content:"−"}
+.m-faq details:not([open]) summary .plus::before{content:"+"}
+.m-faq .a{margin-top:12px;padding-left:50px;color:var(--ink);font-size:14.5px;line-height:1.7}
+
+.m-tldr{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:10px}
+.m-tldr>div{padding:22px 20px;border:1px solid var(--line);background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);min-height:170px;display:flex;flex-direction:column}
+.m-tldr .n{color:var(--accent);font:400 42px/1 var(--display);letter-spacing:-.03em;margin-bottom:12px}
+.m-tldr .k{color:var(--strong);font-weight:900;font-size:16px;margin-bottom:8px}
+.m-tldr .b{color:var(--ink);font-size:13.5px;line-height:1.65}
+
+.ch-nav{margin-top:40px;padding-top:22px;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ch-nav .nav-btn{padding:16px 18px;border:1px solid var(--line);background:var(--panel);text-align:left;color:var(--ink);text-decoration:none;transition:border-color .15s,background .15s;cursor:pointer}
+.ch-nav .nav-btn:hover{border-color:var(--accent);background:var(--panel-2)}
+.ch-nav .nav-btn.next{text-align:right}
+.ch-nav .nav-btn span{color:var(--muted);font:11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.ch-nav .nav-btn b{display:block;margin-top:8px;color:var(--strong);font-size:15px;font-weight:800}
+.ch-nav .nav-btn.disabled{opacity:.3;pointer-events:none}
+
+.manual-aside{border-left:1px solid var(--line);padding:26px 18px 32px;position:sticky;top:64px;align-self:start;max-height:calc(100vh - 64px);overflow-y:auto}
+.manual-aside::-webkit-scrollbar{width:6px}.manual-aside::-webkit-scrollbar-thumb{background:var(--line-soft)}
+.manual-aside h4{margin:0 0 10px;color:var(--strong);font:800 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
+.manual-aside .block+.block{margin-top:22px;padding-top:22px;border-top:1px solid var(--line-soft)}
+.manual-aside p{margin:0 0 8px;color:var(--muted);font-size:12.5px;line-height:1.6}
+.key-points{list-style:none;margin:0;padding:0}
+.key-points li{padding:7px 0 7px 14px;position:relative;font-size:12.5px;line-height:1.55;color:var(--ink);border-bottom:1px dashed var(--line-soft)}
+.key-points li::before{content:"";position:absolute;left:0;top:15px;width:6px;height:1px;background:var(--accent)}
+.key-points li:last-child{border-bottom:0}
+.aside-foot{margin-top:26px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font:11px/1.6 var(--mono)}
+
+.manual-lightbox{position:fixed;inset:0;background:rgba(10,8,7,.92);display:grid;place-items:center;z-index:100;padding:40px;cursor:zoom-out;backdrop-filter:blur(4px)}
+.manual-lightbox img{max-width:94vw;max-height:86vh;border:1px solid var(--line);box-shadow:0 30px 100px rgba(0,0,0,.6);background:#fff}
+.manual-lightbox .lb-close{position:absolute;top:24px;right:28px;color:var(--muted);font:12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;pointer-events:none}
+
+@media(max-width:1240px){.manual-grid{grid-template-columns:240px minmax(0,1fr)}.manual-aside{display:none}.manual-content{padding:36px 40px 60px}}
+@media(max-width:900px){
+  .manual-grid{grid-template-columns:1fr}
+  .manual-toc{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:20px 16px}
+  .manual-content{padding:28px 20px 50px}
+  .ch-body{padding-left:0}
+  .ch-head{grid-template-columns:70px 1fr;gap:14px}
+  .ch-num{font-size:60px}
+  .manual-hero h1{font-size:40px}
+  .m-fig-body{grid-template-columns:1fr}
+  .manual-meta{grid-template-columns:1fr 1fr}
+  .manual-meta>div{border-right:0;margin-right:0;padding-right:0;border-bottom:1px solid var(--line-soft)}
+  .m-tldr{grid-template-columns:1fr}
+}
 </style>
 <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
 </head>
@@ -334,6 +478,11 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
         <span class="ico" aria-hidden="true">＝</span>
         <span class="mode-title">设备比对</span>
         <span class="mode-desc">并排对比多台设备信息</span>
+      </button>
+      <button class="mode-btn" data-mode="manual" onclick="switchMode('manual')">
+        <span class="ico" aria-hidden="true">¶</span>
+        <span class="mode-title">用户手册</span>
+        <span class="mode-desc">完整安装、连接与配置指南</span>
       </button>
     </nav>
     <div class="masthead-right">
@@ -543,6 +692,614 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
       <div id="compare-table-wrap" class="hidden" style="margin-top:16px;overflow-x:auto">
         <table class="compare-table" id="compare-table"></table>
       </div>
+    </div>
+  </section>
+
+  <!-- ============ 模式四：用户手册 ============ -->
+  <section id="mode-manual" class="hidden">
+    <div class="manual-grid">
+      <!-- 左：目录 -->
+      <aside class="manual-toc" aria-label="章节目录">
+        <div class="toc-head">
+          <span class="eyebrow">USER MANUAL</span>
+          <h2 class="toc-title">BikePower C</h2>
+          <div class="toc-sub">v4.2.0 · 普通用户完整手册</div>
+        </div>
+        <div class="toc-progress">
+          <div class="toc-ring" aria-hidden="true">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <circle class="bg" cx="22" cy="22" r="18"></circle>
+              <circle class="fg" id="toc-ring-fg" cx="22" cy="22" r="18" stroke-dasharray="113.1" stroke-dashoffset="105.5"></circle>
+            </svg>
+            <span class="num" id="toc-ring-num">7</span>
+          </div>
+          <div class="toc-progress-text">
+            <b>阅读进度</b>
+            <span id="toc-ring-text">1 / 15 节</span>
+          </div>
+        </div>
+        <ol class="toc-list" id="toc-list"></ol>
+        <div class="toc-foot">
+          <b>基础信息</b>
+          默认 BLE：BikePower<br>
+          WiFi 热点：BikePower-XXXXXX<br>
+          密码：12345678<br>
+          配网地址：192.168.4.1
+        </div>
+      </aside>
+
+      <!-- 中：正文 -->
+      <article class="manual-content" id="manual-content">
+        <section class="manual-hero">
+          <div class="eye"><i></i><span>BIKEPOWER · USER MANUAL</span></div>
+          <h1>像读<em>一本小书</em>，<br>熟悉这台骑行伙伴。</h1>
+          <p class="lead">这份手册面向第一次使用 BikePower 的普通骑行用户。按节顺序读下来大约 10 分钟，覆盖烧录、蓝牙连接、按钮操作、WiFi 配网、骑行与跑步模式、全部设置项与常见故障。遇到问题随时跳到对应章节即可。</p>
+          <div class="manual-meta">
+            <div><span>固件版本</span><b>v4.2.0</b></div>
+            <div><span>默认 BLE 名</span><b>BikePower</b></div>
+            <div><span>配网地址</span><b>http://192.168.4.1</b></div>
+            <div><span>章节</span><b>15 节 · 10 分钟</b></div>
+          </div>
+        </section>
+
+        <!-- 01 -->
+        <section class="ch" id="ch01">
+          <header class="ch-head">
+            <div class="ch-num">01</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">FIRMWARE</div>
+              <h2 class="ch-title">烧录或更新固件</h2>
+              <p class="ch-desc">普通用户统一使用电脑端网页烧录。打开项目 GitHub Pages，用桌面版 Chrome 或 Edge 一键完成，不需要安装命令行工具。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <div class="m-callout">自建入口：<a style="color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-dark)" href="https://mengen-ink.github.io/bikepower-c/" target="_blank" rel="noopener">https://mengen-ink.github.io/bikepower-c/</a>。Pages 临时不可用时，使用<a style="color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-dark)" href="https://easyhey.com/?firmware=MOD220" target="_blank" rel="noopener">备用烧录入口</a>。</div>
+            <h3 class="ch-sub">网页端烧录 · 七步流程</h3>
+            <ol class="m-steps">
+              <li><p>用桌面版 <b>Chrome</b> 或 <b>Edge</b> 打开项目 GitHub Pages 或备用入口。</p></li>
+              <li><p>用支持数据传输的 USB 线把开发板连接到电脑。</p></li>
+              <li><p>选择 <code>通用 ESP32-C3</code> 或 <code>M5Stamp C3</code>，核对版本和文件名。</p></li>
+              <li><p>点击「<b>连接串口并刷写</b>」。</p></li>
+              <li><p>在浏览器弹出的串口列表里<b>选择开发板端口</b>。</p></li>
+              <li><p>按网页提示确认并等待烧录完成。</p></li>
+              <li><p>重新上电或按一下 <kbd>RST</kbd> 复位键，设备启动。</p></li>
+            </ol>
+            <figure class="m-fig">
+              <div class="m-fig-head"><span><b>网页端选择串口</b></span><span class="m-fig-tag">FIGURE 1-1</span></div>
+              <div class="m-fig-body">
+                <div class="m-wide" data-zoom="./manual-images/web-flash-serial-port.jpg" data-zoom-title="网页端选择串口"><img src="./manual-images/web-flash-serial-port.jpg" alt="网页端选择串口" loading="lazy"></div>
+                <div class="m-fig-cap">
+                  <b>图注</b>
+                  <div>浏览器弹出的 Web Serial 端口选择窗口由系统提供，不同操作系统外观略有差异。</div>
+                  <ul>
+                    <li><span>macOS 通常显示为 USB JTAG/serial debug unit (cu.usbmodem101)</span></li>
+                    <li><span>Windows 通常显示为 COMx</span></li>
+                    <li><span>网页不能静默选择串口，必须由用户主动点选</span></li>
+                  </ul>
+                </div>
+              </div>
+            </figure>
+            <div class="m-callout warn"><b>找不到设备？</b>优先更换一根支持数据传输的 USB 线。关闭 Arduino IDE、串口助手等占用串口的程序；拔插开发板后再试一次。</div>
+          </div>
+        </section>
+
+        <!-- 02 -->
+        <section class="ch" id="ch02">
+          <header class="ch-head">
+            <div class="ch-num">02</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">CONNECT</div>
+              <h2 class="ch-title">上电后连接骑行 App</h2>
+              <p class="ch-desc">默认蓝牙名称为 BikePower。上电后 LED 慢闪即进入广播状态，骑行 App 可以立刻搜到。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <ol class="m-steps">
+              <li><p>用 USB 或稳定 5V 电源给设备上电。</p></li>
+              <li><p>等待设备启动，LED 通常进入<b>慢闪</b>。</p></li>
+              <li><p>打开骑行 App，进入<b>添加设备</b>或蓝牙设备搜索页面。</p></li>
+              <li><p>搜索并连接 <code>BikePower</code>。</p></li>
+              <li><p>连接成功后，App 会收到功率、踏频、心率和训练机数据。</p></li>
+            </ol>
+            <div class="m-callout">如果 App 支持多种设备类型，优先按<b>功率计、心率计、踏频传感器</b>或<b>智能训练台</b>搜索。</div>
+          </div>
+        </section>
+
+        <!-- 03 -->
+        <section class="ch" id="ch03">
+          <header class="ch-head">
+            <div class="ch-num">03</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">BUTTON</div>
+              <h2 class="ch-title">按钮日常操作</h2>
+              <p class="ch-desc">设备上只有一个按钮。短按用于调功，长按配合二次确认进入 WiFi 配网。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <table class="m-tbl">
+              <thead><tr><th>操作</th><th>效果</th><th>适用场景</th></tr></thead>
+              <tbody>
+                <tr><td>短按一次</td><td>功率减少一个步进</td><td>骑行中临时降低强度</td></tr>
+                <tr><td>按住约 <code>0.5s</code> 后继续按住</td><td>持续增加功率</td><td>骑行中快速升强度</td></tr>
+                <tr><td>长按超过 <code>2s</code> 后松开</td><td>进入配网确认窗口</td><td>准备修改网页设置</td></tr>
+                <tr><td>确认窗口内再按一次</td><td>打开 WiFi 配网页</td><td>修改功率、设备名、LED 等配置</td></tr>
+                <tr><td>确认窗口内不再操作</td><td>自动取消</td><td>防误触</td></tr>
+              </tbody>
+            </table>
+            <figure class="m-fig">
+              <div class="m-fig-head"><span><b>按钮 / LED 状态机</b></span><span class="m-fig-tag">DIAGRAM 3-1</span></div>
+              <div class="m-fig-body">
+                <div class="m-wide" data-zoom="./manual-images/button-led-state.png" data-zoom-title="按钮 / LED 状态机"><img src="./manual-images/button-led-state.png" alt="按钮 / LED 状态机" loading="lazy"></div>
+                <div class="m-fig-cap">
+                  <b>图注</b>
+                  <div>按钮触发状态在<b>空闲 → 调功 → 配网确认 → WiFi 配网</b>间流转，LED 的闪烁节奏即当前状态。</div>
+                  <ul>
+                    <li><span>绿色 = 短按触发</span></li>
+                    <li><span>橙色 = 长按触发</span></li>
+                    <li><span>洋红 = BLE 事件触发</span></li>
+                  </ul>
+                </div>
+              </div>
+            </figure>
+            <div class="m-callout">按钮调功步进默认 <code>20 W</code>，可在网页「设置 → 配置设备 → 物理按钮」里修改为 <code>5-50 W</code>。</div>
+          </div>
+        </section>
+
+        <!-- 04 -->
+        <section class="ch" id="ch04">
+          <header class="ch-head">
+            <div class="ch-num">04</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">WIFI</div>
+              <h2 class="ch-title">进入 WiFi 配网页</h2>
+              <p class="ch-desc">BikePower C 不会开机自动打开 WiFi。只有手动长按并二次确认后，才会进入配网。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <ol class="m-steps">
+              <li><p><b>长按</b>按钮至少 <code>2s</code> 后松开。</p></li>
+              <li><p>看到 LED 进入<b>快闪</b>确认状态。</p></li>
+              <li><p>在确认窗口内<b>再按一次</b>按钮。</p></li>
+              <li><p>手机连接热点 <code>BikePower-XXXXXX</code>，密码 <code>12345678</code>。</p></li>
+              <li><p>浏览器访问 <code>http://192.168.4.1</code>。</p></li>
+              <li><p>修改配置后点击「<b>保存配置</b>」或「<b>保存设置</b>」。</p></li>
+              <li><p>不再修改时点击「<b>保存并关闭 WiFi</b>」，等待约 <code>5s</code> 后热点关闭。</p></li>
+            </ol>
+            <div class="m-callout">配网期间 BLE 会保持工作，骑行 App 通常可以继续接收数据。手机提示「此网络无互联网」是正常现象，继续保持连接即可。</div>
+          </div>
+        </section>
+
+        <!-- 05 -->
+        <section class="ch" id="ch05">
+          <header class="ch-head">
+            <div class="ch-num">05</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">CYCLING</div>
+              <h2 class="ch-title">首页 · 骑行模式</h2>
+              <p class="ch-desc">首页顶部可以在骑行与跑步之间切换。骑行模式向骑行 App 广播功率、踏频、心率与训练机数据。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <figure class="m-fig">
+              <div class="m-fig-head"><span><b>骑行首页</b></span><span class="m-fig-tag">SCREEN 5-1</span></div>
+              <div class="m-fig-body">
+                <div class="m-phone" data-zoom="./manual-images/home.png" data-zoom-title="骑行首页"><img src="./manual-images/home.png" alt="骑行首页" loading="lazy"></div>
+                <div class="m-fig-cap">
+                  <b>图注</b>
+                  <div><b>骑行输出</b>卡片内选择「固定」或配速机器人，每张卡片下方的 <kbd>−</kbd> / <kbd>+</kbd> 调整浮动范围。</div>
+                  <ul>
+                    <li><span>顶部骑行 / 跑步模式切换</span></li>
+                    <li><span>功率 / 踏频 / 心率三条广播开关</span></li>
+                    <li><span>底部「保存配置」与「保存并关闭 WiFi」</span></li>
+                  </ul>
+                </div>
+              </div>
+            </figure>
+            <h3 class="ch-sub">操作顺序</h3>
+            <ol class="m-steps">
+              <li><p>选择顶部模式：<b>固定模式</b>手动设定，<b>配速机器人</b>按体重和 W/kg 自动换算。</p></li>
+              <li><p>固定模式下，直接修改<b>固定功率、固定踏频、目标心率</b>。</p></li>
+              <li><p>用每张卡片下方的 <kbd>−</kbd> / <kbd>+</kbd> 调整<b>浮动范围</b>。</p></li>
+              <li><p>如需固定心率，打开「<b>锁定心率</b>」；关闭后心率会跟随功率算法变化。</p></li>
+              <li><p>配速机器人模式下选择档位；选择「自定义」后可改昵称和 W/kg 上下限。</p></li>
+              <li><p>点击「<b>保存配置</b>」立即生效。修改完成后点击「<b>保存并关闭 WiFi</b>」退出配网。</p></li>
+            </ol>
+            <div class="m-callout"><b>模式建议：</b>想明确固定在某个瓦数附近 → 固定模式；想按体重模拟跟骑强度 → 配速机器人；使用训练 App 的 ERG 课程 → 让 App 下发目标功率，手动功率可能暂不生效。</div>
+          </div>
+        </section>
+
+        <!-- 06 -->
+        <section class="ch" id="ch06">
+          <header class="ch-head">
+            <div class="ch-num">06</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">RUNNING</div>
+              <h2 class="ch-title">首页 · 跑步模式</h2>
+              <p class="ch-desc">跑步模式向 Zwift、MyWhoosh 等跑步入口广播跑步速度、步频和心率。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <figure class="m-fig">
+              <div class="m-fig-head"><span><b>跑步首页</b></span><span class="m-fig-tag">SCREEN 6-1</span></div>
+              <div class="m-fig-body">
+                <div class="m-phone" data-zoom="./manual-images/home-running.png" data-zoom-title="跑步首页"><img src="./manual-images/home-running.png" alt="跑步首页" loading="lazy"></div>
+                <div class="m-fig-cap">
+                  <b>图注</b>
+                  <div>点击顶部<b>跑步</b>切换到跑步模式。固定配速按钮覆盖 <code>3:00</code>-<code>7:00</code> 常用值。</div>
+                  <ul>
+                    <li><span>顶部切换到「跑步」</span></li>
+                    <li><span>固定配速 / 自定义模板二选一</span></li>
+                    <li><span>步频 / 心率设置与骑行一致</span></li>
+                  </ul>
+                </div>
+              </div>
+            </figure>
+            <ol class="m-steps">
+              <li><p>点击首页顶部「<b>跑步</b>」。</p></li>
+              <li><p>选择固定配速或<b>自定义模板</b>；固定配速可点击 <code>3:00</code> 到 <code>7:00</code> 的常用按钮。</p></li>
+              <li><p>自定义模板可修改名称和<b>快 / 慢配速区间</b>，固件会在区间内生成自然变化。</p></li>
+              <li><p>设置<b>步频</b>和步频浮动。</p></li>
+              <li><p>设置目标心率；联动模式按跑步强度变化，锁死模式按填写值输出。</p></li>
+              <li><p>点击「<b>保存配置</b>」，固件会按跑步模式重建 BLE 广播。</p></li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- 07 -->
+        <section class="ch" id="ch07">
+          <header class="ch-head">
+            <div class="ch-num">07</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">PROFILE</div>
+              <h2 class="ch-title">设置 · 用户资料</h2>
+              <p class="ch-desc">用户资料会影响功率区间、心率区间和配速机器人计算。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <figure class="m-fig">
+              <div class="m-fig-head"><span><b>用户资料设置</b></span><span class="m-fig-tag">SCREEN 7-1</span></div>
+              <div class="m-fig-body">
+                <div class="m-phone" data-zoom="./manual-images/settings-profile.png" data-zoom-title="用户资料设置"><img src="./manual-images/settings-profile.png" alt="用户资料设置" loading="lazy"></div>
+                <div class="m-fig-cap">
+                  <b>图注</b>
+                  <div>设置页首个入口。填完后点击底部「<b>保存设置</b>」生效。</div>
+                  <ul>
+                    <li><span>底部切换到「设置」</span></li>
+                    <li><span>选择「用户资料」标签</span></li>
+                    <li><span>填写体重 / FTP / 阈值心率</span></li>
+                  </ul>
+                </div>
+              </div>
+            </figure>
+            <table class="m-tbl">
+              <thead><tr><th>字段</th><th>范围</th><th>说明</th></tr></thead>
+              <tbody>
+                <tr><td>体重</td><td><code>40-150 kg</code></td><td>配速机器人按体重换算功率</td></tr>
+                <tr><td>FTP</td><td><code>50-500 W</code></td><td>用于功率区间显示</td></tr>
+                <tr><td>阈值心率</td><td><code>100-220 BPM</code></td><td>用于心率区间显示</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 08 -->
+        <section class="ch" id="ch08">
+          <header class="ch-head">
+            <div class="ch-num">08</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">DEVICE</div>
+              <h2 class="ch-title">设置 · 配置设备</h2>
+              <p class="ch-desc">修改蓝牙名称，进入设备模板、物理按钮和 LED 指示等扩展设置。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <figure class="m-fig">
+              <div class="m-fig-head"><span><b>配置设备页</b></span><span class="m-fig-tag">SCREEN 8-1</span></div>
+              <div class="m-fig-body">
+                <div class="m-phone" data-zoom="./manual-images/settings-device.png" data-zoom-title="配置设备页"><img src="./manual-images/settings-device.png" alt="配置设备页" loading="lazy"></div>
+                <div class="m-fig-cap">
+                  <b>图注</b>
+                  <div>设备名称卡片右侧的编辑按钮用于修改名称。扩展入口通向模板、按钮、LED。</div>
+                  <ul>
+                    <li><span>点击设备名称右侧编辑按钮</span></li>
+                    <li><span>输入新名称后点击对勾</span></li>
+                    <li><span>底部「保存设置」最终提交</span></li>
+                  </ul>
+                </div>
+              </div>
+            </figure>
+            <h3 class="ch-sub">修改蓝牙名称</h3>
+            <ol class="m-steps">
+              <li><p>进入「<b>设置 → 配置设备</b>」。</p></li>
+              <li><p>在设备名称卡片右侧点击<b>编辑</b>按钮。</p></li>
+              <li><p>输入新的设备名称。</p></li>
+              <li><p>点击<b>对勾</b>确认。</p></li>
+              <li><p>点击底部「<b>保存设置</b>」。</p></li>
+            </ol>
+            <div class="m-callout warn"><b>注意：</b>只输入名称但不点对勾，不会进入保存流程。名称建议简短，便于骑行 App 搜索识别。</div>
+          </div>
+        </section>
+
+        <!-- 09 -->
+        <section class="ch" id="ch09">
+          <header class="ch-head">
+            <div class="ch-num">09</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">BUTTON STEP</div>
+              <h2 class="ch-title">设置 · 物理按钮</h2>
+              <p class="ch-desc">修改每次短按或长按调功的步进。推荐 10 W / 15 W / 20 W。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <figure class="m-fig">
+              <div class="m-fig-head"><span><b>物理按钮设置</b></span><span class="m-fig-tag">SCREEN 9-1</span></div>
+              <div class="m-fig-body">
+                <div class="m-phone" data-zoom="./manual-images/settings-button.png" data-zoom-title="物理按钮设置"><img src="./manual-images/settings-button.png" alt="物理按钮设置" loading="lazy"></div>
+                <div class="m-fig-cap">
+                  <b>图注</b>
+                  <div>通过 <kbd>−</kbd> / <kbd>+</kbd> 快速调节步进，推荐 10 / 15 / 20 W。</div>
+                  <ul>
+                    <li><span>设置 → 配置设备 → 物理按钮</span></li>
+                    <li><span>点击 ± 调整步进值</span></li>
+                    <li><span>底部保存设置</span></li>
+                  </ul>
+                </div>
+              </div>
+            </figure>
+          </div>
+        </section>
+
+        <!-- 10 -->
+        <section class="ch" id="ch10">
+          <header class="ch-head">
+            <div class="ch-num">10</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">LED</div>
+              <h2 class="ch-title">设置 · LED 指示</h2>
+              <p class="ch-desc">给待连接、已连接、配网中、二次确认、异常 5 种状态分别配置灯效和颜色。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <figure class="m-fig">
+              <div class="m-fig-head"><span><b>LED 指示设置</b></span><span class="m-fig-tag">SCREEN 10-1</span></div>
+              <div class="m-fig-body">
+                <div class="m-phone" data-zoom="./manual-images/settings-led.png" data-zoom-title="LED 指示设置"><img src="./manual-images/settings-led.png" alt="LED 指示设置" loading="lazy"></div>
+                <div class="m-fig-cap">
+                  <b>图注</b>
+                  <div>按状态选择灯效和颜色，RGB 板会同时应用颜色与呼吸效果。</div>
+                  <ul>
+                    <li><span>设置 → 配置设备 → LED 指示</span></li>
+                    <li><span>按状态选择灯效 + 颜色</span></li>
+                    <li><span>底部「保存设置」</span></li>
+                  </ul>
+                </div>
+              </div>
+            </figure>
+            <table class="m-tbl">
+              <thead><tr><th>状态</th><th>含义</th></tr></thead>
+              <tbody>
+                <tr><td><b>待连接</b></td><td>设备正在 BLE 广播，等待 App 连接</td></tr>
+                <tr><td><b>已连接</b></td><td>App 已连接设备</td></tr>
+                <tr><td><b>配网中</b></td><td>WiFi 热点已打开，可访问网页</td></tr>
+                <tr><td><b>二次确认</b></td><td>长按后等待再次按键确认</td></tr>
+                <tr><td><b>异常</b></td><td>设备检测到异常状态</td></tr>
+              </tbody>
+            </table>
+            <div class="m-callout">灯效可选<b>关闭、常亮、慢闪、快闪、双闪、呼吸</b>。普通单色 LED 只体现亮灭节奏，RGB 板同时体现颜色。</div>
+            <h3 class="ch-sub">静默模式</h3>
+            <figure class="m-fig">
+              <div class="m-fig-head"><span><b>LED 静默模式</b></span><span class="m-fig-tag">SCREEN 10-2</span></div>
+              <div class="m-fig-body">
+                <div class="m-phone" data-zoom="./manual-images/settings-led-silent.png" data-zoom-title="LED 静默模式"><img src="./manual-images/settings-led-silent.png" alt="LED 静默模式" loading="lazy"></div>
+                <div class="m-fig-cap">
+                  <b>图注</b>
+                  <div>打开「静默模式」后，下方状态的灯效和颜色选择会自动隐藏，所有状态保持灭灯。</div>
+                  <ul>
+                    <li><span>勾选顶部「静默模式」</span></li>
+                    <li><span>所有状态的灯效下拉隐藏</span></li>
+                    <li><span>适合夜骑 / 卧室场景</span></li>
+                  </ul>
+                </div>
+              </div>
+            </figure>
+            <ol class="m-steps">
+              <li><p>夜骑、卧室或不想被灯光打扰时，<b>打开静默模式</b>，所有状态都灭灯。</p></li>
+              <li><p>需要重新设置颜色和闪烁方式时，<b>先关闭静默模式</b>。</p></li>
+              <li><p>修改后点击「<b>保存设置</b>」。</p></li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- 11 -->
+        <section class="ch" id="ch11">
+          <header class="ch-head">
+            <div class="ch-num">11</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">TEMPLATE</div>
+              <h2 class="ch-title">设置 · 设备模板</h2>
+              <p class="ch-desc">从附近 BLE 设备读取基础信息并复制到本设备，让 BikePower 在 App 中显示更易识别的名称和信息。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <figure class="m-fig">
+              <div class="m-fig-head"><span><b>设备模板设置</b></span><span class="m-fig-tag">SCREEN 11-1</span></div>
+              <div class="m-fig-body">
+                <div class="m-phone" data-zoom="./manual-images/settings-templates.png" data-zoom-title="设备模板设置"><img src="./manual-images/settings-templates.png" alt="设备模板设置" loading="lazy"></div>
+                <div class="m-fig-cap">
+                  <b>图注</b>
+                  <div>扫描附近 BLE 设备，读取别名后保存为模板；需要时一键复制到本设备。</div>
+                  <ul>
+                    <li><span>设置 → 配置设备 → 设备模板</span></li>
+                    <li><span>点击「扫描附近蓝牙设备」</span></li>
+                    <li><span>选中目标设备读取并保存</span></li>
+                  </ul>
+                </div>
+              </div>
+            </figure>
+            <ol class="m-steps">
+              <li><p>进入「<b>设置 → 配置设备 → 设备模板</b>」。</p></li>
+              <li><p>点击「<b>扫描附近蓝牙设备</b>」。</p></li>
+              <li><p>在扫描结果中选择目标设备，点击读取信息。</p></li>
+              <li><p>确认模板别名后<b>保存模板</b>。</p></li>
+              <li><p>需要使用时，点击「<b>复制到本设备</b>」。</p></li>
+              <li><p>返回配置设备页，确认名称变化后点击「<b>保存设置</b>」。</p></li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- 12 -->
+        <section class="ch" id="ch12">
+          <header class="ch-head">
+            <div class="ch-num">12</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">ABOUT</div>
+              <h2 class="ch-title">设置 · 关于</h2>
+              <p class="ch-desc">查看当前设备板型、固件版本和编译时间；排查版本问题时可随问题现象一起反馈。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <figure class="m-fig">
+              <div class="m-fig-head"><span><b>关于页面</b></span><span class="m-fig-tag">SCREEN 12-1</span></div>
+              <div class="m-fig-body">
+                <div class="m-phone" data-zoom="./manual-images/settings-about.png" data-zoom-title="关于页面"><img src="./manual-images/settings-about.png" alt="关于页面" loading="lazy"></div>
+                <div class="m-fig-cap">
+                  <b>图注</b>
+                  <div>排查固件问题时，把这一页的板型 / 版本 / 构建时间与现象一起反馈即可。</div>
+                  <ul>
+                    <li><span>设置 → 关于</span></li>
+                    <li><span>查看板型 + 固件版本 + 编译时间</span></li>
+                    <li><span>可直接截图反馈</span></li>
+                  </ul>
+                </div>
+              </div>
+            </figure>
+          </div>
+        </section>
+
+        <!-- 13 -->
+        <section class="ch" id="ch13">
+          <header class="ch-head">
+            <div class="ch-num">13</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">SAVE</div>
+              <h2 class="ch-title">保存和退出配网</h2>
+              <p class="ch-desc">两个保存按钮对应不同生命周期。推荐的日常保存顺序。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <table class="m-tbl">
+              <thead><tr><th>按钮</th><th>作用</th></tr></thead>
+              <tbody>
+                <tr><td><b>保存配置 / 保存设置</b></td><td>保存当前页面配置，WiFi 继续保持打开</td></tr>
+                <tr><td><b>保存并关闭 WiFi</b></td><td>保存首页配置，并在约 5s 后关闭热点</td></tr>
+              </tbody>
+            </table>
+            <h3 class="ch-sub">推荐流程</h3>
+            <ol class="m-steps">
+              <li><p>先在首页和设置页完成<b>所有修改</b>。</p></li>
+              <li><p>每个页面改完后点击对应的<b>保存按钮</b>。</p></li>
+              <li><p>最后回到首页，点击「<b>保存并关闭 WiFi</b>」。</p></li>
+              <li><p>手机会断开 <code>BikePower-XXXXXX</code> 热点，设备回到日常 BLE 使用状态。</p></li>
+            </ol>
+            <div class="m-callout warn"><b>如果只关闭浏览器或直接断电</b>，最后一次未保存的修改<b>可能不会保留</b>。</div>
+          </div>
+        </section>
+
+        <!-- 14 -->
+        <section class="ch" id="ch14">
+          <header class="ch-head">
+            <div class="ch-num">14</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">TROUBLESHOOT</div>
+              <h2 class="ch-title">常见问题</h2>
+              <p class="ch-desc">7 个最常被问到的问题与解决方向。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <div class="m-faq">
+              <details open>
+                <summary><span class="q">Q01</span><span style="flex:1">搜不到 BLE 设备</span><span class="plus"></span></summary>
+                <div class="a">先确认设备已上电且 LED 有状态变化。然后在骑行 App 里重新扫描 <code>BikePower</code>。如果仍搜不到，重启 App 或重新给设备上电。</div>
+              </details>
+              <details>
+                <summary><span class="q">Q02</span><span style="flex:1">进不了 WiFi 配网页</span><span class="plus"></span></summary>
+                <div class="a">确认已经完成两步按钮操作：长按超过 <code>2s</code>，松开后再按一次确认。然后连接 <code>BikePower-XXXXXX</code> 热点，手动访问 <code>192.168.4.1</code>。</div>
+              </details>
+              <details>
+                <summary><span class="q">Q03</span><span style="flex:1">手机提示无互联网</span><span class="plus"></span></summary>
+                <div class="a">这是正常现象。BikePower 的 WiFi 只用于本地配置，不提供外网。</div>
+              </details>
+              <details>
+                <summary><span class="q">Q04</span><span style="flex:1">保存后 App 没变化</span><span class="plus"></span></summary>
+                <div class="a">先确认点的是「保存配置」或「保存设置」。如果改的是蓝牙名称，部分 App 需要<b>断开后重新扫描</b>才能看到新名称。</div>
+              </details>
+              <details>
+                <summary><span class="q">Q05</span><span style="flex:1">功率变化不符合预期</span><span class="plus"></span></summary>
+                <div class="a">先看当前模式。固定模式按手动设置输出；配速机器人按体重和 W/kg 算功率；<b>ERG 模式</b>可能由训练 App 接管目标功率。</div>
+              </details>
+              <details>
+                <summary><span class="q">Q06</span><span style="flex:1">LED 选项不见了</span><span class="plus"></span></summary>
+                <div class="a">检查是否打开了<b>静默模式</b>。静默模式开启后，普通状态的灯效和颜色选择会隐藏；关闭静默模式后可继续编辑。</div>
+              </details>
+              <details>
+                <summary><span class="q">Q07</span><span style="flex:1">如何更新固件</span><span class="plus"></span></summary>
+                <div class="a">打开项目 GitHub Pages，按第 1 节的网页烧录流程重新烧录；Pages 临时不可用时使用备用烧录入口。</div>
+              </details>
+            </div>
+          </div>
+        </section>
+
+        <!-- 15 -->
+        <section class="ch" id="ch15">
+          <header class="ch-head">
+            <div class="ch-num">15</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">TL;DR</div>
+              <h2 class="ch-title">记住这 4 步</h2>
+              <p class="ch-desc">把 15 节压缩成 4 个动作：上电连接、长按进配网、修改保存、保存并关闭。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <div class="m-tldr">
+              <div><div class="n">01</div><div class="k">上电连接</div><div class="b">给设备通电，等待 LED 慢闪，在骑行 App 内搜索并连接 BikePower。</div></div>
+              <div><div class="n">02</div><div class="k">长按进配网</div><div class="b">长按按钮超过 2 秒松开，看到快闪后再按一次，手机连接 BikePower-XXXXXX 热点并访问 192.168.4.1。</div></div>
+              <div><div class="n">03</div><div class="k">修改保存</div><div class="b">在网页里修改首页或设置页参数，每页改完点击「保存配置」或「保存设置」。</div></div>
+              <div><div class="n">04</div><div class="k">保存并关闭</div><div class="b">回到首页点击「保存并关闭 WiFi」，约 5 秒后热点关闭，回到日常 BLE 使用。</div></div>
+            </div>
+          </div>
+        </section>
+
+      </article>
+
+      <!-- 右：阅读辅助 -->
+      <aside class="manual-aside">
+        <div class="block">
+          <h4>本节要点</h4>
+          <ul class="key-points" id="aside-points"></ul>
+        </div>
+        <div class="block">
+          <h4>你在读</h4>
+          <p id="aside-chapter">第 01 节</p>
+          <p style="color:var(--strong);font-size:14px;font-weight:800;margin-top:4px" id="aside-title">烧录或更新固件</p>
+          <p style="font-size:12px;margin-top:8px;color:var(--faint)" id="aside-kicker">FIRMWARE</p>
+        </div>
+        <div class="block">
+          <h4>快速跳转</h4>
+          <button class="jump-row" onclick="scrollToChapter('ch01')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;width:100%;text-align:left;color:var(--ink);margin-top:10px">
+            <div style="flex:1"><b style="color:var(--accent);font:800 11px/1 var(--mono);display:block">固件烧录</b><span style="font-size:12.5px;margin-top:4px;display:block">01 · FIRMWARE</span></div>
+            <span style="margin-left:auto;color:var(--accent);font-family:var(--mono)">→</span>
+          </button>
+          <button class="jump-row" onclick="scrollToChapter('ch04')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;width:100%;text-align:left;color:var(--ink);margin-top:10px">
+            <div style="flex:1"><b style="color:var(--accent);font:800 11px/1 var(--mono);display:block">进配网</b><span style="font-size:12.5px;margin-top:4px;display:block">04 · WIFI</span></div>
+            <span style="margin-left:auto;color:var(--accent);font-family:var(--mono)">→</span>
+          </button>
+          <button class="jump-row" onclick="scrollToChapter('ch14')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;width:100%;text-align:left;color:var(--ink);margin-top:10px">
+            <div style="flex:1"><b style="color:var(--accent);font:800 11px/1 var(--mono);display:block">常见问题</b><span style="font-size:12.5px;margin-top:4px;display:block">14 · FAQ</span></div>
+            <span style="margin-left:auto;color:var(--accent);font-family:var(--mono)">→</span>
+          </button>
+        </div>
+        <div class="aside-foot">手册源文件：<br>docs/user/02-user-manual.md</div>
+      </aside>
     </div>
   </section>
 
@@ -1442,8 +2199,10 @@ function switchMode(mode){
   $("mode-flash").classList.toggle("hidden",mode!=="flash");
   $("mode-connect").classList.toggle("hidden",mode!=="connect");
   $("mode-compare").classList.toggle("hidden",mode!=="compare");
+  $("mode-manual").classList.toggle("hidden",mode!=="manual");
   if(mode==="connect")loadTemplates();
   if(mode==="compare")renderCompareTable();
+  if(mode==="manual")initManualOnce();
 }
 
 /* ==================== Web Bluetooth 支持检测 ==================== */
@@ -1912,6 +2671,116 @@ function renderCompareTable(){
   html+="</tbody>";
   table.innerHTML=html;
 }
+
+/* ==================== 用户手册 ==================== */
+const MANUAL_META = {
+  "ch01":{num:1,title:"烧录或更新固件",kicker:"FIRMWARE",points:["只支持桌面 Chrome / Edge + HTTPS","USB 线必须支持数据传输，不能是纯充电线","设备内 OTA 已永久放弃，统一走网页烧录"]},
+  "ch02":{num:2,title:"上电后连接骑行 App",kicker:"CONNECT",points:["默认蓝牙名称 BikePower","App 支持多种设备类型时按功率计 / 心率计搜索","LED 慢闪 = 广播中 · 常亮 = 已连接"]},
+  "ch03":{num:3,title:"按钮日常操作",kicker:"BUTTON",points:["短按 = 功率 −1 步进（默认 20 W）","按住 0.5 s 后持续加功率","长按 ≥2 s 松开 → 二次按键 → 进入 WiFi 配网"]},
+  "ch04":{num:4,title:"进入 WiFi 配网页",kicker:"WIFI",points:["长按 2s → 松开 → 窗口内再按一次 → 开热点","热点 SSID = BikePower-XXXXXX · 密码 = 12345678","手机提示「无互联网」是正常现象"]},
+  "ch05":{num:5,title:"首页 · 骑行模式",kicker:"CYCLING",points:["固定模式：手动设功率 / 踏频 / 心率","配速机器人：按体重 + W/kg 自动换算","浮动越大，App 看到的数值变化越明显"]},
+  "ch06":{num:6,title:"首页 · 跑步模式",kicker:"RUNNING",points:["固定配速支持 3:00 - 7:00 常用按钮","自定义模板在区间内生成自然变化","兼容的跑步 App 可远程控速 / 开始 / 停止"]},
+  "ch07":{num:7,title:"设置 · 用户资料",kicker:"PROFILE",points:["体重影响配速机器人功率换算","FTP 用于功率区间显示","阈值心率用于心率区间显示"]},
+  "ch08":{num:8,title:"设置 · 配置设备",kicker:"DEVICE",points:["编辑名称后必须点对勾才会进入保存流程","名称建议简短，便于骑行 App 识别","包含设备模板 / 物理按钮 / LED 指示 3 个扩展入口"]},
+  "ch09":{num:9,title:"设置 · 物理按钮",kicker:"BUTTON STEP",points:["可选范围 5-50 W","步进越大 → 调功越快，越小 → 越细","保存设置后立即生效"]},
+  "ch10":{num:10,title:"设置 · LED 指示",kicker:"LED",points:["普通单色 LED 只体现亮灭节奏","M5Stamp C3 等 RGB 板会同时体现颜色","静默模式一键关闭所有指示"]},
+  "ch11":{num:11,title:"设置 · 设备模板",kicker:"TEMPLATE",points:["模板库最多保存 5 个","扫描仅展示带名称且包含骑行服务的设备","复制模板后必须保存设置才生效"]},
+  "ch12":{num:12,title:"设置 · 关于",kicker:"ABOUT",points:["显示板型 (generic-c3 / m5stamp-c3)","显示固件版本号和构建时间","反馈问题时附上该页信息"]},
+  "ch13":{num:13,title:"保存和退出配网",kicker:"SAVE",points:["保存配置 / 设置 → WiFi 继续保持打开","保存并关闭 WiFi → 约 5 秒后关闭热点","直接关浏览器或断电可能丢失未保存修改"]},
+  "ch14":{num:14,title:"常见问题",kicker:"TROUBLESHOOT",points:["搜不到 BLE / 进不了配网 / 无互联网","保存无效 / 功率不符 / LED 选项消失","固件升级统一走网页烧录"]},
+  "ch15":{num:15,title:"记住这 4 步",kicker:"TL;DR",points:["连接 → 进配网 → 保存 → 关闭 WiFi","适合贴在设备旁或打印","任何陌生场景都按这 4 步就对了"]},
+};
+let MANUAL_INITED=false;
+let MANUAL_ACTIVE="ch01";
+
+function initManualOnce(){
+  if(MANUAL_INITED)return;
+  MANUAL_INITED=true;
+  // 填充左侧目录
+  const list=document.getElementById("toc-list");
+  if(list){
+    const items=Object.keys(MANUAL_META).map(id=>{
+      const m=MANUAL_META[id];
+      const num=String(m.num).padStart(2,"0");
+      return `<li><a href="#${id}" data-ch="${id}" class="toc-link"><span class="toc-num">${num}</span><span><span class="toc-label">${m.title}</span></span></a></li>`;
+    }).join("");
+    list.innerHTML=items;
+    list.querySelectorAll("a.toc-link").forEach(a=>{
+      a.addEventListener("click",ev=>{ev.preventDefault();scrollToChapter(a.dataset.ch);});
+    });
+  }
+  // 图片 lightbox
+  document.querySelectorAll("#mode-manual [data-zoom]").forEach(el=>{
+    el.addEventListener("click",()=>openManualLightbox(el.dataset.zoom,el.dataset.zoomTitle||""));
+  });
+  // 滚动高亮
+  window.addEventListener("scroll",updateManualActive,{passive:true});
+  updateManualActive();
+}
+
+function scrollToChapter(id){
+  const node=document.getElementById(id);
+  if(!node)return;
+  const top=node.getBoundingClientRect().top+window.scrollY-72;
+  window.scrollTo({top,behavior:"smooth"});
+}
+
+function updateManualActive(){
+  if(currentMode!=="manual")return;
+  const y=window.scrollY+160;
+  let cur=Object.keys(MANUAL_META)[0];
+  Object.keys(MANUAL_META).forEach(id=>{
+    const node=document.getElementById(id);
+    if(node&&node.offsetTop<=y)cur=id;
+  });
+  if(cur===MANUAL_ACTIVE)return;
+  MANUAL_ACTIVE=cur;
+  document.querySelectorAll("#toc-list a.toc-link").forEach(a=>{
+    a.classList.toggle("active",a.dataset.ch===cur);
+  });
+  const meta=MANUAL_META[cur];
+  const total=Object.keys(MANUAL_META).length;
+  const pct=(meta.num/total)*100;
+  const ring=document.getElementById("toc-ring-fg");
+  if(ring){
+    const c=2*Math.PI*18;
+    ring.setAttribute("stroke-dasharray",c);
+    ring.setAttribute("stroke-dashoffset",c-pct*c/100);
+  }
+  const num=document.getElementById("toc-ring-num");
+  if(num)num.textContent=Math.round(pct);
+  const txt=document.getElementById("toc-ring-text");
+  if(txt)txt.textContent=`${meta.num} / ${total} 节`;
+  const points=document.getElementById("aside-points");
+  if(points)points.innerHTML=meta.points.map(p=>`<li>${p}</li>`).join("");
+  const asideCh=document.getElementById("aside-chapter");
+  if(asideCh)asideCh.textContent=`第 ${String(meta.num).padStart(2,"0")} 节`;
+  const asideTitle=document.getElementById("aside-title");
+  if(asideTitle)asideTitle.textContent=meta.title;
+  const asideKicker=document.getElementById("aside-kicker");
+  if(asideKicker)asideKicker.textContent=meta.kicker;
+}
+
+function openManualLightbox(src,title){
+  closeManualLightbox();
+  const box=document.createElement("div");
+  box.className="manual-lightbox";
+  box.id="manual-lightbox";
+  box.innerHTML=`<img src="${src}" alt="${title||""}"><div class="lb-close">ESC / 点击背景关闭 · ${title||""}</div>`;
+  box.addEventListener("click",closeManualLightbox);
+  const img=box.querySelector("img");
+  img.addEventListener("click",ev=>ev.stopPropagation());
+  document.body.appendChild(box);
+  document.body.style.overflow="hidden";
+  document.addEventListener("keydown",manualLightboxKey);
+}
+function closeManualLightbox(){
+  const box=document.getElementById("manual-lightbox");
+  if(box)box.remove();
+  document.body.style.overflow="";
+  document.removeEventListener("keydown",manualLightboxKey);
+}
+function manualLightboxKey(e){if(e.key==="Escape")closeManualLightbox();}
 
 /* ==================== 启动 ==================== */
 window.addEventListener("load",()=>{
