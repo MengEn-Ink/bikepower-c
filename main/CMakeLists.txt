@@ -8,6 +8,7 @@ idf_component_register(
          "board_detect.c"
          "nvs_store.c"
          "device_template_store.c"
+         "device_identity_store.c"
          "radio_ctrl.c"
          "wifi_portal.c"
          "captive_portal.c"

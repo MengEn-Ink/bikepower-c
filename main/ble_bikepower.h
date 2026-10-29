@@ -11,6 +11,7 @@
 #include "domain_config.h"
 #include "running_engine.h"
 #include "config_store.h"
+#include "device_identity.h"
 
 /**
  * ERG 目标功率回调类型。
@@ -46,6 +47,14 @@ typedef bool (*ble_run_control_cb_t)(ble_run_control_type_t type, int value);
 typedef bool (*ble_config_commit_cb_t)(const config_data_t *config,
                                        uint32_t transaction_id,
                                        uint32_t base_revision);
+
+/**
+ * DIS 身份覆盖写入回调。
+ * 运行在 NimBLE host 任务上下文，只允许复制到应用层 mailbox，禁止写 NVS。
+ * 返回 false 表示应用层忙（上一次写入尚未落盘），GATT 写入将被拒绝。
+ * 应用层落盘成功后必须调用 ble_bikepower_set_identity() 让 DIS 读值生效。
+ */
+typedef bool (*ble_identity_write_cb_t)(const device_identity_t *identity);
 
 /**
  * 启动 BLE 蓝牙功率计服务。
@@ -137,6 +146,9 @@ void ble_bikepower_set_erg_clear_callback(ble_erg_clear_cb_t cb);
 
 void ble_bikepower_set_run_control_callback(ble_run_control_cb_t cb);
 void ble_bikepower_set_config_commit_callback(ble_config_commit_cb_t cb);
+void ble_bikepower_set_identity_write_callback(ble_identity_write_cb_t cb);
+/* 设置当前已落盘的 DIS 身份覆盖（DIS 读值与 7a5a0008 读值立即生效）。 */
+void ble_bikepower_set_identity(const device_identity_t *identity);
 
 /** 从运行时引擎刷新配置服务只读快照；字段实际变化时 revision 自动递增。 */
 void ble_bikepower_set_config_snapshot(const power_engine_t *engine);

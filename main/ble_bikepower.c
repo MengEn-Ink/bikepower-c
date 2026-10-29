@@ -112,6 +112,12 @@ static const ble_uuid128_t g_config_running_uuid = BLE_UUID128_INIT(BLE_CONFIG_R
 static const ble_uuid128_t g_config_led_uuid = BLE_UUID128_INIT(BLE_CONFIG_LED_UUID_BYTES);
 static const ble_uuid128_t g_config_identity_uuid = BLE_UUID128_INIT(BLE_CONFIG_IDENTITY_UUID_BYTES);
 static const ble_uuid128_t g_config_control_uuid = BLE_UUID128_INIT(BLE_CONFIG_CONTROL_UUID_BYTES);
+static const ble_uuid128_t g_config_dis_profile_uuid = BLE_UUID128_INIT(BLE_CONFIG_DIS_PROFILE_UUID_BYTES);
+
+// DIS 身份覆盖：由应用层落盘后通过 ble_bikepower_set_identity() 写入，host 任务只读。
+static portMUX_TYPE g_identity_lock = portMUX_INITIALIZER_UNLOCKED;
+static device_identity_t g_identity;
+static ble_identity_write_cb_t g_identity_write_cb = NULL;
 
 typedef struct {
     bool active;
@@ -650,63 +656,113 @@ static int config_control_access_cb(uint16_t ch, uint16_t ah,
     return 0;
 }
 
-// ============================ DIS 静态读取 ============================
+// ============================ DIS 读取（支持身份覆盖） ============================
 
 /**
- * 处理 DIS 厂商名特征读访问。
- * 返回设备厂商字符串。
- * ch：连接句柄，未使用。
- * ah：属性句柄，未使用。
+ * 以「覆盖值优先、否则内置值」返回某个 DIS 字符串字段。
  * ctxt：GATT 访问上下文。
- * arg：自定义参数，未使用。
+ * field：身份字段。
+ * fallback：未覆盖时返回的固件内置值。
  * 返回值：0 表示成功，否则返回 ATT 错误码。
- * 特殊行为：内容来自编译期常量。
  */
+static int dis_read_field(struct ble_gatt_access_ctxt *ctxt, device_identity_field_t field,
+                          const char *fallback)
+{
+    if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) return BLE_ATT_ERR_UNLIKELY;
+    char value[DEVICE_IDENTITY_TEXT_MAX];
+    portENTER_CRITICAL(&g_identity_lock);
+    const char *src = device_identity_effective(&g_identity, field, NULL);
+    if (src) {
+        strncpy(value, src, sizeof(value) - 1);
+        value[sizeof(value) - 1] = '\0';
+    }
+    portEXIT_CRITICAL(&g_identity_lock);
+    if (!src) {
+        return chr_read_buf(ctxt, (const uint8_t *)fallback, strlen(fallback));
+    }
+    return chr_read_buf(ctxt, (const uint8_t *)value, strlen(value));
+}
+
+/* DIS 厂商名（0x2A29）：覆盖值或编译期常量。 */
 static int dis_manuf_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR)
-        return chr_read_buf(ctxt, (const uint8_t *)DEVICE_MANUFACTURER, strlen(DEVICE_MANUFACTURER));
-    return BLE_ATT_ERR_UNLIKELY;
+    return dis_read_field(ctxt, DEVICE_IDENTITY_MANUFACTURER, DEVICE_MANUFACTURER);
 }
 
-/**
- * 处理 DIS 型号特征读访问。
- * 返回设备型号字符串。
- * ch：连接句柄，未使用。
- * ah：属性句柄，未使用。
- * ctxt：GATT 访问上下文。
- * arg：自定义参数，未使用。
- * 返回值：0 表示成功，否则返回 ATT 错误码。
- * 特殊行为：内容来自编译期常量。
- */
+/* DIS 型号（0x2A24）：覆盖值或编译期常量。 */
 static int dis_model_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR)
-        return chr_read_buf(ctxt, (const uint8_t *)DEVICE_MODEL, strlen(DEVICE_MODEL));
-    return BLE_ATT_ERR_UNLIKELY;
+    return dis_read_field(ctxt, DEVICE_IDENTITY_MODEL, DEVICE_MODEL);
 }
 
-/**
- * 处理 DIS 固件版本特征读访问。
- * 返回设备固件版本字符串。
- * ch：连接句柄，未使用。
- * ah：属性句柄，未使用。
- * ctxt：GATT 访问上下文。
- * arg：自定义参数，未使用。
- * 返回值：0 表示成功，否则返回 ATT 错误码。
- * 特殊行为：内容来自编译期常量。
- */
+/* DIS 固件版本（0x2A26）：覆盖值或板型固件包名。 */
 static int dis_fw_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
+    char fw_name[96];
+    board_firmware_name(fw_name, sizeof(fw_name));
+    return dis_read_field(ctxt, DEVICE_IDENTITY_FIRMWARE, fw_name);
+}
+
+/* DIS 序列号（0x2A25）：覆盖值或空串。 */
+static int dis_serial_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    return dis_read_field(ctxt, DEVICE_IDENTITY_SERIAL, "");
+}
+
+/* DIS 硬件版本（0x2A27）：覆盖值或板型名称。 */
+static int dis_hw_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    const board_desc_t *desc = board_get_desc();
+    return dis_read_field(ctxt, DEVICE_IDENTITY_HARDWARE, (desc && desc->name) ? desc->name : DEVICE_MODEL);
+}
+
+/* DIS 软件版本（0x2A28）：覆盖值或固件语义版本号。 */
+static int dis_sw_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    return dis_read_field(ctxt, DEVICE_IDENTITY_SOFTWARE, FIRMWARE_VERSION);
+}
+
+/**
+ * DIS 身份覆盖特征（7a5a0008-…）读写。
+ * 读：返回当前已落盘覆盖值的线格式（空字段表示使用内置值）。
+ * 写：校验线格式后交给应用层 mailbox 落盘；落盘成功后读值才会变化，
+ *     客户端应回读确认（网页工具以回读一致作为写入成功依据）。
+ * 特殊行为：host 任务内不写 NVS；应用层忙时返回 Write Not Permitted。
+ */
+static int config_dis_profile_access_cb(uint16_t ch, uint16_t ah,
+                                        struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
     if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
-        char fw_name[96];
-        board_firmware_name(fw_name, sizeof(fw_name));
-        return chr_read_buf(ctxt, (const uint8_t *)fw_name, strlen(fw_name));
+        device_identity_t snapshot;
+        portENTER_CRITICAL(&g_identity_lock);
+        snapshot = g_identity;
+        portEXIT_CRITICAL(&g_identity_lock);
+        uint8_t payload[DEVICE_IDENTITY_WIRE_MAX];
+        size_t len = device_identity_encode(&snapshot, payload, sizeof(payload));
+        return len > 0 ? chr_read_buf(ctxt, payload, len) : BLE_ATT_ERR_UNLIKELY;
     }
-    return BLE_ATT_ERR_UNLIKELY;
+    if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
+
+    uint8_t payload[DEVICE_IDENTITY_WIRE_MAX];
+    uint16_t len = 0;
+    int rc = ble_hs_mbuf_to_flat(ctxt->om, payload, sizeof(payload), &len);
+    if (rc != 0 || len == 0) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+
+    device_identity_t requested;
+    if (!device_identity_decode(payload, len, &requested)) return BLE_ATT_ERR_VALUE_NOT_ALLOWED;
+    if (!g_identity_write_cb || !g_identity_write_cb(&requested)) {
+        ESP_LOGW(TAG, "DIS 身份覆盖写入被拒绝：应用层忙");
+        return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
+    }
+    ESP_LOGI(TAG, "收到 DIS 身份覆盖写入 len=%u，等待应用层落盘", (unsigned)len);
+    return 0;
 }
 
 // ============================ GATT 服务表 ============================
@@ -777,6 +833,12 @@ static const struct ble_gatt_svc_def cycling_gatt_svcs[] = {
               .access_cb = dis_model_cb, .flags = BLE_GATT_CHR_F_READ },
             { .uuid = BLE_UUID16_DECLARE(DIS_FIRMWARE_CHAR_UUID),
               .access_cb = dis_fw_cb, .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(DIS_SERIAL_CHAR_UUID),
+              .access_cb = dis_serial_cb, .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(DIS_HARDWARE_CHAR_UUID),
+              .access_cb = dis_hw_cb, .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(DIS_SOFTWARE_CHAR_UUID),
+              .access_cb = dis_sw_cb, .flags = BLE_GATT_CHR_F_READ },
             { 0 }
         }
     },
@@ -844,6 +906,12 @@ static const struct ble_gatt_svc_def running_gatt_svcs[] = {
               .access_cb = dis_model_cb, .flags = BLE_GATT_CHR_F_READ },
             { .uuid = BLE_UUID16_DECLARE(DIS_FIRMWARE_CHAR_UUID),
               .access_cb = dis_fw_cb, .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(DIS_SERIAL_CHAR_UUID),
+              .access_cb = dis_serial_cb, .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(DIS_HARDWARE_CHAR_UUID),
+              .access_cb = dis_hw_cb, .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(DIS_SOFTWARE_CHAR_UUID),
+              .access_cb = dis_sw_cb, .flags = BLE_GATT_CHR_F_READ },
             { 0 }
         }
     },
@@ -881,6 +949,9 @@ static const struct ble_gatt_svc_def config_gatt_svc = {
           .access_cb = config_control_access_cb,
           .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE,
           .val_handle = &g_config_control_handle },
+        { .uuid = &g_config_dis_profile_uuid.u,
+          .access_cb = config_dis_profile_access_cb,
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
         { 0 }
     }
 };
@@ -1346,6 +1417,21 @@ void ble_bikepower_set_run_control_callback(ble_run_control_cb_t cb)
 void ble_bikepower_set_config_commit_callback(ble_config_commit_cb_t cb)
 {
     g_config_commit_cb = cb;
+}
+
+void ble_bikepower_set_identity_write_callback(ble_identity_write_cb_t cb)
+{
+    g_identity_write_cb = cb;
+}
+
+void ble_bikepower_set_identity(const device_identity_t *identity)
+{
+    device_identity_t next;
+    if (identity) next = *identity;
+    else device_identity_defaults(&next);
+    portENTER_CRITICAL(&g_identity_lock);
+    g_identity = next;
+    portEXIT_CRITICAL(&g_identity_lock);
 }
 
 void ble_bikepower_set_config_snapshot(const power_engine_t *engine)

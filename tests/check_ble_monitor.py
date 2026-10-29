@@ -58,6 +58,17 @@ def main():
         ("filters:CYCLING_SERVICE_FILTERS", "首次设备选择仅显示广播骑行相关服务的设备"),
         ("CYCLING_SERVICE_SET.has", "连接后复核设备实际提供骑行相关 GATT 服务"),
         ("navigator.bluetooth.getDevices", "支持已授权设备自动重连"),
+        ("watchAdvertisements", "刷新后等待已授权设备重新广播再自动连接"),
+        ("LAST_DEVICE_KEY", "记住上次连接的设备并优先自动连接"),
+        ("BroadcastChannel", "多标签页通过 BroadcastChannel 关联同一设备"),
+        ("initAutoLink();", "页面加载后启动自动连接与跨标签页关联"),
+        ("id=\"autolink-enabled\"", "提供自动连接开关"),
+        ("7a5a0008-4c7a-4f2a-9b3e-6d1f4a8c0b21", "声明设备身份覆盖特征 UUID"),
+        ("openTemplateWriter", "模板可写入开发板身份信息"),
+        ("performIdentityWrite", "身份写入后回读确认 NVS 落盘"),
+        ("saveAsTemplate(compareDevices['+rec._idx+'],true)", "比对页复制为模板后直接进入写入流程"),
+        ("decodeGattValue", "GATT 特征值解析为中文可读数值"),
+        ("GATT_CHAR_CN", "GATT 特征码附中文名称与说明"),
         ("setInterval(checkAnomalies", "周期检测通知中断等异常"),
         ("ANOMALY_LIMITS", "集中定义异常阈值"),
         ("parseCyclingPower", "解析 CPS 功率通知"),
@@ -200,6 +211,35 @@ if (!configsEqual(fixture, merged)
     || JSON.stringify(begin) !== JSON.stringify([1, 1, 4, 3, 2, 1, 68, 51, 34, 17])
     || JSON.stringify(commit) !== JSON.stringify([2, 4, 3, 2, 1, 31])) {
   throw new Error("BLE 配置网页协议运行时回归失败");
+}
+const dv = arr => { const u = new Uint8Array(arr); return new DataView(u.buffer); };
+const identity = {manufacturer: "萌恩", model: "BP-C3", serial: "", hardware: "v2", firmware: "1.4.0", software: ""};
+const idBytes = encodeIdentityProfile(identity);
+const idBack = decodeIdentityProfile(new DataView(idBytes.buffer, idBytes.byteOffset, idBytes.byteLength));
+if (idBytes[0] !== 1 || idBytes[1] !== 6 || JSON.stringify(idBack) !== JSON.stringify(identity)) {
+  throw new Error("设备身份覆盖编解码往返失败");
+}
+let rejected = false;
+try { encodeIdentityProfile({manufacturer: "x".repeat(32)}); } catch (e) { rejected = true; }
+if (!rejected) throw new Error("身份覆盖超长字段未被拒绝");
+rejected = false;
+try { decodeIdentityProfile(dv([2, 1, 0])); } catch (e) { rejected = true; }
+if (!rejected) throw new Error("身份覆盖错误版本未被拒绝");
+const cps = decodeGattValue("00002a63-0000-1000-8000-00805f9b34fb", dv([0, 0, 0x04, 0x01]));
+const hr = decodeGattValue("00002a37-0000-1000-8000-00805f9b34fb", dv([0, 145]));
+const bike = decodeGattValue("00002ad2-0000-1000-8000-00805f9b34fb", dv([0x44, 0, 0xe8, 0x03, 0xaa, 0, 0x04, 0x01]));
+const status = decodeGattValue("00002ada-0000-1000-8000-00805f9b34fb", dv([0x08, 0xc8, 0]));
+const range = decodeGattValue("00002ad8-0000-1000-8000-00805f9b34fb", dv([0, 0, 0xe8, 0x03, 5, 0]));
+const name = decodeGattValue("00002a29-0000-1000-8000-00805f9b34fb", dv([0x42, 0x50]));
+if (!cps.includes("功率：260 W") || !hr.includes("心率：145 bpm")
+    || !bike.includes("功率：260 W") || !bike.includes("踏频：85.0 rpm")
+    || !status.includes("目标功率已变更") || !status.includes("200 W")
+    || !range.includes("0–1000 W") || !name.includes("BP")) {
+  throw new Error("GATT 中文数值解析回归失败: " + [cps, hr, bike, status, range, name].join(" | "));
+}
+if (gattCharInfo("00002a63-0000-1000-8000-00805f9b34fb").cn !== "骑行功率测量"
+    || gattServiceInfo("00001826-0000-1000-8000-00805f9b34fb").cn.indexOf("健身") < 0) {
+  throw new Error("GATT 中文描述字典缺失");
 }
 """
         with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as tmp:

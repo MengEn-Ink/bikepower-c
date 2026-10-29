@@ -10,6 +10,7 @@ DOMAIN_SRCS := $(DOMAIN)/profile.c \
         $(DOMAIN)/running_engine.c \
         $(DOMAIN)/config_store.c \
         $(DOMAIN)/device_template.c \
+        $(DOMAIN)/device_identity.c \
         $(DOMAIN)/device_analysis.c \
         $(DOMAIN)/json_miniparse.c \
         $(DOMAIN)/button_logic.c \
