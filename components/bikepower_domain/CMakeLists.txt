@@ -6,6 +6,7 @@ idf_component_register(
          "running_engine.c"
          "config_store.c"
          "device_template.c"
+         "device_identity.c"
          "device_analysis.c"
          "json_miniparse.c"
          "button_logic.c"

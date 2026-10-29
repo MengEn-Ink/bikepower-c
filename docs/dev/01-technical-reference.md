@@ -352,6 +352,9 @@ Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述�
 | LED | `7a5a0005-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 静默开关及五个场景的模式和颜色 |
 | Identity | `7a5a0006-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | BLE 设备名 |
 | Control | `7a5a0007-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write/Indicate | BEGIN、COMMIT、CANCEL 与最终结果 |
+| DIS Profile | `7a5a0008-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 设备信息服务（DIS）身份覆盖：厂商、型号、序列号、硬件 / 固件 / 软件版本 |
+
+**DIS 身份覆盖（`7a5a0008`）**：线格式 `[version=1][count=6]` 后接 6 个 `[len][UTF-8]` 字段，顺序为厂商 `2A29`、型号 `2A24`、序列号 `2A25`、硬件版本 `2A27`、固件版本 `2A26`、软件版本 `2A28`；每字段最多 31 字节，拒绝控制字符与截断 UTF-8。空字段表示该项回退为固件内置值，全空写入会清除 NVS 中的覆盖（namespace `bp_ident` / key `dis`）。它独立于五组配置事务与 schema 迁移：NimBLE host 回调只做解码并投递到应用 mailbox（上一笔未落盘时拒绝写入），主循环写 NVS 成功后才刷新 DIS 读值。部分手机系统会缓存 DIS，写入后需在 App 中删除设备重新搜索。实现：`components/bikepower_domain/device_identity.c`、`main/device_identity_store.c`。
 
 协议版本当前为 `1`，所有多字节整数显式使用小端编码，不把 C struct 直接放上线传输。配置按五组拆分，最长 Running 组为 45 字节，适配当前 NimBLE MTU 64。字符串不携带结尾 `\0`，而是使用单字节 UTF-8 长度前缀；设备名最多 23 字节，自定义骑行/跑步名称最多 31 字节。
 

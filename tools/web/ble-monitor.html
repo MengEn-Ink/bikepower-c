@@ -552,11 +552,66 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
 
 /* ===== 全局确认弹窗 ===== */
 .confirm-mask{position:fixed;inset:0;background:rgba(10,8,7,.82);z-index:120;display:grid;place-items:center;padding:24px}
+.confirm-mask.confirm-top{z-index:140}
 .confirm-box{width:min(420px,100%);background:var(--panel);border:1px solid var(--accent);padding:24px}
 .confirm-box strong{display:block;color:var(--strong);font-size:18px;font-weight:900;letter-spacing:-.01em}
 .confirm-box p{margin:10px 0 20px;color:var(--ink);font-size:14px;line-height:1.6}
 .confirm-box p b{color:var(--accent);font-family:var(--mono);font-size:15px}
 .confirm-actions{display:flex;gap:10px;justify-content:flex-end}
+
+/* ===== 自动连接 / 跨标签页关联 ===== */
+.autolink{margin:16px 0 0;border:1px solid var(--line);background:var(--panel)}
+.autolink-toggle{display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 12px;cursor:pointer;color:var(--strong);font-size:13px;font-weight:800}
+.autolink-toggle input{width:18px;height:18px;accent-color:var(--accent);flex:none}
+.autolink-status{padding:0 12px 11px;color:var(--muted);font:12px/1.55 var(--mono);min-height:30px}
+.autolink-status.busy{color:var(--amber)}.autolink-status.ok{color:var(--green)}.autolink-status.err{color:var(--red)}
+.tab-relay{display:flex;align-items:center;gap:8px;border-top:1px dashed var(--line);padding:9px 12px;font:11px/1.4 var(--mono);color:var(--faint);letter-spacing:.04em}
+.tab-relay .node{width:9px;height:9px;border:1px solid var(--faint);flex:none}
+.tab-relay .node.me{background:var(--accent);border-color:var(--accent)}
+.tab-relay .node.peer{border-color:var(--green)}.tab-relay .node.peer.live{background:var(--green)}
+.tab-relay .wire{flex:1;height:1px;background:repeating-linear-gradient(90deg,var(--line) 0 4px,transparent 4px 7px)}
+.tab-relay.linked .wire{background:repeating-linear-gradient(90deg,var(--green) 0 4px,transparent 4px 7px);background-size:14px 1px;animation:relay 1.2s linear infinite}
+@keyframes relay{to{background-position:14px 0}}
+.tab-relay b{color:var(--ink);font-weight:700;text-align:right}
+.tab-relay .me-label{white-space:nowrap}
+.mirror-flag{display:inline-block;margin-left:8px;padding:1px 6px;border:1px solid var(--green);color:var(--green);font:11px/1.5 var(--mono);vertical-align:middle}
+
+/* ===== GATT 中文解析 ===== */
+.gatt-intro{margin:0 0 10px;color:var(--muted);font-size:13px;line-height:1.6}
+.svc-cn{display:block;color:var(--strong);font-size:14px;font-weight:900;font-family:var(--sans)}
+.svc-desc{display:block;margin-top:2px;color:var(--muted);font-size:12px;line-height:1.5;font-family:var(--sans);font-weight:400}
+.gchar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:6px 16px;padding:9px 0;border-top:1px solid var(--line-soft)}
+.gchar:first-child{border-top:0}
+.gchar-name b{display:block;color:var(--ink);font-size:13px}
+.gchar-name small{display:block;color:var(--faint);font:11px/1.45 var(--mono);overflow-wrap:anywhere}
+.gchar-desc{display:block;margin-top:3px;color:var(--muted);font-size:12px;line-height:1.5}
+.gchar-props{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.gchar-props span{padding:0 5px;border:1px solid var(--line);color:var(--muted);font:11px/1.6 var(--mono)}
+.gchar-props span.live{border-color:var(--accent);color:var(--accent)}
+.gval{align-self:start;min-height:40px;padding:7px 10px;border-left:2px solid var(--line);background:var(--bg);font:12px/1.55 var(--mono);color:var(--strong);overflow-wrap:anywhere;white-space:pre-line;transition:border-color .5s,background-color .5s}
+.gval.empty{color:var(--faint)}
+.gval.flash{border-left-color:var(--accent);background:var(--accent-soft);transition:none}
+.gval .unit{color:var(--accent)}
+@media(max-width:760px){.gchar{grid-template-columns:1fr}}
+
+/* ===== 模板写入开发板 ===== */
+.writer-box{width:min(680px,100%);max-height:calc(100vh - 48px);overflow:auto;background:var(--panel);border:1px solid var(--accent);padding:24px}
+.writer-box h3{margin:0;color:var(--strong);font-size:20px;font-weight:900}
+.writer-lead{margin:8px 0 16px;color:var(--muted);font-size:13px;line-height:1.65}
+.writer-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.writer-grid .span-all{grid-column:1/-1}
+.writer-grid .form-field input[type="text"]{font-family:var(--mono)}
+.byte-count{float:right;color:var(--faint);font:11px/1.8 var(--mono);font-weight:400}
+.byte-count.over{color:var(--red)}
+.writer-steps{margin:16px 0 0;padding:0;list-style:none;border:1px solid var(--line-soft)}
+.writer-steps li{display:flex;gap:10px;padding:8px 12px;border-top:1px solid var(--line-soft);font-size:13px;color:var(--muted)}
+.writer-steps li:first-child{border-top:0}
+.writer-steps li i{font-style:normal;font:12px/1.6 var(--mono);width:44px;flex:none;color:var(--faint)}
+.writer-steps li.run i{color:var(--amber)}.writer-steps li.ok i{color:var(--green)}.writer-steps li.err i{color:var(--red)}
+.writer-steps li.ok{color:var(--ink)}.writer-steps li.err{color:var(--red)}
+.writer-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;margin-top:18px}
+.writer-note{margin-top:14px;padding:11px 13px;border-left:3px solid var(--amber);background:var(--amber-soft);color:var(--ink);font-size:12px;line-height:1.65}
+@media(max-width:600px){.writer-grid{grid-template-columns:1fr}}
 
 /* 新模块响应式 */
 @media(max-width:960px){
@@ -718,6 +773,16 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
           <button class="btn ghost" onclick="loadTemplates()">查看已存模板</button>
         </div>
         <div id="connect-empty" class="monitor-note">首次连接会打开浏览器设备选择器，只显示广播了骑行功率、心率、骑行速度/踏频或智能骑行台服务的设备。网页不能静默获取附近设备。</div>
+        <div class="autolink" aria-label="自动连接与跨标签页关联">
+          <label class="autolink-toggle" for="autolink-enabled"><input type="checkbox" id="autolink-enabled" checked onchange="setAutoLinkEnabled(this.checked)">自动连接 · 断线重连 · 多标签页同步</label>
+          <div class="autolink-status" id="autolink-status" role="status" aria-live="polite">刷新后会优先连接上次使用的已授权设备。</div>
+          <div class="tab-relay" id="tab-relay" title="同一浏览器中打开的其他工具台标签页"><span class="node me"></span><span class="me-label">本页</span><span class="wire"></span><b id="tab-relay-text">无其他标签页</b><span class="node peer" id="tab-relay-node"></span></div>
+        </div>
+        <details class="protocol"><summary>自动连接说明</summary><div class="hint">
+          <p><b>刷新自动连接：</b>页面加载后调用 <code>navigator.bluetooth.getDevices()</code> 取回本站点已授权的设备，按「上次连接的设备 → 其他已授权设备」顺序尝试，支持 <code>watchAdvertisements</code> 的浏览器会先确认设备在附近再连接。</p>
+          <p><b>多标签页同步：</b>任一标签页连上设备后，会通过 <code>BroadcastChannel</code> 通知其他标签页；其他标签页会用同一授权自动建立自己的 GATT 连接（Chrome 会复用同一条蓝牙链路）。若无法直连，则以「镜像」方式显示该标签页转发的实时数值。</p>
+          <p><b>浏览器限制：</b>首次使用必须手动点「扫描并连接设备」授予权限；网页无法静默扫描未授权设备。部分 Chrome 版本需开启 <code>chrome://flags/#enable-web-bluetooth-new-permissions-backend</code> 才能在刷新后保留授权。手动点「断开」后不会自动重连。</p>
+        </div></details>
       </aside>
 
       <main class="signal-stage">
@@ -828,7 +893,12 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
       </div>
       <div class="flash-step">
         <b>怎么用</b>
-        <p>依次点击「添加设备」连接多台蓝牙设备，系统会自动比对各设备的信息字段和 GATT 服务列表。<span style="color:var(--amber)">黄色</span>背景表示该字段在设备间存在差异，<span style="color:var(--green)">绿色</span>表示一致。点击设备卡片中的「复制为模板」可将该设备信息保存为模板。</p>
+        <p>依次点击「添加设备」连接多台蓝牙设备，系统会自动比对各设备的信息字段和 GATT 服务列表。<span style="color:var(--amber)">黄色</span>背景表示该字段在设备间存在差异，<span style="color:var(--green)">绿色</span>表示一致。</p>
+        <p><b>复制为模板并写入开发板：</b>点击参考设备卡片上的「复制为模板」，会保存它的设备名、厂商、型号、序列号、硬件/固件/软件版本，并弹出写入面板。选择一台已连接、刷有 BikePower 新固件的开发板后，可把这些身份信息写入开发板 NVS，开发板的标准设备信息服务（DIS）随即对外报告新值；清空全部字段写入即可恢复固件内置值。</p>
+      </div>
+      <div class="card" id="compare-templates-card" style="display:none;margin-top:14px;padding:16px">
+        <div class="card-head"><h2 style="font-size:16px">已保存模板 · 可写入开发板</h2></div>
+        <div id="compare-templates-list" class="templates"></div>
       </div>
       <div id="compare-empty" class="empty-state">
         <div class="big" aria-hidden="true">A/B</div>
@@ -1610,7 +1680,7 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
   </section>
 
   <!-- 全局二次确认弹窗（ERG 等 Guarded 写入） -->
-  <div class="confirm-mask hidden" id="confirm-mask" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+  <div class="confirm-mask confirm-top hidden" id="confirm-mask" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
     <div class="confirm-box">
       <strong id="confirm-title">写入确认</strong>
       <p id="confirm-body">确认此操作？</p>
@@ -1619,6 +1689,34 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
         <button class="btn primary" id="confirm-ok" onclick="dismissConfirm(true)">确认写入</button>
       </div>
     </div>
+  </div>
+
+  <!-- 模板写入开发板 -->
+  <div class="confirm-mask hidden" id="writer-mask" role="dialog" aria-modal="true" aria-labelledby="writer-title">
+    <form class="writer-box" id="writer-form" onsubmit="writeTemplateToBoard(event)" novalidate>
+      <h3 id="writer-title">把模板写入开发板</h3>
+      <p class="writer-lead" id="writer-lead">模板来源：—</p>
+      <div class="writer-grid">
+        <div class="form-field span-all">
+          <label for="writer-target">目标开发板</label>
+          <select id="writer-target" onchange="updateWriterState()"></select>
+          <span class="field-hint" id="writer-target-hint">只列出已连接、且提供「设备身份写入」特征的 BikePower 开发板。</span>
+        </div>
+        <div class="form-field span-all">
+          <label for="writer-name">设备名（蓝牙广播名）<span class="byte-count" id="writer-name-count">0/23</span></label>
+          <input id="writer-name" type="text" autocomplete="off" oninput="updateWriterState()">
+          <label class="check-line" for="writer-name-enabled" style="margin-top:6px"><input id="writer-name-enabled" type="checkbox" checked onchange="updateWriterState()"><span>同时写入设备名（通过配置事务保存，骑行 App 重新扫描后显示新名称）</span></label>
+        </div>
+      </div>
+      <div class="writer-grid" id="writer-fields" style="margin-top:12px"></div>
+      <ol class="writer-steps hidden" id="writer-steps" aria-live="polite"></ol>
+      <div class="writer-note">写入内容保存在开发板 NVS，断电不丢失。字段留空表示该项使用固件内置值；点「恢复内置值」会清空全部覆盖。部分骑行 App / 系统蓝牙会缓存设备信息，写入后如未刷新，请在 App 中删除设备后重新搜索。</div>
+      <div class="writer-actions">
+        <button class="btn ghost" type="button" onclick="closeTemplateWriter()">关闭</button>
+        <button class="btn alt" type="button" id="writer-reset" onclick="resetBoardIdentity()">恢复内置值</button>
+        <button class="btn primary" type="submit" id="writer-submit">写入开发板</button>
+      </div>
+    </form>
   </div>
 
   <details class="card" id="log-panel" style="margin-top:16px">
@@ -1651,8 +1749,8 @@ const CHAR16 = {
   "2a5b":"CSC Measurement","2a5c":"CSC Feature","2a5d":"Sensor Location",
   "2a37":"Heart Rate Measurement","2a38":"Body Sensor Location","2a39":"Heart Rate Control Point",
   "2a53":"RSC Measurement","2a54":"RSC Feature","2a55":"SC Control Point",
-  "2ad2":"Indoor Bike Data","2ad6":"Fitness Machine Feature","2ad9":"Fitness Machine Control Point",
-  "2ada":"Fitness Machine Status","2acd":"Training Status","2ad1":"Supported Resistance Level Range","2ad8":"Supported Power Range",
+  "2ad2":"Indoor Bike Data","2acc":"Fitness Machine Feature","2ad9":"Fitness Machine Control Point","2acd":"Treadmill Data",
+  "2ada":"Fitness Machine Status","2ad3":"Training Status","2ad6":"Supported Resistance Level Range","2ad8":"Supported Power Range",
   "2a02":"Peripheral Privacy Flag","2a03":"Reconnection Address","2a04":"Peripheral Preferred Connection Parameters",
   "2a05":"Service Changed","2b29":"Client Supported Features",
 };
@@ -1672,7 +1770,7 @@ const UUIDS = {
   ftmsIndoorBike:"00002ad2-0000-1000-8000-00805f9b34fb",
   ftmsStatus:"00002ada-0000-1000-8000-00805f9b34fb",
   ftmsControlPoint:"00002ad9-0000-1000-8000-00805f9b34fb",
-  ftmsFeature:"00002ad6-0000-1000-8000-00805f9b34fb",
+  ftmsFeature:"00002acc-0000-1000-8000-00805f9b34fb",
   ftmsSupportedPowerRange:"00002ad8-0000-1000-8000-00805f9b34fb",
   manufacturer:"00002a29-0000-1000-8000-00805f9b34fb",
   model:"00002a24-0000-1000-8000-00805f9b34fb",
@@ -1698,7 +1796,9 @@ const CUSTOM_UUID_NAMES = {
   [UUIDS.configLed]:"LED Config",
   [UUIDS.configIdentity]:"Device Identity Config",
   [UUIDS.configControl]:"Config Transaction Control",
+  "7a5a0008-4c7a-4f2a-9b3e-6d1f4a8c0b21":"Device Identity Profile (DIS Override)",
 };
+const IDENTITY_PROFILE_UUID = "7a5a0008-4c7a-4f2a-9b3e-6d1f4a8c0b21";
 const CYCLING_SERVICE_UUIDS = [
   UUIDS.cpsService, UUIDS.hrService, UUIDS.cscService, UUIDS.ftmsService,
 ];
@@ -1941,13 +2041,25 @@ function parseCsc(rec,view){
   return Math.round((revDelta/(timeDeltaRaw/1024))*60);
 }
 function parseIndoorBike(view){
-  if(view.byteLength<4)throw new Error("FTMS 长度不足");
+  if(view.byteLength<2)throw new Error("FTMS 长度不足");
   const flags=view.getUint16(0,true);
-  const result={flags,speed:null,cadence:null,power:null};
+  const result={flags,speed:null,avgSpeed:null,cadence:null,avgCadence:null,distance:null,resistance:null,power:null,avgPower:null,energyTotal:null,energyPerHour:null,energyPerMin:null,hr:null,met:null,elapsed:null,remaining:null};
   let offset=2;
-  if(!(flags&0x0001)&&view.byteLength>=offset+2){result.speed=view.getUint16(offset,true)/100;offset+=2;}
-  if((flags&0x0004)&&view.byteLength>=offset+2){result.cadence=view.getUint16(offset,true)/2;offset+=2;}
-  if((flags & 0x0040) && view.byteLength>=offset+2){result.power=view.getInt16(offset,true);}
+  const has=n=>view.byteLength>=offset+n;
+  // FTMS Indoor Bike Data 按 flags 顺序变长排列；bit0=More Data 为 0 时才带瞬时速度
+  if(!(flags&0x0001)&&has(2)){result.speed=view.getUint16(offset,true)/100;offset+=2;}
+  if((flags&0x0002)&&has(2)){result.avgSpeed=view.getUint16(offset,true)/100;offset+=2;}
+  if((flags&0x0004)&&has(2)){result.cadence=view.getUint16(offset,true)/2;offset+=2;}
+  if((flags&0x0008)&&has(2)){result.avgCadence=view.getUint16(offset,true)/2;offset+=2;}
+  if((flags&0x0010)&&has(3)){result.distance=view.getUint16(offset,true)|(view.getUint8(offset+2)<<16);offset+=3;}
+  if((flags&0x0020)&&has(2)){result.resistance=view.getInt16(offset,true);offset+=2;}
+  if((flags & 0x0040) && has(2)){result.power=view.getInt16(offset,true);offset+=2;}
+  if((flags&0x0080)&&has(2)){result.avgPower=view.getInt16(offset,true);offset+=2;}
+  if((flags&0x0100)&&has(5)){result.energyTotal=view.getUint16(offset,true);result.energyPerHour=view.getUint16(offset+2,true);result.energyPerMin=view.getUint8(offset+4);offset+=5;}
+  if((flags&0x0200)&&has(1)){result.hr=view.getUint8(offset);offset+=1;}
+  if((flags&0x0400)&&has(1)){result.met=view.getUint8(offset)/10;offset+=1;}
+  if((flags&0x0800)&&has(2)){result.elapsed=view.getUint16(offset,true);offset+=2;}
+  if((flags&0x1000)&&has(2)){result.remaining=view.getUint16(offset,true);offset+=2;}
   return result;
 }
 function parseRsc(view){
@@ -1973,6 +2085,8 @@ function handleNotify(rec,serviceKey,event){
     else if(serviceKey==="rsc"){const d=parseRsc(view);latest.speed=d.speed;latest.cadence=d.cadence;latest.distance=d.distanceM;if(d.speed>ANOMALY_LIMITS.speedMaxKmh)recordAnomaly("speed",d.speed.toFixed(2)+" km/h");}
     appendSignalHistory(rec);
     renderRealtime(rec);
+    gattLiveUpdate(rec,event.target);
+    if(rec===singleDevice)tabBusRelayData(rec);
   }catch(err){recordAnomaly("parse",err.message);}
 }
 function appendSignalHistory(rec){
@@ -2490,23 +2604,35 @@ function restoreDeviceConfig(){if(!singleDevice||!singleDevice.configState.curre
 function downloadDeviceConfig(){
   if(!singleDevice||!singleDevice.configState.current)return;const payload={exported_at:new Date().toISOString(),device_id:singleDevice.device.id,revision:singleDevice.configState.meta.revision,schema_version:singleDevice.configState.meta.schema,config:singleDevice.configState.current};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="bikepower-nvs-config-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";a.click();URL.revokeObjectURL(url);
 }
+/* 配置事务核心：BEGIN → 五组写入 → COMMIT；失败时尽力 CANCEL。供表单保存与模板写入共用。 */
+async function runConfigTransaction(rec,config,onStatus=()=>{}){
+  const state=rec.configState;const control=state.characters.control;let transactionId=0;let began=false;let committed=false;
+  try{
+    onStatus("正在建立配置事务…");await control.startNotifications();
+    transactionId=crypto.getRandomValues(new Uint32Array(1))[0]||1;
+    let responsePromise=waitForConfigResponse(control,0x01,transactionId);await writeConfigValue(control,makeConfigBegin(transactionId,state.meta.revision));let response=await responsePromise;if(response.result!==0)throw configResultError(response);began=true;
+    let written=0;for(const group of CONFIG_GROUPS){onStatus("正在写入配置组 "+(++written)+" / "+CONFIG_GROUPS.length+"…");await writeConfigValue(state.characters[group.key],encodeConfigGroup(group.key,config));}
+    onStatus("设备正在校验并写入 NVS…");responsePromise=waitForConfigResponse(control,0x02,transactionId);await writeConfigValue(control,makeConfigCommit(transactionId));committed=true;response=await responsePromise;if(response.result!==0)throw configResultError(response);
+    state.meta.revision=response.revision;state.current=JSON.parse(JSON.stringify(config));
+    return response;
+  }catch(err){
+    if(began&&!committed&&transactionId){try{await writeConfigValue(control,makeConfigCancel(transactionId));}catch(cancelError){}}
+    throw err;
+  }
+}
 async function saveDeviceConfig(event){
   event.preventDefault();const rec=singleDevice;if(!rec||!rec.server||!rec.server.connected){setConfigStatus("设备已断开，无法保存。","err");return;}
   let config;try{config=collectConfigForm();}catch(err){setConfigStatus("无法读取表单："+err.message,"err");return;}
   const errors=validateConfig(config);showConfigErrors(errors,true);if(errors.length){setConfigStatus("配置未发送：请先修正表单中的错误。","err");return;}
-  const state=rec.configState;const control=state.characters.control;let transactionId=0;let began=false;let committed=false;
+  const state=rec.configState;
   try{
-    setConfigBusy(true);setConfigStatus("正在建立配置事务…","warn");await control.startNotifications();
-    transactionId=crypto.getRandomValues(new Uint32Array(1))[0]||1;
-    let responsePromise=waitForConfigResponse(control,0x01,transactionId);await writeConfigValue(control,makeConfigBegin(transactionId,state.meta.revision));let response=await responsePromise;if(response.result!==0)throw configResultError(response);began=true;
-    let written=0;for(const group of CONFIG_GROUPS){setConfigStatus("正在写入配置组 "+(++written)+" / "+CONFIG_GROUPS.length+"…","warn");await writeConfigValue(state.characters[group.key],encodeConfigGroup(group.key,config));}
-    setConfigStatus("设备正在校验并写入 NVS…","warn");responsePromise=waitForConfigResponse(control,0x02,transactionId);await writeConfigValue(control,makeConfigCommit(transactionId));committed=true;response=await responsePromise;if(response.result!==0)throw configResultError(response);
-    state.meta.revision=response.revision;state.current=JSON.parse(JSON.stringify(config));clearConfigErrors();setText("config-revision","revision "+response.revision);updateConfigDirty();
+    setConfigBusy(true);
+    const response=await runConfigTransaction(rec,config,message=>setConfigStatus(message,"warn"));
+    clearConfigErrors();setText("config-revision","revision "+response.revision);updateConfigDirty();
     const rebuild=!!(response.restartFlags&1);const renamed=!!(response.restartFlags&2);let message="保存成功：全部配置已写入开发板 NVS（revision "+response.revision+"）。";if(rebuild){message+=" 服务结构已变化，页面将断开连接，设备随后自动重新广播。";state.expectedDisconnectMessage="配置已保存成功（revision "+response.revision+"）。设备正在重建 GATT，请等待重新广播后重连。";}else if(renamed)message+=" 新设备名已同步，当前连接保持在线。";
     setConfigStatus(message,"ok");log(message,"data");
     if(rebuild)setTimeout(()=>{if(rec.server&&rec.server.connected)rec.server.disconnect();},350);
   }catch(err){
-    if(began&&!committed&&transactionId){try{await writeConfigValue(control,makeConfigCancel(transactionId));}catch(cancelError){}}
     const stale=err.configResponse&&err.configResponse.result===4;const message=(stale?"设备配置已变化，请先重新读取。":"保存失败：")+(err.message||String(err));setConfigStatus(message,"err");log(message,"error");
   }finally{setConfigBusy(false);}
 }
@@ -2525,7 +2651,7 @@ function switchMode(mode){
   $("mode-erg").classList.toggle("hidden",mode!=="erg");
   $("mode-manual").classList.toggle("hidden",mode!=="manual");
   if(mode==="connect")loadTemplates();
-  if(mode==="compare")renderCompareTable();
+  if(mode==="compare"){renderCompareTable();loadTemplates();}
   if(mode==="inspector")refreshInspectorFromCurrent();
   if(mode==="health")renderHealthSteps();
   if(mode==="erg")ergRefreshFromCurrent();
@@ -2665,6 +2791,7 @@ async function readDeviceInfo(server){
 
 async function enumerateServices(server){
   const services=[];
+  let reads=0;
   try{
     const svcs=await server.getPrimaryServices();
     for(const svc of svcs){
@@ -2672,9 +2799,14 @@ async function enumerateServices(server){
       try{
         const chars=await svc.getCharacteristics();
         for(const ch of chars){
-          entry.characteristics.push({
-            uuid:ch.uuid,name:charName(ch.uuid),properties:propFlags(ch),
-          });
+          const item={uuid:ch.uuid,name:charName(ch.uuid),properties:propFlags(ch),value:null,raw:null};
+          // 读取一次可读特征的当前值，用于 GATT 列表中文解析；限制次数避免拖慢连接
+          if(ch.properties.read&&reads<48){
+            reads++;
+            try{const v=await ch.readValue();item.raw=hexDump(new Uint8Array(v.buffer,v.byteOffset,v.byteLength));item.value=decodeGattValue(ch.uuid,v);}
+            catch(err){item.value="读取失败："+(err.message||err.name);}
+          }
+          entry.characteristics.push(item);
         }
       }catch(err){
         entry.characteristics.push({uuid:"",name:"读取特征失败: "+err.message,properties:""});
@@ -2703,6 +2835,7 @@ async function connectAndCollect(device){
       setText("power-summary","连接已断开，当前显示最后收到的真实数值。");
       setText("power-detail","本次会话的曲线与统计仍保留，可继续检查具体时间点或导出 CSV / JSON 报告。");
       markConfigDisconnected(rec);renderSignalTrace(rec);updateMonitorEvidence(rec);
+      onSingleDeviceDisconnected(rec);
     }
   });
   try{
@@ -2752,38 +2885,48 @@ async function subscribeNotifications(rec){
 async function connectAuthorized(){
   if(!checkSupport())return;
   if(!navigator.bluetooth.getDevices){log("当前浏览器不支持 getDevices，需点击扫描并连接设备重新授权","warn");return;}
-  const devices=await navigator.bluetooth.getDevices();
-  const candidate=devices[0];
-  if(!candidate){log("没有已授权的设备，请先点击扫描并连接设备","warn");return;}
-  if(currentMode==="connect"){
-    if(singleDevice&&singleDevice.server){const previous=singleDevice;singleDevice=null;try{previous.server.disconnect();}catch(e){}}
-    anomalies={};resetTraceInteraction();
-    $("connect-empty").classList.add("hidden");$("connect-result").classList.remove("hidden");
-    $("single-device-card").innerHTML='<div class="dc-head"><span class="badge warn">连接中...</span></div>';
-    setText("top-status","正在连接");setText("monitor-device-name",candidate.name||"未命名设备");
-    try{singleDevice=await connectAndCollect(candidate);renderSingleDevice(singleDevice);}catch(e){$("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+escapeHtml(e.message)+'</div>';resetMonitorSignals();}
-  }else if(currentMode==="compare"){
+  if(currentMode==="compare"){
+    const devices=await orderedAuthorizedDevices();
+    const candidate=devices[0];
+    if(!candidate){log("没有已授权的设备，请先点击扫描并连接设备","warn");return;}
     addCompareDeviceFromExisting(candidate);
+    return;
   }
+  autoLinkUserDisconnected=false;
+  const ok=await autoConnect("manual");
+  if(!ok)log("没有可连接的已授权设备，请先点击扫描并连接设备","warn");
 }
 
 /* ==================== 模式二：单设备连接 ==================== */
 async function connectAnyDevice(){
   const device=await requestDevice();
   if(!device)return;
+  autoLinkUserDisconnected=false;
+  try{await connectSingleWith(device,"picker");}catch(err){}
+}
+
+/* 统一的单设备连接入口：手动选择、刷新自动连接、断线重连、跨标签页关联都走这里 */
+async function connectSingleWith(device,source="picker",timeoutMs=20000){
   if(singleDevice&&singleDevice.server){const previous=singleDevice;singleDevice=null;try{previous.server.disconnect();}catch(e){}}
+  mirrorState=null;
   anomalies={};resetTraceInteraction();
   $("connect-empty").classList.add("hidden");
   $("connect-result").classList.remove("hidden");
-  $("single-device-card").innerHTML='<div class="dc-head"><span class="badge warn">连接中...</span></div>';
+  const label={picker:"连接中...",auto:"自动连接中...",reconnect:"断线重连中...",tab:"关联其他标签页的设备..."}[source]||"连接中...";
+  $("single-device-card").innerHTML='<div class="dc-head"><span class="badge warn">'+escapeHtml(label)+'</span></div>';
   setText("top-status","正在连接");setText("monitor-device-name",device.name||"未命名设备");
   try{
-    const rec=await connectAndCollect(device);
+    let timer=null;
+    const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{try{device.gatt.disconnect();}catch(e){}reject(new Error("连接超时（"+Math.round(timeoutMs/1000)+" 秒），设备可能不在附近或未上电"));},timeoutMs);});
+    const rec=await Promise.race([connectAndCollect(device),timeout]).finally(()=>clearTimeout(timer));
     singleDevice=rec;
     renderSingleDevice(rec);
+    onSingleDeviceConnected(rec,source);
+    return rec;
   }catch(err){
     $("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+escapeHtml(err.message)+'</div>';
     resetMonitorSignals();
+    throw err;
   }
 }
 
@@ -2803,10 +2946,11 @@ function renderSingleDevice(rec){
   html+='</div>';
   html+='<div class="dc-foot">';
   html+='<button class="btn primary sm" onclick="saveAsTemplate(singleDevice)">保存为模板</button>';
+  if(supportsIdentityProfile(rec))html+='<button class="btn alt sm" onclick="openTemplateWriter(null,singleDevice)">编辑并写入身份信息</button>';
   html+='<button class="btn alt sm" onclick="downloadReport()">导出报告</button>';
   html+='<button class="btn ghost sm" onclick="disconnectSingle()">断开并保留历史</button>';
   html+='</div></section>';
-  html+='<section><h3>GATT 服务列表（'+rec.services.length+'）</h3>'+renderServiceList(rec.services)+'</section>';
+  html+='<section><h3>GATT 服务列表（'+rec.services.length+'）</h3><p class="gatt-intro">每个服务 / 特征都附中文名称与用途说明。右侧为解析后的实际数值：可读特征在连接时读取一次，带 <b>通知</b> 标记的特征会随设备推送实时刷新（橙色闪烁表示刚收到新数据）。</p>'+renderServiceList(rec.services)+'</section>';
   html+=renderConfigEditor(rec);
   card.innerHTML=html;
   bindConfigForm(rec);
@@ -2817,12 +2961,19 @@ function renderServiceList(services){
   if(!services.length)return '<div class="hint">未枚举到任何 GATT 服务（可能未在 optionalServices 中声明）</div>';
   let html='<div class="svc-list">';
   for(const svc of services){
+    const sInfo=gattServiceInfo(svc.uuid);
     html+='<div class="svc-item">';
-    html+='<div class="svc-head"><span class="svc-name">'+escapeHtml(svc.name)+'</span><span class="svc-uuid">'+escapeHtml(svc.uuid)+'</span></div>';
+    html+='<div class="svc-head"><span class="svc-name"><span class="svc-cn">'+escapeHtml(sInfo.cn)+'</span>'+escapeHtml(svc.name)+'<span class="svc-desc">'+escapeHtml(sInfo.desc)+'</span></span><span class="svc-uuid">'+escapeHtml(svc.uuid)+'</span></div>';
     if(svc.characteristics.length){
       html+='<div class="chars">';
       for(const ch of svc.characteristics){
-        html+='<div class="char"><span><b>'+escapeHtml(ch.name)+'</b> <span class="svc-uuid">'+escapeHtml(ch.uuid)+'</span></span><span class="props">'+escapeHtml(ch.properties)+'</span></div>';
+        const cInfo=gattCharInfo(ch.uuid);
+        const props=(ch.properties||"").split("|").filter(Boolean);
+        const live=props.includes("notify")||props.includes("indicate");
+        const propHtml=props.map(p=>'<span class="'+((p==="notify"||p==="indicate")?"live":"")+'" title="'+escapeHtml(p)+'">'+escapeHtml(GATT_PROP_CN[p]||p)+'</span>').join("");
+        const value=ch.value?escapeHtml(ch.value):(live?"等待设备推送…":(props.includes("read")?"—":"不可读（仅写入 / 通知）"));
+        html+='<div class="gchar"><div class="gchar-name"><b>'+escapeHtml(cInfo.cn)+'</b><small>'+escapeHtml(ch.name)+' · '+escapeHtml(ch.uuid)+'</small><span class="gchar-desc">'+escapeHtml(cInfo.desc)+'</span><div class="gchar-props">'+propHtml+'</div></div>';
+        html+='<div class="gval'+(ch.value?"":" empty")+'" data-gatt-char="'+escapeHtml(uuidShort(ch.uuid))+'"'+(ch.raw?' title="原始字节：'+escapeHtml(ch.raw)+'"':'')+'>'+value+'</div></div>';
       }
       html+='</div>';
     }
@@ -2833,6 +2984,7 @@ function renderServiceList(services){
 }
 
 function disconnectSingle(){
+  autoLinkUserDisconnected=true;
   if(singleDevice&&singleDevice.server){
     try{singleDevice.server.disconnect();}catch(e){}
   }
@@ -2840,19 +2992,23 @@ function disconnectSingle(){
 
 /* ==================== 模板管理 ==================== */
 const TPL_KEY="bikepower_device_templates";
-function loadTemplates(){
-  let list=[];
-  try{list=JSON.parse(localStorage.getItem(TPL_KEY)||"[]");}catch(e){list=[];}
-  const card=$("templates-card");
-  const box=$("templates-list");
-  if(!list.length){card.style.display="none";return;}
-  card.style.display="";
-  box.innerHTML=list.map((t,i)=>{
-    const sub=[t.info.manufacturer,t.info.model,t.info.firmware].filter(Boolean).join(" · ")||"无设备信息";
-    return '<div class="tpl-item"><div class="tpl-info"><span class="tpl-name">'+escapeHtml(t.name||t.deviceName||"模板 "+(i+1))+'</span><span class="tpl-sub">'+escapeHtml(sub)+'</span></div><div class="tpl-ops"><button class="btn alt sm" onclick="exportTemplate('+i+')">导出</button><button class="btn ghost sm" onclick="deleteTemplate('+i+')">删除</button></div></div>';
-  }).join("");
+function readTemplateList(){
+  try{const list=JSON.parse(localStorage.getItem(TPL_KEY)||"[]");return Array.isArray(list)?list:[];}catch(e){return [];}
 }
-function saveAsTemplate(rec){
+function loadTemplates(){
+  const list=readTemplateList();
+  const html=list.map((t,i)=>{
+    const info=t.info||{};
+    const sub=[info.manufacturer,info.model,info.firmware].filter(Boolean).join(" · ")||"无设备信息";
+    return '<div class="tpl-item"><div class="tpl-info"><span class="tpl-name">'+escapeHtml(t.name||t.deviceName||"模板 "+(i+1))+'</span><span class="tpl-sub">'+escapeHtml(sub)+'</span></div><div class="tpl-ops"><button class="btn primary sm" onclick="openTemplateWriter('+i+')">写入开发板</button><button class="btn alt sm" onclick="exportTemplate('+i+')">导出</button><button class="btn ghost sm" onclick="deleteTemplate('+i+')">删除</button></div></div>';
+  }).join("");
+  [["templates-card","templates-list"],["compare-templates-card","compare-templates-list"]].forEach(([cardId,boxId])=>{
+    const card=$(cardId),box=$(boxId);if(!card||!box)return;
+    card.style.display=list.length?"":"none";box.innerHTML=html;
+  });
+}
+function saveAsTemplate(rec,openWriter=false){
+  if(!rec||!rec.device){log("没有可保存为模板的设备","warn");return -1;}
   const tpl={
     name:rec.device.name||"未命名设备",
     deviceName:rec.device.name,
@@ -2861,12 +3017,13 @@ function saveAsTemplate(rec){
     info:{...rec.info},
     services:rec.services.map(s=>({uuid:s.uuid,name:s.name,characteristics:s.characteristics.map(c=>({uuid:c.uuid,name:c.name,properties:c.properties}))})),
   };
-  let list=[];
-  try{list=JSON.parse(localStorage.getItem(TPL_KEY)||"[]");}catch(e){list=[];}
+  const list=readTemplateList();
   list.push(tpl);
   localStorage.setItem(TPL_KEY,JSON.stringify(list));
   log("已保存模板: "+tpl.name);
   loadTemplates();
+  if(openWriter)openTemplateWriter(list.length-1);
+  return list.length-1;
 }
 function deleteTemplate(i){
   let list=[];
@@ -2930,8 +3087,12 @@ function renderCompareDeviceCard(card,rec){
   html+='<div><div class="dc-name">'+escapeHtml(rec.device.name||"(无名设备)")+'</div>';
   html+='<div class="dc-meta">'+escapeHtml(rec.device.id)+'</div></div>';
   html+='<span class="badge ok">已连接</span></div>';
+  const info=rec.info||{};
+  const sub=[info.manufacturer,info.model,info.firmware].filter(Boolean).join(" · ");
+  if(sub)html+='<div class="hint" style="margin-top:6px;font-family:var(--mono)">'+escapeHtml(sub)+'</div>';
+  if(supportsIdentityProfile(rec))html+='<div class="hint" style="margin-top:4px;color:var(--green)">✓ 支持写入身份信息（BikePower 开发板）</div>';
   html+='<div class="dc-foot">';
-  html+='<button class="btn primary sm" onclick="saveAsTemplate(compareDevices['+rec._idx+'])">复制为模板</button>';
+  html+='<button class="btn primary sm" onclick="saveAsTemplate(compareDevices['+rec._idx+'],true)">复制为模板</button>';
   html+='<button class="btn alt sm" onclick="removeCompareDevice('+rec._idx+')">移除</button>';
   html+='</div>';
   card.innerHTML=html;
@@ -3133,17 +3294,10 @@ function hexDump(bytes){
 function uuidShortKey(uuid){ return (uuid||"").toLowerCase(); }
 
 function parseKnownFrame(uuid, dataView){
-  const u=uuidShortKey(uuid);
-  try{
-    if(u===UUIDS.cpsMeasurement){ const p=parseCyclingPower(dataView); return "CPS · power="+p.power+"W (flags=0x"+p.flags.toString(16)+")"; }
-    if(u===UUIDS.hrMeasurement){ const hr=parseHeartRate(dataView); return "HRS · HR="+hr+"bpm"; }
-    if(u===UUIDS.cscMeasurement){ const flags=dataView.getUint8(0); return "CSC · flags=0x"+flags.toString(16)+" raw"; }
-    if(u===UUIDS.rscMeasurement){ const r=parseRsc(dataView); return "RSC · speed="+r.speed.toFixed(2)+"km/h cad="+r.cadence+"spm"; }
-    if(u===UUIDS.ftmsIndoorBike){ const d=parseIndoorBike(dataView); const parts=[]; if(d.speed!=null)parts.push("v="+d.speed.toFixed(2)+"km/h"); if(d.cadence!=null)parts.push("cad="+Math.round(d.cadence)+"rpm"); if(d.power!=null)parts.push("P="+d.power+"W"); return "FTMS IndoorBike · "+(parts.join(" ")||"flags only"); }
-    if(u===UUIDS.ftmsStatus){ return "FTMS Status · op=0x"+dataView.getUint8(0).toString(16).padStart(2,"0"); }
-    if(u===UUIDS.ftmsControlPoint){ const op=dataView.getUint8(0); if(op===0x80 && dataView.byteLength>=3){ return "FTMS CP Response · reqOp=0x"+dataView.getUint8(1).toString(16).padStart(2,"0")+" result=0x"+dataView.getUint8(2).toString(16).padStart(2,"0"); } return "FTMS CP · op=0x"+op.toString(16).padStart(2,"0"); }
-  }catch(err){ return "解析失败: "+err.message; }
-  return null;
+  const s=uuidShort(uuid);
+  if(!GATT_CHAR_CN[s]&&!CUSTOM_UUID_NAMES[uuidShortKey(uuid)])return null;
+  try{ return gattCharInfo(uuid).cn+" · "+decodeGattValue(uuid,dataView).replace(/\n/g," · "); }
+  catch(err){ return "解析失败: "+err.message; }
 }
 
 function recordInspectorFrame(serviceUuid, charUuid, dataView){
@@ -3224,13 +3378,13 @@ function renderInspectorTree(){
   let html="";
   svcs.forEach(svc=>{
     html+='<div class="inspector-svc">';
-    html+='<div class="inspector-svc-head"><span>'+escapeHtml(svc.name)+'</span><small>'+escapeHtml(uuidShort(svc.uuid))+'</small></div>';
+    html+='<div class="inspector-svc-head"><span>'+escapeHtml(gattServiceInfo(svc.uuid).cn)+' · '+escapeHtml(svc.name)+'</span><small>'+escapeHtml(uuidShort(svc.uuid))+'</small></div>';
     svc.characteristics.forEach(ch=>{
       const canSubscribe = ch.properties.includes("notify")||ch.properties.includes("indicate");
       const subscribed = inspectorState.subscriptions.has(uuidShortKey(ch.uuid));
       const classes = ["inspector-char"]; if(subscribed) classes.push("subscribed");
       html+='<div class="'+classes.join(" ")+'" data-char="'+escapeHtml(ch.uuid)+'">';
-      html+='<div><div class="inspector-char-name">'+escapeHtml(ch.name)+'</div>';
+      html+='<div><div class="inspector-char-name">'+escapeHtml(gattCharInfo(ch.uuid).cn)+' <span style="color:var(--faint);font-weight:400">'+escapeHtml(ch.name)+'</span></div>';
       html+='<div class="inspector-char-uuid">'+escapeHtml(ch.uuid)+'</div>';
       html+='<div class="inspector-char-props">'+escapeHtml(ch.properties||"—")+'</div></div>';
       if(canSubscribe){
@@ -3793,6 +3947,593 @@ async function ergWriteTargetConfirm(){
   if(sent){ ergState.lastTarget=target; ergRender(); }
 }
 
+/* ==================== GATT 中文字典与数值解析 ==================== */
+const GATT_PROP_CN={read:"读",write:"写","write-wr":"无响应写",notify:"通知",indicate:"指示",broadcast:"广播",signed:"签名写"};
+const GATT_SERVICE_CN={
+  "1800":["通用访问（GAP）","设备名称、外观、首选连接参数等基础信息"],
+  "1801":["通用属性（GATT）","服务表变化通知，App 据此刷新缓存"],
+  "180a":["设备信息（DIS）","厂商、型号、序列号、硬件 / 固件 / 软件版本"],
+  "180d":["心率服务（HRS）","实时心率 bpm，可附带能量消耗与 RR 间期"],
+  "180f":["电池服务（BAS）","剩余电量百分比"],
+  "1816":["骑行速度与踏频（CSC）","车轮 / 曲柄累计转数与事件时间，App 据此计算速度与踏频"],
+  "1818":["骑行功率（CPS）","瞬时功率（W），可附带曲柄 / 车轮转数、踏板平衡等"],
+  "1814":["跑步速度与步频（RSC）","跑步速度、步频、步幅、总距离"],
+  "1826":["健身器材（FTMS）","智能骑行台 / 跑步机数据、状态与 ERG 控制"],
+};
+const GATT_CHAR_CN={
+  "2a00":["设备名称","GAP 层对外公布的设备名"],
+  "2a01":["外观类别","设备外观编码，App 据此显示图标"],
+  "2a04":["首选连接参数","外设期望的连接间隔、从机延迟与监督超时"],
+  "2a05":["服务变更","GATT 服务表变化时指示客户端重新发现"],
+  "2aa6":["中心地址解析","是否支持私有地址解析"],
+  "2b29":["客户端支持特性","GATT 缓存等客户端能力协商"],
+  "2b2a":["数据库哈希","GATT 服务表摘要，用于缓存校验"],
+  "2b3a":["服务端支持特性","服务端 GATT 能力"],
+  "2a29":["厂商名称","设备制造商"],
+  "2a24":["型号","设备型号"],
+  "2a25":["序列号","设备序列号"],
+  "2a27":["硬件版本","硬件 / 板型版本"],
+  "2a26":["固件版本","固件版本或固件包名"],
+  "2a28":["软件版本","软件语义版本号"],
+  "2a23":["系统 ID","厂商定义的唯一标识"],
+  "2a50":["PnP ID","厂商 ID 来源、厂商 ID、产品 ID、产品版本"],
+  "2a19":["电池电量","剩余电量 0–100 %"],
+  "2a63":["骑行功率测量","瞬时功率（W），每次推送实时刷新"],
+  "2a64":["骑行功率向量","曲柄受力方向与大小的分布"],
+  "2a65":["骑行功率特性","功率计支持的测量能力位"],
+  "2a66":["骑行功率控制点","校准、设置曲柄长度等命令"],
+  "2a5d":["传感器位置","传感器安装位置"],
+  "2a5b":["速度 / 踏频测量","车轮、曲柄累计转数与事件时间（1/1024 秒）"],
+  "2a5c":["速度 / 踏频特性","是否支持车轮 / 曲柄数据与多位置"],
+  "2a55":["SC 控制点","设置累计值、更新传感器位置等命令"],
+  "2a37":["心率测量","心率 bpm，可附带能量消耗与 RR 间期"],
+  "2a38":["身体传感器位置","心率传感器佩戴位置"],
+  "2a39":["心率控制点","重置能量消耗累计值"],
+  "2a53":["跑步速度 / 步频测量","速度、步频、步幅、总距离"],
+  "2a54":["跑步速度 / 步频特性","是否支持步幅、距离、跑走状态等"],
+  "2ad2":["室内单车数据","速度、踏频、功率、阻力等实时数据"],
+  "2acd":["跑步机数据","速度、距离、坡度等实时数据"],
+  "2acc":["健身器材特性","器材能力位与可设置的训练目标"],
+  "2ad3":["训练状态","当前训练阶段（热身、间歇等）"],
+  "2ad6":["支持的阻力范围","阻力等级最小值、最大值与步进"],
+  "2ad8":["支持的功率范围","ERG 目标功率最小值、最大值与步进"],
+  "2ad9":["健身器材控制点","申请控制、设置目标功率 / 阻力、开始 / 停止"],
+  "2ada":["健身器材状态","器材状态变化，如目标功率已变更、已停止"],
+};
+const GATT_CUSTOM_CN={
+  "7a5a0000-4c7a-4f2a-9b3e-6d1f4a8c0b21":["BikePower 配置服务","开发板私有服务：读写 NVS 配置与设备身份"],
+  "7a5a0001-4c7a-4f2a-9b3e-6d1f4a8c0b21":["配置元信息","协议版本、schema、配置组掩码与 revision"],
+  "7a5a0002-4c7a-4f2a-9b3e-6d1f4a8c0b21":["核心配置","基础功率、踏频、心率、浮动与广播项"],
+  "7a5a0003-4c7a-4f2a-9b3e-6d1f4a8c0b21":["骑行个人参数","体重、FTP、阈值心率与配速档"],
+  "7a5a0004-4c7a-4f2a-9b3e-6d1f4a8c0b21":["跑步参数","速度、配速浮动、步频与配速模板"],
+  "7a5a0005-4c7a-4f2a-9b3e-6d1f4a8c0b21":["LED 灯效","各场景灯效模式与颜色"],
+  "7a5a0006-4c7a-4f2a-9b3e-6d1f4a8c0b21":["设备名称配置","蓝牙广播名（UTF-8 ≤ 23 字节）"],
+  "7a5a0007-4c7a-4f2a-9b3e-6d1f4a8c0b21":["配置事务控制点","BEGIN / COMMIT / CANCEL 事务命令与结果通知"],
+  "7a5a0008-4c7a-4f2a-9b3e-6d1f4a8c0b21":["设备身份覆盖","写入后 DIS 的厂商 / 型号 / 序列号 / 版本改为报告覆盖值"],
+};
+const SENSOR_LOCATION_CN=["其他","鞋面","鞋内","臀部","前轮","左曲柄","右曲柄","左踏板","右踏板","前轮毂","后勾爪","链条","后轮","后轮毂","胸部","中轴"];
+const BODY_LOCATION_CN=["其他","胸部","手腕","手指","手掌","耳垂","脚部"];
+const APPEARANCE_CN={0:"未知",0x0340:"心率传感器",0x0341:"心率胸带",0x0440:"跑步速度传感器",0x0441:"鞋内跑步传感器",0x0480:"骑行设备",0x0481:"骑行码表",0x0482:"速度传感器",0x0483:"踏频传感器",0x0484:"功率计",0x0485:"速度与踏频传感器"};
+const FTMS_MACHINE_FEATURES=["平均速度","踏频","总距离","坡度","海拔增益","步数","阻力等级","步幅计数","能量消耗","心率","代谢当量","已用时间","剩余时间","功率测量","力 / 皮带","用户数据保留"];
+const FTMS_TARGET_FEATURES=["目标速度","目标坡度","目标阻力","目标功率（ERG）","目标心率","目标能量","目标步数","目标步幅","目标距离","目标训练时长","两区心率时间","三区心率时间","五区心率时间","室内骑行模拟","车轮周长","Spin Down 校准","目标踏频"];
+const CPS_FEATURES=["踏板功率平衡","累计扭矩","车轮转数","曲柄转数","极值幅度","极值角度","上 / 下死点角","累计能量","偏移补偿指示","偏移补偿","内容屏蔽","多传感器位置","曲柄长度调整","链条长度调整","链条重量调整","跨距调整","传感器测量方式","仪表方向","因子校准日期","增强偏移补偿"];
+const FTMS_STATUS_CN={0x01:"器材已复位",0x02:"已被用户停止 / 暂停",0x03:"已被安全键停止",0x04:"已被用户启动 / 恢复",0x05:"目标速度已变更",0x06:"目标坡度已变更",0x07:"目标阻力已变更",0x08:"目标功率已变更",0x09:"目标心率已变更",0x0a:"目标能量已变更",0x12:"室内骑行模拟参数已变更",0x13:"车轮周长已变更",0x14:"Spin Down 状态",0x15:"目标踏频已变更",0xff:"控制权已丢失"};
+const FTMS_CP_OP_CN={0x00:"申请控制权",0x01:"复位",0x02:"设置目标速度",0x03:"设置目标坡度",0x04:"设置目标阻力",0x05:"设置目标功率",0x06:"设置目标心率",0x07:"开始 / 恢复",0x08:"停止 / 暂停",0x11:"设置室内骑行模拟参数",0x12:"设置车轮周长",0x13:"Spin Down 控制",0x14:"设置目标踏频",0x80:"响应"};
+const FTMS_CP_RESULT_CN={0x01:"成功",0x02:"不支持该操作",0x03:"参数无效",0x04:"操作失败",0x05:"未获得控制权"};
+const TRAINING_STATUS_CN={0x00:"其他",0x01:"空闲",0x02:"热身",0x03:"低强度间歇",0x04:"高强度间歇",0x05:"恢复间歇",0x06:"等长训练",0x07:"心率控制",0x08:"体能测试",0x0b:"冷身",0x0c:"功率控制",0x0d:"手动模式",0x0e:"训练前",0x0f:"训练后"};
+
+function gattServiceInfo(uuid){
+  const full=(uuid||"").toLowerCase();const hit=GATT_CUSTOM_CN[full]||GATT_SERVICE_CN[uuidShort(full)];
+  return hit?{cn:hit[0],desc:hit[1]}:{cn:"未收录服务",desc:"厂商私有或本工具暂未收录的服务"};
+}
+function gattCharInfo(uuid){
+  const full=(uuid||"").toLowerCase();const hit=GATT_CUSTOM_CN[full]||GATT_CHAR_CN[uuidShort(full)];
+  return hit?{cn:hit[0],desc:hit[1]}:{cn:"未收录特征",desc:"厂商私有或本工具暂未收录的特征，右侧显示原始字节"};
+}
+function gattBytes(view){return new Uint8Array(view.buffer,view.byteOffset,view.byteLength);}
+function gattUtf8(view){return new TextDecoder("utf-8").decode(gattBytes(view)).replace(/\0/g,"").trim();}
+function bitNames(value,names){const out=[];names.forEach((name,i)=>{if(name&&Math.floor(value/Math.pow(2,i))%2===1)out.push(name);});return out;}
+function fmtDuration(sec){const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;return (h?h+":"+String(m).padStart(2,"0"):String(m))+":"+String(s).padStart(2,"0");}
+function hexOrText(view){
+  const bytes=gattBytes(view);if(!bytes.length)return "（空值）";
+  const printable=bytes.every(b=>b>=0x20&&b<0x7f);
+  return (printable?"文本：「"+gattUtf8(view)+"」\n":"")+"原始字节："+hexDump(bytes);
+}
+function decodeCpsMeasurement(view){
+  if(view.byteLength<4)throw new Error("CPS 长度不足");
+  const flags=view.getUint16(0,true);const lines=["功率："+view.getInt16(2,true)+" W"];let o=4;
+  const has=n=>view.byteLength>=o+n;
+  if((flags&0x0001)&&has(1)){lines.push("踏板平衡："+(view.getUint8(o)/2).toFixed(1)+" %"+((flags&0x0002)?"（左脚）":""));o+=1;}
+  if((flags&0x0004)&&has(2)){lines.push("累计扭矩："+(view.getUint16(o,true)/32).toFixed(2)+" N·m");o+=2;}
+  if((flags&0x0010)&&has(6)){lines.push("车轮累计 "+view.getUint32(o,true)+" 圈 · 事件时间 "+(view.getUint16(o+4,true)/2048).toFixed(3)+" s");o+=6;}
+  if((flags&0x0020)&&has(4)){lines.push("曲柄累计 "+view.getUint16(o,true)+" 圈 · 事件时间 "+(view.getUint16(o+2,true)/1024).toFixed(3)+" s");o+=4;}
+  if((flags&0x0040)&&has(4)){o+=4;}if((flags&0x0080)&&has(4)){o+=4;}if((flags&0x0100)&&has(3)){o+=3;}
+  if((flags&0x0200)&&has(2)){o+=2;}if((flags&0x0400)&&has(2)){o+=2;}
+  if((flags&0x0800)&&has(2)){lines.push("累计能量："+view.getUint16(o,true)+" kJ");o+=2;}
+  return lines.join("\n");
+}
+function decodeHeartRate(view){
+  if(view.byteLength<2)throw new Error("HRS 长度不足");
+  const flags=view.getUint8(0);let o=1;let hr;
+  if(flags&0x01){hr=view.getUint16(1,true);o=3;}else{hr=view.getUint8(1);o=2;}
+  const lines=["心率："+hr+" bpm"];
+  if(flags&0x04)lines.push("皮肤接触："+((flags&0x02)?"良好":"未检测到"));
+  if((flags&0x08)&&view.byteLength>=o+2){lines.push("能量消耗累计："+view.getUint16(o,true)+" kJ");o+=2;}
+  if(flags&0x10){const rr=[];while(view.byteLength>=o+2){rr.push(Math.round(view.getUint16(o,true)/1024*1000));o+=2;}if(rr.length)lines.push("RR 间期："+rr.join(" / ")+" ms");}
+  return lines.join("\n");
+}
+function decodeCscMeasurement(view){
+  if(view.byteLength<1)throw new Error("CSC 长度不足");
+  const flags=view.getUint8(0);const lines=[];let o=1;
+  if((flags&0x01)&&view.byteLength>=o+6){lines.push("车轮累计 "+view.getUint32(o,true)+" 圈 · 事件时间 "+(view.getUint16(o+4,true)/1024).toFixed(3)+" s");o+=6;}
+  if((flags&0x02)&&view.byteLength>=o+4){lines.push("曲柄累计 "+view.getUint16(o,true)+" 圈 · 事件时间 "+(view.getUint16(o+2,true)/1024).toFixed(3)+" s");o+=4;}
+  return lines.join("\n")||"未携带车轮 / 曲柄数据";
+}
+function decodeRscMeasurement(view){
+  const d=parseRsc(view);const lines=["速度："+d.speed.toFixed(2)+" km/h（配速 "+(d.speed>0?fmtDuration(Math.round(3600/d.speed)):"--")+" /km）","步频："+d.cadence+" 步/分"];
+  if(d.stride!==null)lines.push("步幅："+(d.stride/100).toFixed(2)+" m");
+  if(d.distanceM!==null)lines.push("总距离："+d.distanceM.toFixed(1)+" m");
+  lines.push("状态："+(d.running?"跑步":"步行"));
+  return lines.join("\n");
+}
+function decodeIndoorBikeData(view){
+  const d=parseIndoorBike(view);const lines=[];
+  if(d.power!==null)lines.push("功率："+d.power+" W");
+  if(d.cadence!==null)lines.push("踏频："+d.cadence.toFixed(1)+" rpm");
+  if(d.speed!==null)lines.push("速度："+d.speed.toFixed(2)+" km/h");
+  if(d.avgSpeed!==null)lines.push("平均速度："+d.avgSpeed.toFixed(2)+" km/h");
+  if(d.avgCadence!==null)lines.push("平均踏频："+d.avgCadence.toFixed(1)+" rpm");
+  if(d.avgPower!==null)lines.push("平均功率："+d.avgPower+" W");
+  if(d.distance!==null)lines.push("总距离："+d.distance+" m");
+  if(d.resistance!==null)lines.push("阻力等级："+d.resistance);
+  if(d.energyTotal!==null)lines.push("能量："+d.energyTotal+" kcal（"+d.energyPerHour+" kcal/h）");
+  if(d.hr!==null)lines.push("心率："+d.hr+" bpm");
+  if(d.met!==null)lines.push("代谢当量："+d.met.toFixed(1)+" MET");
+  if(d.elapsed!==null)lines.push("已用时间："+fmtDuration(d.elapsed));
+  if(d.remaining!==null)lines.push("剩余时间："+fmtDuration(d.remaining));
+  return lines.join("\n")||"仅含标志位（flags=0x"+d.flags.toString(16)+"）";
+}
+function decodeTreadmillData(view){
+  if(view.byteLength<2)throw new Error("跑步机数据长度不足");
+  const flags=view.getUint16(0,true);let o=2;const lines=[];const has=n=>view.byteLength>=o+n;
+  if(!(flags&0x0001)&&has(2)){const v=view.getUint16(o,true)/100;lines.push("速度："+v.toFixed(2)+" km/h（配速 "+(v>0?fmtDuration(Math.round(3600/v)):"--")+" /km）");o+=2;}
+  if((flags&0x0002)&&has(2)){lines.push("平均速度："+(view.getUint16(o,true)/100).toFixed(2)+" km/h");o+=2;}
+  if((flags&0x0004)&&has(3)){lines.push("总距离："+(view.getUint16(o,true)|(view.getUint8(o+2)<<16))+" m");o+=3;}
+  if((flags&0x0008)&&has(4)){lines.push("坡度："+(view.getInt16(o,true)/10).toFixed(1)+" %");o+=4;}
+  return lines.join("\n")||"仅含标志位（flags=0x"+flags.toString(16)+"）";
+}
+function decodeConfigCustom(full,view){
+  if(full===IDENTITY_PROFILE_UUID){
+    const id=decodeIdentityProfile(view);
+    const lines=IDENTITY_FIELDS.map(([k,label])=>label+"："+(id[k]||"（固件内置值）"));
+    return (IDENTITY_FIELDS.some(([k])=>id[k])?"已写入覆盖值\n":"未覆盖，DIS 报告固件内置值\n")+lines.join("\n");
+  }
+  if(full===UUIDS.configMeta){const m=parseConfigMeta(view);return "协议 v"+m.protocol+" · schema v"+m.schema+"\n配置组掩码 0x"+m.groupMask.toString(16)+" · revision "+m.revision+"\n单组最大 "+m.maxGroupLength+" 字节";}
+  if(full===UUIDS.configIdentity)return "设备名："+parseConfigGroup("identity",view).device_name;
+  if(full===UUIDS.configCore){const c=parseConfigGroup("core",view);return "基础功率 "+c.power+" W · 踏频 "+c.cadence+" rpm\n心率 "+c.heartrate+" bpm"+(c.has_user_hr?"（锁定）":"（联动）")+"\n浮动 ±"+c.power_float+" W / ±"+c.cadence_float+" rpm / ±"+c.hr_float+" bpm\n按钮步进 "+c.power_step+" W · Profile "+(c.sport_profile?"跑步":"骑行");}
+  if(full===UUIDS.configProfile){const c=parseConfigGroup("profile",view);return "体重 "+c.weight+" kg · FTP "+c.ftp+" W\n阈值心率 "+c.thr_hr+" bpm · 配速档 "+c.ride_type+"\n自定义 "+(c.custom_wkg_low/10).toFixed(1)+"–"+(c.custom_wkg_high/10).toFixed(1)+" W/kg「"+c.custom_pacer_name+"」";}
+  if(full===UUIDS.configRunning){const c=parseConfigGroup("running",view);return "固定速度 "+(c.run_speed_x100/100).toFixed(2)+" km/h · 步频 "+c.run_cadence+"\n配速区间 "+fmtDuration(c.run_pace_low_sec)+"–"+fmtDuration(c.run_pace_high_sec)+" /km";}
+  if(full===UUIDS.configLed){const c=parseConfigGroup("led",view);return (c.led_silent?"静默模式（全部灭灯）":"灯效已启用")+"\n场景："+c.led_scenes.map(s=>"模式"+s.mode+"/颜色"+s.color).join("、");}
+  return null;
+}
+/* 把任意 GATT 特征值解析成中文可读文本；未知特征回退为文本 / 十六进制 */
+function decodeGattValue(uuid,view){
+  const full=(uuid||"").toLowerCase();const s=uuidShort(full);
+  if(GATT_CUSTOM_CN[full]){const custom=decodeConfigCustom(full,view);if(custom!==null)return custom;return hexOrText(view);}
+  if(!view||!view.byteLength)return "（空值）";
+  switch(s){
+    case "2a00":case "2a29":case "2a24":case "2a25":case "2a27":case "2a26":case "2a28":{const t=gattUtf8(view);return t?"「"+t+"」":"（空字符串）";}
+    case "2a19":return "电量："+view.getUint8(0)+" %";
+    case "2a01":{const v=view.getUint16(0,true);return (APPEARANCE_CN[v]||"类别 0x"+v.toString(16).padStart(4,"0"))+"（0x"+v.toString(16).padStart(4,"0")+"）";}
+    case "2a04":if(view.byteLength<8)break;return "连接间隔 "+(view.getUint16(0,true)*1.25).toFixed(2)+"–"+(view.getUint16(2,true)*1.25).toFixed(2)+" ms\n从机延迟 "+view.getUint16(4,true)+" · 超时 "+(view.getUint16(6,true)*10)+" ms";
+    case "2a05":if(view.byteLength<4)break;return "受影响句柄范围 0x"+view.getUint16(0,true).toString(16)+"–0x"+view.getUint16(2,true).toString(16);
+    case "2a5d":{const v=view.getUint8(0);return "安装位置："+(SENSOR_LOCATION_CN[v]||"未知（"+v+"）");}
+    case "2a38":{const v=view.getUint8(0);return "佩戴位置："+(BODY_LOCATION_CN[v]||"未知（"+v+"）");}
+    case "2a63":return decodeCpsMeasurement(view);
+    case "2a37":return decodeHeartRate(view);
+    case "2a5b":return decodeCscMeasurement(view);
+    case "2a53":return decodeRscMeasurement(view);
+    case "2ad2":return decodeIndoorBikeData(view);
+    case "2acd":return decodeTreadmillData(view);
+    case "2a65":{const v=view.getUint32(0,true);const n=bitNames(v,CPS_FEATURES);return "支持："+(n.join("、")||"仅基础功率");}
+    case "2a5c":{const n=bitNames(view.getUint16(0,true),["车轮转数","曲柄转数","多传感器位置"]);return "支持："+(n.join("、")||"无");}
+    case "2a54":{const n=bitNames(view.getUint16(0,true),["步幅","总距离","跑 / 走状态","校准","多传感器位置"]);return "支持："+(n.join("、")||"仅速度与步频");}
+    case "2acc":{if(view.byteLength<8)break;const m=bitNames(view.getUint32(0,true),FTMS_MACHINE_FEATURES),t=bitNames(view.getUint32(4,true),FTMS_TARGET_FEATURES);return "器材能力："+(m.join("、")||"无")+"\n可设目标："+(t.join("、")||"无");}
+    case "2ad8":if(view.byteLength<6)break;return "目标功率范围："+view.getInt16(0,true)+"–"+view.getInt16(2,true)+" W，步进 "+view.getUint16(4,true)+" W";
+    case "2ad6":if(view.byteLength<6)break;return "阻力范围："+(view.getInt16(0,true)/10).toFixed(1)+"–"+(view.getInt16(2,true)/10).toFixed(1)+"，步进 "+(view.getUint16(4,true)/10).toFixed(1);
+    case "2ad3":if(view.byteLength<2)break;{const v=view.getUint8(1);return "训练状态："+(TRAINING_STATUS_CN[v]||"未知（0x"+v.toString(16)+"）");}
+    case "2ada":{const op=view.getUint8(0);let text=FTMS_STATUS_CN[op]||"状态码 0x"+op.toString(16).padStart(2,"0");
+      if(op===0x08&&view.byteLength>=3)text+="：新目标 "+view.getInt16(1,true)+" W";
+      if(op===0x02&&view.byteLength>=2)text+="（"+(view.getUint8(1)===2?"暂停":"停止")+"）";
+      if(op===0x07&&view.byteLength>=2)text+="：新阻力 "+(view.getUint8(1)/10).toFixed(1);
+      return text;}
+    case "2ad9":{const op=view.getUint8(0);
+      if(op===0x80&&view.byteLength>=3){const req=view.getUint8(1),res=view.getUint8(2);return "响应：「"+(FTMS_CP_OP_CN[req]||"0x"+req.toString(16))+"」→ "+(FTMS_CP_RESULT_CN[res]||"结果 0x"+res.toString(16));}
+      let text="命令："+(FTMS_CP_OP_CN[op]||"0x"+op.toString(16).padStart(2,"0"));if(op===0x05&&view.byteLength>=3)text+=" "+view.getInt16(1,true)+" W";return text;}
+    case "2a50":if(view.byteLength<7)break;return "厂商 ID 来源："+(view.getUint8(0)===1?"Bluetooth SIG":"USB-IF")+"\n厂商 0x"+view.getUint16(1,true).toString(16).padStart(4,"0")+" · 产品 0x"+view.getUint16(3,true).toString(16).padStart(4,"0")+" · 版本 0x"+view.getUint16(5,true).toString(16).padStart(4,"0");
+  }
+  return hexOrText(view);
+}
+function gattLiveUpdate(rec,characteristic){
+  if(!rec||!characteristic||!characteristic.value)return;
+  const uuid=(characteristic.uuid||"").toLowerCase();const short=uuidShort(uuid);
+  let text;try{text=decodeGattValue(uuid,characteristic.value);}catch(err){text="解析失败："+err.message;}
+  if(short==="2a5b"&&rec.latest&&rec.latest.cadence!==null)text+="\n→ 推算踏频："+rec.latest.cadence+" rpm";
+  for(const svc of rec.services||[])for(const ch of svc.characteristics)if((ch.uuid||"").toLowerCase()===uuid)ch.value=text;
+  if(rec!==singleDevice||typeof document.querySelectorAll!=="function")return;
+  const now=Date.now();rec._gattPaintAt=rec._gattPaintAt||{};
+  if(rec._gattPaintAt[short]&&now-rec._gattPaintAt[short]<160)return;
+  rec._gattPaintAt[short]=now;
+  document.querySelectorAll('#single-device-card [data-gatt-char="'+short+'"]').forEach(el=>{
+    el.textContent=text;el.classList.remove("empty","flash");void el.offsetWidth;el.classList.add("flash");
+    clearTimeout(el._flashTimer);el._flashTimer=setTimeout(()=>el.classList.remove("flash"),200);
+  });
+}
+
+/* ==================== 设备身份覆盖协议（与固件 device_identity.c 一致） ==================== */
+const IDENTITY_PROTOCOL_VERSION=1;
+const IDENTITY_TEXT_MAX=31;
+const IDENTITY_FIELDS=[["manufacturer","厂商"],["model","型号"],["serial","序列号"],["hardware","硬件版本"],["firmware","固件版本"],["software","软件版本"]];
+function identityTextError(value){
+  const length=new TextEncoder().encode(value||"").length;
+  if(length>IDENTITY_TEXT_MAX)return "UTF-8 超过 "+IDENTITY_TEXT_MAX+" 字节（当前 "+length+"）";
+  if(/[\u0000-\u001f\u007f]/.test(value||""))return "不能包含控制字符";
+  return null;
+}
+function encodeIdentityProfile(identity){
+  const parts=IDENTITY_FIELDS.map(([key,label])=>{
+    const value=(identity&&identity[key])||"";const error=identityTextError(value);
+    if(error)throw new Error(label+error);
+    return new TextEncoder().encode(value);
+  });
+  const out=new Uint8Array(2+parts.reduce((sum,p)=>sum+1+p.length,0));
+  out[0]=IDENTITY_PROTOCOL_VERSION;out[1]=parts.length;let o=2;
+  for(const p of parts){out[o++]=p.length;out.set(p,o);o+=p.length;}
+  return out;
+}
+function decodeIdentityProfile(view){
+  const bytes=gattBytes(view);
+  if(bytes.length<2||bytes[0]!==IDENTITY_PROTOCOL_VERSION)throw new Error("身份覆盖协议版本不匹配");
+  const count=bytes[1];if(count<1||count>IDENTITY_FIELDS.length)throw new Error("身份覆盖字段数无效");
+  const identity={};IDENTITY_FIELDS.forEach(([key])=>identity[key]="");
+  let o=2;
+  for(let i=0;i<count;i++){
+    if(o>=bytes.length)throw new Error("身份覆盖数据被截断");
+    const length=bytes[o++];if(length>IDENTITY_TEXT_MAX||o+length>bytes.length)throw new Error("身份覆盖字段长度无效");
+    identity[IDENTITY_FIELDS[i][0]]=new TextDecoder("utf-8",{fatal:true}).decode(bytes.slice(o,o+length));o+=length;
+  }
+  if(o!==bytes.length)throw new Error("身份覆盖数据尾部多余");
+  return identity;
+}
+
+/* ==================== 自动连接 / 断线重连 / 跨标签页关联 ==================== */
+const LAST_DEVICE_KEY="bikepower_last_device";
+const AUTOLINK_KEY="bikepower_autolink";
+const TAB_BUS_NAME="bikepower-ble-bus";
+const TAB_ID=Math.random().toString(36).slice(2,8);
+const RECONNECT_DELAYS=[1500,3000,6000,10000,15000,30000];
+let autoLinkEnabled=true;
+let autoLinkBusy=false;
+let autoLinkUserDisconnected=false;
+let reconnectTimer=null;
+let reconnectAttempt=0;
+let tabBus=null;
+const tabPeers=new Map();
+let mirrorState=null;
+let lastRelayAt=0;
+
+function isSingleConnected(){return !!(singleDevice&&singleDevice.server&&singleDevice.server.connected);}
+function setAutoLinkStatus(text,kind=""){const el=$("autolink-status");if(el){el.textContent=text;el.className="autolink-status"+(kind?" "+kind:"");}}
+function setAutoLinkEnabled(on){
+  autoLinkEnabled=!!on;try{localStorage.setItem(AUTOLINK_KEY,on?"1":"0");}catch(e){}
+  if(!on){clearTimeout(reconnectTimer);setAutoLinkStatus("自动连接已关闭：刷新或断线后需手动连接。");return;}
+  setAutoLinkStatus("自动连接已开启。");
+  if(!isSingleConnected()){autoLinkUserDisconnected=false;autoConnect("auto");}
+}
+function rememberDevice(rec){try{localStorage.setItem(LAST_DEVICE_KEY,JSON.stringify({id:rec.device.id,name:rec.device.name||"",at:Date.now()}));}catch(e){}}
+function lastDevice(){try{return JSON.parse(localStorage.getItem(LAST_DEVICE_KEY)||"null");}catch(e){return null;}}
+async function orderedAuthorizedDevices(preferId){
+  if(!navigator.bluetooth||!navigator.bluetooth.getDevices)return [];
+  let devices=[];try{devices=await navigator.bluetooth.getDevices();}catch(e){return [];}
+  const last=lastDevice();const first=preferId||(last&&last.id);
+  const rank=d=>d.id===first?0:(last&&d.name&&d.name===last.name?1:2);
+  return devices.slice().sort((a,b)=>rank(a)-rank(b));
+}
+function waitForAdvertisement(device,ms){
+  if(typeof device.watchAdvertisements!=="function")return Promise.resolve("unsupported");
+  return new Promise(resolve=>{
+    let done=false;const ctrl=typeof AbortController!=="undefined"?new AbortController():null;
+    const onAdv=()=>finish("seen");
+    const finish=result=>{if(done)return;done=true;clearTimeout(timer);device.removeEventListener("advertisementreceived",onAdv);try{if(ctrl)ctrl.abort();}catch(e){}resolve(result);};
+    const timer=setTimeout(()=>finish("timeout"),ms);
+    device.addEventListener("advertisementreceived",onAdv);
+    device.watchAdvertisements(ctrl?{signal:ctrl.signal}:undefined).catch(()=>finish("unsupported"));
+  });
+}
+async function autoConnect(reason){
+  if(!autoLinkEnabled&&reason!=="manual")return false;
+  if(isSingleConnected())return true;
+  if(autoLinkBusy)return false;
+  if(!navigator.bluetooth)return false;
+  if(!navigator.bluetooth.getDevices){setAutoLinkStatus("此浏览器不支持 getDevices()，刷新后需手动点「扫描并连接设备」。","err");return false;}
+  autoLinkBusy=true;
+  try{
+    const peer=[...tabPeers.values()].find(p=>p.connected&&p.deviceId);
+    const devices=await orderedAuthorizedDevices(peer&&peer.deviceId);
+    if(!devices.length){setAutoLinkStatus("本站点还没有已授权设备：请先点「扫描并连接设备」完成一次授权。");return false;}
+    for(const device of devices.slice(0,4)){
+      if(isSingleConnected())return true;
+      const name=device.name||"未命名设备";
+      const viaPeer=!!(peer&&peer.deviceId===device.id);
+      if(!viaPeer){
+        setAutoLinkStatus("正在寻找「"+name+"」的广播…","busy");
+        const adv=await waitForAdvertisement(device,6000);
+        if(adv==="timeout"){log("自动连接：6 秒内未收到「"+name+"」的广播，跳过","warn");continue;}
+      }
+      setAutoLinkStatus((viaPeer?"正在关联其他标签页已连接的「":"正在连接「")+name+"」…","busy");
+      try{await connectSingleWith(device,viaPeer?"tab":(reason==="reconnect"?"reconnect":"auto"),15000);return true;}
+      catch(err){log("自动连接「"+name+"」失败："+err.message,"warn");}
+    }
+    if(!isSingleConnected())setAutoLinkStatus("附近没有发现已授权设备。确认开发板已上电，或点「扫描并连接设备」。","err");
+    return isSingleConnected();
+  }finally{autoLinkBusy=false;renderTabRelay();}
+}
+function onSingleDeviceConnected(rec,source){
+  rememberDevice(rec);reconnectAttempt=0;clearTimeout(reconnectTimer);mirrorState=null;
+  const how={picker:"手动选择",auto:"刷新后自动连接",reconnect:"断线自动重连",tab:"跟随其他标签页"}[source]||"连接";
+  setAutoLinkStatus("✓ "+how+"成功：「"+(rec.device.name||"未命名设备")+"」","ok");
+  tabBusPost({type:"connected",deviceId:rec.device.id,name:rec.device.name||""});
+  renderTabRelay();
+}
+function onSingleDeviceDisconnected(rec){
+  tabBusPost({type:"disconnected",deviceId:rec.device.id});
+  renderTabRelay();
+  if(autoLinkUserDisconnected){setAutoLinkStatus("已手动断开，不会自动重连。");return;}
+  if(!autoLinkEnabled){setAutoLinkStatus("连接已断开（自动重连已关闭）。","err");return;}
+  scheduleReconnect(rec.configState&&rec.configState.expectedDisconnectMessage?3000:null);
+}
+function scheduleReconnect(delay){
+  clearTimeout(reconnectTimer);
+  if(reconnectAttempt>=RECONNECT_DELAYS.length){setAutoLinkStatus("已连续重连 "+RECONNECT_DELAYS.length+" 次未成功，停止自动重连。请检查设备后手动连接。","err");return;}
+  const wait=delay||RECONNECT_DELAYS[reconnectAttempt];reconnectAttempt++;
+  setAutoLinkStatus("连接已断开，"+Math.round(wait/1000)+" 秒后进行第 "+reconnectAttempt+" 次自动重连…","busy");
+  reconnectTimer=setTimeout(async()=>{
+    if(isSingleConnected()||autoLinkUserDisconnected||!autoLinkEnabled)return;
+    const ok=await autoConnect("reconnect");
+    if(!ok&&!isSingleConnected()&&!autoLinkUserDisconnected)scheduleReconnect();
+  },wait);
+}
+function tabBusPost(message){
+  const payload=Object.assign({},message,{tab:TAB_ID,t:Date.now()});
+  if(tabBus){try{tabBus.postMessage(payload);}catch(e){}return;}
+  try{localStorage.setItem(TAB_BUS_NAME,JSON.stringify(payload));}catch(e){}
+}
+function tabBusPing(){
+  const connected=isSingleConnected();
+  tabBusPost({type:"ping",connected,deviceId:connected?singleDevice.device.id:null,name:connected?(singleDevice.device.name||""):""});
+}
+function tabBusReceive(message){
+  if(!message||message.tab===TAB_ID)return;
+  const peer=tabPeers.get(message.tab)||{connected:false,deviceId:null,name:""};
+  peer.seen=Date.now();tabPeers.set(message.tab,peer);
+  if(message.type==="hello"){tabBusPing();}
+  else if(message.type==="ping"||message.type==="connected"){
+    peer.connected=message.type==="connected"||!!message.connected;peer.deviceId=message.deviceId||null;peer.name=message.name||"";
+    if(peer.connected)maybeFollowPeer(message.tab,peer);
+  }else if(message.type==="disconnected"){
+    peer.connected=false;
+    if(mirrorState&&mirrorState.tab===message.tab)endMirror("被镜像的标签页已断开设备。");
+  }else if(message.type==="data"){
+    peer.connected=true;peer.deviceId=message.deviceId;peer.name=message.name||"";
+    if(!isSingleConnected()&&mirrorState&&mirrorState.tab===message.tab)renderMirror(message);
+  }else if(message.type==="bye"){
+    tabPeers.delete(message.tab);
+    if(mirrorState&&mirrorState.tab===message.tab){endMirror("被镜像的标签页已关闭，尝试自行连接…");setTimeout(()=>autoConnect("auto"),800);}
+  }
+  renderTabRelay();
+}
+async function maybeFollowPeer(tab,peer){
+  if(!autoLinkEnabled||autoLinkUserDisconnected||isSingleConnected()||autoLinkBusy)return;
+  if(mirrorState&&mirrorState.tab===tab)return;
+  const ok=await autoConnect("tab");
+  if(!ok&&!isSingleConnected()&&peer.connected){mirrorState={tab,deviceId:peer.deviceId,name:peer.name};startMirror();}
+}
+function tabBusRelayData(rec){
+  const now=Date.now();if(now-lastRelayAt<400)return;lastRelayAt=now;
+  tabBusPost({type:"data",deviceId:rec.device.id,name:rec.device.name||"",latest:rec.latest,lastNotifyAt:rec.lastNotifyAt});
+}
+function startMirror(){
+  const m=mirrorState;if(!m)return;
+  setAutoLinkStatus("无法直接建立连接，改为镜像显示另一个标签页的实时数据。","ok");
+  setText("monitor-device-name",m.name||"镜像设备");setText("top-status","镜像其他标签页");setText("link-status","跨标签页镜像");
+  const ls=$("link-state");if(ls)ls.classList.remove("is-idle");
+  setText("power-summary","正在镜像其他标签页的实时数据。");
+  setText("power-detail","数值由另一个已连接的标签页通过 BroadcastChannel 转发；本页没有自己的 GATT 连接，因此不记录曲线、不提供配置写入。");
+  renderTabRelay();
+}
+function renderMirror(message){
+  const l=message.latest||{};const power=l.power==null?l.ftmsPower:l.power;
+  setText("m-power",power==null?"--":power);setText("m-hr",l.hr==null?"--":l.hr);
+  setText("m-cadence",l.cadence==null?"--":l.cadence);setText("m-speed",typeof l.speed==="number"?l.speed.toFixed(2):"--");
+  setText("power-summary",power==null?"镜像中，等待功率数据。":"镜像数据：当前 "+power+"W。");
+  const at=new Date(message.lastNotifyAt||message.t);
+  setText("last-notify","镜像自标签页 "+message.tab+" · "+at.toLocaleTimeString("zh-CN",{hour12:false}));
+  setText("signal-clock",at.toLocaleTimeString("zh-CN",{hour12:false})+"."+String(at.getMilliseconds()).padStart(3,"0"));
+}
+function endMirror(text){
+  mirrorState=null;setAutoLinkStatus(text,"err");
+  if(!isSingleConnected())resetMonitorSignals();
+  renderTabRelay();
+}
+function renderTabRelay(){
+  const now=Date.now();
+  for(const [key,peer] of tabPeers)if(now-peer.seen>8000)tabPeers.delete(key);
+  const peers=[...tabPeers.values()];const live=peers.filter(p=>p.connected);
+  const mine=isSingleConnected()?singleDevice.device.id:null;
+  const linked=!!mirrorState||(!!mine&&live.some(p=>p.deviceId===mine));
+  let text=peers.length?peers.length+" 个其他标签页"+(live.length?" · "+live.length+" 个在线":""):"无其他标签页";
+  if(mirrorState)text+=" · 镜像中";else if(linked)text+=" · 已关联";
+  setText("tab-relay-text",text);
+  const relay=$("tab-relay");if(relay)relay.classList.toggle("linked",linked);
+  const node=$("tab-relay-node");if(node)node.classList.toggle("live",live.length>0);
+}
+function initAutoLink(){
+  try{autoLinkEnabled=localStorage.getItem(AUTOLINK_KEY)!=="0";}catch(e){}
+  const box=$("autolink-enabled");if(box)box.checked=autoLinkEnabled;
+  try{if(typeof BroadcastChannel!=="undefined"){tabBus=new BroadcastChannel(TAB_BUS_NAME);tabBus.onmessage=event=>tabBusReceive(event.data);}}catch(e){tabBus=null;}
+  window.addEventListener("storage",event=>{if(event.key===TAB_BUS_NAME&&event.newValue){try{tabBusReceive(JSON.parse(event.newValue));}catch(err){}}});
+  window.addEventListener("beforeunload",()=>tabBusPost({type:"bye"}));
+  setInterval(()=>{tabBusPing();renderTabRelay();},3000);
+  tabBusPost({type:"hello"});
+  renderTabRelay();
+  if(!navigator.bluetooth){setAutoLinkStatus("此浏览器不支持 Web Bluetooth，请使用桌面 Chrome / Edge。","err");return;}
+  if(!navigator.bluetooth.getDevices){setAutoLinkStatus("此浏览器不支持 getDevices()，刷新后需手动连接；多标签页仍可镜像数据。","err");return;}
+  if(!autoLinkEnabled){setAutoLinkStatus("自动连接已关闭。");return;}
+  const last=lastDevice();
+  setAutoLinkStatus(last?"准备自动连接上次使用的「"+(last.name||"未命名设备")+"」…":"正在检查本站点已授权的设备…","busy");
+  // 先留 700ms 给其他标签页回应 hello：若已有标签页连着设备，就直接关联它
+  setTimeout(()=>{if(!isSingleConnected()&&!autoLinkBusy&&!mirrorState)autoConnect("auto");},700);
+}
+
+/* ==================== 模板写入开发板 ==================== */
+let writerState={template:null,busy:false,preferId:null};
+function supportsIdentityProfile(rec){
+  return !!(rec&&rec.services&&rec.services.some(s=>s.characteristics.some(c=>(c.uuid||"").toLowerCase()===IDENTITY_PROFILE_UUID)));
+}
+function connectedBoards(){
+  const list=[];const seen=new Set();
+  [singleDevice,...compareDevices].forEach(rec=>{
+    if(rec&&rec.server&&rec.server.connected&&supportsIdentityProfile(rec)&&!seen.has(rec.device.id)){seen.add(rec.device.id);list.push(rec);}
+  });
+  return list;
+}
+function openTemplateWriter(index,fromRec){
+  let tpl=null;
+  if(index!==null&&index!==undefined){tpl=readTemplateList()[index];if(!tpl){log("模板不存在","warn");return;}}
+  else if(fromRec){tpl={name:fromRec.device.name||"当前开发板",deviceName:fromRec.device.name||"",deviceId:null,info:{...fromRec.info},capturedAt:new Date().toISOString()};}
+  if(!tpl)return;
+  writerState={template:tpl,busy:false,preferId:fromRec?fromRec.device.id:null};
+  const info=tpl.info||{};
+  const captured=tpl.capturedAt?new Date(tpl.capturedAt).toLocaleString("zh-CN",{hour12:false}):"—";
+  $("writer-lead").innerHTML="模板来源：<b>"+escapeHtml(tpl.name||"未命名")+"</b> · 采集于 "+escapeHtml(captured)+"。<br>以下字段已按模板预填，写入前可以修改；留空的字段会让开发板报告固件内置值。";
+  $("writer-name").value=tpl.deviceName||tpl.name||"";
+  $("writer-name-enabled").checked=true;
+  $("writer-fields").innerHTML=IDENTITY_FIELDS.map(([key,label])=>'<div class="form-field"><label for="writer-'+key+'">'+escapeHtml(label)+'<span class="byte-count" id="writer-'+key+'-count">0/31</span></label><input id="writer-'+key+'" type="text" autocomplete="off" placeholder="留空 = 固件内置值" value="'+escapeHtml(info[key]||"")+'" oninput="updateWriterState()"><span class="field-error" id="writer-'+key+'-error"></span></div>').join("");
+  $("writer-steps").classList.add("hidden");$("writer-steps").innerHTML="";
+  refreshWriterTargets();
+  $("writer-mask").classList.remove("hidden");
+  updateWriterState();
+  setTimeout(()=>{try{$("writer-target").focus();}catch(e){}},30);
+}
+function refreshWriterTargets(){
+  const boards=connectedBoards();const select=$("writer-target");
+  if(!boards.length){
+    select.innerHTML='<option value="">（没有已连接、支持身份写入的开发板）</option>';select.disabled=true;
+    setText("writer-target-hint","请先在「实时监控」或本页「添加设备」连接 BikePower 开发板；开发板需刷入带「设备身份覆盖」特征的新固件。");
+    return;
+  }
+  select.disabled=false;
+  select.innerHTML=boards.map(rec=>'<option value="'+escapeHtml(rec.device.id)+'">'+escapeHtml((rec.device.name||"未命名")+(rec.info&&rec.info.model?" · "+rec.info.model:"")+" · "+rec.device.id.slice(0,8))+'</option>').join("");
+  const sourceId=writerState.template&&writerState.template.deviceId;
+  const prefer=boards.find(rec=>rec.device.id===writerState.preferId)||boards.find(rec=>rec.device.id!==sourceId)||boards[0];
+  select.value=prefer.device.id;
+  setText("writer-target-hint","写入所选开发板的 NVS。只列出已连接且提供「设备身份覆盖」特征的 BikePower 开发板。");
+}
+function writerTarget(){const select=$("writer-target");if(!select||!select.value)return null;return connectedBoards().find(rec=>rec.device.id===select.value)||null;}
+function collectWriterIdentity(){const identity={};IDENTITY_FIELDS.forEach(([key])=>{identity[key]=($("writer-"+key).value||"").trim();});return identity;}
+function updateWriterState(){
+  let ok=true;
+  IDENTITY_FIELDS.forEach(([key])=>{
+    const input=$("writer-"+key);if(!input)return;
+    const value=input.value.trim();const length=new TextEncoder().encode(value).length;
+    const count=$("writer-"+key+"-count");count.textContent=length+"/"+IDENTITY_TEXT_MAX;count.classList.toggle("over",length>IDENTITY_TEXT_MAX);
+    const error=identityTextError(value);setText("writer-"+key+"-error",error||"");
+    if(error){input.setAttribute("aria-invalid","true");ok=false;}else input.removeAttribute("aria-invalid");
+  });
+  const nameOn=$("writer-name-enabled").checked;const name=$("writer-name").value.trim();const nameLength=new TextEncoder().encode(name).length;
+  const nameCount=$("writer-name-count");nameCount.textContent=nameLength+"/23";nameCount.classList.toggle("over",nameLength>23);
+  $("writer-name").disabled=!nameOn||writerState.busy;
+  if(nameOn&&(nameLength<1||nameLength>23||/[\u0000-\u001f\u007f]/.test(name)))ok=false;
+  const target=writerTarget();if(!target)ok=false;
+  $("writer-submit").disabled=!ok||writerState.busy;
+  $("writer-reset").disabled=!target||writerState.busy;
+}
+function closeTemplateWriter(){if(writerState.busy)return;$("writer-mask").classList.add("hidden");}
+function renderWriterSteps(steps){
+  const list=$("writer-steps");list.classList.remove("hidden");
+  const label={run:"进行中",ok:"完成",err:"失败",skip:"跳过"};
+  list.innerHTML=steps.map(step=>'<li class="'+(step.state||"")+'"><i>'+(label[step.state]||"等待")+'</i><span>'+escapeHtml(step.text)+'</span></li>').join("");
+}
+async function writeTemplateToBoard(event){
+  if(event)event.preventDefault();
+  if(writerState.busy)return;
+  updateWriterState();if($("writer-submit").disabled)return;
+  const target=writerTarget();const identity=collectWriterIdentity();
+  const nameOn=$("writer-name-enabled").checked;const name=$("writer-name").value.trim();
+  const rows=IDENTITY_FIELDS.map(([key,label])=>"<br>"+escapeHtml(label)+"：<b>"+escapeHtml(identity[key]||"（内置值）")+"</b>").join("");
+  const confirmed=await showConfirm("写入开发板身份信息","目标：<b>"+escapeHtml(target.device.name||target.device.id)+"</b>"+(nameOn?"<br>设备名：<b>"+escapeHtml(name)+"</b>":"")+rows+"<br><br>写入后保存在开发板 NVS，断电不丢失。");
+  if(!confirmed)return;
+  await performIdentityWrite(target,identity,nameOn?name:null);
+}
+async function resetBoardIdentity(){
+  const target=writerTarget();if(!target||writerState.busy)return;
+  const confirmed=await showConfirm("恢复内置身份信息","将清除 <b>"+escapeHtml(target.device.name||"开发板")+"</b> 上全部身份覆盖，设备信息服务恢复报告固件内置的厂商 / 型号 / 版本。设备名不受影响。");
+  if(!confirmed)return;
+  const empty={};IDENTITY_FIELDS.forEach(([key])=>empty[key]="");
+  await performIdentityWrite(target,empty,null);
+  IDENTITY_FIELDS.forEach(([key])=>{const input=$("writer-"+key);if(input)input.value="";});updateWriterState();
+}
+async function performIdentityWrite(rec,identity,newName){
+  writerState.busy=true;updateWriterState();
+  const steps=[
+    {text:"写入身份覆盖（厂商 / 型号 / 序列号 / 硬件 / 固件 / 软件版本）"},
+    {text:"回读确认开发板已保存到 NVS"},
+    {text:newName?"写入设备名「"+newName+"」（配置事务）":"设备名保持不变",state:newName?"":"skip"},
+    {text:"重新读取设备信息并刷新页面"},
+  ];
+  let index=0;
+  const begin=i=>{index=i;steps[i].state="run";renderWriterSteps(steps);};
+  const finish=(i,text)=>{steps[i].state="ok";if(text)steps[i].text=text;renderWriterSteps(steps);};
+  try{
+    if(!rec.server||!rec.server.connected)throw new Error("开发板已断开");
+    begin(0);
+    const service=await rec.server.getPrimaryService(UUIDS.configService);
+    const characteristic=await service.getCharacteristic(IDENTITY_PROFILE_UUID);
+    try{await writeConfigValue(characteristic,encodeIdentityProfile(identity));}
+    catch(err){throw new Error("开发板拒绝写入（可能正忙或数据不合法）："+(err.message||err.name));}
+    finish(0);
+    begin(1);
+    let matched=false;
+    for(let i=0;i<16&&!matched;i++){
+      await new Promise(resolve=>setTimeout(resolve,250));
+      try{const back=decodeIdentityProfile(await characteristic.readValue());matched=IDENTITY_FIELDS.every(([key])=>(back[key]||"")===(identity[key]||""));}catch(e){}
+    }
+    if(!matched)throw new Error("4 秒内未回读到一致的值，开发板可能未成功写入 NVS");
+    finish(1,"回读一致：开发板已保存到 NVS");
+    if(newName){
+      begin(2);
+      const state=await readDeviceConfig(rec);
+      if(!state.supported)throw new Error("开发板未提供配置服务："+(state.error||"未知原因"));
+      if(state.current.device_name===newName)finish(2,"设备名已是「"+newName+"」，无需重复写入");
+      else{
+        const config=Object.assign(JSON.parse(JSON.stringify(state.current)),{device_name:newName});
+        const response=await runConfigTransaction(rec,config,message=>{steps[2].text="写入设备名："+message;renderWriterSteps(steps);});
+        finish(2,"设备名「"+newName+"」已写入（revision "+response.revision+"）");
+        if(rec===singleDevice&&$("config-editor-shell"))refreshConfigEditor(rec);
+      }
+    }
+    begin(3);
+    if(rec.server&&rec.server.connected)rec.info=await readDeviceInfo(rec.server);
+    finish(3,"已刷新：厂商「"+(rec.info.manufacturer||"—")+"」· 型号「"+(rec.info.model||"—")+"」· 固件「"+(rec.info.firmware||"—")+"」");
+    log("身份信息已写入开发板 "+(rec.device.name||rec.device.id),"data");
+    if(rec===singleDevice)renderSingleDevice(rec);
+    renderCompareDevices();renderCompareTable();
+  }catch(err){
+    steps[index].state="err";steps[index].text+="：失败 — "+(err.message||String(err));renderWriterSteps(steps);
+    log("身份写入失败："+(err.message||String(err)),"error");
+  }finally{writerState.busy=false;updateWriterState();}
+}
+
 /* ==================== 全局 Guarded 二次确认弹窗 ==================== */
 let confirmResolver=null;
 function showConfirm(title, bodyHtml){
@@ -3823,6 +4564,7 @@ window.addEventListener("load",()=>{
   switchMode("connect");
   resetMonitorSignals();
   log("BLE 工具台已就绪。");
+  initAutoLink();
 });
 </script>
 </body>

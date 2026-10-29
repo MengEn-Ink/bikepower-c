@@ -84,6 +84,11 @@ typedef enum {
 #define BLE_CONFIG_CONTROL_UUID_BYTES \
     0x21, 0x0b, 0x8c, 0x4a, 0x1f, 0x6d, 0x3e, 0x9b, \
     0x2a, 0x4f, 0x7a, 0x4c, 0x07, 0x00, 0x5a, 0x7a
+// DIS 身份覆盖特征 7a5a0008-…：读写厂商/型号/序列号/硬件/固件/软件版本覆盖值，
+// 线格式见 components/bikepower_domain/include/device_identity.h。
+#define BLE_CONFIG_DIS_PROFILE_UUID_BYTES \
+    0x21, 0x0b, 0x8c, 0x4a, 0x1f, 0x6d, 0x3e, 0x9b, \
+    0x2a, 0x4f, 0x7a, 0x4c, 0x08, 0x00, 0x5a, 0x7a
 
 // ===== 特征值 UUID =====
 #define POWER_CHAR_UUID            0x2A63
@@ -100,6 +105,9 @@ typedef enum {
 #define DIS_MANUFACTURER_CHAR_UUID 0x2A29
 #define DIS_MODEL_CHAR_UUID        0x2A24
 #define DIS_FIRMWARE_CHAR_UUID     0x2A26
+#define DIS_SERIAL_CHAR_UUID       0x2A25
+#define DIS_HARDWARE_CHAR_UUID     0x2A27
+#define DIS_SOFTWARE_CHAR_UUID     0x2A28
 
 // ===== NVS 持久化 =====
 #define NVS_NAMESPACE          "bikepower"
@@ -144,6 +152,8 @@ typedef enum {
 #define NVS_KEY_LED_ERROR_MODE    "lederrm"
 #define NVS_KEY_LED_ERROR_COLOR   "lederrc"
 #define NVS_TEMPLATE_NAMESPACE    "ble_tpl"
+#define NVS_IDENTITY_NAMESPACE    "bp_ident"  // DIS 身份覆盖（独立命名空间，不参与配置 schema 迁移）
+#define NVS_IDENTITY_KEY          "dis"
 #define NVS_TEMPLATE_KEY_PREFIX   "tpl"
 
 // ===== BLE 连接与广播 =====

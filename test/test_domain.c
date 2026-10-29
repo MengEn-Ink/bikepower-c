@@ -21,6 +21,7 @@
 #include "device_analysis.h"
 #include "running_engine.h"
 #include "ble_config_codec.h"
+#include "device_identity.h"
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -2212,6 +2213,66 @@ static void test_config_migrate_v11_to_v12_power_float(void)
     CHECK(custom.power_float == 12, "v12 幂等迁移不改用户浮动");
 }
 
+static void test_device_identity_codec(void)
+{
+    printf("[test] DIS 设备身份覆盖 编解码/校验/回退\n");
+    device_identity_t id;
+    device_identity_defaults(&id);
+    CHECK(!device_identity_has_override(&id), "默认无覆盖字段");
+    CHECK(strcmp(device_identity_effective(&id, DEVICE_IDENTITY_MODEL, "ESP32-C3"), "ESP32-C3") == 0,
+          "空覆盖回退到固件内置值");
+
+    strcpy(id.fields[DEVICE_IDENTITY_MANUFACTURER], "Magene");
+    strcpy(id.fields[DEVICE_IDENTITY_MODEL], "P325-CS");
+    strcpy(id.fields[DEVICE_IDENTITY_FIRMWARE], "1.2.8");
+    strcpy(id.fields[DEVICE_IDENTITY_SOFTWARE], "迈金");
+    CHECK(device_identity_has_override(&id), "写入后存在覆盖字段");
+
+    uint8_t buf[DEVICE_IDENTITY_WIRE_MAX];
+    size_t len = device_identity_encode(&id, buf, sizeof(buf));
+    CHECK(len == 2 + 7 + 8 + 1 + 1 + 6 + 7, "编码长度=版本+数量+各字段长度前缀与内容");
+    CHECK(buf[0] == DEVICE_IDENTITY_PROTOCOL_VERSION && buf[1] == DEVICE_IDENTITY_FIELD_COUNT,
+          "编码头部为版本与字段数");
+    CHECK(device_identity_encode(&id, buf, len - 1) == 0, "缓冲区不足时编码返回0");
+
+    device_identity_t back;
+    device_identity_defaults(&back);
+    CHECK(device_identity_decode(buf, len, &back), "合法负载解码成功");
+    CHECK(memcmp(&id, &back, sizeof(id)) == 0, "编解码往返一致");
+    CHECK(strcmp(device_identity_effective(&back, DEVICE_IDENTITY_MANUFACTURER, "BikePower"), "Magene") == 0,
+          "覆盖值优先于内置值");
+
+    device_identity_t untouched = back;
+    const uint8_t bad_ver[] = {2, 1, 0};
+    CHECK(!device_identity_decode(bad_ver, sizeof(bad_ver), &back), "拒绝错误协议版本");
+    const uint8_t zero_count[] = {1, 0};
+    CHECK(!device_identity_decode(zero_count, sizeof(zero_count), &back), "拒绝字段数为0");
+    const uint8_t too_many[] = {1, 7, 0, 0, 0, 0, 0, 0, 0};
+    CHECK(!device_identity_decode(too_many, sizeof(too_many), &back), "拒绝字段数超过总数");
+    const uint8_t truncated[] = {1, 1, 5, 'A', 'B'};
+    CHECK(!device_identity_decode(truncated, sizeof(truncated), &back), "拒绝长度越界");
+    const uint8_t trailing[] = {1, 1, 1, 'A', 'Z'};
+    CHECK(!device_identity_decode(trailing, sizeof(trailing), &back), "拒绝尾部多余字节");
+    const uint8_t ctrl[] = {1, 1, 2, 'A', '\n'};
+    CHECK(!device_identity_decode(ctrl, sizeof(ctrl), &back), "拒绝控制字符");
+    const uint8_t bad_utf8[] = {1, 1, 2, 0xE8, 0xBF};
+    CHECK(!device_identity_decode(bad_utf8, sizeof(bad_utf8), &back), "拒绝截断的 UTF-8");
+    uint8_t long_field[2 + 1 + 32];
+    long_field[0] = 1; long_field[1] = 1; long_field[2] = 32;
+    memset(long_field + 3, 'X', 32);
+    CHECK(!device_identity_decode(long_field, sizeof(long_field), &back), "拒绝超过31字节字段");
+    CHECK(memcmp(&untouched, &back, sizeof(back)) == 0, "解码失败时输出保持不变");
+
+    const uint8_t partial[] = {1, 2, 3, 'A', 'B', 'C', 2, 'M', '1'};
+    CHECK(device_identity_decode(partial, sizeof(partial), &back), "允许仅携带前若干字段");
+    CHECK(strcmp(back.fields[DEVICE_IDENTITY_MODEL], "M1") == 0 && back.fields[DEVICE_IDENTITY_FIRMWARE][0] == 0,
+          "未携带字段清空为回退值");
+
+    const uint8_t reset[] = {1, 6, 0, 0, 0, 0, 0, 0};
+    CHECK(device_identity_decode(reset, sizeof(reset), &back) && !device_identity_has_override(&back),
+          "全空负载恢复全部内置值");
+}
+
 static void test_ble_config_codec(void)
 {
     printf("[test] BLE 配置协议全字段往返与边界\n");
@@ -2377,6 +2438,7 @@ int main(void)
     test_config_migrate_v9_to_current_running_fields();
     test_config_migrate_v11_to_v12_power_float();
     test_ble_config_codec();
+    test_device_identity_codec();
     test_config_apply_to_engine();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

@@ -28,6 +28,7 @@
 #include "radio_ctrl.h"
 #include "wifi_portal.h"
 #include "board_detect.h"
+#include "device_identity_store.h"
 
 static const char *TAG = "APP";
 
@@ -45,6 +46,52 @@ static volatile bool s_has_pending_ble_config = false;
 static volatile uint32_t s_pending_ble_config_transaction = 0;
 static volatile uint32_t s_pending_ble_config_revision = 0;
 static bool s_ble_config_restart_pending = false;
+// DIS 身份覆盖写入 mailbox：host 任务只复制，主循环负责 NVS 落盘后再让 DIS 读值生效。
+static device_identity_t s_pending_identity;
+static volatile bool s_has_pending_identity = false;
+
+/**
+ * DIS 身份覆盖写入回调（NimBLE host 任务上下文）。
+ * 仅复制到 mailbox；上一笔尚未落盘时拒绝，避免覆盖未确认的数据。
+ */
+static bool on_ble_identity_write(const device_identity_t *identity)
+{
+    if (!identity) return false;
+    bool accepted = false;
+    portDISABLE_INTERRUPTS();
+    if (!s_has_pending_identity) {
+        s_pending_identity = *identity;
+        s_has_pending_identity = true;
+        accepted = true;
+    }
+    portENABLE_INTERRUPTS();
+    return accepted;
+}
+
+/* 主循环消费 DIS 身份覆盖 mailbox：落盘成功后刷新 BLE 侧快照。 */
+static void process_pending_identity(void)
+{
+    device_identity_t requested;
+    bool pending = false;
+    portDISABLE_INTERRUPTS();
+    if (s_has_pending_identity) {
+        requested = s_pending_identity;
+        pending = true;
+    }
+    portENABLE_INTERRUPTS();
+    if (!pending) return;
+
+    if (device_identity_store_save(&requested)) {
+        ble_bikepower_set_identity(&requested);
+        ESP_LOGI(TAG, "DIS 身份覆盖已保存（%s）",
+                 device_identity_has_override(&requested) ? "自定义" : "恢复内置");
+    } else {
+        ESP_LOGW(TAG, "DIS 身份覆盖写入 NVS 失败，保持原值");
+    }
+    portDISABLE_INTERRUPTS();
+    s_has_pending_identity = false;
+    portENABLE_INTERRUPTS();
+}
 
 /**
  * 处理 FTMS 控制点下发的 ERG 目标功率。
@@ -310,6 +357,12 @@ void app_main(void)
     ble_bikepower_set_erg_clear_callback(on_erg_clear);
     ble_bikepower_set_run_control_callback(on_run_control);
     ble_bikepower_set_config_commit_callback(on_ble_config_commit);
+    ble_bikepower_set_identity_write_callback(on_ble_identity_write);
+    {
+        device_identity_t identity;
+        device_identity_store_load(&identity);
+        ble_bikepower_set_identity(&identity);
+    }
     ble_bikepower_set_profile(s_engine.sport_profile);
     ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
     ble_bikepower_set_device_name(s_engine.device_name);
@@ -381,6 +434,7 @@ void app_main(void)
         ble_bikepower_set_config_snapshot(&s_engine);
         process_pending_ble_config();
         ble_bikepower_set_config_snapshot(&s_engine);
+        process_pending_identity();
 
         // WiFi 配网模式（共存）：BLE 保持在线继续通知，主循环继续生成快照推 BLE；
         // APP_EVT_WIFI_DONE 已在上方队列或 pending latch 消费中处理。
