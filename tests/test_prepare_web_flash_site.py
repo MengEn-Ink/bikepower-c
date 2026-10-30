@@ -92,6 +92,81 @@ class WebFlashSiteTest(unittest.TestCase):
             self.assertEqual(manifest["builds"][0]["parts"][0]["offset"], 0)
             self.assertEqual(manifest["builds"][0]["parts"][0]["path"], firmware.name)
 
+    def make_versioned_release(self, version, boards=("generic-c3",), bad=False, body=""):
+        assets = []
+        for board in boards:
+            payload = f"{board} firmware {version}".encode()
+            name = f"bikepower-c-{board}-v{version}-stable-fix-g1234567.bin"
+            assets.append(self.make_asset(name, payload))
+            digest = "f" * 64 if bad else hashlib.sha256(payload).hexdigest()
+            assets.append(self.make_asset(name + ".sha256", f"{digest}  {name}\n".encode()))
+        return {
+            "_provider": "fixture",
+            "tag_name": f"v{version}",
+            "published_at": "2026-08-01T08:00:00Z",
+            "html_url": f"https://example.invalid/releases/v{version}",
+            "body": body,
+            "assets": assets,
+        }
+
+    def test_history_mirrors_verified_rollback_versions(self):
+        site = web_flash.initialize_site(self.source, self.base / "site")
+        latest_release = self.make_versioned_release("4.2.0", body="新版说明")
+        latest = web_flash.materialize_release(site, latest_release, allow_file=True)
+        history = [
+            latest_release,  # GitHub 列表里也会包含最新版，必须去重
+            self.make_versioned_release("4.1.3", body="x" * 2000),
+            self.make_versioned_release("4.1.2", bad=True),
+            self.make_versioned_release("4.1.1", boards=("generic-c3", "m5stamp-c3")),
+            self.make_versioned_release("4.1.0"),
+        ]
+        index = web_flash.materialize_history(
+            site, latest, latest_release, history, allow_file=True, limit=2
+        )
+
+        tags = [entry["tag"] for entry in index["releases"]]
+        self.assertEqual(tags, ["v4.2.0", "v4.1.3", "v4.1.1"])
+        self.assertTrue(index["releases"][0]["latest"])
+        self.assertFalse(any(entry["latest"] for entry in index["releases"][1:]))
+        self.assertEqual(index["skipped"][0]["tag"], "v4.1.2")
+        self.assertIn("SHA256", index["skipped"][0]["reason"])
+        self.assertLessEqual(len(index["releases"][1]["notes"]), web_flash.NOTES_EXCERPT_MAX + 1)
+        self.assertEqual(set(index["releases"][2]["boards"]), {"generic-c3", "m5stamp-c3"})
+        self.assertFalse((site / "firmware" / "v4.1.0").exists())
+
+        disk = json.loads((site / "firmware" / "releases.json").read_text())
+        self.assertEqual(disk["latest"], "v4.2.0")
+        for entry in disk["releases"]:
+            for board_info in entry["boards"].values():
+                self.assertTrue(board_info["download"].startswith("firmware/"))
+                self.assertNotIn("..", board_info["download"])
+                firmware = site / board_info["download"]
+                self.assertEqual(
+                    hashlib.sha256(firmware.read_bytes()).hexdigest(), board_info["sha256"]
+                )
+                manifest = json.loads((site / board_info["manifest"]).read_text())
+                self.assertEqual(manifest["version"], entry["version"])
+                self.assertEqual(manifest["builds"][0]["parts"][0]["path"], firmware.name)
+        # 最新版仍写在 firmware/ 根目录，旧页面 latest.json 保持兼容
+        self.assertTrue((site / "firmware" / "latest.json").is_file())
+        self.assertEqual(
+            json.loads((site / "firmware" / "latest.json").read_text())["tag"], "v4.2.0"
+        )
+
+    def test_history_rejects_unsafe_destination(self):
+        site = web_flash.initialize_site(self.source, self.base / "site")
+        with self.assertRaises(web_flash.ReleaseValidationError):
+            web_flash.materialize_release(
+                site, self.make_versioned_release("4.1.1"), allow_file=True,
+                dest_rel="firmware/../escape",
+            )
+
+    def test_unavailable_writes_empty_release_index(self):
+        site = web_flash.initialize_site(self.source, self.base / "site")
+        web_flash.write_unavailable(site, ["none"])
+        index = json.loads((site / "firmware" / "releases.json").read_text())
+        self.assertEqual(index["releases"], [])
+
     def test_rejects_sha256_mismatch(self):
         site = web_flash.initialize_site(self.source, self.base / "site")
         with self.assertRaisesRegex(web_flash.ReleaseValidationError, "SHA256 校验失败"):
@@ -118,8 +193,9 @@ class WebFlashSiteTest(unittest.TestCase):
         self.assertTrue(args.require_firmware)
         self.assertEqual(
             set(vars(args)),
-            {"source_dir", "site_dir", "github_repo", "require_firmware", "release_json"},
+            {"source_dir", "site_dir", "github_repo", "require_firmware", "release_json", "history"},
         )
+        self.assertEqual(args.history, web_flash.DEFAULT_HISTORY)
 
     def test_rejects_path_traversal_and_nested_output(self):
         with self.assertRaises(web_flash.ReleaseValidationError):

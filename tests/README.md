@@ -71,7 +71,7 @@ source $IDF_PATH/export.sh
 | `check_ble_advertising_fields.py` | BLE 广播字段检查（骑行/跑步服务 UUID 与名字预算） | TC-BLE-ADV | 高 |
 | `check_ftms_control_contract.py` | FTMS 控制点参数校验、应用接纳与 Result Code 静态契约 | TC-BLE-CP | 高 |
 | `check_wifi_done_contract.py` | WiFi 配网完成通知、pending latch 与幂等清理静态契约 | TC-WIFI-DONE | 高 |
-| `test_prepare_web_flash_site.py` | Pages 双板固件选择、SHA256、manifest、降级和路径安全回归 | TC-WEB-FLASH | 高 |
+| `test_prepare_web_flash_site.py` | Pages 双板固件选择、SHA256、manifest、历史版本镜像（回滚）、降级和路径安全回归 | TC-WEB-FLASH | 高 |
 
 ```bash
 # 一键跑全部静态门禁
@@ -148,7 +148,7 @@ python3 scripts/tools/device_acceptance.py init --board generic-c3 --operator "�
 |------|------|
 | `tools/web/ble-monitor.html` | Web Bluetooth 客户端、全量 NVS 配置编辑器与 ESP Web Tools 刷写页；实时曲线支持四档时间范围、逐点读数、统计、暂停和 CSV 导出 |
 | `scripts/tools/serve_ble_monitor.py` | 从 `tools/web/` 启动无缓存本地 HTTP 服务，默认 `http://127.0.0.1:8766/ble-monitor.html` |
-| `scripts/tools/prepare_web_flash_site.py` | 获取 GitHub 最新 Release、验证 merged bin SHA256、生成 Pages 固件索引与 ESP Web Tools manifest |
+| `scripts/tools/prepare_web_flash_site.py` | 获取 GitHub 最新 Release 与最近历史 Release、逐个验证 merged bin SHA256、镜像为同源文件并生成 `latest.json` / `releases.json` 与 ESP Web Tools manifest |
 | `.github/workflows/deploy-web-tools.yml` | CI 成功或 GitHub Release 发布后部署 Pages；缺失完整固件时阻断覆盖 |
 | `tests/check_ble_monitor.py` | 静态门禁，检查监控、刷写交互、Pages 工作流和门禁接入是否漂移 |
 | `tests/test_prepare_web_flash_site.py` | 离线验证双板选择、SHA256、manifest、GitHub-only CLI、降级和路径安全 |

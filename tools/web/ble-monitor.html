@@ -224,7 +224,7 @@ body.gate-lock{overflow:hidden}
 
 /* ===== 页面与面板 ===== */
 #support-warning{margin:18px auto 0;max-width:1120px;border-color:var(--red);color:var(--red)}
-#mode-flash,#mode-compare{max-width:1120px;margin:24px auto 0;padding:0 20px 40px}
+#mode-compare{max-width:1120px;margin:24px auto 0;padding:0 20px 40px}
 .card{background:var(--panel);border:1px solid var(--line);padding:22px}
 .card+.card{margin-top:16px}
 .card-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;padding-bottom:15px;border-bottom:1px solid var(--line)}
@@ -260,6 +260,78 @@ body.gate-lock{overflow:hidden}
 .flash-details summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--muted);font-weight:800}
 .flash-details[open] summary{color:var(--accent)}
 .flash-cta{margin:18px 0}
+
+/* ===== 刷写页：左侧版本时间轴 + 主窗口（IDE 式） ===== */
+.fw-ide{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:calc(100vh - 64px - var(--dock-space,0px) - var(--status-h,0px))}
+.fw-rail{position:relative;border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.pane-title{min-height:36px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 14px;border-bottom:1px solid var(--line);color:var(--faint);font:800 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;flex:0 0 auto}
+.pane-title b{color:var(--muted);font-weight:700;letter-spacing:.02em}
+.pane-x{width:28px;height:28px;border:0;background:transparent;color:var(--faint);cursor:pointer;display:grid;place-items:center;padding:0}
+.pane-title .pane-x{margin-right:-8px}
+.pane-x:hover{color:var(--accent)}
+.pane-x svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6}
+.fw-timeline{position:relative;list-style:none;margin:0;padding:10px 0;flex:1 1 auto;overflow:auto}
+.fw-timeline::before{content:"";position:absolute;left:27px;top:0;bottom:0;width:1px;background:var(--line)}
+.fw-loading{padding:14px 18px 14px 46px;color:var(--faint);font:12px/1.5 var(--mono)}
+.fw-row{position:relative;display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;width:100%;padding:12px 14px;border:0;background:transparent;color:var(--ink);text-align:left;cursor:pointer;transition:background .15s}
+.fw-row:hover{background:var(--panel-2)}
+.fw-node{position:relative;z-index:1;width:9px;height:9px;margin:7px 0 0 9px;border:1px solid var(--line);background:var(--bg);transition:background .2s,border-color .2s,transform .2s}
+.fw-row[data-latest="1"] .fw-node{border-color:var(--green);background:var(--green)}
+.fw-row[aria-current="true"]{background:var(--accent-soft)}
+.fw-row[aria-current="true"] .fw-node{border-color:var(--accent);background:var(--accent);transform:rotate(45deg) scale(1.15)}
+.fw-v{display:flex;align-items:baseline;gap:8px;color:var(--strong);font:400 26px/1 var(--display);letter-spacing:-.02em}
+.fw-v small{font:800 9px/1 var(--mono);letter-spacing:.1em;padding:3px 5px;border:1px solid var(--green);color:var(--green)}
+.fw-v small.old{border-color:var(--line);color:var(--faint)}
+.fw-d{display:block;margin-top:6px;color:var(--muted);font:11px/1.5 var(--mono)}
+.fw-row[aria-current="true"] .fw-v{color:var(--accent)}
+.fw-head{position:absolute;left:0;top:0;width:3px;height:0;background:var(--accent);box-shadow:0 0 18px rgba(240,85,35,.55);transition:transform .45s cubic-bezier(.2,.8,.2,1),height .45s cubic-bezier(.2,.8,.2,1);pointer-events:none}
+.fw-rail-note{margin:0;padding:12px 14px 16px;border-top:1px solid var(--line);color:var(--faint);font-size:12px;line-height:1.6;flex:0 0 auto}
+.fw-main{min-width:0;padding:22px clamp(18px,3vw,40px) 40px;max-width:1080px}
+.fw-headline{margin-bottom:14px}
+.fw-pick{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:18px;padding:6px 0 18px;border-bottom:1px solid var(--line)}
+.fw-pick-k{display:block;color:var(--green);font:800 11px/1 var(--mono);letter-spacing:.1em}
+.fw-pick[data-kind="rollback"] .fw-pick-k{color:var(--amber)}
+.fw-pick-ver b{display:block;margin-top:10px;color:var(--strong);font:400 clamp(56px,7vw,96px)/.86 var(--display);letter-spacing:-.05em}
+.fw-pick[data-kind="rollback"] .fw-pick-ver b{color:var(--amber)}
+.fw-pick-meta{display:block;margin-top:10px;color:var(--muted);font:12px/1.5 var(--mono)}
+.fw-pick-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.fw-board-label{color:var(--faint);font:800 10px/1 var(--mono);letter-spacing:.1em}
+#firmware-board{min-height:40px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:6px 10px;font:13px var(--mono);border-radius:0}
+.fw-rollback{margin-top:16px;padding:14px 16px;border:1px solid var(--amber);background:var(--amber-soft)}
+.fw-rollback b{color:var(--amber)}
+.fw-rollback p{margin:6px 0 12px;color:var(--ink);font-size:13px;line-height:1.6}
+.fw-rollback .check-line{background:transparent;border-color:rgba(228,173,97,.5)}
+.fw-notes{margin:8px 0 0;max-height:260px;overflow:auto;padding:12px 14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:12px/1.7 var(--mono);white-space:pre-wrap;word-break:break-word}
+.flash-anim{margin:22px 0 0;border:1px solid var(--line);background:linear-gradient(var(--line-soft) 1px,transparent 1px) 0 0/100% 30px,var(--bg)}
+.flash-anim svg{display:block;width:100%;height:auto;max-height:190px}
+.fa-laptop rect,.fa-laptop path,.fa-board rect{fill:none;stroke:var(--line);stroke-width:1.5}
+.fa-laptop .fa-screen{fill:var(--panel)}
+.fa-laptop text,.fa-board text{fill:var(--muted);font:11px var(--mono)}
+.fa-board .fa-chip{fill:var(--panel-2);stroke:var(--ink)}
+.fa-cap{fill:var(--faint);font:9px var(--mono);letter-spacing:.1em}
+.fa-cable{fill:none;stroke:var(--line);stroke-width:3}
+.fa-flow{fill:none;stroke:var(--accent);stroke-width:3;stroke-dasharray:4 22;animation:faFlow 1.1s linear infinite}
+.fa-laptop .fa-bar-bg{fill:var(--line-soft);stroke:none}
+.fa-laptop .fa-bar{fill:var(--accent);stroke:none;transform-box:fill-box;transform-origin:left center;animation:faBar 4.8s cubic-bezier(.5,0,.3,1) infinite}
+.fa-led{fill:var(--faint);animation:faLed 4.8s steps(1) infinite}
+@keyframes faFlow{to{stroke-dashoffset:-26}}
+@keyframes faBar{0%{transform:scaleX(0)}75%,100%{transform:scaleX(1)}}
+@keyframes faLed{0%,74%{fill:var(--amber)}75%,100%{fill:var(--green)}}
+.flash-anim figcaption{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+.fa-step{padding:10px 14px;border-right:1px solid var(--line);color:var(--faint);font:12px/1.4 var(--sans);animation:faStep 4.8s steps(1) infinite}
+.fa-step:nth-child(1){animation-delay:-4.8s}
+.fa-step:nth-child(2){animation-delay:-3.2s}
+.fa-step:nth-child(3){animation-delay:-1.6s}
+.fa-step:last-child{border-right:0}
+.fa-step b{margin-right:8px;font:800 11px var(--mono)}
+@keyframes faStep{0%{color:var(--strong);background:var(--accent-soft)}33.33%,100%{color:var(--faint);background:transparent}}
+.fw-step-shot p{margin-top:8px!important;padding-top:0!important}
+.fw-shot{padding:0;border:1px solid var(--line);background:var(--bg);cursor:zoom-in;display:block;text-align:left;margin-top:12px}
+.fw-shot img{display:block;width:100%;height:92px;object-fit:cover;object-position:top;filter:saturate(.85)}
+.fw-shot span{display:block;padding:6px 8px;border-top:1px solid var(--line);color:var(--faint);font:10px/1 var(--mono);letter-spacing:.06em}
+.fw-shot:hover{border-color:var(--accent)}
+@media(prefers-reduced-motion:reduce){.fa-flow,.fa-bar,.fa-led,.fa-step{animation:none!important}.fw-head{transition:none}}
+@media(max-width:900px){.fw-ide{grid-template-columns:1fr}.fw-rail{border-right:0;border-bottom:1px solid var(--line)}.fw-timeline{display:flex;overflow-x:auto;padding:0}.fw-timeline::before,.fw-head,.fw-rail-note{display:none}.fw-row{min-width:150px;border-right:1px solid var(--line-soft)}.fw-pick{grid-template-columns:1fr}.fw-pick-side{align-items:flex-start}.flash-guide{grid-template-columns:1fr}}
 .hint{font-size:13px;color:var(--muted);line-height:1.65;margin-top:10px}
 .hint b{color:var(--strong)}
 .spec{display:grid;gap:0;margin:0}
@@ -345,7 +417,6 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
 .device-lower{grid-column:1/-1;border-top:1px solid var(--line);padding:22px;display:grid;grid-template-columns:minmax(260px,.7fr) minmax(0,1.3fr);gap:28px;background:var(--panel)}
 .device-lower h3{margin:0 0 10px;color:var(--strong);font-size:16px}
 .device-card{border:1px solid var(--line);padding:16px;background:var(--panel-2)}
-#single-device-card{display:contents}
 .dc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
 .dc-name{font-weight:900;font-size:16px;color:var(--strong)}
 .dc-meta{font:12px/1.5 var(--mono);color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
@@ -396,9 +467,6 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
 .tpl-info{display:flex;flex-direction:column;gap:3px}.tpl-name{font-weight:800;color:var(--strong)}.tpl-sub{font:12px/1.45 var(--mono);color:var(--muted)}.tpl-ops{display:flex;gap:6px}
 .empty-state{text-align:center;padding:48px 20px;color:var(--muted)}
 .empty-state .big{font:400 72px/1 var(--display);color:var(--faint);margin-bottom:10px}.empty-state p{margin:5px 0;font-size:14px}
-#templates-card,#log-panel{max-width:1120px;margin:16px auto 0}
-#log-panel{margin-bottom:34px}
-#log-panel>summary{min-height:44px;display:flex;align-items:center}
 .log{height:220px;overflow:auto;background:var(--bg);color:var(--ink);padding:13px 15px;font:12px/1.75 var(--mono);border:1px solid var(--line)}
 .log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.info{color:var(--ink)}.data-log{color:var(--green)}.warn-log{color:var(--amber)}.err-log{color:var(--red)}
 
@@ -421,7 +489,7 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
   .config-groups{grid-template-columns:1fr}.config-group[open]{grid-column:auto}.config-fields{grid-template-columns:1fr 1fr}.config-toolbar{align-items:stretch}.config-toolbar .actions{width:100%;justify-content:flex-start}
   #mode-flash,#mode-compare{margin-top:18px;padding:0 14px 28px}.card{padding:16px}.card-head{align-items:flex-start;flex-direction:column}.card-head .actions{justify-content:flex-start}
   .flash-lead{grid-template-columns:1fr}.flash-time{border-left:0;border-top:1px solid var(--line);padding:12px 0 0}.flash-guide{grid-template-columns:1fr}.flash-step.guide-step{min-height:0}.step-number{margin-bottom:12px}.flash-step.guide-step p{margin-top:7px;padding-top:0}.flash-expect{grid-template-columns:1fr}.flash-terms{grid-template-columns:1fr}.flash-step p,.flash-lead p,.flash-warning{font-size:16px}
-  #templates-card,#log-panel{margin-left:14px;margin-right:14px}.svc-head,.char{flex-direction:column}.svc-uuid{text-align:left}.props{white-space:normal}
+  .svc-head,.char{flex-direction:column}.svc-uuid{text-align:left}.props{white-space:normal}
 }
 @media(max-width:480px){
   .brand-mark{display:block;width:26px;height:26px}.brand h1{display:none}.mode-btn{min-width:74px}
@@ -826,6 +894,118 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
   .erg-state-block{border-right:0;border-bottom:1px solid var(--line-soft)}
   .erg-state-block:last-child{border-bottom:0}
 }
+
+/* ===== IDE 外壳：底部面板 + 状态栏 + 可折叠侧栏 ===== */
+body.ide-shell.ide-wide{padding-bottom:calc(var(--dock-space,0px) + var(--status-h,0px))}
+body.ide-shell.ide-wide .wrap{min-height:calc(100vh - var(--dock-space,0px) - var(--status-h,0px))}
+body.dock-dragging{cursor:ns-resize;user-select:none}
+.ide-dock{background:var(--panel);border-top:1px solid var(--line);display:flex;flex-direction:column;z-index:30}
+body.ide-wide .ide-dock{position:fixed;left:0;right:0;bottom:var(--status-h,0px);height:var(--dock-h,300px)}
+body.ide-wide .ide-dock[data-open="0"]{height:36px}
+.ide-dock[data-open="0"] .dock-body,.ide-dock[data-open="0"] .dock-resize{display:none}
+.dock-resize{position:absolute;left:0;right:0;top:-4px;height:8px;cursor:ns-resize;z-index:2}
+.dock-resize:hover,.dock-resize:focus-visible{background:linear-gradient(transparent 3px,var(--accent) 3px,var(--accent) 5px,transparent 5px);outline:0}
+body:not(.ide-wide) .dock-resize{display:none}
+.dock-tabs{display:flex;align-items:stretch;min-height:36px;border-bottom:1px solid var(--line);padding:0 6px 0 0;flex:0 0 auto;overflow-x:auto;scrollbar-width:none}
+.dock-tab{display:inline-flex;align-items:center;gap:8px;padding:0 14px;border:0;border-right:1px solid var(--line-soft);background:transparent;color:var(--faint);font:700 11px/1 var(--mono);letter-spacing:.04em;cursor:pointer;white-space:nowrap;position:relative}
+.dock-tab:hover{color:var(--strong);background:var(--panel-2)}
+.dock-tab.active{color:var(--strong);background:var(--bg)}
+.dock-tab.active::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--accent)}
+.ide-dock[data-open="0"] .dock-tab.active{background:transparent}
+.ide-dock[data-open="0"] .dock-tab.active::after{display:none}
+.dock-count{min-width:18px;padding:2px 5px;border:1px solid var(--line);color:var(--muted);font:700 10px/1 var(--mono);text-align:center}
+.dock-count.unread{border-color:var(--accent);color:var(--accent)}
+.dock-count.err{border-color:var(--red);color:var(--red)}
+.dock-spacer{flex:1}
+.dock-tools{display:flex;align-items:center;gap:4px;padding-right:6px}
+.dock-tool{min-height:26px;padding:0 9px;border:1px solid var(--line);background:transparent;color:var(--muted);font:700 11px/1 var(--mono);cursor:pointer;white-space:nowrap}
+.dock-tool:hover{color:var(--accent);border-color:var(--accent)}
+.dock-tabs .pane-x{align-self:center}
+#dock-toggle-btn svg{transition:transform .2s}
+#dock-toggle-btn.flip svg{transform:rotate(180deg)}
+.ide-dock[data-max="1"] #dock-max-btn{color:var(--accent)}
+.dock-body{flex:1 1 auto;min-height:0;position:relative;background:var(--bg)}
+.dock-pane{display:none;height:100%;overflow:auto;padding:14px 18px 18px}
+.dock-pane.active{display:block}
+body:not(.ide-wide) .dock-pane{height:auto;max-height:70vh}
+.dock-empty{padding:26px 6px;color:var(--muted);font-size:13px;line-height:1.7;max-width:640px}
+.dock-empty b{display:block;color:var(--strong);font-size:15px;margin-bottom:4px}
+.dock-pane-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-bottom:10px;border-bottom:1px solid var(--line-soft);color:var(--muted);font-size:12px;flex-wrap:wrap}
+#pane-log{padding:0}
+#pane-log .log{height:100%;border:0;padding:10px 18px}
+body:not(.ide-wide) #pane-log .log{height:260px}
+#pane-gatt .svc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:8px;align-items:start}
+#pane-gatt .gatt-intro{margin:0 0 10px}
+#pane-nvs .config-panel{border:0;padding:0;background:transparent}
+.ide-status{display:none}
+body.ide-wide .ide-status{position:fixed;left:0;right:0;bottom:0;height:var(--status-h,26px);z-index:31;display:flex;align-items:stretch;background:var(--bg);border-top:1px solid var(--line);font:11px/1 var(--mono);color:var(--muted)}
+.st-item{display:inline-flex;align-items:center;gap:7px;padding:0 11px;border:0;border-right:1px solid var(--line-soft);background:transparent;color:inherit;font:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
+button.st-item{cursor:pointer}
+button.st-item:hover{color:var(--strong);background:var(--panel)}
+.st-link{color:var(--ink)}
+.st-dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:0 0 auto}
+.st-link[data-link="connected"]{background:var(--accent);color:var(--bg);font-weight:800}
+.st-link[data-link="connected"]:hover{background:#ff7548;color:var(--bg)}
+.st-link[data-link="connected"] .st-dot{background:var(--bg)}
+.st-link[data-link="connecting"] .st-dot,.st-link[data-link="mirror"] .st-dot{background:var(--amber)}
+.st-link[data-link="lost"] .st-dot{background:var(--red)}
+.st-spacer{flex:1}
+.st-keys{color:var(--faint)}
+.st-views{display:flex;border-left:1px solid var(--line-soft)}
+.st-view{width:32px;border:0;background:transparent;color:var(--faint);cursor:pointer;display:grid;place-items:center;padding:0}
+.st-view svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.2}
+.st-view svg .fill{stroke-width:1.2}
+.st-view[aria-pressed="true"]{color:var(--accent)}
+.st-view:hover:not(:disabled){color:var(--strong);background:var(--panel)}
+.st-view:disabled{opacity:.3;cursor:default}
+@media(max-width:1280px){.st-keys{display:none}}
+
+/* 实时监控：PC 首屏一屏装下主窗口；侧栏各自滚动 */
+.rail-reopen{display:none;writing-mode:vertical-rl;border:0;border-right:1px solid var(--line);background:var(--panel);color:var(--faint);font:800 10px/1 var(--mono);letter-spacing:.2em;cursor:pointer;padding:14px 0}
+.rail-reopen.right{border-right:0;border-left:1px solid var(--line)}
+.rail-reopen:hover{color:var(--accent);background:var(--panel-2)}
+.rail-identity:empty{display:none}
+.rail-identity{margin:18px 0 0;padding-top:4px;border-top:1px solid var(--line)}
+.rail-identity h3{margin:12px 0 6px;color:var(--faint);font:800 10px/1 var(--mono);letter-spacing:.12em}
+.rail-identity .row{padding:7px 0;font-size:12px}
+.rail-identity .row span:first-child{min-width:64px}
+.rail-identity .dc-head{flex-wrap:wrap;margin-bottom:6px}
+.rail-identity .dc-name{display:none}
+.rail-identity .dc-meta{display:none}
+.rail-identity .dc-foot{display:grid;gap:6px}
+.rail-identity .dc-foot .btn{width:100%}
+.monitor-rail>.pane-title,.evidence>.pane-title{margin:-30px -18px 18px}
+@media(min-width:1100px) and (min-height:600px){
+  body.ide-wide #mode-connect{min-height:0}
+  body.ide-wide #mode-connect .monitor-grid{height:calc(100vh - 64px - var(--dock-space,0px) - var(--status-h,0px));min-height:420px;grid-template-columns:260px minmax(0,1fr) 272px}
+  body.ide-wide #mode-connect .monitor-grid[data-left="off"]{grid-template-columns:28px minmax(0,1fr) 272px}
+  body.ide-wide #mode-connect .monitor-grid[data-right="off"]{grid-template-columns:260px minmax(0,1fr) 28px}
+  body.ide-wide #mode-connect .monitor-grid[data-left="off"][data-right="off"]{grid-template-columns:28px minmax(0,1fr) 28px}
+  body.ide-wide .monitor-grid[data-left="off"] .monitor-rail,body.ide-wide .monitor-grid[data-right="off"] .evidence{display:none}
+  body.ide-wide .monitor-grid[data-left="off"] .rail-reopen.left{display:block;grid-column:1;grid-row:1}
+  body.ide-wide .monitor-grid[data-right="off"] .rail-reopen.right{display:block;grid-column:3;grid-row:1}
+  body.ide-wide .monitor-grid .monitor-rail{grid-column:1;grid-row:1}
+  body.ide-wide .monitor-grid .signal-stage{grid-column:2;grid-row:1}
+  body.ide-wide .monitor-grid .evidence{grid-column:3;grid-row:1}
+  body.ide-wide .monitor-rail,body.ide-wide .evidence{overflow:auto;min-height:0;scrollbar-width:thin}
+  body.ide-wide .signal-stage{display:flex;flex-direction:column;min-height:0;overflow:auto;padding:16px 22px 16px}
+  body.ide-wide .hero-readout{padding:6px 0 14px}
+  body.ide-wide .signal-head{padding:5px 0 8px}
+  body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
+  body.ide-wide .hero-copy p{font-size:13px;line-height:1.55}
+  body.ide-wide .trace-head{min-height:48px;padding:4px 10px}
+  body.ide-wide .legend-btn,body.ide-wide .trace-range-btn,body.ide-wide .trace-tool-btn{min-height:34px}
+  body.ide-wide .trace-meta{min-height:30px;padding:5px 12px}
+  body.ide-wide .trace-stat{padding:7px 12px}
+  body.ide-wide .trace-stat b{font-size:13px}
+  body.ide-wide .trace-panel{flex:1 1 auto;display:flex;flex-direction:column;min-height:240px;margin-top:10px}
+  body.ide-wide .trace-window{flex:1 1 auto;height:auto;min-height:90px}
+  body.ide-wide .mini-metric{padding:7px 12px}
+  body.ide-wide .mini-metric span{font-size:11px}
+  body.ide-wide .mini-metric b{margin-top:2px;font-size:20px}
+  body.ide-wide .monitor-rail>.pane-title,body.ide-wide .evidence>.pane-title{position:sticky;top:-30px;z-index:2;background:var(--bg)}
+}
+@media(max-width:1099px){.monitor-rail>.pane-title .pane-x,.evidence>.pane-title .pane-x{display:none}}
 </style>
 <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
 </head>
@@ -926,75 +1106,121 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
     当前浏览器不支持 Web Bluetooth API。请使用桌面版 Chrome / Edge，并通过 HTTPS 页面打开。
   </div>
 
-  <!-- ============ 模式一：刷机 ============ -->
+  <!-- ============ 模式一：刷机（左：版本时间轴 / 右：主窗口） ============ -->
   <section id="mode-flash" class="hidden">
-    <div class="card">
-      <div class="card-head">
-        <h2>固件刷写</h2>
-        <span class="badge warn" id="firmware-status">正在获取最新版本</span>
-      </div>
+    <div class="fw-ide">
+      <aside class="fw-rail" aria-label="固件版本">
+        <div class="pane-title"><span>RELEASES · 固件版本</span><b id="fw-count">--</b></div>
+        <ol class="fw-timeline" id="fw-timeline" aria-label="可刷写的固件版本，默认最新">
+          <li class="fw-loading">正在读取版本索引…</li>
+        </ol>
+        <i class="fw-head" id="fw-head" aria-hidden="true"></i>
+        <p class="fw-rail-note">版本来自 GitHub Releases。部署时逐个校验 SHA256，并镜像为本站同源文件，浏览器才能直接刷写历史版本。</p>
+      </aside>
 
-      <div class="serial-scope" id="serial-scope">
-        <div><b>USB 串口只在这一页使用。</b>刷写走 Web Serial；刷完后拔掉数据线也没关系，其余所有工具都通过蓝牙连接开发板。</div>
-        <button class="btn alt sm" type="button" onclick="openGate()">刷完了，用蓝牙连接 →</button>
-      </div>
+      <main class="fw-main">
+        <div class="card-head fw-headline">
+          <h2>固件刷写</h2>
+          <span class="badge warn" id="firmware-status">正在获取最新版本</span>
+        </div>
 
-      <div class="flash-lead">
-        <div><strong>第一次刷固件也没关系。</strong><p>准备一根能传数据的 USB 线，按下面三步操作。整个过程都在浏览器里完成，不需要安装命令行工具。</p></div>
-        <div class="flash-time"><b>约 2 分钟</b>写入期间别拔线</div>
-      </div>
+        <div class="serial-scope" id="serial-scope">
+          <div><b>USB 串口只在这一页使用。</b>刷写走 Web Serial。刷完可以拔掉数据线，其余工具都通过蓝牙连接开发板。</div>
+          <button class="btn alt sm" type="button" onclick="openGate()">刷完了，用蓝牙连接 →</button>
+        </div>
 
-      <div class="flash-guide">
-        <article class="flash-step guide-step"><span class="step-number">STEP 1 / 插线</span><b>把开发板接到电脑</b><p>必须使用支持数据传输的 USB 线。只有充电功能的线会让电脑看不到串口。</p></article>
-        <article class="flash-step guide-step"><span class="step-number">STEP 2 / 选串口</span><b>点击下方按钮并选择设备</b><p>弹窗里通常会看到 USB Serial、CP210x、CH34x 或 JTAG/Serial。只有一个选项时直接选择即可。</p></article>
-        <article class="flash-step guide-step"><span class="step-number">STEP 3 / 等完成</span><b>保持页面可见，不要拔线</b><p>出现 Installing 或 Wrapping up 都是正常过程；看到 Installation complete 才算完成。</p></article>
-      </div>
+        <div class="fw-pick" id="fw-pick" data-kind="latest">
+          <div class="fw-pick-ver">
+            <span class="fw-pick-k" id="fw-pick-k">即将写入 · 最新版本</span>
+            <b id="fw-pick-version">v--</b>
+            <span class="fw-pick-meta" id="fw-pick-meta">--</span>
+          </div>
+          <div class="fw-pick-side">
+            <label class="fw-board-label hidden" id="firmware-board-wrap" for="firmware-board">板型</label>
+            <select id="firmware-board" class="hidden" onchange="renderSelectedFirmware()">
+              <option value="generic-c3" selected>通用 ESP32-C3</option>
+            </select>
+            <button class="btn ghost sm hidden" id="fw-back-latest" type="button" onclick="selectFirmwareRelease(null)">回到最新版本</button>
+          </div>
+        </div>
 
-      <select id="firmware-board" class="hidden" onchange="renderSelectedFirmware()">
-        <option value="generic-c3" selected>通用 ESP32-C3</option>
-      </select>
+        <div class="fw-rollback hidden" id="fw-rollback" role="alert">
+          <b>你选的是历史版本，这会把设备降级。</b>
+          <p id="fw-rollback-text">旧固件可能读不懂新版本保存的配置。建议刷写时在弹窗里选择 Erase（清除数据），刷完后重新设置参数。</p>
+          <label class="check-line"><input type="checkbox" id="fw-rollback-ack" onchange="renderSelectedFirmware()">我了解风险，确认回滚到这个版本</label>
+        </div>
 
-      <div class="flash-cta">
-        <esp-web-install-button id="install-button" class="hidden">
-          <button class="btn primary big" id="flash-activate" slot="activate" onclick="prepareForFlash()">开始刷写（选择串口）</button>
-          <span slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
-          <span slot="not-allowed">网页刷写仅能在 HTTPS 或 localhost 页面使用。</span>
-        </esp-web-install-button>
-        <button class="btn" id="install-unavailable" disabled>暂无可刷写固件</button>
-        <a class="btn alt hidden" id="firmware-download" href="#" download>下载固件</a>
-      </div>
-      <div class="hint" id="flash-message">正在读取最新 Release 固件信息。</div>
+        <div class="flash-cta">
+          <esp-web-install-button id="install-button" class="hidden">
+            <button class="btn primary big" id="flash-activate" slot="activate" onclick="prepareForFlash()">开始刷写（选择串口）</button>
+            <span slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
+            <span slot="not-allowed">网页刷写只能在 HTTPS 或 localhost 页面使用。</span>
+          </esp-web-install-button>
+          <button class="btn" id="install-unavailable" disabled>暂无可刷写固件</button>
+          <a class="btn alt hidden" id="firmware-download" href="#" download>下载固件</a>
+        </div>
+        <div class="hint" id="flash-message">正在读取 Release 固件信息。</div>
 
-      <div class="flash-expect">
-        <strong>英文状态对照</strong>
-        <div class="flash-terms"><div class="flash-term"><b>INSTALL / ERASE</b>确认安装；Erase 表示清除旧数据后重装</div><div class="flash-term"><b>INSTALLING</b>正在写入，保持页面打开</div><div class="flash-term"><b>WRAPPING UP / COMPLETE</b>正在收尾 / 已经完成</div></div>
-      </div>
-      <div class="flash-warning"><b>重要：</b>如果弹窗提示 Erase device，继续后设备内已保存的参数可能需要重新设置。刷写期间不要拔线、刷新或关闭页面。</div>
+        <figure class="flash-anim" aria-label="刷写过程示意：电脑经 USB 数据线把固件写入开发板">
+          <svg viewBox="0 0 640 150" role="img" aria-hidden="true">
+            <g class="fa-laptop"><rect x="18" y="26" width="128" height="80"/><rect x="30" y="38" width="104" height="56" class="fa-screen"/><path d="M6 114h152l-10 10H16z"/>
+              <rect x="40" y="52" width="64" height="5" class="fa-bar-bg"/><rect x="40" y="52" width="64" height="5" class="fa-bar"/><text x="40" y="78">merged.bin</text></g>
+            <path class="fa-cable" d="M146 96C240 96 250 40 330 40S430 98 500 98"/>
+            <path class="fa-flow" d="M146 96C240 96 250 40 330 40S430 98 500 98"/>
+            <g class="fa-board"><rect x="500" y="58" width="122" height="80"/><rect x="532" y="76" width="44" height="44" class="fa-chip"/><text x="540" y="102">C3</text>
+              <circle cx="604" cy="72" r="4" class="fa-led"/><rect x="490" y="88" width="10" height="20"/></g>
+            <text x="22" y="146" class="fa-cap">CHROME · WEB SERIAL</text><text x="300" y="26" class="fa-cap">USB 数据线 · 0x0 起写入</text><text x="520" y="52" class="fa-cap">ESP32-C3</text>
+          </svg>
+          <figcaption>
+            <span class="fa-step" style="--i:0"><b>01</b>插数据线</span>
+            <span class="fa-step" style="--i:1"><b>02</b>选择串口</span>
+            <span class="fa-step" style="--i:2"><b>03</b>写入并校验</span>
+          </figcaption>
+        </figure>
 
-      <details class="flash-details">
-        <summary>弹窗里找不到串口怎么办？</summary>
-        <div class="hint">先确认开发板插在当前这台电脑上；换一根确定能传数据的 USB 线；关闭可能占用串口的 Arduino IDE、串口助手或其他开发工具；拔插开发板后再试。系统串口选择窗口由浏览器提供，因此会保持系统外观。</div>
-      </details>
+        <div class="flash-guide">
+          <article class="flash-step guide-step"><span class="step-number">STEP 1 / 插线</span><b>把开发板接到电脑</b><p>必须使用能传数据的 USB 线。只能充电的线接上后，电脑会找不到串口。</p></article>
+          <article class="flash-step guide-step fw-step-shot"><span class="step-number">STEP 2 / 选串口</span><b>点击按钮并选择设备</b><p>弹窗里通常显示 USB Serial、CP210x、CH34x 或 JTAG/Serial。只有一项时直接选它。</p>
+            <button class="fw-shot" type="button" onclick="openManualLightbox('manual-images/web-flash-serial-port.jpg','浏览器串口选择弹窗')"><img src="manual-images/web-flash-serial-port.jpg" alt="浏览器串口选择弹窗截图" loading="lazy"><span>真实截图 · 点击放大</span></button></article>
+          <article class="flash-step guide-step"><span class="step-number">STEP 3 / 等完成</span><b>保持页面可见，不要拔线</b><p>看到 Installing 或 Wrapping up 属于正常过程，出现 Installation complete 才算完成。</p></article>
+        </div>
 
-      <details class="flash-details">
-        <summary>固件详情</summary>
-        <dl class="spec" style="margin-top:10px">
-          <div class="row"><span>最新版本</span><span id="firmware-version">--</span></div>
-          <div class="row"><span>发布时间</span><span id="firmware-published">--</span></div>
-          <div class="row"><span>固件文件</span><span id="firmware-filename">--</span></div>
-          <div class="row"><span>SHA256</span><span class="flash-sha" id="firmware-sha256">--</span></div>
-          <div class="row"><span>Release</span><span><a class="release-link hidden" id="firmware-release" href="#" target="_blank" rel="noopener">查看发布说明</a><span id="firmware-release-empty">--</span></span></div>
-        </dl>
-      </details>
+        <div class="flash-expect">
+          <strong>英文状态对照</strong>
+          <div class="flash-terms"><div class="flash-term"><b>INSTALL / ERASE</b>确认安装；Erase 表示先清除旧数据再安装</div><div class="flash-term"><b>INSTALLING</b>正在写入，保持页面打开</div><div class="flash-term"><b>WRAPPING UP / COMPLETE</b>正在收尾 / 已经完成</div></div>
+        </div>
+        <div class="flash-warning"><b>重要：</b>如果弹窗提示 Erase device，继续后设备内保存的参数可能需要重新设置。刷写期间不要拔线、刷新或关闭页面。</div>
 
-      <div class="hint" style="margin-top:16px"><b>环境要求：</b>仅支持电脑端 Chrome / Edge、HTTPS 页面和支持数据传输的 USB 线。网页无法替你静默选择串口，这是 Web Serial 的安全限制。</div>
+        <details class="flash-details" id="fw-notes-wrap">
+          <summary>本版本发布说明</summary>
+          <pre class="fw-notes" id="fw-notes">--</pre>
+        </details>
+        <details class="flash-details">
+          <summary>弹窗里找不到串口怎么办？</summary>
+          <div class="hint">先确认开发板插在这台电脑上；换一根确定能传数据的 USB 线；关闭可能占用串口的 Arduino IDE、串口助手等工具；拔插开发板后重试。串口选择窗口由浏览器提供，所以外观和系统一致。</div>
+        </details>
+        <details class="flash-details">
+          <summary>固件详情</summary>
+          <dl class="spec" style="margin-top:10px">
+            <div class="row"><span>所选版本</span><span id="firmware-version">--</span></div>
+            <div class="row"><span>发布时间</span><span id="firmware-published">--</span></div>
+            <div class="row"><span>固件文件</span><span id="firmware-filename">--</span></div>
+            <div class="row"><span>SHA256</span><span class="flash-sha" id="firmware-sha256">--</span></div>
+            <div class="row"><span>Release</span><span><a class="release-link hidden" id="firmware-release" href="#" target="_blank" rel="noopener">查看发布说明</a><span id="firmware-release-empty">--</span></span></div>
+          </dl>
+        </details>
+
+        <div class="hint" style="margin-top:16px"><b>环境要求：</b>只支持电脑端 Chrome / Edge、HTTPS 页面和能传数据的 USB 线。网页不能替你自动选择串口，这是 Web Serial 的安全限制。</div>
+      </main>
     </div>
   </section>
 
   <!-- ============ 模式二：连接蓝牙设备 ============ -->
   <section id="mode-connect" class="hidden">
-    <div class="monitor-grid">
-      <aside class="monitor-rail">
+    <div class="monitor-grid" data-left="on" data-right="on">
+      <button class="rail-reopen left" type="button" onclick="toggleIdePane('left')" title="展开设备侧栏（Ctrl+B）">设备 ▸</button>
+      <aside class="monitor-rail" aria-label="设备侧栏">
+        <div class="pane-title"><span>EXPLORER · 设备</span><button class="pane-x" type="button" title="收起设备侧栏（Ctrl+B）" aria-label="收起设备侧栏" onclick="toggleIdePane('left')"><svg viewBox="0 0 16 16"><path d="M10 4 6 8l4 4"/></svg></button></div>
         <span class="eyebrow">LIVE / CYCLING</span>
         <h2 id="monitor-device-name">BikePower</h2>
         <div class="device-id" id="monitor-device-id">尚未读取设备身份<br>Web Bluetooth / USER GRANT</div>
@@ -1005,9 +1231,10 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
         <div class="actions">
           <button class="btn primary" onclick="connectAnyDevice()">扫描并连接设备</button>
           <button class="btn alt" onclick="connectAuthorized()">已授权设备</button>
-          <button class="btn ghost" onclick="loadTemplates()">查看已存模板</button>
+          <button class="btn ghost" onclick="openDockPane('templates')">打开模板库</button>
         </div>
         <div id="connect-empty" class="monitor-note">首次连接会打开浏览器设备选择器，只显示广播了骑行功率、心率、骑行速度/踏频或智能骑行台服务的设备。网页不能静默获取附近设备。</div>
+        <div class="rail-identity" id="single-device-card" aria-live="polite"></div>
         <div class="autolink" aria-label="自动连接与跨标签页关联">
           <label class="autolink-toggle" for="autolink-enabled"><input type="checkbox" id="autolink-enabled" checked onchange="setAutoLinkEnabled(this.checked)">自动连接 · 断线重连 · 多标签页同步</label>
           <div class="autolink-status" id="autolink-status" role="status" aria-live="polite">刷新后会优先连接上次使用的已授权设备。</div>
@@ -1083,7 +1310,8 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
         </section>
       </main>
 
-      <aside class="evidence">
+      <aside class="evidence" aria-label="会话证据侧栏">
+        <div class="pane-title"><span>SESSION · 证据</span><button class="pane-x" type="button" title="收起证据侧栏（Ctrl+Alt+B）" aria-label="收起证据侧栏" onclick="toggleIdePane('right')"><svg viewBox="0 0 16 16"><path d="M6 4l4 4-4 4"/></svg></button></div>
         <span class="eyebrow">SESSION EVIDENCE</span>
         <h2>信号有据可查。</h2>
         <div class="health-score"><b id="health-score">--</b><p><strong id="health-label">等待连接</strong><br><span id="health-detail">尚无会话证据</span></p></div>
@@ -1098,20 +1326,7 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
         <details class="protocol"><summary>会话说明</summary><div class="hint">健康分由连接状态、最近通知间隔与本次异常计数计算。服务行只在订阅成功后点亮；时间为对应服务最近一条真实通知的间隔。</div></details>
       </aside>
 
-      <div id="connect-result" class="device-lower hidden">
-        <div class="device-card" id="single-device-card"></div>
-      </div>
-    </div>
-
-    <div class="card" id="templates-card" style="display:none">
-      <div class="card-head">
-        <h2>已保存模板</h2>
-        <div class="actions">
-          <button class="btn alt sm" onclick="exportAllTemplates()">导出全部 JSON</button>
-          <button class="btn ghost sm" onclick="clearTemplates()">清空</button>
-        </div>
-      </div>
-      <div id="templates-list" class="templates"></div>
+      <button class="rail-reopen right" type="button" onclick="toggleIdePane('right')" title="展开证据侧栏（Ctrl+Alt+B）">◂ 证据</button>
     </div>
   </section>
 
@@ -1124,6 +1339,7 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
           <button class="btn primary" onclick="addCompareDevice()">添加设备</button>
           <button class="btn alt hidden" id="compare-add-current" onclick="addCurrentToCompare()">加入监控中的设备</button>
           <button class="btn alt" onclick="renderCompareTable()">刷新比对</button>
+          <button class="btn alt" onclick="openDockPane('templates')">模板库</button>
           <button class="btn ghost" onclick="clearCompareDevices()">清空</button>
         </div>
       </div>
@@ -1144,10 +1360,6 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
         </table>
         <p class="hint" style="margin-top:10px">设备名可以被改成任何值（包括写入模板后），所以页面<b>不按名称判断</b>。<span style="color:var(--amber)">黄色</span>单元格表示该字段在设备间存在差异，<span style="color:var(--green)">绿色</span>表示一致。</p>
       </details>
-      <div class="card" id="compare-templates-card" style="display:none;margin-top:14px;padding:16px">
-        <div class="card-head"><h2 style="font-size:16px">已保存模板 · 可写入开发板</h2></div>
-        <div id="compare-templates-list" class="templates"></div>
-      </div>
       <div id="compare-empty" class="empty-state">
         <div class="big" aria-hidden="true">A/B</div>
         <p><b>尚未添加设备</b></p>
@@ -2064,13 +2276,47 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
     </form>
   </div>
 
-  <details class="card" id="log-panel" style="margin-top:16px">
-    <summary style="cursor:pointer;font-weight:700;color:var(--ink)">事件日志 <span class="hint" style="display:inline;font-weight:400">（展开查看）</span></summary>
-    <div style="display:flex;justify-content:flex-end;margin:8px 0 0"><button class="btn ghost sm" onclick="clearLog()">清空</button></div>
-    <div class="log" id="log" style="margin-top:8px"></div>
-  </details>
-</div>
+  <!-- ============ 底部常驻面板（类 IDE Panel）：GATT / NVS / 模板库 / 事件日志 ============ -->
+  <section class="ide-dock hidden" id="ide-dock" data-open="0" data-max="0" aria-label="开发者面板">
+    <div class="dock-resize" id="dock-resize" role="separator" aria-orientation="horizontal" aria-label="拖动或用上下方向键调整面板高度" tabindex="0"></div>
+    <header class="dock-tabs" role="tablist" aria-label="面板">
+      <button class="dock-tab" role="tab" data-pane="gatt" aria-selected="false" onclick="openDockPane('gatt')">GATT 服务<b class="dock-count" id="dock-count-gatt">0</b></button>
+      <button class="dock-tab" role="tab" data-pane="nvs" aria-selected="false" onclick="openDockPane('nvs')">开发板 NVS 配置<b class="dock-count" id="dock-count-nvs">—</b></button>
+      <button class="dock-tab" role="tab" data-pane="templates" aria-selected="false" onclick="openDockPane('templates')">模板库<b class="dock-count" id="dock-count-templates">0</b></button>
+      <button class="dock-tab" role="tab" data-pane="log" aria-selected="false" onclick="openDockPane('log')">事件日志<b class="dock-count" id="dock-count-log">0</b></button>
+      <span class="dock-spacer"></span>
+      <span class="dock-tools" id="dock-tools"></span>
+      <button class="pane-x" type="button" id="dock-max-btn" title="最大化面板" aria-label="最大化面板" onclick="toggleDockMax()"><svg viewBox="0 0 16 16"><path d="M3 6V3h3M10 3h3v3M13 10v3h-3M6 13H3v-3"/></svg></button>
+      <button class="pane-x" type="button" id="dock-toggle-btn" title="收起 / 展开面板（Ctrl+J）" aria-label="收起或展开面板" onclick="toggleDock()"><svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></svg></button>
+    </header>
+    <div class="dock-body">
+      <div class="dock-pane" id="pane-gatt" data-pane="gatt" role="tabpanel"><div class="dock-empty"><b>还没有 GATT 数据</b>连接设备后，这里会枚举全部服务与特征，附中文说明和实时解析值。</div></div>
+      <div class="dock-pane" id="pane-nvs" data-pane="nvs" role="tabpanel"><div class="dock-empty"><b>还没有读取开发板配置</b>连接 BikePower 开发板后，这里会直接读取 NVS 配置，可编辑并以事务方式保存。</div></div>
+      <div class="dock-pane" id="pane-templates" data-pane="templates" role="tabpanel">
+        <div class="dock-pane-bar"><span>模板保存在本浏览器。任意页面都可以把模板写入 BikePower 开发板。</span><span class="actions"><button class="btn alt sm" onclick="exportAllTemplates()">导出全部 JSON</button><button class="btn ghost sm" onclick="clearTemplates()">清空</button></span></div>
+        <div class="dock-empty" id="templates-empty"><b>还没有模板</b>在实时监控或设备比对里点“保存为模板 / 复制为模板”，模板会出现在这里。</div>
+        <div id="templates-list" class="templates"></div>
+      </div>
+      <div class="dock-pane" id="pane-log" data-pane="log" role="tabpanel"><div class="log" id="log"></div></div>
+    </div>
+  </section>
 
+  <!-- ============ 底部状态栏（类 IDE Status Bar） ============ -->
+  <footer class="ide-status" id="ide-status" aria-label="状态栏">
+    <button class="st-item st-link" id="st-link" type="button" data-link="idle" onclick="onStatusLinkClick()"><i class="st-dot"></i><span id="st-link-text">BLE 未连接</span></button>
+    <span class="st-item" id="st-role">—</span>
+    <span class="st-item" id="st-gap">通知 —</span>
+    <span class="st-item" id="st-tabs">本页</span>
+    <span class="st-spacer"></span>
+    <button class="st-item" id="st-fw" type="button" onclick="switchMode('flash')">固件 —</button>
+    <span class="st-item st-keys">Ctrl+B 侧栏 · Ctrl+J 面板</span>
+    <span class="st-views" role="group" aria-label="窗口显示">
+      <button class="st-view" type="button" data-view="left" aria-pressed="true" title="设备侧栏（Ctrl+B）" onclick="toggleIdePane('left')"><svg viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11"/><path d="M5.5 2.5v11" class="fill"/></svg></button>
+      <button class="st-view" type="button" data-view="dock" aria-pressed="false" title="底部面板（Ctrl+J）" onclick="toggleDock()"><svg viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11"/><path d="M1.5 9.5h13" class="fill"/></svg></button>
+      <button class="st-view" type="button" data-view="right" aria-pressed="true" title="证据侧栏（Ctrl+Alt+B）" onclick="toggleIdePane('right')"><svg viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11"/><path d="M10.5 2.5v11" class="fill"/></svg></button>
+    </span>
+  </footer>
+</div>
 <script>
 /* ==================== UUID 字典 ==================== */
 const UUID16 = {
@@ -2166,6 +2412,7 @@ const DIS_CHARS = [
   ["software","软件版本","00002a28-0000-1000-8000-00805f9b34fb"],
 ];
 const FIRMWARE_INDEX_URL = "./firmware/latest.json";
+const FIRMWARE_RELEASES_URL = "./firmware/releases.json";
 const ANOMALY_LIMITS = {
   staleMs: 3500, powerMax: 1500, hrMin: 30, hrMax: 240, cadenceMax: 260, speedMaxKmh: 35,
 };
@@ -2223,6 +2470,8 @@ const themedDialogObservers = new WeakMap();
 
 let currentMode = null;
 let firmwareCatalog = null;
+let firmwareReleases = [];
+let selectedFirmwareTag = null;
 let webInstallerReady = false;
 let singleDevice = null;
 let compareDevices = [];
@@ -2339,8 +2588,9 @@ function log(message,cls="info"){
   div.textContent=new Date().toLocaleTimeString()+"  "+message;
   $("log").appendChild(div);
   $("log").scrollTop=$("log").scrollHeight;
+  if(typeof noteDockLog==="function")noteDockLog(cls);
 }
-function clearLog(){$("log").innerHTML="";events=[];}
+function clearLog(){$("log").innerHTML="";events=[];dockUnread=0;updateDockCounts();}
 
 /* ==================== 实时数据解析与异常检测 ==================== */
 function recordAnomaly(kind, detail){
@@ -3030,6 +3280,7 @@ function switchMode(mode,opts){
   $("mode-health").classList.toggle("hidden",mode!=="health");
   $("mode-erg").classList.toggle("hidden",mode!=="erg");
   $("mode-manual").classList.toggle("hidden",mode!=="manual");
+  if(typeof applyIdeLayout==="function")applyIdeLayout();
   if(mode==="connect")loadTemplates();
   if(mode==="compare"){renderCompareTable();loadTemplates();}
   if(mode==="inspector")refreshInspectorFromCurrent();
@@ -3072,36 +3323,112 @@ function formatPublishedAt(value){
   const date=new Date(value);
   return Number.isNaN(date.getTime())?value:date.toLocaleString();
 }
+function formatPublishedDate(value){
+  if(!value)return "--";
+  const date=new Date(value);
+  if(Number.isNaN(date.getTime()))return String(value).slice(0,10);
+  const p=n=>String(n).padStart(2,"0");
+  return date.getFullYear()+"-"+p(date.getMonth()+1)+"-"+p(date.getDate());
+}
+function formatBytes(n){return typeof n==="number"&&n>0?(n/1048576).toFixed(2)+" MB":"--";}
+/* 版本索引：firmware/releases.json（部署时镜像的历史版本）。缺失时退回 latest.json 单版本。 */
+function normalizeFirmwareReleases(index,latest){
+  const list=[];
+  const ok=r=>r&&typeof r.tag==="string"&&r.boards&&typeof r.boards==="object"&&Object.keys(r.boards).length;
+  if(index&&index.schema_version===1&&Array.isArray(index.releases))for(const r of index.releases)if(ok(r))list.push(r);
+  if(!list.length&&latest&&latest.available&&ok(latest))list.push({tag:latest.tag,version:latest.version,published_at:latest.published_at,release_url:latest.release_url,boards:latest.boards,latest:true,notes:""});
+  if(list.length&&!list.some(r=>r.latest))list[0].latest=true;
+  return list;
+}
+function selectedFirmwareRelease(){
+  return firmwareReleases.find(r=>r.tag===selectedFirmwareTag)||firmwareReleases.find(r=>r.latest)||firmwareReleases[0]||null;
+}
+function selectFirmwareRelease(tag){
+  const latest=firmwareReleases.find(r=>r.latest);
+  selectedFirmwareTag=tag||(latest?latest.tag:null);
+  const ack=$("fw-rollback-ack");if(ack)ack.checked=false;
+  renderFirmwareTimeline();renderSelectedFirmware();
+}
+function renderFirmwareTimeline(){
+  const box=$("fw-timeline");if(!box)return;
+  setText("fw-count",firmwareReleases.length?firmwareReleases.length+" 个版本":"--");
+  if(!firmwareReleases.length){box.innerHTML='<li class="fw-loading">'+escapeHtml(($("flash-message")||{}).textContent||"暂无可刷写版本")+'</li>';moveFirmwareHead();return;}
+  const cur=selectedFirmwareRelease();
+  box.innerHTML=firmwareReleases.map((r,i)=>{
+    const boards=Object.keys(r.boards).length;
+    const size=Object.values(r.boards)[0];
+    const tagHtml=r.latest?'<small>最新</small>':'<small class="old">回滚</small>';
+    return '<li><button class="fw-row" type="button" data-tag="'+escapeHtml(r.tag)+'" data-latest="'+(r.latest?1:0)+'" aria-current="'+(cur&&cur.tag===r.tag)+'" onclick="selectFirmwareRelease(this.dataset.tag)"><i class="fw-node"></i><span><span class="fw-v">'+escapeHtml(r.tag)+tagHtml+'</span><span class="fw-d">'+escapeHtml(formatPublishedDate(r.published_at))+' · '+boards+' 个板型 · '+escapeHtml(formatBytes(size&&size.size))+'</span></span></button></li>';
+  }).join("");
+  moveFirmwareHead();
+}
+/* 时间轴左侧的橙色“写入头”：滑到当前选中的版本 */
+function moveFirmwareHead(){
+  const head=$("fw-head"),box=$("fw-timeline");if(!head||!box||typeof box.querySelector!=="function")return;
+  const row=box.querySelector('.fw-row[aria-current="true"]');
+  if(!row){head.style.height="0px";return;}
+  const top=row.offsetTop+box.offsetTop-box.scrollTop;
+  head.style.transform="translateY("+top+"px)";head.style.height=row.offsetHeight+"px";
+}
 function renderSelectedFirmware(){
   resetFirmwareDetails();
-  if(!firmwareCatalog||!firmwareCatalog.available)return;
-  const board=$("firmware-board").value;
-  const item=firmwareCatalog.boards&&firmwareCatalog.boards[board];
-  if(!item){setFirmwareStatus("板型固件缺失","err");setText("flash-message","最新 Release 未包含当前板型的完整固件与校验文件。");return;}
+  const rel=selectedFirmwareRelease();
+  const pick=$("fw-pick"),rollback=$("fw-rollback");
+  if(!rel){if(rollback)rollback.classList.add("hidden");return;}
+  const isLatest=!!rel.latest;
+  const latest=firmwareReleases.find(r=>r.latest);
+  const behind=latest?firmwareReleases.indexOf(rel)-firmwareReleases.indexOf(latest):0;
+  if(pick)pick.dataset.kind=isLatest?"latest":"rollback";
+  setText("fw-pick-k",isLatest?"即将写入 · 最新版本":"即将写入 · 回滚版本（比最新落后 "+behind+" 个版本）");
+  setText("fw-pick-version",rel.tag);
+  $("fw-back-latest").classList.toggle("hidden",isLatest);
+  if(rollback){
+    rollback.classList.toggle("hidden",isLatest);
+    setText("fw-rollback-text","从 "+(latest?latest.tag:"最新版")+" 回到 "+rel.tag+"：旧固件可能读不懂新版本保存的配置。建议刷写时在弹窗里选择 Erase（清除数据），刷完后重新设置参数。");
+  }
+  // 板型：只列出该版本真实存在的板型
+  const select=$("firmware-board");
+  const boards=Object.keys(rel.boards);
+  const prev=select.value;
+  select.innerHTML=boards.map(b=>'<option value="'+escapeHtml(b)+'">'+escapeHtml(rel.boards[b].label||b)+'</option>').join("");
+  select.value=boards.includes(prev)?prev:(boards.includes("generic-c3")?"generic-c3":boards[0]);
+  select.classList.toggle("hidden",boards.length<2);$("firmware-board-wrap").classList.toggle("hidden",boards.length<2);
+  const board=select.value;
+  const item=rel.boards[board];
+  setText("fw-pick-meta",formatPublishedDate(rel.published_at)+" 发布 · "+(item&&item.label||board)+" · "+formatBytes(item&&item.size)+" · SHA256 已校验");
+  const notes=$("fw-notes");if(notes)notes.textContent=rel.notes||"该版本没有附带发布说明，可点击“固件详情”中的 Release 链接查看。";
+  if(!item){setFirmwareStatus("板型固件缺失","err");setText("flash-message",rel.tag+" 未包含当前板型的完整固件与校验文件。");return;}
   const manifestPath=safeSitePath(item.manifest);
   const downloadPath=safeSitePath(item.download);
   if(!manifestPath||!downloadPath){setFirmwareStatus("索引无效","err");setText("flash-message","固件索引包含无效路径，已阻止刷写。");return;}
-  setText("firmware-version","v"+firmwareCatalog.version);
-  setText("firmware-published",formatPublishedAt(firmwareCatalog.published_at));
+  setText("firmware-version",rel.tag+(isLatest?"（最新）":"（历史版本）"));
+  setText("firmware-published",formatPublishedAt(rel.published_at));
   setText("firmware-filename",item.filename||"--");
   setText("firmware-sha256",item.sha256||"--");
   const download=$("firmware-download");
   download.href=downloadPath;download.download=item.filename||"";download.classList.remove("hidden");
   const installer=$("install-button");
   installer.setAttribute("manifest",manifestPath);
-  if(webInstallerReady){
-    installer.classList.remove("hidden");$("install-unavailable").classList.add("hidden");
-    setFirmwareStatus("可刷写","ok");
-    setText("flash-message","已选择 "+(item.label||board)+"。部署流程已校验固件 SHA256；点击按钮后请选择开发板串口。");
-  }else{
+  const acked=isLatest||!!($("fw-rollback-ack")&&$("fw-rollback-ack").checked);
+  setText("flash-activate",isLatest?"开始刷写 "+rel.tag+"（选择串口）":"回滚到 "+rel.tag+"（选择串口）");
+  if(!webInstallerReady){
     $("install-unavailable").textContent="刷写组件不可用";
     setFirmwareStatus("仅可下载","warn");
     setText("flash-message","固件已通过 SHA256 校验，但 ESP Web Tools 组件加载失败。请检查网络后刷新，或先下载固件。");
+  }else if(!acked){
+    $("install-unavailable").textContent="先勾选上方的回滚确认";
+    setFirmwareStatus("待确认回滚","warn");
+    setText("flash-message","历史版本 "+rel.tag+" 已通过 SHA256 校验。勾选回滚确认后才能开始刷写。");
+  }else{
+    installer.classList.remove("hidden");$("install-unavailable").classList.add("hidden");
+    setFirmwareStatus(isLatest?"可刷写 · 最新":"可回滚","ok");
+    setText("flash-message","已选择 "+rel.tag+" · "+(item.label||board)+"。部署流程已校验固件 SHA256；点击按钮后请选择开发板串口。");
   }
-  if(typeof firmwareCatalog.release_url==="string"&&firmwareCatalog.release_url.startsWith("https://")){
-    const link=$("firmware-release");link.href=firmwareCatalog.release_url;link.classList.remove("hidden");
+  if(typeof rel.release_url==="string"&&rel.release_url.startsWith("https://")){
+    const link=$("firmware-release");link.href=rel.release_url;link.classList.remove("hidden");
     $("firmware-release-empty").classList.add("hidden");
   }
+  renderIdeStatus();
 }
 async function loadFirmwareCatalog(){
   resetFirmwareDetails();
@@ -3109,6 +3436,7 @@ async function loadFirmwareCatalog(){
   if(location.protocol==="file:"){
     setFirmwareStatus("需要本地服务","warn");
     setText("flash-message","直接打开 HTML 时浏览器不能读取同源固件索引。请使用项目的本地监控服务，或访问已部署的 HTTPS Pages 页面。");
+    renderFirmwareTimeline();
     return;
   }
   try{
@@ -3117,12 +3445,16 @@ async function loadFirmwareCatalog(){
     const data=await response.json();
     if(!data||data.schema_version!==1)throw new Error("索引格式不受支持");
     firmwareCatalog=data;
-    if(!data.available){setFirmwareStatus("暂无固件","warn");setText("flash-message",data.reason||"部署页面成功，但最新 Release 暂无完整双板型固件。");return;}
-    renderSelectedFirmware();
+    let index=null;
+    try{const r=await fetch(FIRMWARE_RELEASES_URL,{cache:"no-store"});if(r.ok)index=await r.json();}catch(e){index=null;}
+    firmwareReleases=normalizeFirmwareReleases(index,data);
+    if(!data.available&&!firmwareReleases.length){setFirmwareStatus("暂无固件","warn");setText("flash-message",data.reason||"页面部署成功，但最新 Release 暂无完整板型固件。");renderFirmwareTimeline();return;}
+    selectFirmwareRelease(null);
   }catch(err){
-    firmwareCatalog=null;
+    firmwareCatalog=null;firmwareReleases=[];
     setFirmwareStatus("加载失败","err");
-    setText("flash-message","无法读取最新固件索引："+(err.message||String(err)));
+    setText("flash-message","无法读取固件索引："+(err.message||String(err)));
+    renderFirmwareTimeline();
   }
 }
 function prepareForFlash(){
@@ -3292,7 +3624,8 @@ async function connectSingleWith(device,source="picker",timeoutMs=20000){
   mirrorState=null;
   anomalies={};resetTraceInteraction();
   $("connect-empty").classList.add("hidden");
-  $("connect-result").classList.remove("hidden");
+  $("pane-gatt").innerHTML='<div class="dock-empty"><b>正在枚举 GATT 服务…</b>连接成功后会列出全部服务与特征。</div>';
+  $("pane-nvs").innerHTML='<div class="dock-empty"><b>正在读取开发板配置…</b>非 BikePower 设备没有 NVS 配置服务。</div>';
   const label={picker:"连接中...",auto:"自动连接中...",reconnect:"断线重连中...",tab:"关联其他标签页的设备..."}[source]||"连接中...";
   $("single-device-card").innerHTML='<div class="dc-head"><span class="badge warn">'+escapeHtml(label)+'</span></div>';
   setLinkState("connecting",device);setText("monitor-device-name",device.name||"未命名设备");
@@ -3316,7 +3649,7 @@ function renderSingleDevice(rec){
   const info=rec.info;
   const deviceName=rec.device.name||"(无名设备)";
   setText("monitor-device-name",deviceName);setText("monitor-device-id",rec.device.id);
-  let html='<section><h3>设备身份</h3><div class="dc-head">';
+  let html='<section><h3>设备身份 · DIS</h3><div class="dc-head">';
   html+='<div><div class="dc-name">'+escapeHtml(deviceName)+'</div>';
   html+='<div class="dc-meta">'+escapeHtml(rec.device.id)+'</div></div>';
   html+='<div class="actions">'+roleBadgeHtml(classifyDeviceRole(rec))+'<span class="badge ok" id="single-device-state">已连接</span></div></div><div class="dc-body">';
@@ -3331,10 +3664,11 @@ function renderSingleDevice(rec){
   html+='<button class="btn alt sm" onclick="downloadReport()">导出报告</button>';
   html+='<button class="btn ghost sm" onclick="disconnectSingle()">断开并保留历史</button>';
   html+='</div></section>';
-  html+='<section><h3>GATT 服务列表（'+rec.services.length+'）</h3><p class="gatt-intro">每个服务 / 特征都附中文名称与用途说明。右侧为解析后的实际数值：可读特征在连接时读取一次，带 <b>通知</b> 标记的特征会随设备推送实时刷新（橙色闪烁表示刚收到新数据）。</p>'+renderServiceList(rec.services)+'</section>';
-  html+=renderConfigEditor(rec);
   card.innerHTML=html;
+  $("pane-gatt").innerHTML='<section><p class="gatt-intro"><b>GATT 服务列表（'+rec.services.length+'）</b> · 每个服务 / 特征都附中文名称与用途说明。右侧为解析后的实际数值：可读特征在连接时读取一次，带 <b>通知</b> 标记的特征会随设备推送实时刷新（橙色闪烁表示刚收到新数据）。</p>'+renderServiceList(rec.services)+'</section>';
+  $("pane-nvs").innerHTML=renderConfigEditor(rec);
   bindConfigForm(rec);
+  updateDockCounts();
   renderRealtime(rec);updateMonitorEvidence(rec);
 }
 
@@ -3383,10 +3717,9 @@ function loadTemplates(){
     const sub=[info.manufacturer,info.model,info.firmware].filter(Boolean).join(" · ")||"无设备信息";
     return '<div class="tpl-item"><div class="tpl-info"><span class="tpl-name">'+escapeHtml(t.name||t.deviceName||"模板 "+(i+1))+'</span><span class="tpl-sub">'+escapeHtml(sub)+'</span></div><div class="tpl-ops"><button class="btn primary sm" onclick="openTemplateWriter('+i+')">写入开发板</button><button class="btn alt sm" onclick="exportTemplate('+i+')">导出</button><button class="btn ghost sm" onclick="deleteTemplate('+i+')">删除</button></div></div>';
   }).join("");
-  [["templates-card","templates-list"],["compare-templates-card","compare-templates-list"]].forEach(([cardId,boxId])=>{
-    const card=$(cardId),box=$(boxId);if(!card||!box)return;
-    card.style.display=list.length?"":"none";box.innerHTML=html;
-  });
+  const box=$("templates-list");if(box)box.innerHTML=html;
+  const empty=$("templates-empty");if(empty)empty.classList.toggle("hidden",list.length>0);
+  if(typeof updateDockCounts==="function"&&$("ide-dock"))updateDockCounts();
 }
 function saveAsTemplate(rec,openWriter=false){
   if(!rec||!rec.device){log("没有可保存为模板的设备","warn");return -1;}
@@ -4624,7 +4957,7 @@ function gattLiveUpdate(rec,characteristic){
   const now=Date.now();rec._gattPaintAt=rec._gattPaintAt||{};
   if(rec._gattPaintAt[short]&&now-rec._gattPaintAt[short]<160)return;
   rec._gattPaintAt[short]=now;
-  document.querySelectorAll('#single-device-card [data-gatt-char="'+short+'"]').forEach(el=>{
+  document.querySelectorAll('#pane-gatt [data-gatt-char="'+short+'"]').forEach(el=>{
     el.textContent=text;el.classList.remove("empty","flash");void el.offsetWidth;el.classList.add("flash");
     clearTimeout(el._flashTimer);el._flashTimer=setTimeout(()=>el.classList.remove("flash"),200);
   });
@@ -4907,6 +5240,7 @@ function renderLinkCapsule(){
     const btn=$("cap-btn");if(btn)btn.title=LINK_STATE_CN[s.state]+" · "+s.name+(s.sub?" · "+s.sub:"");
   }
   const panel=$("cap-panel");if(panel&&!panel.classList.contains("hidden"))renderCapPanel(s);
+  if(typeof renderIdeStatus==="function")renderIdeStatus();
 }
 function renderCapPanel(s){
   const panel=$("cap-panel");if(!panel)return;
@@ -5287,6 +5621,147 @@ document.addEventListener&&document.addEventListener("keydown",(e)=>{
   if(e.key==="Enter"){ e.preventDefault(); dismissConfirm(true); }
 });
 
+/* ==================== IDE 式外壳：主窗口 + 侧栏 + 底部面板 + 状态栏 ==================== */
+// 每个页面首屏都是“主窗口”；GATT / NVS / 模板库 / 事件日志是常驻面板，侧栏和面板均可展开 / 隐藏，布局记忆在本浏览器。
+const IDE_KEY="bikepower_ide_layout_v1";
+const DOCK_PANES=["gatt","nvs","templates","log"];
+const DOCK_DEFAULT_PANE={connect:"gatt",compare:"templates",flash:"log",inspector:"gatt",health:"log",erg:"log"};
+const DOCK_TAB_H=36,STATUS_H=26;
+let ideLayout={left:true,right:true,dockH:0,dockMax:false,dockOpen:{connect:true},pane:{}};
+let dockUnread=0,ideStatusKey="";
+function loadIdeLayout(){
+  try{const saved=JSON.parse(localStorage.getItem(IDE_KEY)||"{}");if(saved&&typeof saved==="object")ideLayout={...ideLayout,...saved,dockOpen:{...ideLayout.dockOpen,...(saved.dockOpen||{})},pane:{...(saved.pane||{})}};}catch(e){}
+}
+function saveIdeLayout(){try{localStorage.setItem(IDE_KEY,JSON.stringify(ideLayout));}catch(e){}}
+function isIdeWide(){return typeof window!=="undefined"&&window.innerWidth>=1100&&window.innerHeight>=600;}
+function defaultDockHeight(){return Math.round(Math.max(200,Math.min(340,window.innerHeight*.3)));}
+function currentDockPane(){const p=ideLayout.pane[currentMode]||DOCK_DEFAULT_PANE[currentMode]||"log";return DOCK_PANES.includes(p)?p:"log";}
+function applyIdeLayout(){
+  const dock=$("ide-dock");if(!dock||!document.body)return;
+  const mode=currentMode||"manual";
+  const visible=mode!=="manual";
+  const open=visible&&!!ideLayout.dockOpen[mode];
+  const wide=isIdeWide();
+  const maxH=Math.round(window.innerHeight*.72);
+  const h=Math.max(150,Math.min(ideLayout.dockH||defaultDockHeight(),maxH));
+  dock.classList.toggle("hidden",!visible);
+  dock.dataset.open=open?"1":"0";
+  dock.dataset.max=open&&ideLayout.dockMax?"1":"0";
+  const space=!visible||!wide?0:(open?(ideLayout.dockMax?maxH:h):DOCK_TAB_H);
+  const st=document.body.style;
+  st.setProperty("--dock-h",(ideLayout.dockMax?maxH:h)+"px");
+  st.setProperty("--dock-space",space+"px");
+  st.setProperty("--status-h",wide?STATUS_H+"px":"0px");
+  document.body.classList.add("ide-shell");
+  document.body.classList.toggle("ide-wide",wide);
+  const pane=currentDockPane();
+  dock.querySelectorAll(".dock-tab").forEach(t=>{const on=t.dataset.pane===pane;t.classList.toggle("active",on);t.setAttribute("aria-selected",on?"true":"false");});
+  dock.querySelectorAll(".dock-pane").forEach(p=>p.classList.toggle("active",p.dataset.pane===pane));
+  if(pane==="log"&&open){dockUnread=0;}
+  renderDockTools(pane);
+  const grid=document.querySelector("#mode-connect .monitor-grid");
+  if(grid){grid.dataset.left=ideLayout.left?"on":"off";grid.dataset.right=ideLayout.right?"on":"off";}
+  document.querySelectorAll(".st-view").forEach(b=>{
+    const v=b.dataset.view;const on=v==="dock"?open:!!ideLayout[v];
+    b.setAttribute("aria-pressed",on?"true":"false");
+    b.disabled=(v!=="dock"&&mode!=="connect")||(v==="dock"&&!visible);
+  });
+  const tg=$("dock-toggle-btn");if(tg)tg.classList.toggle("flip",!open);
+  updateDockCounts();
+  if(mode==="flash")moveFirmwareHead();
+}
+function renderDockTools(pane){
+  const box=$("dock-tools");if(!box)return;
+  box.innerHTML=pane==="log"?'<button class="dock-tool" type="button" onclick="clearLog()">清空日志</button>':pane==="gatt"&&isSingleConnected()?'<button class="dock-tool" type="button" onclick="switchMode(\'inspector\')">在通知检查器中打开 →</button>':"";
+}
+function openDockPane(pane){
+  if(!DOCK_PANES.includes(pane))pane="log";
+  ideLayout.pane[currentMode]=pane;ideLayout.dockOpen[currentMode]=true;
+  saveIdeLayout();applyIdeLayout();
+}
+function toggleDock(force){
+  if(currentMode==="manual")return;
+  const open=typeof force==="boolean"?force:!ideLayout.dockOpen[currentMode];
+  ideLayout.dockOpen[currentMode]=open;if(!open)ideLayout.dockMax=false;
+  saveIdeLayout();applyIdeLayout();
+}
+function toggleDockMax(){
+  ideLayout.dockMax=!ideLayout.dockMax;ideLayout.dockOpen[currentMode]=true;
+  saveIdeLayout();applyIdeLayout();
+}
+function toggleIdePane(side){
+  if(side!=="left"&&side!=="right")return;
+  if(currentMode!=="connect")switchMode("connect");
+  ideLayout[side]=!ideLayout[side];saveIdeLayout();applyIdeLayout();
+}
+function updateDockCounts(){
+  const rec=singleDevice;
+  setText("dock-count-gatt",rec&&rec.services?String(rec.services.length):"0");
+  const cs=rec&&rec.configState;
+  setText("dock-count-nvs",cs&&cs.supported&&cs.meta?"v"+cs.meta.schema:(rec?"无":"—"));
+  setText("dock-count-templates",String(readTemplateList().length));
+  const logCount=$("dock-count-log");
+  if(logCount){logCount.textContent=String(events.length);logCount.classList.toggle("unread",dockUnread>0);}
+}
+function noteDockLog(level){
+  const pane=currentDockPane();const open=!!ideLayout.dockOpen[currentMode];
+  if(!(pane==="log"&&open))dockUnread+=1;
+  const c=$("dock-count-log");if(c){c.textContent=String(events.length);c.classList.toggle("unread",dockUnread>0);c.classList.toggle("err",level==="error"&&dockUnread>0);}
+}
+function initDockResize(){
+  const handle=$("dock-resize");if(!handle)return;
+  let dragging=false;
+  const setH=y=>{ideLayout.dockH=Math.max(150,Math.min(Math.round(window.innerHeight*.72),window.innerHeight-STATUS_H-y));ideLayout.dockMax=false;applyIdeLayout();};
+  handle.addEventListener("pointerdown",e=>{dragging=true;try{handle.setPointerCapture(e.pointerId);}catch(err){}document.body.classList.add("dock-dragging");e.preventDefault();});
+  handle.addEventListener("pointermove",e=>{if(dragging)setH(e.clientY);});
+  const end=()=>{if(!dragging)return;dragging=false;document.body.classList.remove("dock-dragging");saveIdeLayout();};
+  handle.addEventListener("pointerup",end);handle.addEventListener("pointercancel",end);
+  handle.addEventListener("keydown",e=>{
+    if(e.key!=="ArrowUp"&&e.key!=="ArrowDown")return;e.preventDefault();
+    ideLayout.dockH=(ideLayout.dockH||defaultDockHeight())+(e.key==="ArrowUp"?24:-24);ideLayout.dockOpen[currentMode]=true;ideLayout.dockMax=false;
+    applyIdeLayout();saveIdeLayout();
+  });
+  handle.addEventListener("dblclick",toggleDockMax);
+}
+function ideKeydown(e){
+  if(!(e.ctrlKey||e.metaKey)||e.shiftKey)return;
+  const t=e.target,tag=t&&t.tagName;
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(t&&t.isContentEditable))return;
+  const k=String(e.key||"").toLowerCase();
+  if(k==="j"&&!e.altKey){e.preventDefault();toggleDock();}
+  else if(k==="b"&&e.altKey){e.preventDefault();toggleIdePane("right");}
+  else if(k==="b"){e.preventDefault();toggleIdePane("left");}
+}
+function onStatusLinkClick(){
+  const s=linkSnapshot();
+  if(s.state==="idle"||s.state==="unsupported"){openGate({force:true});return;}
+  if(s.state==="lost"){reconnectFromCapsule();return;}
+  switchMode("connect");
+}
+function renderIdeStatus(){
+  if(!$("ide-status"))return;
+  const s=linkSnapshot();
+  const rec=isSingleConnected()?singleDevice:null;
+  const gap=rec&&rec.lastNotifyAt?((Date.now()-rec.lastNotifyAt)/1000).toFixed(1)+" s":"—";
+  const fw=firmwareCatalog&&firmwareCatalog.available?"固件 最新 "+(firmwareCatalog.tag||"v"+firmwareCatalog.version)+(firmwareReleases.length>1?" · 可回滚 "+(firmwareReleases.length-1):""):"固件 —";
+  const peers=typeof tabPeers!=="undefined"?tabPeers.size:0;
+  const key=[s.state,s.name,s.sub,gap,fw,peers].join("|");
+  if(key===ideStatusKey)return;ideStatusKey=key;
+  const link=$("st-link");if(link)link.dataset.link=s.state;
+  setText("st-link-text",(LINK_STATE_CN[s.state]||s.state)+" · "+s.name);
+  setText("st-role",s.role?(ROLE_SHORT[s.role.role]||"—"):(s.state==="mirror"?"镜像 · 只读":"BLE 主连接"));
+  setText("st-gap","通知间隔 "+gap);
+  setText("st-tabs",peers?"本页 + "+peers+" 个标签页":"本页");
+  setText("st-fw",fw);
+}
+function initIdeShell(){
+  loadIdeLayout();
+  initDockResize();
+  document.addEventListener("keydown",ideKeydown);
+  window.addEventListener("resize",()=>{applyIdeLayout();});
+  applyIdeLayout();renderIdeStatus();
+}
+
 /* ==================== 启动 ==================== */
 window.addEventListener("load",()=>{
   checkSupport();
@@ -5298,9 +5773,11 @@ window.addEventListener("load",()=>{
   window.addEventListener("popstate",applyRoute);
   resetMonitorSignals();
   log("BLE 工具台已就绪。");
+  initIdeShell();
   initAutoLink();
   initLinkUi();
   setInterval(refreshLaunchpad,2000);
+  setInterval(renderIdeStatus,1000);
 });
 </script>
 </body>
