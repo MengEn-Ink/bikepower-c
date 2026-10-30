@@ -1006,6 +1006,206 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
   body.ide-wide .monitor-rail>.pane-title,body.ide-wide .evidence>.pane-title{position:sticky;top:-30px;z-index:2;background:var(--bg)}
 }
 @media(max-width:1099px){.monitor-rail>.pane-title .pane-x,.evidence>.pane-title .pane-x{display:none}}
+
+/* ==================== 新手引导层：帮助菜单 / 欢迎卡环境检测 / 聚光灯 / 刷写向导 ==================== */
+.help-wrap{position:relative}
+.help-btn{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-weight:700;cursor:pointer}
+.help-btn:hover,.help-btn[aria-expanded="true"]{border-color:var(--accent);color:var(--strong)}
+.help-q{display:inline-grid;place-items:center;width:18px;height:18px;color:var(--accent);font-family:var(--mono);font-weight:700}
+.help-caret{color:var(--faint);font-size:10px}
+.help-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:60;width:300px;background:var(--panel);border:1px solid var(--line);box-shadow:0 20px 50px rgba(0,0,0,.6);text-align:left}
+.help-item{display:block;width:100%;text-align:left;padding:10px 16px;border:0;border-bottom:1px solid var(--line-soft);background:none;color:inherit;cursor:pointer}
+.help-item:hover{background:var(--panel-2)}
+.help-item b{display:block;font-size:13px;color:var(--strong)}
+.help-item span{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.help-keys{padding:10px 16px;border-bottom:1px solid var(--line-soft);font-family:var(--mono);font-size:11px;color:var(--muted);display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
+.help-keys span:nth-child(odd){color:var(--faint)}
+.help-foot{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;font-family:var(--mono);font-size:11px;color:var(--faint)}
+.help-foot button{border:0;background:none;color:var(--accent);cursor:pointer;padding:0}
+.help-foot button:hover{text-decoration:underline}
+@media(max-width:760px){.help-label{display:none}}
+
+/* 欢迎卡：环境检测网格 */
+.gate-env{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line-soft);margin-top:14px}
+.gate-env-item{padding:7px 8px;font-size:11px;color:var(--muted);border-right:1px solid var(--line-soft)}
+.gate-env-item:last-child{border-right:0}
+.gate-env-item i{font-style:normal;margin-right:5px;font-family:var(--mono);font-weight:700}
+.gate-env-item.ok i{color:var(--green)}
+.gate-env-item.bad i{color:var(--red)}
+.gate-env-note{margin:7px 0 0;font-size:11.5px;color:var(--faint)}
+.gate-withtour{margin-top:10px;border-top:1px solid var(--line-soft);padding-top:10px;font-size:12px;color:var(--muted)}
+.gate-withtour input{accent-color:var(--accent);margin-right:6px}
+
+/* 手册首页：新手引导入口卡 */
+.ob-card{margin-top:18px;border:1px solid var(--line);background:var(--panel);display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch}
+.ob-card-main{padding:16px 18px}
+.ob-card-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--accent);font-weight:700;margin-bottom:5px}
+.ob-card-main b{font-size:16px;color:var(--strong)}
+.ob-card-main p{margin:4px 0 0;font-size:13px;color:var(--muted);line-height:1.6}
+.ob-card-actions{display:flex;flex-direction:column;border-left:1px solid var(--line);min-width:170px}
+.ob-card-actions .btn{border:0;border-bottom:1px solid var(--line);border-radius:0;justify-content:center;height:auto;padding:12px 16px}
+.ob-card-actions .btn:last-child{border-bottom:0}
+@media(max-width:760px){.ob-card{grid-template-columns:1fr}.ob-card-actions{flex-direction:row;border-left:0;border-top:1px solid var(--line)}.ob-card-actions .btn{flex:1;border-bottom:0;border-right:1px solid var(--line)}.ob-card-actions .btn:last-child{border-right:0}}
+
+/* 聚光灯：DevTools 检查器式取景框 */
+.ob-blocker{position:fixed;inset:0;z-index:79}
+.ob-hole{position:fixed;z-index:80;pointer-events:none;box-shadow:0 0 0 200vmax rgba(6,4,3,.78);outline:1px solid var(--accent);transition:top .28s cubic-bezier(.2,.7,.2,.1),left .28s cubic-bezier(.2,.7,.2,.1),width .28s cubic-bezier(.2,.7,.2,.1),height .28s cubic-bezier(.2,.7,.2,.1)}
+.ob-hole.ring-only{box-shadow:0 0 0 4px rgba(240,85,35,.18);animation:obRing 1.8s ease-in-out infinite;outline-color:rgba(240,85,35,.8)}
+.ob-hole::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(135deg,rgba(240,85,35,.07) 0 6px,transparent 6px 12px);animation:obHatch .6s ease-out 1}
+.ob-corner{position:absolute;width:10px;height:10px;border:2px solid var(--accent)}
+.ob-corner.tl{top:-5px;left:-5px;border-right:0;border-bottom:0}
+.ob-corner.tr{top:-5px;right:-5px;border-left:0;border-bottom:0}
+.ob-corner.bl{bottom:-5px;left:-5px;border-right:0;border-top:0}
+.ob-corner.br{bottom:-5px;right:-5px;border-left:0;border-top:0}
+.ob-tag{position:absolute;left:-1px;top:-22px;white-space:nowrap;font-family:var(--mono);font-size:10.5px;line-height:20px;padding:0 7px;background:var(--accent);color:#1a0b05;max-width:70vw;overflow:hidden;text-overflow:ellipsis}
+.ob-tag.below{top:auto;bottom:-22px}
+@keyframes obHatch{0%{opacity:1}100%{opacity:0}}
+@keyframes obRing{0%,100%{box-shadow:0 0 0 3px rgba(240,85,35,.14)}50%{box-shadow:0 0 0 8px rgba(240,85,35,.24)}}
+.ob-pop{position:fixed;z-index:90;width:min(380px,86vw);background:var(--panel);border:1px solid var(--line);box-shadow:0 24px 60px rgba(0,0,0,.6);outline:none;animation:obRise .22s cubic-bezier(.2,.7,.2,.1) both}
+.ob-pop:focus{outline:1px solid var(--accent);outline-offset:2px}
+@keyframes obRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.ob-pop.kicker-row{display:flex;align-items:center;justify-content:space-between;padding:13px 16px 0}
+@media(max-width:760px){
+  .ob-pop{position:fixed;inset:auto 0 0 0;width:100%;max-height:72vh;overflow:auto;border-left:0;border-right:0;border-bottom:0;animation:obSheet .26s cubic-bezier(.2,.7,.2,.1) both}
+  @keyframes obSheet{from{transform:translateY(100%)}to{transform:none}}
+}
+
+/* 导览卡 */
+.tour-kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--accent)}
+.tour-skip{border:0;background:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0}
+.tour-skip:hover{color:var(--strong)}
+.tour-skip .mono{font-family:var(--mono);color:var(--faint)}
+.tour-title{margin:7px 16px 0;font-size:16px;font-weight:800;color:var(--strong);line-height:1.35}
+.tour-body{margin:7px 16px 0;font-size:13px;color:var(--ink);line-height:1.65}
+.tour-points{margin:10px 16px 0;border:1px solid var(--line-soft)}
+.tour-points .tp{display:grid;grid-template-columns:6.5em 1fr;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line-soft);font-size:12px}
+.tour-points .tp:last-child{border-bottom:0}
+.tour-points dt{font-weight:700;color:var(--strong)}
+.tour-points dd{margin:0;color:var(--muted)}
+.tour-foot{display:flex;align-items:center;gap:12px;padding:12px 16px;margin-top:13px;border-top:1px solid var(--line-soft)}
+.tour-dots{display:flex;gap:4px}
+.tour-dots i{display:block;height:3px;width:10px;background:var(--line-soft)}
+.tour-dots i.done{background:var(--faint)}
+.tour-dots i.cur{width:20px;background:var(--accent)}
+.tour-never{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);cursor:pointer}
+.tour-never input{accent-color:var(--accent)}
+.tour-nav{margin-left:auto;display:flex;gap:6px}
+.tour-nav .btn{height:32px;padding:0 12px;font-size:12.5px;border-radius:0}
+.tour-nav .btn.primary{font-weight:800}
+
+/* 刷写向导（右侧停靠 / 移动底部卡） */
+#fg-root{position:fixed;top:64px;right:0;bottom:0;z-index:70;width:min(400px,30vw);min-width:330px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;box-shadow:-20px 0 50px rgba(0,0,0,.45);animation:fgIn .24s cubic-bezier(.2,.7,.2,.1) both}
+@keyframes fgIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+.fg-head{padding:13px 16px 12px;border-bottom:1px solid var(--line);flex:0 0 auto}
+.fg-head-row{display:flex;align-items:center;justify-content:space-between}
+.fg-kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--accent)}
+.fg-x{border:0;background:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;width:26px;height:26px}
+.fg-x:hover{color:var(--strong)}
+.fg-title{margin:5px 0 0;font-size:17px;font-weight:800;color:var(--strong)}
+.fg-segments{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-top:10px}
+.fg-segments i{height:3px;background:var(--line-soft);cursor:pointer;border:0;padding:0}
+.fg-segments i.done{background:var(--faint)}
+.fg-segments i.cur{background:var(--accent)}
+.fg-body{flex:1 1 auto;min-height:0;overflow:auto;padding:14px 16px;font-size:13px;line-height:1.65;color:var(--ink)}
+.fg-body p{margin:0 0 10px}
+.fg-list{margin:10px 0 0;padding:0;list-style:none;border:1px solid var(--line-soft)}
+.fg-list li{padding:8px 11px;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.fg-list li:last-child{border-bottom:0}
+.fg-list b{color:var(--strong);font-size:12.5px}
+.fg-list .fg-sub{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.fg-dl{margin:10px 0 0;border:1px solid var(--line-soft);font-size:12px}
+.fg-dl > div{padding:8px 11px;border-bottom:1px solid var(--line-soft)}
+.fg-dl > div:last-child{border-bottom:0}
+.fg-dl dt{font-weight:700;color:var(--strong)}
+.fg-dl dd{margin:3px 0 0;color:var(--muted)}
+.fg-state{margin-top:11px;padding:8px 11px;border:1px solid var(--line);font-size:12px}
+.fg-state.ok{border-color:var(--green);color:var(--green)}
+.fg-state.warn{border-color:var(--amber);color:var(--amber)}
+.fg-state.bad{border-color:var(--red);color:var(--red)}
+.fg-target{margin-top:11px;border:1px solid var(--accent);background:rgba(240,85,35,.07);padding:10px 12px}
+.fg-target .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--accent)}
+.fg-target .v{font-size:13px;font-weight:700;color:var(--strong);margin-top:3px;line-height:1.4}
+.fg-target .x{font-size:11.5px;color:var(--muted);margin-top:3px}
+.fg-phases{margin:10px 0 0;padding:0;list-style:none;border:1px solid var(--line-soft)}
+.fg-phases li{display:grid;grid-template-columns:18px 1fr;gap:8px;padding:8px 11px;border-bottom:1px solid var(--line-soft)}
+.fg-phases li:last-child{border-bottom:0}
+.fg-phases li.run{background:rgba(240,85,35,.08)}
+.fg-phases .idx{font-family:var(--mono);font-size:11px;color:var(--faint)}
+.fg-phases li.done .idx{color:var(--green)}
+.fg-phases li.run .idx{color:var(--accent)}
+.fg-phase-zh{font-size:12.5px;font-weight:700;color:var(--strong)}
+.fg-phase-en{font-family:var(--mono);font-size:10px;color:var(--muted);margin-left:5px}
+.fg-phase-desc{font-size:11.5px;color:var(--muted);margin-top:1px}
+.fg-foot{flex:0 0 auto;padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center}
+.fg-foot .btn{height:36px;font-size:12.5px;border-radius:0}
+.fg-hint{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+@media(max-width:760px){
+  #fg-root{top:auto;left:0;bottom:0;width:100%;min-width:0;max-height:74vh;border-left:0;border-top:1px solid var(--accent);animation:obSheet .26s cubic-bezier(.2,.7,.2,.1) both}
+}
+.fg-errors{margin-top:16px;border:1px solid var(--line-soft)}
+.fg-errors summary{padding:8px 11px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer}
+.fg-err-btn{display:flex;justify-content:space-between;width:100%;text-align:left;border:0;border-top:1px solid var(--line-soft);background:none;color:var(--muted);padding:7px 11px;font-size:12px;cursor:pointer}
+.fg-err-btn:hover{color:var(--strong);background:var(--panel-2)}
+.fg-err-btn span{color:var(--accent)}
+
+/* 串口名称解释（mac/win 切换 + 拔插对比 + 浏览器弹窗示意） */
+.pe-os{display:flex;border:1px solid var(--line);margin-bottom:10px}
+.pe-os button{flex:1;height:32px;border:0;background:none;color:var(--ink);font-size:12.5px;font-weight:700;cursor:pointer}
+.pe-os button.on{background:#e9d9c6;color:#1a0f0a}
+.pe-plug{display:inline-flex;border:1px solid var(--line);margin:0 0 8px}
+.pe-plug button{padding:0 10px;height:24px;border:0;background:none;color:var(--muted);font-size:11.5px;cursor:pointer}
+.pe-plug button+button{border-left:1px solid var(--line)}
+.pe-plug button.on{background:var(--panel-3);color:var(--strong)}
+.pe-chrome{background:#f6f3ef;color:#1f1f1f;border-radius:7px;overflow:hidden;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:11.5px}
+.pe-chrome-head{padding:7px 12px;font-weight:600;border-bottom:1px solid #ddd}
+.pe-row{position:relative;padding:6px 12px;border-bottom:1px solid #e8e4df;display:flex;align-items:center;gap:8px}
+.pe-row:last-child{border-bottom:0}
+.pe-row.good{background:#fff1ea;outline:2px solid #f05523;outline-offset:-2px;font-weight:600}
+.pe-mark{font-family:var(--mono);font-size:10px;width:14px;text-align:center}
+.pe-row.good .pe-mark{color:#c43d0c}.pe-row.bad .pe-mark{color:#b33}
+.pe-row.bad{color:#555}
+.pe-row .pe-why{padding-left:22px;font-size:10.5px;color:#888}
+.pe-row.good .pe-why{color:#c43d0c}
+.pe-new{margin-left:auto;font-family:var(--mono);font-size:9.5px;padding:1px 4px;background:#f05523;color:#fff;animation:peRow .5s ease-out both}
+@keyframes peRow{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+.pe-ol{margin:11px 0 0;padding:0;list-style:none}
+.pe-ol li{display:grid;grid-template-columns:14px 1fr;gap:7px;font-size:12px;margin-bottom:6px;color:var(--ink)}
+.pe-ol li i{font-style:normal;color:var(--accent);font-family:var(--mono)}
+.pe-cli{margin-top:9px;padding-top:8px;border-top:1px solid var(--line-soft);font-family:var(--mono);font-size:10.5px;color:var(--faint);word-break:break-all}
+.pe-nodata{margin-top:8px;font-size:11.5px;color:var(--amber)}
+
+/* 刷写成功 / 错误 模态卡 */
+.ob-modal{position:fixed;inset:0;z-index:95;background:rgba(6,4,3,.78);display:grid;place-items:center;animation:obFade .18s ease-out both;padding:16px}
+@keyframes obFade{from{opacity:0}to{opacity:1}}
+.ob-card2{position:relative;width:min(540px,92vw);background:var(--panel);border:1px solid var(--line);animation:obRise .22s cubic-bezier(.2,.7,.2,.1) both;max-height:90vh;overflow:auto}
+.ob-card2.ok{border-color:var(--green)}.ob-card2.err{border-color:var(--red)}
+.ob-count{position:absolute;top:0;left:0;right:0;height:3px;background:var(--line-soft)}
+.ob-count i{display:block;height:100%;background:var(--green);transform-origin:left center;animation:obCount 5s linear forwards}
+.ob-count i.paused{animation-play-state:paused}
+@keyframes obCount{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.ob-m-body{padding:22px 24px 0}
+.ob-m-kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em}
+.ob-m-kicker.ok{color:var(--green)}.ob-m-kicker.err{color:var(--red)}
+.ob-m-title{margin:7px 0 0;font-size:21px;font-weight:800;color:var(--strong);line-height:1.3}
+.ob-m-lead{margin:8px 0 0;font-size:13px;color:var(--ink);line-height:1.65}
+.ob-stripe{height:10px;background:var(--accent);margin-top:12px;background-image:repeating-linear-gradient(-45deg,rgba(10,8,7,.28) 0 6px,transparent 6px 12px);background-size:17px 17px;animation:obStripe .8s linear infinite}
+@keyframes obStripe{to{background-position:17px 0}}
+.ob-led{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);animation:obLed 1.6s ease-in-out infinite}
+@keyframes obLed{0%,100%{opacity:1}50%{opacity:.15}}
+.ob-m-actions{display:flex;align-items:center;gap:8px;padding:16px 24px 20px}
+.ob-m-actions .btn{border-radius:0;height:36px;padding:0 15px;font-size:12.5px}
+.ob-m-actions .spacer{margin-left:auto;font-size:12px;color:var(--muted)}
+.ob-steps{margin:12px 0 0;padding:0;list-style:none;border:1px solid var(--line-soft)}
+.ob-steps li{display:grid;grid-template-columns:22px 1fr;gap:6px;padding:8px 11px;border-bottom:1px solid var(--line-soft);font-size:12.5px;line-height:1.55}
+.ob-steps li:last-child{border-bottom:0}
+.ob-steps li i{font-style:normal;color:var(--accent);font-family:var(--mono)}
+.ob-code{margin-top:9px;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.ob-reboot{margin-top:13px;border:1px solid var(--line-soft);display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:11px 13px}
+.ob-reboot .chip{position:relative;width:36px;height:36px;border:1px solid var(--line);display:grid;place-items:center;font-family:var(--mono);font-size:11px;color:var(--strong)}
+.ob-reboot .chip i{position:absolute;right:-4px;top:-4px;width:9px;height:9px;border-radius:50%;background:var(--amber);animation:obLed 1.6s ease-in-out infinite}
+.ob-reboot b{font-size:13.5px;color:var(--strong)}
+.ob-reboot p{margin:2px 0 0;font-size:12px;color:var(--muted)}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
 </style>
 <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
 </head>
@@ -1023,7 +1223,7 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
         <span class="sub">固件刷写 · 蓝牙设备信息采集 · 多设备一比一比对</span>
       </div>
     </div>
-    <nav class="mode-select" aria-label="工具模式">
+    <nav class="mode-select" data-tour="nav" aria-label="工具模式">
       <button class="mode-btn mode-home" data-mode="manual" onclick="switchMode('manual')">
         <span class="ico" aria-hidden="true">¶</span>
         <span class="mode-title">使用手册</span>
@@ -1061,7 +1261,19 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
       </button>
     </nav>
     <div class="masthead-right">
-      <div class="link-capsule" id="link-capsule" data-link="idle">
+      <div class="help-wrap" id="help-wrap">
+        <button class="help-btn" id="help-btn" data-tour="help" type="button" aria-haspopup="menu" aria-expanded="false" onclick="onHelpClick(event)">
+          <span class="help-q" aria-hidden="true">?</span><span class="help-label">帮助</span><span class="help-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="help-menu hidden" id="help-menu" role="menu" aria-label="帮助与新手引导">
+          <button class="help-item" type="button" role="menuitem" onclick="closeHelpMenu();startOnboardingTour()"><b>重新开始新手引导</b><span>6 步界面导览 · 约 40 秒</span></button>
+          <button class="help-item" type="button" role="menuitem" onclick="closeHelpMenu();switchMode('flash');openFlashGuide()"><b>打开刷写向导</b><span>插线 → 选串口 → 刷写 → 连蓝牙</span></button>
+          <button class="help-item" type="button" role="menuitem" onclick="closeHelpMenu();openGate({force:true})"><b>显示欢迎卡 / 连接蓝牙</b><span>首次进站时看到的连接说明</span></button>
+          <div class="help-keys"><span>Ctrl+B</span><span>收起侧栏</span><span>Ctrl+J</span><span>展开底部面板</span><span>← → / Esc</span><span>引导翻页 / 退出</span></div>
+          <div class="help-foot"><span id="help-ob-status">引导 v1 · 未开始</span><button type="button" role="menuitem" onclick="closeHelpMenu();resetOnboarding()">重置引导状态</button></div>
+        </div>
+      </div>
+      <div class="link-capsule" id="link-capsule" data-tour="pill" data-link="idle">
         <button class="cap-btn" id="cap-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cap-panel" onclick="onCapsuleClick(event)">
           <span class="cap-glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/></svg><i class="cap-dot"></i></span>
           <span class="cap-text"><span class="cap-name" id="top-status">连接蓝牙设备</span><span class="cap-sub" id="cap-sub">BLE · 主连接</span></span>
@@ -1089,13 +1301,23 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
         <h2 id="gate-title">先连上你的<em>骑行设备</em>。</h2>
         <p class="gate-desc" id="gate-desc">蓝牙是本工具台的主连接：实时监控、设备比对与模板写入、通知检查、健康检查、ERG 都共用这条 BLE 链路。连接后会打开使用手册，带你一步步操作。</p>
         <div class="gate-known hidden" id="gate-known"></div>
+        <div class="gate-env" id="gate-env" aria-label="环境检测">
+          <span class="gate-env-item" id="gate-env-browser"><i>…</i>桌面 Chrome / Edge</span>
+          <span class="gate-env-item" id="gate-env-ble"><i>…</i>Web Bluetooth</span>
+          <span class="gate-env-item" id="gate-env-serial"><i>…</i>Web Serial</span>
+          <span class="gate-env-item" id="gate-env-https"><i>…</i>HTTPS</span>
+        </div>
+        <p class="gate-env-note" id="gate-env-note">Safari、Firefox 和手机浏览器不支持蓝牙与串口，只能阅读手册。</p>
         <div class="gate-actions">
           <button class="btn primary big" id="gate-connect" type="button" onclick="gateConnectPicker()">连接蓝牙设备</button>
           <button class="btn ghost hidden" id="gate-repick" type="button" onclick="setGate('choose')">改为选择其他设备</button>
         </div>
+        <div class="gate-withtour">
+          <label><input type="checkbox" id="gate-with-tour" checked> 看手册时顺便带我认识界面（6 步 · 约 40 秒）</label>
+        </div>
         <div class="gate-alt">
-          <button class="gate-link" type="button" onclick="gateToFlash()">还没刷固件？去刷写<small>USB 串口仅用于刷写</small></button>
-          <button class="gate-link" type="button" onclick="closeGate('skip')">先看手册，稍后连接<small>右上角随时可连接</small></button>
+          <button class="gate-link" type="button" onclick="gateToFlash()">新板子 / 要更新？去刷写 →<small>USB 串口仅用于刷写</small></button>
+          <button class="gate-link" type="button" onclick="gateToManual()">先看手册，稍后连接<small>右上角随时可连接</small></button>
         </div>
       </div>
       <div class="gate-foot"><span>WEB BLUETOOTH</span><span>不会静默扫描 · 需你点选授权</span><span>Chrome / Edge 桌面版</span></div>
@@ -1109,7 +1331,7 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
   <!-- ============ 模式一：刷机（左：版本时间轴 / 右：主窗口） ============ -->
   <section id="mode-flash" class="hidden">
     <div class="fw-ide">
-      <aside class="fw-rail" aria-label="固件版本">
+      <aside class="fw-rail" data-tour="releases" aria-label="固件版本">
         <div class="pane-title"><span>RELEASES · 固件版本</span><b id="fw-count">--</b></div>
         <ol class="fw-timeline" id="fw-timeline" aria-label="可刷写的固件版本，默认最新">
           <li class="fw-loading">正在读取版本索引…</li>
@@ -1121,7 +1343,10 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
       <main class="fw-main">
         <div class="card-head fw-headline">
           <h2>固件刷写</h2>
-          <span class="badge warn" id="firmware-status">正在获取最新版本</span>
+          <span class="fw-head-actions">
+            <button class="btn alt sm" type="button" onclick="openFlashGuide()">刷写向导 · 一步步来</button>
+            <span class="badge warn" id="firmware-status">正在获取最新版本</span>
+          </span>
         </div>
 
         <div class="serial-scope" id="serial-scope">
@@ -1150,7 +1375,7 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
           <label class="check-line"><input type="checkbox" id="fw-rollback-ack" onchange="renderSelectedFirmware()">我了解风险，确认回滚到这个版本</label>
         </div>
 
-        <div class="flash-cta">
+        <div class="flash-cta" data-tour="flash-start">
           <esp-web-install-button id="install-button" class="hidden">
             <button class="btn primary big" id="flash-activate" slot="activate" onclick="prepareForFlash()">开始刷写（选择串口）</button>
             <span slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
@@ -1161,7 +1386,7 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
         </div>
         <div class="hint" id="flash-message">正在读取 Release 固件信息。</div>
 
-        <figure class="flash-anim" aria-label="刷写过程示意：电脑经 USB 数据线把固件写入开发板">
+        <figure class="flash-anim" data-tour="flash-diagram" aria-label="刷写过程示意：电脑经 USB 数据线把固件写入开发板">
           <svg viewBox="0 0 640 150" role="img" aria-hidden="true">
             <g class="fa-laptop"><rect x="18" y="26" width="128" height="80"/><rect x="30" y="38" width="104" height="56" class="fa-screen"/><path d="M6 114h152l-10 10H16z"/>
               <rect x="40" y="52" width="64" height="5" class="fa-bar-bg"/><rect x="40" y="52" width="64" height="5" class="fa-bar"/><text x="40" y="78">merged.bin</text></g>
@@ -1180,7 +1405,7 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
 
         <div class="flash-guide">
           <article class="flash-step guide-step"><span class="step-number">STEP 1 / 插线</span><b>把开发板接到电脑</b><p>必须使用能传数据的 USB 线。只能充电的线接上后，电脑会找不到串口。</p></article>
-          <article class="flash-step guide-step fw-step-shot"><span class="step-number">STEP 2 / 选串口</span><b>点击按钮并选择设备</b><p>弹窗里通常显示 USB Serial、CP210x、CH34x 或 JTAG/Serial。只有一项时直接选它。</p>
+          <article class="flash-step guide-step fw-step-shot"><span class="step-number">STEP 2 / 选串口</span><b>认准开发板那一项</b><p>弹窗由浏览器提供，网页不能替你自动选择，这是 Web Serial 的安全限制。macOS 选 “USB JTAG/serial debug unit”（底层 /dev/cu.usbmodem* 或 /dev/cu.usbserial-*，可能带 “- Paired / 已配对”），不要选 Bluetooth-Incoming-Port；Windows 选插拔后新出现的 “USB JTAG/serial debug unit (COMx)” 或 “USB 串行设备 / USB Serial Device (COMx)”，CP210x / CH340 板显示对应芯片名加 COM 口号。两种系统都要用<b>支持数据传输</b>的 USB 线。拿不准就拔插对比，消失又出现的那一项就是开发板。</p>
             <button class="fw-shot" type="button" onclick="openManualLightbox('manual-images/web-flash-serial-port.jpg','浏览器串口选择弹窗')"><img src="manual-images/web-flash-serial-port.jpg" alt="浏览器串口选择弹窗截图" loading="lazy"><span>真实截图 · 点击放大</span></button></article>
           <article class="flash-step guide-step"><span class="step-number">STEP 3 / 等完成</span><b>保持页面可见，不要拔线</b><p>看到 Installing 或 Wrapping up 属于正常过程，出现 Installation complete 才算完成。</p></article>
         </div>
@@ -1197,7 +1422,15 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
         </details>
         <details class="flash-details">
           <summary>弹窗里找不到串口怎么办？</summary>
-          <div class="hint">先确认开发板插在这台电脑上；换一根确定能传数据的 USB 线；关闭可能占用串口的 Arduino IDE、串口助手等工具；拔插开发板后重试。串口选择窗口由浏览器提供，所以外观和系统一致。</div>
+          <div class="hint">先确认开发板插在这台电脑上；换一根确定能传数据的 USB 线（只能充电的线插上后看不到任何串口，这是最常见原因）；关闭可能占用串口的 Arduino IDE、串口助手等工具；直连电脑接口，先不经过扩展坞；拔插开发板后重试。串口选择窗口由浏览器提供，所以外观和系统一致。</div>
+        </details>
+        <details class="flash-details">
+          <summary>macOS：串口列表里该选哪一项？</summary>
+          <div class="hint">选 “USB JTAG/serial debug unit”，底层设备名是 /dev/cu.usbmodem*（ESP32-C3 内置 USB 串口）或 /dev/cu.usbserial-*（外接 CP210x / CH340 转串口芯片），授权过的条目可能带 “- Paired / 已配对”，括号里的数字每台电脑不同。不要选 cu.Bluetooth-Incoming-Port（Mac 自带的蓝牙虚拟串口）、cu.debug-console、cu.wlan-debug，它们和开发板无关。请使用支持数据传输的 USB 线。</div>
+        </details>
+        <details class="flash-details">
+          <summary>Windows：串口列表里该选哪一项？</summary>
+          <div class="hint">选插上开发板后<b>新出现</b>的 COM 口，常见显示为 “USB JTAG/serial debug unit (COMx)” 或 “USB 串行设备 / USB Serial Device (COMx)”；CP210x 板显示 “Silicon Labs CP210x USB to UART Bridge (COMx)”，CH340 板显示 “USB-SERIAL CH340 (COMx)”。COM 后面的数字每台电脑不同，最可靠的识别方法是拔插前后对比列表。不要选一直都在的 “通信端口 (COM1)” 或 “蓝牙链接上的标准串行”。CH340 板若完全不出现，需要先安装 CH340 驱动。请使用支持数据传输的 USB 线。</div>
         </details>
         <details class="flash-details">
           <summary>固件详情</summary>
@@ -1219,7 +1452,7 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
   <section id="mode-connect" class="hidden">
     <div class="monitor-grid" data-left="on" data-right="on">
       <button class="rail-reopen left" type="button" onclick="toggleIdePane('left')" title="展开设备侧栏（Ctrl+B）">设备 ▸</button>
-      <aside class="monitor-rail" aria-label="设备侧栏">
+      <aside class="monitor-rail" data-tour="rail" aria-label="设备侧栏">
         <div class="pane-title"><span>EXPLORER · 设备</span><button class="pane-x" type="button" title="收起设备侧栏（Ctrl+B）" aria-label="收起设备侧栏" onclick="toggleIdePane('left')"><svg viewBox="0 0 16 16"><path d="M10 4 6 8l4 4"/></svg></button></div>
         <span class="eyebrow">LIVE / CYCLING</span>
         <h2 id="monitor-device-name">BikePower</h2>
@@ -1247,7 +1480,7 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
         </div></details>
       </aside>
 
-      <main class="signal-stage">
+      <main class="signal-stage" data-tour="stage">
         <div class="signal-head"><span>CYCLING POWER / CPS + FTMS</span><b id="signal-clock">--:--:--.---</b></div>
         <div class="hero-readout">
           <div class="hero-value"><span id="m-power">--</span><small> W</small></div>
@@ -1424,6 +1657,19 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
             <div><b id="lb-title">尚未连接蓝牙设备</b><span class="lb-sub" id="lb-sub">工具台以蓝牙为主连接。连接开发板或任意骑行设备后，手册会推荐下一步。</span></div>
             <button class="btn primary sm" id="lb-action" type="button" onclick="linkbarAction()">连接蓝牙设备</button>
           </div>
+
+          <!-- 新手引导入口卡：手册首页可随时重新进入 -->
+          <section class="ob-card" id="onboarding-entry" aria-label="新手引导">
+            <div class="ob-card-main">
+              <div class="ob-card-eyebrow">ONBOARDING · <span id="ob-entry-status">v1 · 未开始</span></div>
+              <b>第一次用？跟着引导走一遍</b>
+              <p>界面导览 6 步约 40 秒；刷写向导会解释每个选项、串口该选哪一项，刷完自动带你连接蓝牙。</p>
+            </div>
+            <div class="ob-card-actions">
+              <button class="btn primary sm" type="button" onclick="startOnboardingTour()">重新开始新手引导</button>
+              <button class="btn alt sm" type="button" onclick="switchMode('flash');openFlashGuide()">打开刷写向导 →</button>
+            </div>
+          </section>
 
           <!-- 工具导航：从手册进入具体操作页面 -->
           <div class="launchpad" id="tool-launchpad" aria-label="网页工具导航">
@@ -2277,7 +2523,7 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
   </div>
 
   <!-- ============ 底部常驻面板（类 IDE Panel）：GATT / NVS / 模板库 / 事件日志 ============ -->
-  <section class="ide-dock hidden" id="ide-dock" data-open="0" data-max="0" aria-label="开发者面板">
+  <section class="ide-dock hidden" id="ide-dock" data-tour="panel" data-open="0" data-max="0" aria-label="开发者面板">
     <div class="dock-resize" id="dock-resize" role="separator" aria-orientation="horizontal" aria-label="拖动或用上下方向键调整面板高度" tabindex="0"></div>
     <header class="dock-tabs" role="tablist" aria-label="面板">
       <button class="dock-tab" role="tab" data-pane="gatt" aria-selected="false" onclick="openDockPane('gatt')">GATT 服务<b class="dock-count" id="dock-count-gatt">0</b></button>
@@ -2308,6 +2554,7 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
     <span class="st-item" id="st-gap">通知 —</span>
     <span class="st-item" id="st-tabs">本页</span>
     <span class="st-spacer"></span>
+    <button class="st-item st-onboard" id="st-onboard" type="button" title="重新开始新手引导" onclick="startOnboardingTour()">引导 v1 · <span id="st-onboard-text">未开始</span></button>
     <button class="st-item" id="st-fw" type="button" onclick="switchMode('flash')">固件 —</button>
     <span class="st-item st-keys">Ctrl+B 侧栏 · Ctrl+J 面板</span>
     <span class="st-views" role="group" aria-label="窗口显示">
@@ -3458,6 +3705,7 @@ async function loadFirmwareCatalog(){
   }
 }
 function prepareForFlash(){
+  fgFinishedPending=false;fgErroredThisSession=false;
   if(singleDevice&&singleDevice.server&&singleDevice.server.connected){
     autoLinkUserDisconnected=true;clearTimeout(reconnectTimer);
     try{singleDevice.server.disconnect();}catch(e){}
@@ -5348,6 +5596,7 @@ async function openGate(opts){
   gateOpen=true;g.classList.remove("hidden","gate-leaving");document.body.classList.add("gate-lock");
   const state=opts.state||((typeof navigator==="undefined"||!navigator.bluetooth)?"unsupported":"choose");
   setGate(state,opts);
+  renderGateEnv();
   await renderGateKnown();
   setGate(state,opts);
   setTimeout(()=>{const b=$("gate-connect");if(gateOpen&&b&&!b.disabled)b.focus();},40);
@@ -5357,9 +5606,9 @@ function closeGate(reason){
   gateOpen=false;
   const g=$("connect-gate");if(g){g.classList.add("hidden");g.classList.remove("gate-leaving");}
   document.body.classList.remove("gate-lock");
-  if(reason==="skip"){try{sessionStorage.setItem(GATE_SKIP_KEY,"1");}catch(e){}log("已跳过蓝牙连接：右上角可随时连接","warn");}
+  if(reason==="skip"){try{sessionStorage.setItem(GATE_SKIP_KEY,"1");}catch(e){}log("已跳过蓝牙连接：右上角可随时连接","warn");if(typeof obPatch==="function")obPatch({status:"skipped"});}
 }
-function gateToFlash(){closeGate("flash");gateReturnMode=null;switchMode("flash");}
+function gateToFlash(){closeGate("flash");gateReturnMode=null;switchMode("flash");if(typeof openFlashGuide==="function")openFlashGuide();}
 async function gateConnectPicker(){
   if(gateBusy)return;
   const device=await requestDevice();
@@ -5386,6 +5635,7 @@ async function gateSuccess(rec){
   capsuleArrive();
   const target=gateReturnMode||"manual";gateReturnMode=null;
   switchMode(target);
+  if(typeof obPatch==="function")obPatch({status:"completed"});
   if(target==="manual"&&typeof window.scrollTo==="function")window.scrollTo(0,0);
 }
 function flyToCapsule(){
@@ -5451,6 +5701,7 @@ async function initLinkUi(){
   if(route.mode==="flash")return;                      // 刷写页只用 USB 串口，不打扰
   let skipped=false;try{skipped=sessionStorage.getItem(GATE_SKIP_KEY)==="1";}catch(e){}
   if(skipped)return;                                   // 本次会话已选择「稍后连接」
+  if(typeof onboardingWelcomeSuppressed==="function"&&onboardingWelcomeSuppressed())return; // 已完成/跳过/不再显示：不打扰（已授权设备的自动重连弹窗除外，见下）
   gateReturnMode=route.mode!=="manual"?route.mode:null; // 深链进来的，连接后回到原工具页
   if(!navigator.bluetooth){openGate({state:"unsupported"});return;}
   const known=await orderedAuthorizedDevices();
@@ -5762,6 +6013,547 @@ function initIdeShell(){
   applyIdeLayout();renderIdeStatus();
 }
 
+/* ==================== 新手引导：欢迎卡环境检测 / 6 步聚光灯导览 / 刷写向导 / 刷写后衔接蓝牙 ==================== */
+// 版本号写进 localStorage key：以后引导升级只给新版本用户再展示新步骤。
+const ONBOARDING_VERSION="1";
+const ONBOARDING_KEY="bikepower.onboarding.v1";
+const OB_STATUS_ZH={new:"未开始",in_progress:"进行中",completed:"已完成",skipped:"已跳过"};
+const OB_TOUR=[
+  {target:"pill",mode:null,kicker:"01 · 主连接",tag:"header › #link-capsule",title:"右上角是蓝牙连接胶囊",
+   body:"整个工具台只有一条主连接：蓝牙。点这里连接开发板，之后切换任何页面都保持连接。",
+   points:[["绿点","已连接，点开可看厂商 / 型号 / 固件"],["红点","已断开，点一下即可重连"],["黄点","连接中，或正在镜像其他标签页"]],place:"bottom-end"},
+  {target:"nav",mode:null,kicker:"02 · 工具导航",tag:"nav.mode-select",title:"顶部是 7 个工具，按任务切换",
+   body:"第一次使用按这个顺序走就够了：",
+   points:[["固件刷写","只有这一页用 USB 串口"],["实时监控","确认功率 / 踏频 / 心率在更新"],["设备比对","把参考设备复制成模板写入开发板"],["健康检查","出问题时一键导出诊断报告"]],place:"bottom"},
+  {target:"rail",mode:"connect",kicker:"03 · 左侧资源栏",tag:"aside.monitor-rail",title:"左侧是当前设备与操作入口",
+   body:"每个工具页的左栏放“对谁操作”：设备身份、连接状态、扫描 / 已授权设备 / 模板库。按 Ctrl+B 可收起。",
+   points:[["扫描并连接设备","首次使用，会打开浏览器的蓝牙选择窗口"],["已授权设备","授权过的设备一键直连，不再弹窗"]],place:"right"},
+  {target:"stage",mode:"connect",kicker:"04 · 主工作区",tag:"main.signal-stage",title:"中间是实时数据",
+   body:"连接后，功率、踏频、心率沿同一条时间轴滚动。没有连接时这里只显示“会出现什么”，不会用演示值冒充设备数据。",
+   points:[["大号读数","最新一条功率通知（W）"],["曲线","30 秒 / 2 分 / 10 分 / 全程，可导出 CSV"]],place:"left"},
+  {target:"panel",mode:"connect",kicker:"05 · 底部常驻工具窗",tag:"section#ide-dock",title:"底部 4 个窗口，任何页面都在",
+   body:"按 Ctrl+J 展开 / 收起。",
+   points:[["GATT 服务","设备提供的全部服务与特征，附中文解释"],["开发板 NVS 配置","直接读写开发板保存的参数"],["模板库","复制下来的设备身份，存在本浏览器"],["事件日志","连接、写入、报错都记在这里"]],place:"top",openDock:"gatt"},
+  {target:"help",mode:null,kicker:"06 · 随时回来",tag:"button#help-btn",title:"忘了怎么用？从“帮助”重新开始",
+   body:"帮助菜单里可以重新开始新手引导、单独打开刷写向导、显示欢迎卡。使用手册首页也有同样的入口。",points:[],place:"bottom-end"},
+];
+const FG_STEPS=[
+  {id:"cable",label:"插入数据线",target:"flash-diagram"},
+  {id:"ports",label:"认识串口名称",target:null},
+  {id:"version",label:"确认固件版本",target:"releases"},
+  {id:"choose",label:"选择串口",target:"flash-start"},
+  {id:"write",label:"擦除 · 写入 · 校验 · 重启",target:null},
+  {id:"done",label:"完成并连接蓝牙",target:null},
+];
+const FG_PHASES=[
+  {id:"connect",match:["connecting","连接芯片"],zh:"连接芯片",en:"CONNECTING",desc:"浏览器通过串口和 ESP32-C3 握手，读取芯片型号。"},
+  {id:"erase",match:["erasing","ask_erase","擦除"],zh:"擦除",en:"ERASING",desc:"清空将要写入的区域。勾选了 Erase 时会一并清除已保存的设置。"},
+  {id:"write",match:["writing","installing","install","写入"],zh:"写入",en:"INSTALLING",desc:"把 merged.bin 从 0x0 地址写入闪存，约 1 分钟。不要拔线、刷新或切走页面。"},
+  {id:"verify",match:["wrapping","wrapping_up","verify","校验"],zh:"校验",en:"WRAPPING UP",desc:"逐段比对写入内容的哈希，确保与 Release 文件一致。"},
+  {id:"reset",match:["complete","finished","reset","重启"],zh:"重启",en:"COMPLETE",desc:"自动复位开发板，新固件开始运行。串口会被释放。"},
+];
+const FG_PORT_COPY={
+  mac:{title:"macOS · 选 “USB JTAG/serial debug unit”",
+    lines:["正确选项通常显示为 USB JTAG/serial debug unit（cu.usbmodem…），授权过会带 “- Paired / 已配对”。括号里的数字每台电脑可能不同。",
+      "使用 CP210x / CH340 转串口芯片的板子，会显示为 cu.usbserial-xxxx 或对应芯片名。",
+      "列表里的 cu.Bluetooth-Incoming-Port、cu.debug-console、cu.wlan-debug 都是系统自带的，不要选。",
+      "请使用支持数据传输的 USB 线；只能充电的线插上后看不到任何串口。"],
+    cli:"/dev/cu.usbmodem*  或  /dev/cu.usbserial-*"},
+  win:{title:"Windows · 选插上后新出现的 COM 口",
+    lines:["常见显示为 USB JTAG/serial debug unit (COMx)，或 USB 串行设备 (COMx) / USB Serial Device (COMx)。COM 后面的数字每台电脑不同。",
+      "CP210x 板显示 Silicon Labs CP210x USB to UART Bridge (COMx)；CH340 板显示 USB-SERIAL CH340 (COMx)。",
+      "最可靠的方法：先拔掉开发板看一眼列表，再插上，选新出现的那一项。“通信端口 (COM1)”“蓝牙链接上的标准串行”都不是开发板。",
+      "请使用支持数据传输的 USB 线；CH340 板完全不出现时需要先安装 CH340 驱动。"],
+    cli:"设备管理器 → 端口 (COM 和 LPT)"},
+};
+const FG_ERRORS={
+  noPort:{title:"串口列表里看不到开发板",lead:"浏览器没发现新的 USB 串口，通常是线或占用的问题，按顺序排查：",
+    steps:["换一根确定能传数据的 USB 线。只能充电的线插上后电脑完全看不到串口，这是最常见原因。","直接插在电脑接口上，先不要经过扩展坞或显示器上的 USB 口。","关闭 Arduino IDE、串口助手，以及其他打开了本站刷写页的标签页。","Windows：打开“设备管理器 → 端口 (COM 和 LPT)”，拔插时看有没有新增项；CH340 板需要先装驱动。","仍然没有：按住开发板 BOOT 键再插入 USB，强制进入下载模式后重试。"],
+    code:"NotFoundError · 列表为空",primary:"知道了"},
+  wrongPort:{title:"你选的口不是开发板",lead:"系统自带的虚拟串口不会回应刷写握手。",
+    steps:["macOS 请选 USB JTAG/serial debug unit（cu.usbmodem…），不要选 cu.Bluetooth-Incoming-Port。","Windows 请选插上开发板后新出现的 COM 口（USB JTAG/serial debug unit / USB 串行设备 / CP210x / CH340）。","不确定时，拔掉开发板再打开一次选择器，消失又出现的那一项就是它。"],
+    code:"Failed to connect · 无芯片响应",primary:"知道了"},
+  busy:{title:"串口被别的程序占用",lead:"同一个串口同一时间只能被一个程序打开。",
+    steps:["关闭 Arduino IDE 的串口监视器、串口助手、esptool 命令行。","关掉其他打开了刷写页的浏览器标签页。","拔插开发板后重试。"],
+    code:"Failed to open serial port",primary:"知道了"},
+  flashFail:{title:"写入中断，固件没有写完",lead:"别担心，ESP32-C3 的下载模式固化在芯片里，重新刷写即可恢复，不会变砖。",
+    steps:["确认数据线没有松动，刷写期间保持页面在前台。","让开发板进入下载模式：按住 BOOT，按一下 RST，再松开 BOOT。","点“开始刷写”，会从头完整写入一次。","连续失败：换一根线、换一个 USB 口，或在 ESP 弹窗里勾选 Erase 后再试。"],
+    code:"Timed out waiting for packet header",primary:"知道了"},
+  bleBusy:{title:"这台设备正被别的 App 连着",lead:"多数骑行设备同一时间只接受一个连接。你选中的设备可能正连着 Zwift、MyWhoosh 或手机 App。",
+    steps:["在骑行 App 里断开这台设备，或暂时关闭手机蓝牙。","确认设备 LED 回到慢闪（广播中）。","回到这里重新连接。如果你要连的是开发板，请选择 BikePower。"],
+    code:"NetworkError · GATT 连接失败",primary:"知道了"},
+  bleCancel:{title:"没有选择设备",lead:"蓝牙选择窗口被关闭了，没有建立连接。",
+    steps:["列表里看不到 BikePower？确认开发板已上电、LED 慢闪；刚刷完固件需要等约 3 秒启动。","设备若正连着手机 App，会停止广播，先断开它。"],
+    code:"NotFoundError · User cancelled",primary:"知道了"},
+};
+let obStore=null;
+function obReadStore(){
+  try{const s=JSON.parse(localStorage.getItem(ONBOARDING_KEY)||"null");if(s&&s.version===ONBOARDING_VERSION)return s;}catch(e){}
+  return {version:ONBOARDING_VERSION,status:"new",tour:"new",flash:"new",neverShow:false,updatedAt:null};
+}
+function obPatch(p){obStore=Object.assign({},obStore||obReadStore(),p,{updatedAt:new Date().toISOString()});try{localStorage.setItem(ONBOARDING_KEY,JSON.stringify(obStore));}catch(e){}renderOnboardingStatus();return obStore;}
+function renderOnboardingStatus(){
+  if(!obStore)obStore=obReadStore();
+  const zh=OB_STATUS_ZH[obStore.status]||"未开始";
+  setText("st-onboard-text",zh);
+  setText("ob-entry-status","v"+ONBOARDING_VERSION+" · "+zh);
+  setText("help-ob-status","引导 v"+ONBOARDING_VERSION+" · "+zh);
+}
+function resetOnboarding(){
+  try{
+    localStorage.removeItem(ONBOARDING_KEY);
+    sessionStorage.removeItem(GATE_SKIP_KEY);
+  }catch(e){}
+  obStore=obReadStore();renderOnboardingStatus();
+  log("引导状态已重置（localStorage 已清除）。");
+}
+function onboardingWelcomeSuppressed(){
+  if(!obStore)obStore=obReadStore();
+  return !!obStore.neverShow||obStore.status==="completed"||obStore.status==="skipped";
+}
+
+/* ---- 帮助菜单 ---- */
+function onHelpClick(event){
+  if(event)event.stopPropagation();
+  const menu=$("help-menu"),btn=$("help-btn");if(!menu)return;
+  const open=menu.classList.contains("hidden");
+  menu.classList.toggle("hidden",!open);
+  btn.setAttribute("aria-expanded",open?"true":"false");
+}
+function closeHelpMenu(){const menu=$("help-menu");if(menu)menu.classList.add("hidden");const btn=$("help-btn");if(btn)btn.setAttribute("aria-expanded","false");}
+
+/* ---- 欢迎卡环境检测 ---- */
+function renderGateEnv(){
+  const box=$("gate-env");if(!box||typeof navigator==="undefined")return;
+  const desktop=/Win|MacIntel|Linux x86|CrOS/.test(navigator.platform||navigator.userAgent||"");
+  const chromium=!!window.chrome||/Edg\//.test(navigator.userAgent||"");
+  const checks=[
+    ["gate-env-browser",desktop&&chromium],
+    ["gate-env-ble",!!navigator.bluetooth],
+    ["gate-env-serial",("serial" in navigator)],
+    ["gate-env-https",window.isSecureContext===true||location.protocol==="file:"],
+  ];
+  checks.forEach(([id,ok])=>{const el=$(id);if(el){el.classList.toggle("ok",!!ok);el.classList.toggle("bad",!ok);const i=el.querySelector("i");if(i)i.textContent=ok?"✓":"✕";}});
+  const note=$("gate-env-note");
+  if(note)note.textContent=navigator.bluetooth?"环境检测通过。Safari、Firefox 和手机浏览器不支持蓝牙与串口，只能阅读手册。":"当前浏览器不支持蓝牙与串口：你仍可阅读手册；刷写和连接请改用桌面版 Chrome / Edge（HTTPS 页面）。";
+}
+
+/* ---- 6 步聚光灯导览 ---- */
+let tourIndex=null,tourNever=false,tourRectTimer=null;
+const obMobile=()=>typeof window!=="undefined"&&window.innerWidth<768;
+function obFindTarget(key){
+  const list=document.querySelectorAll('[data-tour="'+key+'"]');
+  for(const el of list){if(el.getClientRects().length&&!el.classList.contains("hidden")&&el.offsetParent!==null)return el;}
+  return list[0]||null;
+}
+function obEnsureScaffold(){
+  let root=document.getElementById("ob-layer");
+  if(root)return root;
+  root=document.createElement("div");root.id="ob-layer";
+  root.innerHTML='<div class="ob-blocker hidden" id="ob-blocker"></div>'
+    +'<div class="ob-hole hidden" id="ob-hole" aria-hidden="true"><i class="ob-corner tl"></i><i class="ob-corner tr"></i><i class="ob-corner bl"></i><i class="ob-corner br"></i><span class="ob-tag" id="ob-tag"></span></div>'
+    +'<div class="ob-pop hidden" id="ob-pop" tabindex="-1" role="dialog" aria-modal="true"></div>';
+  document.body.appendChild(root);
+  return root;
+}
+function obPlacePop(rect,w,h,place,mobile){
+  if(mobile)return {top:0,left:0};
+  const vw=window.innerWidth,vh=window.innerHeight,gap=16;
+  const cands={
+    bottom:{top:rect.bottom+gap,left:rect.left+rect.width/2-w/2},
+    "bottom-end":{top:rect.bottom+gap,left:rect.right-w},
+    top:{top:rect.top-h-gap,left:rect.left+rect.width/2-w/2},
+    right:{top:rect.top+24,left:rect.right+gap},
+    left:{top:rect.top+24,left:rect.left-w-gap},
+  };
+  const fits=p=>p.top>=8&&p.left>=8&&p.top+h<=vh-8&&p.left+w<=vw-8;
+  let pos=null;
+  for(const k of [place,"bottom","top","right","left"]){if(cands[k]&&fits(cands[k])){pos=cands[k];break;}}
+  if(!pos)pos={top:rect.top+24,left:rect.right-w-24};
+  return {top:Math.max(8,Math.min(pos.top,vh-h-8)),left:Math.max(8,Math.min(pos.left,vw-w-8))};
+}
+function obSpotlight(key,opts){
+  opts=opts||{};
+  const root=obEnsureScaffold();
+  const hole=$("ob-hole"),pop=$("ob-pop"),blocker=$("ob-blocker"),tag=$("ob-tag");
+  const mobile=obMobile();
+  const target=key?obFindTarget(key):null;
+  if(!key||mobile||!target){
+    hole.classList.add("hidden");
+    if(opts.ring)blocker.classList.add("hidden");else blocker.classList.toggle("hidden",mobile);
+  }else{
+    const b=target.getBoundingClientRect();const pad=6;
+    const top=Math.max(3,b.top-pad),left=Math.max(3,b.left-pad);
+    const right=Math.min(window.innerWidth-3,b.right+pad),bottom=Math.min(window.innerHeight-3,b.bottom+pad);
+    hole.style.top=top+"px";hole.style.left=left+"px";hole.style.width=(right-left)+"px";hole.style.height=(bottom-top)+"px";
+    hole.classList.toggle("ring-only",!!opts.ring);
+    hole.classList.remove("hidden");
+    blocker.classList.toggle("hidden",!!opts.ring);
+    if(opts.label!==false){tag.textContent=opts.tag||key+"  "+Math.round(b.width)+" × "+Math.round(b.height);tag.classList.toggle("below",top<30);tag.style.display="";}
+    else tag.style.display="none";
+  }
+  if(opts.html==null){pop.classList.add("hidden");return;}
+  pop.innerHTML=opts.html;
+  pop.classList.remove("hidden");
+  pop.setAttribute("aria-labelledby",opts.labelId||"tour-title");
+  if(mobile){pop.style.top="";pop.style.left="";pop.style.height="";}
+  else{
+    pop.style.height="auto";
+    const h=pop.offsetHeight||300,w=pop.offsetWidth||360;
+    const rect=target?target.getBoundingClientRect():{top:window.innerHeight/2,bottom:window.innerHeight/2,left:window.innerWidth/2,right:window.innerWidth/2,width:0,height:0};
+    const pos=obPlacePop(rect,w,h,opts.place||"bottom",false);
+    pop.style.top=pos.top+"px";pop.style.left=pos.left+"px";
+  }
+  try{pop.focus({preventScroll:true});}catch(e){pop.focus();}
+  if(tourRectTimer)clearTimeout(tourRectTimer);
+}
+function obClearSpotlight(){
+  const root=$("ob-layer");if(!root)return;
+  $("ob-hole").classList.add("hidden");$("ob-pop").classList.add("hidden");$("ob-blocker").classList.add("hidden");
+}
+function tourCardHtml(step){
+  const dots=OB_TOUR.map((_,k)=>'<i class="'+(k===tourIndex?"cur":k<tourIndex?"done":"")+'"></i>').join("");
+  const pts=step.points.length?'<dl class="tour-points">'+step.points.map(([k,v])=>'<div class="tp"><dt>'+escapeHtml(k)+'</dt><dd>'+escapeHtml(v)+'</dd></div>').join("")+'</dl>':"";
+  return '<div class="kicker-row"><span class="tour-kicker">'+escapeHtml(step.kicker)+'</span>'
+    +'<button type="button" class="tour-skip" onclick="endOnboardingTour(false)">跳过 <span class="mono">Esc</span></button></div>'
+    +'<h3 class="tour-title" id="tour-title">'+escapeHtml(step.title)+'</h3>'
+    +'<p class="tour-body">'+escapeHtml(step.body)+'</p>'+pts
+    +'<div class="tour-foot"><span class="tour-dots" aria-label="第 '+(tourIndex+1)+' 步，共 '+OB_TOUR.length+' 步">'+dots+'</span>'
+    +'<label class="tour-never"><input type="checkbox"'+(tourNever?" checked":"")+' onchange="tourNever=this.checked">不再显示</label>'
+    +'<span class="tour-nav">'
+    +(tourIndex>0?'<button type="button" class="btn ghost" onclick="moveOnboardingTour(-1)">上一步</button>':"")
+    +'<button type="button" class="btn primary" onclick="'+(tourIndex<OB_TOUR.length-1?'moveOnboardingTour(1)':'endOnboardingTour(true)')+'">'+(tourIndex===OB_TOUR.length-1?"完成":"下一步 →")+'</button>'
+    +'</span></div>';
+}
+function renderTour(){
+  const step=OB_TOUR[tourIndex];if(!step)return;
+  if(step.mode&&currentMode!==step.mode)switchMode(step.mode);
+  if(step.openDock&&typeof openDockPane==="function"){try{openDockPane(step.openDock);}catch(e){}}
+  // 切换视图/展开面板后给布局一帧再取景
+  setTimeout(()=>obSpotlight(step.target,{html:tourCardHtml(step),place:step.place,tag:step.tag}),60);
+}
+function startOnboardingTour(){
+  closeHelpMenu();
+  if(document.getElementById("fg-root"))closeFlashGuide(true);
+  tourIndex=0;tourNever=false;
+  obPatch({status:"in_progress",tour:"in_progress"});
+  renderTour();
+}
+function moveOnboardingTour(dir){
+  if(tourIndex===null)return;
+  tourIndex=Math.max(0,Math.min(OB_TOUR.length-1,tourIndex+dir));
+  renderTour();
+}
+function endOnboardingTour(done){
+  if(tourIndex===null)return;
+  tourIndex=null;obClearSpotlight();
+  obPatch({tour:done?"completed":"skipped",status:done?"completed":"skipped",neverShow:tourNever||!!(obStore&&obStore.neverShow)});
+  log(done?"导览完成。随时可从右上角“帮助”重新开始。":"已跳过导览。右上角“帮助”可重新开始。",done?"info":"warn");
+}
+
+/* ---- 欢迎卡按钮：看手册（可选附带导览） / 去刷写 ---- */
+function gateToManual(){
+  const withTour=$("gate-with-tour")&&$("gate-with-tour").checked;
+  closeGate("skip");
+  gateReturnMode=null;
+  switchMode("manual");
+  if(withTour)startOnboardingTour();
+}
+
+/* ---- 刷写向导 ---- */
+let fgOpen=false,fgStep=0,fgOs=/Win/i.test((navigator.platform||navigator.userAgent||""))?"win":"mac",fgPlugged=true;
+let fgPhase="connect",fgFlashed=false,fgSuccessTimer=null,fgHandoffTimer=null,fgHandoffBoot=0;
+function selectedFirmwareLabel(){const el=$("fw-pick-version");return el?el.textContent.replace(/^v/,"").trim():"";}
+function isRollbackSelected(){const pick=$("fw-pick");return !!(pick&&pick.dataset.kind&&pick.dataset.kind!=="latest");}
+function rollbackAcked(){const a=$("fw-rollback-ack");return !!a&&a.checked;}
+function openFlashGuide(){
+  if(typeof currentMode!=="undefined"&&currentMode!=="flash")switchMode("flash");
+  fgOpen=true;fgStep=0;fgPhase="connect";
+  renderFlashGuide();
+  obPatch({flash:"in_progress"});
+  if(obStore.status==="new")obPatch({status:"in_progress"});
+}
+function closeFlashGuide(silent){
+  fgOpen=false;const root=document.getElementById("fg-root");if(root)root.remove();
+  obClearSpotlight();
+  if(!silent&&obStore&&obStore.flash!=="completed")obPatch({flash:"skipped"});
+}
+function fgSetOs(os){fgOs=os;renderFlashGuide();}
+function fgSetPlugged(v){fgPlugged=v;renderFlashGuide();}
+function fgGo(step){fgStep=Math.max(0,Math.min(FG_STEPS.length-1,step));renderFlashGuide();}
+function portExplainerHtml(){
+  const c=FG_PORT_COPY[fgOs];
+  const macRows=[
+    {name:"cu.Bluetooth-Incoming-Port",kind:"bad",why:"Mac 自带的蓝牙虚拟串口，和开发板无关"},
+    {name:"cu.debug-console",kind:"bad",why:"系统调试口"},
+    {name:"USB JTAG/serial debug unit (cu.usbmodem101) - 已配对",kind:"good",why:"ESP32-C3 内置 USB 串口，选这个"},
+    {name:"cu.wlan-debug",kind:"bad",why:"无线网卡调试口"},
+  ];
+  const winBefore=[
+    {name:"通信端口 (COM1)",kind:"bad",why:"主板自带串口，一直都在"},
+    {name:"蓝牙链接上的标准串行 (COM3)",kind:"bad",why:"蓝牙虚拟串口"},
+    {name:"蓝牙链接上的标准串行 (COM4)",kind:"bad",why:"蓝牙虚拟串口"},
+  ];
+  const winNew={name:"USB JTAG/serial debug unit (COM5)",kind:"good",why:"插上开发板后新出现的口，选这个",isNew:true};
+  const rows=fgOs==="mac"?macRows:(fgPlugged?winBefore.concat([winNew]):winBefore);
+  let h='<div class="pe-os" role="tablist" aria-label="选择你的系统">'
+    +'<button type="button" class="'+(fgOs==="mac"?"on":"")+'" onclick="fgSetOs(\'mac\')">macOS</button>'
+    +'<button type="button" class="'+(fgOs==="win"?"on":"")+'" onclick="fgSetOs(\'win\')">Windows</button></div>';
+  h+='<div style="font-size:13.5px;font-weight:700;color:var(--strong)">'+escapeHtml(c.title)+'</div>';
+  if(fgOs==="win"){
+    h+='<div style="margin-top:7px;font-size:11.5px;color:var(--muted)">拔插对比：<span class="pe-plug">'
+      +'<button type="button" class="'+(!fgPlugged?"on":"")+'" onclick="fgSetPlugged(false)">拔掉开发板时</button>'
+      +'<button type="button" class="'+(fgPlugged?"on":"")+'" onclick="fgSetPlugged(true)">插上开发板后</button></span></div>';
+  }
+  h+='<div class="pe-chrome" style="margin-top:7px"><div class="pe-chrome-head">mengen-ink.github.io 想连接到串行端口</div>';
+  h+=rows.map(p=>'<div class="pe-row '+p.kind+'"><span class="pe-mark">'+(p.kind==="good"?"✓":"✕")+'</span><span>'+escapeHtml(p.name)+'</span>'
+    +(p.isNew?'<span class="pe-new">新出现</span>':"")+'</div><div class="pe-why" style="padding-left:34px;padding-bottom:5px">'+(p.kind==="good"?"选这个 · ":"勿选 · ")+escapeHtml(p.why)+'</div>').join("");
+  h+='</div><ol class="pe-ol">'+c.lines.map((l,i)=>'<li><i>'+(i+1)+'</i><span>'+escapeHtml(l)+'</span></li>').join("")+'</ol>';
+  h+='<div class="pe-cli">底层名称：'+escapeHtml(c.cli)+'</div>';
+  h+='<div class="pe-nodata">看不到任何 USB 项？多半是“仅充电”数据线，换一根能传数据的线。</div>';
+  return h;
+}
+function fgBodyHtml(){
+  const ver=selectedFirmwareLabel(),rollback=isRollbackSelected(),canStart=!rollback||rollbackAcked();
+  if(fgStep===0){
+    return '<p>用 USB 线把开发板接到这台电脑。开发板上的指示灯亮起即表示已供电。</p>'
+      +'<ul class="fg-list">'
+      +'<li><b>必须能传数据</b><span class="fg-sub">只能充电的线插上后，电脑看不到串口。手机快充线通常可以，赠品短线常常不行。</span></li>'
+      +'<li><b>直插电脑</b><span class="fg-sub">先不要经过扩展坞、显示器或键盘上的 USB 口。</span></li>'
+      +'<li><b>关掉占用程序</b><span class="fg-sub">Arduino IDE 串口监视器、串口助手会占住串口。</span></li></ul>';
+  }
+  if(fgStep===1)return '<p>下一步浏览器会弹出一个串口列表，里面混着系统自带的口。先认清哪一项是开发板：</p>'+portExplainerHtml();
+  if(fgStep===2){
+    return '<p>左侧版本列表已默认选中<b style="color:var(--strong)">最新版</b>，大多数情况直接用它。</p>'
+      +'<dl class="fg-dl">'
+      +'<div><dt>最新版</dt><dd>默认选项，修复最多，直接刷。</dd></div>'
+      +'<div><dt>旧版本 = 回滚</dt><dd>会把设备降级；旧固件可能读不懂新配置，必须勾选页面上的“我了解风险”才能开始。</dd></div>'
+      +'<div><dt>清除设备数据 Erase</dt><dd>不勾：保留蓝牙名、功率等设置，升级推荐。勾选：清空后再写入，回滚或配置错乱时使用，刷完需重新设置。</dd></div></dl>'
+      +'<div class="fg-state '+(rollback?(canStart?"warn":"bad"):"ok")+'">当前选择：'+(ver?"v"+escapeHtml(ver)+" · ":"")
+      +(rollback?(canStart?"回滚，已确认风险":"回滚，尚未确认风险"):"最新版，可直接刷写")+'</div>';
+  }
+  if(fgStep===3){
+    const target=fgOs==="mac"?"USB JTAG/serial debug unit (cu.usbmodem…)":"插上后新出现的 COM 口，如 USB JTAG/serial debug unit (COM5)";
+    const no=fgOs==="mac"?"cu.Bluetooth-Incoming-Port / cu.debug-console":"通信端口 (COM1) / 蓝牙链接上的标准串行";
+    return '<p>点下方按钮后浏览器会弹出串口选择窗口。网页不能替你自动选择，这是浏览器的安全限制。</p>'
+      +'<div class="fg-target"><div class="k">在弹窗里选择</div><div class="v">'+escapeHtml(target)+'</div><div class="x">不要选 '+escapeHtml(no)+'</div></div>'
+      +'<button type="button" class="btn primary" style="width:100%;height:44px;margin-top:11px;font-weight:800"'+(canStart?"":" disabled")+' onclick="fgActivate()">开始刷写'+(ver?" v"+escapeHtml(ver):"")+'（打开串口选择器）</button>'
+      +(canStart?"":'<div style="margin-top:6px;font-size:11.5px;color:var(--amber)">回滚需先在页面上勾选“我了解风险”。</div>')
+      +'<div style="margin-top:8px;font-size:11.5px;color:var(--muted)">弹窗由浏览器提供，两种系统都请使用支持数据传输的 USB 线。</div>';
+  }
+  if(fgStep===4){
+    const idx=FG_PHASES.findIndex(p=>p.id===fgPhase);
+    return '<p>刷写约 1–2 分钟，分 5 个阶段。ESP 弹窗里出现的英文状态对照如下：</p>'
+      +'<ol class="fg-phases">'+FG_PHASES.map((p,k)=>{
+        const st=fgFlashed||k<idx?"done":k===idx?"run":"wait";
+        return '<li class="'+st+'"><span class="idx">'+(st==="done"?"✓":st==="run"?"▸":k+1)+'</span><div><span class="fg-phase-zh">'+p.zh+'</span><span class="fg-phase-en">'+p.en+'</span><div class="fg-phase-desc">'+p.desc+'</div></div></li>';
+      }).join("")+'</ol>'
+      +'<div style="margin-top:8px;font-size:11.5px;color:var(--amber)">刷写期间不要拔线、刷新或切走页面。</div>';
+  }
+  return '<p>'+(fgFlashed?(ver?"v"+escapeHtml(ver)+" 已写入并校验通过，开发板已重启。":"固件已写入并校验通过，开发板已重启。"):"刷写完成后，这里会带你用蓝牙连接开发板。")+'</p>'
+    +'<ol class="fg-steps ob-steps">'
+    +'<li><i>1</i><span>成功窗口 5 秒后自动关闭</span></li>'
+    +'<li><i>2</i><span>等待设备启动约 3 秒，LED 慢闪 = 开始蓝牙广播</span></li>'
+    +'<li><i>3</i><span>点右上角“连接”，在弹窗里选 BikePower</span></li>'
+    +'<li><i>4</i><span>连上后按手册推荐，去实时监控确认数据</span></li></ol>'
+    +'<div style="margin-top:8px;font-size:11.5px;color:var(--muted)">数据线可以继续插着供电，也可以改用 5V 电源；串口已经释放。</div>'
+    +(fgFlashed?'<button type="button" class="btn primary" style="width:100%;height:44px;margin-top:12px;font-weight:800" onclick="fgConnectBle()">连接蓝牙设备</button>':"");
+}
+function renderFlashGuide(){
+  if(!fgOpen)return;
+  let root=document.getElementById("fg-root");
+  if(!root){root=document.createElement("aside");root.id="fg-root";root.setAttribute("aria-label","刷写向导");document.body.appendChild(root);}
+  const seg=FG_STEPS.map((s,k)=>'<i class="'+(k===fgStep?"cur":k<fgStep?"done":"")+'" title="'+s.label+'"'+(k<=3?' onclick="fgGo('+k+')"':"")+'></i>').join("");
+  root.innerHTML='<div class="fg-head"><div class="fg-head-row"><span class="fg-kicker">刷写向导 · '+(fgStep+1)+' / '+FG_STEPS.length+'</span>'
+    +'<button type="button" class="fg-x" aria-label="关闭刷写向导" onclick="closeFlashGuide()">×</button></div>'
+    +'<h3 class="fg-title">'+FG_STEPS[fgStep].label+'</h3><div class="fg-segments">'+seg+'</div></div>'
+    +'<div class="fg-body" id="fg-body">'+fgBodyHtml()
+    +'<details class="fg-errors"><summary>遇到问题？</summary>'
+    +[["noPort","弹窗里看不到开发板"],["wrongPort","选错了串口"],["busy","提示串口被占用"],["flashFail","刷写中途失败"],["bleBusy","蓝牙连不上 / 被占用"]].map(([k,l])=>'<button type="button" class="fg-err-btn" onclick="showObError(\''+k+'\')">'+escapeHtml(l)+'<span>→</span></button>').join("")
+    +'</details></div>'
+    +'<div class="fg-foot">'+fgFooterHtml()+'</div>';
+  const target=FG_STEPS[fgStep].target;
+  if(target&&currentMode==="flash")setTimeout(()=>obSpotlight(target,{html:null,ring:true,label:false,tag:""}),40);
+  else obClearSpotlight();
+}
+function fgFooterHtml(){
+  if(fgStep===0)return '<button type="button" class="btn ghost" onclick="closeFlashGuide()">关闭</button><button type="button" class="btn primary" style="margin-left:auto" onclick="fgGo(1)">已插好，下一步 →</button>';
+  if(fgStep===1)return (fgStep>0?'<button type="button" class="btn ghost" onclick="fgGo(0)">上一步</button>':"")+'<button type="button" class="btn primary" style="margin-left:auto" onclick="fgGo(2)">认清了，下一步 →</button>';
+  if(fgStep===2)return '<button type="button" class="btn ghost" onclick="fgGo(1)">上一步</button><button type="button" class="btn primary" style="margin-left:auto" onclick="fgGo(3)">版本确认，下一步 →</button>';
+  if(fgStep===3)return '<span class="fg-hint">等待你选择串口</span>';
+  if(fgStep===4)return '<span class="fg-hint">刷写进行中…</span>';
+  return '<span class="fg-hint">'+(fgFlashed?"完成":"")+'</span>';
+}
+function fgActivate(){
+  const btn=$("flash-activate");
+  const install=$("install-button");
+  if(!install||install.classList.contains("hidden")||!btn){showObError("noPort");return;}
+  try{btn.click();log("刷写向导：已打开浏览器串口选择器。");}catch(e){showObError("noPort");}
+}
+function fgConnectBle(){closeFlashGuide(true);obStartHandoff();openGate({force:true});}
+
+/* ---- ESP Web Tools 刷写状态 → 向导 / 成功窗 / 衔接蓝牙 ---- */
+function fgMapPhase(state){
+  const s=String(state||"").toLowerCase();
+  for(const p of FG_PHASES){if(p.match.some(m=>s.includes(m)))return p.id;}
+  return null;
+}
+let fgFinishedPending=false,fgErroredThisSession=false;
+function onFlashInstallerState(event){
+  const state=event&&event.detail?event.detail.state:null;
+  if(!state)return;
+  const s=String(state).toLowerCase();
+  if(s.includes("error")){
+    if(!fgErroredThisSession){fgErroredThisSession=true;showObError("flashFail");}
+    if(fgOpen){fgPhase="connect";renderFlashGuide();}
+    return;
+  }
+  if(s==="initial"||s==="serial"||s==="manifest"){fgFinishedPending=false;fgErroredThisSession=false;return;}
+  const phase=fgMapPhase(s);
+  if(phase){
+    fgPhase=phase;
+    if(fgOpen&&fgStep<4)fgGo(4);
+    else if(fgOpen)renderFlashGuide();
+    log("刷写阶段："+(FG_PHASES.find(p=>p.id===phase)||{}).zh+"（"+String(state)+"）");
+  }
+  if(phase==="reset"||s==="finished"){
+    fgFinishedPending=true;fgFlashed=true;fgPhase="reset";
+    if(fgOpen)fgGo(5);
+    obPatch({flash:"completed"});
+  }
+}
+function espInstallDialogPresent(){return !!document.querySelector("ewt-install-dialog");}
+function onEspDialogRemoved(){
+  // ESP 弹窗在刷写完成被用户关闭后：成功窗倒计时 → 重启提示 → 衔接蓝牙
+  if(fgFinishedPending&&!obModalOpen("ob-success")){
+    fgFinishedPending=false;
+    showFlashSuccess();
+  }
+}
+function onNoPortDialogSeen(){
+  // 用户在浏览器原生串口选择器里取消 / 看不到开发板
+  if(!fgFinishedPending)showObError("noPort");
+}
+
+/* ---- 刷写成功窗（5 秒倒计时自动关闭）→ 重启 → 蓝牙衔接聚光灯 ---- */
+function showFlashSuccess(){
+  const ver=selectedFirmwareLabel();
+  let left=5,hold=false;
+  const html='<div class="ob-card2 ok" role="alertdialog" aria-modal="true" aria-labelledby="ob-fs-title">'
+    +'<div class="ob-count"><i id="ob-fs-bar"></i></div><div class="ob-m-body">'
+    +'<div class="ob-m-kicker ok">INSTALLATION COMPLETE · 校验通过</div>'
+    +'<h3 class="ob-m-title" id="ob-fs-title">刷写完成，'+(ver?"v"+escapeHtml(ver)+" ":"")+'已写入</h3>'
+    +'<div class="ob-reboot"><span class="chip">C3<i></i></span><div><b>设备正在重启…</b><p>约 3 秒后 LED 慢闪，表示开始蓝牙广播。数据线可继续插着供电。</p></div></div>'
+    +'</div><div class="ob-m-actions"><span class="spacer" id="ob-fs-left">5 秒后自动关闭，并引导你连接蓝牙</span>'
+    +'<button type="button" class="btn ghost" id="ob-fs-hold">保持打开</button>'
+    +'<button type="button" class="btn primary" id="ob-fs-now">立即连接蓝牙</button>'
+    +'</div></div>';
+  const m=showObModal(html,"ob-success");
+  const tick=()=>{
+    if(!obModalOpen("ob-success")){clearInterval(fgSuccessTimer);return;}
+    if(hold)return;
+    left-=1;
+    const el=$("ob-fs-left");if(el)el.textContent=left>0?left+" 秒后自动关闭，并引导你连接蓝牙":"正在衔接蓝牙连接…";
+    const bar=$("ob-fs-bar");if(bar&&left<=0){bar.style.animation="none";}
+    if(left<=0){clearInterval(fgSuccessTimer);closeObModal("ob-success");obStartHandoff();}
+  };
+  fgSuccessTimer=setInterval(tick,1000);
+  $("ob-fs-hold").onclick=()=>{
+    hold=!hold;
+    const bar=$("ob-fs-bar");if(bar)bar.classList.toggle("paused",hold);
+    const btn=$("ob-fs-hold");if(btn)btn.textContent=hold?"关闭":"保持打开";
+    const el=$("ob-fs-left");if(el)el.textContent=hold?"已暂停自动关闭":left+" 秒后自动关闭，并引导你连接蓝牙";
+    if(!hold)return;
+    clearInterval(fgSuccessTimer);
+    btn.onclick=()=>{closeObModal("ob-success");obStartHandoff();};
+  };
+  $("ob-fs-now").onclick=()=>{clearInterval(fgSuccessTimer);closeObModal("ob-success");obStartHandoff();openGate({force:true});};
+}
+function obStartHandoff(){
+  let boot=3;
+  const render=()=>{
+    const html='<div class="kicker-row" style="display:flex;justify-content:space-between;align-items:center;padding:13px 16px 0">'
+      +'<span class="tour-kicker">下一步 · 蓝牙连接</span><button type="button" class="tour-skip" onclick="obEndHandoff()">稍后</button></div>'
+      +'<h3 class="tour-title" id="ho-title">固件已就绪，用蓝牙连接开发板</h3>'
+      +'<p class="tour-body">USB 串口已释放，之后所有工具都走蓝牙。点“连接蓝牙设备”后在浏览器弹窗里选择 <b style="color:var(--strong)">BikePower</b>（改过名就选你的名字）。</p>'
+      +'<div class="fg-state '+(boot>0?"warn":"ok")+'" style="margin:11px 16px 0"><span class="'+(boot>0?"ob-led":"")+'" style="'+(boot>0?"":'background:var(--green);animation:none;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px')+'"></span>'
+      +(boot>0?"设备启动中，约 "+boot+" 秒…":"已开始蓝牙广播（LED 慢闪）")+'</div>'
+      +'<div class="tour-foot"><span class="fg-hint" style="margin-left:0">刷写 6/6 · 衔接</span>'
+      +'<span class="tour-nav"><button type="button" class="btn primary"'+(boot>0?" disabled":"")+' onclick="obEndHandoff();openGate({force:true})">连接蓝牙设备</button></span></div>';
+    obSpotlight("pill",{html:html,place:"bottom-end",labelId:"ho-title"});
+  };
+  render();
+  clearInterval(fgHandoffTimer);
+  fgHandoffTimer=setInterval(()=>{
+    boot-=1;
+    if(boot<=0){clearInterval(fgHandoffTimer);boot=0;}
+    render();
+    if(typeof isSingleConnected==="function"&&isSingleConnected()){obEndHandoff();}
+  },1000);
+}
+function obEndHandoff(){clearInterval(fgHandoffTimer);obClearSpotlight();}
+
+/* ---- 错误恢复卡：针对性建议，不给裸错误码 ---- */
+function showObError(kind,lead){
+  const e=FG_ERRORS[kind];if(!e)return;
+  const steps=e.steps.map((s,i)=>'<li><i>'+(i+1)+'</i><span>'+escapeHtml(s)+'</span></li>').join("");
+  const html='<div class="ob-card2 err" role="alertdialog" aria-modal="true" aria-labelledby="ob-err-title">'
+    +'<div class="ob-m-body"><div style="display:flex;justify-content:space-between;align-items:center">'
+    +'<span class="ob-m-kicker err">需要处理 · 不是你的错</span>'
+    +'<button type="button" aria-label="关闭" class="fg-x" onclick="closeObModal(\'ob-error\')">×</button></div>'
+    +'<h3 class="ob-m-title" id="ob-err-title">'+escapeHtml(e.title)+'</h3>'
+    +'<p class="ob-m-lead">'+escapeHtml(lead||e.lead||"")+'</p>'
+    +'<ol class="ob-steps">'+steps+'</ol>'
+    +'<div class="ob-code">技术信息（反馈时附上）：'+escapeHtml(e.code)+'</div></div>'
+    +'<div class="ob-m-actions"><button type="button" class="btn ghost" onclick="closeObModal(\'ob-error\');switchMode(\'manual\');closeFlashGuide(true)">查看手册 · 常见问题</button>'
+    +'<button type="button" class="btn primary" style="margin-left:auto" onclick="closeObModal(\'ob-error\')">'+escapeHtml(e.primary)+'</button></div></div>';
+  showObModal(html,"ob-error");
+}
+function showObModal(html,id){
+  let m=document.getElementById(id);
+  if(!m){m=document.createElement("div");m.id=id;m.className="ob-modal";document.body.appendChild(m);}
+  m.innerHTML=html;return m;
+}
+function closeObModal(id){const m=document.getElementById(id);if(m)m.remove();}
+function obModalOpen(id){return !!document.getElementById(id);}
+
+/* ---- 键盘：Esc 退出、← → 翻页 ---- */
+function onboardingKeydown(e){
+  if(obModalOpen("ob-error")||obModalOpen("ob-success")){
+    if(e.key==="Escape"&&obModalOpen("ob-error")){e.stopPropagation();closeObModal("ob-error");}
+    return;
+  }
+  if(tourIndex===null)return;
+  if(e.key==="Escape"){e.preventDefault();e.stopPropagation();endOnboardingTour(false);return;}
+  if(e.key==="ArrowRight"||e.key==="Enter"){e.preventDefault();e.stopPropagation();tourIndex<OB_TOUR.length-1?moveOnboardingTour(1):endOnboardingTour(true);return;}
+  if(e.key==="ArrowLeft"&&tourIndex>0){e.preventDefault();e.stopPropagation();moveOnboardingTour(-1);}
+}
+
+/* ---- 启动 ---- */
+function initOnboarding(){
+  obStore=obReadStore();
+  renderOnboardingStatus();
+  document.addEventListener("click",e=>{const w=$("help-wrap");if(w&&!w.contains(e.target))closeHelpMenu();});
+  window.addEventListener("keydown",onboardingKeydown,true);
+  window.addEventListener("resize",()=>{if(tourIndex!==null)renderTour();if(fgOpen)renderFlashGuide();});
+  renderGateEnv();
+  const install=$("install-button");
+  if(install)install.addEventListener("state-changed",onFlashInstallerState);
+  // 监听 ESP 弹窗出现 / 消失：无串口取消提示、完成后衔接蓝牙
+  let installDialogSeen=false,noPortSeen=false;
+  const espObserver=new MutationObserver(()=>{
+    const d=document.querySelector("ewt-install-dialog");
+    if(d&&!installDialogSeen){installDialogSeen=true;}
+    else if(!d&&installDialogSeen){installDialogSeen=false;onEspDialogRemoved();}
+    const np=document.querySelector("ewt-no-port-picked-dialog");
+    if(np&&!noPortSeen){noPortSeen=true;onNoPortDialogSeen();}
+    else if(!np){noPortSeen=false;}
+  });
+  espObserver.observe(document.body,{childList:true,subtree:true});
+  // 无硬件环境下用于浏览器验收的内部钩子：模拟“刷写完成且 ESP 弹窗已关闭”，仅驱动引导 UI
+  window.bpSimulateFlashFinished=function(){fgFlashed=true;obPatch({flash:"completed"});if(fgOpen)fgGo(5);showFlashSuccess();};
+}
+
 /* ==================== 启动 ==================== */
 window.addEventListener("load",()=>{
   checkSupport();
@@ -5774,6 +6566,7 @@ window.addEventListener("load",()=>{
   resetMonitorSignals();
   log("BLE 工具台已就绪。");
   initIdeShell();
+  initOnboarding();
   initAutoLink();
   initLinkUi();
   setInterval(refreshLaunchpad,2000);
