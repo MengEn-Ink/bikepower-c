@@ -177,6 +177,77 @@ def main():
     check("rscService" not in cycling_filter_src,
           "仅 RSC 跑步设备不会进入骑行设备选择列表", failures)
 
+    # ---------- 新手引导（onboarding tour） ----------
+    onboarding_tokens = [
+        ("bikepower.onboarding.v1", "引导状态使用带版本号的 localStorage key"),
+        ("ONBOARDING_VERSION", "集中定义引导版本，便于以后只对新版本展示新步骤"),
+        ("function startOnboardingTour", "帮助菜单与手册可重新开始分步导览"),
+        ("function endOnboardingTour", "导览支持完成 / 跳过并持久化状态"),
+        ("function openFlashGuide", "提供六步刷写向导"),
+        ("function showFlashSuccess", "刷写成功后弹出倒计时自动关闭的成功窗"),
+        ("function obStartHandoff", "成功窗后衔接蓝牙连接引导"),
+        ("function showObError", "错误恢复给出针对性中文建议而非裸错误码"),
+        ("function resetOnboarding", "帮助菜单可重置引导状态（清除 localStorage）"),
+        ("id=\"help-btn\"", "顶栏新增帮助入口"),
+        ("id=\"help-menu\"", "帮助菜单提供重新开始引导等入口"),
+        ("重新开始新手引导", "帮助菜单与手册包含重新进入引导入口"),
+        ('id="gate-env"', "欢迎卡包含环境检测网格"),
+        ('id="gate-env-serial"', "环境检测覆盖 Web Serial"),
+        ('id="gate-env-https"', "环境检测覆盖 HTTPS"),
+        ('id="gate-with-tour"', "欢迎卡可勾选看手册时附带 6 步界面导览"),
+        ('data-tour="pill"', "聚光灯锚点：蓝牙连接胶囊"),
+        ('data-tour="nav"', "聚光灯锚点：顶部工具导航"),
+        ('data-tour="rail"', "聚光灯锚点：左侧设备栏"),
+        ('data-tour="stage"', "聚光灯锚点：主区实时数据"),
+        ('data-tour="panel"', "聚光灯锚点：底部 GATT/NVS/模板库/日志面板"),
+        ('data-tour="help"', "聚光灯锚点：帮助入口"),
+        ('data-tour="releases"', "刷写向导锚点：固件版本列表"),
+        ('data-tour="flash-start"', "刷写向导锚点：开始刷写按钮"),
+        ('data-tour="flash-diagram"', "刷写向导锚点：数据线示意"),
+        ("USB JTAG/serial debug unit", "macOS/Windows 串口文案点名正确选项"),
+        ("cu.usbmodem", "macOS 串口底层名 cu.usbmodem*"),
+        ("cu.usbserial", "CP210x/CH340 板底层名 cu.usbserial-*"),
+        ("Bluetooth-Incoming-Port", "明确提示不要选 Mac 蓝牙虚拟串口"),
+        ("USB 串行设备", "Windows 串口文案包含 USB 串行设备 (COMx)"),
+        ("USB Serial Device", "Windows 串口文案包含英文 USB Serial Device (COMx)"),
+        ("Silicon Labs CP210x", "Windows CP210x 板显示对应芯片名"),
+        ("USB-SERIAL CH340", "Windows CH340 板显示对应芯片名"),
+        ("支持数据传输的 USB 线", "两种系统都提示使用能传数据的 USB 线"),
+        ("拔插", "Windows 用拔插前后对比识别新 COM 口"),
+        ("FG_PHASES", "刷写阶段集中定义中英文对照"),
+        ("CONNECTING", "阶段英文：连接芯片"),
+        ("ERASING", "阶段英文：擦除"),
+        ("INSTALLING", "阶段英文：写入"),
+        ("WRAPPING UP", "阶段英文：校验"),
+        ("ob-count", "成功窗具备 5 秒自动关闭倒计时条"),
+        ("设备正在重启", "成功窗提示设备重启中、等待 LED 慢闪"),
+        ("已开始蓝牙广播", "重启倒计时结束提示蓝牙已广播"),
+        ("串口列表里看不到开发板", "错误恢复：看不到串口的针对性建议"),
+        ("你选的口不是开发板", "错误恢复：选错串口的针对性建议"),
+        ("串口被别的程序占用", "错误恢复：串口占用建议"),
+        ("写入中断，固件没有写完", "错误恢复：刷写失败且说明不会变砖"),
+        ("这台设备正被别的 App 连着", "错误恢复：蓝牙被占用建议"),
+        ("还没有 GATT 数据", "空状态即教程：GATT 面板说明连接后会出现什么"),
+        ("还没有读取开发板配置", "空状态即教程：NVS 面板说明连接后会出现什么"),
+        ("不会用演示值", "实时监控空状态承诺不用演示值冒充设备数据"),
+        ("neverShow", "支持“不再显示”并持久化"),
+        ("aria-modal", "引导弹窗具备基本 ARIA 支持"),
+        ("ArrowRight", "支持左右方向键切换引导步骤"),
+    ]
+    for token, message in onboarding_tokens:
+        check(token in html, message, failures)
+    # 不得再出现笼统、无法指导选口的旧文案 / 笼统“USB设备xxx”表述
+    check("USB Serial、CP210x、CH34x 或 JTAG/Serial" not in html,
+          "删除笼统的串口选择旧文案，改为已核验的精确文案", failures)
+    check(not re.search(r"USB设备", html),
+          "不出现笼统的“USB设备xxx”串口表述", failures)
+    # 六步导览与六步刷写向导结构齐全
+    check(html.count("target:") >= 11, "6 步界面导览与刷写向导锚点均已定义", failures)
+    check(("01 · 主连接" in html and "06 · 随时回来" in html),
+          "导览覆盖连接胶囊到帮助入口共 6 步", failures)
+    check(("插入数据线" in html and "完成并连接蓝牙" in html),
+          "刷写向导从插线走到连接蓝牙共 6 步", failures)
+
     check("ThreadingHTTPServer" in server and "tools/web" in server,
           "本地服务脚本从 tools/web 提供页面", failures)
     check("Cache-Control" in server and "no-store" in server,
