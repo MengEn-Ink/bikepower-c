@@ -2,7 +2,7 @@
 
 > 状态：协议调研与实现追踪。RSC + HRS + FTMS Treadmill Data、Set Target Speed 和 Start/Stop/Reset 会话语义已落地；标准客户端真机兼容仍待双板验收。
 > 目标软件：Zwift Run、MyWhoosh Running。  
-> 当前固件基线：BikePower C v4.2.0，NimBLE peripheral；骑行模式提供 CPS + HRS + CSC + FTMS Indoor Bike + DIS，跑步模式提供 RSC + HRS + FTMS Treadmill + DIS。
+> 当前固件基线：BikePower C v4.2.1，NimBLE peripheral；骑行模式提供 CPS + HRS + CSC + FTMS Indoor Bike + DIS，跑步模式提供 RSC + HRS + FTMS Treadmill + DIS。
 
 ---
 
