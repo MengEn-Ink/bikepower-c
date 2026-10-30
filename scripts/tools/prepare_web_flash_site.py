@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """从 GitHub Release 生成 BikePower BLE Monitor / ESP Web Tools 静态站点。
 
-脚本只接受最新 GitHub Release 中两个受支持板型的 merged bin，并在复制到
-站点前验证旁文件 SHA256。没有可用 Release 时默认保留 BLE Monitor 并明确
-标记不可刷写；正式 Pages 部署使用 ``--require-firmware`` 将该情况升级为失败。
+脚本接受最新 GitHub Release 中受支持板型的 merged bin，并在复制到站点前
+验证旁文件 SHA256。没有可用 Release 时默认保留 BLE Monitor 并明确标记不可
+刷写；正式 Pages 部署使用 ``--require-firmware`` 将该情况升级为失败。
+
+历史版本（回滚）：额外拉取最近 ``--history`` 个正式 Release，同样逐个校验
+SHA256 后镜像到 ``firmware/<tag>/``，并生成 ``firmware/releases.json`` 版本
+索引。GitHub Release 附件下载地址不返回 CORS 头，ESP Web Tools 无法跨域读取，
+所以历史固件必须在部署时镜像为同源静态文件。单个历史版本校验失败只会被
+跳过并记录原因，不会阻断最新版本部署。
 """
 
 import argparse
@@ -32,6 +38,11 @@ FIRMWARE_RE = re.compile(
 )
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+
+DEFAULT_HISTORY = 6
+MAX_HISTORY = 12
+NOTES_EXCERPT_MAX = 900
 
 
 class ReleaseUnavailable(RuntimeError):
@@ -90,6 +101,33 @@ def fetch_github_release(repo, token):
     if release is not None:
         release["_provider"] = "github"
     return release
+
+
+def fetch_github_release_list(repo, token, limit):
+    """最近的正式 Release（不含 draft / prerelease），按发布时间倒序。"""
+    repo = validate_repo(repo)
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "bikepower-web-flash-site",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    per_page = max(1, min(int(limit) + 4, 30))
+    releases = request_json(
+        f"https://api.github.com/repos/{repo}/releases?per_page={per_page}",
+        headers,
+        "GitHub",
+    )
+    if not isinstance(releases, list):
+        return []
+    result = []
+    for release in releases:
+        if not isinstance(release, dict) or release.get("draft") or release.get("prerelease"):
+            continue
+        release["_provider"] = "github"
+        result.append(release)
+    return result
 
 
 def release_assets(release):
@@ -214,7 +252,19 @@ def manifest(board, version, firmware_name):
     }
 
 
-def materialize_release(site_dir, release, token="", allow_file=False):
+def notes_excerpt(release):
+    body = str(release.get("body") or "").replace("\r\n", "\n").strip()
+    if len(body) > NOTES_EXCERPT_MAX:
+        body = body[:NOTES_EXCERPT_MAX].rstrip() + "…"
+    return body
+
+
+def materialize_release(site_dir, release, token="", allow_file=False, dest_rel="firmware"):
+    """校验并镜像一个 Release；dest_rel 为站点内相对目录（最新版用 firmware）。"""
+    if dest_rel != "firmware" and not re.fullmatch(r"firmware/v?[0-9A-Za-z.+-]+", dest_rel):
+        raise ReleaseValidationError("固件输出目录非法")
+    if ".." in dest_rel:
+        raise ReleaseValidationError("固件输出目录非法")
     provider = str(release.get("_provider") or "fixture")
     tag, version, selected = select_firmware_assets(release)
     verified = {}
@@ -240,7 +290,7 @@ def materialize_release(site_dir, release, token="", allow_file=False):
             "name": firmware_name,
         }
 
-    firmware_dir = site_dir / "firmware"
+    firmware_dir = site_dir / dest_rel
     firmware_dir.mkdir(parents=True, exist_ok=True)
     boards = {}
     for board, artifact in verified.items():
@@ -254,12 +304,12 @@ def materialize_release(site_dir, release, token="", allow_file=False):
         manifest_name = f"manifest-{board}.json"
         write_json(firmware_dir / manifest_name, manifest(board, version, firmware_name))
         boards[board] = {
-            "download": f"firmware/{firmware_name}",
+            "download": f"{dest_rel}/{firmware_name}",
             "filename": firmware_name,
             "label": BOARD_LABELS[board],
-            "manifest": f"firmware/{manifest_name}",
+            "manifest": f"{dest_rel}/{manifest_name}",
             "sha256": actual,
-            "sha256_file": f"firmware/{firmware_name}.sha256",
+            "sha256_file": f"{dest_rel}/{firmware_name}.sha256",
             "size": len(firmware_data),
         }
 
@@ -274,8 +324,54 @@ def materialize_release(site_dir, release, token="", allow_file=False):
         "tag": tag,
         "version": version,
     }
-    write_json(firmware_dir / "latest.json", latest)
+    if dest_rel == "firmware":
+        write_json(firmware_dir / "latest.json", latest)
     return latest
+
+
+def release_entry(info, is_latest, release):
+    return {
+        "boards": info["boards"],
+        "latest": bool(is_latest),
+        "notes": notes_excerpt(release),
+        "published_at": info.get("published_at", ""),
+        "release_url": info.get("release_url", ""),
+        "tag": info["tag"],
+        "version": info["version"],
+    }
+
+
+def materialize_history(site_dir, latest_info, latest_release, history, token="", allow_file=False, limit=DEFAULT_HISTORY):
+    """镜像历史 Release 并写 firmware/releases.json；单个失败只跳过。"""
+    entries = [release_entry(latest_info, True, latest_release)]
+    skipped = []
+    seen = {latest_info["tag"]}
+    limit = max(0, min(int(limit), MAX_HISTORY))
+    for release in history or []:
+        if len(entries) > limit:
+            break
+        tag = str(release.get("tag_name") or "")
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        try:
+            _, version = release_version(release)
+            info = materialize_release(
+                site_dir, release, token=token, allow_file=allow_file,
+                dest_rel=f"firmware/{tag}",
+            )
+            entries.append(release_entry(info, False, release))
+        except (ReleaseUnavailable, ReleaseValidationError) as exc:
+            skipped.append({"reason": str(exc), "tag": tag})
+    index = {
+        "generated_at": utc_now(),
+        "latest": latest_info["tag"],
+        "releases": entries,
+        "schema_version": 1,
+        "skipped": skipped,
+    }
+    write_json(site_dir / "firmware" / "releases.json", index)
+    return index
 
 
 def initialize_site(source_dir, site_dir):
@@ -308,6 +404,13 @@ def write_unavailable(site_dir, reasons):
         "schema_version": 1,
     }
     write_json(firmware_dir / "latest.json", latest)
+    write_json(firmware_dir / "releases.json", {
+        "generated_at": latest["generated_at"],
+        "latest": "",
+        "releases": [],
+        "schema_version": 1,
+        "skipped": [],
+    })
     return latest
 
 
@@ -336,6 +439,12 @@ def parse_args(argv=None):
         help="没有可用板型固件时失败；正式 Pages 部署必须启用",
     )
     parser.add_argument("--release-json", type=Path, help="离线测试用 Release API 响应")
+    parser.add_argument(
+        "--history",
+        type=int,
+        default=DEFAULT_HISTORY,
+        help=f"额外镜像的历史版本数量（回滚用，0 关闭，最多 {MAX_HISTORY}）",
+    )
     return parser.parse_args(argv)
 
 
@@ -345,6 +454,7 @@ def main(argv=None):
     if args.release_json:
         release = load_release_fixture(args.release_json)
         latest = materialize_release(site_dir, release, allow_file=True)
+        materialize_history(site_dir, latest, release, [], allow_file=True, limit=0)
         print(f"[web-flash] 离线站点已生成: v{latest['version']}")
         return 0
 
@@ -356,7 +466,19 @@ def main(argv=None):
             reasons.append("GitHub 没有可用 Release")
         else:
             latest = materialize_release(site_dir, release, token=github_token)
-            print(f"[web-flash] 已从 GitHub 生成 v{latest['version']} 板型刷写站点")
+            history = []
+            if args.history > 0:
+                try:
+                    history = fetch_github_release_list(args.github_repo, github_token, args.history)
+                except ReleaseUnavailable as exc:
+                    print(f"[web-flash] 历史版本列表获取失败，仅部署最新版: {exc}")
+            index = materialize_history(
+                site_dir, latest, release, history, token=github_token, limit=args.history
+            )
+            print(
+                f"[web-flash] 已从 GitHub 生成 v{latest['version']} 板型刷写站点；"
+                f"可回滚版本 {len(index['releases']) - 1} 个，跳过 {len(index['skipped'])} 个"
+            )
             return 0
     except ReleaseUnavailable as exc:
         reasons.append(f"GitHub: {exc}")

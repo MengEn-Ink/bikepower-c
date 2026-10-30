@@ -1006,7 +1006,7 @@ function copyTextFallback(text) {
 }
 function onCopyUpgradeUrl() {
   var urlEl = $("upgrade-url");
-  var url = urlEl ? urlEl.textContent : "https://easyhey.com/?firmware=MOD220";
+  var url = urlEl ? urlEl.textContent : "https://mengen-ink.github.io/bikepower-c/#/flash";
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(url).then(function () {
       toast("升级地址已复制");

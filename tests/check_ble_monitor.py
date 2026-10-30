@@ -146,6 +146,20 @@ def main():
         ("firmware-download", "页面提供同源固件下载"),
         ("Web Serial", "页面说明 Web Serial 安全限制"),
         ("HTTPS", "页面说明网页刷写的安全上下文要求"),
+        ("./firmware/releases.json", "读取部署镜像的历史固件版本索引"),
+        ('id="fw-timeline"', "刷写页提供固件版本时间轴"),
+        ("selectFirmwareRelease", "支持切换到历史版本回滚"),
+        ('id="fw-rollback-ack"', "回滚历史版本前必须显式确认"),
+        ("flash-anim", "刷写页提供刷写过程动画示意"),
+        ("web-flash-serial-port.jpg", "刷写页附串口选择真实截图"),
+        ('id="ide-dock"', "提供 IDE 式底部常驻面板"),
+        ('data-pane="gatt"', "GATT 服务列表作为常驻面板"),
+        ('data-pane="nvs"', "开发板 NVS 配置作为常驻面板"),
+        ('data-pane="templates"', "模板库合并为常驻面板"),
+        ('data-pane="log"', "事件日志作为常驻面板"),
+        ('id="ide-status"', "提供 IDE 式底部状态栏"),
+        ("toggleIdePane", "侧栏可展开 / 隐藏"),
+        ("IDE_KEY", "窗口布局记忆在本浏览器"),
     ]
     for token, message in required_html_tokens:
         check(token in html, message, failures)
@@ -172,6 +186,8 @@ def main():
 
     scripts = re.findall(r"<script>(.*?)</script>", html, flags=re.S)
     check(len(scripts) == 1, "监控页包含单个内联脚本，便于静态语法检查", failures)
+    for legacy_id in ('id="templates-card"', 'id="compare-templates-card"', 'id="log-panel"', 'id="connect-result"'):
+        check(legacy_id not in html, f"旧的页面底部长卡片已并入常驻面板（{legacy_id}）", failures)
     node = shutil.which("node")
     if node and scripts:
         with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as tmp:
@@ -279,6 +295,19 @@ if (linkSnapshot().state !== "unsupported") throw new Error("无 Web Bluetooth �
 navigator.bluetooth = {};
 if (linkSnapshot().state !== "idle" || linkSnapshot().name !== "连接蓝牙设备") throw new Error("未连接时胶囊应提示连接蓝牙设备");
 if (ROLE_SHORT[classifyDeviceRole(boardRec).role] !== "开发板 · 可写入") throw new Error("胶囊角色简称缺失");
+const fwBoards = {"generic-c3": {manifest: "firmware/manifest-generic-c3.json", download: "firmware/a.bin"}};
+const fwIndex = {schema_version: 1, releases: [
+  {tag: "v4.2.0", latest: true, boards: fwBoards},
+  {tag: "v4.1.3", latest: false, boards: {}},
+  {tag: "v4.1.1", latest: false, boards: {"generic-c3": {manifest: "firmware/v4.1.1/manifest-generic-c3.json", download: "firmware/v4.1.1/a.bin"}}},
+]};
+const fwList = normalizeFirmwareReleases(fwIndex, null);
+if (fwList.length !== 2 || fwList[0].tag !== "v4.2.0" || fwList[1].tag !== "v4.1.1") throw new Error("历史版本索引应丢弃无板型的版本");
+const fwFallback = normalizeFirmwareReleases(null, {available: true, tag: "v4.2.0", version: "4.2.0", boards: fwBoards});
+if (fwFallback.length !== 1 || !fwFallback[0].latest) throw new Error("缺少 releases.json 时应退回 latest.json 单版本");
+if (normalizeFirmwareReleases({schema_version: 2, releases: fwIndex.releases}, null).length !== 0) throw new Error("未知索引版本不应被信任");
+if (safeSitePath("firmware/v4.1.1/manifest-generic-c3.json") !== "./firmware/v4.1.1/manifest-generic-c3.json") throw new Error("历史版本 manifest 路径应被允许");
+if (safeSitePath("firmware/../x") !== null) throw new Error("路径穿越必须被拒绝");
 """
         with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as tmp:
             tmp.write(runtime_prelude)
