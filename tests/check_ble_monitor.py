@@ -66,7 +66,22 @@ def main():
         ("7a5a0008-4c7a-4f2a-9b3e-6d1f4a8c0b21", "声明设备身份覆盖特征 UUID"),
         ("openTemplateWriter", "模板可写入开发板身份信息"),
         ("performIdentityWrite", "身份写入后回读确认 NVS 落盘"),
-        ("saveAsTemplate(compareDevices['+rec._idx+'],true)", "比对页复制为模板后直接进入写入流程"),
+        ("saveAsTemplate(rec,true)", "比对页复制为模板后直接进入写入流程"),
+        ("function classifyDeviceRole", "按 GATT 私有服务识别开发板角色，不依赖设备名"),
+        ("BikePower 开发板 · 旧固件", "识别缺少身份覆盖特征的旧固件开发板"),
+        ('id="compare-flow"', "比对页提供三步写入流程指示"),
+        ("addCurrentToCompare", "比对页可加入实时监控中已连接的设备"),
+        ('id="tool-launchpad"', "手册首页提供工具导航入口"),
+        ('id="ch16"', "手册新增设备比对与模板写入章节"),
+        ("applyRoute();", "启动时按地址路由，默认进入使用手册"),
+        ("routeFromHash", "工具页支持 #/monitor 等独立链接"),
+        ('id="connect-gate"', "进站先弹出蓝牙连接门（类钱包连接）"),
+        ("initLinkUi();", "启动时决定是否弹出蓝牙连接门"),
+        ('id="link-capsule"', "右上角常驻蓝牙连接状态胶囊"),
+        ("gateSuccess", "连接成功后关闭连接门并默认打开使用手册"),
+        ('id="manual-linkbar"', "手册首页按设备角色推荐下一步"),
+        ('id="serial-scope"', "刷写页声明 USB 串口仅用于刷写"),
+        ("GATE_SKIP_KEY", "可选择稍后连接且本会话不再打扰"),
         ("decodeGattValue", "GATT 特征值解析为中文可读数值"),
         ("GATT_CHAR_CN", "GATT 特征码附中文名称与说明"),
         ("setInterval(checkAnomalies", "周期检测通知中断等异常"),
@@ -84,7 +99,7 @@ def main():
         ("distanceDm / 10", "RSC 累计距离按 0.1m 单位换算"),
         ("recordAnomaly", "异常统一计数和日志"),
         ("downloadReport", "支持导出监控报告"),
-        ('switchMode("connect")', "默认进入实时监控主任务"),
+        ("switchMode('connect')", "导航提供实时监控主任务入口"),
         ('id="trace-power"', "实时功率轨迹由设备通知驱动"),
         ("HISTORY_RETENTION_MS", "曲线历史按会话长期保留而非固定 30 秒截断"),
         ("HISTORY_MAX_SAMPLES", "曲线历史设置浏览器内存上限"),
@@ -241,6 +256,29 @@ if (gattCharInfo("00002a63-0000-1000-8000-00805f9b34fb").cn !== "骑行功率测
     || gattServiceInfo("00001826-0000-1000-8000-00805f9b34fb").cn.indexOf("健身") < 0) {
   throw new Error("GATT 中文描述字典缺失");
 }
+const svc = (uuid, chars) => ({uuid, characteristics: (chars || []).map(c => ({uuid: c}))});
+const boardRec = {info: {manufacturer: "BikePower"}, services: [svc(UUIDS.cpsService), svc(UUIDS.configService, [UUIDS.configMeta, IDENTITY_PROFILE_UUID])]};
+const legacyRec = {info: {}, services: [svc(UUIDS.cpsService), svc(UUIDS.configService, [UUIDS.configMeta])]};
+const extRec = {info: {manufacturer: "Garmin", model: "Rally", firmware: "3.1"}, services: [svc(UUIDS.cpsService), svc(UUIDS.disService)]};
+// 设备名被改成任何值都不影响识别
+const renamedExt = Object.assign({device: {name: "BikePower"}}, extRec);
+const rb = classifyDeviceRole(boardRec), rl = classifyDeviceRole(legacyRec), re = classifyDeviceRole(renamedExt);
+if (rb.role !== "board" || !rb.writable || rl.role !== "board-legacy" || rl.writable
+    || re.role !== "external" || re.writable || re.disCount !== 3
+    || !supportsIdentityProfile(boardRec) || supportsIdentityProfile(legacyRec) || supportsIdentityProfile(renamedExt)) {
+  throw new Error("开发板角色识别回归失败: " + [rb.role, rl.role, re.role, re.disCount].join(","));
+}
+const routes = [["", "manual"], ["#/monitor", "connect"], ["#/compare", "compare"], ["#flash", "flash"], ["#/erg", "erg"], ["#/unknown", "manual"]];
+for (const [hash, mode] of routes) {
+  if (routeFromHash(hash).mode !== mode) throw new Error("路由解析失败: " + hash);
+}
+const chRoute = routeFromHash("#ch16");
+if (chRoute.mode !== "manual" || chRoute.chapter !== "ch16") throw new Error("手册章节路由解析失败");
+if (Object.keys(MANUAL_META).length !== 16) throw new Error("手册目录应为 16 节");
+if (linkSnapshot().state !== "unsupported") throw new Error("无 Web Bluetooth 时胶囊应显示不支持");
+navigator.bluetooth = {};
+if (linkSnapshot().state !== "idle" || linkSnapshot().name !== "连接蓝牙设备") throw new Error("未连接时胶囊应提示连接蓝牙设备");
+if (ROLE_SHORT[classifyDeviceRole(boardRec).role] !== "开发板 · 可写入") throw new Error("胶囊角色简称缺失");
 """
         with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as tmp:
             tmp.write(runtime_prelude)

@@ -45,7 +45,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,su
 /* ===== 顶部品牌与任务导航 ===== */
 .masthead{
   min-height:64px;border-bottom:1px solid var(--line);padding:0 22px;
-  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:18px;
   background:rgba(10,8,7,.96);position:sticky;top:0;z-index:20;
 }
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
@@ -61,10 +61,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,su
 .masthead-right{justify-self:end}
 .chip{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font:12px/1 var(--mono);white-space:nowrap}
 .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
-.mode-select{display:flex;align-items:stretch;justify-content:center;border:1px solid var(--line);min-height:40px}
+.mode-select{display:flex;align-items:stretch;justify-self:center;max-width:100%;overflow-x:auto;scrollbar-width:none;border:1px solid var(--line);min-height:40px}
 .mode-btn{
-  min-width:132px;min-height:44px;border:0;border-right:1px solid var(--line);
-  padding:0 18px;background:transparent;color:var(--muted);cursor:pointer;
+  min-width:0;flex:0 0 auto;min-height:44px;border:0;border-right:1px solid var(--line);
+  padding:0 16px;background:transparent;color:var(--muted);cursor:pointer;
   display:grid;place-items:center;transition:background .15s,color .15s;
 }
 .mode-btn:last-child{border-right:0}
@@ -72,6 +72,135 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,su
 .mode-btn.active{background:var(--ink);color:var(--bg);font-weight:900}
 .mode-btn .ico,.mode-btn .mode-desc{display:none}
 .mode-btn .mode-title{font-size:13px;font-weight:800;white-space:nowrap}
+.mode-btn[data-mode="flash"] .mode-title::after{content:" · USB";color:var(--faint);font:700 10px/1 var(--mono)}
+.mode-btn.active[data-mode="flash"] .mode-title::after{color:var(--line)}
+
+/* ===== 右上角常驻蓝牙连接胶囊（主连接 = BLE） ===== */
+.link-capsule{position:relative}
+.cap-btn{
+  display:inline-flex;align-items:center;gap:10px;min-height:44px;max-width:320px;padding:0 12px 0 9px;
+  border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;transition:border-color .15s,background .15s,color .15s;
+}
+.cap-btn:hover{border-color:var(--accent);background:var(--panel)}
+.cap-glyph{position:relative;width:26px;height:26px;display:grid;place-items:center;flex:0 0 auto;border:1px solid var(--line);color:var(--accent)}
+.cap-glyph svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:square;stroke-linejoin:miter}
+.cap-dot{position:absolute;right:-4px;bottom:-4px;width:8px;height:8px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 2px var(--bg)}
+.cap-text{display:flex;flex-direction:column;gap:4px;min-width:0;text-align:left}
+.cap-name{color:var(--strong);font:800 13px/1 var(--sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+.cap-sub{color:var(--muted);font:10px/1 var(--mono);letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.cap-caret{color:var(--faint);font:10px/1 var(--mono)}
+.link-capsule[data-link="idle"] .cap-btn{background:var(--accent);border-color:var(--accent)}
+.link-capsule[data-link="idle"] .cap-btn:hover{background:#ff7548;border-color:#ff7548}
+.link-capsule[data-link="idle"] .cap-name{color:var(--bg)}
+.link-capsule[data-link="idle"] .cap-sub,.link-capsule[data-link="idle"] .cap-caret{color:rgba(10,8,7,.62)}
+.link-capsule[data-link="idle"] .cap-glyph{border-color:rgba(10,8,7,.35);color:var(--bg)}
+.link-capsule[data-link="idle"] .cap-dot{display:none}
+.link-capsule[data-link="connected"] .cap-dot{background:var(--green)}
+.link-capsule[data-link="connected"] .cap-glyph{border-color:var(--accent-dark)}
+.link-capsule[data-link="connecting"] .cap-dot{background:var(--amber);animation:capBlink .9s steps(2) infinite}
+.link-capsule[data-link="mirror"] .cap-dot{background:var(--amber)}
+.link-capsule[data-link="lost"] .cap-dot{background:var(--red)}
+.link-capsule[data-link="lost"] .cap-btn{border-color:var(--red)}
+.link-capsule[data-link="unsupported"] .cap-glyph{color:var(--faint)}
+@keyframes capBlink{50%{opacity:.15}}
+.link-capsule.cap-arrive .cap-glyph::after{content:"";position:absolute;inset:-1px;border:1px solid var(--accent);animation:capArrive .9s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes capArrive{from{transform:scale(1);opacity:1}to{transform:scale(2.6);opacity:0}}
+.cap-panel{
+  position:absolute;right:0;top:calc(100% + 8px);width:340px;max-width:calc(100vw - 24px);z-index:60;
+  background:var(--panel);border:1px solid var(--line);box-shadow:0 18px 50px rgba(0,0,0,.55);
+}
+.cp-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);color:var(--faint);font:700 10px/1 var(--mono);letter-spacing:.12em}
+.cp-state{letter-spacing:.04em}
+.cp-state.connected{color:var(--green)}.cp-state.connecting,.cp-state.mirror{color:var(--amber)}.cp-state.lost{color:var(--red)}
+.cp-main{padding:16px}
+.cp-name{color:var(--strong);font:400 30px/1.05 var(--display);word-break:break-all}
+.cp-id{margin-top:6px;color:var(--faint);font:11px/1.4 var(--mono);word-break:break-all}
+.cp-role{margin-top:12px}
+.cp-rows{margin-top:12px;border-top:1px solid var(--line-soft)}
+.cp-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12px}
+.cp-row span:first-child{color:var(--muted)}.cp-row span:last-child{color:var(--strong);font-family:var(--mono);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+.cp-note{margin-top:10px;color:var(--muted);font-size:12px;line-height:1.6}
+.cp-actions{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}
+.cp-actions .btn{border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-height:46px}
+.cp-actions .btn:nth-child(2n){border-right:0}
+.cp-actions .btn:last-child:nth-child(odd){grid-column:1/-1;border-right:0}
+.cp-serial{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:11px 16px;border:0;background:var(--bg);color:var(--muted);font-size:12px;text-align:left;cursor:pointer}
+.cp-serial b{color:var(--ink);font:700 11px/1 var(--mono)}
+.cp-serial:hover{color:var(--accent)}
+
+/* ===== 进站连接门（类钱包连接）：半圆功率表盘 = 蓝牙扫描雷达 ===== */
+body.gate-lock{overflow:hidden}
+.gate{position:fixed;inset:0;z-index:110;display:grid;place-items:center;padding:24px;background:rgba(10,8,7,.86);backdrop-filter:blur(6px);transition:opacity .32s ease}
+.gate.gate-leaving{opacity:0;pointer-events:none}
+.gate-card{position:relative;width:min(468px,100%);max-height:calc(100vh - 48px);overflow:auto;background:var(--panel);border:1px solid var(--line);box-shadow:0 30px 90px rgba(0,0,0,.6)}
+.gate-x{position:absolute;top:8px;right:8px;z-index:2;width:44px;height:44px;border:0;background:transparent;color:var(--muted);font-size:20px;cursor:pointer}
+.gate-x:hover{color:var(--strong)}
+.gate-radar{position:relative;height:196px;overflow:hidden;border-bottom:1px solid var(--line);background:radial-gradient(circle at 50% 100%,rgba(240,85,35,.12),transparent 62%),var(--bg)}
+.radar-rings{position:absolute;inset:0;background:repeating-radial-gradient(circle at 50% 100%,transparent 0 37px,var(--line-soft) 37px 38px)}
+.radar-ticks{position:absolute;left:50%;bottom:0;width:372px;height:186px;margin-left:-186px;border-radius:186px 186px 0 0;border:1px solid var(--line);border-bottom:0}
+.radar-scale{position:absolute;bottom:8px;color:var(--faint);font:10px/1 var(--mono);letter-spacing:.08em}
+.radar-scale.l{left:14px}.radar-scale.r{right:14px}
+.radar-sweep{position:absolute;left:50%;bottom:0;width:400px;height:400px;margin-left:-200px;margin-bottom:-200px;border-radius:50%;
+  background:conic-gradient(from 0deg,transparent 0 318deg,rgba(240,85,35,.05) 320deg,rgba(240,85,35,.42) 358deg,var(--accent) 359.4deg,transparent 360deg);
+  animation:gateSweep 3.6s linear infinite}
+@keyframes gateSweep{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}
+.gate[data-gate="auto"] .radar-sweep,.gate[data-gate="connecting"] .radar-sweep{animation-duration:1.25s}
+.gate[data-gate="locked"] .radar-sweep{animation:none;transform:rotate(0deg);opacity:.9}
+.gate[data-gate="error"] .radar-sweep,.gate[data-gate="unsupported"] .radar-sweep{display:none}
+.gate[data-gate="locked"] .radar-rings{background:repeating-radial-gradient(circle at 50% 100%,transparent 0 37px,rgba(240,85,35,.38) 37px 38px);transition:background .3s}
+.radar-blips{position:absolute;inset:0}
+.blip{position:absolute;transform:translate(-50%,50%);display:flex;align-items:center;gap:6px;color:var(--ink);font:10px/1 var(--mono);white-space:nowrap;pointer-events:none}
+.blip i{width:7px;height:7px;background:var(--strong);box-shadow:0 0 0 3px rgba(244,232,216,.12)}
+.blip.last i{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.gate-core{position:absolute;left:50%;bottom:0;width:58px;height:58px;margin-left:-29px;margin-bottom:-1px;display:grid;place-items:center;background:var(--panel);border:1px solid var(--accent);color:var(--accent)}
+.gate-core svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:square;stroke-linejoin:miter}
+.gate[data-gate="auto"] .gate-core,.gate[data-gate="connecting"] .gate-core{animation:corePulse 1.25s ease-in-out infinite}
+.gate[data-gate="locked"] .gate-core{background:var(--accent);color:var(--bg)}
+.gate[data-gate="error"] .gate-core{border-color:var(--red);color:var(--red)}
+.gate[data-gate="unsupported"] .gate-core{border-color:var(--line);color:var(--faint)}
+@keyframes corePulse{50%{box-shadow:0 0 0 10px rgba(240,85,35,.12)}}
+.gate-body{padding:22px 24px 6px}
+.gate-eyebrow{display:flex;justify-content:space-between;gap:12px;color:var(--faint);font:700 10px/1 var(--mono);letter-spacing:.12em}
+.gate-eyebrow b{color:var(--accent);font-weight:700}
+.gate-body h2{margin:14px 0 0;color:var(--strong);font:400 34px/1.08 var(--display);letter-spacing:-.01em}
+.gate-body h2 em{font-style:italic;color:var(--accent)}
+.gate-desc{margin:10px 0 0;color:var(--muted);font-size:14px;line-height:1.7}
+.gate-known{margin-top:16px;border:1px solid var(--line)}
+.gate-known-head{padding:9px 12px;border-bottom:1px solid var(--line);color:var(--faint);font:700 10px/1 var(--mono);letter-spacing:.1em}
+.gate-dev{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border:0;border-bottom:1px solid var(--line-soft);background:transparent;color:var(--ink);text-align:left;cursor:pointer}
+.gate-dev:last-child{border-bottom:0}
+.gate-dev:hover:not(:disabled){background:var(--panel-2)}
+.gate-dev:hover:not(:disabled) .gate-dev-go{color:var(--accent);transform:translateX(3px)}
+.gate-dev:disabled{opacity:.5;cursor:not-allowed}
+.gate-dev-name{color:var(--strong);font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gate-dev-tag{color:var(--muted);font:10px/1 var(--mono);border:1px solid var(--line);padding:4px 6px}
+.gate-dev-tag.last{color:var(--accent);border-color:var(--accent-dark)}
+.gate-dev-go{color:var(--faint);font:700 12px/1 var(--mono);transition:transform .15s,color .15s}
+.gate-actions{display:grid;gap:8px;margin-top:16px}
+.gate-actions .btn{width:100%}
+.gate-alt{display:grid;grid-template-columns:1fr 1fr;margin:16px -24px 0;border-top:1px solid var(--line)}
+.gate-link{min-height:58px;padding:10px 16px;border:0;background:transparent;color:var(--ink);text-align:left;cursor:pointer;font-size:13px;font-weight:800;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.gate-link+.gate-link{border-left:1px solid var(--line)}
+.gate-link small{color:var(--faint);font:400 11px/1.3 var(--mono)}
+.gate-link:hover{background:var(--panel-2);color:var(--accent)}
+.gate-foot{display:flex;justify-content:space-between;gap:10px;padding:10px 16px;border-top:1px solid var(--line);background:var(--bg);color:var(--faint);font:10px/1.3 var(--mono);letter-spacing:.06em}
+.gate-fly{position:fixed;z-index:130;width:18px;height:18px;background:var(--accent);box-shadow:0 0 0 6px var(--accent-soft),0 0 24px rgba(240,85,35,.6);pointer-events:none}
+@media(prefers-reduced-motion:reduce){.radar-sweep,.gate-core,.cap-dot{animation:none!important}.gate{transition:none}}
+@media(max-width:520px){.gate{padding:12px;align-items:end}.gate-body h2{font-size:28px}.gate-alt{grid-template-columns:1fr}.gate-link+.gate-link{border-left:0;border-top:1px solid var(--line)}.gate-foot span:nth-child(2){display:none}.gate-radar{height:168px}.radar-scale.r{display:none}}
+
+/* ===== 手册首页：连接状态条（连接后引导下一步） ===== */
+.linkbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:16px;margin-top:26px;padding:14px 16px;border:1px solid var(--line);background:var(--panel)}
+.linkbar .lb-mark{width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--accent);color:var(--accent);font:800 13px/1 var(--mono)}
+.linkbar b{display:block;color:var(--strong);font-size:15px}
+.linkbar span.lb-sub{display:block;margin-top:3px;color:var(--muted);font-size:13px;line-height:1.5}
+.linkbar.on{border-color:var(--accent-dark);background:linear-gradient(90deg,var(--accent-soft),transparent 60%),var(--panel)}
+.linkbar.on .lb-mark{background:var(--accent);color:var(--bg)}
+@media(max-width:600px){.linkbar{grid-template-columns:auto minmax(0,1fr)}.linkbar .btn{grid-column:1/-1}}
+
+/* ===== 刷写页：串口作用域说明 ===== */
+.serial-scope{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;margin:0 0 18px;padding:12px 14px;border:1px dashed var(--line);color:var(--muted);font-size:13px;line-height:1.6}
+.serial-scope b{color:var(--strong)}
+@media(max-width:600px){.serial-scope{grid-template-columns:1fr}}
 
 /* ===== 通用控件 ===== */
 .btn{
@@ -281,8 +410,9 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
   .trace-stats{grid-template-columns:repeat(2,1fr)}.trace-stat:nth-child(2){border-right:0}.trace-stat:nth-child(-n+2){border-bottom:1px solid var(--line-soft)}
 }
 @media(max-width:760px){
-  .masthead{grid-template-columns:1fr auto;min-height:58px;padding:0 14px}.masthead-right{display:none}
-  .mode-select{justify-self:end;max-width:236px;overflow-x:auto}.mode-btn{min-width:78px;padding:0 10px}.mode-btn .mode-title{font-size:12px}
+  .masthead{grid-template-columns:auto minmax(0,1fr) auto;min-height:58px;padding:0 10px;gap:8px}
+  .cap-text,.cap-caret{display:none}.cap-btn{padding:0 9px;min-width:44px;justify-content:center}
+  .mode-select{justify-self:stretch;max-width:none;overflow-x:auto}.mode-btn{min-width:78px;padding:0 10px}.mode-btn .mode-title{font-size:12px}
   #mode-connect{min-height:calc(100vh - 58px)}.monitor-grid{grid-template-columns:1fr;min-height:auto}
   .monitor-rail{border-right:0;border-bottom:1px solid var(--line);padding:20px 16px}.monitor-rail h2{font-size:28px}.monitor-rail .actions{grid-template-columns:1fr 1fr}.monitor-note{display:none}
   .signal-stage{padding:18px 14px 24px}.hero-readout{grid-template-columns:1fr;padding-top:7px}.hero-value{font-size:clamp(96px,31vw,140px)}.hero-copy{padding-bottom:2px}
@@ -294,7 +424,7 @@ esp-web-install-button{--esp-tools-button-color:var(--accent);--esp-tools-button
   #templates-card,#log-panel{margin-left:14px;margin-right:14px}.svc-head,.char{flex-direction:column}.svc-uuid{text-align:left}.props{white-space:normal}
 }
 @media(max-width:480px){
-  .brand-mark{display:block;width:26px;height:26px}.brand h1{display:none}.mode-select{max-width:228px}.mode-btn{min-width:74px}
+  .brand-mark{display:block;width:26px;height:26px}.brand h1{display:none}.mode-btn{min-width:74px}
   .monitor-rail .actions{grid-template-columns:1fr}.signal-head{font-size:12px}.hero-copy strong{font-size:17px}.trace-window{height:238px}.trace-range-btn{min-width:50px;padding-left:7px;padding-right:7px}.trace-tooltip{width:190px}
   .signal-foot{grid-template-columns:1fr 1fr}.mini-metric b{font-size:24px}.evidence>.actions{grid-template-columns:1fr}
   .row{flex-direction:column;gap:3px}.row span:first-child{min-width:0}.row span:last-child{text-align:left}
@@ -613,6 +743,69 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
 .writer-note{margin-top:14px;padding:11px 13px;border-left:3px solid var(--amber);background:var(--amber-soft);color:var(--ink);font-size:12px;line-height:1.65}
 @media(max-width:600px){.writer-grid{grid-template-columns:1fr}}
 
+/* ===== 手册首页：工具导航 ===== */
+.mode-btn.mode-home{border-right:1px solid var(--accent)}
+.mode-btn.mode-home .mode-title::before{content:"¶ ";color:var(--accent)}
+.mode-btn.mode-home.active .mode-title::before{color:var(--bg)}
+.launchpad{margin-top:34px}
+.launchpad-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.launchpad-head h2{margin:0;color:var(--strong);font:900 22px/1.2 var(--sans);letter-spacing:-.02em}
+.launchpad-head p{margin:0;color:var(--muted);font-size:13px}
+.launch-route{margin:14px 0 0;display:flex;flex-wrap:wrap;align-items:center;border:1px solid var(--line-soft);background:var(--panel)}
+.launch-route span{padding:9px 14px;color:var(--muted);font:12px/1.4 var(--mono);border-right:1px solid var(--line-soft)}
+.launch-route span b{color:var(--accent);margin-right:6px}
+.launch-route span:last-child{border-right:0}
+.launch-grid{margin-top:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.launch-card{position:relative;display:flex;flex-direction:column;gap:8px;min-height:188px;padding:18px 18px 16px;border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg);color:var(--ink);text-align:left;cursor:pointer;transition:background .15s}
+.launch-card:hover,.launch-card:focus-visible{background:var(--panel)}
+.launch-card:hover .launch-go{color:var(--accent);transform:translateX(3px)}
+.launch-no{color:var(--faint);font:400 30px/1 var(--display);letter-spacing:-.03em}
+.launch-card:hover .launch-no{color:var(--accent)}
+.launch-card b{color:var(--strong);font-size:16px;font-weight:900}
+.launch-card p{margin:0;color:var(--muted);font-size:13px;line-height:1.6;flex:1}
+.launch-need{color:var(--faint);font:11px/1.5 var(--mono)}
+.launch-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:10px;border-top:1px dashed var(--line-soft)}
+.launch-live{font:11px/1.4 var(--mono);color:var(--faint);display:flex;align-items:center;gap:6px;min-width:0}
+.launch-live i{width:7px;height:7px;border-radius:50%;background:var(--line);flex:none}
+.launch-live.on{color:var(--green)}.launch-live.on i{background:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.launch-go{color:var(--muted);font:800 12px/1 var(--mono);transition:transform .15s,color .15s;white-space:nowrap}
+@media(max-width:1100px){.launch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.launch-grid{grid-template-columns:1fr}.launch-card{min-height:0}}
+
+/* ===== 设备比对：角色识别与写入流程 ===== */
+.flow-rail{margin:4px 0 16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line)}
+.flow-step{position:relative;padding:16px 18px 15px;border-right:1px solid var(--line);background:var(--panel-2);transition:background .2s}
+.flow-step:last-child{border-right:0}
+.flow-step::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:transparent;transition:background .25s}
+.flow-step.done::after{background:var(--green)}
+.flow-step.now::after{background:var(--accent)}
+.flow-step.now{background:var(--accent-soft)}
+.flow-step .flow-k{display:flex;align-items:center;gap:8px;color:var(--faint);font:800 11px/1 var(--mono);letter-spacing:.1em}
+.flow-step .flow-k i{font-style:normal;width:20px;height:20px;display:inline-grid;place-items:center;border:1px solid currentColor;font-size:11px}
+.flow-step.done .flow-k{color:var(--green)}.flow-step.now .flow-k{color:var(--accent)}
+.flow-step b{display:block;margin-top:10px;color:var(--strong);font-size:15px;font-weight:900}
+.flow-step p{margin:6px 0 0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.flow-step .flow-state{display:block;margin-top:8px;font:12px/1.4 var(--mono);color:var(--ink)}
+.role-badge{display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:3px 9px;border:1px solid var(--line);font:800 12px/1 var(--mono);white-space:nowrap}
+.role-badge::before{content:"";width:7px;height:7px;background:currentColor}
+.role-badge.board{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.role-badge.board-legacy{color:var(--amber);border-color:var(--amber);background:var(--amber-soft)}
+.role-badge.external{color:var(--violet);border-color:var(--violet);background:rgba(167,139,250,.1)}
+.role-evidence{margin:12px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line-soft)}
+.role-evidence li{padding:9px 11px;border-right:1px solid var(--line-soft);font-size:12px;line-height:1.5;color:var(--muted)}
+.role-evidence li:last-child{border-right:0}
+.role-evidence li b{display:block;font:800 11px/1.3 var(--mono);color:var(--faint);letter-spacing:.04em}
+.role-evidence li.yes b{color:var(--green)}
+.role-tip{margin-top:10px;font-size:12.5px;line-height:1.6;color:var(--muted)}
+.role-tip b{color:var(--strong)}
+.compare-card-board{border-color:var(--accent)!important}
+.compare-rules{margin-top:12px}
+.compare-rules table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+.compare-rules th,.compare-rules td{padding:9px 12px;border-bottom:1px solid var(--line-soft);text-align:left;vertical-align:top;line-height:1.55;color:var(--ink)}
+.compare-rules th{color:var(--accent);font:800 11px/1.4 var(--mono);letter-spacing:.06em}
+.compare-rules code{font-family:var(--mono);font-size:12px;color:var(--amber)}
+@media(max-width:760px){.flow-rail{grid-template-columns:1fr}.flow-step{border-right:0;border-bottom:1px solid var(--line)}.flow-step:last-child{border-bottom:0}.role-evidence{grid-template-columns:1fr}.role-evidence li{border-right:0;border-bottom:1px solid var(--line-soft)}}
+
 /* 新模块响应式 */
 @media(max-width:960px){
   .inspector-grid{grid-template-columns:1fr}
@@ -651,15 +844,20 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
       </div>
     </div>
     <nav class="mode-select" aria-label="工具模式">
-      <button class="mode-btn" data-mode="connect" onclick="switchMode('connect')">
-        <span class="ico" aria-hidden="true">●</span>
-        <span class="mode-title">实时监控</span>
-        <span class="mode-desc">读取设备信息与实时数据</span>
+      <button class="mode-btn mode-home" data-mode="manual" onclick="switchMode('manual')">
+        <span class="ico" aria-hidden="true">¶</span>
+        <span class="mode-title">使用手册</span>
+        <span class="mode-desc">首页：安装、连接与工具导航</span>
       </button>
       <button class="mode-btn" data-mode="flash" onclick="switchMode('flash')">
         <span class="ico" aria-hidden="true">↓</span>
         <span class="mode-title">固件刷写</span>
         <span class="mode-desc">把最新固件烧录到开发板</span>
+      </button>
+      <button class="mode-btn" data-mode="connect" onclick="switchMode('connect')">
+        <span class="ico" aria-hidden="true">●</span>
+        <span class="mode-title">实时监控</span>
+        <span class="mode-desc">读取设备信息与实时数据</span>
       </button>
       <button class="mode-btn" data-mode="compare" onclick="switchMode('compare')">
         <span class="ico" aria-hidden="true">＝</span>
@@ -681,16 +879,48 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
         <span class="mode-title">ERG 控制台</span>
         <span class="mode-desc">FTMS 智能骑行台目标功率与会话控制</span>
       </button>
-      <button class="mode-btn" data-mode="manual" onclick="switchMode('manual')">
-        <span class="ico" aria-hidden="true">¶</span>
-        <span class="mode-title">用户手册</span>
-        <span class="mode-desc">完整安装、连接与配置指南</span>
-      </button>
     </nav>
     <div class="masthead-right">
-      <span class="chip"><span class="dot"></span><span id="top-status">等待用户授权</span></span>
+      <div class="link-capsule" id="link-capsule" data-link="idle">
+        <button class="cap-btn" id="cap-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cap-panel" onclick="onCapsuleClick(event)">
+          <span class="cap-glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/></svg><i class="cap-dot"></i></span>
+          <span class="cap-text"><span class="cap-name" id="top-status">连接蓝牙设备</span><span class="cap-sub" id="cap-sub">BLE · 主连接</span></span>
+          <span class="cap-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="cap-panel hidden" id="cap-panel" role="dialog" aria-label="蓝牙连接详情"></div>
+      </div>
     </div>
   </header>
+
+  <!-- ============ 进站连接门：蓝牙是主连接，USB 串口只用于刷写 ============ -->
+  <div class="gate hidden" id="connect-gate" data-gate="choose" role="dialog" aria-modal="true" aria-labelledby="gate-title" onclick="if(event.target===this)closeGate('skip')">
+    <div class="gate-card">
+      <button class="gate-x" type="button" aria-label="稍后连接" onclick="closeGate('skip')">×</button>
+      <div class="gate-radar" aria-hidden="true">
+        <div class="radar-rings"></div>
+        <div class="radar-ticks"></div>
+        <div class="radar-sweep"></div>
+        <div class="radar-blips" id="gate-blips"></div>
+        <span class="radar-scale l">SCAN · 2.4 GHz</span><span class="radar-scale r" id="gate-scale-r">CPS · HRS · CSC · FTMS</span>
+        <div class="gate-core" id="gate-core"><svg viewBox="0 0 24 24"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/></svg></div>
+      </div>
+      <div class="gate-body">
+        <div class="gate-eyebrow"><span id="gate-step">STEP 0 / 连接</span><b id="gate-tag">BLE · 主连接</b></div>
+        <h2 id="gate-title">先连上你的<em>骑行设备</em>。</h2>
+        <p class="gate-desc" id="gate-desc">蓝牙是本工具台的主连接：实时监控、设备比对与模板写入、通知检查、健康检查、ERG 都共用这条 BLE 链路。连接后会打开使用手册，带你一步步操作。</p>
+        <div class="gate-known hidden" id="gate-known"></div>
+        <div class="gate-actions">
+          <button class="btn primary big" id="gate-connect" type="button" onclick="gateConnectPicker()">连接蓝牙设备</button>
+          <button class="btn ghost hidden" id="gate-repick" type="button" onclick="setGate('choose')">改为选择其他设备</button>
+        </div>
+        <div class="gate-alt">
+          <button class="gate-link" type="button" onclick="gateToFlash()">还没刷固件？去刷写<small>USB 串口仅用于刷写</small></button>
+          <button class="gate-link" type="button" onclick="closeGate('skip')">先看手册，稍后连接<small>右上角随时可连接</small></button>
+        </div>
+      </div>
+      <div class="gate-foot"><span>WEB BLUETOOTH</span><span>不会静默扫描 · 需你点选授权</span><span>Chrome / Edge 桌面版</span></div>
+    </div>
+  </div>
 
   <div class="card hidden" id="support-warning">
     当前浏览器不支持 Web Bluetooth API。请使用桌面版 Chrome / Edge，并通过 HTTPS 页面打开。
@@ -702,6 +932,11 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
       <div class="card-head">
         <h2>固件刷写</h2>
         <span class="badge warn" id="firmware-status">正在获取最新版本</span>
+      </div>
+
+      <div class="serial-scope" id="serial-scope">
+        <div><b>USB 串口只在这一页使用。</b>刷写走 Web Serial；刷完后拔掉数据线也没关系，其余所有工具都通过蓝牙连接开发板。</div>
+        <button class="btn alt sm" type="button" onclick="openGate()">刷完了，用蓝牙连接 →</button>
       </div>
 
       <div class="flash-lead">
@@ -884,18 +1119,31 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
   <section id="mode-compare" class="hidden">
     <div class="card">
       <div class="card-head">
-        <h2>多设备一比一比对</h2>
+        <h2>设备比对 · 模板写入开发板</h2>
         <div class="actions">
           <button class="btn primary" onclick="addCompareDevice()">添加设备</button>
+          <button class="btn alt hidden" id="compare-add-current" onclick="addCurrentToCompare()">加入监控中的设备</button>
           <button class="btn alt" onclick="renderCompareTable()">刷新比对</button>
           <button class="btn ghost" onclick="clearCompareDevices()">清空</button>
         </div>
       </div>
-      <div class="flash-step">
-        <b>怎么用</b>
-        <p>依次点击「添加设备」连接多台蓝牙设备，系统会自动比对各设备的信息字段和 GATT 服务列表。<span style="color:var(--amber)">黄色</span>背景表示该字段在设备间存在差异，<span style="color:var(--green)">绿色</span>表示一致。</p>
-        <p><b>复制为模板并写入开发板：</b>点击参考设备卡片上的「复制为模板」，会保存它的设备名、厂商、型号、序列号、硬件/固件/软件版本，并弹出写入面板。选择一台已连接、刷有 BikePower 新固件的开发板后，可把这些身份信息写入开发板 NVS，开发板的标准设备信息服务（DIS）随即对外报告新值；清空全部字段写入即可恢复固件内置值。</p>
+      <div class="flow-rail" id="compare-flow" aria-label="模板写入流程">
+        <div class="flow-step" id="flow-board"><span class="flow-k"><i>1</i>STEP 01</span><b>连接 BikePower 开发板</b><p>按 GATT 私有服务自动识别，不依赖设备名。</p><span class="flow-state" id="flow-board-state">尚未识别到开发板</span></div>
+        <div class="flow-step" id="flow-ref"><span class="flow-k"><i>2</i>STEP 02</span><b>添加参考骑行设备</b><p>功率计、心率带、骑行台等，只读不写。</p><span class="flow-state" id="flow-ref-state">尚未添加参考设备</span></div>
+        <div class="flow-step" id="flow-write"><span class="flow-k"><i>3</i>STEP 03</span><b>复制为模板 → 写入</b><p>在参考设备卡片上操作，写入后自动回读校验。</p><span class="flow-state" id="flow-write-state">等待前两步</span></div>
       </div>
+      <details class="flash-details compare-rules" open>
+        <summary>如何识别为开发板？</summary>
+        <table>
+          <thead><tr><th>识别结果</th><th>判定依据（连接后枚举 GATT）</th><th>可以做什么</th></tr></thead>
+          <tbody>
+            <tr><td><span class="role-badge board">BikePower 开发板 · 可写入</span></td><td>提供配置服务 <code>7a5a0000</code> 且含身份覆盖特征 <code>7a5a0008</code></td><td>写入目标：设备名、厂商、型号、序列号、硬件 / 固件 / 软件版本</td></tr>
+            <tr><td><span class="role-badge board-legacy">BikePower 开发板 · 旧固件</span></td><td>只有配置服务 <code>7a5a0000</code></td><td>可改设备名与参数；身份写入需先<a class="release-link" href="#/flash" onclick="switchMode('flash');return false">刷写新固件</a></td></tr>
+            <tr><td><span class="role-badge external">参考骑行设备</span></td><td>无 BikePower 配置服务</td><td>只读：比对、复制为模板，不会向它写入任何数据</td></tr>
+          </tbody>
+        </table>
+        <p class="hint" style="margin-top:10px">设备名可以被改成任何值（包括写入模板后），所以页面<b>不按名称判断</b>。<span style="color:var(--amber)">黄色</span>单元格表示该字段在设备间存在差异，<span style="color:var(--green)">绿色</span>表示一致。</p>
+      </details>
       <div class="card" id="compare-templates-card" style="display:none;margin-top:14px;padding:16px">
         <div class="card-head"><h2 style="font-size:16px">已保存模板 · 可写入开发板</h2></div>
         <div id="compare-templates-list" class="templates"></div>
@@ -903,7 +1151,7 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
       <div id="compare-empty" class="empty-state">
         <div class="big" aria-hidden="true">A/B</div>
         <p><b>尚未添加设备</b></p>
-        <p>点击「添加设备」连接第一台蓝牙设备</p>
+        <p>先连接 BikePower 开发板，再添加一台参考骑行设备。页面会自动识别谁是开发板。</p>
       </div>
       <div id="compare-devices"></div>
       <div id="compare-table-wrap" class="hidden" style="margin-top:16px;overflow-x:auto">
@@ -932,7 +1180,7 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
           </div>
           <div class="toc-progress-text">
             <b>阅读进度</b>
-            <span id="toc-ring-text">1 / 15 节</span>
+            <span id="toc-ring-text">1 / 16 节</span>
           </div>
         </div>
         <ol class="toc-list" id="toc-list"></ol>
@@ -955,7 +1203,63 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
             <div><span>固件版本</span><b>v4.2.0</b></div>
             <div><span>默认 BLE 名</span><b>BikePower</b></div>
             <div><span>配网地址</span><b>http://192.168.4.1</b></div>
-            <div><span>章节</span><b>15 节 · 10 分钟</b></div>
+            <div><span>章节</span><b>16 节 · 12 分钟</b></div>
+          </div>
+
+          <!-- 蓝牙连接状态条：未连接时提示连接；连接后按设备角色推荐下一步 -->
+          <div class="linkbar" id="manual-linkbar">
+            <span class="lb-mark">BLE</span>
+            <div><b id="lb-title">尚未连接蓝牙设备</b><span class="lb-sub" id="lb-sub">工具台以蓝牙为主连接。连接开发板或任意骑行设备后，手册会推荐下一步。</span></div>
+            <button class="btn primary sm" id="lb-action" type="button" onclick="linkbarAction()">连接蓝牙设备</button>
+          </div>
+
+          <!-- 工具导航：从手册进入具体操作页面 -->
+          <div class="launchpad" id="tool-launchpad" aria-label="网页工具导航">
+            <div class="launchpad-head">
+              <h2>读完要动手？从这里进入工具。</h2>
+              <p>顶部导航随时可切换；每个工具页都有独立链接，可收藏或分享。</p>
+            </div>
+            <div class="launch-route" aria-label="新手推荐顺序">
+              <span><b>新手顺序</b>刷写固件</span><span>→ 实时监控确认数据</span><span>→ 设备比对复制模板</span><span>→ 健康检查导出报告</span>
+            </div>
+            <div class="launch-grid">
+              <button class="launch-card" type="button" onclick="switchMode('flash')">
+                <span class="launch-no">01</span><b>固件刷写</b>
+                <p>USB 连接开发板，在浏览器里烧录最新 Release 固件，约 2 分钟。</p>
+                <span class="launch-need">需要：数据线 · 桌面 Chrome / Edge</span>
+                <span class="launch-foot"><span class="launch-live" data-live="flash"><i></i><span>读取固件版本中</span></span><span class="launch-go">打开 →</span></span>
+              </button>
+              <button class="launch-card" type="button" onclick="switchMode('connect')">
+                <span class="launch-no">02</span><b>实时监控</b>
+                <p>蓝牙连接设备，查看功率 / 踏频 / 心率曲线、GATT 中文解析与开发板配置。</p>
+                <span class="launch-need">需要：设备上电并在广播</span>
+                <span class="launch-foot"><span class="launch-live" data-live="connect"><i></i><span>未连接</span></span><span class="launch-go">打开 →</span></span>
+              </button>
+              <button class="launch-card" type="button" onclick="switchMode('compare')">
+                <span class="launch-no">03</span><b>设备比对 · 模板写入</b>
+                <p>并排对比多台骑行设备，自动识别 BikePower 开发板，把其他设备复制为模板写入开发板。</p>
+                <span class="launch-need">需要：开发板 + 一台参考骑行设备</span>
+                <span class="launch-foot"><span class="launch-live" data-live="compare"><i></i><span>0 台设备</span></span><span class="launch-go">打开 →</span></span>
+              </button>
+              <button class="launch-card" type="button" onclick="switchMode('inspector')">
+                <span class="launch-no">04</span><b>通知检查器</b>
+                <p>订阅任意特征，逐帧查看原始 BLE 通知 Hex 与中文解析，适合排查协议问题。</p>
+                <span class="launch-need">需要：已连接设备</span>
+                <span class="launch-foot"><span class="launch-live" data-live="inspector"><i></i><span>等待连接</span></span><span class="launch-go">打开 →</span></span>
+              </button>
+              <button class="launch-card" type="button" onclick="switchMode('health')">
+                <span class="launch-no">05</span><b>健康检查</b>
+                <p>一键检查浏览器环境、GATT 服务和通知频率，生成可发给开发者的诊断报告。</p>
+                <span class="launch-need">需要：已连接设备</span>
+                <span class="launch-foot"><span class="launch-live" data-live="health"><i></i><span>等待连接</span></span><span class="launch-go">打开 →</span></span>
+              </button>
+              <button class="launch-card" type="button" onclick="switchMode('erg')">
+                <span class="launch-no">06</span><b>ERG 控制台</b>
+                <p>向 FTMS 智能骑行台下发目标功率，验证 ERG 控制、启动 / 暂停与状态回传。</p>
+                <span class="launch-need">需要：支持 FTMS 控制点的设备</span>
+                <span class="launch-foot"><span class="launch-live" data-live="erg"><i></i><span>等待连接</span></span><span class="launch-go">打开 →</span></span>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -1473,7 +1777,7 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
             <div class="ch-meta">
               <div class="ch-kicker">TL;DR</div>
               <h2 class="ch-title">记住这 4 步</h2>
-              <p class="ch-desc">把 15 节压缩成 4 个动作：上电连接、长按进配网、修改保存、保存并关闭。</p>
+              <p class="ch-desc">把设备日常使用压缩成 4 个动作：上电连接、长按进配网、修改保存、保存并关闭。</p>
             </div>
           </header>
           <div class="ch-body">
@@ -1483,6 +1787,43 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
               <div><div class="n">03</div><div class="k">修改保存</div><div class="b">在网页里修改首页或设置页参数，每页改完点击「保存配置」或「保存设置」。</div></div>
               <div><div class="n">04</div><div class="k">保存并关闭</div><div class="b">回到首页点击「保存并关闭 WiFi」，约 5 秒后热点关闭，回到日常 BLE 使用。</div></div>
             </div>
+          </div>
+        </section>
+
+        <!-- 16 -->
+        <section class="ch" id="ch16">
+          <header class="ch-head">
+            <div class="ch-num">16</div>
+            <div class="ch-meta">
+              <div class="ch-kicker">WEB TOOLS</div>
+              <h2 class="ch-title">网页工具台 · 设备比对与模板写入</h2>
+              <p class="ch-desc">想让开发板在骑行 App 里显示得像另一台真实设备？用「设备比对」读取参考设备的身份信息，复制为模板，再一键写入开发板。</p>
+            </div>
+          </header>
+          <div class="ch-body">
+            <h3 class="ch-sub">进站连接：蓝牙是主连接，USB 串口只用于刷写</h3>
+            <p class="m-p">打开工具台会先弹出<b>蓝牙连接门</b>（类似钱包网站进站先连接钱包）：点「连接蓝牙设备」并在浏览器弹窗里选中设备即可。本站点授权过的设备会直接列出，点一下免弹窗直连；刷新页面时会自动重连上次的设备。连接成功后默认打开本手册，并在页面<b>右上角常驻连接胶囊</b>：绿点 = 已连接，红点 = 已断开（点击可一键重连），黄点 = 连接中或镜像其他标签页。点胶囊可查看厂商 / 型号 / 固件，切换设备、断开或直接写入身份。</p>
+            <div class="m-callout">USB 数据线与 Web Serial 只在「固件刷写」页使用；刷完后拔掉数据线也没关系，其余所有工具都走蓝牙。不想马上连接可点「先看手册，稍后连接」，本次会话内不再弹出。</div>
+            <h3 class="ch-sub">页面如何自动识别开发板</h3>
+            <p class="m-p">连接后网页会枚举设备的 GATT 服务，<b>不看设备名</b>（设备名可以被改成任何值），只看是否提供 BikePower 私有服务：</p>
+            <table class="m-tbl">
+              <thead><tr><th>识别结果</th><th>判定依据</th><th>可以做什么</th></tr></thead>
+              <tbody>
+                <tr><td><b>BikePower 开发板 · 可写入</b></td><td>提供配置服务 <code>7a5a0000</code>，且包含身份覆盖特征 <code>7a5a0008</code></td><td>作为写入目标，接收模板里的设备名、厂商、型号、序列号、硬件 / 固件 / 软件版本</td></tr>
+                <tr><td><b>BikePower 开发板 · 旧固件</b></td><td>只有配置服务 <code>7a5a0000</code>，没有 <code>7a5a0008</code></td><td>可以改设备名和参数；身份写入需先到「固件刷写」升级</td></tr>
+                <tr><td><b>参考骑行设备</b></td><td>没有 BikePower 配置服务的功率计、心率带、骑行台等</td><td>只读：比对字段、复制为模板（不会向它写入任何数据）</td></tr>
+              </tbody>
+            </table>
+            <h3 class="ch-sub">复制模板并写入 · 五步</h3>
+            <ol class="m-steps">
+              <li><p>打开「<b>设备比对</b>」，点「添加设备」连接开发板（已在实时监控里连着的，点「加入监控中的设备」即可）。卡片会显示橙色 <b>BikePower 开发板 · 可写入</b>。</p></li>
+              <li><p>再点「添加设备」连接参考骑行设备，卡片显示紫色 <b>参考骑行设备</b>，下方表格会标出两者差异。</p></li>
+              <li><p>在参考设备卡片上点「<b>复制为模板 → 写入开发板</b>」，模板会保存在浏览器里并打开写入面板，目标开发板已自动选好。</p></li>
+              <li><p>核对或修改字段（每项最多 31 字节，设备名最多 23 字节），点「写入开发板」并确认。</p></li>
+              <li><p>页面会回读校验并刷新卡片。骑行 App 若仍显示旧信息，在 App 里删除设备后重新搜索。</p></li>
+            </ol>
+            <div class="m-callout warn"><b>恢复原样：</b>在写入面板点「恢复内置值」，开发板的设备信息服务会回到固件内置的厂商 / 型号 / 版本，设备名不受影响。</div>
+            <p class="m-p" style="margin-top:20px"><button class="btn primary" type="button" onclick="switchMode('compare')">打开设备比对 →</button></p>
           </div>
         </section>
 
@@ -1512,6 +1853,10 @@ kbd{display:inline-block;min-width:24px;padding:2px 8px;border:1px solid var(--l
           </button>
           <button class="jump-row" onclick="scrollToChapter('ch14')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;width:100%;text-align:left;color:var(--ink);margin-top:10px">
             <div style="flex:1"><b style="color:var(--accent);font:800 11px/1 var(--mono);display:block">常见问题</b><span style="font-size:12.5px;margin-top:4px;display:block">14 · FAQ</span></div>
+            <span style="margin-left:auto;color:var(--accent);font-family:var(--mono)">→</span>
+          </button>
+          <button class="jump-row" onclick="scrollToChapter('ch16')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;width:100%;text-align:left;color:var(--ink);margin-top:10px">
+            <div style="flex:1"><b style="color:var(--accent);font:800 11px/1 var(--mono);display:block">模板写入开发板</b><span style="font-size:12.5px;margin-top:4px;display:block">16 · WEB TOOLS</span></div>
             <span style="margin-left:auto;color:var(--accent);font-family:var(--mono)">→</span>
           </button>
         </div>
@@ -2331,15 +2676,15 @@ function renderRealtime(rec){
 function updateMonitorEvidence(rec){
   const connected=!!(rec&&rec.server&&rec.server.connected);
   if(!connected&&!rec){
-    setText("top-status","等待用户授权");setText("link-status","未连接");setText("last-notify","等待用户主动选择蓝牙设备");
+    setLinkState(mirrorState?"mirror":"idle");setText("link-status","未连接");setText("last-notify","等待用户主动选择蓝牙设备");
     $("link-state").classList.add("is-idle");setText("health-score","--");setText("health-label","等待连接");setText("health-detail","尚无会话证据");setText("m-gap","--");
   }else if(!connected){
-    setText("top-status","BLE 已断开");setText("link-status","已断开 · 历史保留");
+    setLinkState("lost");setText("link-status","已断开 · 历史保留");
     setText("last-notify",rec.lastNotifyAt?"最后通知 "+notificationGapText(rec.lastNotifyAt)+" 前":"本次连接未收到运动通知");
     $("link-state").classList.add("is-idle");setText("health-score","0");setText("health-label","连接已断开");setText("health-detail","曲线、统计和导出数据仍保留在本页");
     setText("m-gap",rec.lastNotifyAt?((Date.now()-rec.lastNotifyAt)/1000).toFixed(1):"--");
   }else{
-    $("link-state").classList.remove("is-idle");setText("top-status","BLE 已连接");setText("link-status","已连接");
+    $("link-state").classList.remove("is-idle");setLinkState("connected");setText("link-status","已连接");
     const gap=rec.lastNotifyAt?Date.now()-rec.lastNotifyAt:null;
     setText("last-notify",gap===null?"已连接，等待第一条通知":"最后通知 "+notificationGapText(rec.lastNotifyAt)+" 前");
     setText("m-gap",gap===null?"--":(gap/1000).toFixed(1));
@@ -2637,9 +2982,44 @@ async function saveDeviceConfig(event){
   }finally{setConfigBusy(false);}
 }
 
-/* ==================== 模式切换 ==================== */
-function switchMode(mode){
+/* ==================== 模式切换与路由 ==================== */
+// 每个工具页都有独立链接：#/manual #/flash #/monitor #/compare #/inspector #/health #/erg；#chNN 直达手册章节
+const MODE_ROUTES={manual:"manual",flash:"flash",monitor:"connect",connect:"connect",compare:"compare",inspector:"inspector",health:"health",erg:"erg"};
+const MODE_SLUG={manual:"manual",flash:"flash",connect:"monitor",compare:"compare",inspector:"inspector",health:"health",erg:"erg"};
+const MODE_TITLE={manual:"使用手册",flash:"固件刷写",connect:"实时监控",compare:"设备比对",inspector:"通知检查器",health:"健康检查",erg:"ERG 控制台"};
+function routeFromHash(hash){
+  const raw=String(hash||"").replace(/^#\/?/,"").trim().toLowerCase();
+  if(/^ch\d{2}$/.test(raw))return {mode:"manual",chapter:raw};
+  return {mode:MODE_ROUTES[raw]||"manual",chapter:null};
+}
+function applyRoute(){
+  const route=routeFromHash(location.hash);
+  if(route.mode!==currentMode)switchMode(route.mode,{fromRoute:true});
+  if(route.chapter)setTimeout(()=>scrollToChapter(route.chapter),60);
+}
+function refreshLaunchpad(){
+  const set=(key,on,text)=>{const el=document.querySelector('.launch-live[data-live="'+key+'"]');if(!el)return;el.classList.toggle("on",!!on);el.lastElementChild.textContent=text;};
+  const linked=isSingleConnected();
+  const name=linked?(singleDevice.device.name||"未命名设备"):"";
+  const fw=!!(firmwareCatalog&&firmwareCatalog.available);
+  const fwBadge=$("firmware-status");
+  set("flash",fw,fw?"最新固件可刷写 · "+(firmwareCatalog.version||firmwareCatalog.tag||"latest"):"固件："+(fwBadge?fwBadge.textContent:"读取中"));
+  set("connect",linked,linked?"已连接 · "+name:"未连接");
+  const boards=connectedBoards().length,total=compareDevices.length;
+  set("compare",total>0||boards>0,total?total+" 台设备 · "+boards+" 台可写入开发板":(boards?"已连接 "+boards+" 台开发板":"0 台设备"));
+  ["inspector","health","erg"].forEach(key=>set(key,linked,linked?"可用 · "+name:"等待连接"));
+  renderManualLinkbar();renderLinkCapsule();
+}
+function switchMode(mode,opts){
+  if(!MODE_SLUG[mode])mode="manual";
+  const changed=currentMode!==mode;
   currentMode=mode;
+  if(!(opts&&opts.fromRoute)){
+    const target="#/"+MODE_SLUG[mode];
+    if(location.hash!==target){try{history.pushState(null,"",target);}catch(e){}}
+  }
+  try{document.title="BikePower · "+MODE_TITLE[mode];}catch(e){}
+  if(changed&&mode!=="manual"&&typeof window.scrollTo==="function")window.scrollTo(0,0);
   document.querySelectorAll(".mode-btn").forEach(b=>{
     b.classList.toggle("active",b.dataset.mode===mode);
   });
@@ -2655,7 +3035,7 @@ function switchMode(mode){
   if(mode==="inspector")refreshInspectorFromCurrent();
   if(mode==="health")renderHealthSteps();
   if(mode==="erg")ergRefreshFromCurrent();
-  if(mode==="manual")initManualOnce();
+  if(mode==="manual"){initManualOnce();refreshLaunchpad();}
 }
 
 /* ==================== Web Bluetooth 支持检测 ==================== */
@@ -2747,6 +3127,7 @@ async function loadFirmwareCatalog(){
 }
 function prepareForFlash(){
   if(singleDevice&&singleDevice.server&&singleDevice.server.connected){
+    autoLinkUserDisconnected=true;clearTimeout(reconnectTimer);
     try{singleDevice.server.disconnect();}catch(e){}
     log("开始刷写前已断开当前 BLE 连接","warn");
   }
@@ -2914,7 +3295,7 @@ async function connectSingleWith(device,source="picker",timeoutMs=20000){
   $("connect-result").classList.remove("hidden");
   const label={picker:"连接中...",auto:"自动连接中...",reconnect:"断线重连中...",tab:"关联其他标签页的设备..."}[source]||"连接中...";
   $("single-device-card").innerHTML='<div class="dc-head"><span class="badge warn">'+escapeHtml(label)+'</span></div>';
-  setText("top-status","正在连接");setText("monitor-device-name",device.name||"未命名设备");
+  setLinkState("connecting",device);setText("monitor-device-name",device.name||"未命名设备");
   try{
     let timer=null;
     const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{try{device.gatt.disconnect();}catch(e){}reject(new Error("连接超时（"+Math.round(timeoutMs/1000)+" 秒），设备可能不在附近或未上电"));},timeoutMs);});
@@ -2938,7 +3319,7 @@ function renderSingleDevice(rec){
   let html='<section><h3>设备身份</h3><div class="dc-head">';
   html+='<div><div class="dc-name">'+escapeHtml(deviceName)+'</div>';
   html+='<div class="dc-meta">'+escapeHtml(rec.device.id)+'</div></div>';
-  html+='<span class="badge ok" id="single-device-state">已连接</span></div><div class="dc-body">';
+  html+='<div class="actions">'+roleBadgeHtml(classifyDeviceRole(rec))+'<span class="badge ok" id="single-device-state">已连接</span></div></div><div class="dc-body">';
   for(const [key,label,uuid] of DIS_CHARS){
     const val=info[key]?escapeHtml(info[key]):"<span style='color:var(--faint)'>未提供</span>";
     html+='<div class="row"><span>'+escapeHtml(label)+'</span><span>'+val+'</span></div>';
@@ -3065,6 +3446,8 @@ async function addCompareDevice(){
 }
 
 async function addCompareDeviceFromExisting(device){
+  if(compareDevices.some(rec=>rec.device.id===device.id&&rec.server&&rec.server.connected)){log("该设备已在比对列表中","warn");return;}
+  if(isSingleConnected()&&singleDevice.device.id===device.id){addCurrentToCompare();return;}
   const card=document.createElement("div");
   card.className="device-card";
   card.style.marginTop="12px";
@@ -3083,24 +3466,93 @@ async function addCompareDeviceFromExisting(device){
 }
 
 function renderCompareDeviceCard(card,rec){
+  const role=classifyDeviceRole(rec);
+  card.classList.toggle("compare-card-board",role.role==="board");
   let html='<div class="dc-head">';
   html+='<div><div class="dc-name">'+escapeHtml(rec.device.name||"(无名设备)")+'</div>';
   html+='<div class="dc-meta">'+escapeHtml(rec.device.id)+'</div></div>';
-  html+='<span class="badge ok">已连接</span></div>';
+  html+='<div class="actions">'+roleBadgeHtml(role)+'<span class="badge '+(rec.server&&rec.server.connected?"ok":"err")+'">'+(rec.server&&rec.server.connected?"已连接":"已断开")+'</span></div></div>';
   const info=rec.info||{};
   const sub=[info.manufacturer,info.model,info.firmware].filter(Boolean).join(" · ");
   if(sub)html+='<div class="hint" style="margin-top:6px;font-family:var(--mono)">'+escapeHtml(sub)+'</div>';
-  if(supportsIdentityProfile(rec))html+='<div class="hint" style="margin-top:4px;color:var(--green)">✓ 支持写入身份信息（BikePower 开发板）</div>';
+  html+='<ul class="role-evidence">';
+  html+='<li class="'+(role.hasConfig?"yes":"no")+'"><b>'+(role.hasConfig?"✓":"×")+' 配置服务 7a5a0000</b>'+(role.hasConfig?"BikePower 私有服务":"未提供")+'</li>';
+  html+='<li class="'+(role.hasIdentity?"yes":"no")+'"><b>'+(role.hasIdentity?"✓":"×")+' 身份覆盖 7a5a0008</b>'+(role.hasIdentity?"可写入 DIS 身份":"未提供")+'</li>';
+  html+='<li class="'+(role.disCount?"yes":"no")+'"><b>'+(role.disCount?"✓":"×")+' 设备信息 DIS</b>可读 '+role.disCount+' / '+DIS_CHARS.length+' 个字段</li>';
+  html+='</ul>';
+  html+='<div class="role-tip">'+role.tip+'</div>';
   html+='<div class="dc-foot">';
-  html+='<button class="btn primary sm" onclick="saveAsTemplate(compareDevices['+rec._idx+'],true)">复制为模板</button>';
-  html+='<button class="btn alt sm" onclick="removeCompareDevice('+rec._idx+')">移除</button>';
+  if(role.role==="board"){
+    html+='<button class="btn primary sm" onclick="openTemplateWriter(null,compareDevices['+rec._idx+'])">编辑并写入身份信息</button>';
+    html+='<button class="btn alt sm" onclick="saveAsTemplate(compareDevices['+rec._idx+'],false)">保存为模板</button>';
+  }else{
+    html+='<button class="btn primary sm" onclick="copyTemplateToBoard('+rec._idx+')">复制为模板 → 写入开发板</button>';
+    html+='<button class="btn alt sm" onclick="saveAsTemplate(compareDevices['+rec._idx+'],false)">仅保存模板</button>';
+  }
+  html+='<button class="btn ghost sm" onclick="removeCompareDevice('+rec._idx+')">移除</button>';
   html+='</div>';
   card.innerHTML=html;
 }
 
+/* 设备角色识别：只看 GATT 私有服务/特征，不依赖可被改写的设备名 */
+function classifyDeviceRole(rec){
+  const services=(rec&&rec.services)||[];
+  const hasConfig=services.some(s=>(s.uuid||"").toLowerCase()===UUIDS.configService);
+  const hasIdentity=services.some(s=>(s.characteristics||[]).some(c=>(c.uuid||"").toLowerCase()===IDENTITY_PROFILE_UUID));
+  const info=(rec&&rec.info)||{};
+  const disCount=DIS_CHARS.filter(([key])=>!!info[key]).length;
+  if(hasConfig&&hasIdentity)return {role:"board",label:"BikePower 开发板 · 可写入",hasConfig,hasIdentity,disCount,writable:true,
+    tip:"<b>写入目标。</b>在参考设备卡片上点「复制为模板 → 写入开发板」，或直接编辑本机身份信息。"};
+  if(hasConfig)return {role:"board-legacy",label:"BikePower 开发板 · 旧固件",hasConfig,hasIdentity,disCount,writable:false,
+    tip:"<b>固件缺少身份覆盖特征。</b>可改设备名与参数；要写入厂商 / 型号 / 版本，请先到「固件刷写」升级后重新连接。"};
+  return {role:"external",label:"参考骑行设备",hasConfig,hasIdentity,disCount,writable:false,
+    tip:disCount?"<b>只读参考源。</b>复制它的设备名与 "+disCount+" 个 DIS 字段为模板，再写入开发板；不会向此设备写入任何数据。":"<b>此设备未提供设备信息服务（DIS）。</b>仍可复制设备名为模板，其余字段需手动填写。"};
+}
+function roleBadgeHtml(role){return '<span class="role-badge '+role.role+'">'+escapeHtml(role.label)+'</span>';}
+
+function copyTemplateToBoard(idx){
+  const rec=compareDevices[idx];if(!rec)return;
+  saveAsTemplate(rec,true);
+  if(!connectedBoards().length)log("模板已保存。还没有可写入的开发板：请先添加 BikePower 开发板，再在模板列表中点「写入开发板」","warn");
+}
+
+function addCurrentToCompare(){
+  if(!isSingleConnected()){log("实时监控中没有已连接的设备","warn");return;}
+  if(compareDevices.some(rec=>rec===singleDevice||rec.device.id===singleDevice.device.id)){log("该设备已在比对列表中","warn");return;}
+  singleDevice._idx=compareDevices.length;
+  compareDevices.push(singleDevice);
+  renderCompareDevices();renderCompareTable();
+  log("已把实时监控中的「"+(singleDevice.device.name||"设备")+"」加入比对（共用同一连接）");
+}
+function releaseCompareRec(rec){
+  // 与实时监控共用的连接不在比对页断开
+  if(rec&&rec!==singleDevice&&rec.server){try{rec.server.disconnect();}catch(e){}}
+}
+
+let compareLastWrite=null;
+function renderCompareFlow(){
+  if(!$("compare-flow"))return;
+  const live=compareDevices.filter(rec=>rec.server&&rec.server.connected);
+  const roles=live.map(rec=>({rec,role:classifyDeviceRole(rec)}));
+  const legacy=roles.filter(x=>x.role.role==="board-legacy");
+  const refs=roles.filter(x=>x.role.role==="external");
+  const allBoards=connectedBoards();
+  const s1=allBoards.length>0,s2=refs.length>0,s3=!!compareLastWrite;
+  const set=(id,done,now,text)=>{const el=$(id);el.classList.toggle("done",done);el.classList.toggle("now",!done&&now);setText(id+"-state",text);};
+  set("flow-board",s1,true,s1?"✓ "+allBoards.map(r=>r.device.name||"开发板").join("、"):(legacy.length?"检测到旧固件开发板，需先刷写升级":"尚未识别到开发板"));
+  set("flow-ref",s2,s1,s2?"✓ "+refs.map(x=>x.rec.device.name||"设备").join("、"):"尚未添加参考设备");
+  set("flow-write",s3,s1&&s2,s3?"✓ 已写入 "+compareLastWrite.target+"（"+compareLastWrite.time+"）":(s1&&s2?"在参考设备卡片上点「复制为模板 → 写入开发板」":"等待前两步"));
+  const addCurrent=$("compare-add-current");
+  if(addCurrent){
+    const show=isSingleConnected()&&!compareDevices.some(rec=>rec===singleDevice||rec.device.id===singleDevice.device.id);
+    addCurrent.classList.toggle("hidden",!show);
+    if(show)addCurrent.textContent="加入监控中的「"+(singleDevice.device.name||"设备")+"」";
+  }
+}
+
 function removeCompareDevice(idx){
   const rec=compareDevices[idx];
-  if(rec&&rec.server){try{rec.server.disconnect();}catch(e){}}
+  releaseCompareRec(rec);
   compareDevices=compareDevices.filter((_,i)=>i!==idx);
   compareDevices.forEach((r,i)=>r._idx=i);
   renderCompareDevices();
@@ -3112,6 +3564,7 @@ function renderCompareDevices(){
   box.innerHTML="";
   if(!compareDevices.length){
     $("compare-empty").classList.remove("hidden");
+    renderCompareFlow();
     return;
   }
   $("compare-empty").classList.add("hidden");
@@ -3121,11 +3574,13 @@ function renderCompareDevices(){
     renderCompareDeviceCard(card,rec);
     box.appendChild(card);
   });
+  renderCompareFlow();
 }
 
 function clearCompareDevices(){
-  compareDevices.forEach(rec=>{if(rec.server){try{rec.server.disconnect();}catch(e){}}});
+  compareDevices.forEach(releaseCompareRec);
   compareDevices=[];
+  compareLastWrite=null;
   renderCompareDevices();
   renderCompareTable();
 }
@@ -3133,12 +3588,16 @@ function clearCompareDevices(){
 function renderCompareTable(){
   const wrap=$("compare-table-wrap");
   const table=$("compare-table");
+  renderCompareFlow();
   if(compareDevices.length<1){wrap.classList.add("hidden");table.innerHTML="";return;}
   wrap.classList.remove("hidden");
   const fields=[["name","设备名"],...DIS_CHARS.map(c=>[c[0],c[1]])];
   let html="<thead><tr><th>字段</th>";
   compareDevices.forEach(rec=>{html+='<th>'+escapeHtml(rec.device.name||"设备")+'</th>';});
   html+="</tr></thead><tbody>";
+  html+='<tr><td class="field-name">识别结果</td>';
+  compareDevices.forEach(rec=>{html+='<td>'+roleBadgeHtml(classifyDeviceRole(rec))+'</td>';});
+  html+="</tr>";
   for(const [key,label] of fields){
     const vals=compareDevices.map(rec=>key==="name"?(rec.device.name||""):(rec.info[key]||""));
     const uniq=[...new Set(vals.map(v=>v||""))];
@@ -3177,6 +3636,7 @@ const MANUAL_META = {
   "ch13":{num:13,title:"保存和退出配网",kicker:"SAVE",points:["保存配置 / 设置 → WiFi 继续保持打开","保存并关闭 WiFi → 约 5 秒后关闭热点","直接关浏览器或断电可能丢失未保存修改"]},
   "ch14":{num:14,title:"常见问题",kicker:"TROUBLESHOOT",points:["搜不到 BLE / 进不了配网 / 无互联网","保存无效 / 功率不符 / LED 选项消失","固件升级统一走网页烧录"]},
   "ch15":{num:15,title:"记住这 4 步",kicker:"TL;DR",points:["连接 → 进配网 → 保存 → 关闭 WiFi","适合贴在设备旁或打印","任何陌生场景都按这 4 步就对了"]},
+  "ch16":{num:16,title:"设备比对与模板写入",kicker:"WEB TOOLS",points:["按 GATT 私有服务识别开发板，不看设备名","参考设备只读，只向开发板写入","写入后回读校验，可一键恢复内置值"]},
 };
 let MANUAL_INITED=false;
 let MANUAL_ACTIVE="ch01";
@@ -4260,7 +4720,7 @@ async function autoConnect(reason){
   try{
     const peer=[...tabPeers.values()].find(p=>p.connected&&p.deviceId);
     const devices=await orderedAuthorizedDevices(peer&&peer.deviceId);
-    if(!devices.length){setAutoLinkStatus("本站点还没有已授权设备：请先点「扫描并连接设备」完成一次授权。");return false;}
+    if(!devices.length){setAutoLinkStatus("本站点还没有已授权设备：请先点「扫描并连接设备」完成一次授权。");if(gateOpen&&gateState()==="auto")setGate("choose");return false;}
     for(const device of devices.slice(0,4)){
       if(isSingleConnected())return true;
       const name=device.name||"未命名设备";
@@ -4275,6 +4735,7 @@ async function autoConnect(reason){
       catch(err){log("自动连接「"+name+"」失败："+err.message,"warn");}
     }
     if(!isSingleConnected())setAutoLinkStatus("附近没有发现已授权设备。确认开发板已上电，或点「扫描并连接设备」。","err");
+    if(!isSingleConnected()&&gateOpen&&gateState()==="auto"&&!mirrorState)setGate("choose",{note:"没有找到上次的设备在广播。确认已上电、未被手机 App 占用，或选择其他设备。"});
     return isSingleConnected();
   }finally{autoLinkBusy=false;renderTabRelay();}
 }
@@ -4284,10 +4745,20 @@ function onSingleDeviceConnected(rec,source){
   setAutoLinkStatus("✓ "+how+"成功：「"+(rec.device.name||"未命名设备")+"」","ok");
   tabBusPost({type:"connected",deviceId:rec.device.id,name:rec.device.name||""});
   renderTabRelay();
+  // 比对列表里若有同一设备的旧连接记录（重连前加入的），替换为新连接
+  let replaced=false;
+  compareDevices=compareDevices.map(old=>{if(old!==rec&&old.device.id===rec.device.id&&!(old.server&&old.server.connected)){replaced=true;rec._idx=old._idx;return rec;}return old;});
+  if(replaced){renderCompareDevices();renderCompareTable();}
+  else renderCompareFlow();
+  refreshLaunchpad();
+  renderLinkCapsule();
+  if(gateOpen&&!gateBusy)gateSuccess(rec);
 }
 function onSingleDeviceDisconnected(rec){
   tabBusPost({type:"disconnected",deviceId:rec.device.id});
   renderTabRelay();
+  if(compareDevices.includes(rec)){renderCompareDevices();renderCompareTable();}else renderCompareFlow();
+  refreshLaunchpad();renderLinkCapsule();
   if(autoLinkUserDisconnected){setAutoLinkStatus("已手动断开，不会自动重连。");return;}
   if(!autoLinkEnabled){setAutoLinkStatus("连接已断开（自动重连已关闭）。","err");return;}
   scheduleReconnect(rec.configState&&rec.configState.expectedDisconnectMessage?3000:null);
@@ -4345,11 +4816,12 @@ function tabBusRelayData(rec){
 function startMirror(){
   const m=mirrorState;if(!m)return;
   setAutoLinkStatus("无法直接建立连接，改为镜像显示另一个标签页的实时数据。","ok");
-  setText("monitor-device-name",m.name||"镜像设备");setText("top-status","镜像其他标签页");setText("link-status","跨标签页镜像");
+  setText("monitor-device-name",m.name||"镜像设备");setLinkState("mirror");setText("link-status","跨标签页镜像");
   const ls=$("link-state");if(ls)ls.classList.remove("is-idle");
   setText("power-summary","正在镜像其他标签页的实时数据。");
   setText("power-detail","数值由另一个已连接的标签页通过 BroadcastChannel 转发；本页没有自己的 GATT 连接，因此不记录曲线、不提供配置写入。");
   renderTabRelay();
+  if(gateOpen&&!gateBusy){closeGate("mirror");if(!gateReturnMode)switchMode("manual");}
 }
 function renderMirror(message){
   const l=message.latest||{};const power=l.power==null?l.ftmsPower:l.power;
@@ -4363,6 +4835,7 @@ function renderMirror(message){
 function endMirror(text){
   mirrorState=null;setAutoLinkStatus(text,"err");
   if(!isSingleConnected())resetMonitorSignals();
+  renderLinkCapsule();
   renderTabRelay();
 }
 function renderTabRelay(){
@@ -4395,10 +4868,267 @@ function initAutoLink(){
   setTimeout(()=>{if(!isSingleConnected()&&!autoLinkBusy&&!mirrorState)autoConnect("auto");},700);
 }
 
+/* ==================== 蓝牙主连接：进站连接门 + 右上角常驻胶囊 ==================== */
+// 交互模型参考 Web3 钱包站点：进站先提示连接主设备（这里是蓝牙，不是串口）→ 连接后默认打开使用手册 → 右上角常驻连接状态。
+// USB 串口（Web Serial）只在「固件刷写」页出现，不作为工具台的主连接。
+const GATE_SKIP_KEY="bikepower_gate_skipped";
+const ROLE_SHORT={board:"开发板 · 可写入","board-legacy":"开发板 · 旧固件",external:"参考设备"};
+const LINK_STATE_CN={idle:"未连接",connecting:"连接中",connected:"已连接",lost:"已断开",mirror:"镜像中",unsupported:"不支持"};
+let linkState="idle",linkPending=null,gateOpen=false,gateBusy=false,gateKnown=[],gateReturnMode=null;
+let capRenderKey="",capPanelKey="";
+function reduceMotion(){try{return !!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);}catch(e){return false;}}
+function gateSleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function setLinkState(state,device){
+  linkState=state;
+  if(state==="connecting")linkPending=device?{name:device.name||"未命名设备",id:device.id}:linkPending;
+  else linkPending=null;
+  renderLinkCapsule();
+}
+/* 胶囊显示内容只由真实连接状态推导：已连接 > 连接中 > 镜像 > 已断开 > 未连接 */
+function linkSnapshot(){
+  if(isSingleConnected()){
+    const rec=singleDevice,role=classifyDeviceRole(rec),info=rec.info||{};
+    const sub=[ROLE_SHORT[role.role],info.model,info.firmware?"FW "+info.firmware:""].filter(Boolean).join(" · ");
+    return {state:"connected",name:rec.device.name||"未命名设备",sub,rec,role};
+  }
+  if(linkState==="connecting")return {state:"connecting",name:linkPending?linkPending.name:"正在连接…",sub:"正在建立 GATT 连接"};
+  if(mirrorState)return {state:"mirror",name:mirrorState.name||"镜像设备",sub:"镜像其他标签页 · 只读"};
+  if(singleDevice)return {state:"lost",name:singleDevice.device.name||"设备",sub:"已断开 · 点击重连",rec:singleDevice,role:classifyDeviceRole(singleDevice)};
+  if(typeof navigator==="undefined"||!navigator.bluetooth)return {state:"unsupported",name:"浏览器不支持蓝牙",sub:"请用桌面 Chrome / Edge"};
+  return {state:"idle",name:"连接蓝牙设备",sub:"BLE · 主连接"};
+}
+function renderLinkCapsule(){
+  const cap=$("link-capsule");if(!cap)return;
+  const s=linkSnapshot();
+  const key=s.state+"|"+s.name+"|"+s.sub;
+  if(key!==capRenderKey){
+    capRenderKey=key;cap.dataset.link=s.state;
+    setText("top-status",s.name);setText("cap-sub",s.sub);
+    const btn=$("cap-btn");if(btn)btn.title=LINK_STATE_CN[s.state]+" · "+s.name+(s.sub?" · "+s.sub:"");
+  }
+  const panel=$("cap-panel");if(panel&&!panel.classList.contains("hidden"))renderCapPanel(s);
+}
+function renderCapPanel(s){
+  const panel=$("cap-panel");if(!panel)return;
+  s=s||linkSnapshot();
+  const info=(s.rec&&s.rec.info)||{};
+  const last=s.rec&&s.rec.lastNotifyAt?notificationGapText(s.rec.lastNotifyAt)+" 前":"—";
+  let h='<div class="cp-head"><span>BLUETOOTH LINK</span><span class="cp-state '+s.state+'">● '+LINK_STATE_CN[s.state]+'</span></div><div class="cp-main">';
+  h+='<div class="cp-name">'+escapeHtml(s.name)+'</div>';
+  if(s.rec){
+    h+='<div class="cp-id">'+escapeHtml(s.rec.device.id||"")+'</div>';
+    h+='<div class="cp-role">'+roleBadgeHtml(s.role)+'</div>';
+    h+='<div class="cp-rows">';
+    [["厂商",info.manufacturer],["型号",info.model],["固件版本",info.firmware],["最后通知",last]].forEach(([k,v])=>{h+='<div class="cp-row"><span>'+k+'</span><span>'+escapeHtml(v||"未提供")+'</span></div>';});
+    h+='</div>';
+  }else if(s.state==="mirror"){
+    h+='<div class="cp-note">本页没有自己的 GATT 连接，正在显示另一个标签页转发的实时数值。可自行连接以使用写入类功能。</div>';
+  }else if(s.state==="connecting"){
+    h+='<div class="cp-note">连接 GATT → 读取设备信息 → 枚举服务 → 订阅通知，通常 2–6 秒。</div>';
+  }
+  h+='</div><div class="cp-actions">';
+  const act=(label,fn,cls)=>'<button class="btn sm '+(cls||"")+'" type="button" onclick="closeCapPanel();'+fn+'">'+label+'</button>';
+  if(s.state==="connected"){
+    h+=act("实时监控","switchMode(\'connect\')");
+    h+=act("设备比对","switchMode(\'compare\')");
+    if(s.role&&s.role.writable)h+=act("写入身份","openTemplateWriter(null,singleDevice)","alt");
+    h+=act("切换设备","openGate({force:true})");
+    h+=act("断开","disconnectSingle()","ghost");
+  }else if(s.state==="lost"){
+    h+=act("重新连接","reconnectFromCapsule()","primary");
+    h+=act("换一台设备","openGate({force:true})");
+    h+=act("查看会话历史","switchMode(\'connect\')","ghost");
+  }else if(s.state==="mirror"){
+    h+=act("自行连接","openGate({force:true})","primary");
+    h+=act("实时监控","switchMode(\'connect\')");
+  }
+  h+='</div><button class="cp-serial" type="button" onclick="closeCapPanel();switchMode(\'flash\')"><span><b>USB 串口</b> 只在「固件刷写」中使用</span><span>→</span></button>';
+  if(h!==capPanelKey){capPanelKey=h;panel.innerHTML=h;}
+}
+function onCapsuleClick(event){
+  if(event)event.stopPropagation();
+  const s=linkSnapshot();
+  if(s.state==="idle"||s.state==="unsupported"){openGate({force:true});return;}
+  const panel=$("cap-panel");if(!panel)return;
+  if(panel.classList.contains("hidden")){capPanelKey="";renderCapPanel(s);panel.classList.remove("hidden");$("cap-btn").setAttribute("aria-expanded","true");}
+  else closeCapPanel();
+}
+function closeCapPanel(){const panel=$("cap-panel");if(panel)panel.classList.add("hidden");const b=$("cap-btn");if(b)b.setAttribute("aria-expanded","false");}
+async function reconnectFromCapsule(){
+  if(!singleDevice)return openGate({force:true});
+  autoLinkUserDisconnected=false;
+  try{await connectSingleWith(singleDevice.device,"reconnect");}catch(err){log("重新连接失败："+err.message,"warn");openGate({force:true,state:"error",message:err.message});}
+}
+function capsuleArrive(){
+  const cap=$("link-capsule");if(!cap)return;
+  cap.classList.remove("cap-arrive");void cap.offsetWidth;cap.classList.add("cap-arrive");
+  setTimeout(()=>cap.classList.remove("cap-arrive"),1000);
+}
+
+/* ---- 连接门 ---- */
+function gateState(){const g=$("connect-gate");return g?g.dataset.gate:"";}
+const GATE_COPY={
+  choose:{step:"STEP 0 / 连接",tag:"BLE · 主连接",title:'先连上你的<em>骑行设备</em>。',desc:"蓝牙是本工具台的主连接：实时监控、设备比对与模板写入、通知检查、健康检查、ERG 都共用这条 BLE 链路。连接后会打开使用手册，带你一步步操作。",cta:"连接蓝牙设备"},
+  auto:{step:"STEP 0 / 自动重连",tag:"已授权 · 免弹窗",title:"正在重连<em>「{name}」</em>",desc:"本站点已获得授权，正在等待设备广播并自动连接，不需要再次弹出选择器。设备未上电时约 6 秒后回到手动选择。",cta:"自动连接中…"},
+  connecting:{step:"STEP 1 / 握手",tag:"GATT",title:"正在连接<em>「{name}」</em>",desc:"连接 GATT → 读取设备信息 → 枚举服务 → 订阅通知。保持设备上电并靠近电脑。",cta:"连接中…"},
+  locked:{step:"STEP 2 / 已锁定",tag:"连接成功",title:"已连接<em>「{name}」</em>",desc:"{role}{next}",cta:"已连接"},
+  error:{step:"STEP 0 / 重试",tag:"连接失败",title:"没能连上。",desc:"{message}",cta:"重新选择设备"},
+  unsupported:{step:"环境不满足",tag:"无 Web Bluetooth",title:"此浏览器无法使用蓝牙。",desc:"Web Bluetooth 只在桌面版 Chrome / Edge（HTTPS 页面）可用，Safari、Firefox 与 iOS 浏览器不支持。你仍可阅读使用手册；刷写固件需要同样支持 Web Serial 的 Chrome / Edge。",cta:"当前浏览器不支持"},
+};
+function setGate(state,opts){
+  opts=opts||{};
+  const g=$("connect-gate");if(!g)return;
+  g.dataset.gate=state;
+  const c=GATE_COPY[state]||GATE_COPY.choose;
+  const fill=t=>t.replace("{name}",escapeHtml(opts.name||"设备")).replace("{role}",opts.role?escapeHtml(opts.role)+"。":"").replace("{next}",gateReturnMode&&MODE_TITLE[gateReturnMode]?"正在返回「"+MODE_TITLE[gateReturnMode]+"」…":"正在打开使用手册…").replace("{message}",escapeHtml(opts.message||"设备没有响应。")+" 请确认设备已上电、未被手机 App 占用（多数 BLE 外设同一时间只允许一个连接）。");
+  setText("gate-step",c.step);setText("gate-tag",c.tag);
+  $("gate-title").innerHTML=fill(c.title);
+  setText("gate-desc",opts.note||fill(c.desc));
+  const cta=$("gate-connect");cta.textContent=c.cta;cta.disabled=!(state==="choose"||state==="error");
+  $("gate-repick").classList.toggle("hidden",state!=="auto");
+  document.querySelectorAll("#gate-known .gate-dev").forEach(b=>{b.disabled=!(state==="choose"||state==="error");});
+  $("gate-known").classList.toggle("hidden",!gateKnown.length||state==="locked"||state==="unsupported");
+}
+async function renderGateKnown(){
+  const list=$("gate-known"),blips=$("gate-blips");if(!list)return;
+  gateKnown=(await orderedAuthorizedDevices()).slice(0,4);
+  const last=lastDevice();
+  if(!gateKnown.length){list.innerHTML="";list.classList.add("hidden");if(blips)blips.innerHTML="";return;}
+  list.innerHTML='<div class="gate-known-head">已授权设备 · 点击直连，无需再选</div>'+gateKnown.map((d,i)=>{
+    const isLast=!!(last&&last.id===d.id);
+    return '<button class="gate-dev" type="button" onclick="gateConnectKnown('+i+')"><span class="gate-dev-name">'+escapeHtml(d.name||"未命名设备")+'</span><span class="gate-dev-tag'+(isLast?" last":"")+'">'+(isLast?"上次使用":"已授权")+'</span><span class="gate-dev-go">连接 →</span></button>';
+  }).join("");
+  // 已授权设备作为雷达上的光点：沿半圆表盘分布，上次使用的设备为橙色
+  if(blips)blips.innerHTML=gateKnown.map((d,i)=>{
+    const angle=(gateKnown.length===1?-22:-58+i*(116/(gateKnown.length-1)))*Math.PI/180;const r=gateKnown.length===1?96:84+(i%2)*40;
+    const x=Math.sin(angle)*r,y=Math.cos(angle)*r;const isLast=!!(last&&last.id===d.id);
+    return '<span class="blip'+(isLast?" last":"")+'" style="left:calc(50% + '+x.toFixed(1)+'px);bottom:'+y.toFixed(1)+'px"><i></i>'+escapeHtml((d.name||"设备").slice(0,14))+'</span>';
+  }).join("");
+  setGate(gateState()||"choose");
+}
+async function openGate(opts){
+  opts=opts||{};
+  closeCapPanel();
+  const g=$("connect-gate");if(!g)return;
+  if(!opts.force&&(isSingleConnected()||mirrorState))return;
+  gateOpen=true;g.classList.remove("hidden","gate-leaving");document.body.classList.add("gate-lock");
+  const state=opts.state||((typeof navigator==="undefined"||!navigator.bluetooth)?"unsupported":"choose");
+  setGate(state,opts);
+  await renderGateKnown();
+  setGate(state,opts);
+  setTimeout(()=>{const b=$("gate-connect");if(gateOpen&&b&&!b.disabled)b.focus();},40);
+}
+function closeGate(reason){
+  if(!gateOpen)return;
+  gateOpen=false;
+  const g=$("connect-gate");if(g){g.classList.add("hidden");g.classList.remove("gate-leaving");}
+  document.body.classList.remove("gate-lock");
+  if(reason==="skip"){try{sessionStorage.setItem(GATE_SKIP_KEY,"1");}catch(e){}log("已跳过蓝牙连接：右上角可随时连接","warn");}
+}
+function gateToFlash(){closeGate("flash");gateReturnMode=null;switchMode("flash");}
+async function gateConnectPicker(){
+  if(gateBusy)return;
+  const device=await requestDevice();
+  if(!device)return;
+  await gateRun(device,"picker");
+}
+async function gateConnectKnown(i){const d=gateKnown[i];if(d&&!gateBusy)await gateRun(d,"auto");}
+async function gateRun(device,source){
+  gateBusy=true;autoLinkUserDisconnected=false;
+  setGate("connecting",{name:device.name||"未命名设备"});
+  try{const rec=await connectSingleWith(device,source);gateBusy=false;await gateSuccess(rec);}
+  catch(err){setGate("error",{message:err.message});}
+  finally{gateBusy=false;}
+}
+/* 成功：表盘锁定 → 信号点沿弧线飞入右上角胶囊 → 胶囊回响一圈 → 打开使用手册 */
+async function gateSuccess(rec){
+  if(!gateOpen)return;
+  rec=rec||singleDevice;if(!rec)return;
+  const role=classifyDeviceRole(rec);
+  setGate("locked",{name:rec.device.name||"未命名设备",role:role.label});
+  await gateSleep(reduceMotion()?0:520);
+  await flyToCapsule();
+  closeGate("connected");
+  capsuleArrive();
+  const target=gateReturnMode||"manual";gateReturnMode=null;
+  switchMode(target);
+  if(target==="manual"&&typeof window.scrollTo==="function")window.scrollTo(0,0);
+}
+function flyToCapsule(){
+  return new Promise(resolve=>{
+    const from=$("gate-core"),to=document.querySelector("#link-capsule .cap-glyph");
+    const g=$("connect-gate");
+    if(!from||!to||reduceMotion()||typeof from.animate!=="function"){resolve();return;}
+    const a=from.getBoundingClientRect(),b=to.getBoundingClientRect();
+    if(!b.width){resolve();return;}
+    const size=18,ax=a.left+a.width/2,ay=a.top+a.height/2,dx=b.left+b.width/2-ax,dy=b.top+b.height/2-ay;
+    const dot=document.createElement("div");dot.className="gate-fly";
+    dot.style.left=(ax-size/2)+"px";dot.style.top=(ay-size/2)+"px";
+    document.body.appendChild(dot);
+    if(g)g.classList.add("gate-leaving");
+    // 先略微上抛再落向胶囊，形成一条弧线
+    const anim=dot.animate([
+      {transform:"translate(0,0) scale(1.8)",opacity:1},
+      {transform:"translate("+(dx*0.45)+"px,"+(dy*0.62-60)+"px) scale(1.1)",opacity:1,offset:.55},
+      {transform:"translate("+dx+"px,"+dy+"px) scale(.4)",opacity:.85},
+    ],{duration:680,easing:"cubic-bezier(.55,.06,.3,1)"});
+    const done=()=>{dot.remove();resolve();};
+    anim.onfinish=done;anim.oncancel=done;
+  });
+}
+
+/* ---- 手册首页状态条：按设备角色推荐下一步 ---- */
+function renderManualLinkbar(){
+  const bar=$("manual-linkbar");if(!bar)return;
+  const s=linkSnapshot();
+  let title,sub,label,on=false;
+  if(s.state==="connected"){
+    on=true;title="已连接「"+s.name+"」 · "+s.role.label;
+    if(s.role.role==="board"){sub="推荐下一步：打开「实时监控」确认功率 / 踏频 / 心率在刷新，再到「设备比对」复制参考设备身份写入。";label="打开实时监控 →";}
+    else if(s.role.role==="board-legacy"){sub="这块开发板固件较旧，缺少身份写入特征。建议先到「固件刷写」升级（USB 串口），完成后再用蓝牙连回来。";label="去升级固件 →";}
+    else{sub="这是一台参考骑行设备（只读）。到「设备比对」再连上你的开发板，就能把它的设备名、厂商、型号、版本复制为模板写入开发板。";label="去设备比对 →";}
+  }else if(s.state==="connecting"){title="正在连接「"+s.name+"」…";sub="连接完成后这里会给出下一步建议。";label="查看进度";}
+  else if(s.state==="mirror"){on=true;title="正在镜像其他标签页的「"+s.name+"」";sub="本页只读显示实时数值。写入、配置等操作需要本页自行连接。";label="自行连接";}
+  else if(s.state==="lost"){title="「"+s.name+"」已断开";sub="会话曲线与报告仍保留。设备重新上电后可一键重连。";label="重新连接";}
+  else if(s.state==="unsupported"){title="当前浏览器不支持 Web Bluetooth";sub="请改用桌面版 Chrome / Edge 打开本页。手册内容不受影响。";label="";}
+  else{title="尚未连接蓝牙设备";sub="工具台以蓝牙为主连接。连接开发板或任意骑行设备后，这里会推荐下一步。USB 串口只在「固件刷写」中使用。";label="连接蓝牙设备";}
+  bar.classList.toggle("on",on);bar.dataset.state=s.state;bar.dataset.role=s.role?s.role.role:"";
+  setText("lb-title",title);setText("lb-sub",sub);
+  const btn=$("lb-action");if(btn){btn.textContent=label;btn.classList.toggle("hidden",!label);btn.className="btn sm "+(on?"alt":"primary")+(label?"":" hidden");}
+}
+function linkbarAction(){
+  const bar=$("manual-linkbar");const state=bar?bar.dataset.state:"idle",role=bar?bar.dataset.role:"";
+  if(state==="connected"){switchMode(role==="board"?"connect":role==="board-legacy"?"flash":"compare");return;}
+  if(state==="lost"){reconnectFromCapsule();return;}
+  if(state==="connecting"){switchMode("connect");return;}
+  openGate({force:true});
+}
+
+/* ---- 启动：决定是否弹出连接门 ---- */
+async function initLinkUi(){
+  document.addEventListener("click",e=>{const cap=$("link-capsule");if(cap&&!cap.contains(e.target))closeCapPanel();});
+  document.addEventListener("keydown",e=>{
+    if(e.key!=="Escape")return;
+    if(gateOpen&&!gateBusy&&$("confirm-mask").classList.contains("hidden")){e.preventDefault();closeGate("skip");}
+    else closeCapPanel();
+  });
+  renderLinkCapsule();renderManualLinkbar();
+  const route=routeFromHash(location.hash);
+  if(route.mode==="flash")return;                      // 刷写页只用 USB 串口，不打扰
+  let skipped=false;try{skipped=sessionStorage.getItem(GATE_SKIP_KEY)==="1";}catch(e){}
+  if(skipped)return;                                   // 本次会话已选择「稍后连接」
+  gateReturnMode=route.mode!=="manual"?route.mode:null; // 深链进来的，连接后回到原工具页
+  if(!navigator.bluetooth){openGate({state:"unsupported"});return;}
+  const known=await orderedAuthorizedDevices();
+  if(isSingleConnected()||mirrorState)return;
+  if(known.length&&autoLinkEnabled){const last=lastDevice();openGate({state:"auto",name:(last&&last.name)||known[0].name||"上次的设备"});}
+  else openGate({state:"choose"});
+}
+
 /* ==================== 模板写入开发板 ==================== */
 let writerState={template:null,busy:false,preferId:null};
 function supportsIdentityProfile(rec){
-  return !!(rec&&rec.services&&rec.services.some(s=>s.characteristics.some(c=>(c.uuid||"").toLowerCase()===IDENTITY_PROFILE_UUID)));
+  return classifyDeviceRole(rec).role==="board";
 }
 function connectedBoards(){
   const list=[];const seen=new Set();
@@ -4429,7 +5159,7 @@ function refreshWriterTargets(){
   const boards=connectedBoards();const select=$("writer-target");
   if(!boards.length){
     select.innerHTML='<option value="">（没有已连接、支持身份写入的开发板）</option>';select.disabled=true;
-    setText("writer-target-hint","请先在「实时监控」或本页「添加设备」连接 BikePower 开发板；开发板需刷入带「设备身份覆盖」特征的新固件。");
+    setText("writer-target-hint","还没有可写入的开发板：请在「设备比对」点「添加设备」连接 BikePower 开发板（卡片显示「BikePower 开发板 · 可写入」）。显示「旧固件」的开发板需先刷写新固件。模板已保存，连接后可在模板列表点「写入开发板」。");
     return;
   }
   select.disabled=false;
@@ -4526,6 +5256,7 @@ async function performIdentityWrite(rec,identity,newName){
     if(rec.server&&rec.server.connected)rec.info=await readDeviceInfo(rec.server);
     finish(3,"已刷新：厂商「"+(rec.info.manufacturer||"—")+"」· 型号「"+(rec.info.model||"—")+"」· 固件「"+(rec.info.firmware||"—")+"」");
     log("身份信息已写入开发板 "+(rec.device.name||rec.device.id),"data");
+    compareLastWrite={target:rec.device.name||rec.device.id.slice(0,8),time:new Date().toLocaleTimeString("zh-CN",{hour12:false})};
     if(rec===singleDevice)renderSingleDevice(rec);
     renderCompareDevices();renderCompareTable();
   }catch(err){
@@ -4561,10 +5292,15 @@ window.addEventListener("load",()=>{
   checkSupport();
   installEspWebToolsTheme();
   loadFirmwareCatalog();
-  switchMode("connect");
+  // 默认打开使用手册；带 #/monitor 等链接时直达对应工具页
+  applyRoute();
+  window.addEventListener("hashchange",applyRoute);
+  window.addEventListener("popstate",applyRoute);
   resetMonitorSignals();
   log("BLE 工具台已就绪。");
   initAutoLink();
+  initLinkUi();
+  setInterval(refreshLaunchpad,2000);
 });
 </script>
 </body>
