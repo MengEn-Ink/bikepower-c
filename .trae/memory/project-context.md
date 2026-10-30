@@ -12,7 +12,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 
 - BikePower 从 MicroPython（仓库 esp32-power）**完全重写**为 C + ESP-IDF + NimBLE。
 - 用户授权"全程你来设计开发"，分阶段（0-6）推进，每阶段编译 → 烧录 → 真机验证后提交推送。
-- 项目根目录以当前 Git 工作区为准，不在规则中绑定单台机器路径；ESP-IDF v5.5.4，当前固件 v4.2.0。
+- 项目根目录以当前 Git 工作区为准，不在规则中绑定单台机器路径；ESP-IDF v5.5.4，当前固件 v4.2.1。
 - MicroPython 专有约束（mpremote/gc/_thread/const/.mpy/部署 .py）**不适用**本项目。
 
 ---

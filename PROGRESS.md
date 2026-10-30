@@ -1,11 +1,18 @@
 # BikePower C — 项目进度
 
 > 基线方案：[docs/archive/01-cidf-nimble-rewrite.md](docs/archive/01-cidf-nimble-rewrite.md)
-> 当前固件版本：v4.2.0（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v4.2.1（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
 ---
+
+## 2026-10-30 v4.2.1 发布验收
+
+- [x] host `6144/0`、全量 operation gate、clean build、generic-c3 烧录与串口启动通过。
+- [x] BLE 五服务、四路通知、FTMS ERG、配置五组读写/错误事务、NVS 重启持久化、GATT 重建、广播掩码与双次重连通过。
+- [ ] WiFi Portal 真机验收：经用户明确豁免；连接设备热点会中断当前发布网络，本次未覆盖。
+- [ ] 物理按钮与 LED 灯效：需要人工观察，本次未覆盖。
 
 ## 阶段进度总览
 
