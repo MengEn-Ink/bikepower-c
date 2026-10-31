@@ -88,6 +88,8 @@ class WebFlashSiteTest(unittest.TestCase):
             self.assertTrue(firmware.is_file())
             self.assertEqual(hashlib.sha256(firmware.read_bytes()).hexdigest(), board_info["sha256"])
             manifest = json.loads((site / board_info["manifest"]).read_text())
+            self.assertEqual(manifest["new_install_improv_wait_time"], 0)
+            self.assertTrue(manifest["new_install_prompt_erase"])
             self.assertEqual(manifest["builds"][0]["chipFamily"], "ESP32-C3")
             self.assertEqual(manifest["builds"][0]["parts"][0]["offset"], 0)
             self.assertEqual(manifest["builds"][0]["parts"][0]["path"], firmware.name)

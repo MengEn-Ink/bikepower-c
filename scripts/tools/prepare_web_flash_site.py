@@ -248,6 +248,7 @@ def manifest(board, version, firmware_name):
         ],
         "name": f"BikePower C {BOARD_LABELS[board]}",
         "new_install_prompt_erase": True,
+        "new_install_improv_wait_time": 0,
         "version": version,
     }
 

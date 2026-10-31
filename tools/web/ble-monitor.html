@@ -1393,7 +1393,8 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 @media(max-width:380px){.mg-channels{grid-template-columns:1fr 1fr}.mg-ch:nth-child(2){border-right:0}.mg-ch:nth-child(-n+2){border-bottom:1px solid var(--line-soft)}.mg-tools{grid-template-columns:1fr}.mg-tools li{border-right:0}.mg-tools li:nth-last-child(2){border-bottom:1px solid var(--line-soft)}}
 @media(prefers-reduced-motion:reduce){.mg-ch s{animation:none;height:60%}}
 </style>
-<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+<script src="./flash-session.js"></script>
 </head>
 <body>
 <!-- ============ 移动端引导页：手机只读，引导到桌面端操作（< 900px 显示） ============ -->
@@ -1629,7 +1630,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 
         <div class="flash-cta" data-tour="flash-start">
           <esp-web-install-button id="install-button" class="hidden">
-            <button class="btn primary big" id="flash-activate" slot="activate" onclick="prepareForFlash()">开始刷写（选择串口）</button>
+            <button class="btn primary big" id="flash-activate" slot="activate" type="button">开始刷写（选择串口）</button>
             <span slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
             <span slot="not-allowed">网页刷写只能在 HTTPS 或 localhost 页面使用。</span>
           </esp-web-install-button>
@@ -2972,6 +2973,7 @@ let firmwareCatalog = null;
 let firmwareReleases = [];
 let selectedFirmwareTag = null;
 let webInstallerReady = false;
+let flashSession = null;
 let singleDevice = null;
 let compareDevices = [];
 let events = [];
@@ -3036,7 +3038,7 @@ function themeEspWebToolsDialog(host){
   if(helper)return;
   const note=document.createElement("aside");note.className="bikepower-flash-helper";note.slot="content";
   if(isInstalling){
-    note.innerHTML="<b>正在把 BikePower 固件写入开发板</b><span>大约需要 2 分钟。Installing / Wrapping up 都是正常状态；保持页面可见，不要拔线、刷新或关闭页面。</span>";
+    note.innerHTML="<b>安装结果以弹窗上方状态为准</b><span>确认安装、初始化失败和写入进度都在此窗口显示。失败后先返回并关闭窗口，再检查 BOOT、线材、供电或串口占用；不要自动重刷。</span>";
     dialog.appendChild(note);
   }else{
     note.innerHTML="<b>没有看到串口？先别急</b><span>换一根确定能传数据的 USB 线，关闭占用串口的软件，拔插开发板后再试。</span>";
@@ -3852,6 +3854,7 @@ function selectedFirmwareRelease(){
   return firmwareReleases.find(r=>r.tag===selectedFirmwareTag)||firmwareReleases.find(r=>r.latest)||firmwareReleases[0]||null;
 }
 function selectFirmwareRelease(tag){
+  if(flashSession&&flashSession.isBusy())return;
   const latest=firmwareReleases.find(r=>r.latest);
   selectedFirmwareTag=tag||(latest?latest.tag:null);
   const ack=$("fw-rollback-ack");if(ack)ack.checked=false;
@@ -3879,6 +3882,7 @@ function moveFirmwareHead(){
   head.style.transform="translateY("+top+"px)";head.style.height=row.offsetHeight+"px";
 }
 function renderSelectedFirmware(){
+  if(flashSession&&flashSession.isBusy())return;
   resetFirmwareDetails();
   const rel=selectedFirmwareRelease();
   const pick=$("fw-pick"),rollback=$("fw-rollback");
@@ -3922,7 +3926,7 @@ function renderSelectedFirmware(){
   if(!webInstallerReady){
     $("install-unavailable").textContent="刷写组件不可用";
     setFirmwareStatus("仅可下载","warn");
-    setText("flash-message","固件已通过 SHA256 校验，但 ESP Web Tools 组件加载失败。请检查网络后刷新，或先下载固件。");
+    setText("flash-message","需要 HTTPS、安全上下文、Web Serial 和安装组件。请使用支持 Web Serial 的桌面浏览器；组件加载失败时检查网络后刷新，也可先下载固件。");
   }else if(!acked){
     $("install-unavailable").textContent="先勾选上方的回滚确认";
     setFirmwareStatus("待确认回滚","warn");
@@ -3940,7 +3944,7 @@ function renderSelectedFirmware(){
 }
 async function loadFirmwareCatalog(){
   resetFirmwareDetails();
-  webInstallerReady=!!customElements.get("esp-web-install-button");
+  webInstallerReady=!!customElements.get("esp-web-install-button")&&!!window.BikePowerFlash&&window.isSecureContext&&!!navigator.serial;
   if(location.protocol==="file:"){
     setFirmwareStatus("需要本地服务","warn");
     setText("flash-message","直接打开 HTML 时浏览器不能读取同源固件索引。请使用项目的本地监控服务，或访问已部署的 HTTPS Pages 页面。");
@@ -3967,7 +3971,7 @@ async function loadFirmwareCatalog(){
   }
 }
 function prepareForFlash(){
-  fgFinishedPending=false;fgErroredThisSession=false;
+  fgFlashed=false;clearInterval(fgSuccessTimer);clearInterval(fgHandoffTimer);
   if(singleDevice&&singleDevice.server&&singleDevice.server.connected){
     autoLinkUserDisconnected=true;clearTimeout(reconnectTimer);
     try{singleDevice.server.disconnect();}catch(e){}
@@ -3977,6 +3981,7 @@ function prepareForFlash(){
 
 /* ==================== 通用：连接任意 BLE 设备 ==================== */
 async function requestDevice(){
+  if(flashSession&&flashSession.isBusy()){log("请先关闭串口安装/日志会话再连接蓝牙","warn");return null;}
   if(!checkSupport())return null;
   try{
     const device=await navigator.bluetooth.requestDevice({
@@ -4043,6 +4048,7 @@ async function enumerateServices(server){
 }
 
 async function connectAndCollect(device){
+  if(flashSession&&flashSession.isBusy())throw new Error("串口会话期间禁止新建 BLE 会话");
   const rec={device,server:null,info:{},services:[],connectedAt:new Date().toISOString(),
     latest:{power:null,hr:null,cadence:null,speed:null,ftmsPower:null,distance:null},
     lastNotifyAt:0,cscPrev:null,staleOpen:false,subscriptions:{},notifyTimes:{},history:[],lastHistoryAt:0,lastHistoryTrimAt:0,
@@ -4130,6 +4136,7 @@ async function connectAnyDevice(){
 
 /* 统一的单设备连接入口：手动选择、刷新自动连接、断线重连、跨标签页关联都走这里 */
 async function connectSingleWith(device,source="picker",timeoutMs=20000){
+  if(flashSession&&flashSession.isBusy())return false;
   if(singleDevice&&singleDevice.server){const previous=singleDevice;singleDevice=null;try{previous.server.disconnect();}catch(e){}}
   mirrorState=null;
   anomalies={};resetTraceInteraction();
@@ -5554,6 +5561,7 @@ function waitForAdvertisement(device,ms){
   });
 }
 async function autoConnect(reason){
+  if(flashSession&&flashSession.isBusy())return false;
   if(!autoLinkEnabled&&reason!=="manual")return false;
   if(isSingleConnected())return true;
   if(autoLinkBusy)return false;
@@ -6605,7 +6613,7 @@ function fgBodyHtml(){
   }
   if(fgStep===4){
     const idx=FG_PHASES.findIndex(p=>p.id===fgPhase);
-    return '<p>刷写约 1–2 分钟，分 5 个阶段。ESP 弹窗里出现的英文状态对照如下：</p>'
+    return '<p>当前是串口会话，不代表已开始写入。确认、进度、失败和完成以 ESP 安装弹窗为准，以下仅为状态说明：</p>'
       +'<ol class="fg-phases">'+FG_PHASES.map((p,k)=>{
         const st=fgFlashed||k<idx?"done":k===idx?"run":"wait";
         return '<li class="'+st+'"><span class="idx">'+(st==="done"?"✓":st==="run"?"▸":k+1)+'</span><div><span class="fg-phase-zh">'+p.zh+'</span><span class="fg-phase-en">'+p.en+'</span><div class="fg-phase-desc">'+p.desc+'</div></div></li>';
@@ -6643,7 +6651,7 @@ function fgFooterHtml(){
   if(fgStep===1)return (fgStep>0?'<button type="button" class="btn ghost" onclick="fgGo(0)">上一步</button>':"")+'<button type="button" class="btn primary" style="margin-left:auto" onclick="fgGo(2)">认清了，下一步 →</button>';
   if(fgStep===2)return '<button type="button" class="btn ghost" onclick="fgGo(1)">上一步</button><button type="button" class="btn primary" style="margin-left:auto" onclick="fgGo(3)">版本确认，下一步 →</button>';
   if(fgStep===3)return '<span class="fg-hint">等待你选择串口</span>';
-  if(fgStep===4)return '<span class="fg-hint">刷写进行中…</span>';
+  if(fgStep===4)return '<span class="fg-hint">以安装弹窗结果为准</span>';
   return '<span class="fg-hint">'+(fgFlashed?"完成":"")+'</span>';
 }
 function fgActivate(){
@@ -6654,49 +6662,7 @@ function fgActivate(){
 }
 function fgConnectBle(){closeFlashGuide(true);obStartHandoff();openGate({force:true});}
 
-/* ---- ESP Web Tools 刷写状态 → 向导 / 成功窗 / 衔接蓝牙 ---- */
-function fgMapPhase(state){
-  const s=String(state||"").toLowerCase();
-  for(const p of FG_PHASES){if(p.match.some(m=>s.includes(m)))return p.id;}
-  return null;
-}
-let fgFinishedPending=false,fgErroredThisSession=false;
-function onFlashInstallerState(event){
-  const state=event&&event.detail?event.detail.state:null;
-  if(!state)return;
-  const s=String(state).toLowerCase();
-  if(s.includes("error")){
-    if(!fgErroredThisSession){fgErroredThisSession=true;showObError("flashFail");}
-    if(fgOpen){fgPhase="connect";renderFlashGuide();}
-    return;
-  }
-  if(s==="initial"||s==="serial"||s==="manifest"){fgFinishedPending=false;fgErroredThisSession=false;return;}
-  const phase=fgMapPhase(s);
-  if(phase){
-    fgPhase=phase;
-    if(fgOpen&&fgStep<4)fgGo(4);
-    else if(fgOpen)renderFlashGuide();
-    log("刷写阶段："+(FG_PHASES.find(p=>p.id===phase)||{}).zh+"（"+String(state)+"）");
-  }
-  if(phase==="reset"||s==="finished"){
-    fgFinishedPending=true;fgFlashed=true;fgPhase="reset";
-    if(fgOpen)fgGo(5);
-    obPatch({flash:"completed"});
-  }
-}
-function espInstallDialogPresent(){return !!document.querySelector("ewt-install-dialog");}
-function onEspDialogRemoved(){
-  // ESP 弹窗在刷写完成被用户关闭后：成功窗倒计时 → 重启提示 → 衔接蓝牙
-  if(fgFinishedPending&&!obModalOpen("ob-success")){
-    fgFinishedPending=false;
-    showFlashSuccess();
-  }
-}
-function onNoPortDialogSeen(){
-  // 用户在浏览器原生串口选择器里取消 / 看不到开发板
-  if(!fgFinishedPending)showObError("noPort");
-}
-
+/* ESP Web Tools v10.4.0 无安装状态事件；结果只以其安装窗口为准。 */
 /* ---- 刷写成功窗（5 秒倒计时自动关闭）→ 重启 → 蓝牙衔接聚光灯 ---- */
 function showFlashSuccess(){
   const ver=selectedFirmwareLabel();
@@ -6739,7 +6705,7 @@ function obStartHandoff(){
       +'<h3 class="tour-title" id="ho-title">固件已就绪，用蓝牙连接开发板</h3>'
       +'<p class="tour-body">USB 串口已释放，之后所有工具都走蓝牙。点“连接蓝牙设备”后在浏览器弹窗里选择 <b style="color:var(--strong)">BikePower</b>（改过名就选你的名字）。</p>'
       +'<div class="fg-state '+(boot>0?"warn":"ok")+'" style="margin:11px 16px 0"><span class="'+(boot>0?"ob-led":"")+'" style="'+(boot>0?"":'background:var(--green);animation:none;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px')+'"></span>'
-      +(boot>0?"设备启动中，约 "+boot+" 秒…":"已开始蓝牙广播（LED 慢闪）")+'</div>'
+      +(boot>0?"设备启动中，约 "+boot+" 秒…":"已等待启动；请观察 LED 是否慢闪，无广播时按 EN / RST 或重新上电")+'</div>'
       +'<div class="tour-foot"><span class="fg-hint" style="margin-left:0">刷写 6/6 · 衔接</span>'
       +'<span class="tour-nav"><button type="button" class="btn primary"'+(boot>0?" disabled":"")+' onclick="obEndHandoff();openGate({force:true})">连接蓝牙设备</button></span></div>';
     obSpotlight("pill",{html:html,place:"bottom-end",labelId:"ho-title"});
@@ -6800,20 +6766,33 @@ function initOnboarding(){
   window.addEventListener("resize",()=>{if(tourIndex!==null)renderTour();if(fgOpen)renderFlashGuide();});
   renderGateEnv();
   const install=$("install-button");
-  if(install)install.addEventListener("state-changed",onFlashInstallerState);
-  // 监听 ESP 弹窗出现 / 消失：无串口取消提示、完成后衔接蓝牙
-  let installDialogSeen=false,noPortSeen=false;
-  const espObserver=new MutationObserver(()=>{
-    const d=document.querySelector("ewt-install-dialog");
-    if(d&&!installDialogSeen){installDialogSeen=true;}
-    else if(!d&&installDialogSeen){installDialogSeen=false;onEspDialogRemoved();}
-    const np=document.querySelector("ewt-no-port-picked-dialog");
-    if(np&&!noPortSeen){noPortSeen=true;onNoPortDialogSeen();}
-    else if(!np){noPortSeen=false;}
+  if(install){
+    install.addEventListener("click",event=>{
+      event.preventDefault();event.stopImmediatePropagation();
+      if(!flashSession){setText("flash-message","安全刷写组件未加载，请检查网络后刷新。");return;}
+      const rel=selectedFirmwareRelease();
+      if(!rel||(!rel.latest&&!rollbackAcked()))return;
+      void flashSession.start(rel.boards[$("firmware-board").value],rel.version);
+    },true);
+  }
+  if(window.BikePowerFlash){
+    flashSession=window.BikePowerFlash.createSession({
+      message:text=>setText("flash-message",text),
+      busy:value=>{
+        for(const id of ["flash-activate","firmware-board","fw-rollback-ack"]){const el=$(id);if(el)el.disabled=value;}
+        if(fgOpen){fgPhase=null;fgGo(value?4:3);}
+      },
+      beforeInstall:prepareForFlash,
+      loadDialog:window.BikePowerFlash.loadDialog,
+    });
+  }
+  customElements.whenDefined("esp-web-install-button").then(()=>{
+    webInstallerReady=!!window.BikePowerFlash&&window.isSecureContext&&!!navigator.serial;
+    if(firmwareCatalog)renderSelectedFirmware();
   });
-  espObserver.observe(document.body,{childList:true,subtree:true});
-  // 无硬件环境下用于浏览器验收的内部钩子：模拟“刷写完成且 ESP 弹窗已关闭”，仅驱动引导 UI
-  window.bpSimulateFlashFinished=function(){fgFlashed=true;obPatch({flash:"completed"});if(fgOpen)fgGo(5);showFlashSuccess();};
+  window.addEventListener("beforeunload",event=>{
+    if(flashSession&&flashSession.isBusy()){event.preventDefault();event.returnValue="";}
+  });
 }
 
 /* ==================== 移动端引导页 ==================== */
