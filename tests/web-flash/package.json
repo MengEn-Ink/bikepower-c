@@ -1,0 +1,9 @@
+{
+  "name": "bikepower-web-flash-regression",
+  "private": true,
+  "scripts": {
+    "test": "node ../test_web_flash_dom.cjs && node --test ../test_web_flash_session.cjs",
+    "browser": "node ../test_web_flash_browser.cjs"
+  },
+  "devDependencies": { "jsdom": "27.4.0", "esp-web-tools": "10.4.0", "playwright": "1.64.1" }
+}

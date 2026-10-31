@@ -33,6 +33,9 @@ __pycache__/
 # Environment variables (contains tokens)
 .env
 
+# Web flash test dependencies
+node_modules/
+
 # Host unit test binary
 test/test_domain
 test/test_domain.exe

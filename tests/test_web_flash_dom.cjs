@@ -1,0 +1,18 @@
+const { JSDOM } = require('./web-flash/node_modules/jsdom');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const html = fs.readFileSync(require('node:path').join(__dirname, '../tools/web/ble-monitor.html'), 'utf8');
+const dom = new JSDOM('<body></body>', { runScripts: 'outside-only' });
+const w = dom.window;
+const code = html.slice(html.indexOf('const ESP_DIALOG_SELECTOR'), html.indexOf('function uuidShort'));
+w.eval(code);
+const host = w.document.createElement('ewt-install-dialog');
+host.setAttribute('state', 'INSTALL');
+const root = host.attachShadow({ mode: 'open' });
+root.innerHTML = '<ew-dialog><div slot="headline">Installation failed</div><ewt-page-message slot="content">Failed to initialize. Try resetting your device or holding the BOOT button while clicking INSTALL.</ewt-page-message></ew-dialog>';
+w.document.body.append(host);
+w.themeEspWebToolsDialog(host);
+assert.doesNotMatch(root.textContent, /正在把 BikePower 固件写入开发板/, '初始化失败时不得残留进行中提示');
+assert.doesNotMatch(root.textContent, /大约需要 2 分钟/);
+console.log('PASS: initialization error DOM has no misleading writing helper');
+dom.window.close();

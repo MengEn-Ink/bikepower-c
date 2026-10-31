@@ -470,3 +470,23 @@ python3 tests/ble_selftest.py
 | `ota_flow_test.py` | v4.0.0 | 移除在线 OTA 功能 | 无 |
 | `ota_local_mock.py` | v4.0.0 | 移除在线 OTA 功能 | `mock_server.py` |
 | `ota_serial_monitor.py` | v4.0.0 | 移除在线 OTA 功能 | `serial_capture.py` |
+
+### Pages 串口刷写生命周期回归（无硬件）
+
+```sh
+npm ci --prefix tests/web-flash --ignore-scripts --registry=https://registry.npmjs.org
+npm test --prefix tests/web-flash
+# CI/Linux：安装无头浏览器；macOS 已装 Chrome 可改用 BP_BROWSER_CHANNEL=chrome
+ tests/web-flash/node_modules/.bin/playwright install --with-deps chromium
+npm run browser --prefix tests/web-flash
+```
+
+- DOM 回归直接提取真实 HTML 主题辅助函数，构造 `INSTALL + Installation failed`，断言不含“正在把 BikePower 固件写入开发板”。修复前实际失败，修复后通过。
+- 会话测试覆盖取消/授权、安全上下文、manifest/大小/SHA256、网络/流式超时与 Abort、加载失败、重复点击、旧回调、锁未释放、断线、跨标签 Web Lock。`closed` 才清理串口和 Blob，无法清理则保持 busy 禁止重试。
+- Chromium 加载真实 HTML 与 npm 固定的 ESP Web Tools 10.4.0 dist，仅模拟 SerialPort 和离线固件；经安装/Erase 确认进入上游初始化失败路径，不修改内部状态伪造安装结果，不访问真实设备。
+- 安装结果完全由上游窗口显示；外层不依赖不存在的 install-button `state-changed`、不读取 Shadow DOM 推导成功。Shadow DOM 只保留原主题及中性说明增强，增强失败不影响会话安全。
+- 上游错误路径会异步 reopen/reset/disconnect；极端情况下 Back 后仍可能停在 Connecting，外层无法安全抢占活跃 writer。保持禁止重复刷写、关闭页面后排障，不自动重试；这不是硬件修复或成功证明。
+- DOWNLOAD 超时 30 秒并取消真实 fetch；3 分钟串口会话只警告，不强制中断写入。端口 open/close、上游擦除/reset 卡死仍采用 fail-closed，不宣称可安全取消。Web Locks 不可用时仍有本页互斥和浏览器端口独占，跨页不能仅靠本页状态保证。
+- 真机初始化/写入/擦除、断电/拔线、BLE 广播、C3 UART 与原生 USB 复位、Pages 发布验收均须另行授权及人工验证，保持 `NOT_RUN`。
+
+依据与取舍：复用 [ESP Web Tools 官方流程](https://esphome.github.io/esp-web-tools/) 与 [10.4.0 install-dialog](https://github.com/esphome/esp-web-tools/blob/10.4.0/src/install-dialog.ts)、[connect](https://github.com/esphome/esp-web-tools/blob/10.4.0/src/connect.ts)、[flash](https://github.com/esphome/esp-web-tools/blob/10.4.0/src/flash.ts) 的确认、错误与关闭边界，版本固定；动态 chunk 名与 dialog 入口属于版本绑定集成点，升级须同时更新并重跑浏览器回归。BikePower 不支持 Improv Wi-Fi，manifest 设等待为 0，不改变 C 固件。[WLED](https://install.wled.me/) 的浏览器/网络/数据线提示、[Tasmota](https://tasmota.github.io/install/) 的串口选择帮助及 [Espressif C3 排障](https://docs.espressif.com/projects/esptool/en/latest/esp32c3/troubleshooting.html) 用于恢复说明；不引入额外上传界面、新主题、自动重刷或降波特率策略。

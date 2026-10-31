@@ -36,6 +36,13 @@ jobs:
       - name: Install Python harness dependencies
         run: python3 -m pip install --disable-pip-version-check -r requirements-test.txt
 
+      - name: Web flash lifecycle and DOM regression
+        run: |
+          npm ci --prefix tests/web-flash --ignore-scripts --registry=https://registry.npmjs.org
+          npm test --prefix tests/web-flash
+          tests/web-flash/node_modules/.bin/playwright install --with-deps chromium
+          npm run browser --prefix tests/web-flash
+
       - name: Run quick operation harness
         run: >-
           python3 tests/operation_gate.py
