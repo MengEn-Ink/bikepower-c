@@ -160,6 +160,17 @@ def main():
         ('id="ide-status"', "提供 IDE 式底部状态栏"),
         ("toggleIdePane", "侧栏可展开 / 隐藏"),
         ("IDE_KEY", "窗口布局记忆在本浏览器"),
+        # ---------- AI Hero 主题层 / 数据信号色 / 移动端引导 ----------
+        ("--accent:#f5c451", "主题强调色为 AI Hero 琥珀金"),
+        ("--sig-power", "功率使用独立数据信号色"),
+        ("--sig-cadence", "踏频使用独立数据信号色"),
+        ("--sig-hr", "心率使用独立数据信号色"),
+        ('class="hero-value sig-power"', "实时功率读数用功率黄突出"),
+        ("function pulseReadout", "真实通知数值变化时读数轻量脉冲"),
+        ('id="mobile-guide"', "移动端只显示引导页"),
+        ("@media(max-width:899px)", "900px 以下隐藏工具台，仅保留引导页"),
+        ("function mgCopyLink", "移动端可复制桌面端链接"),
+        ("body.gate-lock .wrap>:not(#connect-gate) .btn.primary", "弹窗时背后主按钮降级，视口内只保留一个实心金按钮"),
     ]
     for token, message in required_html_tokens:
         check(token in html, message, failures)
