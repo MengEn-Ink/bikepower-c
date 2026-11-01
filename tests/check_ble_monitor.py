@@ -171,9 +171,28 @@ def main():
         ("@media(max-width:899px)", "900px 以下隐藏工具台，仅保留引导页"),
         ("function mgCopyLink", "移动端可复制桌面端链接"),
         ("body.gate-lock .wrap>:not(#connect-gate) .btn.primary", "弹窗时背后主按钮降级，视口内只保留一个实心金按钮"),
+        # ---------- 亮 / 暗双主题 ----------
+        (':root[data-theme="light"]{', "提供完整亮色主题令牌"),
+        ("--page-bg:#f1f2f5", "亮色画框底色对齐 AI Hero light"),
+        ("--accent-fill:#f5c451", "实心金按钮两种主题都用独立 --accent-fill"),
+        ("--on-accent:#0b0b0b", "金色实底上的文字两种主题都保持墨黑"),
+        ('bikepower.theme.v1', "主题偏好使用带版本号的 localStorage key"),
+        ("prefers-color-scheme: light", "未手动选择时跟随系统主题"),
+        ('id="theme-btn"', "桌面顶栏提供主题切换入口"),
+        ('id="mg-theme-btn"', "移动端引导页提供主题切换入口"),
+        ("function toggleTheme", "点击切换亮 / 暗并持久化"),
+        ("function followSystemTheme", "帮助菜单可恢复跟随系统"),
+        ('<meta name="color-scheme" content="dark light">', "声明双配色方案，原生控件随主题变化"),
+        ('"--md-sys-color-surface":"var(--panel)"', "ESP Web Tools 刷写弹窗随主题取色"),
     ]
     for token, message in required_html_tokens:
         check(token in html, message, failures)
+    # 暗色表面色只允许出现在 :root 令牌里，组件/弹窗必须走变量，否则亮色主题会漏出暗块
+    for dark_hex in ("#100f0e", "#171614", "#1e1c19", "#2e2c29"):
+        check(html.count(dark_hex) == 1,
+              f"暗色表面色 {dark_hex} 只在主题令牌中定义一次", failures)
+    check("rgba(11,11,11,.84)" not in html and "rgba(11,11,11,.86)" not in html,
+          "遮罩层随主题取色，不写死暗色", failures)
     check(not re.search(r"acceptAllDevices\s*:\s*true", html),
           "设备选择器不再展示所有无关蓝牙设备", failures)
     check("now-sample.t<=30000" not in html,
