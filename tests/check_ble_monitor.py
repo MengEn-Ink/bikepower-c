@@ -389,7 +389,7 @@ if (rb.role !== "board" || !rb.writable || rl.role !== "board-legacy" || rl.writ
     || !supportsIdentityProfile(boardRec) || supportsIdentityProfile(legacyRec) || supportsIdentityProfile(renamedExt)) {
   throw new Error("开发板角色识别回归失败: " + [rb.role, rl.role, re.role, re.disCount].join(","));
 }
-const routes = [["", "manual"], ["#/monitor", "connect"], ["#/compare", "compare"], ["#flash", "flash"], ["#/erg", "erg"], ["#/unknown", "manual"]];
+const routes = [["", "manual"], ["#/monitor", "connect"], ["#/compare", "compare"], ["#flash", "flash"], ["#/unknown", "manual"]];
 for (const [hash, mode] of routes) {
   if (routeFromHash(hash).mode !== mode) throw new Error("路由解析失败: " + hash);
 }

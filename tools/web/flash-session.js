@@ -130,7 +130,10 @@
         const dialog = document.createElement('ewt-install-dialog');
         dialog.port = session.port;
         dialog.manifestPath = manifest;
-        dialog.addEventListener('closed', () => { void cleanup(session); }, { once: true });
+        dialog.addEventListener('closed', () => {
+          void cleanup(session);
+          if (options.onDialogClose) options.onDialogClose();
+        }, { once: true });
         session.dialog = dialog;
         options.beforeInstall();
         document.body.appendChild(dialog);
