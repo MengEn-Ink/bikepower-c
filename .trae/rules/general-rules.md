@@ -7,7 +7,7 @@
 - **名称**：BikePower C — ESP32-C3 蓝牙功率计模拟器（C 重写版）
 - **运行环境**：ESP-IDF v5.5.4 + NimBLE + FreeRTOS（非 MicroPython）
 - **硬件平台**：合宙 ESP32-C3（RISC-V 单核 160MHz, 400KB SRAM, WiFi+BLE5.0）
-- **当前版本**：v4.1.3
+- **当前版本**：v4.2.1（候选，用户手动验证并明确批准后才能发布）
 - **主仓库**：git@github.com:MengEn-Ink/bikepower-c.git
 - **构建/烧录**：`idf.py build` / `idf.py -p <port> flash monitor`
 
@@ -57,6 +57,7 @@ bikepower-c/
 │   ├── led.c/.h              — LED 任务（通用板 GPIO12 四态 / M5Stamp SK6812 RGB）
 │   ├── board_detect.c/.h     — 运行时板型检测（通用 ESP32-C3 / M5Stamp C3）
 │   ├── ble_bikepower.c/.h    — NimBLE 五服务 + FTMS ERG
+│   ├── ble_config_service.c/.h — 六组 GATT 配置、revision 与提交事务
 │   ├── ble_power_bridge.c/.h — 上游 CPS 静态连接、DIS、通知与重连
 │   ├── ble_scanner.c/.h      — CPS 候选扫描与代次隔离
 │   ├── nvs_store.c/.h        — NVS 配置持久化桥接
@@ -88,6 +89,10 @@ bikepower-c/
 │   ├── log_daemon.sh         — 串口日志守护包装脚本
 │   ├── tools/                — 质量门禁 / 设备监控工具
 │   └── platform/             — 平台相关构建入口
+├── tools/web/
+│   ├── ble-monitor.html      — Pages 工具台与移动使用手册
+│   ├── flash-session.js      — 串口刷写生命周期
+│   └── pages-experience.css/.js — 功能分区、动效、按钮教学与页面更新信息
 ├── tests/
 │   ├── ble_selftest.py       — bleak 五服务 + FTMS ERG 自测
 │   ├── stage3_conn_test.py   — 连接事件驱动状态机验证
@@ -182,6 +187,6 @@ power_engine.snapshot → ble_bikepower_set_data → BLE 通知
 ## 发布流程
 - 分支：GitHub Flow（main + feature/hotfix）。
 - 版本号：SemVer `vMAJOR.MINOR.PATCH`，commit/tag/Release 三者一致。
-- 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + 打 tag（当前 v4.1.3）+ DIS 固件版本同步。
+- 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + 用户手动验证并明确批准 + 打 tag + DIS 固件版本同步。
 - **固件发行产物必须合并为单文件（强制）**：创建发行版时，必须用 `esptool.py merge_bin` 把 bootloader + partition-table + app 合并为单一 `.bin`，用户一次烧录即可，禁止分发分散的多个 bin 文件。
 - Commit message：`<type>(<scope>): <简体中文概述>` + 逐文件正文 + `Co-authored-by: AI <ai@trae>` + `Model:`。

@@ -88,6 +88,8 @@ WiFi 配网的射频共用流程可参考（v3.1.3 起为共存模式，BLE 不�
 
 Pages 地址：[https://mengen-ink.github.io/bikepower-c/](https://mengen-ink.github.io/bikepower-c/)。部署状态可在 `Deploy BLE Monitor and Web Flasher` 工作流中确认。
 
+手机访问同一地址可阅读详细手册，包含按钮四场景演示、配网、真实功率桥接、跑步、排障及实物自查清单；演示不操作设备，也不代替真机验收。离线阅读见 [手机使用手册](docs/user/pages-mobile-guide.html)。页底页面更新时间来自部署构建元数据，与固件 Release 发布时间分别展示。
+
 在 GitHub Pages 尚未启用或临时不可用时，可继续使用备用入口：[https://easyhey.com/?firmware=MOD220](https://easyhey.com/?firmware=MOD220)。
 
 项目已永久放弃设备内 OTA 升级路径。后续固件升级、重刷和恢复出厂固件统一走电脑端网页烧录；这不会让设备开机连接互联网，也不会恢复设备内 OTA。
@@ -224,6 +226,7 @@ bikepower-c/
 │   ├── button.c
 │   ├── led.c
 │   ├── ble_bikepower.c
+│   ├── ble_config_service.c/.h   # 六组 GATT 配置事务与 revision
 │   ├── ble_power_bridge.c        # 上游 CPS 连接、订阅、DIS 与重连
 │   ├── ble_scanner.c             # 有界功率计候选扫描
 │   ├── radio_ctrl.c
@@ -237,6 +240,7 @@ bikepower-c/
 ├── components/
 │   └── bikepower_domain/          # 纯 C 领域层，host 单测覆盖
 ├── scripts/                       # 构建、烧录、静态资源内联和串口守护入口
+├── tools/web/                     # Pages 工具台、页面动效与按钮教学模块
 ├── docs/
 │   ├── INDEX.md
 │   ├── user/        # 产品使用说明（快速上手/手册/硬件）
@@ -250,6 +254,12 @@ bikepower-c/
 ├── partitions.csv
 └── sdkconfig.defaults
 ```
+
+维护工具：`python3 scripts/tools/quality_gate.py` 默认包含固件构建；
+纯文档使用 `--level docs`，已单独构建时可使用 `--no-build`（明确跳过构建）。
+源码版本、schema、路由与模块清单见 [自动生成事实摘要](docs/dev/21-generated-project-facts.md)，
+以 `python3 scripts/tools/doc_facts.py --write` 更新，Markdown 相对链接与锚点由
+`python3 scripts/tools/check_markdown_links.py` 校验。
 
 ## 引用
 

@@ -77,14 +77,15 @@ app_main.c
    ├── led.c
    │     └── board_detect.h (引脚/驱动类型)
    ├── ble_bikepower.c
-   │     └── ble_scanner.c (模板库扫描)
+   │     ├── ble_config_service.c (六组配置事务)
+   │     └── ble_power_bridge.c (上游 CPS)
    ├── radio_ctrl.c
    │     └── wifi_portal.c
    │           └── captive_portal.c
    ├── nvs_store.c
    │     └── config_store.h (领域层)
-   ├── device_template_store.c
-   │     └── device_template.h (领域层)
+   ├── device_identity_store.c
+   │     └── device_identity.h (领域层)
    └── board_detect.c
 ```
 
@@ -113,7 +114,7 @@ app_main.c
 **任务间通信**：
 - `app_queue`（QueueHandle_t，深度 16）：按钮事件、连接变化、ERG 目标、配网结束等统一投递点
 - `s_btn_sem`（SemaphoreHandle_t）：GPIO ISR → button_task 唤醒信号
-- 共享变量（`g_power_w`/`g_hr_bpm`/`g_cadence` 等）：主循环写，BLE 通知定时器读，通过短互斥锁保护
+- 共享输出 `s_output`：主循环锁内整体发布，通知定时器每轮采集一次；静态 payload/动态长度同样受短临界区保护，生命周期单值使用 C11 原子
 
 ---
 
@@ -134,23 +135,27 @@ app_main.c
 
 ### `main/` — 应用层
 
-| 文件 | 行数(约) | 核心职责 |
-|------|----------|----------|
-| [app_main.c](../../main/app_main.c) | ~390 | 入口、初始化顺序、50ms 主循环、WDT、堆监控、事件分发、BLE 重试 |
-| [app_state.c/h](../../main/app_state.c) | ~300 | 7 态高层状态机：按钮语义消费、确认窗口计时、配网触发/退出、LED 协调 |
-| [app_events.h](../../main/app_events.h) | ~50 | 事件类型枚举 `app_evt_t` |
-| [button.c/h](../../main/button.c) | ~200 | GPIO 中断配置、button_task 去抖、短按/长按/自动重复检测 |
-| [led.c/h](../../main/led.c) | ~350 | LED 任务、GPIO 普通 LED / SK6812 RGB 双驱动、闪烁节拍 |
-| [board_detect.c/h](../../main/board_detect.c) | ~150 | 启动时板型检测（GPIO3 下拉读电平）、板型描述表、固件名生成 |
-| [ble_bikepower.c/h](../../main/ble_bikepower.c) | ~900 | NimBLE 五服务 GATT 定义、广播、通知定时器、FTMS 控制点、profile 切换 |
-| [ble_scanner.c/h](../../main/ble_scanner.c) | ~700 | BLE Central/Observer 扫描、GATT 读取、运动数据短时采样分析 |
-| [radio_ctrl.c/h](../../main/radio_ctrl.c) | ~250 | BLE/WiFi 射频软切换唯一入口、coex 共存/失败兜底、SoftAP 启动停止 |
-| [wifi_portal.c/h](../../main/wifi_portal.c) | ~1200 | HTTP 服务器、18+10 路由、JSON API、超时/续期/收尾、前端内联 HTML 输出 |
-| [captive_portal.c/h](../../main/captive_portal.c) | ~100 | UDP 53 DNS 劫持，把所有 A 记录指向 192.168.4.1 |
-| [nvs_store.c/h](../../main/nvs_store.c) | ~350 | NVS namespace `bikepower` 读写、schema 迁移调用、脏标记桥接 |
-| [device_template_store.c/h](../../main/device_template_store.c) | ~250 | NVS namespace `ble_tpl` 模板槽位管理（最多 5 个） |
-| [bikepower_config.h](../../main/bikepower_config.h) | ~220 | 应用层常量：引脚、UUID、阈值、超时、任务栈、内存告警线 |
-| `web/` | — | 前端 SPA 三件套，编译时由 `scripts/inline_static.py` 内联为 `web_index_html.h` |
+模块数量以 [源码事实摘要](../dev/21-generated-project-facts.md) 为准，不手工维护行数。
+
+| 文件 | 核心职责 |
+|------|----------|
+| [app_main.c](../../main/app_main.c) | 入口、50ms 主循环、WDT、mailbox 与持久化 |
+| [app_state.c/h](../../main/app_state.c) | 状态机、按钮/确认窗口与配网协调 |
+| [app_events.h](../../main/app_events.h) | 应用事件类型 |
+| [button.c/h](../../main/button.c) | GPIO ISR 与按钮任务 |
+| [led.c/h](../../main/led.c) | GPIO/RGB 双板灯效 |
+| [board_detect.c/h](../../main/board_detect.c) | 板型描述、检测与固件名称 |
+| [ble_bikepower.c/h](../../main/ble_bikepower.c) | 运动 GATT、广播、通知、FTMS 与生命周期 |
+| [ble_config_service.c/h](../../main/ble_config_service.c) | 六组配置与 revision 事务 |
+| [ble_power_bridge.c/h](../../main/ble_power_bridge.c) | 上游 CPS 连接、DIS、订阅与重连 |
+| [ble_scanner.c/h](../../main/ble_scanner.c) | 有界 CPS 扫描与候选代次 |
+| [radio_ctrl.c/h](../../main/radio_ctrl.c) | 射频共存唯一入口与失败兜底 |
+| [wifi_portal.c/h](../../main/wifi_portal.c) | HTTP JSON、配置事务、超时与静态页面 |
+| [captive_portal.c/h](../../main/captive_portal.c) | DNS 与门户探测 |
+| [nvs_store.c/h](../../main/nvs_store.c) | NVS 配置迁移和持久化 |
+| [device_identity_store.c/h](../../main/device_identity_store.c) | DIS 覆盖持久化 |
+| [bikepower_config.h](../../main/bikepower_config.h) | 板级常量 |
+| `web/` | 编译时内联 HTML/CSS/JS |
 
 ### `components/bikepower_domain/` — 领域层（纯 C，可 host 单测）
 
@@ -160,7 +165,7 @@ app_main.c
 | [hr_model.c](../../components/bikepower_domain/hr_model.c) | 负荷功率滤波、FTP 6 区映射与锚点压缩、心率平滑（tau 升 30s/降 60s）、HRV 慢游走与输出限速 |
 | [running_engine.c](../../components/bikepower_domain/running_engine.c) | 跑步模式：速度/配速/步频生成、配速机器人、RSC 数据 |
 | [profile.c](../../components/bikepower_domain/profile.c) | 用户档案（体重/FTP/阈值心率）、配速机器人表（Coco/Yumi/Jacques/Genie/Constance/自定义） |
-| [config_store.c](../../components/bikepower_domain/config_store.c) | 配置 schema 版本（当前 v12）、defaults、validate（夹紧）、migrate（v6-v11 升级）、serialize/deserialize JSON |
+| [config_store.c](../../components/bikepower_domain/config_store.c) | schema/defaults/校验/迁移/序列化；版本以源码事实摘要为准 |
 | [json_miniparse.c](../../components/bikepower_domain/json_miniparse.c) | 轻量 JSON 字段提取器（无动态分配，用于 HTTP 请求解析） |
 | [button_logic.c](../../components/bikepower_domain/button_logic.c) | 按钮按压语义纯逻辑（短按/长按/自动重复/确认窗口） |
 | [button_debounce.c](../../components/bikepower_domain/button_debounce.c) | 去抖与长按节拍纯逻辑 |

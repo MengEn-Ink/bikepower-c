@@ -8,6 +8,9 @@
 
 代码行数变化频繁且不能代表覆盖质量，本矩阵不再手工记录易漂移的行数；规模分析需要时以当前工作区 `wc -l` 或覆盖工具结果为准。
 
+生产模块与 schema 清单以 [源码事实摘要](21-generated-project-facts.md) 为准；
+断言数量和真机结果以本轮 [验证报告](22-automatic-optimization-report.md) 为准。
+
 ### 领域层 `components/bikepower_domain/`（纯 C，host 可测）
 
 | 文件 | 职责 | 可测性 |
@@ -20,12 +23,16 @@
 | `device_template.c` | 外部 BLE 设备模板、合并和服务标记 | ✅ host 单测 |
 | `device_analysis.c` | 外部 BLE 运动数据解析、统计和 JSON 输出 | ✅ host 单测 |
 | `ble_payload_codec.c` | CPS/CSC/HRS/FTMS/RSC 生产 payload 编码 | ✅ host 编译 + 独立 golden vectors |
+| `ble_config_codec.c` | 六组 BLE 配置协议 | ✅ host 单测 + 实际 GATT 回调回归 |
+| `cps_input_codec.c` | 真实 CPS 可选字段、回绕与踏频解析 | ✅ host 单测 |
+| `power_bridge.c` | 校正、0W、过期和绑定配置 | ✅ host 单测 |
+| `device_identity.c` | DIS 字段编码与校验 | ✅ host 单测 |
 | `json_miniparse.c` | 扁平 JSON 字段提取（配网请求体解析） | ✅ host 单测 |
 | `button_logic.c` | 按压时长分类（短按/长按/确认） | ✅ host 单测 |
 | `led_pattern.c` | LED 模式、颜色与闪烁节拍 | ✅ host 单测 |
 | `button_debounce.c` | 按钮去抖/长按节拍判定 | ✅ host 单测 |
 | `domain_rng.c` | xorshift32 随机数 | ✅ host 单测 |
-| **合计** | **13 个生产源文件** | **全部可 host 编译；覆盖深度以断言和场景矩阵为准** |
+| **模块数量** | **由源码事实摘要生成** | **全部可 host 编译；覆盖深度以场景为准** |
 
 > 抽取原则（v4.0.0 校准）：仅抽取**生产代码真正调用**的纯逻辑（button_logic/led_pattern/button_debounce 分别被 app_state/led/button 引用，`ble_payload_codec` 被 `main/ble_bikepower.c` 直接调用）。此前为刷覆盖率抽取但 main/ 未采用的 `ftms_codec`/`app_state_machine`/`radio_state`/`dns_packet` 已删除，避免并行双份实现。
 
@@ -34,18 +41,20 @@
 | 文件 | 职责 | 可测性分类 |
 |------|------|-----------|
 | `ble_bikepower.c` | BLE 骑行/跑步服务、通知发送、FTMS 控制点 | 🟡 payload 由生产 codec + vectors 覆盖；GATT/NimBLE 链路仍须真机 |
+| `ble_config_service.c` | 六组配置 GATT 与 revision 事务 | 🟡 生产回调 ASan/UBSan；NimBLE/NVS 链路须真机 |
+| `ble_power_bridge.c` | 上游 CPS 连接、订阅、DIS 和重连 | 🟡 生产会话 ASan/UBSan；真实功率计共存须实物 |
 | `ble_scanner.c` | BLE Central/Observer 扫描、读取与运动数据采样 | 🟡 静态契约 + 真机外设必测 |
-| `wifi_portal.c` | HTTP 配网门户（纯 `/api/xxx` JSON） | 🟡 路由/HTML/JS 静态校验；handler 真机必测 |
+| `wifi_portal.c` | HTTP 配网门户（纯 `/api/xxx` JSON） | 🟡 生产 handler/cJSON 容量与超时 ASan/UBSan；WiFi/HTTP 链路须真机 |
 | `radio_ctrl.c` | WiFi/BLE 射频共存与失败兜底 | 🟡 WiFi 启停真机必测 |
 | `app_main.c` | 主循环、任务创建、事件可靠性和 WDT | 🟡 任务/WDT 静态校验；运行时真机必测 |
 | `app_state.c` | 应用状态机 + 事件分发 | 🟡 领域决策可抽取部分 host 测；副作用真机必测 |
 | `nvs_store.c` | NVS 配置持久化 | 🟡 schema 静态校验；运行时真机必测 |
-| `device_template_store.c` | 模板 NVS 并发读写 | 🟡 领域数据 host 测；NVS 真机必测 |
+| `device_identity_store.c` | DIS 覆盖持久化 | 🟡 字段 codec host 测；NVS 真机必测 |
 | `led.c` | LED 模式（GPIO/RMT） | 🟡 颜色映射已抽领域层；RMT/GPIO 真机必测 |
 | `button.c` | GPIO ISR、去抖任务和事件投递 | 🟡 去抖逻辑已抽领域层；ISR/任务真机必测 |
 | `captive_portal.c` | DNS 劫持 + 探测端点 | 🟡 socket 真机必测 |
 | `board_detect.c` | 板级检测 | 🟡 描述表静态校验；GPIO 检测真机必测 |
-| **合计** | **12 个板级生产源文件** | **静态门禁与真机证据互补** |
+| **模块数量** | **由源码事实摘要生成** | **静态/生产替身与真机证据互补** |
 
 ### 头文件（不计入覆盖率分母）
 
@@ -57,7 +66,7 @@
 
 | 层 | 入口 | 覆盖对象 | 状态 |
 |----|------|---------|------|
-| TC-1 host 单测 | `test/test_domain` | 领域层 13 个生产源文件 | ✅ 全绿（6093 断言 / 0 失败，含固定/16 种子 90 分钟统计、24 小时等效快照、极值与模式切换、1Hz 时序退化仿真、二阶心率响应、running 会话、ERG 非持久化、配置映射和 v11→v12 选择性迁移） |
+| TC-1 host 单测 | `test/test_domain` | 当前领域层生产模块 | 固定/16 种子统计、24 小时等效快照、边界、会话与迁移；结果见当前验证报告 |
 | TC-1 FIT 基准 | `tests/analyze_fit_reference.py` | 附件 1Hz 功率/踏频/心率统计 | ✅ SHA-256 与 `tests/fixtures/ride_reference_metrics.json` 固定复验 |
 | TC-3a JS 静态 | `tests/check_portal_js.py` | `main/web/app.js` node --check | ✅ |
 | TC-3c 常量一致性 | `tests/check_config_consistency.py` | config 头文件 ↔ 文档 | ✅ |
@@ -71,7 +80,10 @@
 | TC-3r device 证据采集 | `tests/test_operation_gate_evidence.py` | 自动结果 PASS/FAIL 映射、未执行项保持、人工证据保留 | ✅ |
 | TC-3s 串口启动判定 | `tests/test_serial_boot_check.py` | 空日志、缺 ROM/复位标志、panic、Backtrace、Task WDT/coredump 拒绝 | ✅ |
 | TC-BLE-ADV 广播字段 | `tests/check_ble_advertising_fields.py` | 骑行/跑步主广播服务 UUID 与广播包名字预算 | ✅ |
-| TC-BLE-VEC 协议 vectors | `tests/test_ble_protocol_vectors.py` | 10 组固定 hex；生产 C encoder 与无 bleak Python parser 独立交叉校验 | ✅ 3 项通过 |
+| TC-BLE-VEC 协议 vectors | `tests/test_ble_protocol_vectors.py` | 人工固定 hex；生产 C encoder 与 Python parser 独立交叉校验 | ✅ |
+| TC-BLE-RUNTIME 生产通知 | `tests/test_ble_runtime.py` | 模拟/桥接/跑步同轮快照 | ✅ ASan/UBSan |
+| TC-BLE-SERVICE 生产配置 | `tests/test_ble_config_service.py` | 六组、提交拒收、busy、revision 和断连取消 | ✅ ASan/UBSan |
+| TC-PORTAL-RUNTIME 生产门户 | `tests/test_portal_runtime.py` | 最长字段转义、超限、续期、done 重试/代次与重启取清 | ✅ 实际 IDF cJSON + ASan/UBSan |
 | TC-BLE-CONFIG 配置 E2E 离线回归 | `tests/test_ble_config_e2e.py` | Meta/Control 小端帧、五组合法修改、非法值和 GATT 掩码变更 | ✅ |
 | TC-BLE-RECON 重连 harness | `tests/test_ble_reconnect_harness.py` | fake scanner/client 验证两轮独立扫描、连接、显式断开 | ✅ |
 | TC-BLE-RUNNING running harness | `tests/test_ble_running_harness.py` | opcode indication 等待、严格增长/冻结 helper 与 moving/pause/reset/resume 四阶段结构 | ✅ |
@@ -91,7 +103,10 @@
 | TC-3 配网自测 | `tests/stage5_portal_test.py` | 首页/倒计时/续期/提交（/api/xxx JSON） | 🟡 当前工作区待重新执行 |
 | DT 真机系列 | `.trae/rules/workflows/device-testing.md` | 按钮/LED/状态机/内存 | 🟡 物理按钮/LED 人工确认 |
 
-历史 release 曾有部分真机 PASS，但不能覆盖 2026-10-22 当前工作区。真机自动测试按板型分别写入 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`。每份文件必须匹配板型、当前 `FIRMWARE_VERSION` 和 Git ID；`NOT_RUN` 不算通过。开发期可以只校验结构，正式发布要求参与发布板型的全部 P0 自动项通过（含 5 分钟设备耐久），人工项为 P1 不阻塞。
+历史 release 的 PASS 不能覆盖当前未提交镜像。真机证据必须匹配板型、版本、Git ID
+和实际镜像 SHA256，并明确工作区 dirty 状态；`NOT_RUN` 不算通过。规范结构化文件
+仍位于 `tests/reports/device-acceptance-<板型>.json`，本轮独立证据目录见验证报告，
+不得直接替换旧候选证据。发布除全部 P0 自动项外，还须用户手动验证并明确批准。
 
 ### 本地 Mock / 串口工具（辅助）
 

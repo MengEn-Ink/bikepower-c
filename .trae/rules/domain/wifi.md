@@ -55,6 +55,8 @@
 
 - `WIFI-15`：配网默认 `300s` 自动关闭，仅显式 `/api/renew` 延长；读取、保存、扫描和测试不得隐式续期。
 - `WIFI-16`：配网结束通过 `APP_EVT_WIFI_DONE` 原地关闭 HTTP/DNS/SoftAP 并回到 BLE 主工作模式，不重启设备。
+- `WIFI-17`：deadline/closing/done/restart 使用同一短临界区；done 回调锁外调用，用 inflight 与 generation 防重入和旧会话回写。回调注册在启动前完成，运行期间不更换。
+- `WIFI-35`：JSON 输出容量集中于 `WIFI_JSON_STATE_CAPACITY`、`WIFI_JSON_RUNTIME_CAPACITY`、`WIFI_JSON_SCAN_CAPACITY`；HTTP 服务任务独占共享输出区，序列化失败返回合法错误 JSON。定时器与主任务禁止访问输出区。
 
 ## 配网表单字段
 

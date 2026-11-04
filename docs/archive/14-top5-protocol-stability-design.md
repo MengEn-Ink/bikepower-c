@@ -1,5 +1,7 @@
 # Top 5 缺陷与 BLE 协议稳定性设计规格
 
+> 五项修复已实现，2026-11-04 归档；当前真机与人工验收状态见 PROGRESS。
+
 > 实施状态（2026-10-22）：Top 5 源码修复、生产 codec、golden vectors 和离线 harness 已落地；host 5892/0、10 组 vectors、配置一致性和 `idf.py build` 已通过。整合后的完整门禁仍需提交前再跑，generic-c3/m5stamp-c3 双板真机与标准客户端验收保持 `NOT_RUN`。
 
 ## 1. 背景

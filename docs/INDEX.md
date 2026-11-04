@@ -14,13 +14,13 @@
 |------|------|
 | [Code Wiki 首页](wiki/00-home.md) | Wiki 目录、代码结构速览、关键设计原则、运行时架构图 |
 | [整体架构](wiki/01-architecture.md) | 三层架构概览、模块依赖 DAG、任务模型、目录详解、编译时资源处理、分区表 |
-| [应用层模块](wiki/02-app-layer.md) | app_main、app_state、button、led、board_detect、radio_ctrl、captive_portal、nvs_store、device_template_store、ble_scanner |
-| [领域层模块](wiki/03-domain-layer.md) | power_engine（三模式分层动态）、hr_model（五层心率）、running_engine、profile（配速机器人）、config_store（schema v12）、json_miniparse、button_logic、led_pattern |
+| [应用层模块](wiki/02-app-layer.md) | app_main、app_state、button、led、board_detect、radio_ctrl、captive_portal、nvs_store、设备身份和功率桥接 |
+| [领域层模块](wiki/03-domain-layer.md) | power_engine（三模式分层动态）、hr_model（五层心率）、running_engine、profile（配速机器人）、config_store、json_miniparse、button_logic、led_pattern |
 | [关键数据结构](wiki/04-key-data-structures.md) | app_evt_t、board_desc_t、power_engine_t、snapshot_t、ride_dynamics_t、profile_t、hr_state_t、running_engine_t、config_t、led_config_t、device_template_t |
 | [状态机与事件](wiki/05-state-machine-and-events.md) | 7 态状态迁移图、10 种事件类型、按钮语义阈值、交互流程、长按回滚机制 |
 | [运行时数据流](wiki/06-runtime-flow.md) | 14 步启动流程、主循环 50ms 节拍、BLE 通知双时间尺度、配网完整时序、脏标记落盘、11 种异常恢复路径 |
 | [BLE 服务详解](wiki/07-ble-services.md) | 5+1 服务 UUID、两种运动 profile GATT 表、6 种数据包格式、FTMS 控制点 OpCode/Result Code、广播参数、双时间尺度通知、g_notify_lock 线程安全、DIS 字段 |
-| [WiFi 配网门户](wiki/08-wifi-portal.md) | HTTP 路由表（28 条）、超时状态机、JSON API 详解（50+字段）、Captive Portal 三层弹窗、临时副本原子替换、BLE 扫描/设备模板 API、前端内联 |
+| [WiFi 配网门户](wiki/08-wifi-portal.md) | HTTP 路由、300 秒超时、JSON API、Captive Portal、revision 保存、真实功率计扫描与前端内联 |
 | [构建与测试](wiki/09-build-and-test.md) | idf.py 构建流程、CMake 配置、flash_latest.sh 一键烧录、build_all.sh 双板型发布、GitHub Pages 网页刷写、host 单测、静态门禁脚本、BLE 自测、mock server、产物校验 |
 | [硬件约束与平台限制](wiki/10-hardware-constraints.md) | ESP32-C3 规格、双板型 GPIO 分配、内存预算（80KB/20KB 告警线）、WiFi/BLE 共存硬约束、ISR 安全规则、FreeRTOS 任务模型、WDT 配置、禁止事项 |
 
@@ -50,18 +50,18 @@
 | [操作覆盖矩阵与测试门禁](dev/05-operation-test-gate.md) | 模式切换、保存、按钮、网页、BLE、异常稳定性的操作级门禁矩阵与人工项记录规则 |
 | [Windows 环境编译指南](dev/08-windows-build-guide.md) | Windows 下环境配置、编译流程、速度优化（ccache/Defender/Ninja）、排障 |
 | [智能家居平台接入调研](dev/09-smart-home-integration.md) | 米家官方接入、Matter、Home Assistant/MQTT 网关等路径对比与分阶段建议 |
-| [稳定交付证据链设计](dev/10-stable-delivery-design.md) | 真机自动测试、人工确认、release 报告与正式发布阻断的证据模型 |
-| [稳定交付证据链实施计划](dev/11-stable-delivery-plan.md) | 按证据模型、device 门禁采集、release 强校验分批实施的测试驱动计划 |
-| [Top 5 协议稳定性设计](dev/12-top5-protocol-stability-design.md) | CPS/FTMS 编码、跑步会话、ERG 持久化边界、WiFi 完成可靠性和 P0 真机门禁修复设计 |
 | [项目复审与优化清单](dev/13-project-review-and-optimization.md) | 2026-10-22 全仓代码审查、源码卫生、文档治理结果与分级优化 backlog |
 | [真实功率桥接与网页交互设计](dev/14-real-power-bridge-web-design.md) | 桥接同一功率计的真实功率与真实踏频；心率模拟或关闭，含校正、断线保护与短时网页监测 |
 | [核心设备门户全量重写设计](dev/15-core-portal-rewrite-design.md) | 明主题现场控制台、Pages 高级配置分工、设备模板端到端删除、真实功率桥接和 110 KiB 资源门禁 |
 | [核心门户与桥接实施计划](dev/16-core-portal-bridge-implementation-plan.md) | 领域、上游会话、配置事务、门户及短固件名称的实施与验收 |
 | [核心门户与桥接测试报告](dev/17-core-portal-bridge-test-report.md) | 本轮工作区候选的离线、构建与真机证据及未覆盖项 |
+| [自动优化实施计划](dev/18-automatic-optimization-plan.md) | 维护工具、BLE 配置模块与并发、门户容量、文档治理和自动验证 |
+| [源码事实摘要](dev/21-generated-project-facts.md) | 从源码生成版本、schema、路由和模块清单；不推断验收通过 |
+| [自动优化验证报告](dev/22-automatic-optimization-report.md) | 本轮验证结果、镜像身份、剩余硬件与人工项 |
 
 ## 🗄️ archive/ — 历史 / 归档（仅供追溯）
 
-以下文档对应历史版本或已完成的一次性工作，**不代表 v4.1.1 当前实现**，仅作背景追溯。
+以下文档对应历史版本或已完成的一次性工作，**不代表当前实现或验收状态**，仅作背景追溯。
 
 | 文档 | 说明 |
 |------|------|
@@ -75,6 +75,9 @@
 | [历史跑步模式完整升级实施计划](archive/09-running-mode-implementation-plan.md) | 历史执行计划，包含已移除的坡度/控制点批次，仅供追溯 |
 | [项目优化设计归档](archive/10-project-optimization-design.md) | 历史优化设计，当前结果已合入代码、门禁和文档 |
 | [项目优化执行计划归档](archive/11-project-optimization-plan.md) | 历史执行计划，原 `docs/superpowers` 工作目录已归档 |
+| [稳定交付证据链设计](archive/12-stable-delivery-design.md) | 已实施的证据模型及发布校验设计 |
+| [稳定交付证据链实施计划](archive/13-stable-delivery-plan.md) | 已完成工具实现的历史执行步骤 |
+| [Top 5 协议稳定性设计](archive/14-top5-protocol-stability-design.md) | 已实现的 CPS/FTMS、跑步会话、ERG 与 WiFi 可靠性修复 |
 
 ## 🤖 AI 助手
 
@@ -103,3 +106,7 @@
 |------|------|
 | [项目进度](../PROGRESS.md) | 阶段 0-15 完成情况、第七轮 P0 真机验收清单、待确认项、已知限制 |
 | [更新日志](../CHANGELOG.md) | 版本历史与变更记录 |
+| [手机离线使用手册](user/pages-mobile-guide.html) | 按钮动画、配网、真实桥接、跑步与实物自查 |
+| [Pages 分区与动效方案](dev/19-pages-layout-motion-design.md) | 已批准的工具分区与更新信息语义 |
+| [Pages 实施计划](dev/20-pages-experience-implementation-plan.md) | 页面、元数据与部署检查进度 |
+| [Pages 验证报告](dev/23-pages-experience-test-report.md) | 浏览器回归、离线验证及线上未部署状态 |

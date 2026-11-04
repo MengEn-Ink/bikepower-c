@@ -32,6 +32,8 @@
 
 - `BLE-8`：通知节拍固定为 `BLE_NOTIFY_INTERVAL_MS = 1000ms`。
 - `BLE-9`：通知数据由主循环更新共享快照，定时器负责按节拍发出，禁止在主循环中直接拼包并同步发通知。
+- `BLE-9a`：模拟、桥接、跑步数据由 `s_data_lock` 保护；通知采集一次完整输出快照后统一打包，GATT 锁内复制 payload 与动态长度、锁外写 mbuf。ready/stopping/failed/profile/mask/连接句柄使用 C11 原子，协议栈释放仍须通知互斥锁。
+- `BLE-9b`：六组配置 GATT 与 revision 事务由 `ble_config_service` 维护；snapshot 发布与提交结果只由应用主任务调用。回调在启动前注册，锁内不调用 BLE、日志、NVS 或 JSON。
 - `BLE-10`：新增通知或改变节拍时，必须同步更新 `tests/ble_selftest.py` 与技术文档。
 
 ## GATT 句柄缓存

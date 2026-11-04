@@ -110,9 +110,15 @@ python3 scripts/tools/serve_ble_monitor.py
 python3 scripts/tools/device_acceptance.py validate
 ```
 
-## 四、人工门禁记录（P1，不阻塞发版）
+## 四、人工门禁记录与发布批准
 
-以下人工项默认不阻塞发版，但每次发可分发固件时建议按板型在结构化证据和测试报告中记录。P0 自动项（串口启动、BLE 全量配置读写与 NVS 持久化、骑行 BLE、重连、5 分钟设备耐久）必须全部通过；跑步 profile、配网门户和广播项因需要把测试机切到设备热点，归入 P1。证据文件是 `tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`，release 总包内保留相同文件名到 `evidence/`。
+当前候选固件必须由用户手动验证并明确批准后才能发布。各人工项按板型记录，
+未执行项保持 `NOT_RUN`。证据模型中的 P1 分类不代表免除用户批准。
+P0 自动项（串口启动、BLE 全量配置读写与 NVS 持久化、骑行 BLE、重连、5 分钟设备耐久）
+必须全部通过；跑步、配网门户和广播项仍保留现有证据分级。跑步可用 BLE 配置 harness
+切换验证；门户和广播项需关联热点。证据文件是
+`tests/reports/device-acceptance-generic-c3.json` 与 `tests/reports/device-acceptance-m5stamp-c3.json`，
+release 总包内保留同名文件到 `evidence/`。
 
 | 项目 | 通过标准 | 记录要求 |
 |------|----------|----------|

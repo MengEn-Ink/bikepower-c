@@ -1,5 +1,7 @@
 # 稳定交付证据链实施计划
 
+> 工具实施已完成，2026-11-04 归档；本历史计划不代表所有设备及人工验收通过。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use test-driven development and execute this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 将真机自动测试和人工确认统一为当前固件版本可机检的交付证据，并在正式发布前阻止证据缺失、失败或过期的产物。

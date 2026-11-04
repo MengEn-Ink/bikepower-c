@@ -194,9 +194,9 @@
 
 ```
 ┌──────────────┐    50ms     ┌──────────────────┐
-│  主循环       │ ──────────→ │  g_power_w       │
-│  power_      │             │  g_hr_bpm        │ ←── 共享变量
-│  engine_     │             │  g_cadence       │     （短互斥锁）
+│  主循环       │ ──────────→ │  s_output.power  │
+│  power_      │             │  .heartrate      │ ←── 整体共享快照
+│  engine_     │             │  .cadence 等     │     （短临界区）
 │  snapshot()  │             │  g_running_data  │
 └──────────────┘             └────────┬─────────┘
                                      │

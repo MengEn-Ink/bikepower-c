@@ -26,7 +26,7 @@
 - `button_logic.c`
 - `button_debounce.c`
 - `led_pattern.c`
-- 当前断言规模：`6077` 条（2026-10-27 本轮基线，0 失败）
+- 断言规模以本轮 host 输出与 PROGRESS 验证报告为准，不在规则中手工复制。
 - 骑行模型专项：固定 FIT 指标复验、16 种子 90 分钟统计、24 小时等效快照、极值/退化区间、ERG 高频目标、心率锁定切换、1Hz 抖动/丢样/重复保持
 - 适用改动：
 - `components/bikepower_domain/` 下的逻辑变更

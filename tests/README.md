@@ -1,5 +1,17 @@
 # 测试脚本使用说明
 
+## 自动优化新增验证
+
+- `python3 tests/test_ble_config_service.py`：ASan/UBSan 执行生产六组配置 GATT 回调，覆盖提交拒收、重复 BEGIN、revision 和断连取消。
+- `python3 tests/test_ble_runtime.py`：编译生产快照发布/采集/打包函数，验证模拟、桥接、跑步同轮字段一致。
+- `python3 tests/test_portal_runtime.py`：使用本地 ESP-IDF cJSON 执行生产门户 handler，验证最长转义、超限 JSON、300 秒续期、done 重试/代次与重启取清；替身不能证明无线共存。
+- `python3 tests/test_maintenance_tools.py`：门禁参数、源码事实漂移、Markdown 标题/重复标题/引用链接/代码块边界。
+- `python3 scripts/tools/quality_gate.py --level docs`：纯文档门禁；`--no-build` 保留 host/专项验证并明确跳过构建。默认完整门禁仍包含构建。
+- `python3 scripts/tools/doc_facts.py --write`：生成源码事实摘要；`python3 scripts/tools/check_markdown_links.py` 校验链接与锚点。
+
+生产门户 cJSON 回归需要本地 ESP-IDF 源码，放在 full 操作门禁与完整质量门禁；
+quick 保持无 ESP-IDF 依赖。宿主机 C11 编译显式启用 `_POSIX_C_SOURCE=200809L`。
+
 ## 核心门户与桥接新增验证
 
 - `node tests/test_pages_bridge_browser.cjs`：Pages 浅暗主题真实 DOM 编辑、六组校正保存、绑定保留、未绑定保护、旧固件五组降级、手机引导与键盘焦点；BLE 事务响应为替身，不能代替真机验收。
@@ -10,7 +22,7 @@
 - `python3 tests/bridge_device_e2e.py --device <macOS-BLE-UUID> --control /tmp/bikepower-cps-control.json`：已连接设备热点时，验证双 BLE + WiFi、校正、0W、过期、重连及堆，finally 恢复原模拟配置。
 
 > BikePower C 设备测试脚本集合
-> 更新日期：2026-10-27（v4.2.0：全量配置读写、会话曲线与核心功能 E2E 门禁）
+> 更新日期：2026-11-04（v4.2.1：核心门户、真实功率桥接与自动优化门禁）
 
 ---
 
@@ -156,8 +168,11 @@ python3 scripts/tools/device_acceptance.py init --board generic-c3 --operator "�
 | 文件 | 用途 |
 |------|------|
 | `tools/web/ble-monitor.html` | Web Bluetooth 客户端、全量 NVS 配置编辑器与 ESP Web Tools 刷写页；实时曲线支持四档时间范围、逐点读数、统计、暂停和 CSV 导出 |
+| `tools/web/pages-experience.css` / `.js` | 功能分区、响应布局、按钮四场景教学与独立页面更新时间；教学不操作硬件 |
+| `tests/test_pages_experience.cjs` | 固定时刻验证长按回滚、确认/超时、短按和页面时间信息 |
+| `tests/test_pages_experience_browser.cjs` | 两主题 × 六宽度真实操作、播放/暂停/逐步、减少动画、锚点、验收勾选与桌面导航 |
 | `scripts/tools/serve_ble_monitor.py` | 从 `tools/web/` 启动无缓存本地 HTTP 服务，默认 `http://127.0.0.1:8766/ble-monitor.html` |
-| `scripts/tools/prepare_web_flash_site.py` | 获取 GitHub 最新 Release 与最近历史 Release、逐个验证 merged bin SHA256、镜像为同源文件并生成 `latest.json` / `releases.json` 与 ESP Web Tools manifest |
+| `scripts/tools/prepare_web_flash_site.py` | 获取 GitHub Release、验证 merged bin SHA256、生成固件索引与 manifest；独立生成 `site-info.json` 页面构建时间及源码提交 |
 | `.github/workflows/deploy-web-tools.yml` | CI 成功或 GitHub Release 发布后部署 Pages；缺失完整固件时阻断覆盖 |
 | `tests/check_ble_monitor.py` | 静态门禁，检查监控、刷写交互、Pages 工作流和门禁接入是否漂移 |
 | `tests/test_prepare_web_flash_site.py` | 离线验证双板选择、SHA256、manifest、GitHub-only CLI、降级和路径安全 |

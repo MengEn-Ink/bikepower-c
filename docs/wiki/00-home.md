@@ -56,12 +56,14 @@ bikepower-c/
 │   ├── led.c/h                     # LED 灯效任务（GPIO/SK6812）
 │   ├── board_detect.c/h            # 运行时板型检测
 │   ├── ble_bikepower.c/h           # NimBLE 五服务 + FTMS ERG
-│   ├── ble_scanner.c/h             # BLE Central/Observer（模板库扫描）
+│   ├── ble_config_service.c/h      # 六组配置 GATT 与事务
+│   ├── ble_power_bridge.c/h        # 上游连接、DIS、订阅与重连
+│   ├── ble_scanner.c/h             # 有界 CPS 候选扫描
 │   ├── radio_ctrl.c/h              # BLE/WiFi 射频软切换（唯一 RF 入口）
 │   ├── wifi_portal.c/h             # HTTP 配网门户（/api/xxx JSON）
 │   ├── captive_portal.c/h          # DNS 劫持（Captive Portal 自动弹窗）
 │   ├── nvs_store.c/h               # NVS 配置持久化桥接
-│   ├── device_template_store.c/h   # BLE 设备信息模板库存储
+│   ├── device_identity_store.c/h   # DIS 覆盖持久化
 │   ├── web/                        # 前端 SPA（编译时内联）
 │   │   ├── index.html
 │   │   ├── app.css

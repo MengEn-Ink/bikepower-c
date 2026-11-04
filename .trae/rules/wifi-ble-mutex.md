@@ -18,7 +18,7 @@
 
 - **WB-MUTEX-4**：进入配网（`radio_ctrl_enter_wifi`）时 BLE 保持在线继续通知，不停止广播、不断开现有连接、不停 NimBLE host。
 - **WB-MUTEX-5**：配网期间主循环继续生成快照推 BLE 通知，确保骑行 App 实时数据不中断。
-- **WB-MUTEX-6**：配网结束（保存成功或 180s 超时）由 `wifi_portal` 通过 done 回调投递 `APP_EVT_WIFI_DONE`，状态机收到后调用 `radio_ctrl_exit_wifi` 关闭 HTTP + SoftAP，回到 `ST_BLE_ACTIVE`。**不重启设备**。
+- **WB-MUTEX-6**：配网结束（保存并关闭或 300s 超时，仅显式续期）由 `wifi_portal` 通过 done 回调投递 `APP_EVT_WIFI_DONE`，状态机收到后调用 `radio_ctrl_exit_wifi` 关闭 HTTP + SoftAP，回到 `ST_BLE_ACTIVE`。**不重启设备**。
 - **WB-MUTEX-7**：配置通过 `power_engine_set_*` 系列 setter 实时生效，主循环 50ms 周期通过 BLE 通知新值；NVS 持久化在 setter 内同步完成。
 - **WB-MUTEX-8**：唯一的 RF 开关入口是 `radio_ctrl.c`。其他模块不得直接操作 `esp_wifi_*` 与 NimBLE 启停。
 
@@ -41,7 +41,7 @@
   → radio_ctrl_enter_wifi（BLE 不停）
       → radio_ctrl_start_wifi_ap（coex 仲裁）
       → wifi_portal_start（HTTP 配网，配置通过 power_engine setter 实时生效到 BLE 通知）
-  → 用户保存 / 180s 超时
+  → 用户保存并关闭 / 300s 超时
   → wifi_portal done 回调 → APP_EVT_WIFI_DONE
   → app_state 收到事件 → radio_ctrl_exit_wifi（关 HTTP + SoftAP）→ ST_BLE_ACTIVE
 ```

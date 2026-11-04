@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-11-04 Pages 分区与移动手册
+
+- [x] 工具导航三分区、配置任务分组与运动类型渐进展开，保存保留其他组值。
+- [x] 手机详细手册、四种按钮教学场景、播放/暂停/逐步、减少动画、实物人工自查。
+- [x] `site-info.json` 独立页面构建时间与源码提交；两端页脚与正式固件发布时间分别显示。
+- [x] 页面功能及刷写生命周期 36 项、站点生成 12 项、两主题六宽度交互与桥接配置保存回归通过。
+- [x] 页面代码 `5305a04` 已于 2026-11-05 提交并推送。
+- [ ] 线上部署：新提交 CI 排队，部署待确认；此前最后成功部署为 `1c6b3ad`，`cf1b462` 的 Linux CI 桥接 harness 编译失败导致部署跳过。
+- [ ] 实物按钮/LED、Safari 和真实功率计共存验收；教学与自查勾选不替代设备验收证据。
+
+## 2026-11-04/05 自动优化收口
+
+- [x] 六组配置 GATT 独立模块，通知整体快照、生命周期原子及 mailbox/门户短锁契约。
+- [x] HTTP 独占共享 JSON 区，命名容量与超限错误；300 秒续期、done 重试/代次、重启取清生产回归。
+- [x] 生产 GATT/通知/门户 cJSON ASan/UBSan，host 6146/0；完整质量门禁 107 PASS / 2 dirty WARN / 0 FAIL。
+- [x] full 操作门禁及 3 分钟 17 轮耐久；双板独立构建通过，最终专项门禁 106 PASS / 0 FAIL（构建另有证据）。
+- [x] 分层门禁、源码事实摘要、Markdown 锚点；同步当前文档，归档已完成计划，清理无构建/调用方的旧模板存储文件。
+- [x] generic-c3 独立镜像启动、cycling/running、六组配置/NVS、GATT 重建、双次重连与 307 秒耐久通过；258 条 CPS，扫描/连接/空通知失败均 0，原配置恢复。
+- [x] 补齐 C11 harness 的 POSIX 声明宏，本地 GCC 严格告警及 macOS ASan/UBSan 通过；修复已推送，远端 CI 排队待验证。
+- [ ] 热点 HTTP、真实功率计三方共存、M5 实物、Safari/手机、实体按钮/LED、标准 App 与原生浏览器授权。
+- 证据见 [自动优化报告](docs/dev/22-automatic-optimization-report.md)；代码已分批提交推送，实际验收镜像仍绑定构建时 dirty 身份，旧候选包与旧证据保留，未发布。
+
 ## 2026-11-04 核心门户与真实功率桥接实施
 
 - 发布门禁：代码提交与合并已获授权，v4.2.1 候选固件须用户手动验证并明确批准后才能发布。
@@ -131,7 +153,7 @@
 - [x] 核心数值可配置已就绪：固定/配速机器人模式分段切换、功率/踏频双时间尺度动态、心率锁定/二阶联动，均经 `/api/config` 持久化到 NVS。
 - [x] 配网入口交互已补强：设备名铅笔编辑、保存成功强反馈、不关闭 WiFi 时可继续修改。
 - [x] 配置导入/导出基础能力已落到领域层：`config_store_serialize` / `config_store_deserialize` 支持 JSON 往返、缺字段默认值和范围夹紧。
-- [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成文件名含板型、单一版本号、stable/fix 标识和 Git ID 的 merged bin、SHA256、manifest；脚本不自动打 tag、不创建 GitHub Release。
+- [x] Release 产物标准化脚本已就绪：`scripts/build_all.sh` 可生成 `<板型>-v<版本>.bin` merged bin、SHA256、manifest；Git ID 留在 manifest。脚本不自动打 tag、不创建 GitHub Release。
 - [x] 自动化门禁入口已就绪：`tests/check_config_consistency.py` 与 `scripts/tools/quality_gate.py` 覆盖配置一致性、host 单测、构建和静态检查聚合；`tests/operation_gate.py --level full` 已接入 release 产物门禁和核心流程耐久。
 - [x] 稳定交付证据链已接入：`scripts/tools/device_acceptance.py` 统一记录真机自动项与人工项，`operation_gate.py --level device` 可写入自动结果，正式 GitHub 发布要求当前版本与 Git ID 的 P0 证据全部通过。
 - [x] Config Service 真机 P0 门禁已接入：五组全量读取、事务拒绝路径、五组修改、NVS 重启持久化、广播掩码触发 GATT 重建和 `finally` 原配置恢复由 `tests/ble_config_e2e.py` 自动验证。
@@ -147,7 +169,7 @@
 - [ ] LED 灯效人工观察：通用板广播慢闪/连接常亮/确认快闪；M5Stamp C3 蓝色慢闪/绿色常亮/黄色快闪。
 - [ ] 配网真机流程：手机连接 `BikePower-XXXXXX` 热点，访问 `192.168.4.1`，切换固定/配速机器人模式、修改功率/踏频/心率/浮动幅度/设备名并保存，确认 BLE 保持在线且参数实时生效。
 - [ ] 配网关闭流程：点击“保存并关闭 WiFi”后 5s 收尾退出，HTTP/SoftAP/DNS 停止，设备不重启并回到 BLE。
-- [ ] 配网超时流程：180s 无操作自动关闭 WiFi，回到 BLE，串口无异常重启。
+- [ ] 配网超时流程：当前 300s 无续期自动关闭 WiFi，回到 BLE，串口无异常重启。
 - [ ] Captive Portal 多系统弹窗：iOS、Android、Windows 分别连接 `BikePower-XXXXXX` 热点后能自动弹出配网页；不弹窗时手动访问 `192.168.4.1` 仍可配网。
 - [ ] Captive Portal 生命周期：退出配网后串口确认 DNS 任务停止，不再响应劫持。
 - [ ] 72h 老化：长时间运行无 coredump、无 WDT、无堆持续下降；建议周期性跑 `tests/ble_selftest.py` 和 `tests/stage5_portal_test.py` 采样。
@@ -228,7 +250,7 @@
 | 配网门户 | [main/wifi_portal.c](main/wifi_portal.c) / [main/web/](main/web) | esp_http_server（SoftAP 由 radio_ctrl 启动）；前端三件套 `main/web/` 由 `scripts/inline_static.py` 编译时内联到固件；C 侧仅保留静态首页、`/api/xxx` JSON、Captive Portal 探测路由和 404 兜底 |
 | 状态机接入 | [main/app_state.c](main/app_state.c) | ST_WIFI_CONFIRM → ST_WIFI_CONFIG，经 `wifi_trigger` 回调触发 radio_ctrl |
 
-- 超时方案：180s（`WIFI_SHUTDOWN_MS`）无续期自动关闭 WiFi 回到 BLE，保存并关闭后 5s 收尾再退出配网
+- 超时方案：当前 300s（`WIFI_SHUTDOWN_MS`）无续期自动关闭 WiFi 回到 BLE，保存并关闭后 5s 收尾再退出配网
 - 前端每秒轮询 `/api/time` 显示剩余时间，`/api/renew` 续期；`/api/mem_stats` 返回堆内存 JSON，`/favicon.ico` 返回 204
 - 配网表单可改：功率/踏频/心率/模式/体重/FTP/阈值心率/配速机器人/设备名，保存后写入 power_engine + NVS
 
@@ -236,7 +258,7 @@
 
 - [ ] 长按 + 二次确认 → 进入配网，手机连 `BikePower-XXXXXX` 热点
 - [ ] 浏览器访问 `192.168.4.1` → 修改参数 → 保存并关闭 WiFi → BLE 保持/恢复在线且参数生效
-- [ ] 180s 无操作 → 自动超时关闭 WiFi 回到 BLE
+- [ ] 300s 无续期 → 自动超时关闭 WiFi 回到 BLE
 - [ ] 连上热点后跑 `python3 tests/stage5_portal_test.py` 校验 HTTP 路由（首页、`/api/state`、`/api/time`、`/api/config`、`/api/renew`、`/api/close-wifi`、Captive Portal 探测与 404 兜底）
 
 ---
@@ -332,5 +354,5 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 - 物理按钮/LED 灯效需人工确认，自动化测试只能覆盖 BLE 连接驱动的状态迁移
 - 配网门户动态测试（stage5_portal_test.py）需本机连 BikePower-XXXXXX 热点；本机不能切换 WiFi 时改用 `tests/mock_server.py` 本地调试，或换另一台机器执行
 - `test/` 与 `tests/` 目录职责不同不合并（评估结论见 [tests/README.md](tests/README.md) 第六章）：`test/` 放 ESP-IDF 约定的 host 单测（纯 C），`tests/` 放所有 Python/Shell 设备测试与静态门禁
-- 当前 P0 协议与可靠性缺陷及实施顺序见 [docs/dev/12-top5-protocol-stability-design.md](docs/dev/12-top5-protocol-stability-design.md) 和 [docs/dev/13-project-review-and-optimization.md](docs/dev/13-project-review-and-optimization.md)。在对应修复和真机验收完成前，不把现有自动化全绿等同于协议正确。
+- P0 协议与可靠性修复设计见 [归档规格](docs/archive/14-top5-protocol-stability-design.md)，持续待办见 [优化清单](docs/dev/13-project-review-and-optimization.md)。修复实现已完成，硬件和人工验收按当前镜像证据判定，不把自动化全绿等同于全部验收完成。
 - GitHub Release、Actions 和 Pages 已收敛为单一链路；v4.1.1 双板固件在线 SHA256 与 manifest 已自动复核，generic-c3 / m5stamp-c3 浏览器真机刷写仍待确认。

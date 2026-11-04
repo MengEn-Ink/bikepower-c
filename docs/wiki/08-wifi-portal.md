@@ -4,6 +4,9 @@
 
 ## 生命周期
 
+deadline/closing/done/restart 由 `s_lock` 保护；done 锁外调用，inflight 防重入，
+generation 隔离旧会话回写，拒收时下一节拍重试。重启请求锁内取清。
+
 WiFi 启停统一经过 `radio_ctrl`，普通配网保持 BLE peripheral 在线。默认 300 秒，仅用户点击续期调用 `/api/renew` 重置截止时间；读状态、保存、扫描和测试都不延长。
 
 保存并关闭在事务成功后进入 5 秒收尾窗口，done 回调投递 `APP_EVT_WIFI_DONE`，主循环关闭 HTTP、DNS 和 SoftAP。普通共存模式不重启；异常初始化降级遵循 radio_ctrl 原有恢复流程。
@@ -51,6 +54,10 @@ schema v13 追加桥接来源、绑定地址及类型、校正和名称。NVS �
 复制设备信息只覆盖读取成功且非空的 DIS 字段。名称可使用功率计名称、原开发板名称或自定义名称，最多 23 UTF-8 字节。
 
 ## 前端与验证
+
+HTTP 服务任务独占 8192 字节 JSON 共享区；state/runtime/scan 命名容量分别为
+8192/4096/3072。配置序列化复用同一区。容量不足返回合法错误 JSON。
+生产 cJSON 容量与超时回归入口为 `python3 tests/test_portal_runtime.py`。
 
 草稿、已应用配置和实际输出分别管理。轮询不抢输入焦点；按钮居中、输入字号适配手机、弹窗支持键盘焦点和 Escape，动画遵循 reduced-motion。
 

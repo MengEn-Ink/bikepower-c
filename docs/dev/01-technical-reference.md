@@ -22,7 +22,8 @@
 - `board_detect.c`：启动时检测通用 ESP32-C3 / M5Stamp C3
 - `button.c`：中断驱动按钮任务，通用板 `GPIO9`，M5Stamp C3 `GPIO3`
 - `led.c`：独立灯效任务，通用板 `GPIO12` 普通 LED，M5Stamp C3 `GPIO2` SK6812 RGB
-- `ble_bikepower.c`：NimBLE 运动服务与配置服务、通知打包、FTMS 和配置事务控制点
+- `ble_bikepower.c`：NimBLE 运动服务、生命周期、通知打包与 FTMS 控制点
+- `ble_config_service.c`：六组配置 GATT、staging/revision、提交结果和断连取消；应用 API 仍由 `ble_bikepower` 包装
 - `radio_ctrl.c`：WiFi/BLE 射频共用唯一入口
 - `wifi_portal.c`：`esp_http_server` 配网页面（SoftAP 由 `radio_ctrl.c` 启动）
 - `nvs_store.c`：NVS 与领域层配置对象桥接
@@ -178,11 +179,12 @@
 产出 `snapshot_t` 并更新 `s_engine.snapshot`。
 
 紧接着调用 `ble_bikepower_set_data((uint16_t)s.power, (uint8_t)s.heartrate, (uint16_t)s.cadence)`。
-这个函数只是更新共享变量：
-
-- `g_power_w`
-- `g_hr_bpm`
-- `g_cadence`
+这个函数在 `s_data_lock` 下整体更新 `s_output`。桥接和跑步使用对应发布接口。
+通知每轮采集一次完整快照，保证各特征来自同一轮输入；固定长度纯 C 二进制
+codec 在短临界区内写通知缓冲，GATT 锁内复制缓冲与动态长度，锁外写 mbuf。
+ready/stopping/failed/profile/mask/连接句柄使用 C11 原子；释放 NimBLE 仍受
+`g_notify_lock` 保护。应用 mailbox 通过临界区读写，队列优先、pending fallback；
+引擎和 radio_ctrl 暂停态由主任务独占。
 
 真正的 BLE 通知由 `ble_bikepower.c` 里的 `notify_tick()` 定时器回调完成。
 通知周期由 `BLE_NOTIFY_INTERVAL_MS` 控制，当前是 `1000ms`。
@@ -207,7 +209,8 @@
 
 ## 第四章：BLE 服务详解
 
-BLE 实现集中在 `main/ble_bikepower.c`。
+运动服务与生命周期位于 `main/ble_bikepower.c`，六组配置事务位于
+`main/ble_config_service.c`，字节编码位于纯 C 领域 codec。
 模块可提供以下 GATT 服务（运动服务按 `broadcast_mask` 动态过滤注册，DIS 和 BikePower Config Service 始终注册）：
 
 - `Cycling Power Service`，UUID `0x1818`（骑行，POWER 位）
@@ -690,7 +693,7 @@ WiFi 配网链路分布在 `app_state.c`、`radio_ctrl.c`、`wifi_portal.c`。
 2. `radio_ctrl_start_wifi_ap()` 启动 SoftAP，不触碰 NimBLE
 3. `captive_portal_start_dns()` 启动 DNS 劫持
 4. `wifi_portal_start(engine)` 启动 HTTP 门户
-5. 保存并关闭或 180s 超时后，`wifi_portal` 投递 `APP_EVT_WIFI_DONE`
+5. 保存并关闭或 300s 超时后，`wifi_portal` 投递 `APP_EVT_WIFI_DONE`
 6. 状态机调用 `radio_ctrl_exit_wifi()`，关闭 HTTP/DNS/SoftAP，原地回到 BLE 工作态
 
 SoftAP 启动时还会通过 DHCP 下发 `Domain-Name-Server = 192.168.4.1` 和 Captive Portal URI（DHCP Option 114 / RFC 8910，`http://192.168.4.1/.well-known/captive-portal`）。Portal URI 使用静态存储期字符串，满足 ESP-IDF DHCP Server 对指针生命周期的要求，避免多次进入配网或长时间运行后 DHCP 报文引用失效；该 URI 返回 `application/captive+json`，其中 `user-portal-url` 指向真正的 HTML 首页 `http://192.168.4.1/`。
@@ -706,8 +709,7 @@ SoftAP 由 `radio_ctrl_start_wifi_ap()` 启动，HTTP 门户由 `wifi_portal_sta
 - `WIFI_PASSWORD = "12345678"`
 - `WIFI_AP_CHANNEL = 1`
 - `WIFI_PORT = 80`
-- `WIFI_SHUTDOWN_MS = 180000`
-- `WIFI_RENEW_MS = 180000`
+- `WIFI_SHUTDOWN_MS = 300000`，显式续期重新设置 300 秒截止时间
 
 `start_softap()` 中的运行时配置还包括：
 
@@ -763,10 +765,11 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 配网超时控制基于 `esp_timer`。
 关键变量：
 
-- `s_shutdown_timer`
+- `s_timer`
 - `s_deadline_sec`（32 位秒级单调时间，避免 64 位变量在 httpd 任务与定时器回调间撕裂误重启）
 - `s_closing`（收尾窗口中不再续期、不再接受配置修改）
 - `s_done_called`（done 回调幂等标志）
+- `s_done_inflight` / `s_generation`（防止重入和旧会话回调覆盖新会话）
 - `s_pending_wifi_done`（应用事件队列满时的单比特完成 latch）
 
 流程为：
@@ -781,11 +784,20 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 
 所以当前版本的配网退出不重启设备；BLE 在普通配网期间保持在线。v4.0.0 已永久放弃设备内 OTA 与家庭网络配置；普通用户升级统一走 GitHub Pages 部署的 BLE Monitor / 固件刷写页，Pages 临时不可用时使用 EasyHey 备用入口。网页刷写只在电脑浏览器中通过 USB 串口写入 merged bin，不会恢复设备内 OTA。
 
+deadline、closing、done 与重启请求都在 `s_lock` 下读写；done 回调在锁外执行，
+未接收保持下一秒重试。重启请求使用锁内取清。回调仅在启动前注册。
+
 ### 8.5 前端反馈与 JSON 安全
 
 核心门户采用单页明亮高密度布局，固定模式与配速机器人共用区域，自定义收敛到机器人档位。模板库和 LED 编辑移到电脑工具。真实来源按“选择→扫描→两样本临时测试→配置→保存应用”渐进披露，测试不提前改变实际输出；首次默认关闭心率。支持 DIS 有效字段复制、功率计/开发板/自定义名称、原始与校正值预览。前端区分草稿、已应用配置和实际输出，保存携带 revision，轮询 transaction 确认 NVS 结果，失败保留草稿。默认配网 300 秒，仅显式续期延长。内联资源上限 110 KiB，按钮居中，动画遵循 reduced-motion。详细接口与验证见 `docs/wiki/08-wifi-portal.md`。
 
-`wifi_portal.c` 使用 `json_escape()` 转义字符串字段，避免设备名等用户可控内容破坏 JSON；前端渲染动态文本时使用 HTML 转义。`tests/check_portal_js.py` 与 `tests/check_portal_structure.py` 分别覆盖 JS 语法和前后端路由/视图契约。
+`wifi_portal.c` 用 cJSON 构造和转义 JSON，HTTP 服务任务独占 8192 字节共享输出区，
+state/runtime/scan 容量分别由 `WIFI_JSON_STATE_CAPACITY=8192`、
+`WIFI_JSON_RUNTIME_CAPACITY=4096`、`WIFI_JSON_SCAN_CAPACITY=3072` 限定；
+配置序列化复用此区并受 `CONFIG_JSON_MAX_LEN` 限制。`cJSON_PrintPreallocated`
+容量不足返回合法错误 JSON，主任务与定时器不访问输出区。前端动态文本使用
+HTML 转义。`tests/test_portal_runtime.py` 使用本地 IDF cJSON 验证实际生产处理函数，
+覆盖最长 DIS 转义、响应超限、300 秒续期、done 重试/代次与重启取清。
 
 ## 第九章：配置持久化
 
@@ -839,11 +851,8 @@ namespace 固定为：
 - `NVS_KEY_RUN_PACE_HI = "rphi"`
 - `NVS_KEY_RUN_CUSTOM_NAME = "rcname"`
 
-设备信息模板由 `main/device_template_store.c` 单独管理，避免模板集合数据影响主配置保存。模板 namespace 固定为：
-
-`NVS_TEMPLATE_NAMESPACE = "ble_tpl"`
-
-模板槽位最多 5 个，key 使用 `tpl0` 到 `tpl4`。每个槽位保存一个 `device_template_t` blob，包含模板别名、广播名、应用到本设备的设备名、厂商、型号、固件版本、硬件版本、软件版本、最近地址、地址类型、RSSI 和服务标记。删除模板会擦除对应 key；应用模板只复制设备名到主配置并刷新 BLE 广播名。
+设备门户已删除模板存储服务与 handler。历史 `ble_tpl` namespace 不再读写，
+升级不主动擦除旧槽位；当前配置和 DIS 覆盖分别走 `bikepower` 与 `bp_ident`。
 
 ### 9.2 schema 版本
 

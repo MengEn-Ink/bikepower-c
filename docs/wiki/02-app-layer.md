@@ -15,8 +15,9 @@
 |------|------|------|
 | `s_engine` | `power_engine_t` | 全局唯一的功率引擎实例 |
 | `s_app_queue` | `QueueHandle_t` | 事件队列，深度 16，元素 `app_evt_t` |
-| `s_pending_erg_target` | `volatile int` | 队列满时 ERG 目标兜底缓存 |
-| `s_has_pending_erg` | `volatile bool` | 是否有缓存的 ERG 目标待处理 |
+| `s_pending_erg_target` | `int` | 临界区保护的队列满 ERG 目标缓存 |
+| `s_has_pending_erg` | `bool` | 临界区保护的缓存标记 |
+| `s_real_power_source` | `atomic_bool` | 主任务发布来源，host 不直接读取引擎 |
 
 ### 关键回调函数
 
@@ -308,7 +309,7 @@ radio_ctrl_enter_wifi(engine)
 | `WIFI_PASSWORD` | "12345678" | WPA2 密码 |
 | `WIFI_AP_CHANNEL` | 1 | 信道 |
 | `WIFI_PORT` | 80 | HTTP 端口 |
-| `WIFI_SHUTDOWN_MS` | 180000 | 默认超时 3 分钟 |
+| `WIFI_SHUTDOWN_MS` | 300000 | 默认超时 5 分钟，仅显式续期 |
 | `WIFI_MAX_STA_CONN` | 2 | 最大客户端数 |
 
 ---
@@ -370,21 +371,10 @@ nvs_store_load(engine)
 
 ---
 
-## device_template_store.c — 设备模板存储
+## 历史模板存储
 
-**文件**：[device_template_store.c](../../main/device_template_store.c) / [device_template_store.h](../../main/device_template_store.h)
-**TAG**：`"TPL"`
-
-管理 BLE 设备信息模板库（最多 5 个），独立 namespace `ble_tpl`，键 `tpl0`-`tpl4`，每个槽位存一个 blob。
-
-### 关键函数
-
-| 函数 | 说明 |
-|------|------|
-| `device_template_load_all(arr, count)` | 加载全部模板 |
-| `device_template_save(idx, tpl)` | 保存模板到指定槽位 |
-| `device_template_delete(idx)` | 删除指定槽位 |
-| `device_template_apply_name(idx, engine)` | 应用模板的设备名到主配置 |
+设备门户已移除模板库和未注册的旧存储模块。历史 `ble_tpl` 槽位不主动擦除，
+当前 DIS 持久化由 `device_identity_store` 负责。
 
 ---
 
@@ -393,7 +383,7 @@ nvs_store_load(engine)
 **文件**：[ble_scanner.c](../../main/ble_scanner.c) / [ble_scanner.h](../../main/ble_scanner.h)
 **TAG**：`"SCAN"`
 
-用于设备信息模板库功能：扫描附近 BLE 设备、连接读取 DIS/GATT、短时采样运动数据。
+仅扫描命中 CPS 的真实功率计候选；连接、DIS 读取和订阅由 `ble_power_bridge` 负责。
 
 **注意**：仅在用户点击网页按钮时运行，不常驻扫描。扫描期间 NimBLE 同时作为 peripheral 和 central。
 
@@ -401,11 +391,11 @@ nvs_store_load(engine)
 
 | 函数 | 说明 |
 |------|------|
-| `ble_scanner_start(duration_ms)` | 启动 active scan（默认 8s） |
+| `ble_scanner_start(duration_ms)` | 用户触发有界 active scan |
 | `ble_scanner_stop()` | 停止扫描 |
-| `ble_scanner_get_results(results, max)` | 获取扫描结果（最多 12 个，仅包含骑行相关设备） |
-| `ble_scanner_read_device(addr, result)` | 临时连接指定设备读取 DIS（厂商/型号/版本） |
-| `ble_scanner_analyze_device(addr, result)` | 临时连接并短时采样运动数据（9s 窗口） |
+| `ble_scanner_is_scanning()` | 查询扫描状态 |
+| `ble_scanner_serialize_results(out, size)` | 有界输出候选 JSON |
+| `ble_scanner_candidate(id, out)` | 验证扫描代次、CPS 与地址类型，返回绑定候选 |
 
 ---
 

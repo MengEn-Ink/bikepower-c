@@ -347,10 +347,10 @@ app_main 任务（50ms 周期）          esp_timer 回调（1s 周期）
        │                                    │
        ▼                                    ▼
 ble_bikepower_set_data()            notify_tick()
-  写 g_power_w/g_hr_bpm/g_cadence     xSemaphoreTake(g_notify_lock, 0)
-  （volatile 变量，单字原子）          │
+  锁内更新 s_output                 xSemaphoreTake(g_notify_lock, 0)
+  （模拟/桥接/跑步整体快照）           │
                                        ├→ pack_all() / pack_running()
-                                       │    读取 volatile 变量打包
+                                       │    采集一次 output_snapshot 后打包
                                        │    更新 g_crank_rev / g_last_crank_ms
                                        │
                                        ├→ notify_one_nolock() × N
@@ -403,12 +403,13 @@ ble_bikepower_set_data()            notify_tick()
 | `notify_one`（FTMS 响应等） | `BLE_NOTIFY_LOCK_WAIT_MS`（短等待） | FTMS 关键响应尽量不丢，但不阻塞太久 |
 | `ble_bikepower_stop` | `BLE_STOP_LOCK_WAIT_MS`（较长等待） | 必须等飞行中回调结束才能 deinit |
 
-### volatile 变量
+### 共享状态契约
 
-跨任务访问的共享变量使用 `volatile` 修饰防止编译器缓存：
-- `g_conn_handle`：host 任务写，app_main/esp_timer 读
-- `g_ready` / `g_stopping` / `g_start_failed`：app_main 写，多上下文读
-- `g_power_w` / `g_hr_bpm` / `g_cadence` 等：app_main 写，esp_timer 读（C3 上 16/8 位单次访问原子）
+- `g_conn_handle`、`g_ready` / `g_stopping` / `g_start_failed`、profile 和 mask 使用 C11 原子。
+- `s_output` 与通知缓冲/长度使用 `s_data_lock`；同轮通知只采集一次完整输入。
+- GATT 在锁内复制 payload 与长度，锁外追加到 mbuf。
+- `ble_config_service` 用独立短锁管理六组配置和 revision；提交回调、BLE indication 与 NVS 在锁外。
+- 配置快照发布与提交结果由主任务串行调用；回调在 NimBLE 启动前注册，运行期间不更换。
 
 ---
 
