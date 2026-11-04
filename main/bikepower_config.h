@@ -236,7 +236,10 @@ typedef enum {
 #define WIFI_AP_CHANNEL        1
 #define WIFI_PORT              80
 #define WIFI_SHUTDOWN_MS       300000
-#define WIFI_RENEW_MS          180000
+// HTTP 任务独占同一静态序列化区，容量包含 JSON 转义和结尾空字符。
+#define WIFI_JSON_STATE_CAPACITY   8192
+#define WIFI_JSON_RUNTIME_CAPACITY 4096
+#define WIFI_JSON_SCAN_CAPACITY    3072
 #define WIFI_PORTAL_CHECK_INTERVAL_US  1000000  // 配网门户超时检查周期（每秒）
 #define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 保存并关闭 WiFi 前的收尾等待时间（历史命名保留）
 #define WIFI_MAX_STA_CONN      2        // SoftAP最大连接客户端数

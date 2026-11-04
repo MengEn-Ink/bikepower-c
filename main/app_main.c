@@ -8,6 +8,8 @@
  *   led_task      LED 状态指示
  *   app_main_task 本函数主循环：50ms 节拍生成快照 + 消费事件队列 + 喂看门狗
  */
+#include <stdatomic.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -35,18 +37,21 @@
 static const char *TAG = "APP";
 
 static power_engine_t s_engine;
+// 主任务发布来源，host 控制点只读原子副本，不直接访问正在更新的引擎。
+static atomic_bool s_real_power_source;
 static QueueHandle_t s_app_queue;
 // ERG 控制点队列满时的兜底缓存：正常路径使用 app_queue 保序，避免 Stop/Pause 被旧目标覆盖。
-static volatile int s_pending_erg_target = 0;
-static volatile bool s_has_pending_erg = false;
-static volatile int s_pending_erg_clear_reason = 0;
-static volatile bool s_has_pending_erg_clear = false;
+// mailbox 全部读写均在单核 C3 的关中断临界区；volatile 不承担同步职责。
+static int s_pending_erg_target = 0;
+static bool s_has_pending_erg = false;
+static int s_pending_erg_clear_reason = 0;
+static bool s_has_pending_erg_clear = false;
 // WiFi 完成事件队列满时的单比特保底；事件幂等，无需计数。
-static volatile bool s_pending_wifi_done = false;
+static bool s_pending_wifi_done = false;
 static config_data_t s_pending_ble_config;
-static volatile bool s_has_pending_ble_config = false;
-static volatile uint32_t s_pending_ble_config_transaction = 0;
-static volatile uint32_t s_pending_ble_config_revision = 0;
+static bool s_has_pending_ble_config = false;
+static uint32_t s_pending_ble_config_transaction = 0;
+static uint32_t s_pending_ble_config_revision = 0;
 static bool s_pending_config_wifi;
 static bool s_pending_config_identity;
 static device_identity_t s_config_identity;
@@ -54,7 +59,7 @@ static bool s_processing_config_wifi;
 static bool s_ble_config_restart_pending = false;
 // DIS 身份覆盖写入 mailbox：host 任务只复制，主循环负责 NVS 落盘后再让 DIS 读值生效。
 static device_identity_t s_pending_identity;
-static volatile bool s_has_pending_identity = false;
+static bool s_has_pending_identity = false;
 
 /**
  * DIS 身份覆盖写入回调（NimBLE host 任务上下文）。
@@ -108,7 +113,7 @@ static void process_pending_identity(void)
  */
 static bool on_erg_target(int target_power)
 {
-    if (s_engine.bridge.source == BRIDGE_SOURCE_REAL) return false;
+    if (s_real_power_source) return false;
     // 范围校验：与领域层 POWER_MIN/POWER_MAX 一致
     if (target_power < POWER_MIN || target_power > POWER_MAX) return false;
     app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = target_power };
@@ -302,6 +307,7 @@ static void process_pending_ble_config(void)
     }
 
     s_engine = next;
+    s_real_power_source = s_engine.bridge.source == BRIDGE_SOURCE_REAL;
     if (copy_identity) ble_bikepower_set_identity(&identity);
     ble_bridge_status_t bridge_status = ble_power_bridge_status(&applied.bridge,
         (uint32_t)(esp_timer_get_time() / 1000));
@@ -432,6 +438,7 @@ void app_main(void)
     }
 
     ble_bikepower_set_erg_callback(on_erg_target);
+    s_real_power_source = s_engine.bridge.source == BRIDGE_SOURCE_REAL;
     ble_bikepower_set_erg_clear_callback(on_erg_clear);
     ble_bikepower_set_run_control_callback(on_run_control);
     ble_bikepower_set_config_commit_callback(on_ble_config_commit);

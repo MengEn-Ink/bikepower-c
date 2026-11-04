@@ -95,8 +95,7 @@ def main():
 
     shutdown_check = extract_function(portal_c, "shutdown_check_cb")
     check(
-        "if (s_done_called) return" in shutdown_check
-        and "portal_done();" in shutdown_check,
+        "portal_done();" in shutdown_check and "s_done_called || s_done_inflight" in portal_done,
         "定时检查在 done 未被接受时保留重试",
     )
 

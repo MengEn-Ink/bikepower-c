@@ -10,6 +10,7 @@
  *   FTMS IndoorBike : flags(2)=0x0044 + speed(2)=cad*30 + cadence(2)=cad*2 + power(2)
  *   FTMS ControlPoint: ERG OpCode 状态机
  */
+#include <stdatomic.h>
 #include <string.h>
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -24,6 +25,7 @@
 
 #include "bikepower_config.h"
 #include "ble_config_codec.h"
+#include "ble_config_service.h"
 #include "ble_payload_codec.h"
 #include "domain_config.h"
 #include "running_engine.h"
@@ -34,9 +36,8 @@
 static const char *TAG = "BLE";
 
 static uint8_t  g_own_addr_type;
-// 跨任务访问：host 任务(gap_event_cb/on_reset)写，app_main(conn_count) 与 esp_timer(notify_tick) 读，
-// 加 volatile 防止编译器缓存（C3 上 16 位单次访问原子）。
-static volatile uint16_t g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+// host 发布句柄，主任务与通知任务读取；单值状态使用 C11 原子。
+static atomic_uint_least16_t g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 
 static uint16_t g_cps_val_handle;
 static uint16_t g_hr_val_handle;
@@ -46,19 +47,23 @@ static uint16_t g_ftms_bike_handle;
 static uint16_t g_ftms_treadmill_handle;
 static uint16_t g_ftms_cp_handle;
 static uint16_t g_ftms_status_handle;
-static uint16_t g_config_control_handle;
 
 // 当前通知数据（由领域层写入，notify_tick 读取）
-static volatile uint16_t g_power_w   = DEFAULT_POWER;
-static volatile uint8_t  g_hr_bpm    = DEFAULT_HEARTRATE;
-static volatile uint16_t g_cadence   = DEFAULT_CADENCE;
-static volatile uint8_t  g_broadcast_mask = BROADCAST_FIELD_ALL;
-static volatile uint16_t g_run_speed = 0;
-static volatile uint8_t  g_run_cadence = RUN_CADENCE_DEFAULT;
-static volatile uint16_t g_run_stride_cm = 0;
-static volatile uint32_t g_run_distance_m = 0;
-static volatile uint32_t g_run_elapsed_s = 0;
-static volatile bool     g_run_running = true;
+typedef struct {
+    uint16_t power;
+    uint8_t heartrate;
+    uint16_t cadence;
+    running_snapshot_t running;
+    bridge_snapshot_t bridge;
+    bool real;
+    uint8_t mask;
+} ble_output_snapshot_t;
+static portMUX_TYPE s_data_lock = portMUX_INITIALIZER_UNLOCKED;
+static ble_output_snapshot_t s_output = {
+    .power = DEFAULT_POWER, .heartrate = DEFAULT_HEARTRATE, .cadence = DEFAULT_CADENCE,
+    .running = { .cadence_spm = RUN_CADENCE_DEFAULT, .running = true },
+};
+static atomic_uchar g_broadcast_mask = BROADCAST_FIELD_ALL;
 
 // 曲柄累计（CPS/CSC 共用）
 static uint16_t g_crank_rev = 0;
@@ -67,9 +72,6 @@ static uint32_t g_last_crank_ms = 0;
 // 预分配通知缓冲区（运行时零 malloc）
 static uint8_t g_cps_buf[BLE_PAYLOAD_CPS_LEN];
 static size_t g_cps_len = BLE_PAYLOAD_CPS_LEN;
-static portMUX_TYPE s_bridge_data_lock = portMUX_INITIALIZER_UNLOCKED;
-static bridge_snapshot_t s_bridge_sample;
-static bool s_real_source;
 static bool s_bridge_csc_valid;
 static uint8_t g_hr_buf[BLE_PAYLOAD_HRS_LEN];
 static uint8_t g_csc_buf[BLE_PAYLOAD_CSC_LEN];
@@ -98,49 +100,21 @@ static uint8_t g_ftms_status_buf[1] = { FTMS_STATUS_RESET };
 static ble_erg_cb_t g_erg_cb = NULL;
 static ble_erg_clear_cb_t g_erg_clear_cb = NULL;
 static ble_run_control_cb_t g_run_control_cb = NULL;
-static ble_config_commit_cb_t g_config_commit_cb = NULL;
-static sport_profile_t g_profile = DEFAULT_SPORT_PROFILE;
+static atomic_int g_profile = DEFAULT_SPORT_PROFILE;
 static char g_device_name[DEVICE_NAME_MAX] = DEVICE_NAME;
 static esp_timer_handle_t g_notify_timer = NULL;
-// 跨任务访问：app_main 写(start/stop)，esp_timer(notify_tick) 读，加 volatile 防缓存。
-static volatile bool g_ready = false;
-static volatile bool g_stopping = false;
-static volatile bool g_start_failed = false;
+// 生命周期由主任务和 host 回调发布；释放 NimBLE 仍须取得通知互斥锁。
+static atomic_bool g_ready = false;
+static atomic_bool g_stopping = false;
+static atomic_bool g_start_failed = false;
 // 通知互斥锁：保证 notify_tick 回调与 ble_bikepower_stop 的 deinit 互斥，
 // stop 在释放 NimBLE 前必须先拿到锁，确保没有 notify 回调正在访问协议栈（消除 UAF 窗口）。
 static SemaphoreHandle_t g_notify_lock = NULL;
-
-static const ble_uuid128_t g_config_service_uuid = BLE_UUID128_INIT(BLE_CONFIG_SERVICE_UUID_BYTES);
-static const ble_uuid128_t g_config_meta_uuid = BLE_UUID128_INIT(BLE_CONFIG_META_UUID_BYTES);
-static const ble_uuid128_t g_config_core_uuid = BLE_UUID128_INIT(BLE_CONFIG_CORE_UUID_BYTES);
-static const ble_uuid128_t g_config_profile_uuid = BLE_UUID128_INIT(BLE_CONFIG_PROFILE_UUID_BYTES);
-static const ble_uuid128_t g_config_running_uuid = BLE_UUID128_INIT(BLE_CONFIG_RUNNING_UUID_BYTES);
-static const ble_uuid128_t g_config_led_uuid = BLE_UUID128_INIT(BLE_CONFIG_LED_UUID_BYTES);
-static const ble_uuid128_t g_config_identity_uuid = BLE_UUID128_INIT(BLE_CONFIG_IDENTITY_UUID_BYTES);
-static const ble_uuid128_t g_config_bridge_uuid = BLE_UUID128_INIT(BLE_CONFIG_BRIDGE_UUID_BYTES);
-static const ble_uuid128_t g_config_control_uuid = BLE_UUID128_INIT(BLE_CONFIG_CONTROL_UUID_BYTES);
-static const ble_uuid128_t g_config_dis_profile_uuid = BLE_UUID128_INIT(BLE_CONFIG_DIS_PROFILE_UUID_BYTES);
 
 // DIS 身份覆盖：由应用层落盘后通过 ble_bikepower_set_identity() 写入，host 任务只读。
 static portMUX_TYPE g_identity_lock = portMUX_INITIALIZER_UNLOCKED;
 static device_identity_t g_identity;
 static ble_identity_write_cb_t g_identity_write_cb = NULL;
-
-typedef struct {
-    bool active;
-    bool committing;
-    uint32_t transaction_id;
-    uint32_t base_revision;
-    uint8_t written_mask;
-    config_data_t staging;
-} ble_config_transaction_t;
-
-static portMUX_TYPE g_config_lock = portMUX_INITIALIZER_UNLOCKED;
-static config_data_t g_config_snapshot;
-static bool g_config_snapshot_valid = false;
-static uint32_t g_config_revision = BLE_CONFIG_INITIAL_REVISION;
-static ble_config_transaction_t g_config_transaction;
-static uint8_t g_config_response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
 
 /**
  * 启动 BLE 广播。
@@ -165,10 +139,25 @@ static void indicate_one(uint16_t handle, const uint8_t *buf, size_t len);
  * 返回值：0 表示成功，否则返回 ATT 错误码。
  * 特殊行为：内存不足时转换为 `BLE_ATT_ERR_INSUFFICIENT_RES`。
  */
+static int chr_read_measurement(struct ble_gatt_access_ctxt *ctxt, const uint8_t *buf,
+                                size_t len, const size_t *dynamic_len)
+{
+    uint8_t value[DEVICE_IDENTITY_WIRE_MAX];
+    portENTER_CRITICAL(&s_data_lock);
+    if (dynamic_len) len = *dynamic_len;
+    if (len > sizeof(value)) {
+        portEXIT_CRITICAL(&s_data_lock);
+        return BLE_ATT_ERR_INSUFFICIENT_RES;
+    }
+    memcpy(value, buf, len);
+    portEXIT_CRITICAL(&s_data_lock);
+    int rc = os_mbuf_append(ctxt->om, value, len);
+    return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+}
+
 static int chr_read_buf(struct ble_gatt_access_ctxt *ctxt, const uint8_t *buf, size_t len)
 {
-    int rc = os_mbuf_append(ctxt->om, buf, len);
-    return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    return chr_read_measurement(ctxt, buf, len, NULL);
 }
 
 /**
@@ -184,7 +173,7 @@ static int chr_read_buf(struct ble_gatt_access_ctxt *ctxt, const uint8_t *buf, s
 static int cps_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_cps_buf, g_cps_len);
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_measurement(ctxt, g_cps_buf, 0, &g_cps_len);
     return BLE_ATT_ERR_UNLIKELY;
 }
 
@@ -260,9 +249,9 @@ static int ftms_feat_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
         const uint8_t *buf = (g_profile == SPORT_PROFILE_RUNNING)
             ? g_ftms_running_feature_buf
             : g_ftms_cycling_feature_buf;
-        portENTER_CRITICAL(&s_bridge_data_lock);
-        bool real = s_real_source;
-        portEXIT_CRITICAL(&s_bridge_data_lock);
+        portENTER_CRITICAL(&s_data_lock);
+        bool real = s_output.real;
+        portEXIT_CRITICAL(&s_data_lock);
         if (g_profile == SPORT_PROFILE_CYCLING && real) {
             uint8_t bridge_feature[8];
             memcpy(bridge_feature, buf, sizeof(bridge_feature));
@@ -287,14 +276,14 @@ static int ftms_feat_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
 static int ftms_bike_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_ftms_bike_buf, g_ftms_bike_len);
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_measurement(ctxt, g_ftms_bike_buf, 0, &g_ftms_bike_len);
     return BLE_ATT_ERR_UNLIKELY;
 }
 
 static int ftms_treadmill_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_ftms_treadmill_buf, g_ftms_treadmill_len);
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_measurement(ctxt, g_ftms_treadmill_buf, 0, &g_ftms_treadmill_len);
     return BLE_ATT_ERR_UNLIKELY;
 }
 
@@ -339,7 +328,9 @@ static void ftms_send_response(uint8_t request_op, uint8_t result)
  */
 static void ftms_send_status(uint8_t status)
 {
+    portENTER_CRITICAL(&s_data_lock);
     g_ftms_status_buf[0] = status;
+    portEXIT_CRITICAL(&s_data_lock);
     notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
 }
 
@@ -449,226 +440,6 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
         ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
         break;
     }
-    return 0;
-}
-
-static uint32_t config_get_u32(const uint8_t *data)
-{
-    return (uint32_t)data[0]
-         | ((uint32_t)data[1] << 8)
-         | ((uint32_t)data[2] << 16)
-         | ((uint32_t)data[3] << 24);
-}
-
-static bool config_snapshot_equal(const config_data_t *lhs, const config_data_t *rhs)
-{
-    uint8_t lhs_buf[BLE_CONFIG_GROUP_MAX_LEN];
-    uint8_t rhs_buf[BLE_CONFIG_GROUP_MAX_LEN];
-    for (int group = 0; group < BLE_CONFIG_GROUP_COUNT; group++) {
-        size_t lhs_len = ble_config_encode_group((ble_config_group_t)group, lhs,
-                                                 lhs_buf, sizeof(lhs_buf));
-        size_t rhs_len = ble_config_encode_group((ble_config_group_t)group, rhs,
-                                                 rhs_buf, sizeof(rhs_buf));
-        if (lhs_len == 0 || lhs_len != rhs_len || memcmp(lhs_buf, rhs_buf, lhs_len) != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static void config_send_response(uint8_t request_opcode, uint8_t result,
-                                 uint8_t restart_flags, uint32_t transaction_id,
-                                 uint32_t revision)
-{
-    uint8_t response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
-    ble_config_encode_control_response(response, sizeof(response), request_opcode, result,
-                                       restart_flags, transaction_id, revision);
-    portENTER_CRITICAL(&g_config_lock);
-    memcpy(g_config_response, response, sizeof(g_config_response));
-    portEXIT_CRITICAL(&g_config_lock);
-    indicate_one(g_config_control_handle, response, sizeof(response));
-}
-
-static int config_meta_access_cb(uint16_t ch, uint16_t ah,
-                                 struct ble_gatt_access_ctxt *ctxt, void *arg)
-{
-    (void)ch; (void)ah; (void)arg;
-    if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) return BLE_ATT_ERR_UNLIKELY;
-    uint32_t revision;
-    portENTER_CRITICAL(&g_config_lock);
-    revision = g_config_revision;
-    portEXIT_CRITICAL(&g_config_lock);
-    uint8_t payload[BLE_CONFIG_META_LEN];
-    size_t len = ble_config_encode_meta(payload, sizeof(payload), revision);
-    return chr_read_buf(ctxt, payload, len);
-}
-
-static int config_group_access_cb(uint16_t ch, uint16_t ah,
-                                  struct ble_gatt_access_ctxt *ctxt, void *arg)
-{
-    (void)ch; (void)ah;
-    ble_config_group_t group = (ble_config_group_t)(uintptr_t)arg;
-    if (group < 0 || group >= BLE_CONFIG_GROUP_COUNT) return BLE_ATT_ERR_UNLIKELY;
-
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
-        config_data_t snapshot;
-        portENTER_CRITICAL(&g_config_lock);
-        snapshot = g_config_snapshot;
-        portEXIT_CRITICAL(&g_config_lock);
-        uint8_t payload[BLE_CONFIG_GROUP_MAX_LEN];
-        size_t len = ble_config_encode_group(group, &snapshot, payload, sizeof(payload));
-        return len > 0 ? chr_read_buf(ctxt, payload, len) : BLE_ATT_ERR_UNLIKELY;
-    }
-    if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
-
-    uint8_t payload[BLE_CONFIG_GROUP_MAX_LEN];
-    uint16_t len = 0;
-    int rc = ble_hs_mbuf_to_flat(ctxt->om, payload, sizeof(payload), &len);
-    if (rc != 0 || len == 0 || len > sizeof(payload)) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
-
-    config_data_t staging;
-    uint32_t transaction_id;
-    portENTER_CRITICAL(&g_config_lock);
-    bool writable = g_config_transaction.active && !g_config_transaction.committing;
-    staging = g_config_transaction.staging;
-    transaction_id = g_config_transaction.transaction_id;
-    portEXIT_CRITICAL(&g_config_lock);
-    if (!writable) return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
-    if (!ble_config_decode_group(group, payload, len, &staging)) {
-        return BLE_ATT_ERR_VALUE_NOT_ALLOWED;
-    }
-
-    portENTER_CRITICAL(&g_config_lock);
-    if (!g_config_transaction.active || g_config_transaction.committing
-            || g_config_transaction.transaction_id != transaction_id) {
-        portEXIT_CRITICAL(&g_config_lock);
-        return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
-    }
-    g_config_transaction.staging = staging;
-    g_config_transaction.written_mask |= (uint8_t)(1u << group);
-    portEXIT_CRITICAL(&g_config_lock);
-    return 0;
-}
-
-static int config_control_access_cb(uint16_t ch, uint16_t ah,
-                                    struct ble_gatt_access_ctxt *ctxt, void *arg)
-{
-    (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
-        uint8_t response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
-        portENTER_CRITICAL(&g_config_lock);
-        memcpy(response, g_config_response, sizeof(response));
-        portEXIT_CRITICAL(&g_config_lock);
-        return chr_read_buf(ctxt, response, sizeof(response));
-    }
-    if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
-
-    uint8_t payload[BLE_CONFIG_CONTROL_BUF_SIZE];
-    uint16_t len = 0;
-    int rc = ble_hs_mbuf_to_flat(ctxt->om, payload, sizeof(payload), &len);
-    if (rc != 0 || len == 0 || len > sizeof(payload)) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
-
-    uint8_t opcode = payload[0];
-    uint8_t result = BLE_CONFIG_RESULT_SUCCESS;
-    uint32_t transaction_id = 0;
-    uint32_t revision;
-
-    if (opcode == BLE_CONFIG_OP_BEGIN) {
-        if (len != 10) {
-            result = BLE_CONFIG_RESULT_INVALID_LENGTH;
-        } else if (payload[1] != BLE_CONFIG_PROTOCOL_VERSION) {
-            result = BLE_CONFIG_RESULT_PROTOCOL_MISMATCH;
-        } else {
-            transaction_id = config_get_u32(payload + 2);
-            uint32_t expected_revision = config_get_u32(payload + 6);
-            portENTER_CRITICAL(&g_config_lock);
-            revision = g_config_revision;
-            if (g_config_transaction.active || g_config_transaction.committing) {
-                result = BLE_CONFIG_RESULT_BUSY;
-            } else if (transaction_id == 0 || expected_revision != revision) {
-                result = BLE_CONFIG_RESULT_STALE_REVISION;
-            } else {
-                g_config_transaction.active = true;
-                g_config_transaction.transaction_id = transaction_id;
-                g_config_transaction.base_revision = revision;
-                g_config_transaction.written_mask = 0;
-                g_config_transaction.staging = g_config_snapshot;
-            }
-            portEXIT_CRITICAL(&g_config_lock);
-            config_send_response(opcode, result, 0, transaction_id, revision);
-            return 0;
-        }
-    } else if (opcode == BLE_CONFIG_OP_COMMIT) {
-        if (len != 6) {
-            result = BLE_CONFIG_RESULT_INVALID_LENGTH;
-        } else {
-            transaction_id = config_get_u32(payload + 1);
-            uint8_t required_mask = payload[5];
-            config_data_t staged_config;
-            uint32_t base_revision = 0;
-            bool submit = false;
-            portENTER_CRITICAL(&g_config_lock);
-            revision = g_config_revision;
-            if (!g_config_transaction.active) {
-                result = BLE_CONFIG_RESULT_NO_TRANSACTION;
-            } else if (g_config_transaction.transaction_id != transaction_id) {
-                result = BLE_CONFIG_RESULT_TRANSACTION_MISMATCH;
-            } else if (g_config_transaction.base_revision != revision) {
-                result = BLE_CONFIG_RESULT_STALE_REVISION;
-                g_config_transaction.active = false;
-            } else if (required_mask == 0
-                    || (required_mask & ~BLE_CONFIG_GROUP_MASK_ALL) != 0
-                    || (g_config_transaction.written_mask & required_mask) != required_mask) {
-                result = BLE_CONFIG_RESULT_INCOMPLETE;
-            } else {
-                staged_config = g_config_transaction.staging;
-                base_revision = g_config_transaction.base_revision;
-                g_config_transaction.active = false;
-                g_config_transaction.committing = true;
-                submit = true;
-            }
-            portEXIT_CRITICAL(&g_config_lock);
-            if (submit) {
-                if (g_config_commit_cb
-                        && g_config_commit_cb(&staged_config, transaction_id, base_revision)) {
-                    return 0;
-                }
-                portENTER_CRITICAL(&g_config_lock);
-                g_config_transaction.committing = false;
-                portEXIT_CRITICAL(&g_config_lock);
-                result = BLE_CONFIG_RESULT_BUSY;
-            }
-            config_send_response(opcode, result, 0, transaction_id, revision);
-            return 0;
-        }
-    } else if (opcode == BLE_CONFIG_OP_CANCEL) {
-        if (len != 5) {
-            result = BLE_CONFIG_RESULT_INVALID_LENGTH;
-        } else {
-            transaction_id = config_get_u32(payload + 1);
-            portENTER_CRITICAL(&g_config_lock);
-            revision = g_config_revision;
-            if (!g_config_transaction.active) {
-                result = g_config_transaction.committing
-                    ? BLE_CONFIG_RESULT_BUSY : BLE_CONFIG_RESULT_NO_TRANSACTION;
-            } else if (g_config_transaction.transaction_id != transaction_id) {
-                result = BLE_CONFIG_RESULT_TRANSACTION_MISMATCH;
-            } else {
-                g_config_transaction.active = false;
-                g_config_transaction.written_mask = 0;
-            }
-            portEXIT_CRITICAL(&g_config_lock);
-            config_send_response(opcode, result, 0, transaction_id, revision);
-            return 0;
-        }
-    } else {
-        result = BLE_CONFIG_RESULT_PROTOCOL_MISMATCH;
-    }
-
-    portENTER_CRITICAL(&g_config_lock);
-    revision = g_config_revision;
-    portEXIT_CRITICAL(&g_config_lock);
-    config_send_response(opcode, result, 0, transaction_id, revision);
     return 0;
 }
 
@@ -934,48 +705,6 @@ static const struct ble_gatt_svc_def running_gatt_svcs[] = {
     { 0 }
 };
 
-static const struct ble_gatt_svc_def config_gatt_svc = {
-    .type = BLE_GATT_SVC_TYPE_PRIMARY,
-    .uuid = &g_config_service_uuid.u,
-    .characteristics = (struct ble_gatt_chr_def[]){
-        { .uuid = &g_config_meta_uuid.u,
-          .access_cb = config_meta_access_cb,
-          .flags = BLE_GATT_CHR_F_READ },
-        { .uuid = &g_config_core_uuid.u,
-          .access_cb = config_group_access_cb,
-          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_CORE,
-          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
-        { .uuid = &g_config_profile_uuid.u,
-          .access_cb = config_group_access_cb,
-          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_PROFILE,
-          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
-        { .uuid = &g_config_running_uuid.u,
-          .access_cb = config_group_access_cb,
-          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_RUNNING,
-          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
-        { .uuid = &g_config_led_uuid.u,
-          .access_cb = config_group_access_cb,
-          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_LED,
-          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
-        { .uuid = &g_config_identity_uuid.u,
-          .access_cb = config_group_access_cb,
-          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_IDENTITY,
-          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
-        { .uuid = &g_config_control_uuid.u,
-          .access_cb = config_control_access_cb,
-          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE,
-          .val_handle = &g_config_control_handle },
-        { .uuid = &g_config_dis_profile_uuid.u,
-          .access_cb = config_dis_profile_access_cb,
-          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
-        { .uuid = &g_config_bridge_uuid.u,
-          .access_cb = config_group_access_cb,
-          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_BRIDGE,
-          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
-        { 0 }
-    }
-};
-
 // 按当前 g_broadcast_mask 动态构建 GATT 服务表：仅注册被启用的服务，
 // 未启用的服务从 GATT 表中移除（例如只开心率时蓝牙只暴露 HRS，类似心率带）。
 // 最大 5 个运动/DIS 服务 + 1 个配置服务 + 1 个终止符，预分配静态缓冲避免运行时 malloc。
@@ -1000,7 +729,7 @@ static void build_active_gatt_svcs(void)
         if (power_on || cadence_on) g_active_svcs[idx++] = cycling_gatt_svcs[3]; // FTMS
         g_active_svcs[idx++] = cycling_gatt_svcs[4]; // DIS（始终）
     }
-    g_active_svcs[idx++] = config_gatt_svc; // BikePower 配置服务（所有 profile 始终可用）
+    g_active_svcs[idx++] = *ble_config_service_definition();
     memset(&g_active_svcs[idx], 0, sizeof(g_active_svcs[idx])); // 终止符
 }
 
@@ -1015,7 +744,6 @@ static void reset_svc_handles(void)
     g_ftms_treadmill_handle = 0;
     g_ftms_cp_handle = 0;
     g_ftms_status_handle = 0;
-    g_config_control_handle = 0;
 }
 
 // ============================ 数据打包 ============================
@@ -1027,31 +755,38 @@ static void reset_svc_handles(void)
  * 返回值：无。
  * 特殊行为：会推进曲柄累计圈数和时间戳。
  */
-static void pack_all(void)
+static ble_output_snapshot_t output_snapshot(void)
 {
-    portENTER_CRITICAL(&s_bridge_data_lock);
-    bool real = s_real_source;
-    bridge_snapshot_t sample = s_bridge_sample;
-    portEXIT_CRITICAL(&s_bridge_data_lock);
-    if (real) {
+    portENTER_CRITICAL(&s_data_lock);
+    ble_output_snapshot_t value = s_output;
+    value.mask = g_broadcast_mask;
+    portEXIT_CRITICAL(&s_data_lock);
+    return value;
+}
+
+// 调用者用 s_data_lock 保护静态编码结果；编码器只做有界纯 C 运算。
+static void pack_all(const ble_output_snapshot_t *data)
+{
+    bridge_snapshot_t sample = data->bridge;
+    if (data->real) {
         bool crank = sample.valid && sample.has_crank;
         s_bridge_csc_valid = crank;
         g_cps_len = ble_payload_encode_cps_bridge(g_cps_buf, sizeof(g_cps_buf), crank,
             (int16_t)sample.power_w, sample.crank_revolutions, sample.crank_event_time_1024);
-        ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), g_hr_bpm);
+        ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), data->heartrate);
         ble_payload_encode_csc(g_csc_buf, sizeof(g_csc_buf),
             sample.crank_revolutions, sample.crank_event_time_1024);
         g_ftms_bike_len = ble_payload_encode_ftms_bridge(g_ftms_bike_buf, sizeof(g_ftms_bike_buf),
-            sample.valid && sample.cadence_valid && (g_broadcast_mask & BROADCAST_FIELD_CADENCE),
-            (g_broadcast_mask & BROADCAST_FIELD_POWER) != 0,
-            (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) != 0,
-            sample.cadence_half_rpm, (int16_t)sample.power_w, g_hr_bpm);
+            sample.valid && sample.cadence_valid && (data->mask & BROADCAST_FIELD_CADENCE),
+            (data->mask & BROADCAST_FIELD_POWER) != 0,
+            (data->mask & BROADCAST_FIELD_HEARTRATE) != 0,
+            sample.cadence_half_rpm, (int16_t)sample.power_w, data->heartrate);
         return;
     }
     g_cps_len = BLE_PAYLOAD_CPS_LEN;
     s_bridge_csc_valid = true;
-    uint16_t power = g_power_w;
-    uint16_t cadence = g_cadence;
+    uint16_t power = data->power;
+    uint16_t cadence = data->cadence;
     if (cadence < 1) cadence = 1;
 
     uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
@@ -1070,34 +805,34 @@ static void pack_all(void)
     // 基于踏频推演曲柄累计量，统一驱动 CPS 和 CSC 的 rev/time 字段。
     (void)ble_payload_encode_cps(g_cps_buf, sizeof(g_cps_buf),
                                  (int16_t)power, rev, time_1024);
-    (void)ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), g_hr_bpm);
+    (void)ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), data->heartrate);
     (void)ble_payload_encode_csc(g_csc_buf, sizeof(g_csc_buf), rev, time_1024);
 
-    bool cadence_enabled = (g_broadcast_mask & BROADCAST_FIELD_CADENCE) != 0;
-    bool power_enabled = (g_broadcast_mask & BROADCAST_FIELD_POWER) != 0;
+    bool cadence_enabled = (data->mask & BROADCAST_FIELD_CADENCE) != 0;
+    bool power_enabled = (data->mask & BROADCAST_FIELD_POWER) != 0;
     g_ftms_bike_len = ble_payload_encode_ftms_bike(
         g_ftms_bike_buf, sizeof(g_ftms_bike_buf), cadence_enabled, power_enabled,
         (uint16_t)(cadence * 30u), (uint16_t)(cadence * 2u), (int16_t)power);
 }
 
-static void pack_running(void)
+static void pack_running(const ble_output_snapshot_t *data)
 {
-    uint16_t speed = g_run_speed;
-    uint16_t stride = g_run_stride_cm;
-    uint32_t distance = g_run_distance_m;
-    uint32_t elapsed = g_run_elapsed_s;
-    bool running = g_run_running;
+    uint16_t speed = data->running.rsc_speed_1_256_mps;
+    uint16_t stride = data->running.stride_cm;
+    uint32_t distance = data->running.total_distance_m;
+    uint32_t elapsed = data->running.elapsed_time_s;
+    bool running = data->running.running;
 
-    (void)ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), g_hr_bpm);
+    (void)ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), data->heartrate);
     uint32_t distance_dm = distance > UINT32_MAX / 10u ? UINT32_MAX : distance * 10u;
     (void)ble_payload_encode_rsc(g_rsc_buf, sizeof(g_rsc_buf), running,
-                                 speed, g_run_cadence, stride, distance_dm);
+                                 speed, (uint8_t)data->running.cadence_spm, stride, distance_dm);
 
     uint16_t ftms_speed = (uint16_t)(((uint32_t)speed * 360u + 128u) / 256u);
     uint16_t elapsed16 = elapsed > 0xFFFFu ? 0xFFFFu : (uint16_t)elapsed;
     g_ftms_treadmill_len = ble_payload_encode_ftms_treadmill(
         g_ftms_treadmill_buf, sizeof(g_ftms_treadmill_buf),
-        ftms_speed, distance, g_hr_bpm, elapsed16);
+        ftms_speed, distance, data->heartrate, elapsed16);
 }
 
 /**
@@ -1111,11 +846,12 @@ static void pack_running(void)
  */
 static void notify_one_nolock(uint16_t handle, const uint8_t *buf, size_t len)
 {
-    if (g_stopping || !g_ready || g_conn_handle == BLE_HS_CONN_HANDLE_NONE) return;
+    uint16_t connection = g_conn_handle;
+    if (g_stopping || !g_ready || connection == BLE_HS_CONN_HANDLE_NONE) return;
     // 未注册服务的句柄为 0，跳过通知避免向不存在的特征发通知。
     if (handle == 0) return;
     struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
-    if (om) ble_gatts_notify_custom(g_conn_handle, handle, om);
+    if (om) ble_gatts_notify_custom(connection, handle, om);
 }
 
 /**
@@ -1139,9 +875,10 @@ static void indicate_one(uint16_t handle, const uint8_t *buf, size_t len)
 {
     if (!g_notify_lock || xSemaphoreTake(g_notify_lock, pdMS_TO_TICKS(BLE_NOTIFY_LOCK_WAIT_MS)) != pdTRUE) return;
     // 未注册服务的句柄为 0，跳过 indication。
-    if (!g_stopping && g_ready && handle != 0 && g_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+    uint16_t connection = g_conn_handle;
+    if (!g_stopping && g_ready && handle != 0 && connection != BLE_HS_CONN_HANDLE_NONE) {
         struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
-        if (om) ble_gatts_indicate_custom(g_conn_handle, handle, om);
+        if (om) ble_gatts_indicate_custom(connection, handle, om);
     }
     xSemaphoreGive(g_notify_lock);
 }
@@ -1163,21 +900,25 @@ static void notify_tick(void *arg)
         xSemaphoreGive(g_notify_lock);
         return;
     }
+    ble_output_snapshot_t data = output_snapshot();
+    uint8_t mask = data.mask;
+    portENTER_CRITICAL(&s_data_lock);
+    if (g_profile == SPORT_PROFILE_RUNNING) pack_running(&data);
+    else pack_all(&data);
+    portEXIT_CRITICAL(&s_data_lock);
     if (g_profile == SPORT_PROFILE_RUNNING) {
-        pack_running();
-        if ((g_broadcast_mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) == (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) {
+        if ((mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) == (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) {
             notify_one_nolock(g_rsc_val_handle, g_rsc_buf, sizeof(g_rsc_buf));
         }
-        if (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
-        if (g_broadcast_mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_HEARTRATE)) {
+        if (mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
+        if (mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_HEARTRATE)) {
             notify_one_nolock(g_ftms_treadmill_handle, g_ftms_treadmill_buf, g_ftms_treadmill_len);
         }
     } else {
-        pack_all();
-        if (g_broadcast_mask & BROADCAST_FIELD_POWER) notify_one_nolock(g_cps_val_handle, g_cps_buf, g_cps_len);
-        if (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
-        if ((g_broadcast_mask & BROADCAST_FIELD_CADENCE) && s_bridge_csc_valid) notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
-        if (g_broadcast_mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, g_ftms_bike_len);
+        if (mask & BROADCAST_FIELD_POWER) notify_one_nolock(g_cps_val_handle, g_cps_buf, g_cps_len);
+        if (mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
+        if ((mask & BROADCAST_FIELD_CADENCE) && s_bridge_csc_valid) notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
+        if (mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, g_ftms_bike_len);
     }
     xSemaphoreGive(g_notify_lock);
 }
@@ -1225,12 +966,7 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "设备已断开 reason=%d", event->disconnect.reason);
         g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
-        portENTER_CRITICAL(&g_config_lock);
-        if (g_config_transaction.active) {
-            g_config_transaction.active = false;
-            g_config_transaction.written_mask = 0;
-        }
-        portEXIT_CRITICAL(&g_config_lock);
+        ble_config_service_disconnect();
         rc = start_advertising();
         if (rc != 0 && !g_stopping) mark_start_failed("断开后重广播失败", rc);
         return 0;
@@ -1259,6 +995,10 @@ static int start_advertising(void)
     struct ble_gap_adv_params adv_params;
     struct ble_hs_adv_fields fields;
     int rc;
+    char device_name[DEVICE_NAME_MAX];
+    portENTER_CRITICAL(&s_data_lock);
+    memcpy(device_name, g_device_name, sizeof(device_name));
+    portEXIT_CRITICAL(&s_data_lock);
 
     memset(&fields, 0, sizeof(fields));
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
@@ -1287,8 +1027,8 @@ static int start_advertising(void)
     // 31 字节广播包预算：flags(3) + 完整 16 位 UUID 列表(2+N×2) 占 5+2N 字节，
     // 留给名字 AD 26-2N 字节即最多 BLE_ADV_NAME_MAX_LEN 个字符。超出部分（完整名）放 scan response，
     // 避免 ble_gap_adv_set_fields 因 EMSGSIZE 静默失败导致设备搜不到。
-    size_t name_len = strlen(g_device_name);
-    fields.name = (uint8_t *)g_device_name;
+    size_t name_len = strlen(device_name);
+    fields.name = (uint8_t *)device_name;
     if (name_len > BLE_ADV_NAME_MAX_LEN) {
         fields.name_len = BLE_ADV_NAME_MAX_LEN;
         fields.name_is_complete = 0;
@@ -1307,7 +1047,7 @@ static int start_advertising(void)
         rsp_fields.num_uuids16 = 1;
         rsp_fields.uuids16_is_complete = 0;
     }
-    rsp_fields.name = (uint8_t *)g_device_name;
+    rsp_fields.name = (uint8_t *)device_name;
     rsp_fields.name_len = name_len;
     rsp_fields.name_is_complete = 1;
     rc = ble_gap_adv_rsp_set_fields(&rsp_fields);
@@ -1324,7 +1064,7 @@ static int start_advertising(void)
     if (rc != 0) { ESP_LOGE(TAG, "广播启动失败 rc=%d", rc); return rc; }
     ESP_LOGI(TAG, "开始广播 profile=%s name=%s (间隔%dms)",
              g_profile == SPORT_PROFILE_RUNNING ? "running" : "cycling",
-             g_device_name, BLE_ADVERTISING_INTERVAL_MS);
+             device_name, BLE_ADVERTISING_INTERVAL_MS);
     return 0;
 }
 
@@ -1355,9 +1095,8 @@ static void on_sync(void)
     // 广播成功启动后才标记为就绪状态
     g_ready = true;
     g_start_failed = false;
-    ESP_LOGI(TAG, "BLE 就绪，profile=%s 设备名=%s",
-             g_profile == SPORT_PROFILE_RUNNING ? "RSC+HRS+DIS" : "CPS+HRS+CSC+FTMS+DIS",
-             g_device_name);
+    ESP_LOGI(TAG, "BLE 就绪，profile=%s",
+             g_profile == SPORT_PROFILE_RUNNING ? "RSC+HRS+FTMS+DIS" : "CPS+HRS+CSC+FTMS+DIS");
 }
 
 /**
@@ -1405,22 +1144,22 @@ static void ble_host_task(void *param)
  */
 void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm)
 {
-    portENTER_CRITICAL(&s_bridge_data_lock);
-    s_real_source = false;
-    portEXIT_CRITICAL(&s_bridge_data_lock);
-    g_power_w = power_w;
-    g_hr_bpm = heartrate_bpm;
-    g_cadence = cadence_rpm;
+    portENTER_CRITICAL(&s_data_lock);
+    s_output.real = false;
+    s_output.power = power_w;
+    s_output.heartrate = heartrate_bpm;
+    s_output.cadence = cadence_rpm;
+    portEXIT_CRITICAL(&s_data_lock);
 }
 
 void ble_bikepower_set_bridge_data(const bridge_snapshot_t *snapshot, uint8_t heartrate_bpm)
 {
     if (!snapshot) return;
-    portENTER_CRITICAL(&s_bridge_data_lock);
-    s_real_source = true;
-    s_bridge_sample = *snapshot;
-    g_hr_bpm = heartrate_bpm;
-    portEXIT_CRITICAL(&s_bridge_data_lock);
+    portENTER_CRITICAL(&s_data_lock);
+    s_output.real = true;
+    s_output.bridge = *snapshot;
+    s_output.heartrate = heartrate_bpm;
+    portEXIT_CRITICAL(&s_data_lock);
 }
 
 void ble_bikepower_set_broadcast_mask(int mask)
@@ -1438,13 +1177,10 @@ void ble_bikepower_set_profile(sport_profile_t profile)
 
 void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartrate_bpm)
 {
-    g_run_speed = snapshot.rsc_speed_1_256_mps;
-    g_hr_bpm = heartrate_bpm;
-    g_run_cadence = (uint8_t)snapshot.cadence_spm;
-    g_run_stride_cm = snapshot.stride_cm;
-    g_run_distance_m = snapshot.total_distance_m;
-    g_run_elapsed_s = snapshot.elapsed_time_s;
-    g_run_running = snapshot.running;
+    portENTER_CRITICAL(&s_data_lock);
+    s_output.running = snapshot;
+    s_output.heartrate = heartrate_bpm;
+    portEXIT_CRITICAL(&s_data_lock);
 }
 
 /**
@@ -1471,7 +1207,7 @@ void ble_bikepower_set_run_control_callback(ble_run_control_cb_t cb)
 
 void ble_bikepower_set_config_commit_callback(ble_config_commit_cb_t cb)
 {
-    g_config_commit_cb = cb;
+    ble_config_service_set_commit_callback(cb);
 }
 
 void ble_bikepower_set_identity_write_callback(ble_identity_write_cb_t cb)
@@ -1499,64 +1235,19 @@ void ble_bikepower_set_identity(const device_identity_t *identity)
 
 void ble_bikepower_set_config_snapshot(const power_engine_t *engine)
 {
-    if (!engine) return;
-    config_data_t next;
-    config_store_from_engine(engine, &next);
-
-    portENTER_CRITICAL(&g_config_lock);
-    config_data_t previous = g_config_snapshot;
-    bool was_valid = g_config_snapshot_valid;
-    portEXIT_CRITICAL(&g_config_lock);
-    bool changed = was_valid && !config_snapshot_equal(&previous, &next);
-
-    portENTER_CRITICAL(&g_config_lock);
-    g_config_snapshot = next;
-    if (!was_valid) {
-        g_config_snapshot_valid = true;
-        g_config_revision = BLE_CONFIG_INITIAL_REVISION;
-    } else if (changed) {
-        g_config_revision++;
-        if (g_config_revision == 0) g_config_revision = BLE_CONFIG_INITIAL_REVISION;
-    }
-    portEXIT_CRITICAL(&g_config_lock);
+    ble_config_service_set_snapshot(engine);
 }
 
 bool ble_bikepower_config_revision_matches(uint32_t revision)
 {
-    portENTER_CRITICAL(&g_config_lock);
-    bool matches = g_config_snapshot_valid && g_config_revision == revision;
-    portEXIT_CRITICAL(&g_config_lock);
-    return matches;
+    return ble_config_service_revision_matches(revision);
 }
 
 void ble_bikepower_config_commit_result(uint32_t transaction_id, uint8_t result,
                                         uint8_t restart_flags,
                                         const config_data_t *applied_config)
 {
-    uint32_t revision;
-    portENTER_CRITICAL(&g_config_lock);
-    if (!g_config_transaction.committing
-            || g_config_transaction.transaction_id != transaction_id) {
-        portEXIT_CRITICAL(&g_config_lock);
-        ESP_LOGW(TAG, "忽略未知配置事务结果 id=%lu", (unsigned long)transaction_id);
-        return;
-    }
-    if (result == BLE_CONFIG_RESULT_SUCCESS && applied_config) {
-        g_config_snapshot = *applied_config;
-        g_config_snapshot_valid = true;
-        g_config_revision++;
-        if (g_config_revision == 0) g_config_revision = BLE_CONFIG_INITIAL_REVISION;
-    } else if (result == BLE_CONFIG_RESULT_SUCCESS) {
-        result = BLE_CONFIG_RESULT_SAVE_FAILED;
-        restart_flags = 0;
-    }
-    g_config_transaction.committing = false;
-    g_config_transaction.written_mask = 0;
-    revision = g_config_revision;
-    portEXIT_CRITICAL(&g_config_lock);
-
-    config_send_response(BLE_CONFIG_OP_COMMIT, result, restart_flags,
-                         transaction_id, revision);
+    ble_config_service_commit_result(transaction_id, result, restart_flags, applied_config);
 }
 
 /**
@@ -1569,8 +1260,10 @@ void ble_bikepower_config_commit_result(uint32_t transaction_id, uint8_t result,
 void ble_bikepower_set_device_name(const char *name)
 {
     if (!name || !name[0]) return;
+    portENTER_CRITICAL(&s_data_lock);
     strncpy(g_device_name, name, sizeof(g_device_name) - 1);
     g_device_name[sizeof(g_device_name) - 1] = '\0';
+    portEXIT_CRITICAL(&s_data_lock);
 }
 
 void ble_bikepower_refresh_device_name(void)
@@ -1580,7 +1273,11 @@ void ble_bikepower_refresh_device_name(void)
         ESP_LOGW(TAG, "BLE 未启动，跳过设备名刷新");
         return;
     }
-    int rc = ble_svc_gap_device_name_set(g_device_name);
+    char device_name[DEVICE_NAME_MAX];
+    portENTER_CRITICAL(&s_data_lock);
+    memcpy(device_name, g_device_name, sizeof(device_name));
+    portEXIT_CRITICAL(&s_data_lock);
+    int rc = ble_svc_gap_device_name_set(device_name);
     if (rc != 0) {
         ESP_LOGW(TAG, "GAP 设备名设置失败 rc=%d", rc);
     }
@@ -1593,7 +1290,7 @@ void ble_bikepower_refresh_device_name(void)
             ESP_LOGW(TAG, "刷新设备名后重广播失败 rc=%d", rc);
         }
     }
-    ESP_LOGI(TAG, "BLE 设备名已刷新: %s", g_device_name);
+    ESP_LOGI(TAG, "BLE 设备名已刷新: %s", device_name);
 }
 
 /**
@@ -1619,14 +1316,7 @@ esp_err_t ble_bikepower_start(void)
 {
     g_stopping = false;
     g_start_failed = false;
-    portENTER_CRITICAL(&g_config_lock);
-    g_config_transaction.active = false;
-    g_config_transaction.committing = false;
-    g_config_transaction.written_mask = 0;
-    ble_config_encode_control_response(g_config_response, sizeof(g_config_response),
-                                       BLE_CONFIG_OP_CANCEL, BLE_CONFIG_RESULT_SUCCESS,
-                                       0, 0, g_config_revision);
-    portEXIT_CRITICAL(&g_config_lock);
+    ble_config_service_reset(indicate_one, config_dis_profile_access_cb);
     if (!g_notify_lock) {
         g_notify_lock = xSemaphoreCreateMutex();
         if (!g_notify_lock) {
@@ -1661,7 +1351,11 @@ esp_err_t ble_bikepower_start(void)
         return ESP_FAIL;
     }
 
-    rc = ble_svc_gap_device_name_set(g_device_name);
+    char device_name[DEVICE_NAME_MAX];
+    portENTER_CRITICAL(&s_data_lock);
+    memcpy(device_name, g_device_name, sizeof(device_name));
+    portEXIT_CRITICAL(&s_data_lock);
+    rc = ble_svc_gap_device_name_set(device_name);
     if (rc != 0) {
         ESP_LOGW(TAG, "设置设备名失败 rc=%d", rc);
     }

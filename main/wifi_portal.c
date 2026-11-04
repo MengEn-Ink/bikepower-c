@@ -24,11 +24,14 @@
 static const char *TAG = "PORTAL";
 static httpd_handle_t s_httpd;
 static esp_timer_handle_t s_timer;
-static volatile uint32_t s_deadline_sec;
-static volatile bool s_closing;
-static volatile bool s_done_called;
+// 超时/关闭/事务由 HTTP、定时器及主任务共享，全部通过 s_lock 读写。
+static uint32_t s_deadline_sec;
+static bool s_closing;
+static bool s_done_called;
+static bool s_done_inflight;
+static uint32_t s_generation;
 static bool s_done_retry_logged;
-static volatile bool s_ble_restart_requested;
+static bool s_ble_restart_requested;
 static wifi_portal_done_callback_t s_done_cb;
 static wifi_portal_config_callback_t s_config_cb;
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
@@ -37,6 +40,11 @@ static snapshot_t s_output;
 static running_snapshot_t s_running;
 static uint32_t s_revision = 1;
 static uint32_t s_next_transaction;
+// 仅 HTTP 服务任务使用；构造、合并与发送串行复用，不在定时器或主任务中访问。
+static char s_json_response[WIFI_JSON_STATE_CAPACITY];
+_Static_assert(WIFI_JSON_STATE_CAPACITY >= WIFI_JSON_RUNTIME_CAPACITY, "runtime 容量超出共享区");
+_Static_assert(WIFI_JSON_STATE_CAPACITY >= WIFI_JSON_SCAN_CAPACITY, "scan 容量超出共享区");
+_Static_assert(WIFI_JSON_STATE_CAPACITY >= CONFIG_JSON_MAX_LEN, "config 容量超出共享区");
 static struct {
     uint32_t id;
     uint8_t result;
@@ -52,32 +60,62 @@ static uint32_t now_sec(void)
 
 static int remaining_seconds(void)
 {
-    int32_t remaining = (int32_t)(s_deadline_sec - now_sec());
+    uint32_t now = now_sec();
+    portENTER_CRITICAL(&s_lock);
+    uint32_t deadline = s_deadline_sec;
+    portEXIT_CRITICAL(&s_lock);
+    int32_t remaining = (int32_t)(deadline - now);
     return remaining > 0 ? remaining : 0;
+}
+
+static bool portal_closing(void)
+{
+    portENTER_CRITICAL(&s_lock);
+    bool closing = s_closing;
+    portEXIT_CRITICAL(&s_lock);
+    return closing;
 }
 
 static void arm_deadline(void)
 {
-    if (!s_closing) s_deadline_sec = now_sec() + WIFI_SHUTDOWN_MS / 1000;
+    uint32_t deadline = now_sec() + WIFI_SHUTDOWN_MS / 1000;
+    portENTER_CRITICAL(&s_lock);
+    if (!s_closing) s_deadline_sec = deadline;
+    portEXIT_CRITICAL(&s_lock);
 }
 
 static void portal_done(void)
 {
-    if (s_done_called) return;
+    portENTER_CRITICAL(&s_lock);
+    if (s_done_called || s_done_inflight) {
+        portEXIT_CRITICAL(&s_lock);
+        return;
+    }
     s_closing = true;
+    s_done_inflight = true;
+    uint32_t generation = s_generation;
+    portEXIT_CRITICAL(&s_lock);
     bool accepted = s_done_cb && s_done_cb();
+    bool log_retry = false;
+    portENTER_CRITICAL(&s_lock);
+    if (generation != s_generation) {
+        portEXIT_CRITICAL(&s_lock);
+        return;
+    }
+    s_done_inflight = false;
     if (accepted) {
         s_done_called = true;
     } else if (!s_done_retry_logged) {
         s_done_retry_logged = true;
-        ESP_LOGW(TAG, "配网结束事件未接收，下个节拍重试");
+        log_retry = true;
     }
+    portEXIT_CRITICAL(&s_lock);
+    if (log_retry) ESP_LOGW(TAG, "配网结束事件未接收，下个节拍重试");
 }
 
 static void shutdown_check_cb(void *arg)
 {
     (void)arg;
-    if (s_done_called) return;
     if (!remaining_seconds()) portal_done();
 }
 
@@ -89,15 +127,14 @@ static esp_err_t send_json(httpd_req_t *req, const char *body)
     return httpd_resp_sendstr(req, body);
 }
 
-static esp_err_t send_object(httpd_req_t *req, cJSON *object)
+static esp_err_t send_object(httpd_req_t *req, cJSON *object, size_t capacity)
 {
     if (!object) return send_json(req, "{\"ok\":false,\"error\":\"内存不足\"}");
-    char *text = cJSON_PrintUnformatted(object);
+    bool ok = capacity <= sizeof(s_json_response)
+        && cJSON_PrintPreallocated(object, s_json_response, (int)capacity, false);
     cJSON_Delete(object);
-    if (!text) return send_json(req, "{\"ok\":false,\"error\":\"内存不足\"}");
-    esp_err_t result = send_json(req, text);
-    cJSON_free(text);
-    return result;
+    if (!ok) return send_json(req, "{\"ok\":false,\"error\":\"响应超限\"}");
+    return send_json(req, s_json_response);
 }
 
 static cJSON *receive_object(httpd_req_t *req)
@@ -127,9 +164,8 @@ static cJSON *receive_object(httpd_req_t *req)
 
 static cJSON *config_object(const config_data_t *config)
 {
-    char text[CONFIG_JSON_MAX_LEN];
-    if (!config_store_serialize(config, text, sizeof(text))) return NULL;
-    return cJSON_Parse(text);
+    if (!config_store_serialize(config, s_json_response, CONFIG_JSON_MAX_LEN)) return NULL;
+    return cJSON_Parse(s_json_response);
 }
 
 void wifi_portal_sync(const power_engine_t *engine)
@@ -161,24 +197,23 @@ bool wifi_portal_revision_matches(uint32_t revision)
 void wifi_portal_config_result(uint32_t transaction, uint8_t result,
                                uint8_t restart_flags, const config_data_t *applied)
 {
-    bool close = false;
+    uint32_t deadline = now_sec() + WIFI_PORTAL_REBOOT_DELAY_SEC;
     portENTER_CRITICAL(&s_lock);
     if (s_transaction.pending && s_transaction.id == transaction) {
         if (result == BLE_CONFIG_RESULT_SUCCESS && applied) {
             s_config = *applied;
             s_revision++;
-            close = s_transaction.close_wifi;
+            if (s_transaction.close_wifi) {
+                s_closing = true;
+                s_deadline_sec = deadline;
+            }
         }
         s_transaction.pending = false;
         s_transaction.result = result;
         s_transaction.restart = restart_flags;
     }
-    portEXIT_CRITICAL(&s_lock);
     if (restart_flags & BLE_CONFIG_RESTART_GATT) s_ble_restart_requested = true;
-    if (close) {
-        s_closing = true;
-        s_deadline_sec = now_sec() + WIFI_PORTAL_REBOOT_DELAY_SEC;
-    }
+    portEXIT_CRITICAL(&s_lock);
 }
 
 static esp_err_t h_home(httpd_req_t *req)
@@ -230,7 +265,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
     uint32_t revision = s_revision;
     portEXIT_CRITICAL(&s_lock);
     cJSON *object = cJSON_CreateObject();
-    if (!object) return send_object(req, NULL);
+    if (!object) return send_object(req, NULL, WIFI_JSON_STATE_CAPACITY);
     cJSON_AddItemToObject(object, "config", config_object(&config));
     cJSON_AddNumberToObject(object, "revision", revision);
     cJSON_AddStringToObject(object, "firmware_version", FIRMWARE_VERSION);
@@ -249,7 +284,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
             device_identity_effective(&identity, (device_identity_field_t)i, NULL));
     }
     cJSON_AddNumberToObject(object, "remaining_sec", remaining_seconds());
-    cJSON_AddBoolToObject(object, "closing", s_closing);
+    cJSON_AddBoolToObject(object, "closing", portal_closing());
     cJSON *pacers = cJSON_AddArrayToObject(object, "pacers");
     for (int i = 0; i < PACER_COUNT; i++) {
         cJSON *pacer = cJSON_CreateObject();
@@ -270,7 +305,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         cJSON_AddItemToArray(run_pacers, pacer);
     }
     cJSON_AddItemToObject(object, "bridge", bridge_object(&config.bridge));
-    return send_object(req, object);
+    return send_object(req, object, WIFI_JSON_STATE_CAPACITY);
 }
 
 static esp_err_t h_api_runtime(httpd_req_t *req)
@@ -286,7 +321,7 @@ static esp_err_t h_api_runtime(httpd_req_t *req)
     uint8_t restart = s_transaction.restart;
     portEXIT_CRITICAL(&s_lock);
     cJSON *object = cJSON_CreateObject();
-    if (!object) return send_object(req, NULL);
+    if (!object) return send_object(req, NULL, WIFI_JSON_RUNTIME_CAPACITY);
     cJSON_AddNumberToObject(object, "revision", revision);
     cJSON_AddNumberToObject(object, "transaction", transaction);
     cJSON_AddBoolToObject(object, "pending", pending);
@@ -301,9 +336,9 @@ static esp_err_t h_api_runtime(httpd_req_t *req)
     cJSON_AddNumberToObject(object, "run_elapsed_sec", running.elapsed_time_s);
     cJSON_AddNumberToObject(object, "connections", ble_bikepower_conn_count());
     cJSON_AddNumberToObject(object, "remaining_sec", remaining_seconds());
-    cJSON_AddBoolToObject(object, "closing", s_closing);
+    cJSON_AddBoolToObject(object, "closing", portal_closing());
     cJSON_AddItemToObject(object, "bridge", bridge_object(&config.bridge));
-    return send_object(req, object);
+    return send_object(req, object, WIFI_JSON_RUNTIME_CAPACITY);
 }
 
 static bool merge_config(cJSON *body, const config_data_t *base, config_data_t *out)
@@ -335,17 +370,16 @@ static bool merge_config(cJSON *body, const config_data_t *base, config_data_t *
             return false;
         }
     }
-    char *text = cJSON_PrintUnformatted(object);
+    bool printed = cJSON_PrintPreallocated(object, s_json_response, CONFIG_JSON_MAX_LEN, false);
     cJSON_Delete(object);
-    bool ok = text && config_store_deserialize(text, out) && out->schema_ver == CONFIG_VERSION
+    bool ok = printed && config_store_deserialize(s_json_response, out) && out->schema_ver == CONFIG_VERSION
         && device_identity_text_valid((const uint8_t *)out->bridge.name, strlen(out->bridge.name));
-    cJSON_free(text);
     return ok;
 }
 
 static esp_err_t submit_config(httpd_req_t *req, bool close_wifi)
 {
-    if (s_closing || !remaining_seconds()) return send_json(req, "{\"ok\":false,\"error\":\"配网已结束\"}");
+    if (portal_closing() || !remaining_seconds()) return send_json(req, "{\"ok\":false,\"error\":\"配网已结束\"}");
     cJSON *body = receive_object(req);
     if (!body) return send_json(req, "{\"ok\":false,\"error\":\"无效请求\"}");
     portENTER_CRITICAL(&s_lock);
@@ -403,23 +437,22 @@ static esp_err_t h_api_close_wifi(httpd_req_t *req) { return submit_config(req, 
 static esp_err_t h_api_scan(httpd_req_t *req)
 {
     if (req->method == HTTP_POST) {
-        if (s_closing || !remaining_seconds()) return send_json(req, "{\"ok\":false,\"error\":\"配网已结束\"}");
+        if (portal_closing() || !remaining_seconds()) return send_json(req, "{\"ok\":false,\"error\":\"配网已结束\"}");
         cJSON *body = receive_object(req);
         cJSON *stop = cJSON_GetObjectItemCaseSensitive(body, "stop");
         esp_err_t result = cJSON_IsTrue(stop) ? ble_scanner_stop() : ble_scanner_start(BLE_SCAN_DEFAULT_MS);
         cJSON_Delete(body);
         if (result != ESP_OK) return send_json(req, "{\"ok\":false,\"error\":\"扫描忙或蓝牙未就绪\"}");
     }
-    static char response[3072];
-    if (!ble_scanner_serialize_results(response, sizeof(response))) {
+    if (!ble_scanner_serialize_results(s_json_response, WIFI_JSON_SCAN_CAPACITY)) {
         return send_json(req, "{\"ok\":false,\"error\":\"扫描结果超限\"}");
     }
-    return send_json(req, response);
+    return send_json(req, s_json_response);
 }
 
 static esp_err_t h_api_bridge_control(httpd_req_t *req)
 {
-    if (s_closing || !remaining_seconds()) return send_json(req, "{\"ok\":false,\"error\":\"配网已结束\"}");
+    if (portal_closing() || !remaining_seconds()) return send_json(req, "{\"ok\":false,\"error\":\"配网已结束\"}");
     cJSON *body = receive_object(req);
     cJSON *action = cJSON_GetObjectItemCaseSensitive(body, "action");
     esp_err_t result = ESP_ERR_INVALID_ARG;
@@ -467,7 +500,7 @@ static esp_err_t h_api_mem_stats(httpd_req_t *req)
 
 static esp_err_t h_captive_api(httpd_req_t *req)
 {
-    return send_json(req, s_closing ? "{\"captive\":false}"
+    return send_json(req, portal_closing() ? "{\"captive\":false}"
         : "{\"captive\":true,\"user-portal-url\":\"http://" CAPTIVE_PORTAL_HOST "/\"}");
 }
 
@@ -481,7 +514,10 @@ esp_err_t wifi_portal_start(power_engine_t *engine)
 {
     if (s_httpd) return ESP_ERR_INVALID_STATE;
     wifi_portal_sync(engine);
-    s_closing = s_done_called = s_done_retry_logged = false;
+    portENTER_CRITICAL(&s_lock);
+    s_generation++;
+    s_closing = s_done_called = s_done_retry_logged = s_done_inflight = false;
+    portEXIT_CRITICAL(&s_lock);
     arm_deadline();
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = WIFI_PORT;
@@ -536,15 +572,26 @@ void wifi_portal_stop(void)
     ble_power_bridge_portal_stop();
     if (s_timer) { esp_timer_stop(s_timer); esp_timer_delete(s_timer); s_timer = NULL; }
     if (s_httpd) { httpd_stop(s_httpd); s_httpd = NULL; }
-    s_closing = s_done_called = s_done_retry_logged = false;
+    portENTER_CRITICAL(&s_lock);
+    s_generation++;
+    s_closing = s_done_called = s_done_retry_logged = s_done_inflight = false;
+    portEXIT_CRITICAL(&s_lock);
 }
 
 void wifi_portal_set_done_callback(wifi_portal_done_callback_t cb) { s_done_cb = cb; }
 void wifi_portal_set_config_callback(wifi_portal_config_callback_t cb) { s_config_cb = cb; }
-bool wifi_portal_ble_restart_requested(void) { return s_ble_restart_requested; }
+bool wifi_portal_ble_restart_requested(void)
+{
+    portENTER_CRITICAL(&s_lock);
+    bool requested = s_ble_restart_requested;
+    portEXIT_CRITICAL(&s_lock);
+    return requested;
+}
 bool wifi_portal_consume_ble_restart_requested(void)
 {
+    portENTER_CRITICAL(&s_lock);
     bool requested = s_ble_restart_requested;
     s_ble_restart_requested = false;
+    portEXIT_CRITICAL(&s_lock);
     return requested;
 }

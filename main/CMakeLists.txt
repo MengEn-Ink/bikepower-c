@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS "app_main.c"
          "ble_bikepower.c"
+         "ble_config_service.c"
          "ble_scanner.c"
          "ble_power_bridge.c"
          "app_state.c"

@@ -98,7 +98,7 @@ bool ble_bikepower_stop(void);
  * heartrate_bpm：心率，单位 BPM。
  * cadence_rpm：踏频，单位 RPM。
  * 返回值：无。
- * 特殊行为：这里只更新共享快照，不会立即主动发送通知。
+ * 特殊行为：锁内整体更新共享快照，不会立即主动发送通知。
  */
 void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm);
 /* 原样转发真实曲柄事件；无效样本功率归零，不补模拟速度或踏频。 */
@@ -114,7 +114,7 @@ void ble_bikepower_set_broadcast_mask(int mask);
 
 /**
  * 设置 BLE 运动 profile。
- * profile：cycling 时注册现有 CPS/HRS/CSC/FTMS/DIS；running 时注册 RSC/HRS/DIS。
+ * profile：cycling 注册 CPS/HRS/CSC/FTMS/DIS；running 注册 RSC/HRS/FTMS/DIS。
  * 返回值：无。
  * 特殊行为：建议在 ble_bikepower_start() 前调用；运行中修改需重启 BLE 才能重建 GATT 表。
  */
@@ -134,7 +134,7 @@ void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartra
  * 保存上层提供的回调函数，供 FTMS 控制点写入目标功率时触发。
  * cb：回调函数指针，可为 NULL。
  * 返回值：无。
- * 特殊行为：新回调会覆盖旧回调。
+ * 特殊行为：启动前注册，运行期间不更换回调。
  */
 void ble_bikepower_set_erg_callback(ble_erg_cb_t cb);
 
@@ -143,7 +143,7 @@ void ble_bikepower_set_erg_callback(ble_erg_cb_t cb);
  * 保存上层提供的回调函数，供 FTMS 控制点收到 Stop/Pause、Reset 时触发。
  * cb：回调函数指针，可为 NULL。
  * 返回值：无。
- * 特殊行为：新回调会覆盖旧回调。
+ * 特殊行为：启动前注册，运行期间不更换回调。
  */
 void ble_bikepower_set_erg_clear_callback(ble_erg_clear_cb_t cb);
 

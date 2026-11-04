@@ -31,7 +31,8 @@ static esp_netif_t *s_ap_netif = NULL;
 static bool s_wifi_inited = false;     // esp_wifi_init 已调用且未 deinit
 static bool s_event_loop_created = false;  // 自建默认事件循环（与 BLE 共用时不重复创建）
 static bool s_netif_inited = false;    // 本模块调 esp_netif_init 成功（INVALID_STATE 表示别人已 init，不能 deinit）
-static volatile bool s_ble_suspended = false;  // 独占 WiFi 兜底主动停 BLE，主循环需暂停 BLE 自动重试
+// RF 启停与暂停标志均由应用主任务串行调用，其他任务只能投递事件。
+static bool s_ble_suspended = false;
 static const char s_portal_uri[] = "http://" CAPTIVE_PORTAL_HOST CAPTIVE_PORTAL_API_PATH;
 
 // 前向声明：stop_wifi_ap 在 start_wifi_ap 失败时被复用做统一回滚
