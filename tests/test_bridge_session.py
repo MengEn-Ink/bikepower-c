@@ -20,7 +20,7 @@ def main():
             path.write_text('#include "bridge_stubs.h"\n')
         binary = folder / "bridge-session"
         subprocess.run([
-            "cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
+            "cc", "-std=c11", "-D_POSIX_C_SOURCE=200809L", "-Wall", "-Wextra", "-Werror",
             "-fsanitize=address,undefined", "-I", str(folder), "-I", str(ROOT / "test"),
             "-I", str(ROOT / "components/bikepower_domain/include"),
             str(ROOT / "test/test_bridge_session.c"),
@@ -32,7 +32,7 @@ def main():
         subprocess.run([str(binary)], check=True)
         scan_binary = folder / "bridge-scan"
         subprocess.run([
-            "cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
+            "cc", "-std=c11", "-D_POSIX_C_SOURCE=200809L", "-Wall", "-Wextra", "-Werror",
             "-fsanitize=address,undefined", "-I", str(folder), "-I", str(ROOT / "test"),
             "-I", str(ROOT / "components/bikepower_domain/include"),
             str(ROOT / "test/test_bridge_scan.c"),

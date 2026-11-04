@@ -35,7 +35,7 @@ DOCS_ROOT = ROOT / "docs"
 PROJECT_CONTEXT = ROOT / ".trae" / "memory" / "project-context.md"
 WIFI_RULES = ROOT / ".trae" / "rules" / "domain" / "wifi.md"
 WIKI_HOME = ROOT / "docs" / "wiki" / "00-home.md"
-PROTOCOL_DESIGN = ROOT / "docs" / "dev" / "12-top5-protocol-stability-design.md"
+PROTOCOL_DESIGN = ROOT / "docs" / "archive" / "14-top5-protocol-stability-design.md"
 REVIEW_AND_OPTIMIZATION = ROOT / "docs" / "dev" / "13-project-review-and-optimization.md"
 TECH_REF = ROOT / "docs" / "dev" / "01-technical-reference.md"
 QUICKSTART = ROOT / "docs" / "user" / "01-quickstart.md"
@@ -512,8 +512,8 @@ check(not DOCS_SUPERPOWERS.exists(),
       "docs/superpowers 工作目录已归档，不应重新出现")
 check(WIKI_HOME.is_file() and "wiki/00-home.md" in doc_index_src,
       "Code Wiki 首页使用小写 kebab-case 路径并已收录索引")
-check(PROTOCOL_DESIGN.is_file() and "dev/12-top5-protocol-stability-design.md" in doc_index_src,
-      "Top 5 协议稳定性设计位于规范 dev 目录并已收录索引")
+check(PROTOCOL_DESIGN.is_file() and "archive/14-top5-protocol-stability-design.md" in doc_index_src,
+      "已完成 Top 5 协议稳定性设计位于 archive 并已收录索引")
 check(REVIEW_AND_OPTIMIZATION.is_file() and "dev/13-project-review-and-optimization.md" in doc_index_src,
       "项目复审与优化清单位于规范 dev 目录并已收录索引")
 docs_with_local_urls = []

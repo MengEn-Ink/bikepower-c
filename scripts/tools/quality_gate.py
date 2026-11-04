@@ -14,6 +14,7 @@
 - 仅支持 ESP-IDF v5.5.x 版本。
 """
 
+import argparse
 import os
 import re
 import shutil
@@ -190,10 +191,23 @@ def ensure_idf():
     return None
 
 
+def parse_options(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--no-build", action="store_true",
+                        help="跳过 ESP-IDF 构建，仍运行 host 和全部专项门禁")
+    parser.add_argument("--level", choices=("full", "docs"), default="full",
+                        help="full 为默认完整门禁；docs 只运行资产、Git、配置与文档校验")
+    return parser.parse_args(argv)
+
+
 # 1. 编译检查
+options = parse_options()
 print("\n=== 1. 编译检查 ===")
-idf_result = ensure_idf()
-if idf_result is None:
+skip_build = options.no_build or options.level == "docs"
+idf_result = None if skip_build else ensure_idf()
+if skip_build:
+    print("  跳过 ESP-IDF 构建（显式选择的局部门禁，不代表构建通过）")
+elif idf_result is None:
     fail("未找到可用的 ESP-IDF v5.5.x 环境，请设置 IDF_PATH 环境变量")
 else:
     idf_path, py_exe = idf_result
@@ -209,7 +223,9 @@ else:
 print("\n=== 2. Host 单测 ===")
 make_cmd = shutil.which("make") or shutil.which("mingw32-make")
 gcc_cmd = shutil.which("gcc") or shutil.which("clang")
-if not make_cmd or not gcc_cmd:
+if options.level == "docs":
+    print("  跳过 host 单测（文档门禁）")
+elif not make_cmd or not gcc_cmd:
     warn("无 host 编译工具链（make/gcc），跳过单测")
 else:
     test_dir = os.path.join(PROJECT, "test")
@@ -296,9 +312,9 @@ required_assets = [
     "docs/dev/01-technical-reference.md",
     "docs/dev/02-firmware-security.md",
     "docs/dev/03-test-coverage-analysis.md",
-    "docs/dev/10-stable-delivery-design.md",
-    "docs/dev/11-stable-delivery-plan.md",
-    "docs/dev/12-top5-protocol-stability-design.md",
+    "docs/archive/12-stable-delivery-design.md",
+    "docs/archive/13-stable-delivery-plan.md",
+    "docs/archive/14-top5-protocol-stability-design.md",
     "docs/dev/13-project-review-and-optimization.md",
     "docs/archive/01-cidf-nimble-rewrite.md",
     "docs/archive/02-micropython-vs-c-comparison.md",
@@ -372,6 +388,10 @@ ok(f"检查了 {len(config_vars)} 个宏定义，无冲突")
 print("\n=== 6. 静态门禁聚合 ===")
 # (脚本相对路径, 人类可读名称)
 STATIC_CHECKS = [
+    ("tests/test_maintenance_tools.py", "维护工具功能回归"),
+    ("tests/test_ble_config_service.py", "生产 BLE 配置 GATT 回调 ASan/UBSan"),
+    ("tests/test_ble_runtime.py", "生产 BLE 同轮通知快照 ASan/UBSan"),
+    ("tests/test_portal_runtime.py", "生产门户容量与超时 ASan/UBSan"),
     ("tests/test_bridge_session.py", "上游桥接会话与扫描 ASan/UBSan"),
     ("tests/test_ble_config_e2e.py", "BLE 六组配置协议"),
     ("tests/test_ble_protocol_vectors.py", "BLE 协议 golden vectors (TC-BLE-VECTOR)"),
@@ -411,6 +431,15 @@ ENV_MISSING_MARKERS = [
     "ModuleNotFoundError",
 ]
 python_exe = find_python()
+if options.level == "docs":
+    STATIC_CHECKS = [item for item in STATIC_CHECKS if item[0] in {
+        "tests/test_maintenance_tools.py", "tests/check_config_consistency.py",
+        "tests/check_operation_coverage.py", "tests/check_github_workflows.py",
+    }]
+STATIC_CHECKS += [
+    ("scripts/tools/doc_facts.py", "源码事实摘要"),
+    ("scripts/tools/check_markdown_links.py", "Markdown 相对链接与锚点"),
+]
 for rel_path, name in STATIC_CHECKS:
     full = os.path.join(PROJECT, rel_path)
     if not os.path.exists(full):
@@ -428,6 +457,7 @@ for rel_path, name in STATIC_CHECKS:
 
 # 7. 总体
 print(f"\n{'='*40}")
+print(f"范围: {options.level}，ESP-IDF 构建: {'未执行' if skip_build else '已执行'}")
 print(f"结果: ✅ {SCORE['pass']}  ⚠️  {SCORE['warn']}  ❌ {SCORE['fail']}")
 if SCORE["fail"] > 0:
     print("状态: 需要修复")

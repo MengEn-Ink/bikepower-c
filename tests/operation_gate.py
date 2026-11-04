@@ -180,6 +180,8 @@ def run_step(gate, name, command, timeout=120, required=True, acceptance_item=No
 def quick_steps(gate):
     run_step(gate, "Host 领域层单测", "make -C test run", 120)
     run_step(gate, "上游桥接会话与扫描 ASan/UBSan", "python3 tests/test_bridge_session.py", 60)
+    run_step(gate, "生产配置 GATT ASan/UBSan", "python3 tests/test_ble_config_service.py", 60)
+    run_step(gate, "生产通知快照 ASan/UBSan", "python3 tests/test_ble_runtime.py", 60)
     run_step(gate, "BLE 协议 golden vectors", "python3 tests/test_ble_protocol_vectors.py", 60)
     run_step(gate, "BLE 配置 E2E 离线协议回归", "python3 tests/test_ble_config_e2e.py", 30)
     run_step(gate, "BLE 重连 harness 单测", "python3 tests/test_ble_reconnect_harness.py", 30)
@@ -200,10 +202,14 @@ def quick_steps(gate):
 
 def full_steps(gate, build):
     quick_steps(gate)
+    run_step(gate, "生产门户容量与超时 ASan/UBSan", "python3 tests/test_portal_runtime.py", 60)
     run_step(gate, "配置一致性", "python3 tests/check_config_consistency.py", 60)
     run_step(gate, "NVS schema", "python3 tests/check_nvs_schema.py", 60)
     run_step(gate, "板型描述表", "python3 tests/check_board_desc.py", 60)
     run_step(gate, "任务/WDT", "python3 tests/check_tasks_wdt.py", 60)
+    run_step(gate, "维护工具功能回归", "python3 tests/test_maintenance_tools.py", 60)
+    run_step(gate, "源码事实摘要", "python3 scripts/tools/doc_facts.py --check", 30)
+    run_step(gate, "Markdown 链接及锚点", "python3 scripts/tools/check_markdown_links.py", 30)
     run_step(gate, "Release 产物门禁接线", "python3 tests/check_release_gate.py", 30)
     run_step(gate, "Release 产物门禁功能样例", "python3 tests/test_release_artifacts.py", 30)
     run_step(gate, "核心流程耐久", "python3 tests/test_core_flow_endurance.py", 240)
