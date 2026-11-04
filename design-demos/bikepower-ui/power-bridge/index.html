@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0a0807">
+  <title>BikePower · 真实功率桥接配置</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="wordmark" href="#" aria-label="BikePower 首页">Bike<span>Power</span></a>
+      <div class="wifi-clock" aria-label="配网剩余时间">
+        <span class="status-dot status-dot--warn"></span>
+        <span>配网剩余</span>
+        <strong id="wifiTimer">02:45</strong>
+      </div>
+      <button class="icon-button" id="extendWifiBtn" type="button" title="延长配网时间" aria-label="延长配网时间">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="9"/><path d="M12 3V1M21 12h2M12 21v2M3 12H1"/></svg>
+      </button>
+    </header>
+
+    <main>
+      <div class="prototype-notice">
+        <span>交互原型</span>
+        <p>当前读数为演示数据，未连接真实固件。</p>
+      </div>
+
+      <nav class="sport-tabs" aria-label="运动类型">
+        <button class="sport-tab is-active" type="button" aria-current="page">骑行</button>
+        <button class="sport-tab" id="runningTab" type="button">跑步</button>
+      </nav>
+
+      <div class="page-grid">
+        <section class="live-column" aria-labelledby="liveTitle">
+          <header class="section-heading section-heading--hero">
+            <div>
+              <p class="eyebrow">LIVE OUTPUT / 实际输出</p>
+              <h1 id="liveTitle">骑行信号</h1>
+            </div>
+            <span class="state-label state-label--ok" id="liveStateLabel">
+              <span class="status-dot"></span>
+              数据有效
+            </span>
+          </header>
+
+          <div class="connection-rail">
+            <div>
+              <span class="rail-label">上游功率计</span>
+              <strong id="upstreamState">已连接 · P505-4A29</strong>
+            </div>
+            <div class="rail-line" aria-hidden="true"><span></span></div>
+            <div>
+              <span class="rail-label">下游骑行 App</span>
+              <strong id="appState">已连接 · 已订阅</strong>
+            </div>
+          </div>
+
+          <div class="power-readout">
+            <div class="readout-primary">
+              <span class="metric-label" id="powerOutputLabel">校正后功率</span>
+              <div class="metric-value"><strong id="outputPower">250</strong><span>W</span></div>
+              <p id="sampleAge">最后通知 0.4 秒前</p>
+            </div>
+            <div class="readout-input">
+              <span>原始输入</span>
+              <strong><b id="rawPower">238</b> W</strong>
+              <small id="appliedCorrection">已应用 +12 W</small>
+            </div>
+          </div>
+
+          <div class="secondary-metrics">
+            <article>
+              <header>
+                <span>踏频</span>
+                <em id="cadenceSource">真实 · 同一功率计</em>
+              </header>
+              <div><strong id="cadenceValue">92</strong><span id="cadenceUnit">rpm</span></div>
+              <p id="cadenceMeta">CPS 曲柄数据有效</p>
+            </article>
+            <article>
+              <header>
+                <span>心率</span>
+                <em id="heartSource">模拟 · 功率联动</em>
+              </header>
+              <div><strong id="heartValue">148</strong><span id="heartUnit">bpm</span></div>
+              <p id="heartMeta">基于原始功率平滑生成</p>
+            </article>
+          </div>
+
+          <div class="signal-status" id="signalStatus">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h3l2-7 4 14 2-7h5"/></svg>
+            <div>
+              <strong id="signalStatusTitle">桥接正在运行</strong>
+              <p id="signalStatusCopy">功率和真实踏频来自同一台功率计。</p>
+            </div>
+          </div>
+
+          <details class="monitor-details">
+            <summary>
+              <span>监测详情</span>
+              <span class="summary-meta">CONFIG v13 · 演示</span>
+            </summary>
+            <dl class="diagnostic-grid">
+              <div><dt>设备地址</dt><dd id="diagAddress">··:··:A4:29</dd></div>
+              <div><dt>扫描信号</dt><dd id="diagRssi">-48 dBm · 1 分钟前</dd></div>
+              <div><dt>功率通知</dt><dd id="diagPackets">1,284 · 丢弃 0</dd></div>
+              <div><dt>曲柄事件</dt><dd id="diagCrank">有效 · Δ 668 ticks</dd></div>
+              <div><dt>App 订阅</dt><dd id="diagSubscribe">CPS / CSC / FTMS</dd></div>
+              <div><dt>最近重连</dt><dd id="diagReconnect">无</dd></div>
+            </dl>
+            <div class="demo-state-control">
+              <span>原型状态</span>
+              <div class="compact-segment" role="group" aria-label="切换演示连接状态">
+                <button class="is-active" type="button" data-demo-state="normal">正常</button>
+                <button type="button" data-demo-state="stale">过期</button>
+                <button type="button" data-demo-state="reconnecting">重连</button>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <section class="settings-column" aria-labelledby="settingsTitle">
+          <header class="section-heading">
+            <div>
+              <p class="eyebrow">CYCLING CONFIG / 骑行配置</p>
+              <h2 id="settingsTitle">输出来源</h2>
+            </div>
+            <span class="draft-badge" id="draftBadge" hidden>未应用</span>
+          </header>
+
+          <div class="source-switch" role="group" aria-label="功率来源">
+            <button type="button" data-source="simulation">
+              <span>模拟输出</span>
+              <small>固定 / 配速机器人</small>
+            </button>
+            <button class="is-active" type="button" data-source="bridge">
+              <span>真实功率计</span>
+              <small>功率＋同源踏频</small>
+            </button>
+          </div>
+
+          <div class="draft-notice" id="draftNotice" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.6 2.4 17.3A2 2 0 0 0 4.1 20h15.8a2 2 0 0 0 1.7-2.7L13.7 3.6a2 2 0 0 0-3.4 0Z"/></svg>
+            <p id="draftNoticeText">修改尚未应用，实际输出继续使用已保存配置。</p>
+          </div>
+
+          <div id="bridgeSettings">
+            <section class="config-section" aria-labelledby="deviceTitle">
+              <header class="config-heading">
+                <div>
+                  <span class="section-index">01</span>
+                  <h3 id="deviceTitle">来源设备</h3>
+                </div>
+                <button class="text-button" id="replaceDeviceBtn" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                  更换
+                </button>
+              </header>
+              <div class="device-row">
+                <div class="device-mark" aria-hidden="true">PM</div>
+                <div class="device-copy">
+                  <strong id="deviceName">P505-4A29</strong>
+                  <span id="deviceAddress">地址末尾 A4:29 · CPS</span>
+                  <div class="capability-list" id="deviceCapabilities">
+                    <span>功率</span><span>真实踏频</span>
+                  </div>
+                </div>
+                <span class="connection-chip" id="deviceConnection">已连接</span>
+              </div>
+              <div class="inline-warning" id="noCadenceWarning" hidden>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.6 2.4 17.3A2 2 0 0 0 4.1 20h15.8a2 2 0 0 0 1.7-2.7L13.7 3.6a2 2 0 0 0-3.4 0Z"/></svg>
+                <p>此功率计未提供曲柄数据。保存后只输出真实功率，不会用模拟踏频补位。</p>
+              </div>
+              <button class="danger-line-button" id="stopBridgeBtn" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12"/></svg>
+                停止桥接
+              </button>
+            </section>
+
+            <section class="config-section" aria-labelledby="calibrationTitle">
+              <header class="config-heading">
+                <div>
+                  <span class="section-index">02</span>
+                  <h3 id="calibrationTitle">功率校正</h3>
+                </div>
+                <span class="applied-state">实际：<b id="actualCalibration">+12 W</b></span>
+              </header>
+              <div class="mode-segment" role="group" aria-label="校正模式">
+                <button type="button" data-cal-mode="raw">原值</button>
+                <button class="is-active" type="button" data-cal-mode="watts">瓦数</button>
+                <button type="button" data-cal-mode="percent">百分比</button>
+              </div>
+              <div class="adjustment-control" id="calibrationControl">
+                <label for="calibrationInput" id="calibrationLabel">调整瓦数</label>
+                <div class="stepper">
+                  <button class="icon-button" id="calibrationMinus" type="button" aria-label="减少校正值">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+                  </button>
+                  <div>
+                    <input id="calibrationInput" type="number" min="-200" max="200" step="1" value="12" inputmode="decimal">
+                    <span id="calibrationUnit">W</span>
+                  </div>
+                  <button class="icon-button" id="calibrationPlus" type="button" aria-label="增加校正值">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                  </button>
+                </div>
+                <input class="range-input" id="calibrationRange" type="range" min="-200" max="200" step="1" value="12" aria-label="校正值">
+              </div>
+              <div class="formula-row">
+                <p id="calibrationFormula">输入 + 12 W；零功率保持为 0 W</p>
+                <strong id="calibrationPreview">238 W → 250 W</strong>
+              </div>
+            </section>
+
+            <section class="config-section cadence-contract" aria-labelledby="cadenceContractTitle">
+              <header class="config-heading">
+                <div>
+                  <span class="section-index">03</span>
+                  <h3 id="cadenceContractTitle">真实踏频</h3>
+                </div>
+                <span class="locked-source">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="1"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                  跟随功率计
+                </span>
+              </header>
+              <p>从同一台功率计的 CPS 曲柄事件计算，不扫描第二台设备。数据失效时踏频同步停止输出。</p>
+            </section>
+          </div>
+
+          <div id="simulationSettings" hidden>
+            <section class="config-section" aria-labelledby="simulationTitle">
+              <header class="config-heading">
+                <div>
+                  <span class="section-index">01</span>
+                  <h3 id="simulationTitle">模拟输出</h3>
+                </div>
+              </header>
+              <div class="mode-segment" role="group" aria-label="模拟功率模式">
+                <button class="is-active" type="button" data-sim-mode="steady">固定</button>
+                <button type="button" data-sim-mode="pacer">配速机器人</button>
+                <button type="button" data-sim-mode="custom">自定义</button>
+              </div>
+              <div class="field-grid">
+                <label>目标功率 <span><input id="simPowerInput" type="number" min="0" max="2000" value="220"> W</span></label>
+                <label>模拟踏频 <span><input id="simCadenceInput" type="number" min="0" max="250" value="90"> rpm</span></label>
+              </div>
+            </section>
+          </div>
+
+          <section class="config-section" aria-labelledby="heartConfigTitle">
+            <header class="config-heading">
+              <div>
+                <span class="section-index" id="heartSectionIndex">04</span>
+                <h3 id="heartConfigTitle">模拟心率</h3>
+              </div>
+              <button class="switch-control is-on" id="heartToggle" type="button" role="switch" aria-checked="true">
+                <span aria-hidden="true"></span>
+                <b>已启用</b>
+              </button>
+            </header>
+            <div id="heartConfigBody">
+              <div class="mode-segment" role="group" aria-label="模拟心率模式">
+                <button class="is-active" type="button" data-heart-mode="linked">功率联动</button>
+                <button type="button" data-heart-mode="fixed">固定心率</button>
+              </div>
+              <div class="field-grid" id="linkedHeartFields">
+                <label>FTP <span><input id="ftpInput" type="number" min="50" max="600" value="250"> W</span></label>
+                <label>阈值心率 <span><input id="thresholdHeartInput" type="number" min="80" max="220" value="172"> bpm</span></label>
+              </div>
+              <div class="field-grid" id="fixedHeartFields" hidden>
+                <label>目标心率 <span><input id="fixedHeartInput" type="number" min="40" max="220" value="140"> bpm</span></label>
+              </div>
+              <p class="field-note">功率联动使用原始功率，不受校正值影响。</p>
+            </div>
+          </section>
+
+          <section class="protection-section" aria-labelledby="protectionTitle">
+            <header>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+              <div>
+                <h3 id="protectionTitle">断线保护已启用</h3>
+                <p>3 秒无新数据，功率归零且真实踏频失效；60 秒内限时重连。</p>
+              </div>
+            </header>
+          </section>
+
+          <footer class="action-footer">
+            <button class="primary-button" id="saveButton" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+              保存并应用
+            </button>
+            <button class="secondary-button" id="saveCloseButton" type="button">
+              保存并关闭 WiFi
+            </button>
+          </footer>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <dialog class="sheet-dialog" id="scanDialog" aria-labelledby="scanDialogTitle">
+    <div class="dialog-head">
+      <div>
+        <p class="eyebrow">BLE SCAN / 8 秒</p>
+        <h2 id="scanDialogTitle">选择功率计</h2>
+      </div>
+      <button class="icon-button" id="closeScanButton" type="button" aria-label="关闭扫描">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p class="dialog-copy">转动曲柄唤醒设备。这里只显示 Cycling Power Service 功率计。</p>
+    <div class="scan-progress" id="scanProgress">
+      <span></span>
+      <p id="scanStatus">正在扫描附近的功率计…</p>
+    </div>
+    <div class="device-results" id="deviceResults" aria-live="polite"></div>
+    <button class="secondary-button full-width" id="scanAgainButton" type="button" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg>
+      重新扫描
+    </button>
+  </dialog>
+
+  <dialog class="confirm-dialog" id="closeWifiDialog" aria-labelledby="closeWifiTitle">
+    <div class="dialog-head">
+      <div>
+        <p class="eyebrow">SAVE & EXIT</p>
+        <h2 id="closeWifiTitle">保存并关闭 WiFi？</h2>
+      </div>
+      <button class="icon-button" id="cancelCloseWifiIcon" type="button" aria-label="取消">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p>配置保存后网页将断开。已启动的功率与踏频桥接会继续运行。</p>
+    <div class="dialog-actions">
+      <button class="secondary-button" id="cancelCloseWifiButton" type="button">取消</button>
+      <button class="primary-button" id="confirmCloseWifiButton" type="button">保存并关闭</button>
+    </div>
+  </dialog>
+
+  <div class="wifi-closed" id="wifiClosedOverlay" hidden>
+    <div>
+      <span class="status-dot"></span>
+      <p class="eyebrow">BIKEPOWER CONTINUES</p>
+      <h2>配网 WiFi 已关闭</h2>
+      <p>网页连接已结束，真实功率与同源踏频桥接继续运行。</p>
+      <button class="secondary-button" id="returnPrototypeButton" type="button">返回原型</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="mock.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

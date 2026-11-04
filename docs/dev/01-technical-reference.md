@@ -291,7 +291,7 @@ DIS 读取内容来自编译期常量：
 - `FIRMWARE_STABLE_VERSION = "4.0.0"`
 - `FIRMWARE_FIX_VERSION = "4.2.0"`
 - `BIKEPOWER_GIT_SHA` 由 `main/CMakeLists.txt` 在构建时注入最后一次 Git 短提交 ID
-- DIS 固件字段与门户完整版本名使用 `board_firmware_name()` 生成，格式为 `板型-v版本-stable稳定版-fix修复版-gGitID`，例如 `generic-c3-v4.2.0-stable4.0.0-fix4.2.0-gabcdef0`
+- DIS 固件字段与门户固件名使用 `board_firmware_name()` 生成，格式为 `板型-v版本`，例如 `generic-c3-v4.2.1`；Git ID 和构建时间单独保留。
 
 测试脚本 `tests/ble_selftest.py` 也会校验这三项。
 
@@ -353,16 +353,17 @@ Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述�
 | Identity | `7a5a0006-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | BLE 设备名 |
 | Control | `7a5a0007-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write/Indicate | BEGIN、COMMIT、CANCEL 与最终结果 |
 | DIS Profile | `7a5a0008-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 设备信息服务（DIS）身份覆盖：厂商、型号、序列号、硬件 / 固件 / 软件版本 |
+| Bridge | `7a5a0009-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 真实来源、绑定地址与类型、校正及显示名 |
 
 **DIS 身份覆盖（`7a5a0008`）**：线格式 `[version=1][count=6]` 后接 6 个 `[len][UTF-8]` 字段，顺序为厂商 `2A29`、型号 `2A24`、序列号 `2A25`、硬件版本 `2A27`、固件版本 `2A26`、软件版本 `2A28`；每字段最多 31 字节，拒绝控制字符与截断 UTF-8。空字段表示该项回退为固件内置值，全空写入会清除 NVS 中的覆盖（namespace `bp_ident` / key `dis`）。它独立于五组配置事务与 schema 迁移：NimBLE host 回调只做解码并投递到应用 mailbox（上一笔未落盘时拒绝写入），主循环写 NVS 成功后才刷新 DIS 读值。部分手机系统会缓存 DIS，写入后需在 App 中删除设备重新搜索。实现：`components/bikepower_domain/device_identity.c`、`main/device_identity_store.c`。
 
-协议版本当前为 `1`，所有多字节整数显式使用小端编码，不把 C struct 直接放上线传输。配置按五组拆分，最长 Running 组为 45 字节，适配当前 NimBLE MTU 64。字符串不携带结尾 `\0`，而是使用单字节 UTF-8 长度前缀；设备名最多 23 字节，自定义骑行/跑步名称最多 31 字节。
+协议版本当前为 `1`，所有多字节整数显式使用小端编码，不把 C struct 直接放上线传输。配置按六组拆分，Bridge 组最长 47 字节，适配当前 NimBLE MTU 64。字符串不携带结尾 `\0`，而是使用单字节 UTF-8 长度前缀；设备名最多 23 字节，自定义骑行/跑步名称最多 31 字节。Bridge UUID 为 `7a5a0009-4c7a-4f2a-9b3e-6d1f4a8c0b21`，包含来源、绑定、地址类型及地址、校正和显示名；原五组线格式不变。
 
 保存流程如下：
 
-1. 页面读取 Meta 与五组配置，记录当前 revision。
+1. 页面读取 Meta 与六组配置，记录当前 revision；旧固件缺少 Bridge 时使用原五组。
 2. 页面向 Control 写 `BEGIN(protocol, transaction_id, revision)`；设备拒绝旧 revision、零事务号或并发事务。
-3. 页面写入五组完整配置；每组先解码到事务 staging，不改正式引擎，也不写 NVS。
+3. 页面写入设备支持的完整配置组；每组先解码到事务 staging，不改正式引擎，也不写 NVS。
 4. 页面写 `COMMIT(transaction_id, required_mask)`；缺组、事务号不一致或 revision 变化都会失败。
 5. NimBLE host 回调只把 staging 复制到应用 mailbox。主循环先再次确认 base revision 未变化，再做 schema/范围校验，在临时引擎上应用并调用 `nvs_store_save()`。
 6. 只有 NVS commit 成功后才替换 `s_engine`、更新配置快照和 revision，并通过 Control indication 返回成功；失败保留旧引擎和旧 revision。
@@ -565,7 +566,7 @@ Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述�
 5. 保持 `base_power` 不变
 6. 不设置配置 `dirty`
 
-Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，清除目标、切回 steady 并恢复原 `base_power`，同样不设置 dirty。`config_store_from_engine()` 在运行时仍处于 ERG 时也只导出 steady/base power；`config_store_validate()` 会把旧 NVS 或导入配置中的 ERG 修正为 steady，沿用现有 fixed 回写路径清理旧值。当前 schema 为 v12。
+Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，清除目标、切回 steady 并恢复原 `base_power`，同样不设置 dirty。`config_store_from_engine()` 在运行时仍处于 ERG 时也只导出 steady/base power；`config_store_validate()` 会把旧 NVS 或导入配置中的 ERG 修正为 steady，沿用现有 fixed 回写路径清理旧值。当前 schema 为 v13，真实功率来源拒绝 ERG 目标。
 
 ### 6.9 跑步会话状态
 
@@ -728,26 +729,21 @@ v3.2.0 起配网门户前后端分离：
 - `cfg.max_open_sockets = HTTP_MAX_OPEN_SOCKETS`（当前 7）
 - `cfg.keep_alive_enable = false`
 
-已注册业务路由 18 个，另有 10 个 Captive Portal 探测路由：
+已注册业务路由 13 个，另有 10 个 Captive Portal 探测路由：
 
 - `GET /`（返回内联 HTML 整页）
 - `GET /favicon.ico`（204）
 - `GET /.well-known/captive-portal`（RFC 8910 Captive Portal API，返回 `application/captive+json`）
-- `GET /api/state`（设备全状态：device_name/firmware_version/firmware_name/board/stable_version/fix_version/git_sha/power/cadence/heartrate/mode/profile_*/pacers/LED 配置/remaining_sec/closing）
+- `GET /api/state`（配置 `config`、有效 DIS `identity`、revision、桥接状态、固件信息、预设与配网剩余时间）
+- `GET /api/runtime`（实际输出、保存事务结果、桥接原始值、有效性和跑步累计）
 - `GET /api/time`（纯数字剩余秒数）
 - `POST /api/renew`（续期，返回新的剩余秒数）
 - `GET /api/mem_stats`（`{"free":..,"min_free":..}`）
-- `POST /api/config`（保存配置，返回 `{"ok":true}`）
+- `POST /api/config`（提交带 revision 的配置，返回 transaction；轮询 runtime 确认落盘结果）
 - `POST /api/close-wifi`（保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE）
-- `GET /api/device-templates`（读取最多 5 个 BLE 设备信息模板）
-- `POST /api/device-templates/save`（保存一个设备信息模板，模板满时返回错误）
-- `POST /api/device-templates/delete`（删除指定模板）
-- `POST /api/device-templates/apply`（把模板设备名应用为本设备 BLE 名称并持久化）
-- `POST /api/ble-scan/start`（启动 8 秒 BLE active scan，结果缓存在内存中）
-- `POST /api/ble-scan/stop`（停止当前扫描）
-- `GET /api/ble-scan/results`（返回扫描状态和最多 12 个附近设备摘要；仅包含有名称且广播服务命中骑行功率、踏频、心率或智能骑行台任意一种的设备；运行态结果包含 `adv_raw_hex`、`scan_rsp_raw_hex`、`manufacturer_data_hex`、`service_data_hex`、`tx_power`、`appearance` 等诊断字段）
-- `POST /api/ble-scan/read`（临时连接指定设备，读取 GAP Device Name 与 DIS 厂商/型号/版本字段后断开；若该设备来自本轮扫描，会合并扫描阶段的原始广播字段）
-- `POST /api/ble-scan/analyze`（临时连接指定设备，读取基础信息并订阅运动数据通知，短时采样后返回功率、踏频、心率、速度、设备能力摘要，以及最近一次 CPS/HRS/CSC/FTMS 通知 raw hex）
+- `GET /api/bridge/scan`（读取本轮 CPS 候选列表与扫描状态）
+- `POST /api/bridge/scan`（用户启动或停止有界扫描，候选编号包含代次）
+- `POST /api/bridge/control`（test 临时测试、stop 停止、resume 重试已绑定功率计）
 
 Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Location: /` 和短文本 body `Redirect to the captive portal`。这与 ESP-IDF captive_portal 示例保持一致：iOS Captive Network Assistant 对“只有空 302”的响应兼容性较差，带 body 的 303 更稳；404 兜底则用于覆盖 Chrome/Chromium `browsernetworktime/*` 等新增或变化的系统探测路径。DHCP Option 114 走 `/.well-known/captive-portal` JSON API，避免新系统把 HTML 首页当作 Captive Portal API 解析失败而不弹窗。
 
@@ -758,8 +754,9 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 - `/api/time`：返回剩余秒数
 - `/api/renew`：续期
 - `/api/mem_stats`：返回 `free` 和 `min_free`
-- `/api/device-templates*`：管理设备信息模板库，模板内容独立存入 NVS namespace `ble_tpl`
-- `/api/ble-scan*`：模板库专用 BLE Central/Observer 入口，仅用户点击扫描、读取或分析时运行；读取完成、分析采样完成、失败或超时都会断开外部设备连接
+- `/api/bridge/*`：仅连接真实功率计；测试期间保持原输出，收到两份有效通知后才允许保存来源。复制有效 DIS 字段到 `bp_ident`，缺失字段保留原值。
+- schema v13：桥接 blob 使用显式小端编码；v12 迁移默认模拟且无绑定。BLE 配置保留原五组并增加 Bridge 第六组。
+- 配网默认 300 秒，读取、扫描和临时测试不自动续期。
 
 ### 8.4 超时恢复
 
@@ -786,7 +783,7 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 
 ### 8.5 前端反馈与 JSON 安全
 
-配网门户是单页 SPA。首页与设置页通过 `location.hash` 切换，保存入口统一为 `POST /api/config`，保存并关闭 WiFi 入口为 `POST /api/close-wifi`。前端提交完整 JSON payload，保存成功后页面显示即时反馈；字段级校验覆盖功率、踏频、心率、体重、FTP、阈值心率、设备名称、调功步进、浮动幅度、自定义 W/kg 与 LED 配置。设备名称在设置页默认文本展示，点击右侧编辑按钮后进入输入态，点对勾确认后再随“保存设置”持久化；设备信息页提供“设备信息模板库”折叠卡片，最多保存 5 个模板，支持扫描附近 BLE 设备、连接读取设备基础信息、短时分析运动数据、确认别名后保存、应用模板设备名和二次确认删除。扫描结果只展示包含骑行功率、踏频、心率或智能骑行台任意能力的有名称设备，并在设备名称行右侧以小型圆角标签显示功率、踏频、心率、智能骑行台能力；同一设备包含多个服务时并排显示多个标签。分析卡默认只显示状态、样本数和摘要，用户展开“详细数据”后可查看功率、心率、踏频、速度、RSSI、样本数和服务能力，展开“原始数据”后可查看广播 raw hex、扫描响应 raw hex、厂商数据、服务数据以及最近一次运动通知 raw hex。分析结果和原始诊断字段只保存在前端运行态和本次 HTTP 响应中，用于辅助识别外部设备能力；`POST /api/device-templates/save` 只接收常规模板字段，不把 raw hex 写入 `ble_tpl` 模板 NVS，也不改变主配置 schema。物理按钮和 LED 配置卡片默认收起，仅用户主动展开时显示编辑控件。
+核心门户采用单页明亮高密度布局，固定模式与配速机器人共用区域，自定义收敛到机器人档位。模板库和 LED 编辑移到电脑工具。真实来源按“选择→扫描→两样本临时测试→配置→保存应用”渐进披露，测试不提前改变实际输出；首次默认关闭心率。支持 DIS 有效字段复制、功率计/开发板/自定义名称、原始与校正值预览。前端区分草稿、已应用配置和实际输出，保存携带 revision，轮询 transaction 确认 NVS 结果，失败保留草稿。默认配网 300 秒，仅显式续期延长。内联资源上限 110 KiB，按钮居中，动画遵循 reduced-motion。详细接口与验证见 `docs/wiki/08-wifi-portal.md`。
 
 `wifi_portal.c` 使用 `json_escape()` 转义字符串字段，避免设备名等用户可控内容破坏 JSON；前端渲染动态文本时使用 HTML 转义。`tests/check_portal_js.py` 与 `tests/check_portal_structure.py` 分别覆盖 JS 语法和前后端路由/视图契约。
 
@@ -852,7 +849,11 @@ namespace 固定为：
 
 领域层配置版本在 `domain_config.h` 中：
 
-`CONFIG_VERSION = 12`
+`CONFIG_VERSION = 13`
+
+v12→v13 新增 `bridge_config_t`，默认模拟、无上游绑定、无校正，不自动扫描或连接。v11→v12 的历史 ±5W→±50W 迁移仍逐级执行。NVS `bridge` 保存最长 47 字节显式小端配置编码，禁止写入 C 结构体；BLE 配置服务新增第六组 `7a5a0009`，原五组字节布局不变。
+
+桥接领域模块 `cps_input_codec` 完整跳过 CPS 可选字段后读取功率及曲柄事件；`power_bridge` 要求两份有效样本，3 秒过期、断线立即失效。校正支持 ±200W 偏移或 50.0–150.0% 比例，输出夹紧到 0–2000W，原始功率 ≤0 时保持 0W。曲柄计数和时间差采用 16 位回绕，非法差值或曲柄停更不会输出旧踏频。桥接无曲柄 CPS 为 4 字节，有曲柄为 8 字节；桥接 FTMS 使用 More Data 位省略速度，仅编码真实踏频、校正功率及可选模拟心率。
 
 `config_store_migrate()` 负责把旧 `schema_ver` 升级到当前版本。当前策略是：
 
@@ -1042,11 +1043,11 @@ idf.py build
 
 根据项目规则，C 代码改动后 `idf.py build` 必须通过。
 
-发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行会先跑 host 单测、mock 配网页保存测试、3 分钟核心流程耐久测试和静态门禁，再为 generic-c3 / m5stamp-c3 生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip。脚本不会打 git tag，也不会创建 GitHub Release。合并固件文件名格式为 `bikepower-c-板型-v版本-stable-fix-gGitID.bin`，例如 `bikepower-c-generic-c3-v4.1.1-stable-fix-g6d7eaaf.bin`，版本号只出现一次；总包文件名格式为 `bikepower-c-release-v版本-stable-fix-gGitID.zip`。
+发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行先跑 host、桥接会话、压缩页面交互、mock、3 分钟核心流程耐久和静态门禁，再生成双板型合并固件、SHA256、manifest、报告、手册和总包。合并固件文件名为 `bikepower-c-板型-v版本.bin`，总包为 `bikepower-c-v版本.zip`，Git ID 单独保存在 manifest。脚本不创建 tag 或 GitHub Release。
 
 每次生成可分发固件时，`build/release/` 必须同时包含：
 
-- `bikepower-c-<板型>-v<版本>-stable-fix-g<GitID>.bin`
+- `<板型>-v<版本>.bin`
 - `*.bin.sha256`
 - `manifest.txt`
 - `test-report.md`
@@ -1055,7 +1056,7 @@ idf.py build
 - `images/`
 - `evidence/device-acceptance-generic-c3.json`（当前版本证据存在时收录）
 - `evidence/device-acceptance-m5stamp-c3.json`（当前版本证据存在时收录）
-- `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip`
+- `bikepower-c-v<版本>.zip`
 - `*.zip.sha256`
 
 `test-report.md` 由 `scripts/tools/generate_release_docs.py` 生成，必须记录已执行测试、未执行项、原因以及真机验收证据摘要；`core-flow-endurance.md` 由 `tests/test_core_flow_endurance.py` 输出，记录按钮、心率随动、网页编辑、模板和关闭 WiFi 等核心流程循环；`user-manual.md` 从 `docs/user/` 生成，要求先更新源用户文档再打包。

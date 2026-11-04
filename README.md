@@ -48,10 +48,12 @@ BikePower C 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，�
 
 - 支持标准 BLE 骑行相关服务，可被主流骑行 App 识别
 - 模拟功率、踏频、心率、设备信息等训练数据
+- 真实功率计桥接：仅转发功率及同源踏频，支持固定瓦数或百分比校正，停踩保持 0W、3 秒过期归零
 - 支持 FTMS ERG 控制，适合训练模式联动
 - 提供实体按钮操作，不依赖屏幕也能快速调功
 - 提供 LED 状态提示，方便判断当前设备状态
 - 支持 WiFi 配网门户，可在手机浏览器里修改核心参数
+- 设备门户采用明亮高密度布局，固定模式和配速机器人统一配置；配网默认 5 分钟，仅主动续期延长
 - 支持配置保存，重启后继续使用上一次设置
 - 支持配置 JSON 序列化能力，领域层可做配置导入/导出、备份/恢复和 host 单测覆盖
 - 提供静态门禁聚合与标准化 Release 构建脚本，便于发版前统一验证和产出 merged bin
@@ -151,7 +153,7 @@ idf.py -p <port> monitor
 ./scripts/build_all.sh
 ```
 
-每次生成可分发固件时，`build/release/` 必须包含参与发布板型的 merged bin、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip` 总包。测试报告记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行项必须写明原因。
+每次生成可分发固件时，`build/release/` 必须包含参与发布板型的 `<板型>-v<版本>.bin` 合并固件、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-v<版本>.zip` 总包。Git ID 与构建时间在 manifest 单独保留。测试报告记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行项必须写明原因。
 
 真机自动测试按板型分别记录到 `tests/reports/device-acceptance-generic-c3.json` 和 `tests/reports/device-acceptance-m5stamp-c3.json`。本地构建允许没有证据；证据存在且匹配当前版本时，`build_all.sh` 会将其收录到总包 `evidence/`。正式上传要求**参与发布板型**的当前固件版本、Git ID 和 5 项 P0 自动项（串口启动、BLE 全量配置读写与 NVS 持久化、骑行 BLE、重连、5 分钟设备耐久）全部为 `PASS`；跑步 profile、配网门户、广播项以及按钮/LED/手机/第三方 App 为 P1，允许 `NOT_RUN` 但必须在测试报告明示。
 
@@ -222,6 +224,8 @@ bikepower-c/
 │   ├── button.c
 │   ├── led.c
 │   ├── ble_bikepower.c
+│   ├── ble_power_bridge.c        # 上游 CPS 连接、订阅、DIS 与重连
+│   ├── ble_scanner.c             # 有界功率计候选扫描
 │   ├── radio_ctrl.c
 │   ├── wifi_portal.c
 │   ├── captive_portal.c

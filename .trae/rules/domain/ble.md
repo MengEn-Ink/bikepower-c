@@ -9,9 +9,9 @@
 ## 角色与范围
 
 - `BLE-1`：BikePower C 主工作角色是 NimBLE `peripheral`。cycling profile 暴露 CPS/HRS/CSC/FTMS/DIS；running profile 暴露 RSC/HRS/FTMS/DIS，两套 GATT 表互斥。
-- `BLE-2`：仅允许为“设备信息模板库”和后续功率桥接实现受控 `central/observer` 能力；扫描必须由用户在配网页主动触发，限时运行，不允许开机后台扫描或与业务无关的 GAP 搜索逻辑。
+- `BLE-2`：central/observer 用于真实功率桥接；扫描由用户在配网页主动触发并限时运行，已保存真实来源的功率计可在开机后连接，不允许开机后台扫描。
 - `BLE-3`：BLE 是设备主工作模式；普通配网期间 peripheral 保持在线。外部设备读取使用临时 central 连接，完成或超时后必须主动断开。
-- `BLE-3a`：设备信息模板扫描结果必须同时满足“有名称”和“服务命中 CPS/CSC/HRS/FTMS 任意一种”；仅 DIS/BAS 或未知服务的广播不得进入用户可选结果。
+- `BLE-3a`：桥接扫描候选必须命中 CPS，允许无名称功率计；地址类型和地址共同标识设备，候选编号限定本轮代次。仅 DIS/BAS/HRS/CSC 的设备不得作为功率上游。
 
 ## 服务清单
 

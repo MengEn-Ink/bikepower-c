@@ -22,6 +22,8 @@
 
 BikePower C 采用 NimBLE host 实现蓝牙 peripheral 角色，暴露标准蓝牙 SIG 定义的运动传感器服务集，与码表/骑行 App 兼容。
 
+当前桥接实现额外使用一个受控 central 上游连接，peripheral 仍只接受一个下游。真实来源只转发 CPS 功率及同源曲柄踏频；无曲柄时 CPS 为 4 字节功率包，CSC 不发送模拟曲柄。桥接 FTMS 不补模拟速度，按实际字段设置 flags。心率可选模拟，首次桥接默认关闭。私有配置服务增加 Bridge 第六组，原五组布局不变。流程与事务见 [门户说明](08-wifi-portal.md)。
+
 ### 核心设计原则
 
 | 原则 | 实现 |

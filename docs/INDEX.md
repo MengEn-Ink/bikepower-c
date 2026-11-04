@@ -54,6 +54,10 @@
 | [稳定交付证据链实施计划](dev/11-stable-delivery-plan.md) | 按证据模型、device 门禁采集、release 强校验分批实施的测试驱动计划 |
 | [Top 5 协议稳定性设计](dev/12-top5-protocol-stability-design.md) | CPS/FTMS 编码、跑步会话、ERG 持久化边界、WiFi 完成可靠性和 P0 真机门禁修复设计 |
 | [项目复审与优化清单](dev/13-project-review-and-optimization.md) | 2026-10-22 全仓代码审查、源码卫生、文档治理结果与分级优化 backlog |
+| [真实功率桥接与网页交互设计](dev/14-real-power-bridge-web-design.md) | 桥接同一功率计的真实功率与真实踏频；心率模拟或关闭，含校正、断线保护与短时网页监测 |
+| [核心设备门户全量重写设计](dev/15-core-portal-rewrite-design.md) | 明主题现场控制台、Pages 高级配置分工、设备模板端到端删除、真实功率桥接和 110 KiB 资源门禁 |
+| [核心门户与桥接实施计划](dev/16-core-portal-bridge-implementation-plan.md) | 领域、上游会话、配置事务、门户及短固件名称的实施与验收 |
+| [核心门户与桥接测试报告](dev/17-core-portal-bridge-test-report.md) | 本轮工作区候选的离线、构建与真机证据及未覆盖项 |
 
 ## 🗄️ archive/ — 历史 / 归档（仅供追溯）
 

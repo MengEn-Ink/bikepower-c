@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f1f2f5">
+  <title>BikePower · 设备配置</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#" aria-label="BikePower">
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <path class="brand-accent" d="M37 4 22 28h11l-8 14 19-22H33z"/>
+          <path class="brand-line" d="M13 19a24 24 0 1 0 34 27M7 12a36 36 0 0 1 13-7"/>
+          <circle class="brand-hub" cx="22" cy="35" r="5"/>
+        </svg>
+        <span>Bike<strong>Power</strong></span>
+      </a>
+      <div class="device-heading">
+        <b id="headerDeviceName">BikePower-C3</b>
+        <span>固件 4.2.1 · 演示数据</span>
+      </div>
+      <div class="session-clock">
+        <span>配网剩余</span>
+        <b id="wifiTimer" aria-label="配网剩余时间">05:00</b>
+        <button class="icon-btn" id="renewBtn" type="button" title="续期配网" aria-label="续期配网">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <nav class="sport-switch" aria-label="运动类型">
+      <button class="is-active" type="button" data-sport="cycling">骑行</button>
+      <button type="button" data-sport="running">跑步</button>
+    </nav>
+
+    <div class="workspace">
+      <section class="live-pane" aria-labelledby="liveTitle">
+        <div class="section-kicker">
+          <span>当前输出</span>
+          <span class="status-chip status-chip--ok" id="liveStatus"><i></i>模拟运行</span>
+        </div>
+        <div class="live-title-row">
+          <div>
+            <h1 id="liveTitle">模拟骑行输出</h1>
+            <p id="liveSubtitle">已应用配置 · 最后通知 0.4 秒前</p>
+          </div>
+          <span class="applied-tag">已应用</span>
+        </div>
+
+        <div class="signal-chain" aria-label="信号链路">
+          <div class="chain-node">
+            <span>上游</span>
+            <b id="chainSource">模拟引擎</b>
+            <small id="chainSourceState">已连接</small>
+          </div>
+          <div class="chain-path chain-path--in"><i></i><span id="chainTransform">平滑</span></div>
+          <div class="chain-node chain-node--core">
+            <span>BikePower</span>
+            <b>校正与保护</b>
+            <small>广播中</small>
+          </div>
+          <div class="chain-path chain-path--out"><i></i><span>BLE</span></div>
+          <div class="chain-node">
+            <span>下游</span>
+            <b>骑行 App</b>
+            <small>已订阅</small>
+          </div>
+        </div>
+
+        <div class="hero-metric">
+          <span id="heroMetricLabel">模拟功率</span>
+          <div><strong id="heroMetricValue">220</strong><b id="heroMetricUnit">W</b></div>
+          <p id="heroMetricMeta">目标 220 W</p>
+        </div>
+
+        <div class="metric-grid">
+          <article>
+            <span id="metricTwoLabel">模拟踏频</span>
+            <div><strong id="metricTwoValue">88</strong><b id="metricTwoUnit">rpm</b></div>
+            <small id="metricTwoMeta">本机平滑生成</small>
+          </article>
+          <article>
+            <span>模拟心率</span>
+            <div><strong id="heartLiveValue">148</strong><b>bpm</b></div>
+            <small id="heartLiveMeta">随原始功率联动</small>
+          </article>
+        </div>
+
+        <div class="runtime-alert" id="runtimeAlert">
+          <i></i>
+          <div>
+            <b id="runtimeAlertTitle">模拟输出正在运行</b>
+            <p id="runtimeAlertText">功率与踏频由设备本机平滑生成。</p>
+          </div>
+        </div>
+
+        <details class="diagnostics">
+          <summary>运行详情 <span>展开</span></summary>
+          <dl>
+            <div><dt>配置版本</dt><dd>schema v12</dd></div>
+            <div><dt>空闲堆</dt><dd>96.4 KiB</dd></div>
+            <div><dt>功率通知</dt><dd id="packetCount">1,284</dd></div>
+            <div><dt>曲柄事件</dt><dd id="crankState">有效</dd></div>
+            <div><dt>App 订阅</dt><dd>CPS / CSC / FTMS</dd></div>
+            <div><dt>最近重连</dt><dd id="reconnectState">无</dd></div>
+          </dl>
+        </details>
+      </section>
+
+      <section class="editor-pane" aria-labelledby="editorTitle">
+        <div class="editor-head">
+          <div>
+            <span>现场配置</span>
+            <h2 id="editorTitle">骑行输出</h2>
+          </div>
+          <span class="draft-chip" id="draftChip" hidden>有未保存修改</span>
+        </div>
+
+        <div id="cyclingEditor">
+          <section class="editor-section">
+            <div class="section-title">
+              <div><span>01</span><h3>输出来源</h3></div>
+              <p id="sourceSummary">本机平滑模拟</p>
+            </div>
+            <div class="segmented source-segment" role="group" aria-label="骑行输出来源">
+              <button class="is-active" type="button" data-source="simulation">
+                <b>模拟输出</b><small>固定 / 机器人</small>
+              </button>
+              <button type="button" data-source="bridge">
+                <b>真实功率计</b><small>功率 + 同源踏频</small>
+              </button>
+            </div>
+          </section>
+
+          <section class="editor-section bridge-entry" id="bridgeIntro" hidden>
+            <div class="bridge-entry-copy">
+              <span class="bridge-entry-index">02</span>
+              <div>
+                <span>真实功率来源</span>
+                <h3>选择一台功率计</h3>
+                <p>测试通过前，当前模拟输出保持不变。</p>
+              </div>
+            </div>
+            <button class="primary-btn" id="bridgeStartScanBtn" type="button">选择功率计</button>
+          </section>
+
+          <div id="bridgeEditor" hidden>
+            <section class="editor-section">
+              <div class="section-title">
+                <div><span>02</span><h3>来源设备</h3></div>
+                <button class="text-btn" id="scanBtn" type="button">更换功率计</button>
+              </div>
+              <div class="device-row">
+                <div class="device-monogram">P5</div>
+                <div>
+                  <b id="selectedDeviceName">P505-4A29</b>
+                  <span id="selectedDeviceMeta">地址末尾 A4:29 · CPS</span>
+                </div>
+                <span class="inline-state">已连接</span>
+              </div>
+              <div class="capability-row" id="deviceCapabilities">
+                <span>功率</span><span>真实踏频</span>
+              </div>
+              <div class="identity-heading"><b>功率计设备信息</b><span>示例 DIS 数据</span></div>
+              <dl class="identity-grid" id="meterInfo"></dl>
+              <label class="copy-check"><input id="copyIdentity" type="checkbox"><span><b>复制设备信息到开发板</b><small>保存后应用厂商、型号、序列号及版本；未提供的字段保留开发板原值。</small></span></label>
+              <div id="identityOptions" hidden>
+                <label class="wide-field">开发板广播名称
+                  <select id="identityNameSource">
+                    <option value="meter">使用功率计名称</option>
+                    <option value="board">保留开发板名称</option>
+                    <option value="custom">自定义名称</option>
+                  </select>
+                </label>
+                <label class="wide-field" id="customNameField" hidden>自定义名称<input id="customIdentityName" type="text" maxlength="23" placeholder="输入开发板广播名称"></label>
+                <div class="identity-heading"><b>保存后的开发板信息</b><span>预览</span></div>
+                <dl class="identity-grid" id="identityPreview"></dl>
+                <p class="identity-note">仅复制名称与设备信息，不复制蓝牙地址。骑行 App 中可能出现同名设备。</p>
+              </div>
+              <button class="quiet-danger" id="stopBridgeBtn" type="button">停止桥接</button>
+            </section>
+
+            <section class="editor-section">
+              <div class="section-title">
+                <div><span>03</span><h3>功率校正</h3></div>
+                <p>实际 <b id="actualCalibration">+12 W</b></p>
+              </div>
+              <div class="segmented" role="group" aria-label="校正模式">
+                <button type="button" data-calibration="raw">原值</button>
+                <button class="is-active" type="button" data-calibration="watts">按瓦数</button>
+                <button type="button" data-calibration="percent">按百分比</button>
+              </div>
+              <div class="adjustment" id="calibrationAdjustment">
+                <label for="calibrationValue" id="calibrationLabel">调整瓦数</label>
+                <div class="stepper">
+                  <button type="button" id="calibrationMinus" aria-label="减少校正值">−</button>
+                  <div>
+                    <input id="calibrationValue" type="number" value="12" inputmode="decimal">
+                    <span id="calibrationUnit">W</span>
+                  </div>
+                  <button type="button" id="calibrationPlus" aria-label="增加校正值">+</button>
+                </div>
+                <input id="calibrationRange" type="range" min="-200" max="200" value="12" aria-label="功率校正值">
+              </div>
+              <div class="formula-line">
+                <span id="calibrationFormula">输入 + 12 W，0 W 保持为 0 W</span>
+                <b id="calibrationPreview">238 W → 250 W</b>
+              </div>
+            </section>
+          </div>
+
+          <div id="simulationEditor">
+            <section class="editor-section">
+              <div class="section-title">
+                <div><span>02</span><h3>模拟目标</h3></div>
+                <p>当前 <b id="simulationModeSummary">固定功率</b></p>
+              </div>
+              <div class="segmented two-options" role="group" aria-label="模拟模式">
+                <button class="is-active" type="button" data-sim-mode="fixed">固定功率</button>
+                <button type="button" data-sim-mode="pacer">配速机器人</button>
+              </div>
+              <div class="field-pair">
+                <label id="fixedPowerField">目标功率<input id="simPower" type="number" min="0" max="2000" value="220" inputmode="numeric"><span>W</span></label>
+                <label id="robotWeightField" hidden>体重<input id="profileWeight" type="number" min="30" max="200" value="70" inputmode="decimal"><span>kg</span></label>
+                <label>模拟踏频<input id="simCadence" type="number" value="88" inputmode="numeric"><span>rpm</span></label>
+              </div>
+              <div id="robotFields" hidden>
+                <label class="wide-field intensity-field">骑行强度
+                  <select id="robotPreset">
+                    <option value="recovery">恢复骑行 · 1.5–2.0 W/kg</option>
+                    <option value="endurance" selected>耐力骑行 · 2.5–3.0 W/kg</option>
+                    <option value="tempo">节奏骑行 · 3.0–3.5 W/kg</option>
+                    <option value="custom">自定义强度</option>
+                  </select>
+                </label>
+                <div class="field-pair" id="customRobotFields" hidden>
+                  <label>强度下限<input id="wkgMin" type="number" min="0.5" max="10" step="0.1" value="2.5" inputmode="decimal"><span>W/kg</span></label>
+                  <label>强度上限<input id="wkgMax" type="number" min="0.5" max="10" step="0.1" value="3" inputmode="decimal"><span>W/kg</span></label>
+                </div>
+                <div class="robot-preview"><span>功率范围 <b id="robotPowerRange">175–210 W</b></span><small>按体重与强度平滑变化</small></div>
+                <p class="field-error" id="robotRangeError" role="status" hidden>强度下限不能大于上限</p>
+              </div>
+            </section>
+          </div>
+
+          <section class="editor-section">
+            <div class="section-title">
+              <div><span id="broadcastIndex">04</span><h3>广播数据</h3></div>
+              <p>至少保留一项</p>
+            </div>
+            <div class="check-grid">
+              <label><input type="checkbox" data-broadcast="power" checked><span><b>功率</b><small>CPS / FTMS</small></span></label>
+              <label><input type="checkbox" data-broadcast="cadence" checked><span><b>踏频</b><small>CSC / FTMS</small></span></label>
+              <label><input type="checkbox" data-broadcast="heart" checked><span><b>心率</b><small>HRS / FTMS</small></span></label>
+            </div>
+          </section>
+
+          <section class="editor-section" id="heartSection">
+            <div class="section-title">
+              <div><span id="heartIndex">05</span><h3>模拟心率</h3></div>
+              <button class="toggle is-on" id="heartToggle" type="button" role="switch" aria-checked="true"><i></i><b>已启用</b></button>
+            </div>
+            <p class="identity-note" id="bridgeHeartHint" hidden>接入真实功率计后默认关闭；可手动开启模拟心率。</p>
+            <div id="heartFields">
+              <div class="segmented" role="group" aria-label="模拟心率模式">
+                <button class="is-active" type="button" data-heart-mode="linked">功率联动</button>
+                <button type="button" data-heart-mode="fixed">固定心率</button>
+              </div>
+              <div class="field-pair" id="linkedHeartFields">
+                <label>FTP<input id="ftpValue" type="number" value="245"><span>W</span></label>
+                <label>阈值心率<input id="thresholdHeart" type="number" value="178"><span>bpm</span></label>
+              </div>
+              <div class="field-pair" id="fixedHeartFields" hidden>
+                <label>目标心率<input id="fixedHeart" type="number" value="145"><span>bpm</span></label>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div id="runningEditor" hidden>
+          <section class="editor-section">
+            <div class="section-title">
+              <div><span>01</span><h3>跑步模式</h3></div>
+              <p>固定配速</p>
+            </div>
+            <div class="segmented" role="group" aria-label="跑步模式">
+              <button class="is-active" type="button" data-run-mode="fixed">固定配速</button>
+              <button type="button" data-run-mode="pacer">配速档</button>
+              <button type="button" data-run-mode="custom">自定义</button>
+            </div>
+            <div class="pace-editor">
+              <label>配速</label>
+              <div><input id="paceMinutes" type="number" value="5"><span>分</span><input id="paceSeconds" type="number" value="0"><span>秒/km</span></div>
+              <small id="paceSpeed">12.00 km/h</small>
+            </div>
+            <div class="field-pair">
+              <label>步频<input id="runCadence" type="number" value="170"><span>spm</span></label>
+              <label>步频浮动<input id="runCadenceFloat" type="number" value="4"><span>±spm</span></label>
+            </div>
+          </section>
+          <section class="editor-section">
+            <div class="section-title">
+              <div><span>02</span><h3>模拟心率</h3></div>
+              <p>功率联动模型</p>
+            </div>
+            <div class="field-pair">
+              <label>FTP<input type="number" value="245"><span>W</span></label>
+              <label>阈值心率<input type="number" value="178"><span>bpm</span></label>
+            </div>
+          </section>
+        </div>
+
+        <details class="device-settings">
+          <summary>
+            <div><span>设备</span><b>名称、按钮与固件详情</b></div>
+            <span>展开</span>
+          </summary>
+          <div class="device-settings-body">
+            <label class="wide-field">设备名称<input id="deviceNameInput" type="text" value="BikePower-C3" maxlength="23"></label>
+            <label class="wide-field">按钮调功步进<input id="powerStepInput" type="number" value="20"><span>W</span></label>
+            <dl class="identity-grid" id="boardIdentity"></dl>
+            <dl class="firmware-list">
+              <div><dt>固件</dt><dd>BikePower C 4.2.1</dd></div>
+              <div><dt>板型</dt><dd>m5stamp-c3</dd></div>
+              <div><dt>Git SHA</dt><dd>f498429</dd></div>
+              <div><dt>编译时间</dt><dd>2026-11-04 18:42</dd></div>
+            </dl>
+          </div>
+        </details>
+      </section>
+    </div>
+  </main>
+
+  <div class="action-bar">
+    <div>
+      <span id="saveState">当前配置已应用</span>
+      <small id="saveHint">关闭网页不会停止已运行的桥接</small>
+    </div>
+    <div>
+      <button class="secondary-btn" id="closeWifiBtn" type="button">关闭 WiFi</button>
+      <button class="primary-btn" id="saveBtn" type="button" disabled>保存并应用</button>
+    </div>
+  </div>
+
+  <div class="demo-dock" aria-label="原型状态演示">
+    <span>状态演示</span>
+    <button class="is-active" type="button" data-runtime="normal">正常</button>
+    <button type="button" data-runtime="stale">过期</button>
+    <button type="button" data-runtime="reconnecting">重连</button>
+  </div>
+
+  <div class="modal" id="scanModal" hidden>
+    <div class="modal-backdrop" data-close-modal="scan"></div>
+    <section class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
+      <header>
+        <div><span>功率计扫描</span><h2 id="scanTitle">选择真实功率来源</h2></div>
+        <button class="icon-btn" type="button" data-close-modal="scan" aria-label="关闭">×</button>
+      </header>
+      <div class="scan-state"><i></i><span id="scanStatus">扫描完成 · 发现 3 台 CPS 功率计</span><button id="rescanBtn" type="button">重新扫描</button></div>
+      <div class="device-results">
+        <article>
+          <div class="signal-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div><b>ASSIOMA DUO 721</b><span>地址末尾 7C:21 · -41 dBm</span><small>功率 + 真实踏频</small></div>
+          <button type="button" data-select-device="assioma">选择并测试</button>
+        </article>
+        <article>
+          <div class="signal-bars signal-bars--three" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div><b>4iiii PRECISION</b><span>地址末尾 1F:08 · -56 dBm</span><small>功率 + 真实踏频</small></div>
+          <button type="button" data-select-device="4iiii">选择并测试</button>
+        </article>
+        <article>
+          <div class="signal-bars signal-bars--two" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div><b>未命名功率计</b><span>地址末尾 B8:4D · -68 dBm</span><small>仅功率</small></div>
+          <button type="button" data-select-device="unnamed">选择并测试</button>
+        </article>
+      </div>
+      <p class="modal-note">测试不会替换当前输出；保存后才会应用新设备。</p>
+    </section>
+  </div>
+
+  <div class="modal" id="closeModal" hidden>
+    <div class="modal-backdrop" data-close-modal="close"></div>
+    <section class="confirm-sheet" role="dialog" aria-modal="true" aria-labelledby="closeTitle">
+      <span>关闭本次配网</span>
+      <h2 id="closeTitle">网页将无法继续访问</h2>
+      <p>已运行的功率桥接会继续；未保存修改不会自动提交。</p>
+      <div>
+        <button class="secondary-btn" type="button" data-close-modal="close">取消</button>
+        <button class="primary-btn" id="confirmCloseBtn" type="button">确认关闭</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="wifi-closed" id="wifiClosed" hidden>
+    <div>
+      <span>WiFi 已关闭</span>
+      <h2>BikePower 继续广播</h2>
+      <p>真实功率桥接保持运行，设备门户已结束。</p>
+      <button class="primary-btn" id="restoreDemoBtn" type="button">返回原型</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

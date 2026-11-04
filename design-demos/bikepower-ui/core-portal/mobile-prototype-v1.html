@@ -1,0 +1,1451 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f1f2f5">
+  <title>BikePower · 设备配置</title>
+  <style>
+:root {
+  --page: #f1f2f5;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --surface-3: #eceef2;
+  --ink: #14161a;
+  --muted: #515966;
+  --faint: #555d68;
+  --line: #dde0e5;
+  --line-strong: #c6cad1;
+  --gold: #f5c451;
+  --gold-hover: #e9b83e;
+  --gold-soft: #fff7df;
+  --cyan: #006a75;
+  --cyan-soft: #e7f4f5;
+  --warn: #a66a00;
+  --warn-soft: #fff5df;
+  --danger: #c73e3a;
+  --danger-soft: #fff0ef;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html { min-width: 320px; background: var(--page); }
+body {
+  min-height: 100vh;
+  margin: 0;
+  padding-bottom: 92px;
+  background: var(--page);
+  color: var(--ink);
+  font: 15px/1.5 var(--sans);
+  letter-spacing: 0;
+}
+button, input { font: inherit; letter-spacing: 0; }
+button { color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+button:disabled { cursor: default; }
+[hidden] { display: none !important; }
+svg { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+
+.topbar {
+  position: sticky;
+  z-index: 30;
+  top: 0;
+  border-bottom: 1px solid var(--line);
+  background: rgba(251, 251, 252, .96);
+  backdrop-filter: blur(12px);
+}
+.topbar-inner {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  width: min(100%, 1240px);
+  min-height: 64px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+.brand { display: inline-flex; align-items: center; gap: 9px; color: var(--ink); text-decoration: none; font-size: 17px; font-weight: 900; }
+.brand strong { color: #946600; }
+.brand-mark { width: 30px; height: 30px; }
+.brand-accent { fill: var(--gold); stroke: none; }
+.brand-line { stroke: currentColor; stroke-width: 6; }
+.brand-hub { fill: var(--surface); stroke: currentColor; stroke-width: 4; }
+.device-heading { text-align: center; }
+.device-heading b { display: block; font-size: 13px; line-height: 1.2; }
+.device-heading span { color: var(--faint); font-size: 12px; }
+.session-clock { display: flex; align-items: center; justify-content: flex-end; gap: 8px; color: var(--muted); font-size: 12px; }
+.session-clock b { min-width: 42px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.icon-btn {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+}
+.icon-btn:hover { border-color: var(--line); background: var(--surface-2); }
+.icon-btn svg { width: 19px; height: 19px; }
+
+.page { width: min(100%, 1240px); margin: 0 auto; padding: 18px 20px 44px; }
+.sport-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(360px, 100%);
+  margin: 0 0 14px auto;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-3);
+}
+.sport-switch button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+}
+.sport-switch button.is-active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(20, 22, 26, .08); }
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(440px, 1.1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.live-pane {
+  min-width: 0;
+  padding: 28px;
+  border-right: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.editor-pane { min-width: 0; padding: 28px 28px 120px; }
+.section-kicker, .editor-head, .section-title, .live-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.section-kicker > span:first-child, .editor-head > div > span {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 800;
+}
+.status-chip, .draft-chip, .applied-tag, .inline-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.status-chip i { width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: currentColor; }
+.status-chip--ok { border-color: #b8dadd; background: var(--cyan-soft); color: var(--cyan); }
+.status-chip--warn { border-color: #ead29e; background: var(--warn-soft); color: var(--warn); }
+.status-chip--danger { border-color: #efc1be; background: var(--danger-soft); color: var(--danger); }
+.draft-chip { border-color: #ead29e; background: var(--warn-soft); color: var(--warn); }
+.applied-tag { border-color: #b8dadd; background: var(--cyan-soft); color: var(--cyan); }
+.live-title-row { align-items: flex-end; margin-top: 18px; }
+.live-title-row h1, .editor-head h2 { margin: 0; font-size: 27px; line-height: 1.1; }
+.live-title-row p { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+
+.signal-chain {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr) 52px minmax(0, 1fr);
+  align-items: center;
+  margin-top: 28px;
+}
+.chain-node { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.chain-node span, .chain-node small { display: block; overflow: hidden; color: var(--faint); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.chain-node b { display: block; overflow: hidden; margin: 5px 0 2px; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.chain-node--core { border-color: #e5c66e; background: var(--gold-soft); }
+.chain-path { position: relative; display: grid; place-items: center; height: 46px; color: var(--faint); font-size: 12px; }
+.chain-path i { position: absolute; right: 0; left: 0; top: 22px; height: 1px; background: var(--line-strong); }
+.chain-path i::after { position: absolute; right: -1px; top: -3px; width: 6px; height: 6px; content: ""; transform: rotate(45deg); border-top: 1px solid var(--line-strong); border-right: 1px solid var(--line-strong); }
+.chain-path span { z-index: 1; padding: 2px 4px; background: var(--surface-2); }
+
+.hero-metric { margin-top: 34px; padding: 24px 0 26px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.hero-metric > span { color: var(--muted); font-size: 13px; font-weight: 800; }
+.hero-metric > div { display: flex; align-items: baseline; min-height: 96px; gap: 9px; }
+.hero-metric strong { font-size: 82px; line-height: 1; font-weight: 820; font-variant-numeric: tabular-nums; }
+.hero-metric b { color: var(--muted); font-size: 20px; }
+.hero-metric p { margin: 4px 0 0; color: var(--muted); }
+.metric-grid { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
+.metric-grid article { min-width: 0; padding: 20px 18px 20px 0; }
+.metric-grid article + article { padding-right: 0; padding-left: 18px; border-left: 1px solid var(--line); }
+.metric-grid article > span { color: var(--muted); font-size: 12px; font-weight: 800; }
+.metric-grid article > div { display: flex; align-items: baseline; gap: 6px; }
+.metric-grid strong { font-size: 36px; font-variant-numeric: tabular-nums; }
+.metric-grid b { color: var(--muted); font-size: 13px; }
+.metric-grid small { display: block; overflow: hidden; color: var(--faint); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+.runtime-alert { display: flex; align-items: flex-start; margin-top: 20px; padding: 14px; border: 1px solid #b8dadd; border-radius: 7px; background: var(--cyan-soft); gap: 11px; }
+.runtime-alert > i { width: 8px; height: 8px; flex: 0 0 8px; margin-top: 6px; border-radius: 50%; background: var(--cyan); }
+.runtime-alert b { display: block; color: var(--cyan); font-size: 13px; }
+.runtime-alert p { margin: 3px 0 0; color: #315d62; font-size: 12px; }
+.runtime-alert.is-warn { border-color: #ead29e; background: var(--warn-soft); }
+.runtime-alert.is-warn > i { background: var(--warn); }
+.runtime-alert.is-warn b, .runtime-alert.is-warn p { color: var(--warn); }
+.runtime-alert.is-danger { border-color: #efc1be; background: var(--danger-soft); }
+.runtime-alert.is-danger > i { background: var(--danger); }
+.runtime-alert.is-danger b, .runtime-alert.is-danger p { color: var(--danger); }
+
+.diagnostics { margin-top: 14px; border-top: 1px solid var(--line); }
+.diagnostics summary, .device-settings summary { display: flex; align-items: center; justify-content: space-between; min-height: 50px; cursor: pointer; font-size: 13px; font-weight: 800; list-style: none; }
+.diagnostics summary::-webkit-details-marker, .device-settings summary::-webkit-details-marker { display: none; }
+.diagnostics summary span, .device-settings summary > span { color: var(--faint); font-size: 12px; }
+.diagnostics[open] summary span, .device-settings[open] summary > span { color: var(--cyan); }
+.diagnostics dl, .firmware-list { display: grid; grid-template-columns: 1fr 1fr; margin: 0; border-top: 1px solid var(--line); }
+.diagnostics dl div, .firmware-list div { min-width: 0; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.diagnostics dl div:nth-child(odd), .firmware-list div:nth-child(odd) { padding-right: 14px; }
+.diagnostics dl div:nth-child(even), .firmware-list div:nth-child(even) { padding-left: 14px; border-left: 1px solid var(--line); }
+dt { color: var(--faint); font-size: 12px; }
+dd { overflow: hidden; margin: 3px 0 0; font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+
+.editor-head { align-items: flex-end; padding-bottom: 20px; }
+.editor-head h2 { margin-top: 4px; }
+.editor-section { padding: 21px 0; border-top: 1px solid var(--line); }
+.bridge-entry { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.bridge-entry-copy { display: flex; align-items: flex-start; min-width: 0; gap: 10px; }
+.bridge-entry-copy > div { min-width: 0; }
+.bridge-entry-copy > div > span { color: var(--cyan); font-size: 12px; font-weight: 850; }
+.bridge-entry-index { display: grid; width: 26px; height: 26px; flex: 0 0 26px; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--faint); font-size: 12px; font-weight: 900; }
+.bridge-entry h3 { margin: 4px 0 2px; font-size: 18px; }
+.bridge-entry p { margin: 0; color: var(--muted); font-size: 12px; }
+.bridge-entry .primary-btn { flex: 0 0 auto; }
+.section-title { align-items: center; margin-bottom: 14px; }
+.section-title > div { display: flex; align-items: center; gap: 10px; }
+.section-title > div > span { display: grid; width: 26px; height: 26px; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--faint); font-size: 12px; font-weight: 900; }
+.section-title h3 { margin: 0; font-size: 15px; }
+.section-title p { margin: 0; color: var(--muted); font-size: 12px; }
+.section-title p b { color: var(--ink); }
+.segmented { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-3); }
+.segmented button { min-height: 43px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 800; }
+.segmented button.is-active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(20, 22, 26, .08); }
+.source-segment { grid-template-columns: 1fr 1fr; }
+.source-segment button { min-height: 58px; text-align: left; }
+.source-segment b, .source-segment small { display: block; }
+.source-segment small { margin-top: 2px; color: var(--faint); font-size: 12px; font-weight: 600; }
+.source-segment .is-active small { color: var(--muted); }
+.text-btn, .quiet-danger {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 800;
+}
+.quiet-danger { width: 100%; margin-top: 10px; border-top: 1px solid var(--line); color: var(--danger); text-align: left; }
+.device-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 11px; }
+.device-monogram { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); font-size: 12px; font-weight: 900; }
+.device-row > div:nth-child(2) { min-width: 0; }
+.device-row b, .device-row span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.device-row span { margin-top: 2px; color: var(--faint); font-size: 12px; }
+.device-row .inline-state { display: inline-flex; margin: 0; color: var(--cyan); }
+.capability-row { display: flex; gap: 6px; margin: 10px 0 0 55px; }
+.capability-row span { padding: 3px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 12px; font-weight: 800; }
+
+.adjustment { margin-top: 14px; }
+.adjustment > label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 12px; font-weight: 800; }
+.stepper { display: grid; grid-template-columns: 44px 1fr 44px; min-height: 52px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); }
+.stepper button { border: 0; background: transparent; font-size: 21px; }
+.stepper button:first-child { border-right: 1px solid var(--line); }
+.stepper button:last-child { border-left: 1px solid var(--line); }
+.stepper > div { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.stepper input { width: 92px; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 21px; font-weight: 850; text-align: right; }
+.stepper span { color: var(--muted); font-size: 13px; }
+input[type="range"] { width: 100%; margin: 14px 0 0; accent-color: var(--gold-hover); }
+.formula-line { display: flex; align-items: center; justify-content: space-between; margin-top: 11px; gap: 14px; color: var(--muted); font-size: 12px; }
+.formula-line b { flex: 0 0 auto; color: var(--ink); font-size: 12px; }
+
+.field-pair, .inline-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.field-pair label, .inline-fields label, .wide-field { position: relative; display: block; color: var(--muted); font-size: 12px; font-weight: 800; }
+.field-pair input, .inline-fields input, .wide-field input {
+  width: 100%;
+  height: 48px;
+  margin-top: 6px;
+  padding: 0 42px 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 750;
+}
+.field-pair label > span, .inline-fields label > span, .wide-field > span { position: absolute; right: 11px; bottom: 13px; color: var(--faint); font-size: 12px; }
+.check-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.check-grid label { display: flex; align-items: center; min-height: 56px; padding: 0 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); gap: 9px; cursor: pointer; }
+.check-grid input { width: 17px; height: 17px; accent-color: var(--cyan); }
+.check-grid span, .check-grid b, .check-grid small { display: block; }
+.check-grid b { font-size: 12px; }
+.check-grid small { color: var(--faint); font-size: 12px; }
+.toggle { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; gap: 7px; }
+.toggle i { position: relative; display: block; width: 38px; height: 22px; border-radius: 11px; background: var(--surface-3); }
+.toggle i::after { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; content: ""; transition: transform .18s ease; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgba(20, 22, 26, .22); }
+.toggle.is-on i { background: var(--cyan); }
+.toggle.is-on i::after { transform: translateX(16px); }
+.toggle b { font-size: 12px; }
+
+.pace-editor { margin-top: 14px; }
+.pace-editor > label { display: block; color: var(--muted); font-size: 12px; font-weight: 800; }
+.pace-editor > div { display: flex; align-items: baseline; margin-top: 6px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); }
+.pace-editor input { width: 28%; height: 54px; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 21px; font-weight: 850; text-align: right; }
+.pace-editor span { margin: 0 10px 0 5px; color: var(--muted); font-size: 12px; }
+.pace-editor small { display: block; margin-top: 5px; color: var(--faint); text-align: right; }
+
+.device-settings { margin-top: 8px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.device-settings summary > div span, .device-settings summary > div b { display: block; }
+.device-settings summary > div span { color: var(--faint); font-size: 12px; }
+.device-settings summary > div b { margin-top: 2px; font-size: 13px; }
+.device-settings-body { display: grid; grid-template-columns: 1fr 1fr; padding: 16px 0 8px; border-top: 1px solid var(--line); gap: 12px; }
+.firmware-list { grid-column: 1 / -1; }
+
+.action-bar {
+  position: fixed;
+  z-index: 25;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 76px;
+  padding: 10px max(20px, calc((100vw - 1200px) / 2));
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, .97);
+  backdrop-filter: blur(12px);
+}
+.action-bar > div:first-child span, .action-bar > div:first-child small { display: block; }
+.action-bar > div:first-child span { font-size: 12px; font-weight: 850; }
+.action-bar > div:first-child small { margin-top: 2px; color: var(--faint); font-size: 12px; }
+.action-bar > div:last-child { display: flex; gap: 8px; }
+.primary-btn, .secondary-btn {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 850;
+}
+.primary-btn { border: 1px solid var(--gold); background: var(--gold); color: var(--ink); }
+.primary-btn:hover:not(:disabled) { border-color: var(--gold-hover); background: var(--gold-hover); }
+.primary-btn:disabled { border-color: #ead7a5; background: #f4e3b5; color: #5a616c; }
+.secondary-btn { border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+.secondary-btn:hover { background: var(--surface-2); }
+
+.demo-dock {
+  position: fixed;
+  z-index: 24;
+  left: 18px;
+  bottom: 92px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(20, 22, 26, .09);
+}
+.demo-dock span, .demo-dock button { min-height: 38px; padding: 0 9px; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 12px; font-weight: 800; }
+.demo-dock button:last-child { border-right: 0; }
+.demo-dock button.is-active { background: var(--ink); color: var(--surface); }
+
+.modal { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; padding: 20px; }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(20, 22, 26, .48); backdrop-filter: blur(4px); }
+.modal-sheet, .confirm-sheet {
+  position: relative;
+  z-index: 1;
+  width: min(620px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 28px 80px rgba(20, 22, 26, .28);
+}
+.modal-sheet > header { display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 22px 16px; border-bottom: 1px solid var(--line); }
+.modal-sheet header span, .confirm-sheet > span { color: var(--faint); font-size: 12px; font-weight: 800; }
+.modal-sheet h2, .confirm-sheet h2 { margin: 4px 0 0; font-size: 23px; }
+.scan-state { display: flex; align-items: center; min-height: 48px; padding: 0 22px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; gap: 8px; }
+.scan-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); }
+.scan-state button { margin-left: auto; border: 0; background: transparent; color: var(--cyan); font-size: 12px; font-weight: 800; }
+.device-results article { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; min-height: 86px; padding: 12px 22px; border-bottom: 1px solid var(--line); gap: 12px; }
+.device-results article > div:nth-child(2) { min-width: 0; }
+.device-results b, .device-results span, .device-results small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.device-results b { font-size: 13px; }
+.device-results span { margin-top: 2px; color: var(--faint); font-size: 12px; }
+.device-results small { margin-top: 5px; color: var(--cyan); font-size: 12px; font-weight: 800; }
+.device-results article > button { min-height: 44px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); font-size: 12px; font-weight: 800; }
+.device-results article > button:hover { border-color: var(--gold-hover); background: var(--gold-soft); }
+.signal-bars { display: flex; align-items: flex-end; width: 28px; height: 26px; gap: 2px; }
+.signal-bars i { width: 4px; background: var(--cyan); }
+.signal-bars i:nth-child(1) { height: 7px; }.signal-bars i:nth-child(2) { height: 12px; }.signal-bars i:nth-child(3) { height: 18px; }.signal-bars i:nth-child(4) { height: 25px; }
+.signal-bars--three i:nth-child(4), .signal-bars--two i:nth-child(3), .signal-bars--two i:nth-child(4) { background: var(--line-strong); }
+.modal-note { margin: 0; padding: 14px 22px 20px; color: var(--faint); font-size: 12px; }
+.confirm-sheet { width: min(430px, 100%); padding: 24px; }
+.confirm-sheet p { margin: 12px 0 22px; color: var(--muted); }
+.confirm-sheet > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wifi-closed { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 24px; background: var(--page); text-align: center; }
+.wifi-closed > div { width: min(420px, 100%); }
+.wifi-closed span { color: var(--cyan); font-size: 12px; font-weight: 850; }
+.wifi-closed h2 { margin: 10px 0 6px; font-size: 29px; }
+.wifi-closed p { margin: 0 0 22px; color: var(--muted); }
+.toast { position: fixed; z-index: 120; left: 50%; bottom: 96px; max-width: calc(100% - 32px); padding: 10px 14px; transform: translate(-50%, 16px); transition: opacity .18s ease, transform .18s ease; border-radius: 7px; background: var(--ink); color: var(--surface); font-size: 12px; font-weight: 800; opacity: 0; pointer-events: none; }
+.toast.is-visible { transform: translate(-50%, 0); opacity: 1; }
+
+@media (max-width: 920px) {
+  body { padding-bottom: 104px; }
+  .topbar-inner { grid-template-columns: 1fr auto; padding: 0 14px; }
+  .device-heading { display: none; }
+  .page { padding: 10px 10px 36px; }
+  .sport-switch { width: 100%; margin-bottom: 10px; }
+  .workspace { display: block; }
+  .live-pane { padding: 20px 16px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .editor-pane { padding: 20px 16px 112px; }
+  .hero-metric strong { font-size: 64px; }
+  .action-bar { min-height: 88px; padding: 9px 10px calc(9px + env(safe-area-inset-bottom, 0px)); }
+  .action-bar > div:first-child { display: none; }
+  .action-bar > div:last-child { display: grid; grid-template-columns: .8fr 1.2fr; width: 100%; }
+  .action-bar button { padding: 0 10px; }
+  .demo-dock { position: static; width: calc(100% - 20px); margin: -98px auto 112px; box-shadow: none; }
+  .demo-dock span, .demo-dock button { flex: 1; }
+}
+
+@media (max-width: 540px) {
+  .topbar-inner { min-height: 58px; }
+  .brand { font-size: 15px; }
+  .brand-mark { width: 27px; height: 27px; }
+  .session-clock > span { display: none; }
+  .workspace { border-radius: 7px; }
+  .live-title-row h1, .editor-head h2 { font-size: 23px; }
+  .signal-chain { grid-template-columns: 1fr 32px 1fr; }
+  .signal-chain .chain-path--out, .signal-chain .chain-node:last-child { display: none; }
+  .chain-node { padding: 10px 8px; }
+  .chain-path span { display: none; }
+  .hero-metric { margin-top: 24px; padding: 20px 0; }
+  .hero-metric > div { min-height: 76px; }
+  .hero-metric strong { font-size: 60px; }
+  .metric-grid article { padding-top: 16px; padding-bottom: 16px; }
+  .metric-grid strong { font-size: 31px; }
+  .segmented { grid-template-columns: 1fr; }
+  .source-segment { grid-template-columns: 1fr 1fr; }
+  .source-segment button { min-width: 0; padding: 0 7px; }
+  .field-pair, .inline-fields, .device-settings-body { grid-template-columns: 1fr; }
+  .bridge-entry { align-items: stretch; flex-direction: column; }
+  .bridge-entry .primary-btn { width: 100%; }
+  .check-grid { grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+  .check-grid label { min-width: 0; padding: 0 7px; gap: 5px; }
+  .check-grid small { display: none; }
+  .diagnostics dl, .firmware-list { grid-template-columns: 1fr; }
+  .diagnostics dl div:nth-child(odd), .diagnostics dl div:nth-child(even), .firmware-list div:nth-child(odd), .firmware-list div:nth-child(even) { padding: 9px 0; border-left: 0; }
+  .device-results article { grid-template-columns: 24px minmax(0, 1fr); padding: 12px 16px; }
+  .device-results article > button { grid-column: 2; width: 100%; }
+  .modal { padding: 8px; align-items: end; }
+  .modal-sheet { max-height: calc(100vh - 16px); }
+  .formula-line { align-items: flex-start; flex-direction: column; gap: 4px; }
+}
+
+.identity-heading { display: flex; justify-content: space-between; gap: 8px; margin: 12px 0 5px; font-size: 12px; }
+.identity-heading span { color: var(--muted); }
+.identity-grid { display: grid; grid-template-columns: 1fr 1fr; margin: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); }
+.identity-grid > div { min-width: 0; padding: 6px 9px; border-bottom: 1px solid var(--line); }
+.identity-grid > div:first-child { grid-column: 1 / -1; }
+.identity-grid > div:nth-child(even) { border-right: 1px solid var(--line); }
+.identity-grid dd { white-space: normal; overflow-wrap: anywhere; margin-top: 1px; }
+.copy-check { display: flex; align-items: flex-start; gap: 9px; min-height: 44px; padding: 10px 0; cursor: pointer; }
+.copy-check input { width: 18px; height: 18px; margin: 2px 0; flex: 0 0 auto; accent-color: var(--cyan); }
+.copy-check b, .copy-check small { display: block; font-size: 12px; }
+.copy-check small, .identity-note { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.identity-note { margin: 6px 0; }
+.wide-field select { width: 100%; min-height: 44px; margin: 5px 0 8px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; font-size: 16px; }
+#customNameField { margin-bottom: 8px; }
+#boardIdentity { grid-column: 1 / -1; }
+.editor-pane { padding: 16px 20px 24px; }
+.editor-head { padding-bottom: 10px; }
+.editor-head h2 { font-size: 20px; }
+.editor-section { padding: 10px 0; }
+.section-title { margin-bottom: 7px; gap: 8px; }
+.section-title > div { gap: 7px; }
+.section-title > div > span { width: auto; height: auto; border: 0; border-radius: 0; }
+.source-segment button { min-height: 48px; }
+.field-pair, .inline-fields { margin-top: 8px; }
+.field-pair input, .inline-fields input, .wide-field input { height: 44px; margin-top: 3px; }
+.check-grid label { min-height: 44px; }
+.runtime-alert { margin-top: 10px; padding: 8px 10px; }
+.live-pane { padding: 18px; }
+.live-title-row { margin-top: 8px; }
+.live-title-row h1 { font-size: 22px; }
+.hero-metric { margin-top: 16px; padding: 14px 0; }
+.hero-metric strong { font-size: 54px; }
+.hero-metric > div { min-height: 62px; }
+.metric-grid article { padding-top: 10px; padding-bottom: 10px; }
+.metric-grid strong { font-size: 28px; }
+.segmented:has([data-heart-mode]) { grid-template-columns: 1fr 1fr; }
+.demo-dock { position: static; width: fit-content; margin: 12px auto 0; box-shadow: none; }
+.demo-dock span, .demo-dock button { min-height: 44px; }
+@media (max-width: 920px) {
+  body { padding-bottom: 86px; }
+  .topbar-inner { min-height: 50px; }
+  .page { padding: 6px 8px 8px; }
+  .sport-switch { margin-bottom: 6px; }
+  .live-pane { display: grid; grid-template-columns: 1fr 2fr; padding: 10px 12px; gap: 0 10px; }
+  .section-kicker, .live-title-row, .signal-chain, .runtime-alert, .diagnostics { grid-column: 1 / -1; }
+  .live-title-row { margin: 3px 0 8px; }
+  .live-title-row h1 { font-size: 17px; }
+  .live-title-row p { font-size: 12px; margin-top: 2px; }
+  .applied-tag { display: none; }
+  .hero-metric { margin: 0; padding: 6px 0; border: 0; }
+  .hero-metric > div { min-height: 40px; gap: 3px; }
+  .hero-metric strong { font-size: 34px; }
+  .hero-metric b { font-size: 13px; }
+  .hero-metric p { font-size: 12px; }
+  .metric-grid { border: 0; }
+  .metric-grid article, .metric-grid article + article { padding: 6px 0 6px 9px; border-left: 1px solid var(--line); }
+  .metric-grid strong { font-size: 28px; }
+  .metric-grid article > div { gap: 3px; }
+  .diagnostics { margin-top: 7px; }
+  .diagnostics summary { min-height: 44px; }
+  .runtime-alert:not(.is-warn):not(.is-danger) { display: none; }
+  .editor-pane { padding: 10px 12px 12px; }
+  .editor-head > div > span { display: none; }
+  .editor-head h2 { font-size: 17px; margin: 0; }
+  .editor-head { padding-bottom: 8px; }
+  .segmented { grid-template-columns: repeat(3, 1fr); }
+  .source-segment { grid-template-columns: 1fr 1fr; }
+  .segmented button { min-height: 44px; padding: 0 5px; }
+  .source-segment button { min-height: 48px; }
+  .field-pair, .inline-fields, .device-settings-body { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .device-settings-body { padding-top: 8px; }
+  .bridge-entry { flex-direction: row; align-items: center; gap: 8px; }
+  .bridge-entry h3 { font-size: 15px; }
+  .bridge-entry-index { display: none; }
+  .bridge-entry .primary-btn { width: auto; padding: 0 10px; }
+  .bridge-entry-copy > div > span { display: none; }
+  .action-bar { min-height: 70px; }
+  .demo-dock { width: calc(100% - 16px); margin: 8px auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}
+
+.prototype-label{padding:5px 10px;background:#fff7df;color:#65501b;font-size:12px;text-align:center;border-bottom:1px solid #ead7a5}
+</style>
+</head>
+<body>
+<div class="prototype-label">交互设计稿 · 所有读数及设备信息均为示例</div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#" aria-label="BikePower">
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <path class="brand-accent" d="M37 4 22 28h11l-8 14 19-22H33z"/>
+          <path class="brand-line" d="M13 19a24 24 0 1 0 34 27M7 12a36 36 0 0 1 13-7"/>
+          <circle class="brand-hub" cx="22" cy="35" r="5"/>
+        </svg>
+        <span>Bike<strong>Power</strong></span>
+      </a>
+      <div class="device-heading">
+        <b id="headerDeviceName">BikePower-C3</b>
+        <span>固件 4.2.1 · 演示数据</span>
+      </div>
+      <div class="session-clock">
+        <span>配网剩余</span>
+        <b id="wifiTimer">02:45</b>
+        <button class="icon-btn" id="renewBtn" type="button" title="续期配网" aria-label="续期配网">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <nav class="sport-switch" aria-label="运动类型">
+      <button class="is-active" type="button" data-sport="cycling">骑行</button>
+      <button type="button" data-sport="running">跑步</button>
+    </nav>
+
+    <div class="workspace">
+      <section class="live-pane" aria-labelledby="liveTitle">
+        <div class="section-kicker">
+          <span>当前输出</span>
+          <span class="status-chip status-chip--ok" id="liveStatus"><i></i>模拟运行</span>
+        </div>
+        <div class="live-title-row">
+          <div>
+            <h1 id="liveTitle">模拟骑行输出</h1>
+            <p id="liveSubtitle">已应用配置 · 最后通知 0.4 秒前</p>
+          </div>
+          <span class="applied-tag">已应用</span>
+        </div>
+
+        <div class="signal-chain" aria-label="信号链路">
+          <div class="chain-node">
+            <span>上游</span>
+            <b id="chainSource">模拟引擎</b>
+            <small id="chainSourceState">已连接</small>
+          </div>
+          <div class="chain-path chain-path--in"><i></i><span id="chainTransform">平滑</span></div>
+          <div class="chain-node chain-node--core">
+            <span>BikePower</span>
+            <b>校正与保护</b>
+            <small>广播中</small>
+          </div>
+          <div class="chain-path chain-path--out"><i></i><span>BLE</span></div>
+          <div class="chain-node">
+            <span>下游</span>
+            <b>骑行 App</b>
+            <small>已订阅</small>
+          </div>
+        </div>
+
+        <div class="hero-metric">
+          <span id="heroMetricLabel">模拟功率</span>
+          <div><strong id="heroMetricValue">220</strong><b id="heroMetricUnit">W</b></div>
+          <p id="heroMetricMeta">目标 220 W</p>
+        </div>
+
+        <div class="metric-grid">
+          <article>
+            <span id="metricTwoLabel">模拟踏频</span>
+            <div><strong id="metricTwoValue">88</strong><b id="metricTwoUnit">rpm</b></div>
+            <small id="metricTwoMeta">本机平滑生成</small>
+          </article>
+          <article>
+            <span>模拟心率</span>
+            <div><strong id="heartLiveValue">148</strong><b>bpm</b></div>
+            <small id="heartLiveMeta">随原始功率联动</small>
+          </article>
+        </div>
+
+        <div class="runtime-alert" id="runtimeAlert">
+          <i></i>
+          <div>
+            <b id="runtimeAlertTitle">模拟输出正在运行</b>
+            <p id="runtimeAlertText">功率与踏频由设备本机平滑生成。</p>
+          </div>
+        </div>
+
+        <details class="diagnostics">
+          <summary>运行详情 <span>展开</span></summary>
+          <dl>
+            <div><dt>配置版本</dt><dd>schema v12</dd></div>
+            <div><dt>空闲堆</dt><dd>96.4 KiB</dd></div>
+            <div><dt>功率通知</dt><dd id="packetCount">1,284</dd></div>
+            <div><dt>曲柄事件</dt><dd id="crankState">有效</dd></div>
+            <div><dt>App 订阅</dt><dd>CPS / CSC / FTMS</dd></div>
+            <div><dt>最近重连</dt><dd id="reconnectState">无</dd></div>
+          </dl>
+        </details>
+      </section>
+
+      <section class="editor-pane" aria-labelledby="editorTitle">
+        <div class="editor-head">
+          <div>
+            <span>现场配置</span>
+            <h2 id="editorTitle">骑行输出</h2>
+          </div>
+          <span class="draft-chip" id="draftChip" hidden>有未保存修改</span>
+        </div>
+
+        <div id="cyclingEditor">
+          <section class="editor-section">
+            <div class="section-title">
+              <div><span>01</span><h3>输出来源</h3></div>
+              <p id="sourceSummary">本机平滑模拟</p>
+            </div>
+            <div class="segmented source-segment" role="group" aria-label="骑行输出来源">
+              <button class="is-active" type="button" data-source="simulation">
+                <b>模拟输出</b><small>固定 / 机器人</small>
+              </button>
+              <button type="button" data-source="bridge">
+                <b>真实功率计</b><small>功率 + 同源踏频</small>
+              </button>
+            </div>
+          </section>
+
+          <section class="editor-section bridge-entry" id="bridgeIntro" hidden>
+            <div class="bridge-entry-copy">
+              <span class="bridge-entry-index">02</span>
+              <div>
+                <span>真实功率来源</span>
+                <h3>选择一台功率计</h3>
+                <p>测试通过前，当前模拟输出保持不变。</p>
+              </div>
+            </div>
+            <button class="primary-btn" id="bridgeStartScanBtn" type="button">选择功率计</button>
+          </section>
+
+          <div id="bridgeEditor" hidden>
+            <section class="editor-section">
+              <div class="section-title">
+                <div><span>02</span><h3>来源设备</h3></div>
+                <button class="text-btn" id="scanBtn" type="button">更换功率计</button>
+              </div>
+              <div class="device-row">
+                <div class="device-monogram">P5</div>
+                <div>
+                  <b id="selectedDeviceName">P505-4A29</b>
+                  <span id="selectedDeviceMeta">地址末尾 A4:29 · CPS</span>
+                </div>
+                <span class="inline-state">已连接</span>
+              </div>
+              <div class="capability-row" id="deviceCapabilities">
+                <span>功率</span><span>真实踏频</span>
+              </div>
+              <div class="identity-heading"><b>功率计设备信息</b><span>示例 DIS 数据</span></div>
+              <dl class="identity-grid" id="meterInfo"></dl>
+              <label class="copy-check"><input id="copyIdentity" type="checkbox"><span><b>复制设备信息到开发板</b><small>保存后应用厂商、型号、序列号及版本；未提供的字段保留开发板原值。</small></span></label>
+              <div id="identityOptions" hidden>
+                <label class="wide-field">开发板广播名称
+                  <select id="identityNameSource">
+                    <option value="meter">使用功率计名称</option>
+                    <option value="board">保留开发板名称</option>
+                    <option value="custom">自定义名称</option>
+                  </select>
+                </label>
+                <label class="wide-field" id="customNameField" hidden>自定义名称<input id="customIdentityName" type="text" maxlength="23" placeholder="输入开发板广播名称"></label>
+                <div class="identity-heading"><b>保存后的开发板信息</b><span>预览</span></div>
+                <dl class="identity-grid" id="identityPreview"></dl>
+                <p class="identity-note">仅复制名称与设备信息，不复制蓝牙地址。骑行 App 中可能出现同名设备。</p>
+              </div>
+              <button class="quiet-danger" id="stopBridgeBtn" type="button">停止桥接</button>
+            </section>
+
+            <section class="editor-section">
+              <div class="section-title">
+                <div><span>03</span><h3>功率校正</h3></div>
+                <p>实际 <b id="actualCalibration">+12 W</b></p>
+              </div>
+              <div class="segmented" role="group" aria-label="校正模式">
+                <button type="button" data-calibration="raw">原值</button>
+                <button class="is-active" type="button" data-calibration="watts">按瓦数</button>
+                <button type="button" data-calibration="percent">按百分比</button>
+              </div>
+              <div class="adjustment" id="calibrationAdjustment">
+                <label for="calibrationValue" id="calibrationLabel">调整瓦数</label>
+                <div class="stepper">
+                  <button type="button" id="calibrationMinus" aria-label="减少校正值">−</button>
+                  <div>
+                    <input id="calibrationValue" type="number" value="12" inputmode="decimal">
+                    <span id="calibrationUnit">W</span>
+                  </div>
+                  <button type="button" id="calibrationPlus" aria-label="增加校正值">+</button>
+                </div>
+                <input id="calibrationRange" type="range" min="-200" max="200" value="12" aria-label="功率校正值">
+              </div>
+              <div class="formula-line">
+                <span id="calibrationFormula">输入 + 12 W，0 W 保持为 0 W</span>
+                <b id="calibrationPreview">238 W → 250 W</b>
+              </div>
+            </section>
+          </div>
+
+          <div id="simulationEditor">
+            <section class="editor-section">
+              <div class="section-title">
+                <div><span>02</span><h3>模拟目标</h3></div>
+                <p>当前 <b id="simulationModeSummary">固定功率</b></p>
+              </div>
+              <div class="segmented" role="group" aria-label="模拟模式">
+                <button class="is-active" type="button" data-sim-mode="fixed">固定功率</button>
+                <button type="button" data-sim-mode="pacer">配速机器人</button>
+                <button type="button" data-sim-mode="custom">自定义</button>
+              </div>
+              <div class="field-pair">
+                <label>目标功率<input id="simPower" type="number" value="220"><span>W</span></label>
+                <label>模拟踏频<input id="simCadence" type="number" value="88"><span>rpm</span></label>
+              </div>
+              <div class="inline-fields" id="robotFields" hidden>
+                <label>体重<input id="profileWeight" type="number" value="70"><span>kg</span></label>
+                <label>W/kg 范围<input id="wkgRange" type="text" value="2.5 – 3.0"></label>
+              </div>
+            </section>
+          </div>
+
+          <section class="editor-section">
+            <div class="section-title">
+              <div><span id="broadcastIndex">04</span><h3>广播数据</h3></div>
+              <p>至少保留一项</p>
+            </div>
+            <div class="check-grid">
+              <label><input type="checkbox" data-broadcast="power" checked><span><b>功率</b><small>CPS / FTMS</small></span></label>
+              <label><input type="checkbox" data-broadcast="cadence" checked><span><b>踏频</b><small>CSC / FTMS</small></span></label>
+              <label><input type="checkbox" data-broadcast="heart" checked><span><b>心率</b><small>HRS / FTMS</small></span></label>
+            </div>
+          </section>
+
+          <section class="editor-section" id="heartSection">
+            <div class="section-title">
+              <div><span id="heartIndex">05</span><h3>模拟心率</h3></div>
+              <button class="toggle is-on" id="heartToggle" type="button" role="switch" aria-checked="true"><i></i><b>已启用</b></button>
+            </div>
+            <p class="identity-note" id="bridgeHeartHint" hidden>接入真实功率计后默认关闭；可手动开启模拟心率。</p>
+            <div id="heartFields">
+              <div class="segmented" role="group" aria-label="模拟心率模式">
+                <button class="is-active" type="button" data-heart-mode="linked">功率联动</button>
+                <button type="button" data-heart-mode="fixed">固定心率</button>
+              </div>
+              <div class="field-pair" id="linkedHeartFields">
+                <label>FTP<input id="ftpValue" type="number" value="245"><span>W</span></label>
+                <label>阈值心率<input id="thresholdHeart" type="number" value="178"><span>bpm</span></label>
+              </div>
+              <div class="field-pair" id="fixedHeartFields" hidden>
+                <label>目标心率<input id="fixedHeart" type="number" value="145"><span>bpm</span></label>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div id="runningEditor" hidden>
+          <section class="editor-section">
+            <div class="section-title">
+              <div><span>01</span><h3>跑步模式</h3></div>
+              <p>固定配速</p>
+            </div>
+            <div class="segmented" role="group" aria-label="跑步模式">
+              <button class="is-active" type="button" data-run-mode="fixed">固定配速</button>
+              <button type="button" data-run-mode="pacer">配速档</button>
+              <button type="button" data-run-mode="custom">自定义</button>
+            </div>
+            <div class="pace-editor">
+              <label>配速</label>
+              <div><input id="paceMinutes" type="number" value="5"><span>分</span><input id="paceSeconds" type="number" value="0"><span>秒/km</span></div>
+              <small id="paceSpeed">12.00 km/h</small>
+            </div>
+            <div class="field-pair">
+              <label>步频<input id="runCadence" type="number" value="170"><span>spm</span></label>
+              <label>步频浮动<input id="runCadenceFloat" type="number" value="4"><span>±spm</span></label>
+            </div>
+          </section>
+          <section class="editor-section">
+            <div class="section-title">
+              <div><span>02</span><h3>模拟心率</h3></div>
+              <p>功率联动模型</p>
+            </div>
+            <div class="field-pair">
+              <label>FTP<input type="number" value="245"><span>W</span></label>
+              <label>阈值心率<input type="number" value="178"><span>bpm</span></label>
+            </div>
+          </section>
+        </div>
+
+        <details class="device-settings">
+          <summary>
+            <div><span>设备</span><b>名称、按钮与固件详情</b></div>
+            <span>展开</span>
+          </summary>
+          <div class="device-settings-body">
+            <label class="wide-field">设备名称<input id="deviceNameInput" type="text" value="BikePower-C3" maxlength="23"></label>
+            <label class="wide-field">按钮调功步进<input id="powerStepInput" type="number" value="20"><span>W</span></label>
+            <dl class="identity-grid" id="boardIdentity"></dl>
+            <dl class="firmware-list">
+              <div><dt>固件</dt><dd>BikePower C 4.2.1</dd></div>
+              <div><dt>板型</dt><dd>m5stamp-c3</dd></div>
+              <div><dt>Git SHA</dt><dd>f498429</dd></div>
+              <div><dt>编译时间</dt><dd>2026-11-04 18:42</dd></div>
+            </dl>
+          </div>
+        </details>
+      </section>
+    </div>
+  </main>
+
+  <div class="action-bar">
+    <div>
+      <span id="saveState">当前配置已应用</span>
+      <small id="saveHint">关闭网页不会停止已运行的桥接</small>
+    </div>
+    <div>
+      <button class="secondary-btn" id="closeWifiBtn" type="button">关闭 WiFi</button>
+      <button class="primary-btn" id="saveBtn" type="button" disabled>保存并应用</button>
+    </div>
+  </div>
+
+  <div class="demo-dock" aria-label="原型状态演示">
+    <span>状态演示</span>
+    <button class="is-active" type="button" data-runtime="normal">正常</button>
+    <button type="button" data-runtime="stale">过期</button>
+    <button type="button" data-runtime="reconnecting">重连</button>
+  </div>
+
+  <div class="modal" id="scanModal" hidden>
+    <div class="modal-backdrop" data-close-modal="scan"></div>
+    <section class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
+      <header>
+        <div><span>功率计扫描</span><h2 id="scanTitle">选择真实功率来源</h2></div>
+        <button class="icon-btn" type="button" data-close-modal="scan" aria-label="关闭">×</button>
+      </header>
+      <div class="scan-state"><i></i><span id="scanStatus">扫描完成 · 发现 3 台 CPS 功率计</span><button id="rescanBtn" type="button">重新扫描</button></div>
+      <div class="device-results">
+        <article>
+          <div class="signal-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div><b>ASSIOMA DUO 721</b><span>地址末尾 7C:21 · -41 dBm</span><small>功率 + 真实踏频</small></div>
+          <button type="button" data-select-device="assioma">选择并测试</button>
+        </article>
+        <article>
+          <div class="signal-bars signal-bars--three" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div><b>4iiii PRECISION</b><span>地址末尾 1F:08 · -56 dBm</span><small>功率 + 真实踏频</small></div>
+          <button type="button" data-select-device="4iiii">选择并测试</button>
+        </article>
+        <article>
+          <div class="signal-bars signal-bars--two" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div><b>未命名功率计</b><span>地址末尾 B8:4D · -68 dBm</span><small>仅功率</small></div>
+          <button type="button" data-select-device="unnamed">选择并测试</button>
+        </article>
+      </div>
+      <p class="modal-note">测试不会替换当前输出；保存后才会应用新设备。</p>
+    </section>
+  </div>
+
+  <div class="modal" id="closeModal" hidden>
+    <div class="modal-backdrop" data-close-modal="close"></div>
+    <section class="confirm-sheet" role="dialog" aria-modal="true" aria-labelledby="closeTitle">
+      <span>关闭本次配网</span>
+      <h2 id="closeTitle">网页将无法继续访问</h2>
+      <p>已运行的功率桥接会继续；未保存修改不会自动提交。</p>
+      <div>
+        <button class="secondary-btn" type="button" data-close-modal="close">取消</button>
+        <button class="primary-btn" id="confirmCloseBtn" type="button">确认关闭</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="wifi-closed" id="wifiClosed" hidden>
+    <div>
+      <span>WiFi 已关闭</span>
+      <h2>BikePower 继续广播</h2>
+      <p>真实功率桥接保持运行，设备门户已结束。</p>
+      <button class="primary-btn" id="restoreDemoBtn" type="button">返回原型</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var clone = function (value) { return JSON.parse(JSON.stringify(value)); };
+  var devices = {
+    p505: { name: "P505-4A29", suffix: "A4:29", cadence: true, mark: "P5", info: { manufacturer: "Magene", model: "P505", serial: "DEMO-4A29", hardware: "1.0", firmware: "2.1", software: "" } },
+    assioma: { name: "ASSIOMA DUO 721", suffix: "7C:21", cadence: true, mark: "AD", info: { manufacturer: "Favero", model: "ASSIOMA DUO", serial: "DEMO-00721", hardware: "1.0", firmware: "4.8", software: "" } },
+    "4iiii": { name: "4iiii PRECISION", suffix: "1F:08", cadence: true, mark: "4I", info: { manufacturer: "4iiii", model: "PRECISION", serial: "DEMO-1F08", hardware: "2.0", firmware: "3.2", software: "" } },
+    unnamed: { name: "未命名功率计", suffix: "B8:4D", cadence: false, mark: "PM", info: { manufacturer: "", model: "", serial: "", hardware: "", firmware: "", software: "" } }
+  };
+  var initialConfig = {
+    sport: "cycling",
+    source: "simulation",
+    device: "p505",
+    calibration: { mode: "watts", watts: 12, percent: 10 },
+    simulation: { mode: "fixed", power: 220, cadence: 88, weight: 70, wkg: "2.5 – 3.0" },
+    broadcast: { power: true, cadence: true, heart: true },
+    heart: { enabled: true, mode: "linked", ftp: 245, threshold: 178, fixed: 145 },
+    running: { mode: "fixed", paceMinutes: 5, paceSeconds: 0, cadence: 170, cadenceFloat: 4 },
+    deviceName: "BikePower-C3",
+    identity: { manufacturer: "BikePower", model: "m5stamp-c3", serial: "C3-DEMO-001", hardware: "ESP32-C3", firmware: "4.2.1", software: "4.2.1" },
+    powerStep: 20
+  };
+  var state = {
+    applied: clone(initialConfig),
+    draft: clone(initialConfig),
+    runtime: "normal",
+    rawPower: 238,
+    wifiSeconds: 165,
+    bridgeStage: "idle",
+    bridgeHeartInitialized: false,
+    copyIdentity: false,
+    nameSource: "meter",
+    customName: "",
+    toastTimer: 0
+  };
+
+  function isDirty() {
+    return JSON.stringify(state.applied) !== JSON.stringify(pendingConfig());
+  }
+
+  function pendingConfig() {
+    var config = clone(state.draft);
+    if (config.sport !== "cycling" || config.source !== "bridge" || !state.copyIdentity) return config;
+    var device = devices[config.device];
+    Object.keys(device.info).forEach(function (key) {
+      if (device.info[key]) config.identity[key] = device.info[key];
+    });
+    if (state.nameSource === "meter" && config.device !== "unnamed") config.deviceName = device.name;
+    if (state.nameSource === "custom") config.deviceName = state.customName.trim();
+    return config;
+  }
+
+  function setActive(selector, value, key) {
+    document.querySelectorAll(selector).forEach(function (button) {
+      button.classList.toggle("is-active", button.dataset[key] === value);
+    });
+  }
+
+  function outputPower(config) {
+    if (config.source === "simulation") return config.simulation.power;
+    if (state.runtime !== "normal") return 0;
+    if (state.rawPower === 0) return 0;
+    if (config.calibration.mode === "watts") return Math.max(0, Math.min(2000, Math.round(state.rawPower + config.calibration.watts)));
+    if (config.calibration.mode === "percent") return Math.max(0, Math.min(2000, Math.round(state.rawPower * (1 + config.calibration.percent / 100))));
+    return state.rawPower;
+  }
+
+  function calibrationText(config) {
+    if (config.calibration.mode === "watts") return (config.calibration.watts > 0 ? "+" : "") + config.calibration.watts + " W";
+    if (config.calibration.mode === "percent") return (config.calibration.percent > 0 ? "+" : "") + config.calibration.percent + "%";
+    return "原值";
+  }
+
+  function showToast(message) {
+    clearTimeout(state.toastTimer);
+    $("toast").textContent = message;
+    $("toast").classList.add("is-visible");
+    state.toastTimer = setTimeout(function () { $("toast").classList.remove("is-visible"); }, 2200);
+  }
+
+  function updateDirty() {
+    var dirty = isDirty();
+    var bridgePending = state.draft.sport === "cycling"
+      && state.draft.source === "bridge"
+      && state.bridgeStage !== "tested"
+      && state.applied.source !== "bridge";
+    $("draftChip").hidden = !dirty;
+    $("saveBtn").disabled = !dirty || bridgePending;
+    if (state.copyIdentity && state.draft.source === "bridge" && state.nameSource === "custom" && !state.customName.trim()) {
+      $("saveBtn").disabled = true;
+    }
+    $("saveState").textContent = dirty ? "有未保存修改" : "当前配置已应用";
+    $("saveHint").textContent = bridgePending
+      ? "先选择并测试一台功率计"
+      : (dirty ? "实际输出继续使用已应用配置" : "关闭网页不会停止已运行的桥接");
+    $("saveBtn").textContent = bridgePending
+      ? "选择功率计后继续"
+      : (state.draft.source === "bridge" && state.draft.sport === "cycling" ? "保存并启用桥接" : "保存并应用");
+  }
+
+  function renderHeader() {
+    $("headerDeviceName").textContent = state.applied.deviceName;
+    $("deviceNameInput").value = state.draft.deviceName;
+    $("powerStepInput").value = state.draft.powerStep;
+  }
+
+  function renderSport() {
+    setActive("[data-sport]", state.draft.sport, "sport");
+    $("cyclingEditor").hidden = state.draft.sport !== "cycling";
+    $("runningEditor").hidden = state.draft.sport !== "running";
+    $("editorTitle").textContent = state.draft.sport === "cycling" ? "骑行输出" : "跑步输出";
+  }
+
+  function renderSource() {
+    var bridgeSelected = state.draft.source === "bridge";
+    var bridgeReady = bridgeSelected
+      && (state.bridgeStage === "tested" || state.applied.source === "bridge");
+    setActive("[data-source]", state.draft.source, "source");
+    $("bridgeIntro").hidden = !bridgeSelected || bridgeReady;
+    $("bridgeEditor").hidden = !bridgeReady;
+    $("simulationEditor").hidden = state.draft.source !== "simulation";
+    $("bridgeHeartHint").hidden = !bridgeReady;
+    $("stopBridgeBtn").hidden = state.applied.source !== "bridge" || state.applied.sport !== "cycling";
+    $("sourceSummary").textContent = bridgeSelected
+      ? (state.applied.source === "bridge" && !isDirty()
+        ? "真实功率 + 同源踏频"
+        : (bridgeReady ? "功率计已测试，等待保存" : "尚未选择功率计"))
+      : "本机平滑模拟";
+    $("broadcastIndex").textContent = bridgeSelected ? (bridgeReady ? "04" : "03") : "03";
+    $("heartIndex").textContent = bridgeSelected ? (bridgeReady ? "05" : "04") : "04";
+    var powerCheck = document.querySelector('[data-broadcast="power"]');
+    powerCheck.disabled = state.draft.source === "bridge";
+    if (powerCheck.disabled) {
+      powerCheck.checked = true;
+      state.draft.broadcast.power = true;
+    }
+    document.querySelectorAll("[data-broadcast]").forEach(function (input) {
+      input.checked = state.draft.broadcast[input.dataset.broadcast];
+    });
+  }
+
+  function fillInfo(id, info, name, missing) {
+    var fields = { name: "设备名称", manufacturer: "厂商", model: "型号", serial: "序列号", hardware: "硬件版本", firmware: "固件版本", software: "软件版本" };
+    $(id).replaceChildren();
+    Object.keys(fields).forEach(function (key) {
+      var row = document.createElement("div");
+      var label = document.createElement("dt");
+      var value = document.createElement("dd");
+      label.textContent = fields[key];
+      value.textContent = (key === "name" ? name : info[key]) || missing;
+      row.append(label, value);
+      $(id).appendChild(row);
+    });
+  }
+
+  function renderIdentity() {
+    var device = devices[state.draft.device];
+    $("copyIdentity").checked = state.copyIdentity;
+    $("identityOptions").hidden = !state.copyIdentity;
+    $("identityNameSource").value = state.nameSource;
+    $("identityNameSource").options[0].disabled = state.draft.device === "unnamed";
+    $("customNameField").hidden = state.nameSource !== "custom";
+    $("customIdentityName").value = state.customName;
+    fillInfo("meterInfo", device.info, state.draft.device === "unnamed" ? "" : device.name, "未提供");
+    var preview = pendingConfig();
+    fillInfo("identityPreview", preview.identity, preview.deviceName, "未提供");
+    fillInfo("boardIdentity", state.applied.identity, state.applied.deviceName, "未提供");
+  }
+
+  function renderDevice() {
+    var device = devices[state.draft.device];
+    $("selectedDeviceName").textContent = device.name;
+    $("selectedDeviceMeta").textContent = "地址末尾 " + device.suffix + " · CPS";
+    document.querySelector(".device-monogram").textContent = device.mark;
+    $("deviceCapabilities").replaceChildren();
+    ["功率", device.cadence ? "真实踏频" : "仅功率"].forEach(function (label) {
+      var span = document.createElement("span");
+      span.textContent = label;
+      $("deviceCapabilities").appendChild(span);
+    });
+    renderIdentity();
+  }
+
+  function renderSimulation() {
+    setActive("[data-sim-mode]", state.draft.simulation.mode, "simMode");
+    $("simulationModeSummary").textContent = state.draft.simulation.mode === "fixed" ? "固定功率" : (state.draft.simulation.mode === "pacer" ? "配速机器人" : "自定义");
+    $("robotFields").hidden = state.draft.simulation.mode === "fixed";
+    $("simPower").value = state.draft.simulation.power;
+    $("simCadence").value = state.draft.simulation.cadence;
+    $("profileWeight").value = state.draft.simulation.weight;
+    $("wkgRange").value = state.draft.simulation.wkg;
+  }
+
+  function renderCalibration() {
+    var config = state.draft;
+    var calibration = config.calibration;
+    setActive("[data-calibration]", calibration.mode, "calibration");
+    $("calibrationAdjustment").hidden = calibration.mode === "raw";
+    $("actualCalibration").textContent = calibrationText(state.applied);
+    var value = calibration.mode === "percent" ? calibration.percent : calibration.watts;
+    var unit = calibration.mode === "percent" ? "%" : "W";
+    var min = calibration.mode === "percent" ? -50 : -200;
+    var max = calibration.mode === "percent" ? 50 : 200;
+    var step = calibration.mode === "percent" ? .1 : 1;
+    $("calibrationLabel").textContent = calibration.mode === "percent" ? "调整比例" : "调整瓦数";
+    $("calibrationUnit").textContent = unit;
+    $("calibrationValue").min = min;
+    $("calibrationValue").max = max;
+    $("calibrationValue").step = step;
+    $("calibrationValue").value = value;
+    $("calibrationRange").min = min;
+    $("calibrationRange").max = max;
+    $("calibrationRange").step = step;
+    $("calibrationRange").value = value;
+    if (calibration.mode === "raw") {
+      $("calibrationFormula").textContent = "输出等于输入，不应用校正";
+    } else if (calibration.mode === "percent") {
+      $("calibrationFormula").textContent = "输入 × (1 " + (value >= 0 ? "+" : "−") + " " + Math.abs(value) + " / 100)，0 W 保持为 0 W";
+    } else {
+      $("calibrationFormula").textContent = "输入 " + (value >= 0 ? "+" : "−") + " " + Math.abs(value) + " W，0 W 保持为 0 W";
+    }
+    $("calibrationPreview").textContent = state.rawPower + " W → " + outputPower(config) + " W";
+  }
+
+  function renderHeart() {
+    var heart = state.draft.heart;
+    $("heartToggle").classList.toggle("is-on", heart.enabled);
+    $("heartToggle").setAttribute("aria-checked", String(heart.enabled));
+    $("heartToggle").querySelector("b").textContent = heart.enabled ? "已启用" : "已关闭";
+    $("heartFields").hidden = !heart.enabled;
+    document.querySelector('[data-broadcast="heart"]').checked = heart.enabled;
+    setActive("[data-heart-mode]", heart.mode, "heartMode");
+    $("linkedHeartFields").hidden = heart.mode !== "linked";
+    $("fixedHeartFields").hidden = heart.mode !== "fixed";
+    $("ftpValue").value = heart.ftp;
+    $("thresholdHeart").value = heart.threshold;
+    $("fixedHeart").value = heart.fixed;
+  }
+
+  function renderRunning() {
+    setActive("[data-run-mode]", state.draft.running.mode, "runMode");
+    $("paceMinutes").value = state.draft.running.paceMinutes;
+    $("paceSeconds").value = state.draft.running.paceSeconds;
+    $("runCadence").value = state.draft.running.cadence;
+    $("runCadenceFloat").value = state.draft.running.cadenceFloat;
+    var total = Math.max(144, state.draft.running.paceMinutes * 60 + state.draft.running.paceSeconds);
+    $("paceSpeed").textContent = (3600 / total).toFixed(2) + " km/h";
+  }
+
+  function renderLive() {
+    var applied = state.applied;
+    var running = applied.sport === "running";
+    var device = devices[applied.device];
+    var bridge = !running && applied.source === "bridge";
+    var normal = state.runtime === "normal";
+    var power = outputPower(applied);
+    $("liveTitle").textContent = running ? "跑步广播" : (bridge ? "真实功率桥接" : "模拟骑行输出");
+    $("liveSubtitle").textContent = state.runtime === "normal" ? "已应用配置 · 最后通知 0.4 秒前" : (state.runtime === "stale" ? "保护已生效 · 数据超过 3 秒未更新" : "上游断开 · 限时重连中");
+    $("heroMetricLabel").textContent = running ? "当前速度" : (bridge ? "校正后功率" : "模拟功率");
+    $("heroMetricValue").textContent = running ? (3600 / Math.max(144, applied.running.paceMinutes * 60 + applied.running.paceSeconds)).toFixed(2) : power;
+    $("heroMetricUnit").textContent = running ? "km/h" : "W";
+    $("heroMetricMeta").textContent = running ? applied.running.paceMinutes + ":" + String(applied.running.paceSeconds).padStart(2, "0") + " /km" : (bridge ? "原始输入 " + (normal ? state.rawPower : "—") + " W" : "目标 " + applied.simulation.power + " W");
+    $("metricTwoLabel").textContent = running ? "步频" : (bridge ? "真实踏频" : "模拟踏频");
+    $("metricTwoValue").textContent = normal ? (running ? applied.running.cadence : (bridge ? (device.cadence ? 92 : "—") : applied.simulation.cadence)) : "—";
+    $("metricTwoUnit").textContent = running ? "spm" : "rpm";
+    $("metricTwoMeta").textContent = running ? "本机平滑生成" : (bridge ? (device.cadence ? "同一功率计" : "设备未提供") : "本机平滑生成");
+    $("heartLiveValue").textContent = applied.heart.enabled ? (applied.heart.mode === "fixed" ? applied.heart.fixed : (normal ? 148 : 112)) : "—";
+    $("heartLiveMeta").textContent = applied.heart.enabled ? (applied.heart.mode === "fixed" ? "固定模拟" : "随原始功率联动") : "已关闭";
+    $("chainSource").textContent = running ? "跑步引擎" : (bridge ? device.name : "模拟引擎");
+    $("chainSourceState").textContent = normal ? "已连接" : (state.runtime === "stale" ? "数据过期" : "正在重连");
+    $("chainTransform").textContent = running ? "RSC" : (bridge ? calibrationText(applied) : "平滑");
+    document.querySelector(".signal-chain").hidden = !bridge;
+
+    var status = $("liveStatus");
+    status.className = "status-chip " + (normal ? "status-chip--ok" : (state.runtime === "stale" ? "status-chip--danger" : "status-chip--warn"));
+    status.innerHTML = "<i></i>" + (normal ? "数据有效" : (state.runtime === "stale" ? "数据过期" : "正在重连"));
+    var alert = $("runtimeAlert");
+    alert.className = "runtime-alert" + (normal ? "" : (state.runtime === "stale" ? " is-danger" : " is-warn"));
+    $("runtimeAlertTitle").textContent = normal ? (bridge ? "桥接正在运行" : "模拟输出正在运行") : (state.runtime === "stale" ? "数据已过期，保护已生效" : "功率计断开，正在重连");
+    $("runtimeAlertText").textContent = normal ? (bridge ? "功率与踏频来自同一台功率计。" : "输出由设备本机平滑生成。") : (state.runtime === "stale" ? "功率已归零，真实踏频已停止输出。" : "剩余 42 秒，不会切换到模拟数据。");
+    $("crankState").textContent = normal ? "有效" : "已失效";
+    $("reconnectState").textContent = state.runtime === "reconnecting" ? "第 3 次" : "无";
+  }
+
+  function renderAll() {
+    renderHeader();
+    renderSport();
+    renderSource();
+    renderDevice();
+    renderSimulation();
+    renderCalibration();
+    renderHeart();
+    renderRunning();
+    renderLive();
+    updateDirty();
+  }
+
+  function setCalibrationValue(value) {
+    var calibration = state.draft.calibration;
+    var min = calibration.mode === "percent" ? -50 : -200;
+    var max = calibration.mode === "percent" ? 50 : 200;
+    var parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    parsed = Math.min(max, Math.max(min, parsed));
+    if (calibration.mode === "percent") calibration.percent = Math.round(parsed * 10) / 10;
+    else calibration.watts = Math.round(parsed);
+    renderCalibration();
+    updateDirty();
+  }
+
+  document.querySelectorAll("[data-sport]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      state.draft.sport = button.dataset.sport;
+      renderSport();
+      updateDirty();
+    });
+  });
+  document.querySelectorAll("[data-source]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      state.draft.source = button.dataset.source;
+      if (state.draft.source === "bridge" && state.applied.source !== "bridge" && state.bridgeStage === "idle") {
+        state.bridgeStage = "select";
+      }
+      renderSource();
+      renderCalibration();
+      updateDirty();
+    });
+  });
+  document.querySelectorAll("[data-calibration]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      state.draft.calibration.mode = button.dataset.calibration;
+      renderCalibration();
+      updateDirty();
+    });
+  });
+  document.querySelectorAll("[data-sim-mode]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      state.draft.simulation.mode = button.dataset.simMode;
+      renderSimulation();
+      updateDirty();
+    });
+  });
+  document.querySelectorAll("[data-heart-mode]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      state.draft.heart.mode = button.dataset.heartMode;
+      renderHeart();
+      updateDirty();
+    });
+  });
+  document.querySelectorAll("[data-run-mode]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      state.draft.running.mode = button.dataset.runMode;
+      renderRunning();
+      updateDirty();
+    });
+  });
+  document.querySelectorAll("[data-runtime]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      state.runtime = button.dataset.runtime;
+      setActive("[data-runtime]", state.runtime, "runtime");
+      renderLive();
+    });
+  });
+  document.querySelectorAll("[data-broadcast]").forEach(function (input) {
+    input.addEventListener("change", function () {
+      state.draft.broadcast[input.dataset.broadcast] = input.checked;
+      var active = Object.keys(state.draft.broadcast).filter(function (key) { return state.draft.broadcast[key]; });
+      if (!active.length) {
+        input.checked = true;
+        state.draft.broadcast[input.dataset.broadcast] = true;
+        showToast("至少保留一项广播数据");
+      }
+      if (input.dataset.broadcast === "heart") {
+        state.draft.heart.enabled = input.checked;
+        renderHeart();
+      }
+      updateDirty();
+    });
+  });
+  document.querySelectorAll("[data-close-modal]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      $(button.dataset.closeModal + "Modal").hidden = true;
+    });
+  });
+  document.querySelectorAll("[data-select-device]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      button.disabled = true;
+      button.textContent = "测试中…";
+      $("scanStatus").textContent = "正在连接并等待两份有效功率通知";
+      setTimeout(function () {
+        state.draft.device = button.dataset.selectDevice;
+        if (!state.bridgeHeartInitialized) {
+          state.draft.heart.enabled = false;
+          state.draft.broadcast.heart = false;
+          state.bridgeHeartInitialized = true;
+        }
+        if (state.draft.device === "unnamed" && state.nameSource === "meter") state.nameSource = "board";
+        state.bridgeStage = "tested";
+        $("scanModal").hidden = true;
+        button.disabled = false;
+        button.textContent = "选择并测试";
+        $("scanStatus").textContent = "扫描完成 · 发现 3 台 CPS 功率计";
+        renderDevice();
+        renderSource();
+        renderHeart();
+        renderCalibration();
+        updateDirty();
+        showToast("测试通过，保存后应用新功率计");
+      }, 700);
+    });
+  });
+
+  $("calibrationMinus").addEventListener("click", function () { setCalibrationValue(Number($("calibrationValue").value) - Number($("calibrationValue").step)); });
+  $("calibrationPlus").addEventListener("click", function () { setCalibrationValue(Number($("calibrationValue").value) + Number($("calibrationValue").step)); });
+  $("calibrationValue").addEventListener("input", function () { setCalibrationValue(this.value); });
+  $("calibrationRange").addEventListener("input", function () { setCalibrationValue(this.value); });
+  $("heartToggle").addEventListener("click", function () {
+    state.draft.heart.enabled = !state.draft.heart.enabled;
+    state.draft.broadcast.heart = state.draft.heart.enabled;
+    document.querySelector('[data-broadcast="heart"]').checked = state.draft.heart.enabled;
+    renderHeart();
+    updateDirty();
+  });
+  $("copyIdentity").addEventListener("change", function () {
+    state.copyIdentity = this.checked;
+    renderIdentity();
+    updateDirty();
+  });
+  $("identityNameSource").addEventListener("change", function () {
+    state.nameSource = this.value;
+    renderIdentity();
+    updateDirty();
+  });
+  $("customIdentityName").addEventListener("input", function () {
+    state.customName = this.value;
+    fillInfo("identityPreview", pendingConfig().identity, pendingConfig().deviceName, "未提供");
+    updateDirty();
+  });
+  $("scanBtn").addEventListener("click", function () { $("scanModal").hidden = false; });
+  $("bridgeStartScanBtn").addEventListener("click", function () { $("scanModal").hidden = false; });
+  $("rescanBtn").addEventListener("click", function () {
+    $("scanStatus").textContent = "正在扫描附近 CPS 功率计…";
+    this.disabled = true;
+    var button = this;
+    setTimeout(function () {
+      $("scanStatus").textContent = "扫描完成 · 发现 3 台 CPS 功率计";
+      button.disabled = false;
+    }, 800);
+  });
+  $("stopBridgeBtn").addEventListener("click", function () {
+    if (this.dataset.armed !== "true") {
+      this.dataset.armed = "true";
+      this.textContent = "再次点击确认停止";
+      showToast("停止后功率立即归零，绑定信息会保留");
+      return;
+    }
+    state.runtime = "stale";
+    setActive("[data-runtime]", state.runtime, "runtime");
+    this.dataset.armed = "false";
+    this.textContent = "停止桥接";
+    renderLive();
+  });
+  $("saveBtn").addEventListener("click", function () {
+    state.applied = pendingConfig();
+    state.draft = clone(state.applied);
+    state.copyIdentity = false;
+    if (state.applied.source === "bridge") state.bridgeStage = "active";
+    renderAll();
+    showToast(state.applied.source === "bridge" && state.applied.sport === "cycling" ? "配置已保存，桥接已启用" : "配置已保存并应用");
+  });
+  $("closeWifiBtn").addEventListener("click", function () { $("closeModal").hidden = false; });
+  $("confirmCloseBtn").addEventListener("click", function () {
+    $("closeModal").hidden = true;
+    $("wifiClosed").hidden = false;
+  });
+  $("restoreDemoBtn").addEventListener("click", function () { $("wifiClosed").hidden = true; });
+  $("renewBtn").addEventListener("click", function () {
+    state.wifiSeconds = 180;
+    showToast("配网时间已续期至 3 分钟");
+  });
+
+  [
+    ["simPower", function (v) { state.draft.simulation.power = Number(v); }],
+    ["simCadence", function (v) { state.draft.simulation.cadence = Number(v); }],
+    ["profileWeight", function (v) { state.draft.simulation.weight = Number(v); }],
+    ["wkgRange", function (v) { state.draft.simulation.wkg = v; }],
+    ["ftpValue", function (v) { state.draft.heart.ftp = Number(v); }],
+    ["thresholdHeart", function (v) { state.draft.heart.threshold = Number(v); }],
+    ["fixedHeart", function (v) { state.draft.heart.fixed = Number(v); }],
+    ["paceMinutes", function (v) { state.draft.running.paceMinutes = Number(v); renderRunning(); }],
+    ["paceSeconds", function (v) { state.draft.running.paceSeconds = Number(v); renderRunning(); }],
+    ["runCadence", function (v) { state.draft.running.cadence = Number(v); }],
+    ["runCadenceFloat", function (v) { state.draft.running.cadenceFloat = Number(v); }],
+    ["deviceNameInput", function (v) { state.draft.deviceName = v; renderHeader(); }],
+    ["powerStepInput", function (v) { state.draft.powerStep = Number(v); }]
+  ].forEach(function (binding) {
+    $(binding[0]).addEventListener("input", function () {
+      binding[1](this.value);
+      updateDirty();
+    });
+  });
+
+  setInterval(function () {
+    state.wifiSeconds = Math.max(0, state.wifiSeconds - 1);
+    var minutes = Math.floor(state.wifiSeconds / 60);
+    var seconds = state.wifiSeconds % 60;
+    $("wifiTimer").textContent = String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+  }, 1000);
+
+  renderAll();
+}());
+</script>
+</body>
+</html>

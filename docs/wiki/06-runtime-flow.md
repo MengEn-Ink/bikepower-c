@@ -46,7 +46,7 @@
      ├─ GPIO3 配置为输入下拉，延时 1ms 读电平
      ├─ 高电平 → M5Stamp C3，低电平 → 通用 ESP32-C3
      └─ 恢复 GPIO3 配置
-   board_firmware_name(fw_name, sizeof(fw_name))  // 生成 "板型-v版本-stable-fix-gGitID"
+   board_firmware_name(fw_name, sizeof(fw_name))  // 生成 "bikepower-c-板型-v版本"
 
 7. [LED 初始化]
    led_init()

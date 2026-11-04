@@ -57,6 +57,8 @@ bikepower-c/
 │   ├── led.c/.h              — LED 任务（通用板 GPIO12 四态 / M5Stamp SK6812 RGB）
 │   ├── board_detect.c/.h     — 运行时板型检测（通用 ESP32-C3 / M5Stamp C3）
 │   ├── ble_bikepower.c/.h    — NimBLE 五服务 + FTMS ERG
+│   ├── ble_power_bridge.c/.h — 上游 CPS 静态连接、DIS、通知与重连
+│   ├── ble_scanner.c/.h      — CPS 候选扫描与代次隔离
 │   ├── nvs_store.c/.h        — NVS 配置持久化桥接
 │   ├── radio_ctrl.c/.h       — BLE/WiFi 射频软切换（唯一 RF 开关）
 │   ├── wifi_portal.c/.h      — HTTP 配网门户（v3.2.0 起仅 /api/xxx JSON 接口，HTML 由 web/ 内联）
@@ -64,10 +66,12 @@ bikepower-c/
 │   ├── web/                  — 前端三件套（v3.2.0 起，编译时由 scripts/inline_static.py 内联到固件）
 │   │   ├── index.html        — SPA 入口（含 <!-- INLINE_CSS --> / <!-- INLINE_JS --> 占位符）
 │   │   ├── app.css           — 统一所有视图样式
-│   │   └── app.js            — SPA 路由 + XMLHttpRequest 调用 /api/xxx 自行渲染
+│   │   └── app.js            — 草稿、实际输出及 fetch 配置事务，桥接渐进披露
 │   └── bikepower_config.h    — 全局常量（引脚/阈值/UUID/版本）
 ├── components/bikepower_domain/   — 纯 C 领域层（可 host 单测）
 │   ├── power_engine.c        — 功率/踏频数据引擎
+│   ├── power_bridge.c        — 真实功率校正、踏频差分与失效保护
+│   ├── cps_input_codec.c     — 上游 CPS 可选字段长度检查及解码
 │   ├── hr_model.c            — 心率模型
 │   ├── profile.c             — 用户配置 + 范围校验
 │   ├── config_store.c        — 配置 schema（defaults/validate/migrate/serialize）

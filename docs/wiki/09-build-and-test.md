@@ -233,7 +233,7 @@ idf.py -p <port> flash
 
 ```bash
 python3 esptool.py --chip esp32c3 merge_bin \
-    -o bikepower-c-generic-c3-v4.1.1-stable-fix-gXXXXXXX.bin \
+    -o generic-c3-v4.2.1.bin \
     --flash_mode dio --flash_freq 80m --flash_size 4MB \
     0x0 build/bootloader/bootloader.bin \
     0x8000 build/partition_table/partition-table.bin \
@@ -382,7 +382,7 @@ build_all.sh 执行顺序:
 
 | 产物 | 说明 |
 |------|------|
-| `bikepower-c-<板型>-v<版本>-stable-fix-g<GitSHA>.bin` | 合并单文件固件 |
+| `<板型>-v<版本>.bin` | 合并单文件固件 |
 | `*.bin.sha256` | SHA256 校验文件 |
 | `manifest.txt` | 产物清单（文件名/大小/SHA256/版本） |
 | `test-report.md` | 测试报告模板 |
@@ -390,7 +390,7 @@ build_all.sh 执行顺序:
 | `user-manual.md` | 用户手册 |
 | `images/` | 文档引用截图 |
 | `evidence/device-acceptance-<板型>.json` | 真机验收证据（如存在） |
-| `bikepower-c-release-v<版本>-stable-fix-g<GitSHA>.zip` | 总包 |
+| `bikepower-c-v<版本>.zip` | 总包 |
 | `*.zip.sha256` | 总包校验 |
 
 ### 版本元信息
@@ -398,15 +398,15 @@ build_all.sh 执行顺序:
 从 `main/bikepower_config.h` 提取：
 
 ```c
-#define FIRMWARE_VERSION       "4.1.1"
-#define FIRMWARE_STABLE_VERSION "4.1"
-#define FIRMWARE_FIX_VERSION   "0"
+#define FIRMWARE_VERSION       "4.2.1"
+#define FIRMWARE_STABLE_VERSION "4.0.0"
+#define FIRMWARE_FIX_VERSION   "4.2.1"
 ```
 
 产物文件名格式：
-`bikepower-c-<board>-v<VERSION>-stable-fix-g<GIT_SHA>.bin`
+`bikepower-c-<board>-v<VERSION>.bin`
 
-示例：`bikepower-c-generic-c3-v4.1.1-stable-fix-ga1b2c3d.bin`
+示例：`generic-c3-v4.2.1.bin`。Git ID 与构建时间保留在 manifest；正式构建显式关闭 `PORTAL_TEST_AUTO_CONFIG`，不继承测试缓存。
 
 ---
 
