@@ -18,6 +18,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -391,6 +392,20 @@ def initialize_site(source_dir, site_dir):
     if not monitor.is_file():
         raise RuntimeError("站点源目录缺少 ble-monitor.html")
     shutil.copy2(monitor, site_dir / "index.html")
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
+        capture_output=True, text=True,
+    ).stdout.strip()
+    dirty = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    write_json(site_dir / "site-info.json", {
+        "schema_version": 1,
+        "built_at": utc_now(),
+        "commit": commit,
+        "dirty": bool(dirty),
+    })
     return site_dir
 
 

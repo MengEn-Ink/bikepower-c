@@ -1433,6 +1433,8 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 </style>
 <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
 <script src="./flash-session.js"></script>
+<link rel="stylesheet" href="./pages-experience.css">
+<script defer src="./pages-experience.js"></script>
 </head>
 <body>
 <!-- ============ 移动端引导页：手机只读，引导到桌面端操作（< 900px 显示） ============ -->
@@ -1448,7 +1450,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
   <section class="mg-hero">
     <span class="mg-eyebrow">ESP32-C3 · BLE 骑行信号源</span>
     <h1>把一块开发板，<br>变成你的<em>功率计</em>。</h1>
-    <p>BikePower C 向骑行 App 广播功率、踏频、心率与智能骑行台数据。刷写固件、蓝牙监控、模板写入需要桌面版 Chrome / Edge 的 Web Serial 与 Web Bluetooth，手机浏览器无法完成。</p>
+    <p>电脑完成首次安装，手机修改设备配置。按下面的步骤开始使用，按钮操作可以先看演示。</p>
     <div class="mg-channels" aria-label="设备广播的数据">
       <div class="mg-ch" style="--c:var(--sig-power)"><span>功率</span><b>W</b><i aria-hidden="true"><s></s><s></s><s></s><s></s><s></s><s></s><s></s></i><small>CPS 0x1818</small></div>
       <div class="mg-ch" style="--c:var(--sig-cadence)"><span>踏频</span><b>rpm</b><i aria-hidden="true"><s></s><s></s><s></s><s></s><s></s><s></s><s></s></i><small>CSC 0x1816</small></div>
@@ -1457,6 +1459,9 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
     </div>
   </section>
 
+  <nav class="guide-index" aria-label="使用手册目录">
+    <a href="#mg-steps-title">快速上手</a><a href="#mg-button-title">按钮演示</a><a href="#mg-wifi-title">手机配网</a><a href="#mg-bridge-title">真实桥接</a><a href="#mg-run-title">跑步模式</a><a href="#mg-check-title">实物验收</a><a href="#mg-faq-title">遇到问题</a>
+  </nav>
   <section class="mg-desk" aria-labelledby="mg-desk-title">
     <div class="mg-desk-head"><span class="mg-num">→</span><div><h2 id="mg-desk-title">请在电脑上打开本页</h2><p>桌面版 Chrome 或 Edge，HTTPS 访问</p></div></div>
     <code class="mg-url" id="mg-url">https://mengen-ink.github.io/bikepower-c/</code>
@@ -1472,33 +1477,108 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
     <ol class="mg-steps">
       <li><b>烧录固件 <em>电脑</em></b><p>用能传数据的 USB 线连接开发板，在电脑上打开本页 →「固件刷写」→ 选择板型 → 连接串口并刷写。</p></li>
       <li><b>连接骑行 App <em>手机 / 平板</em></b><p>上电后 LED 慢闪即开始广播。在骑行 App 里按功率计、心率计、踏频传感器或智能训练台搜索 <code>BikePower</code>。</p></li>
-      <li><b>按钮调功 <em>设备</em></b><p>短按一次功率减少一个步进（默认 20 W）；按住约 0.5s 后继续按住持续增加功率。</p></li>
-      <li><b>WiFi 配网 <em>手机即可</em></b><p>长按 2s 松开，LED 快闪时再按一次。手机连热点 <code>BikePower-XXXXXX</code>（密码 <code>12345678</code>），访问 <code>http://192.168.4.1</code>。</p></li>
+      <li><b>日常操作 <em>设备</em></b><p>用操作键调整目标值；按压时长和反馈见下方<a href="#mg-button-title">按键操作示范</a>。</p></li>
+      <li><b>修改配置 <em>手机即可</em></b><p>需要调整模式或接入真实功率计时，按<a href="#mg-wifi-title">手机配网步骤</a>进入配置页。</p></li>
     </ol>
   </section>
 
-  <section class="mg-sec" aria-labelledby="mg-tools-title">
-    <h2 class="mg-h" id="mg-tools-title"><span>02</span>桌面端工具台</h2>
-    <ul class="mg-tools">
-      <li><b>固件刷写</b><span>USB 串口 · 版本时间轴与回滚</span></li>
-      <li><b>实时监控</b><span>功率 / 踏频 / 心率同一时间轴</span></li>
-      <li><b>设备比对</b><span>DIS 差异 · 模板写入开发板</span></li>
-      <li><b>通知检查器</b><span>任意特征原始 Hex 帧</span></li>
-      <li><b>健康检查</b><span>环境 / GATT / 通知一键诊断</span></li>
-    </ul>
+  <section class="mg-sec" aria-labelledby="mg-button-title">
+    <h2 class="mg-h" id="mg-button-title"><span>02</span>先练一次按钮操作</h2>
+    <p class="guide-intro">通用板使用 BOOT 操作键，M5Stamp C3 使用用户按钮，RST 是复位键。下面以<strong>模拟固定骑行、200 W、20 W 步进</strong>演示。数值与灯色均为教学示意，不控制设备。</p>
+    <div class="button-demo" data-button-demo data-state="ble" data-pressed="true" data-playing="false">
+      <div class="demo-scenes" role="group" aria-label="选择按钮操作演示">
+        <button type="button" data-demo-scene="short" aria-pressed="false">短按减功率</button>
+        <button type="button" data-demo-scene="adjust" aria-pressed="false">按住持续调功</button>
+        <button type="button" data-demo-scene="wifi" aria-pressed="true">长按 + 二次确认</button>
+        <button type="button" data-demo-scene="cancel" aria-pressed="false">不确认，自动取消</button>
+      </div>
+      <div class="demo-head"><b data-demo-title>长按 + 二次确认</b><time data-demo-time>0.0 s</time></div>
+      <div class="demo-stage">
+        <div class="demo-board" aria-hidden="true"><i class="demo-usb"></i><i class="demo-led"></i><span class="demo-key" data-demo-key>按住</span><small>BUTTON / LED</small></div>
+        <div class="demo-metric">示例目标功率<strong><span data-demo-power>200</span><small>W</small></strong><span class="demo-state" data-demo-state>蓝牙工作</span></div>
+      </div>
+      <div class="demo-track" aria-hidden="true"><i data-demo-fill></i></div>
+      <p class="demo-text" data-demo-text>按下设备操作键，开始计时。满 2 秒松开后，在 3 秒内再按一次。</p>
+      <div class="demo-controls"><button type="button" class="btn primary" data-demo-play aria-pressed="false">播放演示</button><button type="button" class="btn" data-demo-step>下一步</button><button type="button" class="btn ghost" data-demo-reset>重置</button></div>
+      <span class="demo-caption" data-demo-caption role="status" aria-live="polite"></span>
+    </div>
+    <div class="demo-legend"><span>蓝牙工作</span><span>等待确认</span><span>WiFi 配网</span></div>
+    <div class="guide-note"><strong>先松开，再确认。</strong>一直按住不会直接打开热点。满 2 秒松开后，本次临时调功会回滚，并进入 3 秒确认窗口。开启 ERG、配速机器人或真实桥接后，按钮目标与此示例可能不同，请以实际模式为准。</div>
+  </section>
+
+  <section class="mg-sec" aria-labelledby="mg-wifi-title">
+    <h2 class="mg-h" id="mg-wifi-title"><span>03</span>用手机修改设备配置</h2>
+    <p class="guide-intro">Pages 是手册与电脑工具台。设备配置页在开发板自己的热点里，需要先连接热点。</p>
+    <ol class="guide-list">
+      <li><b>进入配网：</b>操作键长按至少 2 秒，松开；看到确认快闪后，在 3 秒内再按一次。</li>
+      <li><b>连接热点：</b>手机 WiFi 设置选择 <code>BikePower-XXXXXX</code>，密码 <code>12345678</code>。“无互联网”属于正常现象，请选择保持连接。</li>
+      <li><b>使用自动弹窗：</b>连接热点后，手机会自动弹出配置窗口，直接按页面提示操作。若没有弹出，再打开 Safari 或 Chrome，手动输入 <code>http://192.168.4.1</code>；弹窗无法正常操作时，也可用完整浏览器打开。</li>
+      <li><b>选择运动和输出：</b>切换骑行 / 跑步，填写必要参数。骑行可选模拟固定模式、配速机器人或真实来源；自定义档用于设置强度范围。</li>
+      <li><b>保存并核对：</b>点击页面保存按钮，等待成功提示，再核对回显和 App 数据。失败时保留页面，检查输入后重试。</li>
+      <li><b>结束配网：</b>默认开放 5 分钟。需要更多时间时主动续期，并以实际倒计时为准；完成后可保存并关闭 WiFi，或等待超时关闭。</li>
+    </ol>
+    <div class="guide-note">普通配网期间 BLE 继续工作。修改运动类型或广播服务，保存可能引起短暂断连，需要重新配对。热点关闭后，设备页暂时无法访问属于正常现象。</div>
+  </section>
+
+  <section class="mg-sec" aria-labelledby="mg-bridge-title">
+    <h2 class="mg-h" id="mg-bridge-title"><span>04</span>接入真实功率计</h2>
+    <div class="guide-flow" aria-label="功率桥接流程"><span>真实功率计</span><b>→</b><span>盒子校正</span><b>→</b><span>骑行 App</span></div>
+    <ol class="guide-list">
+      <li><b>唤醒功率计：</b>转动曲柄让它广播；若被其他 App 占用，先断开。</li>
+      <li><b>选择真实来源：</b>在设备配网页主动扫描，按设备信息选择功率计。点击测试，确认收到功率样本。</li>
+      <li><b>设置校正：</b>固定偏移：200 W + 10 W = 210 W；比例：200 W × 105% = 210 W。两种方式择一，也可不校正。</li>
+      <li><b>核对身份与心率：</b>按需复制已读取的设备信息或自定义盒子名称。真实来源默认关闭心率广播；手动开启后，心率仍来自模拟。</li>
+      <li><b>保存切换：</b>测试成功不等于正式切换。保存后核对原始值、校正值和连接状态，再让骑行 App 连接盒子的广播名称。</li>
+    </ol>
+    <div class="guide-note"><strong>停踩与断线保护：</strong>真实输入 0 W 时保持 0 W，不叠加正偏移；超过 3 秒没有新样本会归零。断开后会尝试重连，需要实物确认恢复。仅桥接功率和同源踏频，不接入独立心率计。</div>
+  </section>
+
+  <section class="mg-sec" aria-labelledby="mg-run-title">
+    <h2 class="mg-h" id="mg-run-title"><span>05</span>切换跑步模式</h2>
+    <p class="guide-intro">设备配网页选择跑步，设置速度或配速模板、步频与心率，保存后重新搜索设备。跑步和骑行使用不同服务，旧配对可能需要重新建立。</p>
+    <ol class="guide-list">
+      <li><b>固定与配速：</b>固定模式设速度；配速模式选模板或自定义范围。配速数值越小，速度越快。</li>
+      <li><b>开始与暂停：</b>支持的 App 可通过 FTMS 开始 / 恢复或停止 / 暂停。暂停后速度、步频与步幅归零，距离和用时冻结。</li>
+      <li><b>重置：</b>清空累计距离和用时，保持此前的运行 / 暂停状态。暂停后重置仍需恢复才继续累计。</li>
+    </ol>
+    <div class="guide-note">App 对 RSC 与 FTMS 的支持不同。若只有心率被识别，先确认 App 是否支持跑步传感器，再核对运动类型和广播项。</div>
+  </section>
+
+  <section class="mg-sec" aria-labelledby="mg-check-title">
+    <h2 class="mg-h" id="mg-check-title"><span>06</span>拿起实物，逐项验收</h2>
+    <p class="guide-intro">在实物上操作后手动勾选。这里只记录本页自查，刷新后清除，不生成固件通过报告。</p>
+    <div class="guide-checks">
+      <label><input type="checkbox"><span><b>上电与连接：</b>广播时 LED 慢闪，App 连接后切换连接灯效。先确认未开启静默或自定义灯效。</span></label>
+      <label><input type="checkbox"><span><b>短按与调功：</b>模拟固定骑行模式核对目标值减一步；按住 0.5–2 秒松开核对目标值增加。瞬时输出可能包含浮动。</span></label>
+      <label><input type="checkbox"><span><b>确认与取消：</b>长按满 2 秒松开看到快闪，核对临时调功回滚；不再按，3 秒后恢复蓝牙，热点不应开启。</span></label>
+      <label><input type="checkbox"><span><b>二次确认：</b>重做长按，确认窗口内再按一次，手机可见热点并能访问 192.168.4.1，检查 App 数据是否继续。</span></label>
+      <label><input type="checkbox"><span><b>保存与持久化：</b>修改一个参数，保存成功后核对回显；重新上电再读配置，确认保留。</span></label>
+      <label><input type="checkbox"><span><b>桥接（使用时）：</b>核对校正、停踩 0 W、断开保护和重连；手机配网页与下游 App 同时在线观察。</span></label>
+    </div>
+    <div class="guide-note">M5Stamp C3 默认：广播蓝色慢闪、连接绿色常亮、确认黄色快闪、配网青色慢闪。通用板仅用单色灯表示节奏。自定义灯效或静默时，以实际配置为准。</div>
+  </section>
+
+  <section class="mg-sec" aria-labelledby="mg-faq-title">
+    <h2 class="mg-h" id="mg-faq-title"><span>07</span>遇到问题，从这里排查</h2>
+    <details class="guide-faq"><summary>找不到设备，或 App 连不上</summary><p>重新上电唤醒广播，确认没有被另一个 App 或电脑工具台占用下游连接。关闭其他连接再扫描。改过运动类型、广播项或名称后，在 App 里删除旧配对再搜索。</p></details>
+    <details class="guide-faq"><summary>连接热点后，没有自动弹出配置窗口</summary><p>确认 WiFi 已连接 BikePower 热点，并选择保持无互联网连接。没有自动弹窗时，打开 Safari 或 Chrome 手动访问 http://192.168.4.1；仍打不开再检查影响本地访问的 VPN 或代理。热点超时关闭后，需要重新长按并确认。</p></details>
+    <details class="guide-faq"><summary>长按了，为什么没有 WiFi</summary><p>满 2 秒先松开，等待确认提示，再在 3 秒内按一次。一直按住无法二次确认。不要把 RST 当成操作键；静默灯效时结合计时与热点判断。</p></details>
+    <details class="guide-faq"><summary>真实功率为 0，或扫描不到功率计</summary><p>转动曲柄唤醒，确认支持标准 Cycling Power Service。解除其他 App 占用，重新扫描并测试。核对上游连接与样本状态；无新样本时的 0 W 是保护输出，不能证明功率计正常。</p></details>
+    <details class="guide-faq"><summary>怎么升级，会不会清掉配置</summary><p>电脑 Chrome / Edge 配合数据 USB 线，选择正确板型并核对版本。擦除会丢失配置，按弹窗提示决定并先备份。这里刷写正式 Release 固件，页面更新不代表新固件已发布。</p></details>
+    <details class="guide-faq"><summary>演示能播放，就算验收通过吗</summary><p>不能。动画只解释默认操作。按钮、灯色、手机 Safari、训练 App 兼容性，以及真实功率计与 WiFi 共存都需要实物验证，请逐项确认上方清单。</p></details>
   </section>
 
   <section class="mg-sec" aria-labelledby="mg-facts-title">
-    <h2 class="mg-h" id="mg-facts-title"><span>03</span>基本信息</h2>
+    <h2 class="mg-h" id="mg-facts-title"><span>08</span>基本信息</h2>
     <dl class="mg-facts">
-      <div><dt>最新固件</dt><dd id="mg-fw">v4.2.1</dd></div>
+      <div><dt>最新正式固件</dt><dd id="mg-fw">正在读取 Release</dd></div>
       <div><dt>默认蓝牙名</dt><dd>BikePower</dd></div>
       <div><dt>配网地址</dt><dd>192.168.4.1</dd></div>
       <div><dt>支持板型</dt><dd>通用 ESP32-C3 · M5Stamp C3</dd></div>
     </dl>
   </section>
 
-  <footer class="mg-foot"><a href="https://github.com/MengEn-Ink/bikepower-c" rel="noopener">GitHub · MengEn-Ink/bikepower-c</a><span>Web Bluetooth / Web Serial 仅桌面端</span></footer>
+  <footer class="mg-foot"><a href="https://github.com/MengEn-Ink/bikepower-c" rel="noopener">GitHub · MengEn-Ink/bikepower-c</a><span>Web Bluetooth / Web Serial 仅桌面端</span><span data-page-release>本地预览 · 未发布</span></footer>
 </div>
 <div class="wrap">
   <header class="masthead">
@@ -1514,6 +1594,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
       </div>
     </div>
     <nav class="mode-select" data-tour="nav" aria-label="工具模式">
+      <div class="tool-cluster" role="group" aria-label="上手工具"><span class="cluster-label">上手</span>
       <button class="mode-btn mode-home" data-mode="manual" onclick="switchMode('manual')">
         <span class="ico" aria-hidden="true">¶</span>
         <span class="mode-title">使用手册</span>
@@ -1524,6 +1605,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <span class="mode-title">固件刷写</span>
         <span class="mode-desc">把最新固件烧录到开发板</span>
       </button>
+      </div><div class="tool-cluster" role="group" aria-label="设备工具"><span class="cluster-label">设备</span>
       <button class="mode-btn" data-mode="connect" onclick="switchMode('connect')">
         <span class="ico" aria-hidden="true">●</span>
         <span class="mode-title">实时监控</span>
@@ -1534,6 +1616,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <span class="mode-title">设备比对</span>
         <span class="mode-desc">并排对比多台设备信息</span>
       </button>
+      </div><div class="tool-cluster" role="group" aria-label="诊断工具"><span class="cluster-label">诊断</span>
       <button class="mode-btn" data-mode="inspector" onclick="switchMode('inspector')">
         <span class="ico" aria-hidden="true">⟡</span>
         <span class="mode-title">通知检查器</span>
@@ -1544,6 +1627,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <span class="mode-title">健康检查</span>
         <span class="mode-desc">一键环境/GATT/通知诊断并导出报告</span>
       </button>
+      </div>
     </nav>
     <div class="masthead-right">
       <button class="theme-btn" id="theme-btn" type="button" data-theme-toggle data-source="system" aria-label="切换亮 / 暗主题" title="切换亮 / 暗主题" onclick="toggleTheme()"><svg class="ti-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="ti-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
@@ -2121,7 +2205,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
               <li><p>看到 LED 进入<b>快闪</b>确认状态。</p></li>
               <li><p>在确认窗口内<b>再按一次</b>按钮。</p></li>
               <li><p>手机连接热点 <code>BikePower-XXXXXX</code>，密码 <code>12345678</code>。</p></li>
-              <li><p>浏览器访问 <code>http://192.168.4.1</code>。</p></li>
+              <li><p>连接热点后，使用手机<b>自动弹出的配置窗口</b>；未弹出时，再打开浏览器访问 <code>http://192.168.4.1</code>。</p></li>
               <li><p>修改配置后点击「<b>保存配置</b>」或「<b>保存设置</b>」。</p></li>
               <li><p>不再修改时点击「<b>保存并关闭 WiFi</b>」，等待约 <code>5s</code> 后热点关闭。</p></li>
             </ol>
@@ -2762,6 +2846,8 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
       <div class="dock-pane" id="pane-log" data-pane="log" role="tabpanel"><div class="log" id="log"></div></div>
     </div>
   </section>
+
+  <footer class="page-release" aria-label="页面发布信息"><span data-page-release>本地预览 · 未发布</span><a href="https://github.com/MengEn-Ink/bikepower-c/actions/workflows/deploy-web-tools.yml" target="_blank" rel="noopener">查看页面部署记录 ↗</a></footer>
 
   <!-- ============ 底部状态栏（类 IDE Status Bar） ============ -->
   <footer class="ide-status" id="ide-status" aria-label="状态栏">
@@ -3669,10 +3755,12 @@ function renderConfigEditor(rec){
   const statusClass=state.statusKind?" "+state.statusKind:"";
   return '<section class="config-panel" id="config-editor-shell"><div class="config-head"><div><h3>开发板 NVS 配置</h3><p>以下字段全部直接从设备读取。编辑只发生在浏览器中，点击“保存到设备”后才会通过事务写入 NVS。</p></div><div class="config-meta"><span class="badge muted">协议 v'+m.protocol+'</span><span class="badge muted">schema v'+m.schema+'</span><span class="badge ok" id="config-revision">revision '+m.revision+'</span><span class="badge warn" id="config-dirty">未修改</span></div></div>'+
     '<form id="config-form" onsubmit="saveDeviceConfig(event)" novalidate><div class="config-toolbar"><div class="config-status'+statusClass+'" id="config-status" role="status" aria-live="polite">'+escapeHtml(state.statusText||"已读取设备配置。")+'</div><div class="actions"><button class="btn ghost sm" type="button" data-config-action data-config-device-action onclick="reloadDeviceConfig()">从设备重新读取</button><button class="btn ghost sm" type="button" data-config-action onclick="restoreDeviceConfig()">恢复设备当前值</button><button class="btn alt sm" type="button" data-config-action onclick="downloadDeviceConfig()">导出配置 JSON</button><button class="btn primary sm" id="config-save" type="submit" data-config-action data-config-device-action>保存到设备</button></div></div><div class="config-error-summary hidden" id="config-error-summary" tabindex="-1" role="alert"></div><div class="config-groups">'+
-    '<details class="config-group" open><summary>基础、身份与广播</summary><div class="config-fields">'+configTextField("cfg-device-name","设备名称",c.device_name,23,"UTF-8 最多 23 字节；修改后会刷新 GAP 名称。","span-2")+configSelect("cfg-sport-profile","运动 Profile",c.sport_profile,CONFIG_SPORT_OPTIONS,"改变后保存会暂时断开并重建 GATT。")+configSelect("cfg-mode","骑行模式",c.mode,CONFIG_MODE_OPTIONS,"ERG 是训练会话态，不写入 NVS。")+configField("cfg-power","基础功率",c.power,0,2000,1,"单位 W")+configField("cfg-cadence","基础踏频",c.cadence,20,120,1,"单位 RPM")+configCheck("cfg-hr-lock","锁定固定心率",!!c.has_user_hr,"关闭后心率随负荷联动。")+configField("cfg-heartrate","固定心率",c.heartrate,60,200,1,"单位 BPM；仅锁定时生效。")+configField("cfg-power-step","按钮调功步进",c.power_step,5,50,1,"单位 W")+configField("cfg-power-float","功率浮动",c.power_float,0,100,1,"±W")+configField("cfg-cadence-float","踏频浮动",c.cadence_float,0,20,1,"±RPM")+configField("cfg-hr-float","心率浮动",c.hr_float,0,20,1,"±BPM")+'<div class="form-field span-all"><span class="field-label">广播数据项（至少选择一项）</span><div class="check-grid">'+configCheck("cfg-broadcast-power","功率",!!(c.broadcast_mask&1))+configCheck("cfg-broadcast-cadence","踏频",!!(c.broadcast_mask&2))+configCheck("cfg-broadcast-hr","心率",!!(c.broadcast_mask&4))+'</div></div></div></details>'+
-    renderBridgeConfig(c)+'<details class="config-group"><summary>骑行与个人参数</summary><div class="config-fields">'+configField("cfg-weight","体重",c.weight,40,150,1,"单位 kg")+configField("cfg-ftp","FTP",c.ftp,50,500,1,"单位 W")+configField("cfg-thr-hr","阈值心率",c.thr_hr,100,220,1,"单位 BPM")+configSelect("cfg-ride-type","骑行配速档",c.ride_type,CONFIG_RIDE_OPTIONS,"自定义档使用下方 W/kg 范围。")+configField("cfg-custom-wkg-low","自定义 W/kg 下限",(c.custom_wkg_low/10).toFixed(1),1,7,.1,"不能高于上限。")+configField("cfg-custom-wkg-high","自定义 W/kg 上限",(c.custom_wkg_high/10).toFixed(1),1,7,.1,"不能低于下限。")+configTextField("cfg-custom-pacer-name","自定义骑行档名称",c.custom_pacer_name,31,"UTF-8 最多 31 字节。","span-2")+'</div></details>'+
-    '<details class="config-group"><summary>跑步参数</summary><div class="config-fields">'+configField("cfg-run-speed","固定速度",(c.run_speed_x100/100).toFixed(2),3,25,.01,"单位 km/h")+configField("cfg-run-pace-float","配速浮动",c.run_pace_float_sec,0,60,1,"±秒/km")+configField("cfg-run-cadence","步频",c.run_cadence,120,220,1,"steps/min")+configField("cfg-run-cadence-float","步频浮动",c.run_cadence_float,0,20,1,"±steps/min")+configSelect("cfg-run-mode","跑步模式",c.run_mode,CONFIG_RUN_MODE_OPTIONS)+configSelect("cfg-run-pacer-type","配速模板",c.run_pacer_type,CONFIG_RUN_PACER_OPTIONS)+configField("cfg-run-pace-low","配速下限",c.run_pace_low_sec,144,1200,1,"秒/km，数值越小速度越快。")+configField("cfg-run-pace-high","配速上限",c.run_pace_high_sec,144,1200,1,"秒/km，必须不小于下限。")+configTextField("cfg-run-custom-name","自定义跑步档名称",c.run_custom_name,31,"UTF-8 最多 31 字节。","span-2")+'</div></details>'+
-    '<details class="config-group"><summary>LED 灯效</summary><div class="config-fields">'+ledFields+'</div></details></div><div class="config-save-note">保存使用 BEGIN → 分组写入 → COMMIT 事务；只有设备校验并成功提交 NVS 后才显示成功。修改运动 Profile 或广播数据项会在成功后短暂断开 BLE，以便重建服务表。</div></form></section>';
+    '<details class="config-group" open><summary>01 · 设备身份与广播</summary><div class="config-fields">'+configTextField("cfg-device-name","设备名称",c.device_name,23,"UTF-8 最多 23 字节；修改后刷新 GAP 名称。","span-2")+configSelect("cfg-sport-profile","运动类型",c.sport_profile,CONFIG_SPORT_OPTIONS,"保存后可能断开并重建 GATT。")+'<div class="form-field span-all"><span class="field-label">广播数据项（至少选择一项）</span><div class="check-grid">'+configCheck("cfg-broadcast-power","功率",!!(c.broadcast_mask&1))+configCheck("cfg-broadcast-cadence","踏频",!!(c.broadcast_mask&2))+configCheck("cfg-broadcast-hr","心率",!!(c.broadcast_mask&4))+'</div></div></div></details>'+
+    renderBridgeConfig(c)+
+    '<details class="config-group" data-config-profile="0"'+(c.sport_profile===0?' open':'')+'><summary>骑行 · 模拟与配速</summary><div class="config-fields">'+configSelect("cfg-mode","骑行模式",c.mode,CONFIG_MODE_OPTIONS,"ERG 是训练会话态，不写入 NVS。")+configField("cfg-power","基础功率",c.power,0,2000,1,"单位 W")+configField("cfg-cadence","基础踏频",c.cadence,20,120,1,"单位 RPM")+configField("cfg-power-float","功率浮动",c.power_float,0,100,1,"±W")+configField("cfg-cadence-float","踏频浮动",c.cadence_float,0,20,1,"±RPM")+configSelect("cfg-ride-type","骑行配速档",c.ride_type,CONFIG_RIDE_OPTIONS,"自定义档使用下方 W/kg 范围。")+configField("cfg-custom-wkg-low","自定义 W/kg 下限",(c.custom_wkg_low/10).toFixed(1),1,7,.1,"不能高于上限。")+configField("cfg-custom-wkg-high","自定义 W/kg 上限",(c.custom_wkg_high/10).toFixed(1),1,7,.1,"不能低于下限。")+configTextField("cfg-custom-pacer-name","自定义骑行档名称",c.custom_pacer_name,31,"UTF-8 最多 31 字节。","span-2")+'</div></details>'+
+    '<details class="config-group" data-config-profile="1"'+(c.sport_profile===1?' open':'')+'><summary>跑步 · 速度与配速</summary><div class="config-fields">'+configField("cfg-run-speed","固定速度",(c.run_speed_x100/100).toFixed(2),3,25,.01,"单位 km/h")+configField("cfg-run-pace-float","配速浮动",c.run_pace_float_sec,0,60,1,"±秒/km")+configField("cfg-run-cadence","步频",c.run_cadence,120,220,1,"steps/min")+configField("cfg-run-cadence-float","步频浮动",c.run_cadence_float,0,20,1,"±steps/min")+configSelect("cfg-run-mode","跑步模式",c.run_mode,CONFIG_RUN_MODE_OPTIONS)+configSelect("cfg-run-pacer-type","配速模板",c.run_pacer_type,CONFIG_RUN_PACER_OPTIONS)+configField("cfg-run-pace-low","配速下限",c.run_pace_low_sec,144,1200,1,"秒/km，数值越小速度越快。")+configField("cfg-run-pace-high","配速上限",c.run_pace_high_sec,144,1200,1,"秒/km，必须不小于下限。")+configTextField("cfg-run-custom-name","自定义跑步档名称",c.run_custom_name,31,"UTF-8 最多 31 字节。","span-2")+'</div></details>'+
+    '<details class="config-group"><summary>个人资料与心率</summary><div class="config-fields">'+configField("cfg-weight","体重",c.weight,40,150,1,"单位 kg")+configField("cfg-ftp","FTP",c.ftp,50,500,1,"单位 W")+configField("cfg-thr-hr","阈值心率",c.thr_hr,100,220,1,"单位 BPM")+configCheck("cfg-hr-lock","锁定固定心率",!!c.has_user_hr,"关闭后心率随负荷联动。")+configField("cfg-heartrate","固定心率",c.heartrate,60,200,1,"单位 BPM；仅锁定时生效。")+configField("cfg-hr-float","心率浮动",c.hr_float,0,20,1,"±BPM")+'</div></details>'+
+    '<details class="config-group"><summary>按钮与 LED 灯效</summary><div class="config-fields">'+configField("cfg-power-step","按钮调功步进",c.power_step,5,50,1,"单位 W")+ledFields+'</div></details></div><div class="config-save-note">只有设备校验并成功提交 NVS 后才显示保存成功。未启用运动类型的参数仍保留。修改运动类型或广播数据项会短暂断开 BLE，请重新连接。</div></form></section>';
 }
 function refreshConfigEditor(rec){const shell=$("config-editor-shell");if(!shell)return;shell.outerHTML=renderConfigEditor(rec);bindConfigForm(rec);}
 function configNumber(id){return Number($(id).value);}
@@ -3724,6 +3812,16 @@ function updateConfigDirty(){
 }
 function bindConfigForm(rec){
   const form=$("config-form");if(!form)return;
+  function showProfileGroups(){
+    const selected=$("cfg-sport-profile").value;
+    form.querySelectorAll("[data-config-profile]").forEach(group=>{
+      const active=group.dataset.configProfile===selected;
+      group.classList.toggle("profile-inactive",!active);
+      group.open=active;
+    });
+  }
+  $("cfg-sport-profile").addEventListener("change",showProfileGroups);
+  showProfileGroups();
   const source=$("cfg-cycling-source");
   if(source){source.querySelector('option[value="1"]').disabled=!rec.configState.current.bridge_bound;let previous=Number(source.value);
     source.addEventListener("change",()=>{if(previous===0&&Number(source.value)===1)$("cfg-broadcast-hr").checked=false;previous=Number(source.value);updateConfigDirty();});}
@@ -3826,6 +3924,7 @@ function switchMode(mode,opts){
   if(changed&&mode!=="manual"&&typeof window.scrollTo==="function")window.scrollTo(0,0);
   document.querySelectorAll(".mode-btn").forEach(b=>{
     b.classList.toggle("active",b.dataset.mode===mode);
+    if(b.dataset.mode===mode)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");
   });
   $("mode-flash").classList.toggle("hidden",mode!=="flash");
   $("mode-connect").classList.toggle("hidden",mode!=="connect");
@@ -3989,6 +4088,7 @@ async function loadFirmwareCatalog(){
   resetFirmwareDetails();
   webInstallerReady=!!customElements.get("esp-web-install-button")&&!!window.BikePowerFlash&&window.isSecureContext&&!!navigator.serial;
   if(location.protocol==="file:"){
+    setText("mg-fw","请到在线工具台查看");
     setFirmwareStatus("需要本地服务","warn");
     setText("flash-message","直接打开 HTML 时浏览器不能读取同源固件索引。请使用项目的本地监控服务，或访问已部署的 HTTPS Pages 页面。");
     renderFirmwareTimeline();
@@ -4000,7 +4100,7 @@ async function loadFirmwareCatalog(){
     const data=await response.json();
     if(!data||data.schema_version!==1)throw new Error("索引格式不受支持");
     firmwareCatalog=data;
-    if(data.tag)setText("mg-fw",data.tag);
+    setText("mg-fw",data.tag||"暂无可读取的正式固件");
     let index=null;
     try{const r=await fetch(FIRMWARE_RELEASES_URL,{cache:"no-store"});if(r.ok)index=await r.json();}catch(e){index=null;}
     firmwareReleases=normalizeFirmwareReleases(index,data);
@@ -4008,6 +4108,7 @@ async function loadFirmwareCatalog(){
     selectFirmwareRelease(null);
   }catch(err){
     firmwareCatalog=null;firmwareReleases=[];
+    setText("mg-fw","版本信息暂不可用");
     setFirmwareStatus("加载失败","err");
     setText("flash-message","无法读取固件索引："+(err.message||String(err)));
     renderFirmwareTimeline();

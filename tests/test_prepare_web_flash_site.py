@@ -6,6 +6,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -30,6 +31,17 @@ class WebFlashSiteTest(unittest.TestCase):
 
     def tearDown(self):
         self.temp_dir.cleanup()
+
+    def test_site_records_page_build_separately_from_firmware_release(self):
+        with patch.object(web_flash, "utc_now", return_value="2026-11-04T10:56:24Z"):
+            site = web_flash.initialize_site(self.source, self.base / "site")
+        info = site / "site-info.json"
+        self.assertTrue(info.is_file(), "页面构建元数据必须独立生成")
+        metadata = json.loads(info.read_text())
+        self.assertEqual(metadata["built_at"], "2026-11-04T10:56:24Z")
+        self.assertRegex(metadata["commit"], r"^[0-9a-f]{40}$")
+        self.assertIsInstance(metadata["dirty"], bool)
+        self.assertNotIn("published_at", metadata)
 
     def make_asset(self, name, payload):
         path = self.assets / name

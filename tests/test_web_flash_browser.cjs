@@ -22,6 +22,10 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
         return route.fulfill({ path: file, contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' } });
       }
       if (url.hostname !== 'example.test') return route.abort();
+      if (url.pathname.endsWith('pages-experience.js') || url.pathname.endsWith('pages-experience.css')) {
+        return route.fulfill({ path: path.join(root, 'tools/web', path.basename(url.pathname)),
+          contentType: url.pathname.endsWith('.css') ? 'text/css' : 'text/javascript' });
+      }
       if (url.pathname.endsWith('/flash-session.js')) return route.fulfill({ path: path.join(root, 'tools/web/flash-session.js'), contentType: 'text/javascript' });
       if (url.pathname.endsWith('/manifest.json')) return route.fulfill({ json: manifest });
       if (url.pathname.endsWith('/bike.bin')) return route.fulfill({ body: bytes });
