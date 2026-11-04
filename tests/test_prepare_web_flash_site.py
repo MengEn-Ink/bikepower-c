@@ -42,7 +42,7 @@ class WebFlashSiteTest(unittest.TestCase):
             ("generic-c3", b"generic merged firmware"),
             ("m5stamp-c3", b"m5stamp merged firmware"),
         ):
-            name = f"bikepower-c-{board}-v4.1.1-stable-fix-gabcdef1.bin"
+            name = f"{board}-v4.1.1.bin"
             assets.append(self.make_asset(name, payload))
             digest = hashlib.sha256(payload).hexdigest()
             if board == bad_board:
@@ -221,10 +221,18 @@ class WebFlashSiteTest(unittest.TestCase):
         _, _, selected = web_flash.select_firmware_assets(release)
         self.assertEqual(set(selected), {"generic-c3"})
 
+    def test_keeps_previous_prefixed_short_names(self):
+        release = self.make_release()
+        for asset in release["assets"]:
+            if asset["name"].startswith(("generic-c3-", "m5stamp-c3-")):
+                asset["name"] = "bikepower-c-" + asset["name"]
+        _, _, selected = web_flash.select_firmware_assets(release)
+        self.assertEqual(set(selected), {"generic-c3", "m5stamp-c3"})
+
     def test_rejects_release_without_supported_board(self):
         release = self.make_release()
         release["assets"] = [
-            asset for asset in release["assets"] if "bikepower-c-" not in asset["name"]
+            asset for asset in release["assets"] if not any(board in asset["name"] for board in web_flash.BOARD_LABELS)
         ]
         with self.assertRaisesRegex(web_flash.ReleaseUnavailable, "没有受支持的板型"):
             web_flash.select_firmware_assets(release)

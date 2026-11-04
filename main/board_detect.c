@@ -81,12 +81,9 @@ const board_desc_t *board_get_desc(void)
 void board_firmware_name(char *out, size_t out_sz)
 {
     if (!out || out_sz == 0) return;
-    snprintf(out, out_sz, "%s-v%s-stable%s-fix%s-g%s",
+    snprintf(out, out_sz, "%s-v%s",
              s_board_desc[s_board].name,
-             FIRMWARE_VERSION,
-             FIRMWARE_STABLE_VERSION,
-             FIRMWARE_FIX_VERSION,
-             BIKEPOWER_GIT_SHA);
+             FIRMWARE_VERSION);
 }
 
 int board_btn_pin(void)

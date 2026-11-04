@@ -1,7 +1,7 @@
 #!/bin/bash
 # BikePower C — 双板型构建脚本
 # 分别编译通用 ESP32-C3 和 M5Stamp C3 固件，
-# 输出合并后的单文件固件包，包名包含板型、单一版本号、stable/fix 标识和 Git ID。
+# 输出合并单文件固件，文件名仅含板型和语义版本；Git ID 保留在 manifest。
 #
 # 用法：
 #   ./scripts/build_all.sh              # 编译两种板型
@@ -35,7 +35,7 @@ usage() {
   -h, --help      显示本帮助
 
 输出物（写入 build/release/）:
-  bikepower-c-<板型>-v<版本>-stable-fix-g<GitID>.bin
+  <板型>-v<版本>.bin
                                         合并单文件固件（bootloader+分区表+app）
   *.bin.sha256                         对应 SHA256 校验文件
   manifest.txt                         产物清单（文件名/大小/SHA256/版本）
@@ -43,7 +43,7 @@ usage() {
   core-flow-endurance.md               3 分钟核心流程耐久测试明细
   user-manual.md                       随固件分发的用户文档副本
   images/                              用户文档引用的截图与示意图
-  bikepower-c-release-v<版本>-stable-fix-g<GitID>.zip
+  bikepower-c-v<版本>.zip
                                       双板型固件、报告、手册、截图的总包
   *.zip.sha256                         总包 SHA256 校验文件
   evidence/device-acceptance-<板型>.json
@@ -123,8 +123,7 @@ fi
 
 firmware_file_name() {
     local board_name="$1"
-    printf 'bikepower-c-%s-v%s-stable-fix-g%s.bin\n' \
-        "$board_name" "$VERSION" "$GIT_SHA"
+    printf '%s-v%s.bin\n' "$board_name" "$VERSION"
 }
 
 # 计算 SHA256（兼容 macOS shasum 与 Linux sha256sum）
@@ -158,8 +157,8 @@ if [ "$DRY_RUN" -eq 1 ]; then
     echo "  - user-manual.md   （用户文档副本）"
     echo "  - images/          （用户文档截图与示意图）"
     echo "  - evidence/device-acceptance-<板型>.json （当前版本各板型真机验收证据；存在时收录）"
-    echo "  - bikepower-c-release-v${VERSION}-stable-fix-g${GIT_SHA}.zip （release 总包）"
-    echo "  - bikepower-c-release-v${VERSION}-stable-fix-g${GIT_SHA}.zip.sha256"
+    echo "  - bikepower-c-v${VERSION}.zip （release 总包）"
+    echo "  - bikepower-c-v${VERSION}.zip.sha256"
     exit 0
 fi
 
@@ -179,6 +178,10 @@ echo "=== BikePower C 双板型构建 v${VERSION} stable${STABLE_VERSION} fix${F
 mkdir -p "$RELEASE_DIR"
 rm -f "$RELEASE_DIR"/bikepower-c-*.bin \
       "$RELEASE_DIR"/bikepower-c-*.bin.sha256 \
+      "$RELEASE_DIR"/generic-c3-v*.bin \
+      "$RELEASE_DIR"/generic-c3-v*.bin.sha256 \
+      "$RELEASE_DIR"/m5stamp-c3-v*.bin \
+      "$RELEASE_DIR"/m5stamp-c3-v*.bin.sha256 \
       "$RELEASE_DIR"/manifest.txt \
       "$RELEASE_DIR"/test-report.md \
       "$RELEASE_DIR"/core-flow-endurance.md \
@@ -189,8 +192,9 @@ rm -rf "$RELEASE_DIR/evidence"
 
 echo ""
 echo "=== 构建前测试门禁：host / mock / static ==="
-make -C test
-./test/test_domain
+make -C test run
+python3 tests/test_bridge_session.py
+python3 tests/check_portal_render.py
 python3 tests/test_portal_config_save.py
 python3 tests/test_core_flow_endurance.py \
     --minutes "${CORE_FLOW_MINUTES:-3}" \
@@ -231,7 +235,7 @@ for target in "${TARGETS[@]}"; do
     rm -f sdkconfig
 
     # 编译
-    idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.board.tmp" build
+    idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.board.tmp" -DPORTAL_TEST_AUTO_CONFIG=OFF build
 
     # 合并固件为单文件
     FW_NAME="$(firmware_file_name "$board_name")"
@@ -336,7 +340,7 @@ fi
 # 版本号一致性校验：产物文件名必须含当前固件版本与标识信息，且版本号只出现一次
 for fw in "${PRODUCED_BINS[@]}"; do
     case "$fw" in
-        *"-v${VERSION}-stable-fix-g${GIT_SHA}.bin") ;;
+        *"-v${VERSION}.bin") ;;
         *) echo "错误：产物名 '$fw' 与版本元信息不一致"; exit 1 ;;
     esac
 done
@@ -347,7 +351,7 @@ if ! command -v zip >/dev/null 2>&1; then
     echo "错误：未找到 zip 命令，无法生成 release 总包"
     exit 1
 fi
-PACKAGE_NAME="bikepower-c-release-v${VERSION}-stable-fix-g${GIT_SHA}.zip"
+PACKAGE_NAME="bikepower-c-v${VERSION}.zip"
 PACKAGE_ITEMS=("${PRODUCED_BINS[@]}")
 for fw in "${PRODUCED_BINS[@]}"; do
     PACKAGE_ITEMS+=("${fw}.sha256")

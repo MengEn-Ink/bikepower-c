@@ -50,11 +50,9 @@ def collect_artifacts(release_dir, git_sha):
     for path in sorted(release_dir.glob("*")):
         if not path.is_file() or path.name in {"manifest.txt", "test-report.md", "user-manual.md"}:
             continue
-        if path.name.startswith("bikepower-c-") and f"-g{git_sha}.bin" not in path.name:
-            continue
-        if path.name.startswith("bikepower-c-") and path.name.endswith(".bin.sha256") and f"-g{git_sha}.bin.sha256" not in path.name:
-            continue
-        if path.name.startswith("bikepower-c-"):
+        if path.name.startswith(("generic-c3-v", "m5stamp-c3-v")) and (
+            path.name.endswith(".bin") or path.name.endswith(".bin.sha256")
+        ):
             items.append(path)
     return items
 

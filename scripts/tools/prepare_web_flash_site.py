@@ -32,9 +32,9 @@ BOARD_LABELS = {
     "m5stamp-c3": "M5Stamp C3",
 }
 FIRMWARE_RE = re.compile(
-    r"^bikepower-c-(?P<board>generic-c3|m5stamp-c3)-"
-    r"v(?P<version>[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?)-"
-    r"stable-fix-g(?P<git>[0-9a-fA-F]{7,40})\.bin$"
+    r"^(?:bikepower-c-)?(?P<board>generic-c3|m5stamp-c3)-"
+    r"v(?P<version>[0-9]+\.[0-9]+\.[0-9]+(?:[-+](?!stable-fix-g)[0-9A-Za-z.-]+)?)"
+    r"(?:-stable-fix-g(?P<git>[0-9a-fA-F]{7,40}))?\.bin$"
 )
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")

@@ -372,6 +372,8 @@ ok(f"检查了 {len(config_vars)} 个宏定义，无冲突")
 print("\n=== 6. 静态门禁聚合 ===")
 # (脚本相对路径, 人类可读名称)
 STATIC_CHECKS = [
+    ("tests/test_bridge_session.py", "上游桥接会话与扫描 ASan/UBSan"),
+    ("tests/test_ble_config_e2e.py", "BLE 六组配置协议"),
     ("tests/test_ble_protocol_vectors.py", "BLE 协议 golden vectors (TC-BLE-VECTOR)"),
     ("tests/test_ble_reconnect_harness.py", "BLE 重连 harness (TC-BLE-RECONNECT)"),
     ("tests/test_ble_running_harness.py", "BLE running 分阶段 harness (TC-BLE-RUNNING)"),

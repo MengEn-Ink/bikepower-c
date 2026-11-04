@@ -43,8 +43,8 @@ def create_release_dir(
     release_dir = Path(temp.name)
 
     firmware_names = [
-        f"bikepower-c-generic-c3-v{VERSION}-stable-fix-g{GIT_SHA}.bin",
-        f"bikepower-c-m5stamp-c3-v{VERSION}-stable-fix-g{GIT_SHA}.bin",
+        f"generic-c3-v{VERSION}.bin",
+        f"m5stamp-c3-v{VERSION}.bin",
     ]
     for name in firmware_names:
         (release_dir / name).write_bytes(f"firmware:{name}".encode("utf-8"))
@@ -68,7 +68,7 @@ def create_release_dir(
         write_record(release_dir / evidence_rel, evidence)
         evidence_rel_names.append(evidence_rel)
 
-    package_name = f"bikepower-c-release-v{VERSION}-stable-fix-g{GIT_SHA}.zip"
+    package_name = f"bikepower-c-v{VERSION}.zip"
     manifest_lines = [
         "# BikePower C Release 产物清单",
         f"# 版本: v{VERSION}",
@@ -135,7 +135,7 @@ def main():
         assert len(artifacts) == 10
         print(f"{TAG} PASS 标准 release 样例通过")
 
-        tampered = release_dir / f"bikepower-c-generic-c3-v{VERSION}-stable-fix-g{GIT_SHA}.bin"
+        tampered = release_dir / f"generic-c3-v{VERSION}.bin"
         tampered.write_bytes(b"tampered")
         expect_error("SHA256 不匹配", lambda: validate_release_artifacts(
             release_dir=release_dir,
@@ -205,7 +205,7 @@ def main():
 
     temp, release_dir = create_release_dir()
     try:
-        package_name = f"bikepower-c-release-v{VERSION}-stable-fix-g{GIT_SHA}.zip"
+        package_name = f"bikepower-c-v{VERSION}.zip"
         with zipfile.ZipFile(release_dir / package_name, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             archive.write(release_dir / "manifest.txt", "manifest.txt")
         write_sidecar(release_dir, package_name)

@@ -44,7 +44,7 @@ board_type_t board_get_type(void);
 const board_desc_t *board_get_desc(void);
 
 /**
- * 生成含板型、版本号、稳定版、修复版和 Git ID 的固件显示名称。
+ * 生成“板型-v版本号”固件显示名称，不包含文件扩展名。
  * out：输出缓冲区。
  * out_sz：输出缓冲区大小。
  */

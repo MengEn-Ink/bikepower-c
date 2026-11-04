@@ -22,12 +22,12 @@ GIT_STATUS_COMMAND = "git status --short"
 
 DEFAULT_BOARDS = ("generic-c3", "m5stamp-c3")
 BOARD_ATTACHMENTS = (
-    "bikepower-c-{board}-v{version}-stable-fix-g{git_sha}.bin",
-    "bikepower-c-{board}-v{version}-stable-fix-g{git_sha}.bin.sha256",
+    "{board}-v{version}.bin",
+    "{board}-v{version}.bin.sha256",
 )
 FIXED_ATTACHMENTS = (
-    "bikepower-c-release-v{version}-stable-fix-g{git_sha}.zip",
-    "bikepower-c-release-v{version}-stable-fix-g{git_sha}.zip.sha256",
+    "bikepower-c-v{version}.zip",
+    "bikepower-c-v{version}.zip.sha256",
     "manifest.txt",
     "test-report.md",
     "core-flow-endurance.md",
@@ -242,7 +242,7 @@ def validate_release_artifacts(
     if manifest_extra:
         raise ReleaseGateError("manifest.txt 存在非标准记录: " + ", ".join(manifest_extra))
 
-    zip_name = f"bikepower-c-release-v{version}-stable-fix-g{git_sha}.zip"
+    zip_name = f"bikepower-c-v{version}.zip"
     zip_path = release_dir / zip_name
     expected_zip_entries = {
         name for name in expected

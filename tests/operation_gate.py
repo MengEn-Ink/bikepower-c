@@ -179,6 +179,7 @@ def run_step(gate, name, command, timeout=120, required=True, acceptance_item=No
 
 def quick_steps(gate):
     run_step(gate, "Host 领域层单测", "make -C test run", 120)
+    run_step(gate, "上游桥接会话与扫描 ASan/UBSan", "python3 tests/test_bridge_session.py", 60)
     run_step(gate, "BLE 协议 golden vectors", "python3 tests/test_ble_protocol_vectors.py", 60)
     run_step(gate, "BLE 配置 E2E 离线协议回归", "python3 tests/test_ble_config_e2e.py", 30)
     run_step(gate, "BLE 重连 harness 单测", "python3 tests/test_ble_reconnect_harness.py", 30)
@@ -194,6 +195,7 @@ def quick_steps(gate):
     run_step(gate, "BLE 广播项监控静态门禁", "python3 tests/check_ble_broadcast_monitor.py", 30)
     run_step(gate, "门户结构", "python3 tests/check_portal_structure.py", 60)
     run_step(gate, "门户 JS", "python3 tests/check_portal_js.py", 60)
+    run_step(gate, "压缩门户手机与桌面交互", "python3 tests/check_portal_render.py", 180)
 
 
 def full_steps(gate, build):

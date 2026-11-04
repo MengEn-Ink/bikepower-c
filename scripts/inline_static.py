@@ -52,6 +52,9 @@ def minify_css(css):
     css = re.sub(r"\s+", " ", css)
     css = re.sub(r"\s*([{}:;,>])\s*", r"\1", css)
     css = css.replace(";}", "}")
+    variables = sorted(set(re.findall(r"--[a-z][a-z0-9-]*", css)), key=lambda name: (-len(name), name))
+    for index, name in enumerate(variables):
+        css = re.sub(re.escape(name) + r"(?![a-z0-9-])", "--v" + format(index, "x"), css)
     return css.strip()
 
 

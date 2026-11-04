@@ -1,6 +1,6 @@
 ﻿# BikePower C - Windows 双板型构建脚本
 # 分别编译通用 ESP32-C3 和 M5Stamp C3 固件，
-# 输出合并后的单文件固件包，包名包含板型、版本号、stable/fix 标识和 Git ID。
+# 输出合并单文件固件，名称仅含板型和版本；Git ID 留在 manifest。
 #
 # 用法:
 #   .\scripts\build_all.ps1                    # 编译两种板型
@@ -64,6 +64,8 @@ function Run-HostTests {
         }
         $testBin = Join-Path $testDir "test_domain.exe"
         $null = Invoke-SafeCommand -Command $testBin -ArgsList @() -WorkingDir $testDir
+        $bridgeTest = Join-Path $testDir "test_power_bridge.exe"
+        $null = Invoke-SafeCommand -Command $bridgeTest -ArgsList @() -WorkingDir $testDir
     } finally {
         Pop-Location
     }
@@ -82,6 +84,7 @@ function Run-StaticChecks {
         "tests\check_board_desc.py",
         "tests\check_ble_advertising_fields.py",
         "tests\test_ble_protocol_vectors.py",
+        "tests\test_ble_config_e2e.py",
         "tests\test_ble_reconnect_harness.py",
         "tests\test_ble_running_harness.py",
         "tests\test_device_profile_harness.py",
@@ -122,7 +125,7 @@ function Build-Board {
         [string]$ReleaseDir
     )
     $boardName = Get-BoardName $Target
-    $fwName = "bikepower-c-" + $boardName + "-v" + $Version + "-stable-fix-g" + $GitSha + ".bin"
+    $fwName = $boardName + "-v" + $Version + ".bin"
     $fwPath = Join-Path $ReleaseDir $fwName
 
     Write-Log ("构建板型: " + $boardName)
@@ -157,10 +160,12 @@ function Build-Board {
 
         Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @(
             "-D", "SDKCONFIG_DEFAULTS=" + $mergedDefaults,
+            "-D", "PORTAL_TEST_AUTO_CONFIG=OFF",
             "reconfigure"
         )
         Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @(
             "-D", "SDKCONFIG_DEFAULTS=" + $mergedDefaults,
+            "-D", "PORTAL_TEST_AUTO_CONFIG=OFF",
             "build"
         )
 
@@ -284,7 +289,7 @@ function Build-ZipPackage {
         [string[]]$Items
     )
     Write-Log "打包 Release 总包"
-    $zipName = "bikepower-c-release-v" + $Version + "-stable-fix-g" + $GitSha + ".zip"
+    $zipName = "bikepower-c-v" + $Version + ".zip"
     $zipPath = Join-Path $ReleaseDir $zipName
 
     if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
@@ -334,8 +339,8 @@ if ($DryRun) {
     Write-Host "将生成的产物:"
     foreach ($target in $Board) {
         $bn = Get-BoardName $target
-        Write-Host ("  - bikepower-c-" + $bn + "-v" + $Version + "-stable-fix-g" + $GitSha + ".bin  (合并单文件固件)")
-        Write-Host ("  - bikepower-c-" + $bn + "-v" + $Version + "-stable-fix-g" + $GitSha + ".bin.sha256  (SHA256 校验)")
+        Write-Host ("  - " + $bn + "-v" + $Version + ".bin  (合并单文件固件)")
+        Write-Host ("  - " + $bn + "-v" + $Version + ".bin.sha256  (SHA256 校验)")
     }
     Write-Host "  - manifest.txt  (产物清单)"
     Write-Host "  - test-report.md  (测试报告)"
@@ -343,8 +348,8 @@ if ($DryRun) {
     Write-Host "  - user-manual.md  (用户文档副本)"
     Write-Host "  - images/  (用户文档截图与示意图)"
     Write-Host "  - evidence\device-acceptance-<板型>.json  (当前版本各板型真机验收证据；存在时收录)"
-    Write-Host ("  - bikepower-c-release-v" + $Version + "-stable-fix-g" + $GitSha + ".zip  (release 总包)")
-    Write-Host ("  - bikepower-c-release-v" + $Version + "-stable-fix-g" + $GitSha + ".zip.sha256")
+    Write-Host ("  - bikepower-c-v" + $Version + ".zip  (release 总包)")
+    Write-Host ("  - bikepower-c-v" + $Version + ".zip.sha256")
     exit 0
 }
 
@@ -363,10 +368,10 @@ if (-not (Test-Path $ReleaseDir)) {
 }
 
 $oldPatterns = @(
-    "bikepower-c-*-v" + $Version + "-stable-fix-g*.bin",
-    "bikepower-c-*-v" + $Version + "-stable-fix-g*.bin.sha256",
-    "bikepower-c-release-v" + $Version + "-stable-fix-g*.zip",
-    "bikepower-c-release-v" + $Version + "-stable-fix-g*.zip.sha256",
+    "*-c3-v" + $Version + "*.bin",
+    "*-c3-v" + $Version + "*.bin.sha256",
+    "bikepower-c-v" + $Version + ".zip",
+    "bikepower-c-v" + $Version + ".zip.sha256",
     "manifest.txt",
     "test-report.md",
     "core-flow-endurance.md",
