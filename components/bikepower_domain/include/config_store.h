@@ -46,6 +46,7 @@ typedef struct {
     int run_pace_high_sec; // 跑步模板/自定义配速上限，秒/km
     char run_custom_name[RUN_CUSTOM_NAME_MAX]; // 自定义跑步档名称
     char device_name[DEVICE_NAME_MAX];  // BLE 广播名
+    bridge_config_t bridge;
 } config_data_t;
 
 /* 填充配置对象的出厂默认值。 */

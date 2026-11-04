@@ -16,12 +16,13 @@ DOMAIN_SRCS := $(DOMAIN)/profile.c \
         $(DOMAIN)/button_logic.c \
         $(DOMAIN)/led_pattern.c \
         $(DOMAIN)/button_debounce.c
+DOMAIN_SRCS += $(DOMAIN)/cps_input_codec.c $(DOMAIN)/power_bridge.c
 CODEC_SRC := $(DOMAIN)/ble_payload_codec.c
 CONFIG_CODEC_SRC := $(DOMAIN)/ble_config_codec.c
 TEST_SRCS := test_domain.c $(DOMAIN_SRCS) $(CODEC_SRC) $(CONFIG_CODEC_SRC)
 
 .PHONY: all run clean
-all: test_domain ble_codec_cli
+all: test_domain ble_codec_cli test_power_bridge
 
 test_domain: $(TEST_SRCS)
 	$(CC) $(CFLAGS) -o $@ $(TEST_SRCS) -lm
@@ -29,8 +30,12 @@ test_domain: $(TEST_SRCS)
 ble_codec_cli: ble_codec_cli.c $(CODEC_SRC)
 	$(CC) $(CFLAGS) -o $@ ble_codec_cli.c $(CODEC_SRC)
 
+test_power_bridge: test_power_bridge.c $(DOMAIN_SRCS) $(CONFIG_CODEC_SRC) $(CODEC_SRC)
+	$(CC) $(CFLAGS) -o $@ $^ -lm
+
 run: all
 	./test_domain
+	./test_power_bridge
 
 clean:
-	rm -f test_domain test_domain.exe ble_codec_cli ble_codec_cli.exe
+	rm -f test_domain test_domain.exe ble_codec_cli ble_codec_cli.exe test_power_bridge

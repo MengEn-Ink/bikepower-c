@@ -109,11 +109,10 @@ def main():
         if status == 200:
             try:
                 d = json.loads(body)
-                ok = ("device_name" in d and "firmware_version" in d
-                      and "pacers" in d and "remaining_sec" in d
-                      and "custom_pacer_name" in d
-                      and any(p.get("id") == "custom" and p.get("name") == d.get("custom_pacer_name") for p in d.get("pacers", [])))
-                detail += f" dev={d.get('device_name')} ver={d.get('firmware_version')}"
+                ok = ("config" in d and "revision" in d and "bridge" in d
+                      and "firmware_version" in d and "pacers" in d and "remaining_sec" in d
+                      and "custom_pacer_name" in d.get("config", {}))
+                detail += f" dev={d.get('config', {}).get('device_name')} ver={d.get('firmware_version')}"
             except Exception as e:
                 detail += f" JSON 解析失败: {e}"
         return ok, detail
@@ -124,7 +123,7 @@ def main():
         detail = f"status={status} body={body[:32]!r}"
         try:
             secs = int(body.strip())
-            ok = status == 200 and 0 <= secs <= 180
+            ok = status == 200 and 0 <= secs <= 300
             detail = f"剩余={secs}s"
         except Exception:
             ok = False

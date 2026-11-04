@@ -70,6 +70,27 @@ int main(int argc, char **argv)
         }
         length = ble_payload_encode_cps(payload, sizeof(payload),
                                         (int16_t)values[0], (uint16_t)values[1], (uint16_t)values[2]);
+    } else if (strcmp(argv[1], "cps_bridge") == 0) {
+        if (argc != 6
+            || !parse_long(argv[2], 0, 1, &values[0])
+            || !parse_long(argv[3], INT16_MIN, INT16_MAX, &values[1])
+            || !parse_long(argv[4], 0, UINT16_MAX, &values[2])
+            || !parse_long(argv[5], 0, UINT16_MAX, &values[3])) return usage(argv[0]);
+        length = ble_payload_encode_cps_bridge(payload, sizeof(payload), values[0] != 0,
+                                               (int16_t)values[1], (uint16_t)values[2],
+                                               (uint16_t)values[3]);
+    } else if (strcmp(argv[1], "ftms_bridge") == 0) {
+        if (argc != 8
+            || !parse_long(argv[2], 0, 1, &values[0])
+            || !parse_long(argv[3], 0, 1, &values[1])
+            || !parse_long(argv[4], 0, 1, &values[2])
+            || !parse_long(argv[5], 0, UINT16_MAX, &values[3])
+            || !parse_long(argv[6], INT16_MIN, INT16_MAX, &values[4])
+            || !parse_long(argv[7], 0, UINT8_MAX, &values[5])) return usage(argv[0]);
+        length = ble_payload_encode_ftms_bridge(payload, sizeof(payload), values[0] != 0,
+                                                values[1] != 0, values[2] != 0,
+                                                (uint16_t)values[3], (int16_t)values[4],
+                                                (uint8_t)values[5]);
     } else if (strcmp(argv[1], "csc") == 0) {
         if (argc != 4
                 || !parse_long(argv[2], 0, UINT16_MAX, &values[0])

@@ -12,6 +12,7 @@
 #include "running_engine.h"
 #include "config_store.h"
 #include "device_identity.h"
+#include "power_bridge.h"
 
 /**
  * ERG 目标功率回调类型。
@@ -100,6 +101,8 @@ bool ble_bikepower_stop(void);
  * 特殊行为：这里只更新共享快照，不会立即主动发送通知。
  */
 void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm);
+/* 原样转发真实曲柄事件；无效样本功率归零，不补模拟速度或踏频。 */
+void ble_bikepower_set_bridge_data(const bridge_snapshot_t *snapshot, uint8_t heartrate_bpm);
 /**
  * 设置 BLE 广播字段掩码，同时决定 GATT 服务注册与通知发送。
  * mask：`BROADCAST_FIELD_*` 位组合，为 0 时归一化为全开。
@@ -149,6 +152,8 @@ void ble_bikepower_set_config_commit_callback(ble_config_commit_cb_t cb);
 void ble_bikepower_set_identity_write_callback(ble_identity_write_cb_t cb);
 /* 设置当前已落盘的 DIS 身份覆盖（DIS 读值与 7a5a0008 读值立即生效）。 */
 void ble_bikepower_set_identity(const device_identity_t *identity);
+/* 从受保护缓存读取当前 DIS 覆盖，不访问 NVS。 */
+void ble_bikepower_get_identity(device_identity_t *identity);
 
 /** 从运行时引擎刷新配置服务只读快照；字段实际变化时 revision 自动递增。 */
 void ble_bikepower_set_config_snapshot(const power_engine_t *engine);

@@ -28,6 +28,8 @@ if PARSER_ONLY:
 
 PARSERS = {
     "cps": parse_cps,
+    "cps_bridge": parse_cps,
+    "ftms_bridge": parse_ftms_indoor_bike,
     "csc": parse_csc,
     "hrs": parse_hr,
     "ftms_bike": parse_ftms_indoor_bike,
@@ -41,6 +43,13 @@ def cli_args(vector):
     fields = vector["input"]
     if protocol == "cps":
         values = [fields["power_w"], fields["crank_revolutions"], fields["crank_event_time_1024"]]
+    elif protocol == "cps_bridge":
+        values = [int(fields["has_crank"]), fields["power_w"],
+                  fields["crank_revolutions"], fields["crank_event_time_1024"]]
+    elif protocol == "ftms_bridge":
+        values = [int(fields["include_cadence"]), int(fields["include_power"]),
+                  int(fields["include_heartrate"]), fields["cadence_half_rpm"],
+                  fields["power_w"], fields["heart_rate_bpm"]]
     elif protocol == "csc":
         values = [fields["crank_revolutions"], fields["crank_event_time_1024"]]
     elif protocol == "hrs":

@@ -89,6 +89,9 @@ typedef enum {
 #define BLE_CONFIG_DIS_PROFILE_UUID_BYTES \
     0x21, 0x0b, 0x8c, 0x4a, 0x1f, 0x6d, 0x3e, 0x9b, \
     0x2a, 0x4f, 0x7a, 0x4c, 0x08, 0x00, 0x5a, 0x7a
+#define BLE_CONFIG_BRIDGE_UUID_BYTES \
+    0x21, 0x0b, 0x8c, 0x4a, 0x1f, 0x6d, 0x3e, 0x9b, \
+    0x2a, 0x4f, 0x7a, 0x4c, 0x09, 0x00, 0x5a, 0x7a
 
 // ===== 特征值 UUID =====
 #define POWER_CHAR_UUID            0x2A63
@@ -112,6 +115,7 @@ typedef enum {
 // ===== NVS 持久化 =====
 #define NVS_NAMESPACE          "bikepower"
 #define NVS_KEY_SCHEMA_VER     "sv"
+#define NVS_KEY_BRIDGE         "bridge"
 #define NVS_KEY_POWER          "power"
 #define NVS_KEY_CADENCE        "cadence"
 #define NVS_KEY_MODE           "mode"
@@ -163,6 +167,13 @@ typedef enum {
 #define BLE_NOTIFY_LOCK_WAIT_MS      10     // 通知互斥锁短等待上限：锁持有为微秒级，避免阻塞 NimBLE 任务
 #define BLE_SCAN_DEFAULT_MS          8000   // 模板库扫描附近 BLE 设备的默认时长
 #define BLE_SCAN_MAX_RESULTS         12     // 扫描结果缓存上限，避免配网态占用过多内存
+#define BLE_BRIDGE_TEST_MS           30000u
+#define BLE_BRIDGE_CONNECT_MS        8000u
+#define BLE_BRIDGE_NO_SAMPLE_MS      10000u
+#define BLE_BRIDGE_RECONNECT_MS      60000u
+#define BLE_BRIDGE_RETRY_MIN_MS      1000u
+#define BLE_BRIDGE_RETRY_MAX_MS      8000u
+#define BLE_BRIDGE_CPS_INPUT_MAX     64
 #define BLE_SCAN_READ_TIMEOUT_MS     10000  // 连接外部设备读取 DIS 的最长等待时间
 #define DEVICE_ANALYSIS_SAMPLE_MS    9000   // 外部运动设备短时连接采样窗口
 // 广播包名字 AD 字段最大字符数。31 字节预算 - flags(3) - 完整16位UUID列表(8) = 20 字节给名字 AD，
@@ -224,7 +235,7 @@ typedef enum {
 #define WIFI_PASSWORD          "12345678"
 #define WIFI_AP_CHANNEL        1
 #define WIFI_PORT              80
-#define WIFI_SHUTDOWN_MS       180000
+#define WIFI_SHUTDOWN_MS       300000
 #define WIFI_RENEW_MS          180000
 #define WIFI_PORTAL_CHECK_INTERVAL_US  1000000  // 配网门户超时检查周期（每秒）
 #define WIFI_PORTAL_REBOOT_DELAY_SEC  5         // 保存并关闭 WiFi 前的收尾等待时间（历史命名保留）

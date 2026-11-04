@@ -115,6 +115,8 @@ size_t ble_config_encode_group(ble_config_group_t group, const config_data_t *c,
         if (out_size < 2) return 0;
         out[0] = BLE_CONFIG_PROTOCOL_VERSION;
         return encode_string(out, out_size, 1, c->device_name, sizeof(c->device_name));
+    case BLE_CONFIG_GROUP_BRIDGE:
+        return power_bridge_config_encode(&c->bridge, out, out_size);
     default:
         return 0;
     }
@@ -175,6 +177,9 @@ bool ble_config_decode_group(ble_config_group_t group, const uint8_t *data, size
     case BLE_CONFIG_GROUP_IDENTITY:
         if (!decode_string(data, len, 1, next.device_name,
                            sizeof(next.device_name))) return false;
+        break;
+    case BLE_CONFIG_GROUP_BRIDGE:
+        if (!power_bridge_config_decode(data, len, &next.bridge)) return false;
         break;
     default:
         return false;

@@ -14,5 +14,7 @@ idf_component_register(
          "button_debounce.c"
          "ble_payload_codec.c"
          "ble_config_codec.c"
+         "cps_input_codec.c"
+         "power_bridge.c"
     INCLUDE_DIRS "include"
 )

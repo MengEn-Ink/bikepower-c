@@ -520,6 +520,7 @@ esp-web-install-button{--esp-tools-button-color:var(--accent-fill);--esp-tools-b
 .form-field input[type="number"],.form-field input[type="text"],.form-field select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:0;background:var(--bg);color:var(--ink);padding:9px 10px;font:14px/1.4 var(--mono)}
 .form-field input[aria-invalid="true"],.form-field select[aria-invalid="true"]{border-color:var(--red);background:var(--red-soft)}
 .field-hint{display:block;margin-top:5px;color:var(--faint);font-size:12px;line-height:1.45}.field-error{display:block;min-height:17px;margin-top:4px;color:var(--red);font-size:12px;line-height:1.4}
+.bridge-config .field-hint{color:var(--muted)}
 .check-line{min-height:44px;display:flex;align-items:center;gap:9px;border:1px solid var(--line);padding:9px 11px;background:var(--bg);color:var(--ink);cursor:pointer}.check-line input{width:18px;height:18px;accent-color:var(--accent)}
 .check-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.config-save-note{margin-top:13px;padding:11px 13px;border-left:3px solid var(--accent);background:var(--accent-soft);color:var(--muted);font-size:13px;line-height:1.6}
 .config-unavailable{grid-column:1/-1;padding:18px;border:1px solid var(--line);background:var(--panel)}
@@ -3016,6 +3017,7 @@ const CONFIG_GROUPS = [
   {key:"running",uuid:UUIDS.configRunning,bit:4},
   {key:"led",uuid:UUIDS.configLed,bit:8},
   {key:"identity",uuid:UUIDS.configIdentity,bit:16},
+  {key:"bridge",uuid:"7a5a0009-4c7a-4f2a-9b3e-6d1f4a8c0b21",bit:32,optional:true},
 ];
 const CONFIG_RESULTS = {
   0:"成功",1:"数据长度不正确",2:"协议版本不匹配",3:"设备正忙",4:"配置已被其他操作更新",
@@ -3635,6 +3637,12 @@ function parseConfigMeta(value){
 function parseConfigGroup(key,value){
   const bytes=configBytes(value);const view=configDataView(bytes);
   if(!bytes.length||bytes[0]!==CONFIG_PROTOCOL_VERSION)throw new Error(key+" 配置协议版本不匹配");
+  if(key==="bridge"){
+    if(bytes.length<16||bytes.length!==16+bytes[15]||bytes[15]>31)throw new Error("Bridge 配置长度不正确");
+    return {bridge_wire:Array.from(bytes),cycling_source:bytes[1],bridge_bound:bytes[2],
+      bridge_calibration:bytes[10],bridge_watts:view.getInt16(11,true),bridge_percent_x10:view.getInt16(13,true),
+      bridge_name:new TextDecoder("utf-8",{fatal:true}).decode(bytes.slice(16))};
+  }
   if(key==="core"){
     if(bytes.length!==15)throw new Error("Core 配置长度不正确");
     return {power:view.getUint16(1,true),cadence:view.getUint16(3,true),mode:bytes[5],heartrate:view.getUint16(6,true),has_user_hr:bytes[8],power_float:bytes[9],cadence_float:bytes[10],hr_float:bytes[11],power_step:bytes[12],sport_profile:bytes[13],broadcast_mask:bytes[14]};
@@ -3664,6 +3672,14 @@ function encodeConfigString(prefix,value,maxBytes){
   const out=new Uint8Array(prefix.length+1+encoded.length);out.set(prefix);out[prefix.length]=encoded.length;out.set(encoded,prefix.length+1);return out;
 }
 function encodeConfigGroup(key,c){
+  if(key==="bridge"){
+    const out=new Uint8Array(c.bridge_wire||[1,0,0,0,0,0,0,0,0,0,0,0,0,232,3,0]),view=configDataView(out);
+    if(c.cycling_source!==undefined)out[1]=c.cycling_source;
+    if(c.bridge_calibration!==undefined)out[10]=c.bridge_calibration;
+    if(c.bridge_watts!==undefined)view.setInt16(11,c.bridge_watts,true);
+    if(c.bridge_percent_x10!==undefined)view.setInt16(13,c.bridge_percent_x10,true);
+    return out;
+  }
   if(key==="core"){
     const out=new Uint8Array(15),view=configDataView(out);out[0]=CONFIG_PROTOCOL_VERSION;view.setUint16(1,c.power,true);view.setUint16(3,c.cadence,true);out[5]=c.mode;view.setUint16(6,c.heartrate,true);out[8]=c.has_user_hr?1:0;out[9]=c.power_float;out[10]=c.cadence_float;out[11]=c.hr_float;out[12]=c.power_step;out[13]=c.sport_profile;out[14]=c.broadcast_mask;return out;
   }
@@ -3684,7 +3700,7 @@ function parseConfigResponse(value){
   const view=configDataView(bytes);return {request:bytes[1],result:bytes[2],restartFlags:bytes[3],transactionId:view.getUint32(4,true),revision:view.getUint32(8,true)};
 }
 function makeConfigBegin(transactionId,revision){const out=new Uint8Array(10),view=configDataView(out);out[0]=0x01;out[1]=CONFIG_PROTOCOL_VERSION;view.setUint32(2,transactionId,true);view.setUint32(6,revision,true);return out;}
-function makeConfigCommit(transactionId){const out=new Uint8Array(6),view=configDataView(out);out[0]=0x02;view.setUint32(1,transactionId,true);out[5]=CONFIG_GROUP_MASK_ALL;return out;}
+function makeConfigCommit(transactionId,mask=CONFIG_GROUP_MASK_ALL){const out=new Uint8Array(6),view=configDataView(out);out[0]=0x02;view.setUint32(1,transactionId,true);out[5]=mask;return out;}
 function makeConfigCancel(transactionId){const out=new Uint8Array(5),view=configDataView(out);out[0]=0x03;view.setUint32(1,transactionId,true);return out;}
 async function writeConfigValue(characteristic,value){
   if(characteristic.writeValueWithResponse)await characteristic.writeValueWithResponse(value);
@@ -3713,6 +3729,7 @@ async function readDeviceConfig(rec,announce=false){
     if((meta.groupMask&CONFIG_GROUP_MASK_ALL)!==CONFIG_GROUP_MASK_ALL)throw new Error("设备未提供全部配置组");
     const current={schema_ver:meta.schema};
     for(const group of CONFIG_GROUPS){
+      if(group.optional&&!(meta.groupMask&group.bit))continue;
       const characteristic=await service.getCharacteristic(group.uuid);characters[group.key]=characteristic;
       Object.assign(current,parseConfigGroup(group.key,await characteristic.readValue()));
     }
@@ -3748,6 +3765,18 @@ function configSelect(id,label,value,options,hint="",extra=""){
 function configCheck(id,label,checked,hint="",extra=""){
   return '<div class="form-field '+extra+'"><label class="check-line" for="'+id+'"><input id="'+id+'" type="checkbox"'+(checked?' checked':'')+' aria-describedby="'+id+'-hint '+id+'-error"><span>'+escapeHtml(label)+'</span></label><span class="field-hint" id="'+id+'-hint">'+escapeHtml(hint)+'</span><span class="field-error" id="'+id+'-error"></span></div>';
 }
+function renderBridgeConfig(c){
+  if(!c.bridge_wire)return "";
+  const peer=c.bridge_bound?(c.bridge_name||"无名称功率计"):"尚未绑定功率计";
+  const address=c.bridge_bound?Array.from(c.bridge_wire.slice(4,10)).reverse().map(v=>v.toString(16).padStart(2,"0")).join(":").toUpperCase():"";
+  return '<details class="config-group bridge-config" open><summary>骑行输出来源与功率校正</summary><div class="config-fields">'+
+    configSelect("cfg-cycling-source","骑行输出来源",c.cycling_source,[[0,"模拟"],[1,"真实功率计"]],"首次扫描、测试及绑定请在设备配网页完成。")+
+    '<div class="form-field"><span class="field-label">已绑定功率计</span><strong>'+escapeHtml(peer)+'</strong><span class="field-hint">'+escapeHtml(address)+' · Pages 保留当前绑定，不更换功率计。</span></div>'+
+    configSelect("cfg-bridge-calibration","功率校正",c.bridge_calibration,[[0,"原始功率"],[1,"固定瓦数偏移"],[2,"百分比比例"]],"停踩 0W 保持为 0；最终输出限制为 0–2000W。")+
+    configField("cfg-bridge-watts","瓦数偏移",c.bridge_watts,-200,200,1,"单位 W；仅固定偏移时生效。")+
+    configField("cfg-bridge-percent","功率比例",(c.bridge_percent_x10/10).toFixed(1),50,150,.1,"单位 %；仅百分比时生效。")+
+    '<div class="field-hint span-all">真实来源仅影响骑行功率和同源踏频。首次切到真实来源时默认关闭模拟心率，可在广播数据项中手动开启。保存后才切换设备输出。</div></div></details>';
+}
 function renderConfigEditor(rec){
   const state=rec.configState;
   if(!state||!state.supported){
@@ -3761,7 +3790,7 @@ function renderConfigEditor(rec){
   return '<section class="config-panel" id="config-editor-shell"><div class="config-head"><div><h3>开发板 NVS 配置</h3><p>以下字段全部直接从设备读取。编辑只发生在浏览器中，点击“保存到设备”后才会通过事务写入 NVS。</p></div><div class="config-meta"><span class="badge muted">协议 v'+m.protocol+'</span><span class="badge muted">schema v'+m.schema+'</span><span class="badge ok" id="config-revision">revision '+m.revision+'</span><span class="badge warn" id="config-dirty">未修改</span></div></div>'+
     '<form id="config-form" onsubmit="saveDeviceConfig(event)" novalidate><div class="config-toolbar"><div class="config-status'+statusClass+'" id="config-status" role="status" aria-live="polite">'+escapeHtml(state.statusText||"已读取设备配置。")+'</div><div class="actions"><button class="btn ghost sm" type="button" data-config-action data-config-device-action onclick="reloadDeviceConfig()">从设备重新读取</button><button class="btn ghost sm" type="button" data-config-action onclick="restoreDeviceConfig()">恢复设备当前值</button><button class="btn alt sm" type="button" data-config-action onclick="downloadDeviceConfig()">导出配置 JSON</button><button class="btn primary sm" id="config-save" type="submit" data-config-action data-config-device-action>保存到设备</button></div></div><div class="config-error-summary hidden" id="config-error-summary" tabindex="-1" role="alert"></div><div class="config-groups">'+
     '<details class="config-group" open><summary>基础、身份与广播</summary><div class="config-fields">'+configTextField("cfg-device-name","设备名称",c.device_name,23,"UTF-8 最多 23 字节；修改后会刷新 GAP 名称。","span-2")+configSelect("cfg-sport-profile","运动 Profile",c.sport_profile,CONFIG_SPORT_OPTIONS,"改变后保存会暂时断开并重建 GATT。")+configSelect("cfg-mode","骑行模式",c.mode,CONFIG_MODE_OPTIONS,"ERG 是训练会话态，不写入 NVS。")+configField("cfg-power","基础功率",c.power,0,2000,1,"单位 W")+configField("cfg-cadence","基础踏频",c.cadence,20,120,1,"单位 RPM")+configCheck("cfg-hr-lock","锁定固定心率",!!c.has_user_hr,"关闭后心率随负荷联动。")+configField("cfg-heartrate","固定心率",c.heartrate,60,200,1,"单位 BPM；仅锁定时生效。")+configField("cfg-power-step","按钮调功步进",c.power_step,5,50,1,"单位 W")+configField("cfg-power-float","功率浮动",c.power_float,0,100,1,"±W")+configField("cfg-cadence-float","踏频浮动",c.cadence_float,0,20,1,"±RPM")+configField("cfg-hr-float","心率浮动",c.hr_float,0,20,1,"±BPM")+'<div class="form-field span-all"><span class="field-label">广播数据项（至少选择一项）</span><div class="check-grid">'+configCheck("cfg-broadcast-power","功率",!!(c.broadcast_mask&1))+configCheck("cfg-broadcast-cadence","踏频",!!(c.broadcast_mask&2))+configCheck("cfg-broadcast-hr","心率",!!(c.broadcast_mask&4))+'</div></div></div></details>'+
-    '<details class="config-group"><summary>骑行与个人参数</summary><div class="config-fields">'+configField("cfg-weight","体重",c.weight,40,150,1,"单位 kg")+configField("cfg-ftp","FTP",c.ftp,50,500,1,"单位 W")+configField("cfg-thr-hr","阈值心率",c.thr_hr,100,220,1,"单位 BPM")+configSelect("cfg-ride-type","骑行配速档",c.ride_type,CONFIG_RIDE_OPTIONS,"自定义档使用下方 W/kg 范围。")+configField("cfg-custom-wkg-low","自定义 W/kg 下限",(c.custom_wkg_low/10).toFixed(1),1,7,.1,"不能高于上限。")+configField("cfg-custom-wkg-high","自定义 W/kg 上限",(c.custom_wkg_high/10).toFixed(1),1,7,.1,"不能低于下限。")+configTextField("cfg-custom-pacer-name","自定义骑行档名称",c.custom_pacer_name,31,"UTF-8 最多 31 字节。","span-2")+'</div></details>'+
+    renderBridgeConfig(c)+'<details class="config-group"><summary>骑行与个人参数</summary><div class="config-fields">'+configField("cfg-weight","体重",c.weight,40,150,1,"单位 kg")+configField("cfg-ftp","FTP",c.ftp,50,500,1,"单位 W")+configField("cfg-thr-hr","阈值心率",c.thr_hr,100,220,1,"单位 BPM")+configSelect("cfg-ride-type","骑行配速档",c.ride_type,CONFIG_RIDE_OPTIONS,"自定义档使用下方 W/kg 范围。")+configField("cfg-custom-wkg-low","自定义 W/kg 下限",(c.custom_wkg_low/10).toFixed(1),1,7,.1,"不能高于上限。")+configField("cfg-custom-wkg-high","自定义 W/kg 上限",(c.custom_wkg_high/10).toFixed(1),1,7,.1,"不能低于下限。")+configTextField("cfg-custom-pacer-name","自定义骑行档名称",c.custom_pacer_name,31,"UTF-8 最多 31 字节。","span-2")+'</div></details>'+
     '<details class="config-group"><summary>跑步参数</summary><div class="config-fields">'+configField("cfg-run-speed","固定速度",(c.run_speed_x100/100).toFixed(2),3,25,.01,"单位 km/h")+configField("cfg-run-pace-float","配速浮动",c.run_pace_float_sec,0,60,1,"±秒/km")+configField("cfg-run-cadence","步频",c.run_cadence,120,220,1,"steps/min")+configField("cfg-run-cadence-float","步频浮动",c.run_cadence_float,0,20,1,"±steps/min")+configSelect("cfg-run-mode","跑步模式",c.run_mode,CONFIG_RUN_MODE_OPTIONS)+configSelect("cfg-run-pacer-type","配速模板",c.run_pacer_type,CONFIG_RUN_PACER_OPTIONS)+configField("cfg-run-pace-low","配速下限",c.run_pace_low_sec,144,1200,1,"秒/km，数值越小速度越快。")+configField("cfg-run-pace-high","配速上限",c.run_pace_high_sec,144,1200,1,"秒/km，必须不小于下限。")+configTextField("cfg-run-custom-name","自定义跑步档名称",c.run_custom_name,31,"UTF-8 最多 31 字节。","span-2")+'</div></details>'+
     '<details class="config-group"><summary>LED 灯效</summary><div class="config-fields">'+ledFields+'</div></details></div><div class="config-save-note">保存使用 BEGIN → 分组写入 → COMMIT 事务；只有设备校验并成功提交 NVS 后才显示成功。修改运动 Profile 或广播数据项会在成功后短暂断开 BLE，以便重建服务表。</div></form></section>';
 }
@@ -3769,11 +3798,21 @@ function refreshConfigEditor(rec){const shell=$("config-editor-shell");if(!shell
 function configNumber(id){return Number($(id).value);}
 function collectConfigForm(){
   const scenes=CONFIG_LED_SCENES.map(([key])=>({mode:configNumber("cfg-led-"+key+"-mode"),color:configNumber("cfg-led-"+key+"-color")}));
-  return {schema_ver:singleDevice.configState.meta.schema,device_name:$("cfg-device-name").value.trim(),sport_profile:configNumber("cfg-sport-profile"),mode:configNumber("cfg-mode"),power:configNumber("cfg-power"),cadence:configNumber("cfg-cadence"),has_user_hr:$("cfg-hr-lock").checked?1:0,heartrate:configNumber("cfg-heartrate"),power_step:configNumber("cfg-power-step"),power_float:configNumber("cfg-power-float"),cadence_float:configNumber("cfg-cadence-float"),hr_float:configNumber("cfg-hr-float"),broadcast_mask:($("cfg-broadcast-power").checked?1:0)|($("cfg-broadcast-cadence").checked?2:0)|($("cfg-broadcast-hr").checked?4:0),weight:configNumber("cfg-weight"),ftp:configNumber("cfg-ftp"),thr_hr:configNumber("cfg-thr-hr"),ride_type:configNumber("cfg-ride-type"),custom_wkg_low:Math.round(configNumber("cfg-custom-wkg-low")*10),custom_wkg_high:Math.round(configNumber("cfg-custom-wkg-high")*10),custom_pacer_name:$("cfg-custom-pacer-name").value.trim(),run_speed_x100:Math.round(configNumber("cfg-run-speed")*100),run_pace_float_sec:configNumber("cfg-run-pace-float"),run_cadence:configNumber("cfg-run-cadence"),run_cadence_float:configNumber("cfg-run-cadence-float"),run_mode:configNumber("cfg-run-mode"),run_pacer_type:configNumber("cfg-run-pacer-type"),run_pace_low_sec:configNumber("cfg-run-pace-low"),run_pace_high_sec:configNumber("cfg-run-pace-high"),run_custom_name:$("cfg-run-custom-name").value.trim(),led_silent:$("cfg-led-silent").checked?1:0,led_scenes:scenes};
+  const current=singleDevice.configState.current;
+  const bridge=current.bridge_wire?{...parseConfigGroup("bridge",configDataView(new Uint8Array(current.bridge_wire))),
+    cycling_source:configNumber("cfg-cycling-source"),bridge_calibration:configNumber("cfg-bridge-calibration"),
+    bridge_watts:configNumber("cfg-bridge-watts"),bridge_percent_x10:Math.round(configNumber("cfg-bridge-percent")*10)}:{};
+  return {...bridge,schema_ver:singleDevice.configState.meta.schema,device_name:$("cfg-device-name").value.trim(),sport_profile:configNumber("cfg-sport-profile"),mode:configNumber("cfg-mode"),power:configNumber("cfg-power"),cadence:configNumber("cfg-cadence"),has_user_hr:$("cfg-hr-lock").checked?1:0,heartrate:configNumber("cfg-heartrate"),power_step:configNumber("cfg-power-step"),power_float:configNumber("cfg-power-float"),cadence_float:configNumber("cfg-cadence-float"),hr_float:configNumber("cfg-hr-float"),broadcast_mask:($("cfg-broadcast-power").checked?1:0)|($("cfg-broadcast-cadence").checked?2:0)|($("cfg-broadcast-hr").checked?4:0),weight:configNumber("cfg-weight"),ftp:configNumber("cfg-ftp"),thr_hr:configNumber("cfg-thr-hr"),ride_type:configNumber("cfg-ride-type"),custom_wkg_low:Math.round(configNumber("cfg-custom-wkg-low")*10),custom_wkg_high:Math.round(configNumber("cfg-custom-wkg-high")*10),custom_pacer_name:$("cfg-custom-pacer-name").value.trim(),run_speed_x100:Math.round(configNumber("cfg-run-speed")*100),run_pace_float_sec:configNumber("cfg-run-pace-float"),run_cadence:configNumber("cfg-run-cadence"),run_cadence_float:configNumber("cfg-run-cadence-float"),run_mode:configNumber("cfg-run-mode"),run_pacer_type:configNumber("cfg-run-pacer-type"),run_pace_low_sec:configNumber("cfg-run-pace-low"),run_pace_high_sec:configNumber("cfg-run-pace-high"),run_custom_name:$("cfg-run-custom-name").value.trim(),led_silent:$("cfg-led-silent").checked?1:0,led_scenes:scenes};
 }
 function validateConfig(config){
   const errors=[];const add=(id,message)=>errors.push({id,message});
   const integer=(id,value,[min,max],label)=>{if(!Number.isInteger(value)||value<min||value>max)add(id,label+"必须是 "+min+"–"+max+" 的整数");};
+  if(config.bridge_wire){
+    if(![0,1].includes(config.cycling_source)||config.cycling_source===1&&!config.bridge_bound)add("cfg-cycling-source","请先在设备配网页扫描、测试并绑定真实功率计");
+    if(![0,1,2].includes(config.bridge_calibration))add("cfg-bridge-calibration","功率校正方式无效");
+    integer("cfg-bridge-watts",config.bridge_watts,[-200,200],"瓦数偏移");
+    integer("cfg-bridge-percent",config.bridge_percent_x10,[500,1500],"功率比例（0.1%）");
+  }
   integer("cfg-power",config.power,CONFIG_LIMITS.power,"基础功率");integer("cfg-cadence",config.cadence,CONFIG_LIMITS.cadence,"基础踏频");integer("cfg-heartrate",config.heartrate,CONFIG_LIMITS.heartrate,"固定心率");integer("cfg-power-step",config.power_step,CONFIG_LIMITS.power_step,"按钮步进");integer("cfg-power-float",config.power_float,CONFIG_LIMITS.power_float,"功率浮动");integer("cfg-cadence-float",config.cadence_float,CONFIG_LIMITS.cadence_float,"踏频浮动");integer("cfg-hr-float",config.hr_float,CONFIG_LIMITS.hr_float,"心率浮动");
   if(![0,1].includes(config.sport_profile))add("cfg-sport-profile","运动 Profile 无效");if(![0,1].includes(config.mode))add("cfg-mode","骑行模式无效");if(!config.broadcast_mask)add("cfg-broadcast-power","广播数据项至少选择一项");
   integer("cfg-weight",config.weight,CONFIG_LIMITS.weight,"体重");integer("cfg-ftp",config.ftp,CONFIG_LIMITS.ftp,"FTP");integer("cfg-thr-hr",config.thr_hr,CONFIG_LIMITS.thr_hr,"阈值心率");if(!Number.isInteger(config.ride_type)||config.ride_type<0||config.ride_type>5)add("cfg-ride-type","骑行配速档无效");
@@ -3804,7 +3843,11 @@ function updateConfigDirty(){
   const badge=$("config-dirty");badge.textContent=dirty?"有未保存修改":"未修改";badge.className="badge "+(dirty?"warn":"ok");const save=$("config-save");if(save)save.disabled=!dirty||singleDevice.configState.saving||!singleDevice.server||!singleDevice.server.connected;
 }
 function bindConfigForm(rec){
-  const form=$("config-form");if(!form)return;form.addEventListener("input",updateConfigDirty);form.addEventListener("change",updateConfigDirty);form.querySelectorAll("input,select").forEach(field=>field.addEventListener("blur",()=>{let errors=[];try{errors=validateConfig(collectConfigForm());}catch(err){}const output=$(field.id+"-error");if(output)output.textContent="";field.removeAttribute("aria-invalid");showConfigErrors(errors,false,field.id);}));updateConfigDirty();
+  const form=$("config-form");if(!form)return;
+  const source=$("cfg-cycling-source");
+  if(source){source.querySelector('option[value="1"]').disabled=!rec.configState.current.bridge_bound;let previous=Number(source.value);
+    source.addEventListener("change",()=>{if(previous===0&&Number(source.value)===1)$("cfg-broadcast-hr").checked=false;previous=Number(source.value);updateConfigDirty();});}
+  form.addEventListener("input",updateConfigDirty);form.addEventListener("change",updateConfigDirty);form.querySelectorAll("input,select").forEach(field=>field.addEventListener("blur",()=>{let errors=[];try{errors=validateConfig(collectConfigForm());}catch(err){}const output=$(field.id+"-error");if(output)output.textContent="";field.removeAttribute("aria-invalid");showConfigErrors(errors,false,field.id);}));updateConfigDirty();
 }
 function setConfigStatus(message,kind=""){
   const status=$("config-status");if(status){status.textContent=message;status.className="config-status"+(kind?" "+kind:"");}
@@ -3826,15 +3869,19 @@ function restoreDeviceConfig(){if(!singleDevice||!singleDevice.configState.curre
 function downloadDeviceConfig(){
   if(!singleDevice||!singleDevice.configState.current)return;const payload={exported_at:new Date().toISOString(),device_id:singleDevice.device.id,revision:singleDevice.configState.meta.revision,schema_version:singleDevice.configState.meta.schema,config:singleDevice.configState.current};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="bikepower-nvs-config-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";a.click();URL.revokeObjectURL(url);
 }
-/* 配置事务核心：BEGIN → 五组写入 → COMMIT；失败时尽力 CANCEL。供表单保存与模板写入共用。 */
+/* 配置事务核心：BEGIN → 支持的配置组写入 → COMMIT；失败时尽力 CANCEL。供表单保存与模板写入共用。 */
 async function runConfigTransaction(rec,config,onStatus=()=>{}){
   const state=rec.configState;const control=state.characters.control;let transactionId=0;let began=false;let committed=false;
   try{
     onStatus("正在建立配置事务…");await control.startNotifications();
     transactionId=crypto.getRandomValues(new Uint32Array(1))[0]||1;
     let responsePromise=waitForConfigResponse(control,0x01,transactionId);await writeConfigValue(control,makeConfigBegin(transactionId,state.meta.revision));let response=await responsePromise;if(response.result!==0)throw configResultError(response);began=true;
-    let written=0;for(const group of CONFIG_GROUPS){onStatus("正在写入配置组 "+(++written)+" / "+CONFIG_GROUPS.length+"…");await writeConfigValue(state.characters[group.key],encodeConfigGroup(group.key,config));}
-    onStatus("设备正在校验并写入 NVS…");responsePromise=waitForConfigResponse(control,0x02,transactionId);await writeConfigValue(control,makeConfigCommit(transactionId));committed=true;response=await responsePromise;if(response.result!==0)throw configResultError(response);
+    if(state.current.bridge_wire){
+      if(!config.bridge_wire)Object.assign(config,parseConfigGroup("bridge",configDataView(new Uint8Array(state.current.bridge_wire))));
+      config.bridge_wire=Array.from(encodeConfigGroup("bridge",config));
+    }
+    let written=0;for(const group of CONFIG_GROUPS){if(group.optional&&!state.characters[group.key])continue;onStatus("正在写入配置组 "+(++written)+" / "+CONFIG_GROUPS.length+"…");await writeConfigValue(state.characters[group.key],encodeConfigGroup(group.key,config));}
+    onStatus("设备正在校验并写入 NVS…");responsePromise=waitForConfigResponse(control,0x02,transactionId);await writeConfigValue(control,makeConfigCommit(transactionId,CONFIG_GROUP_MASK_ALL|(state.characters.bridge?32:0)));committed=true;response=await responsePromise;if(response.result!==0)throw configResultError(response);
     state.meta.revision=response.revision;state.current=JSON.parse(JSON.stringify(config));
     return response;
   }catch(err){

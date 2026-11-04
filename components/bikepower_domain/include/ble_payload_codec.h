@@ -22,6 +22,15 @@ size_t ble_payload_encode_cps(uint8_t *out, size_t capacity,
                               int16_t power_w,
                               uint16_t crank_revolutions,
                               uint16_t crank_event_time_1024);
+/* 桥接设备无曲柄字段时只发 4 字节功率，不伪造曲柄累计。 */
+size_t ble_payload_encode_cps_bridge(uint8_t *out, size_t capacity, bool has_crank,
+                                     int16_t power_w, uint16_t crank_revolutions,
+                                     uint16_t crank_event_time_1024);
+/* 桥接 FTMS 无速度字段，按有效性选择真实踏频、功率和模拟心率。 */
+size_t ble_payload_encode_ftms_bridge(uint8_t *out, size_t capacity,
+                                      bool include_cadence, bool include_power,
+                                      bool include_heartrate, uint16_t cadence_half_rpm,
+                                      int16_t power_w, uint8_t heart_rate_bpm);
 
 size_t ble_payload_encode_csc(uint8_t *out, size_t capacity,
                               uint16_t crank_revolutions,

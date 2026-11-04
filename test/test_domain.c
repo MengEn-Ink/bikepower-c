@@ -1209,7 +1209,7 @@ static void test_web_config_persistence_scenario(void)
     saved.led.scenes[LED_SCENE_WIFI_CONFIG].mode = LED_MODE_BREATH;
     saved.led.scenes[LED_SCENE_WIFI_CONFIG].color = LED_COLOR_CYAN;
 
-    char json[768];
+    char json[CONFIG_JSON_MAX_LEN];
     size_t n = config_store_serialize(&saved, json, sizeof(json));
     CHECK(n > 0, "网页保存配置可序列化");
     CHECK(strstr(json, "\"power\":345") != NULL, "网页保存 JSON 含功率");
@@ -1481,7 +1481,7 @@ static void test_config_store(void)
     CHECK(hr2.has_user_hr == 1, "has_user_hr 规范化为1");
 
     // ===== 序列化 / 反序列化 往返 =====
-    char js[768];
+    char js[CONFIG_JSON_MAX_LEN];
     config_data_t src;
     config_store_defaults(&src);
     src.power = 222;
@@ -2003,7 +2003,7 @@ static void test_running_pacer_defaults(void)
     config_data_t c;
     config_store_defaults(&c);
 
-    CHECK(CONFIG_VERSION == 12, "配置 schema 版本升级到 12");
+    CHECK(CONFIG_VERSION == 13, "配置 schema 版本升级到 13");
     CHECK(c.run_mode == RUN_MODE_FIXED, "默认跑步模式为固定配速");
     CHECK(c.run_pacer_type == RUN_PACER_JOG, "默认跑步模板为慢跑");
     CHECK(c.run_pace_low_sec == 390, "默认跑步模板下限=6:30/km");

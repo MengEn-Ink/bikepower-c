@@ -12,9 +12,20 @@
 #include <stdbool.h>
 
 #include "power_engine.h"
+#include "config_store.h"
 #include "esp_err.h"
+#include "device_identity.h"
 
 typedef bool (*wifi_portal_done_callback_t)(void);
+typedef bool (*wifi_portal_config_callback_t)(const config_data_t *config,
+    uint32_t transaction, uint32_t revision, bool close_wifi,
+    const device_identity_t *identity);
+void wifi_portal_set_config_callback(wifi_portal_config_callback_t callback);
+/* 应用主循环发布一致快照，并完成已接受的配置事务。 */
+void wifi_portal_sync(const power_engine_t *engine);
+bool wifi_portal_revision_matches(uint32_t revision);
+void wifi_portal_config_result(uint32_t transaction, uint8_t result,
+    uint8_t restart_flags, const config_data_t *applied);
 
 /**
  * 启动 WiFi 配网门户（HTTP 部分）。

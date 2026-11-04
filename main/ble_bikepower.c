@@ -29,6 +29,7 @@
 #include "running_engine.h"
 #include "ble_bikepower.h"
 #include "board_detect.h"
+#include "ble_power_bridge.h"
 
 static const char *TAG = "BLE";
 
@@ -65,6 +66,11 @@ static uint32_t g_last_crank_ms = 0;
 
 // 预分配通知缓冲区（运行时零 malloc）
 static uint8_t g_cps_buf[BLE_PAYLOAD_CPS_LEN];
+static size_t g_cps_len = BLE_PAYLOAD_CPS_LEN;
+static portMUX_TYPE s_bridge_data_lock = portMUX_INITIALIZER_UNLOCKED;
+static bridge_snapshot_t s_bridge_sample;
+static bool s_real_source;
+static bool s_bridge_csc_valid;
 static uint8_t g_hr_buf[BLE_PAYLOAD_HRS_LEN];
 static uint8_t g_csc_buf[BLE_PAYLOAD_CSC_LEN];
 static uint8_t g_rsc_buf[BLE_PAYLOAD_RSC_LEN];
@@ -111,6 +117,7 @@ static const ble_uuid128_t g_config_profile_uuid = BLE_UUID128_INIT(BLE_CONFIG_P
 static const ble_uuid128_t g_config_running_uuid = BLE_UUID128_INIT(BLE_CONFIG_RUNNING_UUID_BYTES);
 static const ble_uuid128_t g_config_led_uuid = BLE_UUID128_INIT(BLE_CONFIG_LED_UUID_BYTES);
 static const ble_uuid128_t g_config_identity_uuid = BLE_UUID128_INIT(BLE_CONFIG_IDENTITY_UUID_BYTES);
+static const ble_uuid128_t g_config_bridge_uuid = BLE_UUID128_INIT(BLE_CONFIG_BRIDGE_UUID_BYTES);
 static const ble_uuid128_t g_config_control_uuid = BLE_UUID128_INIT(BLE_CONFIG_CONTROL_UUID_BYTES);
 static const ble_uuid128_t g_config_dis_profile_uuid = BLE_UUID128_INIT(BLE_CONFIG_DIS_PROFILE_UUID_BYTES);
 
@@ -177,7 +184,7 @@ static int chr_read_buf(struct ble_gatt_access_ctxt *ctxt, const uint8_t *buf, s
 static int cps_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_cps_buf, sizeof(g_cps_buf));
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_cps_buf, g_cps_len);
     return BLE_ATT_ERR_UNLIKELY;
 }
 
@@ -253,6 +260,15 @@ static int ftms_feat_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
         const uint8_t *buf = (g_profile == SPORT_PROFILE_RUNNING)
             ? g_ftms_running_feature_buf
             : g_ftms_cycling_feature_buf;
+        portENTER_CRITICAL(&s_bridge_data_lock);
+        bool real = s_real_source;
+        portEXIT_CRITICAL(&s_bridge_data_lock);
+        if (g_profile == SPORT_PROFILE_CYCLING && real) {
+            uint8_t bridge_feature[8];
+            memcpy(bridge_feature, buf, sizeof(bridge_feature));
+            bridge_feature[4] = 0;
+            return chr_read_buf(ctxt, bridge_feature, sizeof(bridge_feature));
+        }
         return chr_read_buf(ctxt, buf, sizeof(g_ftms_cycling_feature_buf));
     }
     return BLE_ATT_ERR_UNLIKELY;
@@ -952,6 +968,10 @@ static const struct ble_gatt_svc_def config_gatt_svc = {
         { .uuid = &g_config_dis_profile_uuid.u,
           .access_cb = config_dis_profile_access_cb,
           .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
+        { .uuid = &g_config_bridge_uuid.u,
+          .access_cb = config_group_access_cb,
+          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_BRIDGE,
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
         { 0 }
     }
 };
@@ -1009,6 +1029,27 @@ static void reset_svc_handles(void)
  */
 static void pack_all(void)
 {
+    portENTER_CRITICAL(&s_bridge_data_lock);
+    bool real = s_real_source;
+    bridge_snapshot_t sample = s_bridge_sample;
+    portEXIT_CRITICAL(&s_bridge_data_lock);
+    if (real) {
+        bool crank = sample.valid && sample.has_crank;
+        s_bridge_csc_valid = crank;
+        g_cps_len = ble_payload_encode_cps_bridge(g_cps_buf, sizeof(g_cps_buf), crank,
+            (int16_t)sample.power_w, sample.crank_revolutions, sample.crank_event_time_1024);
+        ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), g_hr_bpm);
+        ble_payload_encode_csc(g_csc_buf, sizeof(g_csc_buf),
+            sample.crank_revolutions, sample.crank_event_time_1024);
+        g_ftms_bike_len = ble_payload_encode_ftms_bridge(g_ftms_bike_buf, sizeof(g_ftms_bike_buf),
+            sample.valid && sample.cadence_valid && (g_broadcast_mask & BROADCAST_FIELD_CADENCE),
+            (g_broadcast_mask & BROADCAST_FIELD_POWER) != 0,
+            (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) != 0,
+            sample.cadence_half_rpm, (int16_t)sample.power_w, g_hr_bpm);
+        return;
+    }
+    g_cps_len = BLE_PAYLOAD_CPS_LEN;
+    s_bridge_csc_valid = true;
     uint16_t power = g_power_w;
     uint16_t cadence = g_cadence;
     if (cadence < 1) cadence = 1;
@@ -1133,9 +1174,9 @@ static void notify_tick(void *arg)
         }
     } else {
         pack_all();
-        if (g_broadcast_mask & BROADCAST_FIELD_POWER) notify_one_nolock(g_cps_val_handle, g_cps_buf, sizeof(g_cps_buf));
+        if (g_broadcast_mask & BROADCAST_FIELD_POWER) notify_one_nolock(g_cps_val_handle, g_cps_buf, g_cps_len);
         if (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
-        if (g_broadcast_mask & BROADCAST_FIELD_CADENCE) notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
+        if ((g_broadcast_mask & BROADCAST_FIELD_CADENCE) && s_bridge_csc_valid) notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
         if (g_broadcast_mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, g_ftms_bike_len);
     }
     xSemaphoreGive(g_notify_lock);
@@ -1329,6 +1370,7 @@ static void on_sync(void)
  */
 static void on_reset(int reason)
 {
+    ble_power_bridge_host_reset();
     ESP_LOGE(TAG, "BLE 协议栈复位 reason=%d", reason);
     // 复位后旧连接句柄已失效且不会有断开事件，清理以免 conn_count 误报已连接、
     // notify_tick 持续向失效句柄发通知。
@@ -1363,9 +1405,22 @@ static void ble_host_task(void *param)
  */
 void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm)
 {
+    portENTER_CRITICAL(&s_bridge_data_lock);
+    s_real_source = false;
+    portEXIT_CRITICAL(&s_bridge_data_lock);
     g_power_w = power_w;
     g_hr_bpm = heartrate_bpm;
     g_cadence = cadence_rpm;
+}
+
+void ble_bikepower_set_bridge_data(const bridge_snapshot_t *snapshot, uint8_t heartrate_bpm)
+{
+    if (!snapshot) return;
+    portENTER_CRITICAL(&s_bridge_data_lock);
+    s_real_source = true;
+    s_bridge_sample = *snapshot;
+    g_hr_bpm = heartrate_bpm;
+    portEXIT_CRITICAL(&s_bridge_data_lock);
 }
 
 void ble_bikepower_set_broadcast_mask(int mask)
@@ -1422,6 +1477,14 @@ void ble_bikepower_set_config_commit_callback(ble_config_commit_cb_t cb)
 void ble_bikepower_set_identity_write_callback(ble_identity_write_cb_t cb)
 {
     g_identity_write_cb = cb;
+}
+
+void ble_bikepower_get_identity(device_identity_t *identity)
+{
+    if (!identity) return;
+    portENTER_CRITICAL(&g_identity_lock);
+    *identity = g_identity;
+    portEXIT_CRITICAL(&g_identity_lock);
 }
 
 void ble_bikepower_set_identity(const device_identity_t *identity)
@@ -1650,6 +1713,7 @@ bool ble_bikepower_start_failed(void)
  */
 bool ble_bikepower_stop(void)
 {
+    ble_power_bridge_radio_stop();
     g_stopping = true;
     if (g_notify_timer) {
         esp_timer_stop(g_notify_timer);

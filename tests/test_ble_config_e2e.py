@@ -39,11 +39,12 @@ def fixture_groups():
         "running": running,
         "led": led,
         "identity": identity,
+        "bridge": bytes.fromhex("01000000000000000000000000e80300"),
     }
 
 
 def main():
-    meta = struct.pack("<BBBBIHH", 1, 12, 0x1F, 0x0F, 0x11223344, 48, 0)
+    meta = struct.pack("<BBBBIHH", 1, 13, 0x3F, 0x0F, 0x11223344, 48, 0)
     parsed_meta = parse_meta(meta)
     assert parsed_meta["revision"] == 0x11223344
     assert parsed_meta["group_mask"] == GROUP_MASK_ALL
@@ -61,7 +62,7 @@ def main():
     assert make_begin(0x01020304, 0x11223344) == bytes.fromhex(
         "01010403020144332211"
     )
-    assert make_commit(0x01020304) == bytes.fromhex("02040302011f")
+    assert make_commit(0x01020304) == bytes.fromhex("02040302013f")
     assert make_cancel(0x01020304) == bytes.fromhex("0304030201")
     assert make_begin(1, 2)[0] == OP_BEGIN
     assert make_commit(1)[0] == OP_COMMIT
@@ -95,7 +96,7 @@ def main():
     assert "--control" not in selftest_command("cycling", 12, 250)
     assert PROTOCOL_VERSION == 1
 
-    print(f"{TAG} PASS 元数据、控制帧、五组修改、非法值、GATT 掩码与 profile 回归")
+    print(f"{TAG} PASS 元数据、控制帧、六组修改、非法值、GATT 掩码与 profile 回归")
     return 0
 
 

@@ -56,6 +56,43 @@ size_t ble_payload_encode_csc(uint8_t *out, size_t capacity,
     return BLE_PAYLOAD_CSC_LEN;
 }
 
+size_t ble_payload_encode_cps_bridge(uint8_t *out, size_t capacity, bool has_crank,
+                                     int16_t power_w, uint16_t revolutions, uint16_t event_time)
+{
+    if (has_crank) return ble_payload_encode_cps(out, capacity, power_w, revolutions, event_time);
+    if (!out || capacity < 4) return 0;
+    put_u16_le(out, 0);
+    put_u16_le(out + 2, (uint16_t)power_w);
+    return 4;
+}
+
+size_t ble_payload_encode_ftms_bridge(uint8_t *out, size_t capacity,
+                                      bool cadence, bool power, bool heartrate,
+                                      uint16_t cadence_half_rpm, int16_t power_w, uint8_t bpm)
+{
+    if (!out || (!cadence && !power && !heartrate)) return 0;
+    size_t required = 2 + (cadence ? 2 : 0) + (power ? 2 : 0) + (heartrate ? 1 : 0);
+    if (capacity < required) return 0;
+    uint16_t flags = FTMS_BIKE_FLAG_MORE_DATA;
+    size_t offset = 2;
+    if (cadence) {
+        flags |= FTMS_BIKE_FLAG_CADENCE;
+        put_u16_le(out + offset, cadence_half_rpm);
+        offset += 2;
+    }
+    if (power) {
+        flags |= FTMS_BIKE_FLAG_POWER;
+        put_u16_le(out + offset, (uint16_t)power_w);
+        offset += 2;
+    }
+    if (heartrate) {
+        flags |= 0x0200;
+        out[offset++] = bpm;
+    }
+    put_u16_le(out, flags);
+    return offset;
+}
+
 size_t ble_payload_encode_hrs(uint8_t *out, size_t capacity, uint8_t heart_rate_bpm)
 {
     if (!out || capacity < BLE_PAYLOAD_HRS_LEN) return 0;

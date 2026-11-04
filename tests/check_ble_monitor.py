@@ -113,7 +113,7 @@ def main():
         ("downsampleTracePoints", "长会话曲线绘制前执行保峰降采样"),
         ("downloadSignalCsv", "支持导出完整会话 CSV"),
         ("7a5a0000-4c7a-4f2a-9b3e-6d1f4a8c0b21", "声明 BikePower 配置服务 UUID"),
-        ("CONFIG_GROUPS", "配置按 Core/Profile/Running/LED/Identity 五组读写"),
+        ("CONFIG_GROUPS", "配置按基础五组及可选 Bridge 组读写"),
         ("readDeviceConfig", "连接后读取开发板全部配置"),
         ("saveDeviceConfig", "支持编辑并保存开发板配置"),
         ("makeConfigBegin", "保存前建立带 revision 的配置事务"),
@@ -342,13 +342,39 @@ const actualCore = Array.from(encodeConfigGroup("core", fixture));
 const begin = Array.from(makeConfigBegin(0x01020304, 0x11223344));
 const commit = Array.from(makeConfigCommit(0x01020304));
 if (!configsEqual(fixture, merged)
-    || JSON.stringify(lengths) !== JSON.stringify([15, 22, 24, 12, 14])
+    || JSON.stringify(lengths) !== JSON.stringify([15, 22, 24, 12, 14, 16])
     || JSON.stringify(actualCore) !== JSON.stringify(expectedCore)
     || JSON.stringify(begin) !== JSON.stringify([1, 1, 4, 3, 2, 1, 68, 51, 34, 17])
     || JSON.stringify(commit) !== JSON.stringify([2, 4, 3, 2, 1, 31])) {
   throw new Error("BLE 配置网页协议运行时回归失败");
 }
 const dv = arr => { const u = new Uint8Array(arr); return new DataView(u.buffer); };
+const bridgeWire=[1,1,1,1,1,2,3,4,5,6,1,12,0,232,3,2,80,77];
+const bridgeBack=parseConfigGroup("bridge",dv(bridgeWire));
+if(JSON.stringify(Array.from(encodeConfigGroup("bridge",bridgeBack)))!==JSON.stringify(bridgeWire)
+    || makeConfigCommit(1,63)[5]!==63 || bridgeBack.bridge_watts!==12){
+  throw new Error("Bridge 原始配置保留及六组提交失败");
+}
+const editedBridge={...fixture,...bridgeBack,cycling_source:0,bridge_calibration:2,bridge_watts:-25,bridge_percent_x10:1123};
+const editedBytes=Array.from(encodeConfigGroup("bridge",editedBridge));
+if(editedBytes[1]!==0||editedBytes[10]!==2||dv(editedBytes).getInt16(11,true)!==-25
+    ||dv(editedBytes).getInt16(13,true)!==1123
+    ||JSON.stringify(editedBytes.slice(2,10))!==JSON.stringify(bridgeWire.slice(2,10))
+    ||JSON.stringify(editedBytes.slice(15))!==JSON.stringify(bridgeWire.slice(15))
+    ||configsEqual(editedBridge,{...fixture,...bridgeBack})){
+  throw new Error("Pages 校正草稿必须编码且保留绑定");
+}
+if(!validateConfig({...fixture,...bridgeBack,bridge_bound:0}).some(e=>e.id==="cfg-cycling-source")
+    ||!validateConfig({...editedBridge,bridge_percent_x10:1501}).some(e=>e.id==="cfg-bridge-percent")
+    ||!validateConfig({...editedBridge,bridge_watts:-201}).some(e=>e.id==="cfg-bridge-watts")){
+  throw new Error("Pages 未绑定及校正边界校验缺失");
+}
+const bridgeEditor=renderConfigEditor({configState:{supported:true,current:{...fixture,...bridgeBack},meta:{protocol:1,schema:13,revision:1}}});
+const legacyEditor=renderConfigEditor({configState:{supported:true,current:fixture,meta:{protocol:1,schema:12,revision:1}}});
+if(!bridgeEditor.includes('id="cfg-cycling-source"')||!bridgeEditor.includes('id="cfg-bridge-percent"')
+    ||!bridgeEditor.includes("PM")||legacyEditor.includes('id="cfg-cycling-source"')){
+  throw new Error("Pages 桥接表单及旧固件降级失败");
+}
 const identity = {manufacturer: "萌恩", model: "BP-C3", serial: "", hardware: "v2", firmware: "1.4.0", software: ""};
 const idBytes = encodeIdentityProfile(identity);
 const idBack = decodeIdentityProfile(new DataView(idBytes.buffer, idBytes.byteOffset, idBytes.byteLength));
@@ -421,7 +447,7 @@ if (safeSitePath("firmware/../x") !== null) throw new Error("路径穿越必须�
             runtime_path = tmp.name
         try:
             result = subprocess.run([node, runtime_path], capture_output=True, text=True, timeout=15)
-            check(result.returncode == 0, "网页配置协议小端编码与五组往返正确", failures)
+            check(result.returncode == 0, "网页六组小端编码、桥接编辑和旧固件兼容正确", failures)
             if result.returncode != 0:
                 print((result.stderr or result.stdout).strip())
         finally:

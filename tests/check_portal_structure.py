@@ -1,487 +1,64 @@
 #!/usr/bin/env python3
-"""TC-3d WiFi 门户静态结构检查（无需设备，v3.2.0 重构版）
-
-v3.2.0 起 HTML 不再嵌入 C 字符串，前端三件套独立存放：
-  - main/web/index.html  - SPA 入口（含占位符）
-  - main/web/app.css     - 样式
-  - main/web/app.js      - SPA 逻辑
-
-静态校验四类内容，防止烧录后才发现路由缺失或字段漂移：
-
-1. HTML 基础结构：index.html 必须含 <html>/<head>/<body>/<meta viewport>，
-   且必须保留 <!-- INLINE_CSS --> 与 <!-- INLINE_JS --> 占位符（编译时替换）。
-2. 路由表一致性：wifi_portal.c 注册的路由必须包含前端调用的全部 /api/xxx。
-3. 前端 API 调用完整性：app.js 必须调用 /api/state（初始化）和 /api/time（轮询）。
-4. 前端信息架构：底部只保留首页/设置两 Tab，用户资料、设备信息、关于并入设置页。
-   物理按钮和 LED 自定义配置归入设备信息分区。
-
-设计：仅做静态文本匹配，不解析 DOM，不依赖 bs4 / lxml，便于 CI 裸跑。
-
-用法:
-    python3 tests/check_portal_structure.py
-退出码: 0 全绿, 1 有失败
-"""
+"""TC-3d 核心门户结构、路由、体积和设备资源边界。"""
+import importlib.util
 import re
-import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-INDEX_HTML = ROOT / "main" / "web" / "index.html"
-APP_JS = ROOT / "main" / "web" / "app.js"
-APP_CSS = ROOT / "main" / "web" / "app.css"
-PORTAL_C = ROOT / "main" / "wifi_portal.c"
-INLINE_STATIC = ROOT / "scripts" / "inline_static.py"
-BLE_SCANNER_C = ROOT / "main" / "ble_scanner.c"
-DEVICE_ANALYSIS_C = ROOT / "components" / "bikepower_domain" / "device_analysis.c"
-CAPTIVE_PORTAL_C = ROOT / "main" / "captive_portal.c"
-PORTAL_CONFIG_SAVE_TEST = ROOT / "tests" / "test_portal_config_save.py"
-CORE_FLOW_ENDURANCE_TEST = ROOT / "tests" / "test_core_flow_endurance.py"
-TEST_RUNNER = ROOT / "tests" / "test_runner.sh"
-
-TAG = "[TC-3d]"
-g_pass = 0
-g_fail = 0
-failures = []
 
 
-def check(cond: bool, msg: str):
-    global g_pass, g_fail
-    if cond:
-        g_pass += 1
-    else:
-        g_fail += 1
-        failures.append(msg)
-        print(f"{TAG}   FAIL {msg}")
+class Markup(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.ids = []
+        self.external = []
 
-
-REQUIRED_HTML_TAGS = [
-    "<html",
-    "<head",
-    "<body",
-    'name="viewport"',  # 移动端适配
-]
-
-REQUIRED_PLACEHOLDERS = [
-    "<!-- INLINE_CSS -->",
-    "<!-- INLINE_JS -->",
-]
-
-# 前端 app.js 必须调用的核心 API（防止删错路由后前端黑屏）
-# 注：/api/mem_stats 自 v3.2.1 起不再被前端调用（关于页移除内存统计展示）
-REQUIRED_FRONTEND_APIS = [
-    "/api/state",
-    "/api/time",
-    "/api/renew",
-    "/api/config",
-    "/api/close-wifi",
-    "/api/device-templates",
-    "/api/device-templates/save",
-    "/api/device-templates/delete",
-    "/api/device-templates/apply",
-    "/api/ble-scan/start",
-    "/api/ble-scan/stop",
-    "/api/ble-scan/results",
-    "/api/ble-scan/read",
-    "/api/ble-scan/analyze",
-]
-
-# wifi_portal.c 必须注册的核心路由（防止改坏路由表）
-REQUIRED_BACKEND_ROUTES = REQUIRED_FRONTEND_APIS + ["/"]
+    def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if values.get("id"):
+            self.ids.append(values["id"])
+        if tag in ("img", "script", "link") and (values.get("src") or values.get("href")):
+            self.external.append(values)
 
 
 def main():
-    if not INDEX_HTML.is_file():
-        print(f"{TAG} FAIL: 文件不存在 {INDEX_HTML}", file=sys.stderr)
-        return 1
-    if not APP_JS.is_file():
-        print(f"{TAG} FAIL: 文件不存在 {APP_JS}", file=sys.stderr)
-        return 1
-    if not APP_CSS.is_file():
-        print(f"{TAG} FAIL: 文件不存在 {APP_CSS}", file=sys.stderr)
-        return 1
-    if not PORTAL_C.is_file():
-        print(f"{TAG} FAIL: 文件不存在 {PORTAL_C}", file=sys.stderr)
-        return 1
-    if not INLINE_STATIC.is_file():
-        print(f"{TAG} FAIL: 文件不存在 {INLINE_STATIC}", file=sys.stderr)
-        return 1
-    if not BLE_SCANNER_C.is_file():
-        print(f"{TAG} FAIL: 文件不存在 {BLE_SCANNER_C}", file=sys.stderr)
-        return 1
-    if not CAPTIVE_PORTAL_C.is_file():
-        print(f"{TAG} FAIL: 文件不存在 {CAPTIVE_PORTAL_C}", file=sys.stderr)
-        return 1
-    if not PORTAL_CONFIG_SAVE_TEST.is_file():
-        print(f"{TAG} FAIL: 文件不存在 {PORTAL_CONFIG_SAVE_TEST}", file=sys.stderr)
-        return 1
-    if not CORE_FLOW_ENDURANCE_TEST.is_file():
-        print(f"{TAG} FAIL: 文件不存在 {CORE_FLOW_ENDURANCE_TEST}", file=sys.stderr)
-        return 1
-    if not TEST_RUNNER.is_file():
-        print(f"{TAG} FAIL: 文件不存在 {TEST_RUNNER}", file=sys.stderr)
-        return 1
-
-    html = INDEX_HTML.read_text(encoding="utf-8")
-    js = APP_JS.read_text(encoding="utf-8")
-    css = APP_CSS.read_text(encoding="utf-8")
-    csrc = PORTAL_C.read_text(encoding="utf-8")
-    inline_static_src = INLINE_STATIC.read_text(encoding="utf-8")
-    scanner_src = BLE_SCANNER_C.read_text(encoding="utf-8")
-    device_analysis_src = DEVICE_ANALYSIS_C.read_text(encoding="utf-8")
-    captive_src = CAPTIVE_PORTAL_C.read_text(encoding="utf-8")
-    portal_config_save_src = PORTAL_CONFIG_SAVE_TEST.read_text(encoding="utf-8")
-    core_flow_endurance_src = CORE_FLOW_ENDURANCE_TEST.read_text(encoding="utf-8")
-    test_runner_src = TEST_RUNNER.read_text(encoding="utf-8")
-
-    print(f"{TAG} 检查 index.html: {len(html)} 字节")
-    print(f"{TAG} 检查 app.js: {len(js)} 字节")
-    print(f"{TAG} 检查 app.css: {len(css)} 字节")
-    print(f"{TAG} 检查 wifi_portal.c: {len(csrc)} 字节")
-    print(f"{TAG} 检查 inline_static.py: {len(inline_static_src)} 字节")
-    print(f"{TAG} 检查 ble_scanner.c: {len(scanner_src)} 字节")
-    print(f"{TAG} 检查 device_analysis.c: {len(device_analysis_src)} 字节")
-    print(f"{TAG} 检查 captive_portal.c: {len(captive_src)} 字节")
-    print(f"{TAG} 检查 test_portal_config_save.py: {len(portal_config_save_src)} 字节")
-    print(f"{TAG} 检查 test_core_flow_endurance.py: {len(core_flow_endurance_src)} 字节")
-
-    # 1. HTML 基础结构
-    print(f"\n{TAG} [1/4] HTML 基础结构")
-    for tag in REQUIRED_HTML_TAGS:
-        check(tag in html, f"HTML 标记 {tag!r} 缺失")
-    for ph in REQUIRED_PLACEHOLDERS:
-        check(ph in html, f"占位符 {ph!r} 缺失")
-
-    # 2. 后端路由表完整性
-    print(f"{TAG} [2/4] wifi_portal.c 路由表完整性")
-    for route in REQUIRED_BACKEND_ROUTES:
-        # 路由在 C 源码中以 ".uri = "/api/xxx"" 形式出现
-        pat = '.uri = "' + route + '"'
-        check(pat in csrc, f"路由 {route} 未在 wifi_portal.c 注册")
-
-    # 3. 前端 API 调用完整性
-    print(f"{TAG} [3/4] app.js 前端 API 调用完整性")
-    for api in REQUIRED_FRONTEND_APIS:
-        # app.js 中可能以 "/api/xxx" 字符串调用，或拼接，统一查字符串
-        check(('"' + api + '"') in js, f"app.js 未调用 {api}")
-
-    # 4. 前端信息架构
-    print(f"{TAG} [4/4] 前端信息架构")
-    nav_items = re.findall(r'<a\b[^>]*class="nav-item"[^>]*data-h="([^"]+)"', html)
-    check(nav_items == ["/home", "/settings"], "底部导航必须只有 首页/设置 两个 Tab")
-    check('id="view-settings"' in html, "缺少设置视图 view-settings")
-    check('id="view-more"' not in html, "旧更多视图 view-more 必须并入设置")
-    check('id="view-about"' not in html, "旧关于视图 view-about 必须并入设置")
-    check('id="settings-profile"' in html, "设置页缺少用户资料分区")
-    check('id="settings-device"' in html, "设置页缺少配置设备分区")
-    check('id="settings-about"' in html, "设置页缺少关于分区")
-    check('id="settings-device-name"' in html, "设备名称输入必须挪入设置页")
-    check('id="device-name-display"' in html, "设备名称必须默认以文本形式展示")
-    check('id="device-name-edit"' in html, "设备名称必须提供右侧编辑按钮")
-    check('id="device-name-confirm"' in html, "设备名称编辑必须提供对勾确认按钮")
-    check('onDeviceNameEdit' in js and 'onDeviceNameConfirm' in js, "app.js 缺少设备名称编辑/确认交互")
-    check('data-panel="device" onclick="onSettingsPanel(\'device\')">配置设备<' in html,
-          "设置页第二 Tab 必须改名为配置设备")
-    check('<h2>配置设备</h2>' in html and '修改 BLE 广播名称' in html,
-          "配置设备页必须聚焦设备名称和扩展设置")
-    check('id="settings-version"' not in html and 'settings-version' not in js,
-          "配置设备页不应展示或渲染固件版本")
-    check('固件版本' not in html,
-          "固件版本只能保留在关于页，不应出现在配置设备页")
-    check('id="settings-menu"' in html, "配置设备页必须提供扩展设置菜单入口列表")
-    check('设备模板' in html and '物理按钮' in html and 'LED 指示' in html, "设置菜单入口名称必须短且对齐")
-    check('id="settings-templates"' in html, "模板库必须迁移到设置子页面")
-    check('id="settings-button"' in html, "物理按钮必须迁移到设置子页面")
-    check('id="settings-led"' in html, "LED 必须迁移到设置子页面")
-    check('id="template-list"' in html, "设备信息模板库缺少列表容器")
-    check('id="template-scan-btn"' in html, "设备信息模板库缺少扫描入口按钮")
-    check('loadTemplates' in js and 'renderTemplates' in js, "app.js 缺少模板加载/渲染逻辑")
-    init_match = re.search(r"function init\(\) \{(?P<body>.*?)\n\}", js, re.S)
-    init_body = init_match.group("body") if init_match else ""
-    check('loadTemplates();' not in init_body, "首页初始化不应预加载设备模板，模板页进入时再拉取 /api/device-templates")
-    check('minify_css' in inline_static_src and 'minify_js' in inline_static_src and 'minify_html' in inline_static_src,
-          "inline_static.py 必须在编译期压缩内联 HTML/CSS/JS，降低门户首包大小")
-    check('minify_css(css)' in inline_static_src and 'minify_js(js)' in inline_static_src,
-          "inline_static.py 必须只压缩生成进固件的 CSS/JS 内容，源文件保持可读")
-    check('--no-minify' in inline_static_src,
-          "inline_static.py 必须提供 --no-minify 逃生开关，便于定位前端问题")
-    check('--report' in inline_static_src and 'bytes_saved' in inline_static_src,
-          "inline_static.py 必须支持输出压缩报告，便于量化网页载入优化效果")
-    check('--report' in ' '.join((ROOT / "main" / "CMakeLists.txt").read_text(encoding="utf-8").split()),
-          "main/CMakeLists.txt 必须让 inline_static.py 输出压缩报告")
-    check('--report' not in ' '.join((ROOT / "main" / "CMakeLists.txt").read_text(encoding="utf-8").split()) or 'COMMENT "Inlining web static resources -> web_index_html.h"' in (ROOT / "main" / "CMakeLists.txt").read_text(encoding="utf-8"),
-          "web 资源内联步骤说明必须保留，便于构建日志定位")
-    check('min-height:calc(100dvh - var(--nav-h)' in css and 'padding-bottom:calc(var(--nav-h)' in css,
-          "页面容器必须使用稳定视口高度与底部留白，避免页面切换时底部菜单跳动")
-    check('.view{display:none;min-height:calc(100dvh - var(--nav-h)' in css,
-          "每个 SPA 视图必须有稳定最小高度，底部导航固定不随内容高度跳动")
-    check('.navbar{position:fixed' in css and 'height:var(--nav-h)' in css and 'transform:translateZ(0)' in css,
-          "底部导航必须固定高度并启用合成层，避免多页面切换抖动")
-    check('firmware_name' in csrc and 'board_firmware_name' in csrc, "wifi_portal.c 必须输出包含板型/Git/稳定版/修复版的 firmware_name")
-    check('firmware_name' in js and 'firmwareLabel' in js and 'firmwareShortLabel' in js, "app.js 必须保留完整固件名并提供短标签展示")
-    check('version-short' in css and 'version-full' not in css, "app.css 关于页只应保留固件短标签样式")
-    cmake_src = (ROOT / "main" / "CMakeLists.txt").read_text(encoding="utf-8")
-    check('BIKEPOWER_BUILD_TIME' in cmake_src and 'string(TIMESTAMP' in cmake_src,
-          "main/CMakeLists.txt 必须在编译时注入 BIKEPOWER_BUILD_TIME")
-    check('BIKEPOWER_BUILD_TIME' in csrc and '\\"build_time\\":\\"%s\\"' in csrc,
-          "wifi_portal.c 必须在 /api/state 输出 build_time")
-    check('build_time' in js and 'settings-build-time' in html,
-          "关于页必须展示编译固件时间")
-    check('about-version' in html and 'about-version-full' not in html and 'aboutVer' in js and 'aboutFullVer' not in js,
-          "关于页固件版本必须只显示简称，避免完整固件名占用页面")
-    check('about-git' not in html and 'aboutGit' not in js and '>Git<' not in html,
-          "关于页不应展示 Git 参数")
-    check('about-device-name' not in html and 'aboutDeviceName' not in js,
-          "关于页不应重复展示设备名称，设备名称归配置设备页")
-    check('about-details-card' in html and 'about-help-card' in html,
-          "关于页必须拆成只读详情和精简提醒两块")
-    check('about-upgrade-card' in html and 'https://easyhey.com/?firmware=MOD220' in html,
-          "关于页必须提供 MOD220 在线升级入口")
-    check('电脑端' in html and '手机端不支持' in html and '手机或电脑' not in html,
-          "在线升级说明必须明确只支持电脑端烧录，手机端不支持")
-    check('id="upgrade-url"' in html and 'onCopyUpgradeUrl' in html,
-          "在线升级地址必须提供一键复制操作")
-    check('onCopyUpgradeUrl' in js and 'navigator.clipboard' in js and 'document.execCommand("copy")' in js,
-          "app.js 必须实现升级地址复制并提供旧 WebView 兜底")
-    check('about-upgrade-card' in css and 'upgrade-copy-row' in css and 'upgrade-copy-btn' in css,
-          "app.css 必须提供在线升级卡片和复制控件样式")
-    check('about-hero' not in html and 'cap-grid' not in html,
-          "关于页必须去掉顶部介绍和能力概览以保持一页展示")
-    check('about-tip-list' in html,
-          "关于页必须保留精简使用提醒")
-    check('BikePower 是什么' not in html and '三种骑行模式' not in html and '功率与心率' not in html,
-          "关于页不应保留说明书式长段落")
-    check('about-details-card' in css and 'about-upgrade-card' in css and 'about-tip' in css,
-          "app.css 必须提供紧凑关于页样式")
-    check('"/settings/templates"' in js and '"/settings/button"' in js and '"/settings/led"' in js, "app.js 必须注册设置子路由")
-    check('settingsSubpageBack' in js and 'settings-menu-row' in css, "设置子页面必须有返回与菜单行样式")
-    check('pollScanResults' in js and 'onTemplateReadDevice' in js, "app.js 缺少 BLE 扫描轮询/读取逻辑")
-    check('onTemplateAnalyzeDevice' in js and 'analysisCardHtml' in js, "app.js 缺少外部设备分析交互/结果渲染")
-    check('template_analysis' in js and 'analysis.summary' in js and 'analysis.status' in js,
-          "app.js 必须保存并展示设备分析摘要和状态")
-    check('analysisDetailsHtml' in js and 'analysisRawHtml' in js,
-          "app.js 必须提供详细数据和原始数据折叠展示")
-    check('power_watts' in js and 'heart_rate_bpm' in js and 'last_cps_hex' in js and 'adv_raw_hex' in js,
-          "app.js 必须展示功率/心率等解析值和广播/通知原始 hex")
-    check('analysisMetricBoardHtml' in js and 'analysis-metric-board' in css and 'analysis-metric-value' in css,
-          "app.js/app.css 必须用大号数值面板突出显示扫描分析数值")
-    check('analysis-metric-primary' in js and 'analysis-metric-secondary' in css,
-          "扫描分析数值面板必须区分主指标和辅助指标")
-    check('readableDeviceName' in js and 'safeDeviceNameText' in js,
-          "app.js 必须对不可读外部设备名做中文兜底，避免显示方块乱码")
-    check('>FT</span>' not in js and '>智能</span>' in js,
-          "app.js 智能骑行台能力标签必须使用用户可理解文案，不能显示 FT 缩写")
-    check('ble_scanner_analyze_device' in scanner_src and 'device_analysis_parse_ftms_bike' in scanner_src,
-          "ble_scanner.c 必须连接外部设备并解析运动数据样本")
-    check('adv_raw_hex' in scanner_src and 'scan_rsp_raw_hex' in scanner_src,
-          "ble_scanner.c 必须保留广播和扫描响应原始 hex")
-    check('last_cps_hex' in device_analysis_src and 'last_hrs_hex' in device_analysis_src and 'last_ftms_hex' in device_analysis_src,
-          "device_analysis 必须保留最近一次运动通知原始 hex")
-    check('DEVICE_ANALYSIS_SAMPLE_MS' in scanner_src or 'DEVICE_ANALYSIS_SAMPLE_MS' in (ROOT / "main" / "bikepower_config.h").read_text(encoding="utf-8"),
-          "设备分析采样时长必须集中定义")
-    check('filterNamedDevices' in js and 'hasDeviceName' in js, "app.js 必须过滤未命名 BLE 扫描设备")
-    check('filterUniqueDevices' in js and 'templateIdentityKey' in js, "app.js 必须按 MAC 地址和设备名称去重扫描结果")
-    check('find_item_by_identity' in scanner_src, "ble_scanner.c 必须按 MAC 地址和设备名称合并重复扫描广播")
-    domain_template_src = (ROOT / "components" / "bikepower_domain" / "device_template.c").read_text(encoding="utf-8")
-    check('device_template_list_add' in scanner_src or 'device_template_list_add' in domain_template_src, "设备模板保存必须复用领域层去重逻辑")
-    check('scan_item_has_name' in scanner_src and 'continue;' in scanner_src, "ble_scanner.c 必须在序列化扫描结果时排除未命名设备")
-    check('device_template_has_ride_service' in scanner_src, "ble_scanner.c 必须按功率/踏频/心率/FTMS 服务过滤扫描结果")
-    check('filterRideDevices' in js and 'hasRideService' in js, "app.js 必须二次过滤无骑行服务的扫描结果")
-    check('serviceBadges' in js and 'template-title-row' in js, "app.js 必须在设备名称行渲染多服务图标标签")
-    check('template-expanded' in js and 'onTemplateToggle' in js, "已保存模板必须默认收起并支持点击展开详情")
-    check('template-detail-grid' in js and 'template-compact-head' in css, "模板详情和紧凑标题必须有压缩布局样式")
-    check('applied_template' in js and 'copyTemplateToState' in js, "应用模板后必须在页面展示复制后的厂商/型号/版本等设备信息")
-    check('id="settings-applied-template-card"' in html, "复制后的设备信息必须展示在设置页设备信息分区")
-    check('id="applied-template-card"' not in html, "复制后的设备信息不应展示在首页")
-    check('applied_template_expanded' in js and 'onAppliedTemplateToggle' in js, "复制后的设备信息必须默认收起并支持点击展开")
-    check('.svc-badge' in css and '.svc-power' in css and '.svc-cadence' in css and '.svc-hr' in css and '.svc-ftms' in css, "app.css 必须定义功率/踏频/心率/FTMS 标签样式")
-    check('httpd_register_err_handler' in csrc and 'HTTPD_404_NOT_FOUND' in csrc, "wifi_portal.c 必须注册 404 兜底重定向以覆盖新系统探测路径")
-    check('/.well-known/captive-portal' in csrc or 'CAPTIVE_PORTAL_API_PATH' in csrc, "wifi_portal.c 必须注册 RFC 8910 Captive Portal API 路由")
-    check('application/captive+json' in csrc, "Captive Portal API 必须返回 application/captive+json")
-    check('303 See Other' in captive_src, "Captive Portal 探测响应必须使用 303 See Other")
-    check('Redirect to the captive portal' in captive_src, "Captive Portal 重定向响应必须带短 body 兼容 iOS CNA")
-    check('shutdown(sock, 0)' in captive_src, "DNS 停止时必须 shutdown socket 以稳定唤醒 recvfrom")
-    check('onTemplateSavePending' in js and 'onTemplateCancelPending' in js, "app.js 缺少扫描读取后保存/取消逻辑")
-    check('onTemplateApply' in js and 'onTemplateDelete' in js, "app.js 缺少模板应用/删除逻辑")
-    check('id="custom-pacer-name"' in html, "自定义配速机器人昵称输入缺失")
-    check('custom-pacer-panel' in html and 'id="custom-target-watt"' in html,
-          "自定义机器人必须使用紧凑窗口展示目标功率")
-    check('id="custom-wkg-range"' in html and 'id="custom-watt-range"' in html,
-          "自定义机器人窗口必须合并展示 W/kg 与功率区间")
-    check('custom-pacer-panel' in css and 'custom-wkg-controls' in css,
-          "app.css 缺少自定义机器人紧凑窗口样式")
-    check('id="pacer-wkg"' not in html and 'id="pacer-watt"' not in html,
-          "自定义机器人不应再用独立 info-row 显示功体比/功率区间")
-    check('id="ride-power-editor"' in html and 'id="ride-power-float-row"' in html,
-          "骑行固定功率输入和浮动范围必须有独立容器以便机器人模式隐藏")
-    check('ride-power-editor' in js and 'ride-power-float-row' in js,
-          "app.js 必须在机器人模式隐藏重复的功率输入/浮动范围")
-    check('id="home-road"' not in html, "骑行配速机器人不应再使用独立 home-road 窗口")
-    check('id="broadcast-toggle-bar"' in html, "首页顶部缺少广播数据多选项")
-    check('data-broadcast="power"' in html and 'data-broadcast="cadence"' in html and 'data-broadcast="heartrate"' in html,
-          "广播数据多选项必须包含功率/踏频/心率")
-    check('onBroadcastToggle' in html and 'onBroadcastToggle' in js,
-          "广播数据多选项必须绑定切换逻辑")
-    check('broadcast_mask' in js and 'broadcastEnabled' in js and 'applyBroadcastVisibility' in js,
-          "app.js 必须保存广播 mask 并按选择隐藏对应窗口")
-    check('broadcast-toggle-bar' in css and 'broadcast-toggle' in css,
-          "app.css 必须提供顶部广播多选项样式")
-    check('onlyHeartrateBroadcast' in js and 'directHrControl' in js,
-          "app.js 必须在只剩心率广播时进入心率直接控制模式")
-    check('hrLockRows' in js and 'hr_lock: directHrControl() ? 1' in js,
-          "只剩心率时网页端必须隐藏联动/锁死选择，并保存为直接心率值")
-    check('estimateLinkedHeartrate' in js and 'applyLinkedHrPreview' in js,
-          "网页端必须在联动心率时按当前强度刷新目标心率预览")
-    check('runningEquivalentPower' in js and 'STATE.run_speed_x100' in js,
-          "跑步联动心率必须按当前配速/速度折算强度")
-    check(js.count('hr_lock: directHrControl() ? 1') >= 2,
-          "首页和设置页保存都必须复用只剩心率直接控制语义")
-    check('id="run-source-picker"' in html and 'id="run-source-summary"' in html,
-          "跑步页缺少固定/模板来源胶囊条和摘要")
-    check('id="run-fixed-panel"' in html and 'id="run-custom-panel"' in html,
-          "跑步页缺少固定配速区和自定义模板区")
-    check('running-incline-row' not in html and 'run-incline' not in html,
-          "跑步页不应残留坡度控件")
-    check('renderRunSourcePicker' in js and 'onRunSourceSelect' in js and 'updateRunPacerInfo' in js,
-          "app.js 缺少跑步来源渲染/切换/摘要逻辑")
-    check('onRunCustomPaceAdj' in js and 'onRunCustomNameInput' in js,
-          "app.js 缺少自定义跑步模板交互逻辑")
-    check('onRunInclineAdj' not in js and 'run_incline_x10' not in js,
-          "app.js 不应残留跑步坡度交互或保存字段")
-    check('paceSecText' in js and 'speedTextFromPaceSec' in js,
-          "app.js 缺少跑步配速/速度展示格式化逻辑")
-    check('run_pacers' in js,
-          "app.js 必须保存跑步模板列表")
-    for field in [
-        "run_mode",
-        "run_pacer_type",
-        "run_pace_low_sec",
-        "run_pace_high_sec",
-        "run_custom_name",
-    ]:
-        check(field in js and field in portal_config_save_src,
-              f"网页保存测试和 app.js 必须覆盖跑步字段 {field}")
-    check('切换骑行/跑步需点保存并关闭 WiFi' not in js,
-          "普通保存必须允许切换骑行/跑步，并由固件即时重建 BLE GATT 表")
-    check('active_sport_profile = STATE.sport_profile' in js,
-          "保存成功后必须同步 active_sport_profile，避免误提示未保存")
-    check('apply_json_fields(&next, body, true)' in csrc,
-          "/api/config 必须允许 sport_profile 保存，不能只在关闭 WiFi 时生效")
-    check('wifi_portal_ble_restart_requested' in csrc,
-          "配网保持打开时也必须能请求 BLE 重启以重建 GATT 服务表")
-    app_main_src = (ROOT / "main" / "app_main.c").read_text(encoding="utf-8")
-    check('wifi_portal_ble_restart_requested()' in app_main_src
-          and '重启 BLE 以重建 GATT 服务表' in app_main_src,
-          "app_main 必须在主任务上下文处理运动 profile 或服务开关切换后的 BLE 重启")
-    check('conn == 0' in app_main_src and '等待 BLE 断开后重建 GATT 服务表' in app_main_src,
-          "BLE 已连接时必须等待断开后再重建 GATT，避免强制踢掉客户端")
-    check('id="ride-source-picker"' in html, "骑行页缺少固定功率/配速机器人胶囊条容器")
-    check('id="ride-source-summary"' in html, "骑行页缺少当前骑行输出摘要")
-    check('renderRideSourcePicker' in js and 'onRideSourceSelect' in js, "app.js 缺少骑行输出来源胶囊条渲染/切换逻辑")
-    check('ride-source-pill' in css and 'ride-source-picker' in css and 'ride-source-summary' in css,
-          "app.css 缺少骑行输出来源胶囊条/摘要样式")
-    check('ride-source-card' not in css and 'ride-source-grid' not in css,
-          "骑行输出来源不应继续使用大卡片网格样式")
-    check('cycling-compact-card' in css and 'compact-hr-lock' in css,
-          "骑行页必须提供一页内高密度布局样式")
-    check('ride-inline-grid' not in html and 'ride-inline-field' not in html,
-          "踏频和心率必须保持独立卡片，不应合并为双列区域")
-    check('id="run-speed"' not in html, "跑步页不应保留独立跑步速度输入框")
-    check('id="run-pace-min"' in html and 'id="run-pace-sec"' in html, "跑步页缺少配速分钟/秒输入")
-    check('id="run-pace-presets"' in html, "跑步页缺少常用配速小卡片容器")
-    check('id="run-pace-float"' in html and 'id="float-run-pace"' in html, "跑步页缺少配速浮动控件")
-    check('id="run-cadence-float"' in html and 'id="float-run-cadence"' in html, "跑步页缺少步频浮动控件")
-    for pace in ["3:00", "4:00", "5:00", "6:00", "7:00"]:
-        check(f">{pace}<" in html, f"跑步页缺少 {pace}/km 配速小卡片")
-    for key in [
-        "paceSecFromSpeedX100",
-        "speedX100FromPaceSec",
-        "renderPaceFromState",
-        "syncSpeedFromPace",
-        "onRunPacePreset",
-        "run_pace_float_sec",
-        "run_cadence_float",
-    ]:
-        check(key in js, f"app.js 缺少跑步配速换算/浮动逻辑 {key}")
-    check('id="about-dev"' not in html, "设备名称不应继续留在关于页")
-    check('pager-track' not in html and 'pager-track' not in css, "关于内容不应继续使用横向分页")
-    check('"/settings": renderSettings' in js, "app.js 路由缺少 /settings -> renderSettings")
-    check('"/more":' not in js and '"/about":' not in js, "app.js 不应保留更多/关于作为一级路由")
-
-    profile_pos = html.find('id="settings-profile"')
-    device_pos = html.find('id="settings-device"')
-    about_pos = html.find('id="settings-about"')
-    applied_pos = html.find('id="settings-applied-template-card"')
-    template_pos = html.find('id="settings-templates"')
-    button_pos = html.find("物理按钮")
-    check(device_pos != -1 and applied_pos != -1 and template_pos != -1 and device_pos < applied_pos < template_pos, "复制后的设备信息卡片必须位于设置页设备信息分区内")
-    check(device_pos < button_pos < about_pos or about_pos < button_pos, "物理按钮入口或子页面必须位于设置区域")
-    check(not (profile_pos < button_pos < device_pos), "物理按钮不应留在用户资料分区")
-    check('id="settings-button-card"' not in html, "物理按钮不应继续使用折叠卡片")
-    check('id="settings-led-card"' not in html, "LED 不应继续使用折叠卡片")
-    check('toggleCollapse' not in js, "设置子页面改造后不应保留折叠卡片切换逻辑")
-    legacy_collapsible_selectors = [
-        ".collapsible-card",
-        ".collapse-head",
-        ".collapse-ico",
-        ".collapse-body",
-    ]
-    for selector in legacy_collapsible_selectors:
-        check(selector not in css, f"app.css 不应保留旧折叠卡片样式 {selector}")
-
-    led_control_ids = [
-        "settings-led-silent",
-        "settings-led-wait-mode", "settings-led-wait-color",
-        "settings-led-conn-mode", "settings-led-conn-color",
-        "settings-led-wifi-mode", "settings-led-wifi-color",
-        "settings-led-confirm-mode", "settings-led-confirm-color",
-        "settings-led-error-mode", "settings-led-error-color",
-    ]
-    for ctl in led_control_ids:
-        check(f'id="{ctl}"' in html, f"LED 自定义配置控件 {ctl} 缺失")
-    check('id="settings-led-options"' in html, "LED 静默模式必须有可隐藏的模式/颜色选项容器")
-    check('syncLedSilentVisibility' in js, "app.js 必须同步 LED 静默模式下的选项显隐")
-    check('settings-led-silent' in js and 'change' in js, "LED 静默模式 checkbox 必须绑定 change 事件")
-    check('POST' in portal_config_save_src and '/api/config' in portal_config_save_src and '/api/state' in portal_config_save_src,
-          "test_portal_config_save.py 必须覆盖网页端保存后状态回显")
-    check('DEFAULT_MINUTES = 3' in core_flow_endurance_src,
-          "test_core_flow_endurance.py 必须默认执行 3 分钟核心流程耐久测试")
-    check('simulate_button_flow' in core_flow_endurance_src and 'exercise_hr_following' in core_flow_endurance_src,
-          "test_core_flow_endurance.py 必须覆盖模拟按钮与心率随动流程")
-    check('exercise_web_edits' in core_flow_endurance_src and 'exercise_template_flow' in core_flow_endurance_src,
-          "test_core_flow_endurance.py 必须覆盖网页编辑与设备模板流程")
-    check('run_mock_portal_test' in test_runner_src and 'test_portal_config_save.py' in test_runner_src,
-          "test_runner.sh 必须提供 mock 配网页保存测试入口")
-    check('run_endurance_test' in test_runner_src and 'test_core_flow_endurance.py' in test_runner_src,
-          "test_runner.sh 必须提供 3 分钟核心流程耐久测试入口")
-    check('run_portal_test' in test_runner_src and 'stage5_portal_test.py' in test_runner_src,
-          "test_runner.sh 必须提供配网门户 HTTP 自测入口")
-    for key in [
-        "led_silent",
-        "led_wait_mode", "led_wait_color",
-        "led_conn_mode", "led_conn_color",
-        "led_wifi_mode", "led_wifi_color",
-        "led_confirm_mode", "led_confirm_color",
-        "led_error_mode", "led_error_color",
-    ]:
-        check(key in js, f"app.js 缺少 LED 配置字段 {key}")
-    for key in ["custom_pacer_name", "syncCustomPacerOption", "customPacerDisplayName"]:
-        check(key in js, f"app.js 缺少自定义配速昵称/下拉刷新逻辑 {key}")
-    check('runpace:' in js and 'labelId: "float-run-pace"' in js,
-          "跑步配速浮动按钮必须映射到实际显示节点 float-run-pace")
-    check('runcadence:' in js and 'labelId: "float-run-cadence"' in js,
-          "跑步步频浮动按钮必须映射到实际显示节点 float-run-cadence")
-
-    # 总结
-    print(f"\n{TAG} 结果: {g_pass} 通过, {g_fail} 失败")
-    if g_fail == 0:
-        print(f"{TAG} PASS: WiFi 门户静态结构全部通过")
-        return 0
-    else:
-        print(f"{TAG} FAIL: 存在结构缺失，禁止编译/烧录", file=sys.stderr)
-        for m in failures:
-            print(f"{TAG}   - {m}", file=sys.stderr)
-        return 1
+    html, css, js = [(ROOT / "main/web" / name).read_text() for name in ("index.html", "app.css", "app.js")]
+    portal = (ROOT / "main/wifi_portal.c").read_text()
+    parser = Markup()
+    parser.feed(html)
+    errors = []
+    def check(ok, message):
+        if not ok:
+            errors.append(message)
+    check(len(parser.ids) == len(set(parser.ids)), "HTML id 唯一")
+    check(not parser.external, "设备页不加载外部资源")
+    check(all(x in html for x in ("<html", "<head", "<body", "viewport", "<!-- INLINE_CSS -->", "<!-- INLINE_JS -->")), "内联入口结构")
+    check(all(x in parser.ids for x in ("simulationEditor", "bridgeIntro", "bridgeEditor", "runningEditor", "sharedHeart", "scanResults")), "核心渐进界面")
+    check("data-runtime" not in html and "restoreDemoBtn" not in html, "禁止原型模拟操作进入设备页")
+    check("prefers-color-scheme" not in css and "localStorage" not in js, "仅明亮主题")
+    check("prefers-reduced-motion" in css and "text-align: center" in css, "动画与居中按钮")
+    check("data-sim-mode=\"custom\"" not in html, "骑行自定义收敛于机器人档")
+    for api in ("state", "runtime", "config", "close-wifi", "bridge/scan", "bridge/control", "renew", "time"):
+        check(f'"/api/{api}"' in portal, f"设备路由 {api}")
+    check("/api/device-templates" not in portal and "/api/ble-scan" not in portal, "移除旧模板与分析路由")
+    check("revision:state.revision" in js and "accepted.transaction" in js, "保存使用 revision 与结果事务")
+    check("state.draft.heart.enabled = false" in js and "bridgeReady()" in js, "测试后关闭心率与保存门槛")
+    check("textContent" in js and ".innerHTML" not in js, "设备信息使用文本输出")
+    spec = importlib.util.spec_from_file_location("inline_static", ROOT / "scripts/inline_static.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    parts = [module.minify_html(html), module.minify_css(css), module.minify_js(js)]
+    for value, limit, name in zip(parts, (21, 20, 65), ("HTML", "CSS", "JS")):
+        size = len(value.encode())
+        check(size <= limit * 1024, f"{name} {size} bytes 超过 {limit} KiB")
+    size = len(module.inline_html(*parts).encode())
+    check(size <= 110 * 1024, f"内联总量 {size} 超过 110 KiB")
+    for error in errors:
+        print("[TC-3d] FAIL", error)
+    print(f"[TC-3d] {'FAIL' if errors else 'PASS'}: 内联 {size} bytes，{len(parser.ids)} 个唯一控件")
+    return bool(errors)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

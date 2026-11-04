@@ -148,6 +148,7 @@ void power_engine_init(power_engine_t *e)
     e->sport_profile = DEFAULT_SPORT_PROFILE;
     e->broadcast_mask = BROADCAST_FIELD_ALL;
     running_engine_init(&e->running);
+    power_bridge_config_defaults(&e->bridge);
     e->snapshot.power = DEFAULT_POWER;
     e->snapshot.cadence = DEFAULT_CADENCE;
     e->snapshot.heartrate = DEFAULT_HEARTRATE;
@@ -603,6 +604,24 @@ int power_engine_running_heartrate(power_engine_t *e, int speed_x100_kmh)
     return hr;
 }
 
+snapshot_t power_engine_bridge_snapshot(power_engine_t *e, const bridge_snapshot_t *bridge)
+{
+    snapshot_t snap = {0};
+    if (!e || !bridge) return snap;
+    snap.mode = e->mode;
+    snap.power = bridge->valid ? bridge->power_w : 0;
+    snap.cadence = bridge->cadence_valid ? (bridge->cadence_half_rpm + 1) / 2 : 0;
+    if (e->broadcast_mask & BROADCAST_FIELD_HEARTRATE) {
+        snap.heartrate = e->has_user_hr
+            ? hr_model_steady_user(&e->hr, e->user_heartrate, e->hr_float)
+            : linked_heartrate(e, bridge->valid ? clamp_power(bridge->raw_power_w) : 0);
+    }
+    e->last_heartrate = snap.heartrate;
+    e->snapshot = snap;
+    e->snapshot_count++;
+    return snap;
+}
+
 bool power_engine_set_broadcast_mask(power_engine_t *e, int mask)
 {
     int normalized = mask & BROADCAST_FIELD_ALL;
@@ -628,6 +647,7 @@ control_target_t power_engine_button_target(const power_engine_t *e)
         if (e->broadcast_mask & BROADCAST_FIELD_HEARTRATE) return CONTROL_TARGET_HEARTRATE;
         return CONTROL_TARGET_NONE;
     }
+    if (e->bridge.source == BRIDGE_SOURCE_REAL) return CONTROL_TARGET_NONE;
     if (e->broadcast_mask & BROADCAST_FIELD_POWER) return CONTROL_TARGET_POWER;
     if (e->broadcast_mask & BROADCAST_FIELD_CADENCE) return CONTROL_TARGET_CADENCE;
     if (e->broadcast_mask & BROADCAST_FIELD_HEARTRATE) return CONTROL_TARGET_HEARTRATE;
@@ -719,6 +739,7 @@ int power_engine_adjust_control_target(power_engine_t *e, control_target_t targe
 bool power_engine_set_erg_target(power_engine_t *e, int target_power)
 {
     if (!e) return false;
+    if (e->sport_profile == SPORT_PROFILE_CYCLING && e->bridge.source == BRIDGE_SOURCE_REAL) return false;
     if (target_power < POWER_MIN || target_power > POWER_MAX) return false;
     if (e->mode == RIDE_MODE_ERG && e->has_erg_target && e->erg_active_target == target_power) {
         return true;

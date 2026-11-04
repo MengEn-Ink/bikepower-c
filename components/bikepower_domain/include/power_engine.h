@@ -13,6 +13,7 @@
 #include "hr_model.h"
 #include "led_pattern.h"
 #include "running_engine.h"
+#include "power_bridge.h"
 
 /*
  * 单次领域层输出快照。
@@ -69,6 +70,7 @@ typedef struct {
     sport_profile_t sport_profile;
     int broadcast_mask;
     running_engine_t running;
+    bridge_config_t bridge;
     snapshot_t snapshot;
     uint64_t snapshot_count;
     bool dirty;
@@ -89,6 +91,8 @@ void power_engine_init(power_engine_t *e);
 
 /* 生成当前快照（每个主循环 tick 调用一次，dt=50ms）。 */
 snapshot_t power_engine_snapshot(power_engine_t *e);
+/* 使用真实原始功率驱动可选模拟心率，输出不混入模拟功率或踏频。 */
+snapshot_t power_engine_bridge_snapshot(power_engine_t *e, const bridge_snapshot_t *bridge);
 
 /* 调整基准功率，仅 steady 模式生效，返回调整后的功率值。 */
 int power_engine_adjust_power(power_engine_t *e, int delta);

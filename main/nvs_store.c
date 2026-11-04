@@ -67,6 +67,16 @@ void nvs_store_load(power_engine_t *e)
     }
 
     get_i32(h, NVS_KEY_SCHEMA_VER, &c.schema_ver);
+    uint8_t bridge_wire[BRIDGE_WIRE_MAX_LEN];
+    size_t bridge_length = sizeof(bridge_wire);
+    esp_err_t bridge_err = nvs_get_blob(h, NVS_KEY_BRIDGE, bridge_wire, &bridge_length);
+    if (bridge_err == ESP_OK) {
+        if (!power_bridge_config_decode(bridge_wire, bridge_length, &c.bridge)) {
+            ESP_LOGW(TAG, "桥接配置编码无效，恢复模拟来源");
+        }
+    } else if (bridge_err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "读取桥接配置失败(%s)，恢复模拟来源", esp_err_to_name(bridge_err));
+    }
     get_i32(h, NVS_KEY_POWER, &c.power);
     get_i32(h, NVS_KEY_CADENCE, &c.cadence);
     get_i32(h, NVS_KEY_MODE, &c.mode);
@@ -174,6 +184,18 @@ bool nvs_store_save(power_engine_t *e)
     }
 
     bool ok = true;
+    uint8_t bridge_wire[BRIDGE_WIRE_MAX_LEN];
+    size_t bridge_length = power_bridge_config_encode(&c.bridge, bridge_wire, sizeof(bridge_wire));
+    if (!bridge_length) {
+        ESP_LOGW(TAG, "桥接配置校验失败，取消保存");
+        ok = false;
+    } else {
+        err = nvs_set_blob(h, NVS_KEY_BRIDGE, bridge_wire, bridge_length);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "保存桥接配置失败(%s)", esp_err_to_name(err));
+            ok = false;
+        }
+    }
 #define SET_I32(k, v) do { \
         esp_err_t _e = nvs_set_i32(h, (k), (v)); \
         if (_e != ESP_OK) { \

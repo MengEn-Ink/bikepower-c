@@ -21,15 +21,17 @@ def _require_length(payload, expected, name):
 
 def parse_cps(data):
     payload = _bytes(data)
-    _require_length(payload, 8, "CPS Measurement")
+    if len(payload) < 4:
+        raise ValueError("CPS Measurement truncated")
     flags = struct.unpack_from("<H", payload, 0)[0]
-    if flags != 0x0020:
+    if flags not in (0, 0x0020):
         raise ValueError(f"unsupported CPS flags 0x{flags:04x}")
+    _require_length(payload, 8 if flags else 4, "CPS Measurement")
     return {
         "flags": flags,
         "power_w": struct.unpack_from("<h", payload, 2)[0],
-        "crank_revolutions": struct.unpack_from("<H", payload, 4)[0],
-        "crank_event_time_1024": struct.unpack_from("<H", payload, 6)[0],
+        "crank_revolutions": struct.unpack_from("<H", payload, 4)[0] if flags else None,
+        "crank_event_time_1024": struct.unpack_from("<H", payload, 6)[0] if flags else None,
     }
 
 
@@ -60,13 +62,14 @@ def parse_ftms_indoor_bike(data):
     if len(payload) < 2:
         raise ValueError(f"FTMS Indoor Bike length must be at least 2, got {len(payload)}")
     flags = struct.unpack_from("<H", payload, 0)[0]
-    if flags & ~(0x0001 | 0x0004 | 0x0040):
+    if flags & ~(0x0001 | 0x0004 | 0x0040 | 0x0200):
         raise ValueError(f"unsupported FTMS Indoor Bike flags 0x{flags:04x}")
 
     offset = 2
     speed = None
     cadence_half = None
     power = None
+    heartrate = None
     if not (flags & 0x0001):
         if len(payload) < offset + 2:
             raise ValueError("FTMS Indoor Bike speed field truncated")
@@ -82,6 +85,11 @@ def parse_ftms_indoor_bike(data):
             raise ValueError("FTMS Indoor Bike power field truncated")
         power = struct.unpack_from("<h", payload, offset)[0]
         offset += 2
+    if flags & 0x0200:
+        if len(payload) < offset + 1:
+            raise ValueError("FTMS Indoor Bike heart rate field truncated")
+        heartrate = payload[offset]
+        offset += 1
     if offset != len(payload):
         raise ValueError(f"FTMS Indoor Bike has {len(payload) - offset} trailing bytes")
     return {
@@ -90,6 +98,7 @@ def parse_ftms_indoor_bike(data):
         "cadence_half_rpm": cadence_half,
         "cadence_rpm": cadence_half / 2.0 if cadence_half is not None else None,
         "power_w": power,
+        "heart_rate_bpm": heartrate,
     }
 
 

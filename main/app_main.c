@@ -29,6 +29,8 @@
 #include "wifi_portal.h"
 #include "board_detect.h"
 #include "device_identity_store.h"
+#include "ble_power_bridge.h"
+#include "esp_timer.h"
 
 static const char *TAG = "APP";
 
@@ -45,6 +47,10 @@ static config_data_t s_pending_ble_config;
 static volatile bool s_has_pending_ble_config = false;
 static volatile uint32_t s_pending_ble_config_transaction = 0;
 static volatile uint32_t s_pending_ble_config_revision = 0;
+static bool s_pending_config_wifi;
+static bool s_pending_config_identity;
+static device_identity_t s_config_identity;
+static bool s_processing_config_wifi;
 static bool s_ble_config_restart_pending = false;
 // DIS 身份覆盖写入 mailbox：host 任务只复制，主循环负责 NVS 落盘后再让 DIS 读值生效。
 static device_identity_t s_pending_identity;
@@ -102,6 +108,7 @@ static void process_pending_identity(void)
  */
 static bool on_erg_target(int target_power)
 {
+    if (s_engine.bridge.source == BRIDGE_SOURCE_REAL) return false;
     // 范围校验：与领域层 POWER_MIN/POWER_MAX 一致
     if (target_power < POWER_MIN || target_power > POWER_MAX) return false;
     app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = target_power };
@@ -171,63 +178,119 @@ static bool on_ble_config_commit(const config_data_t *config,
         s_pending_ble_config_transaction = transaction_id;
         s_pending_ble_config_revision = base_revision;
         s_has_pending_ble_config = true;
+        s_pending_config_wifi = false;
+        s_pending_config_identity = false;
         accepted = true;
     }
     portENABLE_INTERRUPTS();
     return accepted;
 }
 
+static bool on_wifi_config_commit(const config_data_t *config, uint32_t transaction,
+                                  uint32_t revision, bool close_wifi,
+                                  const device_identity_t *identity)
+{
+    (void)close_wifi;
+    if (!config || !transaction) return false;
+    portDISABLE_INTERRUPTS();
+    bool accepted = !s_has_pending_ble_config;
+    if (accepted) {
+        s_pending_ble_config = *config;
+        s_pending_ble_config_transaction = transaction;
+        s_pending_ble_config_revision = revision;
+        s_pending_config_wifi = true;
+        s_pending_config_identity = identity != NULL;
+        if (identity) s_config_identity = *identity;
+        s_has_pending_ble_config = true;
+    }
+    portENABLE_INTERRUPTS();
+    return accepted;
+}
+
+static void config_commit_result(uint32_t transaction, uint8_t result,
+                                  uint8_t restart, const config_data_t *applied)
+{
+    if (s_processing_config_wifi) wifi_portal_config_result(transaction, result, restart, applied);
+    else ble_bikepower_config_commit_result(transaction, result, restart, applied);
+}
+
 static void process_pending_ble_config(void)
 {
-    config_data_t requested;
+    /*
+     * 仅由主任务串行调用。事务工作副本静态预分配，避免内联后叠加
+     * 到 app_main 栈帧并挤占启动配置校验和 NVS 调用的栈空间。
+     */
+    static config_data_t checked;
+    static config_data_t previous;
+    static config_data_t applied;
+    static power_engine_t next;
+    static device_identity_t identity;
+    static device_identity_t old_identity;
     uint32_t transaction_id = 0;
     uint32_t base_revision = 0;
     bool pending = false;
+    bool copy_identity = false;
 
     portDISABLE_INTERRUPTS();
     if (s_has_pending_ble_config) {
-        requested = s_pending_ble_config;
+        checked = s_pending_ble_config;
         transaction_id = s_pending_ble_config_transaction;
         base_revision = s_pending_ble_config_revision;
+        s_processing_config_wifi = s_pending_config_wifi;
+        copy_identity = s_pending_config_identity;
+        if (copy_identity) identity = s_config_identity;
         s_has_pending_ble_config = false;
         pending = true;
     }
     portENABLE_INTERRUPTS();
     if (!pending) return;
 
-    if (!ble_bikepower_config_revision_matches(base_revision)) {
+    if (!(s_processing_config_wifi ? wifi_portal_revision_matches(base_revision)
+                                   : ble_bikepower_config_revision_matches(base_revision))) {
         ESP_LOGW(TAG, "拒绝 BLE 配置事务 id=%lu rev=%lu：提交前配置已变化",
                  (unsigned long)transaction_id, (unsigned long)base_revision);
-        ble_bikepower_config_commit_result(transaction_id, BLE_CONFIG_RESULT_STALE_REVISION,
+        config_commit_result(transaction_id, BLE_CONFIG_RESULT_STALE_REVISION,
                                            0, NULL);
         return;
     }
 
-    config_data_t checked = requested;
     if (checked.schema_ver != CONFIG_VERSION || config_store_validate(&checked)) {
         ESP_LOGW(TAG, "拒绝 BLE 配置事务 id=%lu rev=%lu：字段越界或 schema 不匹配",
                  (unsigned long)transaction_id, (unsigned long)base_revision);
-        ble_bikepower_config_commit_result(transaction_id, BLE_CONFIG_RESULT_INVALID_VALUE,
+        config_commit_result(transaction_id, BLE_CONFIG_RESULT_INVALID_VALUE,
                                            0, NULL);
         return;
     }
 
-    config_data_t previous;
     config_store_from_engine(&s_engine, &previous);
-    power_engine_t next = s_engine;
+    next = s_engine;
     if (!config_store_apply_to_engine(&checked, &next)) {
-        ble_bikepower_config_commit_result(transaction_id, BLE_CONFIG_RESULT_INVALID_VALUE,
+        config_commit_result(transaction_id, BLE_CONFIG_RESULT_INVALID_VALUE,
                                            0, NULL);
         return;
+    }
+    if (copy_identity) {
+        device_identity_store_load(&old_identity);
+        for (size_t i = 0; i < DEVICE_IDENTITY_FIELD_COUNT; i++) {
+            if (!identity.fields[i][0]) {
+                memcpy(identity.fields[i], old_identity.fields[i], DEVICE_IDENTITY_TEXT_MAX);
+            }
+        }
+        if (!device_identity_store_save(&identity)) {
+            config_commit_result(transaction_id, BLE_CONFIG_RESULT_SAVE_FAILED, 0, NULL);
+            return;
+        }
     }
     if (!nvs_store_save(&next)) {
+        if (copy_identity && !device_identity_store_save(&old_identity)) {
+            ESP_LOGE(TAG, "配置失败后身份回滚失败，需要重新保存身份");
+        }
         ESP_LOGW(TAG, "BLE 配置事务 id=%lu 写入 NVS 失败", (unsigned long)transaction_id);
-        ble_bikepower_config_commit_result(transaction_id, BLE_CONFIG_RESULT_SAVE_FAILED,
+        config_commit_result(transaction_id, BLE_CONFIG_RESULT_SAVE_FAILED,
                                            0, NULL);
         return;
     }
 
-    config_data_t applied;
     config_store_from_engine(&next, &applied);
     uint8_t restart_flags = 0;
     if (previous.sport_profile != applied.sport_profile
@@ -239,6 +302,19 @@ static void process_pending_ble_config(void)
     }
 
     s_engine = next;
+    if (copy_identity) ble_bikepower_set_identity(&identity);
+    ble_bridge_status_t bridge_status = ble_power_bridge_status(&applied.bridge,
+        (uint32_t)(esp_timer_get_time() / 1000));
+    if (!power_bridge_config_equal(&previous.bridge, &applied.bridge)
+            || previous.sport_profile != applied.sport_profile
+            || (applied.bridge.source == BRIDGE_SOURCE_REAL
+                && (bridge_status.temporary || !bridge_status.connected))) {
+        if (applied.bridge.source == BRIDGE_SOURCE_REAL && applied.sport_profile == SPORT_PROFILE_CYCLING) {
+            ble_power_bridge_request(&applied.bridge, false);
+        } else {
+            ble_power_bridge_request_stop();
+        }
+    }
     power_engine_clear_dirty(&s_engine);
     app_state_refresh_led();
     if (restart_flags & BLE_CONFIG_RESTART_NAME) {
@@ -247,7 +323,7 @@ static void process_pending_ble_config(void)
             ble_bikepower_refresh_device_name();
         }
     }
-    ble_bikepower_config_commit_result(transaction_id, BLE_CONFIG_RESULT_SUCCESS,
+    config_commit_result(transaction_id, BLE_CONFIG_RESULT_SUCCESS,
                                        restart_flags, &applied);
     if (restart_flags & BLE_CONFIG_RESTART_GATT) {
         s_ble_config_restart_pending = true;
@@ -344,6 +420,8 @@ void app_main(void)
     app_state_set_wifi_trigger(on_wifi_trigger);
     app_state_set_wifi_exit(on_wifi_exit);
     wifi_portal_set_done_callback(on_wifi_done);  // 注册配网结束回调，由 wifi_portal 在保存/超时后调用
+    wifi_portal_set_config_callback(on_wifi_config_commit);
+    wifi_portal_sync(&s_engine);
 
     ret = button_init(s_app_queue);
     if (ret != ESP_OK) {
@@ -432,6 +510,7 @@ void app_main(void)
             app_state_handle_event(&e);
         }
         ble_bikepower_set_config_snapshot(&s_engine);
+        wifi_portal_sync(&s_engine);
         process_pending_ble_config();
         ble_bikepower_set_config_snapshot(&s_engine);
         process_pending_identity();
@@ -503,6 +582,10 @@ void app_main(void)
                         s_ble_config_restart_pending = false;
                         last_conn = 0;
                         app_state_clear_error();
+                        if (s_engine.bridge.source == BRIDGE_SOURCE_REAL
+                                && s_engine.sport_profile == SPORT_PROFILE_CYCLING) {
+                            ble_power_bridge_request(&s_engine.bridge, false);
+                        }
                     } else {
                         ESP_LOGE(TAG, "BLE 重启失败 ret=%d", r);
                         app_state_set_error();
@@ -519,17 +602,30 @@ void app_main(void)
         app_state_tick();
 
         snapshot_t s = s_engine.snapshot;
+        uint32_t bridge_now = (uint32_t)(esp_timer_get_time() / 1000);
+        ble_power_bridge_tick(&s_engine.bridge, bridge_now);
         ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
         if (s_engine.sport_profile == SPORT_PROFILE_RUNNING) {
             running_snapshot_t rs = running_engine_snapshot(&s_engine.running, HR_LOOP_INTERVAL_MS);
             int running_hr = power_engine_running_heartrate(&s_engine, rs.speed_x100_kmh);
             s.heartrate = running_hr;
+            s_engine.snapshot.heartrate = running_hr;
             ble_bikepower_set_running_data(rs, (uint8_t)running_hr);
+        } else if (s_engine.bridge.source == BRIDGE_SOURCE_REAL) {
+            ble_bridge_status_t status = ble_power_bridge_status(&s_engine.bridge, bridge_now);
+            if (status.temporary || !status.peer.bound
+                    || status.peer.addr_type != s_engine.bridge.addr_type
+                    || memcmp(status.peer.addr, s_engine.bridge.addr, 6) != 0) {
+                status.sample = (bridge_snapshot_t) { 0 };
+            }
+            s = power_engine_bridge_snapshot(&s_engine, &status.sample);
+            ble_bikepower_set_bridge_data(&status.sample, (uint8_t)s.heartrate);
         } else {
             s = power_engine_snapshot(&s_engine);
             ble_bikepower_set_data((uint16_t)s.power, (uint8_t)s.heartrate, (uint16_t)s.cadence);
         }
 
+        wifi_portal_sync(&s_engine);
         if (++tick >= MAIN_HEARTBEAT_INTERVAL_TICKS) {  // 每 10s 一次心跳日志
             tick = 0;
             hb_count++;

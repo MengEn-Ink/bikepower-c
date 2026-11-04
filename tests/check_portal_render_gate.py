@@ -1,69 +1,23 @@
 #!/usr/bin/env python3
-"""Portal render gate wiring checks."""
-import subprocess
-import tempfile
+"""检查生产页面浏览器门禁接线与故障路径覆盖。"""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPT = ROOT / "tests" / "check_portal_render.py"
-QUALITY_GATE = ROOT / "scripts" / "tools" / "quality_gate.py"
-TESTS_README = ROOT / "tests" / "README.md"
-TAG = "[portal-render-gate-check]"
-
-
-def check(condition, message, failures):
-    if condition:
-        print(f"{TAG} PASS {message}")
-    else:
-        failures.append(message)
-        print(f"{TAG} FAIL {message}")
 
 
 def main():
-    failures = []
-    check(SCRIPT.is_file(), "存在 tests/check_portal_render.py", failures)
-    if not SCRIPT.is_file():
-        print(f"{TAG} 结果: {len(failures)} 失败")
-        return 1
-
-    src = SCRIPT.read_text(encoding="utf-8")
-    quality_gate = QUALITY_GATE.read_text(encoding="utf-8")
-    tests_readme = TESTS_README.read_text(encoding="utf-8")
-
-    required_tokens = [
-        ("tests/mock_server.py", "启动本地门户 mock server"),
-        ("agent-browser", "使用 agent-browser 驱动真实浏览器"),
-        ("#/settings/about", "直接进入关于页 hash 路由"),
-        ("手机端不支持", "等待并校验电脑端升级说明文案"),
-        ("https://easyhey.com/?firmware=MOD220", "校验 MOD220 升级地址"),
-        ("screenshot", "保存渲染截图"),
-        ("document.body.scrollHeight", "检查页面高度"),
-        ("--screenshot-dir", "支持指定截图输出目录"),
-    ]
-    for token, message in required_tokens:
-        check(token in src, message, failures)
-
-    check("tests/check_portal_render.py" in quality_gate,
-          "quality_gate.py 聚合门户渲染截图检查", failures)
-    check("check_portal_render.py" in tests_readme,
-          "tests/README.md 记录门户渲染截图检查", failures)
-
-    result = subprocess.run(
-        ["python3", str(SCRIPT), "--browser-cmd", "missing-agent-browser-for-test",
-         "--screenshot-dir", str(Path(tempfile.gettempdir()))],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        timeout=20,
-    )
-    check(result.returncode != 0 and "未找到 agent-browser" in (result.stdout + result.stderr),
-          "缺少浏览器工具时失败且给出明确环境原因", failures)
-
-    if failures:
-        print(f"{TAG} 结果: {len(failures)} 失败")
-        return 1
-    print(f"{TAG} PASS: 门户渲染截图门禁接线检查通过")
-    return 0
+    renderer = (ROOT / "tests/check_portal_render.py").read_text()
+    browser = (ROOT / "tests/portal_bridge_browser.py").read_text()
+    quality = (ROOT / "scripts/tools/quality_gate.py").read_text()
+    required = [("portal_bridge_browser.py" in renderer, "渲染执行完整交互"),
+                ("--screenshot-dir" in renderer and "page.screenshot" in browser, "截图输出"),
+                ("chromium.launch" in browser and "tests/mock_server.py" in browser, "真实浏览器与接口替身"),
+                ("fail_save" in browser and '"stale"' in browser, "保存失败与过期路径"),
+                ("320, 390, 1440" in browser, "手机与桌面宽度"),
+                ("tests/check_portal_render.py" in quality, "质量门禁聚合")]
+    for ok, label in required:
+        print("[portal-render-gate-check]", "PASS" if ok else "FAIL", label)
+    return any(not ok for ok, _ in required)
 
 
 if __name__ == "__main__":

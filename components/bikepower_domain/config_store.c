@@ -55,11 +55,13 @@ void config_store_defaults(config_data_t *c)
     c->run_custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
     strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
+    power_bridge_config_defaults(&c->bridge);
 }
 
 void config_store_from_engine(const power_engine_t *e, config_data_t *c)
 {
     if (!e || !c) return;
+    memset(c, 0, sizeof(*c));
     c->schema_ver = CONFIG_VERSION;
     c->power = e->base_power;
     c->cadence = e->cadence_base;
@@ -93,6 +95,7 @@ void config_store_from_engine(const power_engine_t *e, config_data_t *c)
     c->run_custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
     strncpy(c->device_name, e->device_name, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
+    c->bridge = e->bridge;
 }
 
 bool config_store_apply_to_engine(const config_data_t *c, power_engine_t *e)
@@ -103,7 +106,8 @@ bool config_store_apply_to_engine(const config_data_t *c, power_engine_t *e)
     if (config_store_validate(&checked)) return false;
 
     power_engine_t next = *e;
-    bool restore_erg = next.has_erg_target && checked.mode == RIDE_MODE_STEADY;
+    bool restore_erg = next.has_erg_target && checked.mode == RIDE_MODE_STEADY
+        && checked.bridge.source == BRIDGE_SOURCE_SIMULATED;
     int erg_target = next.erg_active_target;
 
     if (next.mode != RIDE_MODE_STEADY) {
@@ -148,6 +152,8 @@ bool config_store_apply_to_engine(const config_data_t *c, power_engine_t *e)
     power_engine_set_run_mode(&next, (run_mode_t)checked.run_mode);
     power_engine_set_device_name(&next, checked.device_name);
     power_engine_set_mode(&next, (ride_mode_t)checked.mode);
+    next.bridge = checked.bridge;
+    if (checked.bridge.source == BRIDGE_SOURCE_REAL) power_engine_clear_erg_target(&next);
     if (restore_erg) power_engine_set_erg_target(&next, erg_target);
     next.dirty = true;
     *e = next;
@@ -162,7 +168,9 @@ bool config_store_apply_to_engine(const config_data_t *c, power_engine_t *e)
  */
 bool config_store_validate(config_data_t *c)
 {
+    if (!c) return false;
     config_data_t in = *c;
+    bool bridge_fixed = power_bridge_config_validate(&c->bridge);
 
     c->power = clamp_int(c->power, POWER_MIN, POWER_MAX);
     c->cadence = clamp_int(c->cadence, CADENCE_MIN, CADENCE_MAX);
@@ -211,7 +219,7 @@ bool config_store_validate(config_data_t *c)
         strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
     }
 
-    return in.power != c->power
+    return bridge_fixed || in.power != c->power
         || in.cadence != c->cadence
         || in.mode != c->mode
         || in.heartrate != c->heartrate
@@ -283,6 +291,10 @@ bool config_store_migrate(config_data_t *c)
         if (c->power_float == POWER_FLOAT_LEGACY_DEFAULT) {
             c->power_float = POWER_FLOAT_DEFAULT;
         }
+    }
+    if (c->schema_ver == 12) {
+        c->schema_ver = 13;
+        power_bridge_config_defaults(&c->bridge);
         config_store_validate(c);
         return true;
     }
@@ -376,9 +388,13 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
     if (json_escape(c->run_custom_name, run_custom_esc, sizeof(run_custom_esc)) == (size_t)-1) return 0;
     char esc[DEVICE_NAME_MAX * 6];
     if (json_escape(c->device_name, esc, sizeof(esc)) == (size_t)-1) return 0;
+    char bridge_esc[BRIDGE_NAME_MAX * 6];
+    if (json_escape(c->bridge.name, bridge_esc, sizeof(bridge_esc)) == (size_t)-1) return 0;
+    char address[13];
+    for (size_t i = 0; i < 6; i++) snprintf(address + i * 2, 3, "%02x", c->bridge.addr[i]);
 
     /* 先写入栈缓冲，确认总长后再拷贝出参，避免向 out 写截断内容 */
-    char buf[1024];
+    char buf[CONFIG_JSON_MAX_LEN];
     int n = snprintf(buf, sizeof(buf),
         "{\"schema_ver\":%d,\"power\":%d,\"cadence\":%d,\"mode\":%d,"
         "\"heartrate\":%d,\"has_user_hr\":%d,"
@@ -400,7 +416,10 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         "\"run_mode\":%d,\"run_pacer_type\":%d,"
         "\"run_pace_low_sec\":%d,\"run_pace_high_sec\":%d,"
         "\"run_custom_name\":\"%s\","
-        "\"device_name\":\"%s\"}",
+        "\"device_name\":\"%s\","
+        "\"cycling_source\":%d,\"bridge_bound\":%d,\"bridge_addr_type\":%d,"
+        "\"bridge_address\":\"%s\",\"bridge_calibration\":%d,"
+        "\"bridge_watts\":%d,\"bridge_percent_x10\":%d,\"bridge_name\":\"%s\"}",
         c->schema_ver, c->power, c->cadence, c->mode,
         c->heartrate, c->has_user_hr,
         c->power_float, c->cadence_float, c->hr_float,
@@ -421,7 +440,8 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         c->run_mode, c->run_pacer_type,
         c->run_pace_low_sec, c->run_pace_high_sec,
         run_custom_esc,
-        esc);
+        esc, c->bridge.source, c->bridge.bound, c->bridge.addr_type, address,
+        c->bridge.calibration_mode, c->bridge.watts, c->bridge.percent_x10, bridge_esc);
 
     if (n < 0 || (size_t)n >= sizeof(buf)) return 0;  /* 编码错误或内部缓冲不足 */
     if ((size_t)n >= out_sz) return 0;                /* 出参缓冲不足，不溢出 */
@@ -460,6 +480,12 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         {"run_pacer_type", &tmp.run_pacer_type},
         {"run_pace_low_sec", &tmp.run_pace_low_sec},
         {"run_pace_high_sec", &tmp.run_pace_high_sec},
+        {"cycling_source", &tmp.bridge.source},
+        {"bridge_bound", &tmp.bridge.bound},
+        {"bridge_addr_type", &tmp.bridge.addr_type},
+        {"bridge_calibration", &tmp.bridge.calibration_mode},
+        {"bridge_watts", &tmp.bridge.watts},
+        {"bridge_percent_x10", &tmp.bridge.percent_x10},
     };
     for (size_t i = 0; i < sizeof(int_keys) / sizeof(int_keys[0]); i++) {
         char pat[40];
@@ -494,6 +520,23 @@ bool config_store_deserialize(const char *json, config_data_t *c)
     if (cp) {
         cp += strlen("\"custom_pacer_name\":\"");
         json_unescape(cp, tmp.custom_pacer_name, CUSTOM_PACER_NAME_MAX);
+    }
+    const char *bp = strstr(json, "\"bridge_name\":\"");
+    if (bp) {
+        bp += strlen("\"bridge_name\":\"");
+        if (!json_unescape(bp, tmp.bridge.name, sizeof(tmp.bridge.name))) return false;
+    }
+    const char *ap = strstr(json, "\"bridge_address\":\"");
+    if (ap) {
+        ap += strlen("\"bridge_address\":\"");
+        if (strlen(ap) < 13 || ap[12] != '"') return false;
+        for (size_t i = 0; i < 6; i++) {
+            char hex[3] = { ap[i * 2], ap[i * 2 + 1], 0 };
+            char *end;
+            long byte = strtol(hex, &end, 16);
+            if (end != hex + 2 || byte < 0 || byte > 255) return false;
+            tmp.bridge.addr[i] = (uint8_t)byte;
+        }
     }
 
     const char *rp = strstr(json, "\"run_custom_name\":\"");

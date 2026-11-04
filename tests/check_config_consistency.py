@@ -211,9 +211,9 @@ check("FIRMWARE_STABLE_VERSION" in build_all_src and "FIRMWARE_FIX_VERSION" in b
       "Release 构建脚本必须读取稳定版和修复版")
 check("git -C \"$PROJECT_DIR\" rev-parse --short HEAD" in build_all_src,
       "Release 构建脚本必须读取最后 Git 短提交 ID")
-check("bikepower-c-%s-v%s-stable-fix-g%s.bin" in build_all_src,
-      "Release 合并固件文件名必须包含板型、单一版本号、stable/fix 标识和 Git ID")
-check("bikepower-c-release-v${VERSION}-stable-fix-g${GIT_SHA}.zip" in build_all_src,
+check("printf '%s-v%s.bin" in build_all_src,
+      "Release 合并固件文件名包含板型与单一版本号")
+check("bikepower-c-v${VERSION}.zip" in build_all_src,
       "Release 构建脚本必须生成包含双板型固件、测试报告和用户手册的总包")
 check("zip -qr \"$PACKAGE_NAME\"" in build_all_src,
       "Release 构建脚本必须使用 zip 生成可直接分发的总包")
@@ -314,9 +314,9 @@ range_expectations = {
     "cadence_float": (extract_int(domain_src, "CADENCE_FLOAT_MIN"), extract_int(domain_src, "CADENCE_FLOAT_MAX")),
     "hr_float": (extract_int(domain_src, "HR_FLOAT_MIN"), extract_int(domain_src, "HR_FLOAT_MAX")),
     "power_step": (extract_int(domain_src, "POWER_STEP_MIN"), extract_int(domain_src, "POWER_STEP_MAX")),
-    "profile_weight": (extract_int(domain_src, "PROFILE_WEIGHT_MIN"), extract_int(domain_src, "PROFILE_WEIGHT_MAX")),
-    "profile_ftp": (extract_int(domain_src, "PROFILE_FTP_MIN"), extract_int(domain_src, "PROFILE_FTP_MAX")),
-    "profile_thr_hr": (extract_int(domain_src, "PROFILE_THR_HR_MIN"), extract_int(domain_src, "PROFILE_THR_HR_MAX")),
+    "weight": (extract_int(domain_src, "PROFILE_WEIGHT_MIN"), extract_int(domain_src, "PROFILE_WEIGHT_MAX")),
+    "ftp": (extract_int(domain_src, "PROFILE_FTP_MIN"), extract_int(domain_src, "PROFILE_FTP_MAX")),
+    "thr_hr": (extract_int(domain_src, "PROFILE_THR_HR_MIN"), extract_int(domain_src, "PROFILE_THR_HR_MAX")),
     "custom_wkg_low": (extract_int(domain_src, "CUSTOM_WKG_MIN"), extract_int(domain_src, "CUSTOM_WKG_MAX")),
     "custom_wkg_high": (extract_int(domain_src, "CUSTOM_WKG_MIN"), extract_int(domain_src, "CUSTOM_WKG_MAX")),
     "run_speed_x100": (extract_int(domain_src, "RUN_SPEED_X100_MIN"), extract_int(domain_src, "RUN_SPEED_X100_MAX")),
@@ -332,25 +332,25 @@ for key, expected in range_expectations.items():
     check(actual == expected, f"tests/mock_server.py LIMITS[{key}] == {expected} (实际={actual})")
 
 js_ranges = {
-    "power": "power_float",
-    "cadence": "cadence_float",
-    "hr": "hr_float",
-    "runpace": "run_pace_float_sec",
-    "runcadence": "run_cadence_float",
-    "pstep": "power_step",
+    "s.powerFloat": "power_float",
+    "s.cadenceFloat": "cadence_float",
+    "h.float": "hr_float",
+    "r.paceFloat": "run_pace_float_sec",
+    "r.cadenceFloat": "run_cadence_float",
+    "c.powerStep": "power_step",
 }
 for js_key, domain_key in js_ranges.items():
-    actual = extract_js_range(app_js_src, js_key)
+    match = re.search(rf"range\({re.escape(js_key)},\s*(-?\d+),\s*(-?\d+)\)", app_js_src)
+    actual = tuple(map(int, match.groups())) if match else None
     expected = range_expectations[domain_key]
-    check(actual == expected, f"main/web/app.js FLOAT_RANGE.{js_key} == {expected} (实际={actual})")
+    check(actual == expected, f"main/web/app.js range({js_key}) == {expected} (实际={actual})")
 
 power_float_default = extract_int(domain_src, "POWER_FLOAT_DEFAULT")
 cadence_float_default = extract_int(domain_src, "CADENCE_FLOAT_DEFAULT")
 check(
-    re.search(rf"power_float:\s*{power_float_default}\s*,\s*cadence_float:\s*{cadence_float_default}", app_js_src)
-    and f"data.power_float != null ? data.power_float : {power_float_default}" in app_js_src
-    and f"data.cadence_float != null ? data.cadence_float : {cadence_float_default}" in app_js_src,
-    "main/web/app.js 的初始值和缺省回退与领域层功率/踏频浮动默认值一致",
+    "powerFloat:c.power_float" in app_js_src and "cadenceFloat:c.cadence_float" in app_js_src
+    and "draft:null" in app_js_src,
+    "main/web/app.js 初始草稿从设备配置读取，不重复硬编码领域默认值",
 )
 check(
     re.search(rf'"power_float"\s*:\s*{power_float_default}', mock_src)
@@ -372,7 +372,7 @@ check(fit_reference.get("power", {}).get("ac1") == 0.9550639560242542
       "真实骑行参考基准保留功率自相关与38秒最佳心率滞后")
 
 config_version = extract_int(domain_src, "CONFIG_VERSION")
-check(config_version == 12, f"CONFIG_VERSION 必须升级到 12 (实际={config_version})")
+check(config_version == 13, f"CONFIG_VERSION 必须升级到 13 (实际={config_version})")
 check(f"`CONFIG_VERSION = {config_version}`" in tech_ref_src,
       f"技术参考 schema 版本与 CONFIG_VERSION({config_version}) 一致")
 for macro in [
@@ -442,7 +442,7 @@ check(captive_host == "192.168.4.1", f"CAPTIVE_PORTAL_HOST = 192.168.4.1 (实际
 check("192.168.4.1" in readme_src, "README 含网关 192.168.4.1")
 
 wifi_shutdown = extract_int(config_src, "WIFI_SHUTDOWN_MS")
-check(wifi_shutdown == 180000, f"WIFI_SHUTDOWN_MS = 180000 (实际={wifi_shutdown})")
+check(wifi_shutdown == 300000, f"WIFI_SHUTDOWN_MS = 300000 (实际={wifi_shutdown})")
 
 
 # ============================ 4b. 用户文档配网描述一致性 ============================
@@ -564,11 +564,11 @@ route_table_src = routes_match.group(1) if routes_match else ""
 route_count = route_table_src.count(".uri =")
 captive_route_count = route_table_src.count(".handler = captive_portal_detect_handler")
 business_route_count = route_count - captive_route_count
-check(route_count == 28 and business_route_count == 18 and captive_route_count == 10,
-      f"wifi_portal.c 路由数为 18 个业务 + 10 个 Captive (实际={business_route_count}+{captive_route_count})")
-check("已注册业务路由 18 个，另有 10 个 Captive Portal 探测路由" in tech_ref_src,
+check(route_count == 23 and business_route_count == 13 and captive_route_count == 10,
+      f"wifi_portal.c 路由数为 13 个业务 + 10 个 Captive (实际={business_route_count}+{captive_route_count})")
+check("已注册业务路由 13 个，另有 10 个 Captive Portal 探测路由" in tech_ref_src,
       "技术参考路由计数与实现一致")
-check("18 个业务路由 + 10 个 Captive Portal 探测路由" in wifi_rules_src,
+check("13 个业务路由 + 10 个 Captive Portal 探测路由" in wifi_rules_src,
       "WiFi 规则路由计数与实现一致")
 check('"diff", "--check"' in quality_gate_src,
       "quality_gate.py 必须检查工作区 whitespace")
@@ -623,7 +623,7 @@ check("HTTPD_SOCK_ERR_TIMEOUT" in wifi_portal_src and "HTTP_RECV_TIMEOUT_RETRIES
       "wifi_portal.c 对 HTTPD_SOCK_ERR_TIMEOUT 做有限重试")
 check("xSemaphoreTake(g_notify_lock, portMAX_DELAY)" not in ble_bikepower_src and "BLE_STOP_LOCK_WAIT_MS" in ble_bikepower_src,
       "ble_bikepower_stop 不无限等待通知锁")
-check("xSemaphoreTake(s_scan.lock, portMAX_DELAY)" not in ble_scanner_src and "BLE_SCAN_LOCK_WAIT_MS" in ble_scanner_src,
+check("xSemaphoreTake(" not in ble_scanner_src and "portENTER_CRITICAL" in ble_scanner_src,
       "ble_scanner 回调不无限等待扫描锁")
 
 

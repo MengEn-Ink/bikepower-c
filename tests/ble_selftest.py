@@ -80,7 +80,7 @@ def get_expected_fw_version():
                     git_sha = subprocess.check_output(["git", "-C", repo_root, "rev-parse", "--short", "HEAD"], text=True).strip()
                 except Exception:
                     git_sha = "nogit"
-            return "%s-v%s-stable%s-fix%s-g%s" % (board, version.group(1), stable.group(1), fix.group(1), git_sha)
+            return "%s-v%s" % (board, version.group(1))
     except Exception:
         pass
     return "3.1.1"  # fallback默认值

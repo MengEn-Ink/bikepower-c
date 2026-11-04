@@ -1,540 +1,287 @@
 #!/usr/bin/env python3
-"""BikePower 配网门户 Mock Server（v3.2.0 前后端分离重构版）
-
-复刻设备端 wifi_portal.c 的全部 /api/xxx JSON 接口与首页静态资源，
-让前端 main/web/ 三件套在本地不烧设备即可调试。
-
-用法:
-  python3 tests/mock_server.py                     # 默认 http://127.0.0.1:8080
-  python3 tests/mock_server.py --port 8000
-  python3 tests/mock_server.py --bind 0.0.0.0      # 局域网内手机可访问
-
-行为说明:
-  - GET /                 返回 main/web/index.html（自动内联 app.css + app.js）
-  - GET /favicon.ico      204
-  - GET /api/state        JSON 设备状态
-  - GET /api/time         纯数字倒计时（每请求自减，最低 0）
-  - POST /api/renew       重置倒计时为 180
-  - GET /api/mem_stats    JSON 假内存数据
-  - POST /api/config      {"ok":true}（保存到运行时状态）
-  - POST /api/close-wifi  {"ok":true}
-  - /api/device-templates* 和 /api/ble-scan* 模拟设备信息模板库与 BLE 扫描
-"""
+"""核心门户接口替身；配置事务、桥接临时测试及显式 300 秒续期。"""
 import argparse
+import copy
 import json
-import os
+import math
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WEB_DIR = os.path.join(REPO_ROOT, "main", "web")
-
-MOCK_STATE = {
-    "device_name": "BikePower-Mock",
-    "firmware_version": "4.0.3-mock",
-    "firmware_name": "generic-c3-v4.0.3-stable4.0.0-fix4.0.3-g6e90860",
-    "board": "generic-c3",
-    "stable_version": "4.0.0",
-    "fix_version": "4.0.3",
-    "git_sha": "6e90860",
-    "build_time": "2026-07-07 15:50:00 CST",
-    "sport_profile": "running",
-    "broadcast_mask": 7,
-    "power": 150,
-    "cadence": 80,
-    "heartrate": 130,
-    "run_speed_x100": 1000,
-    "run_pace_float_sec": 10,
-    "run_cadence": 170,
-    "run_cadence_float": 4,
-    "run_mode": "fixed",
-    "run_pacer_type": "jog",
-    "run_pace_low_sec": 390,
-    "run_pace_high_sec": 450,
-    "run_custom_name": "自定义",
-    "mode": "steady",
-    "power_float": 50,
-    "cadence_float": 8,
-    "hr_float": 2,
-    "power_step": 20,
-    "profile_weight": 70,
-    "profile_ftp": 200,
-    "profile_thr_hr": 170,
-    "profile_ride_type": "coco",
-    "custom_wkg_low": 25,
-    "custom_wkg_high": 30,
-    "custom_pacer_name": "自定义",
+ROOT = Path(__file__).resolve().parent.parent
+WEB_DIR = ROOT / "main/web"
+LOCK = threading.RLock()
+CONFIG = {
+    "schema_ver": 13, "power": 220, "cadence": 88, "mode": 0,
+    "heartrate": 145, "has_user_hr": 0, "power_float": 50, "cadence_float": 8,
+    "hr_float": 2, "power_step": 20, "weight": 70, "ftp": 300, "thr_hr": 190,
+    "ride_type": 0, "custom_wkg_low": 25, "custom_wkg_high": 30,
+    "custom_pacer_name": "自定义", "sport_profile": 0, "broadcast_mask": 7,
+    "run_speed_x100": 1000, "run_pace_float_sec": 10, "run_cadence": 170,
+    "run_cadence_float": 4, "run_mode": 0, "run_pacer_type": 0,
+    "run_pace_low_sec": 390, "run_pace_high_sec": 450, "run_custom_name": "自定义",
+    "device_name": "BikePower-Mock", "cycling_source": 0, "bridge_bound": 0,
+    "bridge_addr_type": 0, "bridge_address": "000000000000",
+    "bridge_calibration": 0, "bridge_watts": 0, "bridge_percent_x10": 1000, "bridge_name": "",
     "led_silent": 0,
-    "led_wait_mode": 2,
-    "led_wait_color": 2,
-    "led_conn_mode": 1,
-    "led_conn_color": 1,
-    "led_wifi_mode": 2,
-    "led_wifi_color": 4,
-    "led_confirm_mode": 3,
-    "led_confirm_color": 3,
-    "led_error_mode": 3,
-    "led_error_color": 0,
-    "remaining_sec": 180,
-    "closing": False,
-    "hr_locked": False,
-    "pacers": [
-        {"id": "coco", "name": "Coco", "wkg_low": 2.4, "wkg_high": 2.8},
-        {"id": "yumi", "name": "Yumi", "wkg_low": 2.7, "wkg_high": 3.1},
-        {"id": "jacques", "name": "Jacques", "wkg_low": 3.0, "wkg_high": 3.5},
-        {"id": "genie", "name": "Genie", "wkg_low": 3.5, "wkg_high": 3.9},
-        {"id": "constance", "name": "Constance", "wkg_low": 4.0, "wkg_high": 4.4},
-        {"id": "custom", "name": "自定义", "wkg_low": 2.5, "wkg_high": 3.0, "custom": True},
-    ],
-    "run_pacers": [
-        {"id": "jog", "name": "慢跑", "pace_low_sec": 390, "pace_high_sec": 450, "cadence": 165},
-        {"id": "aerobic", "name": "有氧", "pace_low_sec": 330, "pace_high_sec": 390, "cadence": 170},
-        {"id": "tempo", "name": "节奏", "pace_low_sec": 270, "pace_high_sec": 315, "cadence": 174},
-        {"id": "interval", "name": "间歇", "pace_low_sec": 210, "pace_high_sec": 255, "cadence": 180},
-        {"id": "custom", "name": "自定义", "pace_low_sec": 390, "pace_high_sec": 450, "cadence": 170, "custom": True},
-    ],
 }
-
-LOCK = threading.Lock()
-REMAINING_SEC = [180]
-TEMPLATES = []
-SCAN_DEVICES = [
-    {
-        "id": 0,
-        "alias": "",
-        "adv_name": "Magene P325",
-        "device_name": "",
-        "manufacturer": "",
-        "model": "",
-        "firmware": "",
-        "hardware": "",
-        "software": "",
-        "addr": "AA:BB:CC:DD:EE:FF",
-        "addr_type": 1,
-        "last_rssi": -54,
-        "tx_power": -4,
-        "appearance": 1152,
-        "adv_raw_hex": "02010603031818",
-        "scan_rsp_raw_hex": "0c094d6167656e652050333235",
-        "manufacturer_data_hex": "ffff0102",
-        "service_data_hex": "1818b900",
-        "service_flags": 5,
-    },
-    {
-        "id": 1,
-        "alias": "",
-        "adv_name": "Zwift Hub",
-        "device_name": "",
-        "manufacturer": "",
-        "model": "",
-        "firmware": "",
-        "hardware": "",
-        "software": "",
-        "addr": "12:34:56:78:9A:BC",
-        "addr_type": 0,
-        "last_rssi": -68,
-        "tx_power": -6,
-        "appearance": 1152,
-        "adv_raw_hex": "020106050318181618",
-        "scan_rsp_raw_hex": "0a095a7769667420487562",
-        "manufacturer_data_hex": "004c0102",
-        "service_data_hex": "18261c0b",
-        "service_flags": 37,
-    },
-    {
-        "id": 2,
-        "alias": "",
-        "adv_name": "Office Keyboard",
-        "device_name": "",
-        "manufacturer": "",
-        "model": "",
-        "firmware": "",
-        "hardware": "",
-        "software": "",
-        "addr": "66:55:44:33:22:11",
-        "addr_type": 0,
-        "last_rssi": -48,
-        "tx_power": 0,
-        "appearance": 0,
-        "adv_raw_hex": "020106",
-        "scan_rsp_raw_hex": "",
-        "manufacturer_data_hex": "",
-        "service_data_hex": "",
-        "service_flags": 0,
-    },
-    {
-        "id": 3,
-        "alias": "",
-        "adv_name": "Polar H10",
-        "device_name": "",
-        "manufacturer": "",
-        "model": "",
-        "firmware": "",
-        "hardware": "",
-        "software": "",
-        "addr": "20:21:22:23:24:25",
-        "addr_type": 0,
-        "last_rssi": -61,
-        "tx_power": -2,
-        "appearance": 833,
-        "adv_raw_hex": "02010603030d18",
-        "scan_rsp_raw_hex": "0909506f6c617220483130",
-        "manufacturer_data_hex": "6b000102",
-        "service_data_hex": "",
-        "service_flags": 8,
-    },
+for scene in ("wait", "conn", "wifi", "confirm", "error"):
+    CONFIG[f"led_{scene}_mode"] = 2
+    CONFIG[f"led_{scene}_color"] = 1
+PACERS = [(24, 28, "Coco"), (27, 31, "Yumi"), (30, 35, "Jacques"),
+          (35, 39, "Genie"), (40, 44, "Constance")]
+RUN_PACERS = [(390, 450, 165, "慢跑"), (330, 390, 170, "有氧"),
+              (270, 315, 174, "节奏"), (210, 255, 180, "间歇")]
+DEVICES = [
+    {"candidate": 16, "name": "P505-4A29", "rssi": -41, "addr_type": 0, "address": "294a11223344"},
+    {"candidate": 17, "name": "", "rssi": -68, "addr_type": 1, "address": "4db811223344"},
 ]
-SCANNING = [False]
-
+IDENTITY = {"manufacturer": "Magene", "model": "P505", "serial": "MOCK-4A29",
+            "hardware": "1.0", "firmware": "2.1", "software": ""}
+BOARD_IDENTITY = {"manufacturer": "BikePower", "model": "Generic-C3", "serial": "",
+                  "hardware": "1.0", "firmware": "4.2.1", "software": ""}
 LIMITS = {
-    "power": (0, 2000),
-    "cadence": (20, 120),
-    "heartrate": (60, 200),
-    "power_float": (0, 100),
-    "cadence_float": (0, 20),
-    "hr_float": (0, 20),
-    "power_step": (5, 50),
-    "profile_weight": (40, 150),
-    "profile_ftp": (50, 500),
-    "profile_thr_hr": (100, 220),
-    "custom_wkg_low": (10, 70),
-    "custom_wkg_high": (10, 70),
-    "run_speed_x100": (300, 2500),
-    "run_pace_float_sec": (0, 60),
-    "run_cadence": (120, 220),
-    "run_cadence_float": (0, 20),
-    "run_pace_low_sec": (144, 1200),
-    "run_pace_high_sec": (144, 1200),
-    "led_wait_mode": (0, 5),
-    "led_wait_color": (0, 6),
-    "led_conn_mode": (0, 5),
-    "led_conn_color": (0, 6),
-    "led_wifi_mode": (0, 5),
-    "led_wifi_color": (0, 6),
-    "led_confirm_mode": (0, 5),
-    "led_confirm_color": (0, 6),
-    "led_error_mode": (0, 5),
-    "led_error_color": (0, 6),
+    "power": (0, 2000), "cadence": (20, 120), "heartrate": (60, 200),
+    "power_float": (0, 100), "cadence_float": (0, 20), "hr_float": (0, 20),
+    "power_step": (5, 50), "weight": (40, 150), "ftp": (50, 500), "thr_hr": (100, 220),
+    "custom_wkg_low": (10, 70), "custom_wkg_high": (10, 70),
+    "run_speed_x100": (300, 2500), "run_pace_float_sec": (0, 60),
+    "run_cadence": (120, 220), "run_cadence_float": (0, 20),
+    "run_pace_low_sec": (144, 1200), "run_pace_high_sec": (144, 1200),
+    "bridge_watts": (-200, 200), "bridge_percent_x10": (500, 1500),
+    "mode": (0, 1), "run_mode": (0, 1), "sport_profile": (0, 1), "ride_type": (0, 5),
+    "run_pacer_type": (0, 4), "bridge_calibration": (0, 2), "cycling_source": (0, 1),
+    "bridge_bound": (0, 1), "bridge_addr_type": (0, 1), "has_user_hr": (0, 1),
+    "broadcast_mask": (1, 7),
 }
-
-ENUM_VALUES = {
-    "sport_profile": {"cycling", "running"},
-    "mode": {"steady", "road"},
-    "profile_ride_type": {"coco", "yumi", "jacques", "genie", "constance", "custom"},
-    "run_mode": {"fixed", "pacer"},
-    "run_pacer_type": {"jog", "aerobic", "tempo", "interval", "custom"},
-}
+STATE = {"revision": 1, "deadline": time.monotonic() + 300, "closing": False,
+         "transaction": 0, "pending": False, "result": 0, "restart": 0,
+         "scanning_until": 0, "generation": 1, "test_at": 0, "test_until": 0,
+         "peer": None, "temporary": False, "bridge_state": 0,
+         "fault": "", "fail_save": False, "next_config": None, "close_after": False,
+         "complete_at": 0}
 
 
-def _clamp(value, lo, hi):
-    return min(max(value, lo), hi)
+def remaining():
+    return max(0, math.ceil(STATE["deadline"] - time.monotonic()))
 
 
-def _apply_config_field(key, value):
-    if key in LIMITS:
-        if not isinstance(value, int):
-            return
-        lo, hi = LIMITS[key]
-        MOCK_STATE[key] = _clamp(value, lo, hi)
-        return
-    if key in ENUM_VALUES:
-        if isinstance(value, str) and value in ENUM_VALUES[key]:
-            MOCK_STATE[key] = value
-        return
-    if key == "led_silent":
-        if isinstance(value, int):
-            MOCK_STATE[key] = 1 if value else 0
-        return
-    if key == "broadcast_mask":
-        if isinstance(value, int) and 1 <= (value & 7) <= 7:
-            MOCK_STATE[key] = value & 7
-        return
-    if key == "hr_lock":
-        MOCK_STATE["hr_locked"] = bool(value)
-        return
-    MOCK_STATE[key] = value
+def bridge():
+    peer = STATE["peer"] or {"address": "000000000000", "addr_type": 0, "name": ""}
+    elapsed = time.monotonic() - STATE["test_at"]
+    if STATE["peer"] and elapsed >= 0.4 and STATE["bridge_state"] not in (0, 9):
+        STATE["bridge_state"] = 5
+    if STATE["temporary"] and time.monotonic() > STATE["test_until"]:
+        STATE["bridge_state"] = 0
+    tested = STATE["bridge_state"] == 5
+    fault = STATE["fault"]
+    valid = tested and fault not in ("stale", "disconnect")
+    raw = 0 if fault == "zero" else 238
+    c = CONFIG
+    corrected = raw
+    if raw > 0:
+        if c["bridge_calibration"] == 1:
+            corrected += c["bridge_watts"]
+        if c["bridge_calibration"] == 2:
+            corrected = math.floor(raw * c["bridge_percent_x10"] / 1000 + 0.5)
+    return {"state": 6 if fault == "stale" else 7 if fault == "disconnect" else STATE["bridge_state"],
+            "connected": tested and fault != "disconnect", "temporary": STATE["temporary"],
+            "tested": tested, "valid": valid, "raw_power": raw if valid else 0,
+            "power": max(0, min(2000, corrected)) if valid else 0,
+            "cadence": 92 if valid and raw and peer["name"] else 0, "age_ms": 4000 if fault == "stale" else 100,
+            "error": 0, "device_name": peer["name"], "address": peer["address"],
+            "addr_type": peer["addr_type"], "name": peer["name"],
+            "identity": IDENTITY if peer["name"] else {k: "" for k in IDENTITY}}
 
 
-def _inline_html():
-    """读取 index.html 并替换占位符为 app.css / app.js 内容（与 inline_static.py 一致）。"""
-    with open(os.path.join(WEB_DIR, "index.html"), encoding="utf-8") as f:
-        html = f.read()
-    with open(os.path.join(WEB_DIR, "app.css"), encoding="utf-8") as f:
-        css = f.read()
-    with open(os.path.join(WEB_DIR, "app.js"), encoding="utf-8") as f:
-        js = f.read()
-    html = html.replace("<!-- INLINE_CSS -->", "<style>\n" + css + "\n</style>")
-    html = html.replace("<!-- INLINE_JS -->", "<script>\n" + js + "\n</script>")
-    return html.encode("utf-8")
+def tick():
+    if STATE["pending"] and time.monotonic() >= STATE["complete_at"]:
+        STATE["pending"] = False
+        STATE["result"] = 5 if STATE["fail_save"] else 0
+        if not STATE["fail_save"]:
+            CONFIG.update(STATE["next_config"])
+            if STATE.get("copy_identity"):
+                BOARD_IDENTITY.update({k: v for k, v in bridge()["identity"].items() if v})
+            STATE["revision"] += 1
+            if CONFIG["cycling_source"] and CONFIG["sport_profile"] == 0:
+                STATE["temporary"] = False
+            else:
+                STATE["peer"] = None
+                STATE["bridge_state"] = 0
+            if STATE["close_after"]:
+                STATE["closing"] = True
+        STATE["fail_save"] = False
+    if remaining() == 0:
+        STATE["closing"] = True
 
 
-def _tick_remaining():
-    """每次读取倒计时自减 1（最低 0），模拟设备端 deadline 流逝。"""
-    with LOCK:
-        if REMAINING_SEC[0] > 0:
-            REMAINING_SEC[0] -= 1
-        return REMAINING_SEC[0]
+def runtime():
+    tick()
+    b = bridge()
+    c = CONFIG
+    is_bridge = c["cycling_source"] and c["sport_profile"] == 0
+    active = b["valid"] and not b["temporary"] and b["address"] == c["bridge_address"]
+    power = b["power"] if active else 0 if is_bridge else c["power"]
+    cadence = b["cadence"] if active else 0 if is_bridge else c["cadence"]
+    if c["sport_profile"]:
+        cadence = c["run_cadence"]
+    return {k: STATE[k] for k in ("revision", "transaction", "pending", "result", "restart")} | {
+        "source": c["cycling_source"], "power": power, "cadence": cadence,
+        "heartrate": c["heartrate"] if c["broadcast_mask"] & 4 else 0,
+        "connections": 1, "remaining_sec": remaining(), "closing": STATE["closing"], "bridge": b,
+        "run_speed_x100": c["run_speed_x100"], "run_distance_m": 123, "run_elapsed_sec": 60}
+
+
+def state():
+    tick()
+    return {"config": copy.deepcopy(CONFIG), "revision": STATE["revision"], "bridge": bridge(),
+            "identity": copy.deepcopy(BOARD_IDENTITY),
+            "firmware_version": "4.2.1", "firmware_name": "generic-c3-v4.2.1",
+            "board": "generic-c3", "git_sha": "mock", "build_time": "mock",
+            "remaining_sec": remaining(), "closing": STATE["closing"],
+            "pacers": [{"id": i, "low": lo, "high": hi, "name": name} for i, (lo, hi, name) in enumerate(PACERS)],
+            "run_pacers": [{"id": i, "low": lo, "high": hi, "cadence": cadence, "name": name}
+                           for i, (lo, hi, cadence, name) in enumerate(RUN_PACERS)]}
+
+
+def submit(body, close):
+    tick()
+    if STATE["closing"] or STATE["pending"] or body.get("revision") != STATE["revision"]:
+        return {"ok": False, "error": "配置已变化或设备忙"}
+    requested = copy.deepcopy(CONFIG)
+    for key, value in body.items():
+        if key not in CONFIG:
+            continue
+        if isinstance(CONFIG[key], int):
+            if type(value) is not int:
+                return {"ok": False, "error": "参数类型无效"}
+            lo, hi = LIMITS.get(key, (0, 13))
+            requested[key] = min(hi, max(lo, value))
+        elif not isinstance(value, str) or len(value.encode()) > (23 if key == "device_name" else 31):
+            return {"ok": False, "error": "名称过长"}
+        else:
+            requested[key] = value
+    if requested["cycling_source"]:
+        b = bridge()
+        if not b["tested"] or b["address"] != requested["bridge_address"] or b["addr_type"] != requested["bridge_addr_type"]:
+            return {"ok": False, "error": "功率计尚未通过测试"}
+    STATE["transaction"] += 1
+    STATE.update(pending=True, next_config=requested, close_after=close, result=1,
+                 copy_identity=bool(body.get("copy_identity")),
+                 complete_at=time.monotonic() + 0.1)
+    return {"ok": True, "pending": True, "transaction": STATE["transaction"]}
+
+
+def inline_html():
+    import sys
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from inline_static import inline_html as merge, minify_html, minify_css, minify_js
+    html = merge(minify_html((WEB_DIR / "index.html").read_text()),
+                 minify_css((WEB_DIR / "app.css").read_text()), minify_js((WEB_DIR / "app.js").read_text()))
+    return html.encode()
 
 
 class Handler(BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args):
-        # 简化日志，避免默认 stderr 噪音
-        print(f"[mock] {self.command} {self.path} -> {args[1] if len(args) > 1 else ''}")
+    def log_message(self, *_):
+        pass
 
-    def _send(self, status, body=b"", content_type="text/plain; charset=utf-8", extra_headers=None):
+    def send(self, body, content_type="application/json", status=200, headers=None):
+        if not isinstance(body, bytes):
+            body = json.dumps(body, ensure_ascii=False).encode() if content_type == "application/json" else str(body).encode()
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Connection", "close")
-        if extra_headers:
-            for k, v in extra_headers.items():
-                self.send_header(k, v)
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
         self.end_headers()
-        if body:
-            self.wfile.write(body)
-
-    def _send_json(self, obj, status=200):
-        body = json.dumps(obj).encode("utf-8")
-        self._send(status, body, "application/json")
-
-    def _send_text(self, text, status=200):
-        self._send(status, text.encode("utf-8"), "text/plain; charset=utf-8")
-
-    def _read_body(self):
-        length = int(self.headers.get("Content-Length", "0") or "0")
-        if length <= 0:
-            return b""
-        return self.rfile.read(length)
+        self.wfile.write(body)
 
     def do_GET(self):
-        path = self.path.split("?", 1)[0]
-        if path == "/" or path == "/index.html":
-            self._send(200, _inline_html(), "text/html; charset=utf-8")
-            return
-        if path == "/favicon.ico":
-            self._send(204)
-            return
-        if path == "/api/state":
-            with LOCK:
-                MOCK_STATE["remaining_sec"] = REMAINING_SEC[0]
-            self._send_json(MOCK_STATE)
-            return
-        if path == "/api/time":
-            sec = _tick_remaining()
-            self._send_text(str(sec))
-            return
-        if path == "/api/mem_stats":
-            self._send_json({"free": 120000, "min_free": 98000})
-            return
-        if path == "/api/device-templates":
-            self._send_json({"max": 5, "count": len(TEMPLATES), "items": TEMPLATES})
-            return
-        if path == "/api/ble-scan/results":
-            self._send_json({"scanning": SCANNING[0], "devices": SCAN_DEVICES})
-            SCANNING[0] = False
-            return
-        if path == "/.well-known/captive-portal":
-            self._send(200, b'{"captive":true,"user-portal-url":"http://192.168.4.1/"}',
-                       "application/captive+json", {})
-            return
-        # Captive Portal 检测端点：303 回首页，带短 body 兼容 iOS CNA
-        if path in ("/generate_204", "/gen_204", "/hotspot-detect.html",
-                    "/library/test/success.html", "/ncsi.txt",
-                    "/connecttest.txt", "/canonical.html",
-                    "/success.txt", "/redirect",
-                    "/kindle-wifi/wifistub.html"):
-            self._send(303, b"Redirect to the captive portal", "text/plain; charset=utf-8", {"Location": "/"})
-            return
-        self._send(303, b"Redirect to the captive portal", "text/plain; charset=utf-8", {"Location": "/"})
+        path = self.path.split("?")[0]
+        with LOCK:
+            if path in ("/", "/index.html"):
+                return self.send(inline_html(), "text/html; charset=utf-8")
+            if path == "/favicon.ico":
+                return self.send(b"", status=204)
+            if path == "/api/state":
+                return self.send(state())
+            if path == "/api/runtime":
+                return self.send(runtime())
+            if path == "/api/time":
+                return self.send(remaining(), "text/plain")
+            if path == "/api/mem_stats":
+                return self.send({"free": 120000, "min_free": 98000})
+            if path == "/api/bridge/scan":
+                return self.send({"scanning": STATE["scanning_until"] > time.monotonic(), "devices": DEVICES})
+            if path.startswith("/api/"):
+                return self.send({"ok": False, "error": "路由不存在"}, status=404)
+            return self.send(b"Redirect to the captive portal", "text/plain", 303, {"Location": "/"})
 
     def do_POST(self):
-        path = self.path.split("?", 1)[0]
-        body = self._read_body()
-
-        if path == "/api/config":
-            try:
-                data = json.loads(body) if body else {}
-            except Exception:
-                data = {}
-            with LOCK:
-                for k in ("device_name", "sport_profile", "mode", "power", "cadence",
-                          "heartrate", "run_speed_x100", "run_pace_float_sec",
-                          "run_cadence", "run_cadence_float",
-                          "run_mode", "run_pacer_type", "run_pace_low_sec",
-                          "run_pace_high_sec", "run_custom_name",
-                          "broadcast_mask",
-                          "power_float", "cadence_float", "hr_float",
-                          "power_step",
-                          "profile_weight", "profile_ftp",
-                          "profile_thr_hr", "profile_ride_type",
-                          "custom_wkg_low", "custom_wkg_high", "custom_pacer_name",
-                          "led_silent",
-                          "led_wait_mode", "led_wait_color",
-                          "led_conn_mode", "led_conn_color",
-                          "led_wifi_mode", "led_wifi_color",
-                          "led_confirm_mode", "led_confirm_color",
-                          "led_error_mode", "led_error_color",
-                          "closing"):
-                    if k in data:
-                        _apply_config_field(k, data[k])
-                for p in MOCK_STATE["pacers"]:
-                    if p.get("id") == "custom":
-                        if MOCK_STATE.get("custom_wkg_low", 25) > MOCK_STATE.get("custom_wkg_high", 30):
-                            MOCK_STATE["custom_wkg_high"] = MOCK_STATE["custom_wkg_low"]
-                        p["name"] = MOCK_STATE.get("custom_pacer_name") or "自定义"
-                        p["wkg_low"] = MOCK_STATE.get("custom_wkg_low", 25) / 10
-                        p["wkg_high"] = MOCK_STATE.get("custom_wkg_high", 30) / 10
-                if MOCK_STATE.get("run_pace_low_sec", 390) > MOCK_STATE.get("run_pace_high_sec", 450):
-                    MOCK_STATE["run_pace_high_sec"] = MOCK_STATE["run_pace_low_sec"]
-                for p in MOCK_STATE["run_pacers"]:
-                    if p.get("id") == "custom":
-                        p["name"] = MOCK_STATE.get("run_custom_name") or "自定义"
-                        p["pace_low_sec"] = MOCK_STATE.get("run_pace_low_sec", 390)
-                        p["pace_high_sec"] = MOCK_STATE.get("run_pace_high_sec", 450)
-                        p["cadence"] = MOCK_STATE.get("run_cadence", 170)
-                if "hr_lock" in data:
-                    _apply_config_field("hr_lock", data["hr_lock"])
-            self._send_json({"ok": True})
-            return
-        if path == "/api/renew":
-            with LOCK:
-                REMAINING_SEC[0] = 180
-            self._send_text("180")
-            return
-        if path == "/api/close-wifi":
-            with LOCK:
-                MOCK_STATE["closing"] = True
-            self._send_json({"ok": True})
-            return
-        if path == "/api/device-templates/save":
-            try:
-                data = json.loads(body) if body else {}
-            except Exception:
-                data = {}
-            if len(TEMPLATES) >= 5:
-                self._send_json({"ok": False, "error": "模板已满，请先删除旧模板"})
-                return
-            tpl = dict(data)
-            tpl["id"] = len(TEMPLATES)
-            if not tpl.get("alias"):
-                tpl["alias"] = tpl.get("device_name") or tpl.get("adv_name") or tpl.get("addr") or "未命名设备"
-            TEMPLATES.append(tpl)
-            self._send_json({"ok": True, "id": tpl["id"]})
-            return
-        if path == "/api/device-templates/delete":
-            try:
-                data = json.loads(body) if body else {}
-            except Exception:
-                data = {}
-            tid = int(data.get("id", -1))
-            if 0 <= tid < len(TEMPLATES):
-                TEMPLATES.pop(tid)
-                for i, tpl in enumerate(TEMPLATES):
-                    tpl["id"] = i
-                self._send_json({"ok": True})
-            else:
-                self._send_json({"ok": False, "error": "模板不存在"})
-            return
-        if path == "/api/device-templates/apply":
-            try:
-                data = json.loads(body) if body else {}
-            except Exception:
-                data = {}
-            tid = int(data.get("id", -1))
-            if 0 <= tid < len(TEMPLATES):
-                MOCK_STATE["device_name"] = TEMPLATES[tid].get("device_name") or TEMPLATES[tid].get("adv_name") or MOCK_STATE["device_name"]
-                self._send_json({"ok": True})
-            else:
-                self._send_json({"ok": False, "error": "模板不存在"})
-            return
-        if path == "/api/ble-scan/start":
-            SCANNING[0] = True
-            self._send_json({"ok": True, "scanning": True})
-            return
-        if path == "/api/ble-scan/stop":
-            SCANNING[0] = False
-            self._send_json({"ok": True, "scanning": False})
-            return
-        if path == "/api/ble-scan/read":
-            try:
-                data = json.loads(body) if body else {}
-            except Exception:
-                data = {}
-            dev = next((d for d in SCAN_DEVICES if d["addr"] == data.get("addr")), SCAN_DEVICES[0])
-            tpl = dict(dev)
-            tpl.update({
-                "alias": tpl.get("adv_name") or "外部设备",
-                "device_name": tpl.get("adv_name") or "ExternalPower",
-                "manufacturer": "MockPower",
-                "model": "PWR-1",
-                "firmware": "1.2.3",
-                "hardware": "A1",
-                "software": "BLE",
-                "service_flags": tpl.get("service_flags", 0) | 1,
-            })
-            self._send_json({"ok": True, "template": tpl})
-            return
-        if path == "/api/ble-scan/analyze":
-            try:
-                data = json.loads(body) if body else {}
-            except Exception:
-                data = {}
-            dev = next((d for d in SCAN_DEVICES if d["addr"] == data.get("addr")), SCAN_DEVICES[0])
-            tpl = dict(dev)
-            tpl.update({
-                "alias": tpl.get("adv_name") or "外部设备",
-                "device_name": tpl.get("adv_name") or "ExternalPower",
-                "manufacturer": "MockPower",
-                "model": "PWR-1",
-                "firmware": "1.2.3",
-                "hardware": "A1",
-                "software": "BLE",
-                "service_flags": tpl.get("service_flags", 0) | 1,
-            })
-            analysis = {
-                "sample_count": 4,
-                "service_flags": tpl.get("service_flags", 0),
-                "power_watts": 185 if tpl.get("service_flags", 0) & 4 else 0,
-                "cadence_rpm": 82 if tpl.get("service_flags", 0) & (16 | 32) else 0,
-                "heart_rate_bpm": 145 if tpl.get("service_flags", 0) & 8 else 0,
-                "speed_x10_kmh": 284 if tpl.get("service_flags", 0) & 32 else 0,
-                "ftms_control_supported": bool(tpl.get("service_flags", 0) & 32),
-                "last_cps_hex": "2000b90012004012" if tpl.get("service_flags", 0) & 4 else "",
-                "last_hrs_hex": "0091" if tpl.get("service_flags", 0) & 8 else "",
-                "last_csc_hex": "0231008010" if tpl.get("service_flags", 0) & (16 | 32) else "",
-                "last_ftms_hex": "44001c0ba400be00" if tpl.get("service_flags", 0) & 32 else "",
-                "ftms_feature_hex": "0000000020000000" if tpl.get("service_flags", 0) & 32 else "",
-                "status": "数据正常",
-                "summary": "功率 185W / 踏频 82rpm / 心率 145",
-            }
-            self._send_json({"ok": True, "template": tpl, "analysis": analysis})
-            return
-        self._send_text("Not Found", 404)
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if length <= 0 or length > 4096:
+                raise ValueError("无效请求长度")
+            body = json.loads(self.rfile.read(length))
+            if not isinstance(body, dict):
+                raise ValueError("请求必须为对象")
+        except (ValueError, json.JSONDecodeError):
+            return self.send({"ok": False, "error": "无效请求"})
+        path = self.path.split("?")[0]
+        with LOCK:
+            if path == "/api/mock/fault":
+                STATE["fault"] = body.get("fault", "")
+                STATE["fail_save"] = bool(body.get("fail_save"))
+                return self.send({"ok": True})
+            if path == "/api/renew":
+                STATE["deadline"] = time.monotonic() + 300
+                return self.send(300, "text/plain")
+            if path in ("/api/config", "/api/close-wifi"):
+                return self.send(submit(body, path.endswith("close-wifi")))
+            if path == "/api/bridge/scan":
+                if not body.get("stop"):
+                    STATE["generation"] += 1
+                    for i, device in enumerate(DEVICES):
+                        device["candidate"] = STATE["generation"] * 16 + i
+                STATE["scanning_until"] = 0 if body.get("stop") else time.monotonic() + 1
+                return self.send({"scanning": not body.get("stop"), "devices": DEVICES})
+            if path == "/api/bridge/control":
+                action = body.get("action")
+                if action == "stop":
+                    STATE.update(peer=None, bridge_state=0)
+                elif action == "test":
+                    peer = next((d for d in DEVICES if d["candidate"] == body.get("candidate")), None)
+                    if not peer:
+                        return self.send({"ok": False, "error": "候选已失效"})
+                    STATE.update(peer=copy.deepcopy(peer), temporary=True, test_at=time.monotonic(),
+                                 test_until=time.monotonic() + 30, bridge_state=1)
+                elif action == "resume" and CONFIG["cycling_source"]:
+                    STATE.update(peer={"address": CONFIG["bridge_address"], "name": CONFIG["bridge_name"],
+                                      "addr_type": CONFIG["bridge_addr_type"]},
+                                 temporary=False, test_at=time.monotonic(), bridge_state=1)
+                else:
+                    return self.send({"ok": False, "error": "操作无效"})
+                return self.send({"ok": True})
+            return self.send({"ok": False, "error": "路由不存在"}, status=404)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="BikePower 配网门户 Mock Server")
-    parser.add_argument("--bind", default="127.0.0.1", help="监听地址（默认 127.0.0.1）")
-    parser.add_argument("--port", type=int, default=8080, help="监听端口（默认 8080）")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--bind", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
-
-    if not os.path.isdir(WEB_DIR):
-        print(f"FAIL: web 目录不存在 {WEB_DIR}", flush=True)
-        return 1
-
-    httpd = HTTPServer((args.bind, args.port), Handler)
-    print(f"Mock server: http://{args.bind}:{args.port}")
-    print(f"  web 目录: {WEB_DIR}")
-    print(f"  倒计时: 180s 自动递减，/api/renew 重置")
-    print(f"  Ctrl+C 退出")
+    server = ThreadingHTTPServer((args.bind, args.port), Handler)
+    print(f"Mock server: http://{args.bind}:{args.port}（300 秒，显式续期）", flush=True)
     try:
-        httpd.serve_forever()
+        server.serve_forever()
     except KeyboardInterrupt:
-        print("\n[mock] 已停止")
+        pass
     finally:
-        httpd.server_close()
-    return 0
+        server.server_close()
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

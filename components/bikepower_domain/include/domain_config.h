@@ -44,8 +44,22 @@
 #define RUN_CUSTOM_NAME_DEFAULT "自定义"
 
 // ===== 配置格式版本 =====
-// v12：把仍使用历史默认 ±5W 的配置迁移到当前 FIT 拟合默认值 ±50W。
-#define CONFIG_VERSION        12
+/* v13 新增真实功率来源配置，保留 v11→v12 的 FIT 浮动迁移。 */
+#define CONFIG_VERSION        13
+#define CONFIG_JSON_MAX_LEN    2048
+
+/* 真实功率桥接的校正、有效性和显式配置编码边界。 */
+#define BRIDGE_NAME_MAX                32
+#define BRIDGE_OFFSET_MIN             -200
+#define BRIDGE_OFFSET_MAX              200
+#define BRIDGE_PERCENT_MIN             500
+#define BRIDGE_PERCENT_MAX             1500
+#define BRIDGE_PERCENT_DEFAULT         1000
+#define BRIDGE_STALE_MS                3000u
+#define BRIDGE_VALID_SAMPLE_COUNT      2
+#define BRIDGE_CADENCE_HALF_RPM_MAX     600
+#define BRIDGE_WIRE_VERSION            1
+#define BRIDGE_WIRE_MAX_LEN            47
 
 // ===== 设备名称（BLE 广播名，可配网修改并持久化） =====
 #define DEVICE_NAME_MAX       24
