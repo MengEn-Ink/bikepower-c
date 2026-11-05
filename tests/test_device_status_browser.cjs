@@ -51,8 +51,14 @@ assert.ok(fs.existsSync(path.join(root,"device-status.js")),"缺少设备状态�
         };
         __telemetryFeed(1);
       });
-      assert.equal(await page.locator("#telemetry-memory-value").textContent(),"25.0%");
+      assert.equal(await page.locator("#telemetry-memory-value").textContent(),"80.0 KiB");
+      assert.equal(await page.locator("#telemetry-memory-sub").textContent(),"25.0% 空闲");
       assert.equal(await page.locator("#telemetry-cpu-value").textContent(),"25.0%");
+      assert.ok(await page.evaluate(()=>{
+        const bar=document.getElementById("telemetry-bar"),theme=document.getElementById("theme-btn");
+        const a=bar.getBoundingClientRect(),b=theme.getBoundingClientRect();
+        return bar.nextElementSibling===theme&&a.width>0&&a.right<=b.left&&Math.abs(a.y+a.height/2-b.y-b.height/2)<2;
+      }),"指标应在右上角主题按钮左侧同排显示");
       await page.locator('[data-telemetry-open="cpu"]').click();
       assert.equal(await page.locator("#telemetry-window").isVisible(),true);
       const windowBox=page.locator("#telemetry-window");
@@ -75,15 +81,17 @@ assert.ok(fs.existsSync(path.join(root,"device-status.js")),"缺少设备状态�
       assert.equal(await page.locator(".telemetry-window-body").isVisible(),true);
       await page.locator("#telemetry-window-pause").click();
       await page.evaluate(()=>__telemetryFeed(2,98304));
-      assert.equal(await page.locator("#telemetry-memory-value").textContent(),"30.0%");
+      assert.equal(await page.locator("#telemetry-memory-value").textContent(),"96.0 KiB");
+      assert.equal(await page.locator("#telemetry-memory-sub").textContent(),"30.0% 空闲");
       assert.match(await page.locator("#telemetry-window-pause").textContent(),/继续/);
       await page.locator("#telemetry-window-pause").click();
       await page.locator("#telemetry-window-close").click();
       await page.locator("#telemetry-page-pause").click();
       await page.evaluate(()=>__telemetryFeed(3,114688));
-      assert.equal(await page.locator("#telemetry-memory-value").textContent(),"30.0%");
+      assert.equal(await page.locator("#telemetry-memory-value").textContent(),"96.0 KiB");
       await page.locator("#telemetry-page-pause").click();
-      assert.equal(await page.locator("#telemetry-memory-value").textContent(),"35.0%");
+      assert.equal(await page.locator("#telemetry-memory-value").textContent(),"112.0 KiB");
+      assert.equal(await page.locator("#telemetry-memory-sub").textContent(),"35.0% 空闲");
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),"不得横向溢出");
       await page.screenshot({path:`/tmp/bikepower-device-status-${width}-${theme}.png`,animations:"disabled"});
       await page.evaluate(()=>window.BikePowerStatus.detach());

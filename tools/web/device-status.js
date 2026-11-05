@@ -9,11 +9,11 @@
   const esc=value=>String(value??"—").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const pct=value=>value===null||value===undefined?"—":value.toFixed(1)+"%";
   const kib=value=>value===undefined?"—":(value/1024).toFixed(1)+" KiB";
-  const metric=(key,title)=>`<button class="telemetry-metric" data-telemetry-open="${key}" type="button"><span>${title}</span><strong id="telemetry-${key}-value">—</strong><small id="telemetry-${key}-sub">等待设备</small><span class="telemetry-track"><i id="telemetry-${key}-fill"></i></span></button>`;
+  const metric=(key,title)=>`<button class="telemetry-metric" data-telemetry-open="${key}" type="button" title="查看${title}详情"><span>${title}</span><strong id="telemetry-${key}-value">—</strong><small id="telemetry-${key}-sub">—</small></button>`;
   const bar=document.createElement("div");bar.className="telemetry-bar";bar.id="telemetry-bar";
   bar.setAttribute("aria-label","设备实时状态");
-  bar.innerHTML=metric("memory","空闲堆")+metric("cpu","CPU 忙碌")+metric("link","板端信号");
-  document.querySelector(".masthead").after(bar);
+  bar.innerHTML=metric("memory","堆")+metric("cpu","CPU")+metric("link","信号");
+  $("theme-btn").before(bar);
   const select=(id)=>`<label>指标 <select id="${id}"><option value="memory">内存</option><option value="cpu">CPU</option><option value="link">蓝牙</option></select></label>`;
   const range=(id)=>`<label>时间 <select id="${id}"><option value="60000">最近 1 分钟</option><option value="300000">最近 5 分钟</option></select></label>`;
   host.classList.add("telemetry-page");
@@ -82,15 +82,14 @@
   function render(){
     if(!session)return;
     const p=snapshot(pageFrozen),s=p.sample;
-    [["memory",s?pct(s.freePercent):"—",s?kib(s.free)+" 空闲":"等待设备",s?.freePercent],
-      ["cpu",s?pct(s.cpu):"—",s?(s.cpu===null?"首窗口或能力缺失":pct(100-s.cpu)+" 空闲"):"等待设备",s?.cpu],
-      ["link",s?.rssi!=null?s.rssi+" dBm":"—",s?s.mtu+" MTU · "+s.interval+" ms":"等待设备",null]].forEach(([key,value,sub,fill])=>{
+    [["memory",s?kib(s.free):"—",s?pct(s.freePercent)+" 空闲":"—"],
+      ["cpu",s?pct(s.cpu):"—",s&&s.cpu!==null?pct(100-s.cpu)+" 空闲":"—"],
+      ["link",s?.rssi!=null?s.rssi+" dBm":"—",s?s.interval+" ms":"—"]].forEach(([key,value,sub])=>{
         const label=$("telemetry-"+key+"-value");
         if(label.textContent!==value&&label.animate&&!matchMedia("(prefers-reduced-motion: reduce)").matches){
           label.animate([{transform:"translateY(-2px)",opacity:.75},{transform:"none",opacity:1}],{duration:350,easing:"ease-out"});
         }
         label.textContent=value;$("telemetry-"+key+"-sub").textContent=sub;
-        $("telemetry-"+key+"-fill").style.width=(fill??0)+"%";
       });
     bar.querySelector('[data-telemetry-open="memory"]').dataset.warning=String(!!s&&s.free<81920);
     $("telemetry-state").textContent=status()+(pageFrozen?" · 画面已暂停":"");
