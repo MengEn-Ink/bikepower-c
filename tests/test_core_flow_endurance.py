@@ -5,6 +5,7 @@ import socket
 import subprocess
 import sys
 import time
+import traceback
 from datetime import datetime
 from pathlib import Path
 from test_portal_config_save import exercise, wait_ready
@@ -45,7 +46,10 @@ def main():
                 break
             time.sleep(min(args.interval, 30, max(0, args.minutes * 60 - (time.monotonic() - started))))
     except Exception as error:
-        errors.append(str(error))
+        errors.append(
+            f"{type(error).__name__}: {error!r}\n\n```text\n"
+            f"{traceback.format_exc().rstrip()}\n```"
+        )
     finally:
         proc.terminate()
         proc.wait(timeout=5)

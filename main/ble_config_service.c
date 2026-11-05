@@ -35,6 +35,10 @@ static const ble_uuid128_t s_running_uuid = BLE_UUID128_INIT(BLE_CONFIG_RUNNING_
 static const ble_uuid128_t s_led_uuid = BLE_UUID128_INIT(BLE_CONFIG_LED_UUID_BYTES);
 static const ble_uuid128_t s_identity_uuid = BLE_UUID128_INIT(BLE_CONFIG_IDENTITY_UUID_BYTES);
 static const ble_uuid128_t s_bridge_uuid = BLE_UUID128_INIT(BLE_CONFIG_BRIDGE_UUID_BYTES);
+static const ble_uuid128_t s_bridge_backup_1_uuid =
+    BLE_UUID128_INIT(BLE_CONFIG_BRIDGE_BACKUP_1_UUID_BYTES);
+static const ble_uuid128_t s_bridge_backup_2_uuid =
+    BLE_UUID128_INIT(BLE_CONFIG_BRIDGE_BACKUP_2_UUID_BYTES);
 static const ble_uuid128_t s_control_uuid = BLE_UUID128_INIT(BLE_CONFIG_CONTROL_UUID_BYTES);
 static const ble_uuid128_t s_dis_profile_uuid = BLE_UUID128_INIT(BLE_CONFIG_DIS_PROFILE_UUID_BYTES);
 
@@ -242,6 +246,12 @@ static const struct ble_gatt_svc_def s_service = {
         { .uuid = &s_dis_profile_uuid.u, .access_cb = identity_access, .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
         { .uuid = &s_bridge_uuid.u, .access_cb = group_access,
           .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_BRIDGE, .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
+        { .uuid = &s_bridge_backup_1_uuid.u, .access_cb = group_access,
+          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_BRIDGE_BACKUP_1,
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
+        { .uuid = &s_bridge_backup_2_uuid.u, .access_cb = group_access,
+          .arg = (void *)(uintptr_t)BLE_CONFIG_GROUP_BRIDGE_BACKUP_2,
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
         { 0 }
     }
 };

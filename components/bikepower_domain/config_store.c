@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 static int clamp_int(int v, int lo, int hi)
 {
@@ -259,6 +260,7 @@ bool config_store_validate(config_data_t *c)
  */
 bool config_store_migrate(config_data_t *c)
 {
+    if (!c) return false;
     if (c->schema_ver == CONFIG_VERSION) {
         return false;
     }
@@ -295,6 +297,9 @@ bool config_store_migrate(config_data_t *c)
     if (c->schema_ver == 12) {
         c->schema_ver = 13;
         power_bridge_config_defaults(&c->bridge);
+    }
+    if (c->schema_ver == 13) {
+        c->schema_ver = 14;
         config_store_validate(c);
         return true;
     }
@@ -343,8 +348,10 @@ static size_t json_escape(const char *src, char *dst, size_t dst_sz)
  * 解析到未转义的 '"' 结束。返回 true 表示成功。 */
 static bool json_unescape(const char *src, char *dst, size_t dst_sz)
 {
+    if (!src || !dst || dst_sz == 0) return false;
     size_t n = 0;
-    for (const char *p = src; *p && *p != '"'; p++) {
+    const char *p = src;
+    for (; *p && *p != '"'; p++) {
         char out;
         if (*p == '\\') {
             p++;
@@ -370,11 +377,53 @@ static bool json_unescape(const char *src, char *dst, size_t dst_sz)
         } else {
             out = *p;
         }
-        if (n + 1 >= dst_sz) break;  /* 截断保护，保留结尾 '\0' */
+        if (n + 1 >= dst_sz) {
+            dst[0] = '\0';
+            return false;
+        }
         dst[n++] = out;
+    }
+    if (*p != '"') {
+        dst[0] = '\0';
+        return false;
     }
     dst[n] = '\0';
     return true;
+}
+
+static bool append_format(char *buf, size_t size, size_t *offset,
+                          const char *format, ...)
+{
+    if (!buf || !offset || *offset >= size) return false;
+    va_list args;
+    va_start(args, format);
+    int written = vsnprintf(buf + *offset, size - *offset, format, args);
+    va_end(args);
+    if (written < 0 || (size_t)written >= size - *offset) return false;
+    *offset += (size_t)written;
+    return true;
+}
+
+static bool format_bridge_devices(const bridge_config_t *bridge,
+                                  char *out, size_t out_size)
+{
+    size_t offset = 0;
+    if (!append_format(out, out_size, &offset, "[")) return false;
+    for (int i = 0; i < bridge->device_count; i++) {
+        const bridge_device_t *device = &bridge->devices[i];
+        char name[BRIDGE_NAME_MAX * 6];
+        if (json_escape(device->name, name, sizeof(name)) == (size_t)-1) return false;
+        char address[13];
+        for (size_t j = 0; j < sizeof(device->addr); j++) {
+            snprintf(address + j * 2, 3, "%02x", device->addr[j]);
+        }
+        if (!append_format(out, out_size, &offset,
+                           "%s{\"addr_type\":%d,\"address\":\"%s\",\"name\":\"%s\"}",
+                           i ? "," : "", device->addr_type, address, name)) {
+            return false;
+        }
+    }
+    return append_format(out, out_size, &offset, "]");
 }
 
 size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
@@ -388,10 +437,18 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
     if (json_escape(c->run_custom_name, run_custom_esc, sizeof(run_custom_esc)) == (size_t)-1) return 0;
     char esc[DEVICE_NAME_MAX * 6];
     if (json_escape(c->device_name, esc, sizeof(esc)) == (size_t)-1) return 0;
+    char bridge_devices[BRIDGE_DEVICE_MAX * (BRIDGE_NAME_MAX * 6 + 80) + 3];
+    if (!format_bridge_devices(&c->bridge, bridge_devices, sizeof(bridge_devices))) return 0;
+
+    const bridge_device_t *primary = power_bridge_device(&c->bridge, 0);
+    bridge_device_t empty_primary = {0};
+    if (!primary) primary = &empty_primary;
     char bridge_esc[BRIDGE_NAME_MAX * 6];
-    if (json_escape(c->bridge.name, bridge_esc, sizeof(bridge_esc)) == (size_t)-1) return 0;
+    if (json_escape(primary->name, bridge_esc, sizeof(bridge_esc)) == (size_t)-1) return 0;
     char address[13];
-    for (size_t i = 0; i < 6; i++) snprintf(address + i * 2, 3, "%02x", c->bridge.addr[i]);
+    for (size_t i = 0; i < sizeof(primary->addr); i++) {
+        snprintf(address + i * 2, 3, "%02x", primary->addr[i]);
+    }
 
     /* 先写入栈缓冲，确认总长后再拷贝出参，避免向 out 写截断内容 */
     char buf[CONFIG_JSON_MAX_LEN];
@@ -417,9 +474,11 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         "\"run_pace_low_sec\":%d,\"run_pace_high_sec\":%d,"
         "\"run_custom_name\":\"%s\","
         "\"device_name\":\"%s\","
-        "\"cycling_source\":%d,\"bridge_bound\":%d,\"bridge_addr_type\":%d,"
-        "\"bridge_address\":\"%s\",\"bridge_calibration\":%d,"
-        "\"bridge_watts\":%d,\"bridge_percent_x10\":%d,\"bridge_name\":\"%s\"}",
+        "\"cycling_source\":%d,\"bridge_calibration\":%d,"
+        "\"bridge_watts\":%d,\"bridge_percent_x10\":%d,"
+        "\"bridge_devices\":%s,"
+        "\"bridge_bound\":%d,\"bridge_addr_type\":%d,"
+        "\"bridge_address\":\"%s\",\"bridge_name\":\"%s\"}",
         c->schema_ver, c->power, c->cadence, c->mode,
         c->heartrate, c->has_user_hr,
         c->power_float, c->cadence_float, c->hr_float,
@@ -440,13 +499,110 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         c->run_mode, c->run_pacer_type,
         c->run_pace_low_sec, c->run_pace_high_sec,
         run_custom_esc,
-        esc, c->bridge.source, c->bridge.bound, c->bridge.addr_type, address,
-        c->bridge.calibration_mode, c->bridge.watts, c->bridge.percent_x10, bridge_esc);
+        esc, c->bridge.source, c->bridge.calibration_mode,
+        c->bridge.watts, c->bridge.percent_x10, bridge_devices,
+        primary->bound, primary->addr_type, address, bridge_esc);
 
     if (n < 0 || (size_t)n >= sizeof(buf)) return 0;  /* 编码错误或内部缓冲不足 */
     if ((size_t)n >= out_sz) return 0;                /* 出参缓冲不足，不溢出 */
     memcpy(out, buf, (size_t)n + 1);
     return (size_t)n;
+}
+
+static const char *json_string_value(const char *json, const char *key)
+{
+    char pattern[48];
+    int written = snprintf(pattern, sizeof(pattern), "\"%s\":\"", key);
+    if (written < 0 || (size_t)written >= sizeof(pattern)) return NULL;
+    const char *value = strstr(json, pattern);
+    return value ? value + strlen(pattern) : NULL;
+}
+
+static bool parse_bridge_address(const char *value, uint8_t address[6])
+{
+    if (!value || strlen(value) < 13 || value[12] != '"') return false;
+    for (size_t i = 0; i < 6; i++) {
+        char hex[3] = {value[i * 2], value[i * 2 + 1], 0};
+        char *end = NULL;
+        long byte = strtol(hex, &end, 16);
+        if (end != hex + 2 || byte < 0 || byte > UINT8_MAX) return false;
+        address[i] = (uint8_t)byte;
+    }
+    return true;
+}
+
+static bool bridge_device_valid(const bridge_device_t *device)
+{
+    bridge_config_t check;
+    power_bridge_config_defaults(&check);
+    check.source = BRIDGE_SOURCE_REAL;
+    check.device_count = 1;
+    check.devices[0] = *device;
+    return !power_bridge_config_validate(&check) && check.device_count == 1;
+}
+
+static bool parse_bridge_device(const char *json, bridge_device_t *device)
+{
+    if (!json || !device || !strstr(json, "\"addr_type\":")
+        || !strstr(json, "\"address\":\"") || !strstr(json, "\"name\":\"")) {
+        return false;
+    }
+    bridge_device_t parsed = {
+        .bound = 1,
+        .addr_type = json_get_int(json, "addr_type"),
+    };
+    if (!parse_bridge_address(json_string_value(json, "address"), parsed.addr)
+        || !json_unescape(json_string_value(json, "name"),
+                          parsed.name, sizeof(parsed.name))
+        || !bridge_device_valid(&parsed)) {
+        return false;
+    }
+    *device = parsed;
+    return true;
+}
+
+static bool parse_bridge_devices(const char *json, bridge_config_t *bridge)
+{
+    int count = json_get_object_array_count(json, "bridge_devices");
+    if (count < 0 || count > BRIDGE_DEVICE_MAX) return false;
+    bridge->device_count = 0;
+    memset(bridge->devices, 0, sizeof(bridge->devices));
+    for (int i = 0; i < count; i++) {
+        char item[BRIDGE_NAME_MAX * 6 + 96];
+        bridge_device_t device;
+        if (!json_get_object_array_item(json, "bridge_devices", i,
+                                        item, sizeof(item))
+            || !parse_bridge_device(item, &device)
+            || power_bridge_find_device(bridge, &device) >= 0) {
+            return false;
+        }
+        bridge->devices[bridge->device_count++] = device;
+    }
+    return true;
+}
+
+static bool parse_legacy_bridge(const char *json, bridge_config_t *bridge)
+{
+    if (!strstr(json, "\"bridge_bound\":")) return true;
+    int bound = json_get_int(json, "bridge_bound");
+    if (bound == 0) return true;
+    if (bound != 1 || !strstr(json, "\"bridge_addr_type\":")
+        || !strstr(json, "\"bridge_address\":\"")) {
+        return false;
+    }
+    bridge_device_t device = {
+        .bound = 1,
+        .addr_type = json_get_int(json, "bridge_addr_type"),
+    };
+    if (!parse_bridge_address(json_string_value(json, "bridge_address"), device.addr)) {
+        return false;
+    }
+    const char *name = json_string_value(json, "bridge_name");
+    if (name && !json_unescape(name, device.name, sizeof(device.name))) return false;
+    if (!bridge_device_valid(&device)) return false;
+    bridge->device_count = 1;
+    bridge->devices[0] = device;
+    return true;
 }
 
 bool config_store_deserialize(const char *json, config_data_t *c)
@@ -481,8 +637,6 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         {"run_pace_low_sec", &tmp.run_pace_low_sec},
         {"run_pace_high_sec", &tmp.run_pace_high_sec},
         {"cycling_source", &tmp.bridge.source},
-        {"bridge_bound", &tmp.bridge.bound},
-        {"bridge_addr_type", &tmp.bridge.addr_type},
         {"bridge_calibration", &tmp.bridge.calibration_mode},
         {"bridge_watts", &tmp.bridge.watts},
         {"bridge_percent_x10", &tmp.bridge.percent_x10},
@@ -521,24 +675,6 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         cp += strlen("\"custom_pacer_name\":\"");
         json_unescape(cp, tmp.custom_pacer_name, CUSTOM_PACER_NAME_MAX);
     }
-    const char *bp = strstr(json, "\"bridge_name\":\"");
-    if (bp) {
-        bp += strlen("\"bridge_name\":\"");
-        if (!json_unescape(bp, tmp.bridge.name, sizeof(tmp.bridge.name))) return false;
-    }
-    const char *ap = strstr(json, "\"bridge_address\":\"");
-    if (ap) {
-        ap += strlen("\"bridge_address\":\"");
-        if (strlen(ap) < 13 || ap[12] != '"') return false;
-        for (size_t i = 0; i < 6; i++) {
-            char hex[3] = { ap[i * 2], ap[i * 2 + 1], 0 };
-            char *end;
-            long byte = strtol(hex, &end, 16);
-            if (end != hex + 2 || byte < 0 || byte > 255) return false;
-            tmp.bridge.addr[i] = (uint8_t)byte;
-        }
-    }
-
     const char *rp = strstr(json, "\"run_custom_name\":\"");
     if (rp) {
         rp += strlen("\"run_custom_name\":\"");
@@ -552,6 +688,13 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         json_unescape(dp, tmp.device_name, DEVICE_NAME_MAX);
     }
 
+    if (tmp.schema_ver == CONFIG_VERSION) {
+        if (!parse_bridge_devices(json, &tmp.bridge)) return false;
+    } else if (tmp.schema_ver <= 13) {
+        if (!parse_legacy_bridge(json, &tmp.bridge)) return false;
+    }
+
+    config_store_migrate(&tmp);
     config_store_validate(&tmp);
     *c = tmp;
     return true;

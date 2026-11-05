@@ -117,7 +117,7 @@ bool ble_scanner_is_scanning(void)
     return active;
 }
 
-bool ble_scanner_candidate(uint32_t candidate, bridge_config_t *out)
+bool ble_scanner_candidate(uint32_t candidate, bridge_device_t *out)
 {
     if (!out) return false;
     unsigned slot = candidate & 15u;
@@ -128,7 +128,7 @@ bool ble_scanner_candidate(uint32_t candidate, bridge_config_t *out)
     candidate_t item = valid ? s_candidates[slot] : (candidate_t) { 0 };
     portEXIT_CRITICAL(&s_lock);
     if (!valid) return false;
-    power_bridge_config_defaults(out);
+    *out = (bridge_device_t){0};
     out->bound = 1;
     out->addr_type = item.address.type;
     memcpy(out->addr, item.address.val, sizeof(out->addr));

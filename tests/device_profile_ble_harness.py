@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """通过 BikePower Config Service 临时切换 GATT profile 并执行真机自测。
 
-不启动 WiFi；结束时恢复测试前五组完整配置，适合无人值守 device gate。
+不启动 WiFi；结束时恢复测试前八组完整配置，适合无人值守 device gate。
 """
 
 import argparse

@@ -17,12 +17,13 @@ DOMAIN_SRCS := $(DOMAIN)/profile.c \
         $(DOMAIN)/led_pattern.c \
         $(DOMAIN)/button_debounce.c
 DOMAIN_SRCS += $(DOMAIN)/cps_input_codec.c $(DOMAIN)/power_bridge.c
+DOMAIN_SRCS += $(DOMAIN)/bridge_failover.c
 CODEC_SRC := $(DOMAIN)/ble_payload_codec.c
 CONFIG_CODEC_SRC := $(DOMAIN)/ble_config_codec.c
 TEST_SRCS := test_domain.c $(DOMAIN_SRCS) $(CODEC_SRC) $(CONFIG_CODEC_SRC)
 
 .PHONY: all run clean
-all: test_domain ble_codec_cli test_power_bridge
+all: test_domain ble_codec_cli test_power_bridge test_bridge_failover
 
 test_domain: $(TEST_SRCS)
 	$(CC) $(CFLAGS) -o $@ $(TEST_SRCS) -lm
@@ -33,9 +34,15 @@ ble_codec_cli: ble_codec_cli.c $(CODEC_SRC)
 test_power_bridge: test_power_bridge.c $(DOMAIN_SRCS) $(CONFIG_CODEC_SRC) $(CODEC_SRC)
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
+test_bridge_failover: test_bridge_failover.c $(DOMAIN)/bridge_failover.c \
+		$(DOMAIN)/power_bridge.c $(DOMAIN)/device_identity.c
+	$(CC) $(CFLAGS) -o $@ $^
+
 run: all
 	./test_domain
 	./test_power_bridge
+	./test_bridge_failover
 
 clean:
-	rm -f test_domain test_domain.exe ble_codec_cli ble_codec_cli.exe test_power_bridge
+	rm -f test_domain test_domain.exe ble_codec_cli ble_codec_cli.exe \
+		test_power_bridge test_bridge_failover

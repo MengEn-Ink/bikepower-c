@@ -17,6 +17,28 @@ static const char *TAG = "NVS";
 static SemaphoreHandle_t s_save_mutex = NULL;
 static StaticSemaphore_t s_save_mutex_buf;
 
+#define BRIDGE_RECENT_WIRE_VERSION 1u
+#define BRIDGE_RECENT_WIRE_LEN     8u
+
+static void ensure_save_mutex(void)
+{
+    if (s_save_mutex == NULL) {
+        s_save_mutex = xSemaphoreCreateMutexStatic(&s_save_mutex_buf);
+    }
+}
+
+static bool bridge_recent_valid(const bridge_device_t *device)
+{
+    if (!device) return false;
+    bridge_config_t checked;
+    power_bridge_config_defaults(&checked);
+    checked.source = BRIDGE_SOURCE_REAL;
+    checked.device_count = 1;
+    checked.devices[0] = *device;
+    checked.devices[0].name[0] = '\0';
+    return !power_bridge_config_validate(&checked);
+}
+
 // 读单个 i32，缺失时保留默认值
 /**
  * 从 NVS 读取一个 32 位整数键。
@@ -45,9 +67,7 @@ static void get_i32(nvs_handle_t h, const char *key, int *out)
 void nvs_store_load(power_engine_t *e)
 {
     // 启动时单线程初始化互斥锁（load 先于任何 save 调用，保证 mutex 在 save 之前就绪）
-    if (s_save_mutex == NULL) {
-        s_save_mutex = xSemaphoreCreateMutexStatic(&s_save_mutex_buf);
-    }
+    ensure_save_mutex();
 
     config_data_t c;
     config_store_defaults(&c);
@@ -162,9 +182,7 @@ void nvs_store_load(power_engine_t *e)
 bool nvs_store_save(power_engine_t *e)
 {
     // 防御性 lazy init：load 异常时 mutex 仍可能在 save 首次调用时为 NULL
-    if (s_save_mutex == NULL) {
-        s_save_mutex = xSemaphoreCreateMutexStatic(&s_save_mutex_buf);
-    }
+    ensure_save_mutex();
     // 互斥保护整段 nvs_open→set→commit 流程，避免并发写造成 commit 丢失或脏写。
     // 等待 100ms 让另一侧先写完；超时则放弃本次保存（dirty 保留，下次心跳重试）。
     if (xSemaphoreTake(s_save_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
@@ -283,4 +301,60 @@ bool nvs_store_save(power_engine_t *e)
                  c.device_name);
     }
     return ok;
+}
+
+bool nvs_store_load_bridge_recent(bridge_device_t *device)
+{
+    if (!device) return false;
+    *device = (bridge_device_t){0};
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &h);
+    if (err != ESP_OK) return false;
+
+    uint8_t wire[BRIDGE_RECENT_WIRE_LEN];
+    size_t length = sizeof(wire);
+    err = nvs_get_blob(h, NVS_KEY_BRIDGE_RECENT, wire, &length);
+    nvs_close(h);
+    if (err != ESP_OK || length != sizeof(wire)
+        || wire[0] != BRIDGE_RECENT_WIRE_VERSION || wire[1] > 1) {
+        return false;
+    }
+
+    bridge_device_t loaded = {
+        .bound = 1,
+        .addr_type = wire[1],
+    };
+    memcpy(loaded.addr, wire + 2, sizeof(loaded.addr));
+    if (!bridge_recent_valid(&loaded)) return false;
+    *device = loaded;
+    return true;
+}
+
+bool nvs_store_save_bridge_recent(const bridge_device_t *device)
+{
+    if (!bridge_recent_valid(device)) return false;
+    ensure_save_mutex();
+    if (xSemaphoreTake(s_save_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGW(TAG, "最近成功设备保存互斥锁等待超时");
+        return false;
+    }
+
+    uint8_t wire[BRIDGE_RECENT_WIRE_LEN] = {
+        BRIDGE_RECENT_WIRE_VERSION,
+        (uint8_t)device->addr_type,
+    };
+    memcpy(wire + 2, device->addr, sizeof(device->addr));
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
+    if (err == ESP_OK) {
+        err = nvs_set_blob(h, NVS_KEY_BRIDGE_RECENT, wire, sizeof(wire));
+        if (err == ESP_OK) err = nvs_commit(h);
+        nvs_close(h);
+    }
+    xSemaphoreGive(s_save_mutex);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "保存最近成功设备失败(%s)", esp_err_to_name(err));
+        return false;
+    }
+    return true;
 }

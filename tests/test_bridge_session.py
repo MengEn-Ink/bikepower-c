@@ -41,6 +41,20 @@ def main():
             "-o", str(scan_binary),
         ], check=True)
         subprocess.run([str(scan_binary)], check=True)
+        runtime_binary = folder / "bridge-runtime"
+        subprocess.run([
+            "cc", "-std=c11", "-D_POSIX_C_SOURCE=200809L", "-Wall", "-Wextra", "-Werror",
+            "-fsanitize=address,undefined", "-I", str(folder), "-I", str(ROOT / "test"),
+            "-I", str(ROOT / "main"),
+            "-I", str(ROOT / "components/bikepower_domain/include"),
+            str(ROOT / "test/test_bridge_runtime.c"),
+            str(ROOT / "main/bridge_runtime.c"),
+            str(ROOT / "components/bikepower_domain/bridge_failover.c"),
+            str(ROOT / "components/bikepower_domain/power_bridge.c"),
+            str(ROOT / "components/bikepower_domain/device_identity.c"),
+            "-o", str(runtime_binary),
+        ], check=True)
+        subprocess.run([str(runtime_binary)], check=True)
 
 
 if __name__ == "__main__":

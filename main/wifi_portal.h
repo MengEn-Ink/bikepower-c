@@ -11,18 +11,23 @@
 
 #include <stdbool.h>
 
-#include "power_engine.h"
+#include "bridge_runtime.h"
 #include "config_store.h"
-#include "esp_err.h"
 #include "device_identity.h"
+#include "esp_err.h"
+#include "power_engine.h"
 
 typedef bool (*wifi_portal_done_callback_t)(void);
 typedef bool (*wifi_portal_config_callback_t)(const config_data_t *config,
     uint32_t transaction, uint32_t revision, bool close_wifi,
     const device_identity_t *identity);
+typedef esp_err_t (*wifi_portal_bridge_callback_t)(
+    bridge_runtime_command_t command, const bridge_device_t *device);
 void wifi_portal_set_config_callback(wifi_portal_config_callback_t callback);
+void wifi_portal_set_bridge_callback(wifi_portal_bridge_callback_t callback);
 /* 应用主循环发布一致快照，并完成已接受的配置事务。 */
 void wifi_portal_sync(const power_engine_t *engine);
+void wifi_portal_sync_bridge(const bridge_runtime_snapshot_t *snapshot);
 bool wifi_portal_revision_matches(uint32_t revision);
 /* 成功结果必须携带 applied；缺失时按保存失败处理，未知事务不更新配置。 */
 void wifi_portal_config_result(uint32_t transaction, uint8_t result,

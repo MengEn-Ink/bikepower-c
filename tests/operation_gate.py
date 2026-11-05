@@ -180,6 +180,7 @@ def run_step(gate, name, command, timeout=120, required=True, acceptance_item=No
 def quick_steps(gate):
     run_step(gate, "Host 领域层单测", "make -C test run", 120)
     run_step(gate, "上游桥接会话与扫描 ASan/UBSan", "python3 tests/test_bridge_session.py", 60)
+    run_step(gate, "桥接主备恢复静态契约", "python3 tests/check_bridge_failover_contract.py", 30)
     run_step(gate, "生产配置 GATT ASan/UBSan", "python3 tests/test_ble_config_service.py", 60)
     run_step(gate, "生产通知快照 ASan/UBSan", "python3 tests/test_ble_runtime.py", 60)
     run_step(gate, "BLE 协议 golden vectors", "python3 tests/test_ble_protocol_vectors.py", 60)

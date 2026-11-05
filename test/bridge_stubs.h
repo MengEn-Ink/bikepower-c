@@ -18,6 +18,7 @@ typedef int portMUX_TYPE;
 #define BLE_HS_EDONE 1
 #define BLE_HS_ENOENT 2
 #define BLE_HS_ENOTCONN 3
+#define BLE_HS_ETIMEOUT 4
 #define BLE_ERR_REM_USER_CONN_TERM 19
 #define BLE_GATT_CHR_PROP_NOTIFY 16
 #define BLE_GAP_EVENT_CONNECT 1
@@ -25,7 +26,7 @@ typedef int portMUX_TYPE;
 #define BLE_GAP_EVENT_NOTIFY_RX 3
 #define BLE_GAP_EVENT_DISC 4
 #define BLE_GAP_EVENT_DISC_COMPLETE 5
-#define BLE_HS_EALREADY 4
+#define BLE_HS_EALREADY 5
 #define BLE_GAP_SCAN_ITVL_MS(ms) (ms)
 #define BLE_GAP_SCAN_WIN_MS(ms) (ms)
 

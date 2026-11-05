@@ -7,24 +7,38 @@
     wire:null, revision:0, runtime:"normal", rawPower:0, wifiDeadline:0,
     bridgeStage:"idle", bridgeHeartInitialized:false, copyIdentity:false,
     nameSource:"board", customName:"", toastTimer:0, pacers:[], runPacers:[],
-    bridge:null, output:null, testCandidate:null, polling:false, closed:false};
+    bridge:null, bridgeRuntime:null, output:null, testCandidate:null,
+    pendingReplacementKey:null, replaceSlot:null, polling:false, closed:false};
   var emptyIdentity = {manufacturer:"",model:"",serial:"",hardware:"",firmware:"",software:""};
   function deviceKey(address, type) { return address + ":" + type; }
-  function rememberBridge(b) {
-    var key = deviceKey(b.address, b.addr_type);
-    devices[key] = {name:b.device_name || b.name || "未命名功率计", named:!!(b.device_name || b.name),
-      suffix:(b.address || "").match(/.{2}/g)?.reverse().join(":") || "—",
-      cadence:b.cadence > 0, mark:"PM", info:b.identity || clone(emptyIdentity),
-      address:b.address, addrType:b.addr_type};
+  function rememberDevice(item, info) {
+    var key = deviceKey(item.address,item.addr_type);
+    devices[key] = Object.assign(devices[key] || {}, {
+      name:item.device_name || item.name || "未命名功率计",
+      named:!!(item.device_name || item.name),
+      suffix:(item.address || "").match(/.{2}/g)?.reverse().join(":") || "—",
+      cadence:item.cadence > 0, mark:"PM", info:info || item.identity || clone(emptyIdentity),
+      address:item.address,addrType:item.addr_type
+    });
     return key;
+  }
+  function rememberBridge(b) {
+    return rememberDevice(b,b.identity || clone(emptyIdentity));
   }
   function decode(c) {
     var total = Math.round(360000 / c.run_speed_x100);
-    var key = deviceKey(c.bridge_address, c.bridge_addr_type);
-    if (!devices[key]) devices[key] = {name:c.bridge_name || "未命名功率计",named:!!c.bridge_name,
-      suffix:c.bridge_address, cadence:false,mark:"PM",info:clone(emptyIdentity),
-      address:c.bridge_address,addrType:c.bridge_addr_type};
-    return {sport:c.sport_profile ? "running":"cycling", source:c.cycling_source ? "bridge":"simulation",device:key,
+    var saved = Array.isArray(c.bridge_devices) ? c.bridge_devices : [];
+    if (!saved.length && c.bridge_bound) saved = [{
+      address:c.bridge_address,addr_type:c.bridge_addr_type,name:c.bridge_name
+    }];
+    var keys = saved.map(function(item) {
+      return rememberDevice(item,clone(emptyIdentity));
+    });
+    var key = keys[0] || rememberDevice({
+      address:"000000000000",addr_type:0,name:"未选择功率计"
+    },clone(emptyIdentity));
+    return {sport:c.sport_profile ? "running":"cycling", source:c.cycling_source ? "bridge":"simulation",
+      device:key,devices:keys,
       calibration:{mode:["raw","watts","percent"][c.bridge_calibration],watts:c.bridge_watts,percent:c.bridge_percent_x10 / 10 - 100},
       simulation:{mode:c.mode === 1 ? "pacer":"fixed",power:c.power,cadence:c.cadence,weight:c.weight,
         preset:c.ride_type === 5 ? "custom":String(c.ride_type),wkgMin:c.custom_wkg_low / 10,
@@ -40,10 +54,14 @@
   }
   function encode(config) {
     var c = clone(state.wire), s = config.simulation, h = config.heart, r = config.running;
-    var meter = devices[config.device];
+    var saved = config.devices.map(function(key) {
+      var item = devices[key];
+      return {addr_type:item.addrType,address:item.address,name:item.named ? item.name:""};
+    });
+    var meter = devices[config.devices[0]] || devices[config.device];
     Object.assign(c, {sport_profile:config.sport === "running" ? 1:0,
       cycling_source:config.source === "bridge" ? 1:0,
-      bridge_bound:meter.address !== "000000000000" ? 1:0,bridge_address:meter.address,
+      bridge_devices:saved,bridge_bound:saved.length ? 1:0,bridge_address:saved.length ? meter.address:"000000000000",
       bridge_addr_type:meter.addrType,bridge_name:meter.named ? meter.name:"",
       bridge_calibration:["raw","watts","percent"].indexOf(config.calibration.mode),
       bridge_watts:config.calibration.watts,bridge_percent_x10:Math.round((100 + config.calibration.percent) * 10),
@@ -61,7 +79,7 @@
     return c;
   }
   function pendingConfig() {
-    var c = clone(state.draft), d = devices[c.device];
+    var c = clone(state.draft), d = devices[c.device] || devices[c.devices[0]];
     if (state.copyIdentity && c.source === "bridge") {
       Object.keys(d.info).forEach(function(k) { if (d.info[k]) c.identity[k] = d.info[k]; });
       if (state.nameSource === "meter" && d.named) c.deviceName = d.name;
@@ -71,7 +89,10 @@
   }
   function isDirty() { return state.loaded && (state.copyIdentity || JSON.stringify(encode(pendingConfig())) !== JSON.stringify(state.wire)); }
   function bridgeReady() {
-    return state.bridge && state.bridge.tested
+    return state.draft && state.draft.devices.length > 0;
+  }
+  function testedBridgeReady() {
+    return state.bridge && state.bridge.temporary && state.bridge.tested
       && deviceKey(state.bridge.address,state.bridge.addr_type) === state.draft.device;
   }
   function textValid(value, limit) {
@@ -135,7 +156,8 @@
     state.applied.identity = data.identity || clone(emptyIdentity);
     if (!preserve || !state.draft) {
       state.draft = clone(state.applied); state.copyIdentity = false;
-      state.bridgeHeartInitialized = !!data.config.bridge_bound;
+      state.bridgeHeartInitialized = state.applied.devices.length > 0;
+      state.replaceSlot = null; state.pendingReplacementKey = null;
     }
     state.loaded = true; state.message = ""; countdown(data.remaining_sec);
     fillPresets();
@@ -149,16 +171,18 @@
   function renderLive() {
     if (!state.output) return;
     var o = state.output, c = state.applied, b = o.bridge;
+    var runtime = o.bridge_runtime || {state:"disabled",actual_source:c.source === "bridge" ? "real":"simulation",active_slot:0,next_attempt_ms:0};
     var running = c.sport === "running", bridge = !running && c.source === "bridge";
-    var active = bridge && !b.temporary && deviceKey(b.address,b.addr_type) === c.device;
-    var valid = !bridge || (active && b.valid);
+    var active = bridge && runtime.actual_source === "real" && !b.temporary && b.valid;
+    var fallback = bridge && runtime.actual_source === "simulation";
+    var valid = !bridge || active || fallback;
     var labels = ["未启动","连接中","读取服务","订阅中","等待功率","数据有效","数据过期","重连中","停止中","连接失败"];
-    $("liveTitle").textContent = running ? "跑步广播":bridge ? "真实功率桥接":"模拟骑行输出";
+    $("liveTitle").textContent = running ? "跑步广播":fallback ? "桥接模拟降级":bridge ? "真实功率桥接":"模拟骑行输出";
     $("liveSubtitle").textContent = "已应用配置 · App 连接 " + o.connections;
     $("heroMetricLabel").textContent = running ? "当前速度":bridge ? "校正后功率":"模拟功率";
     $("heroMetricValue").textContent = running ? (o.run_speed_x100 / 100).toFixed(2):o.power;
     $("heroMetricUnit").textContent = running ? "km/h":"W";
-    $("heroMetricMeta").textContent = running ? "累计 " + o.run_distance_m + " m · " + o.run_elapsed_sec + " 秒":bridge ? "原始输入 " + (active && b.valid ? b.raw_power:"—") + " W":"目标 " + c.simulation.power + " W";
+    $("heroMetricMeta").textContent = running ? "累计 " + o.run_distance_m + " m · " + o.run_elapsed_sec + " 秒":bridge && !fallback ? "原始输入 " + (active ? b.raw_power:"—") + " W":"目标 " + c.simulation.power + " W";
     $("metricTwoLabel").textContent = running ? "步频":bridge ? "真实踏频":"模拟踏频";
     $("metricTwoValue").textContent = o.cadence;
     $("metricTwoUnit").textContent = running ? "spm":"rpm";
@@ -166,20 +190,46 @@
     $("heartLiveValue").textContent = c.heart.enabled ? o.heartrate:"—";
     $("heartLiveMeta").textContent = c.heart.enabled ? "模拟心率":"已关闭";
     document.querySelector(".signal-chain").hidden = !bridge;
-    $("chainSource").textContent = devices[c.device].name;
-    $("chainSourceState").textContent = active ? labels[b.state]:"等待已绑定功率计";
+    $("chainSource").textContent = fallback ? "模拟引擎":(devices[deviceKey(b.address,b.addr_type)] || devices[c.device]).name;
+    $("chainSourceState").textContent = fallback ? "维持完整模拟输出":active ? labels[b.state]:"等待已保存功率计";
     $("chainTransform").textContent = calibrationText(c);
     $("liveStatus").className = "status-chip " + (valid ? "status-chip--ok":"status-chip--warn");
-    $("liveStatus").textContent = running ? "跑步广播中":bridge ? (active ? labels[b.state]:"上游未连接"):"模拟运行";
+    $("liveStatus").textContent = running ? "跑步广播中":fallback ? "模拟降级":bridge ? (active ? labels[b.state]:"上游未连接"):"模拟运行";
     $("runtimeAlert").className = "runtime-alert" + (valid ? "":" is-warn");
-    $("runtimeAlertTitle").textContent = running ? "跑步模拟正在运行":bridge ? (valid ? "桥接正在运行":"真实数据不可用，功率归零"):"模拟输出正在运行";
-    $("runtimeAlertText").textContent = running ? "速度与步频由设备本机平滑生成。":bridge ? (valid ? "功率与踏频来自同一台功率计。":"请检查功率计；可重新连接或选择模拟后保存。"):"输出由设备本机平滑生成。";
+    $("runtimeAlertTitle").textContent = running ? "跑步模拟正在运行":fallback ? "真实来源不可用，模拟输出继续":bridge ? (valid ? "桥接正在运行":"正在恢复真实功率计"):"模拟输出正在运行";
+    $("runtimeAlertText").textContent = running ? "速度与步频由设备本机平滑生成。":fallback ? "设备会按低频节拍自动尝试已保存功率计。":bridge ? (valid ? "功率与踏频来自同一台功率计。":"快速恢复期间等待真实数据。"):"输出由设备本机平滑生成。";
     $("packetCount").textContent = b.valid ? (b.age_ms / 1000).toFixed(1) + " 秒":"—";
     $("eventStateLabel").textContent = running ? "步频状态":"曲柄事件";
     $("crankState").textContent = running ? (o.cadence > 0 ? "步频有效":"已停止"):(b.cadence > 0 ? "踏频有效":"未提供或已停止");
     $("appServices").textContent = running ? "RSC / HRS / FTMS":"CPS / CSC / FTMS";
     $("upstreamStateLabel").textContent = running ? "会话来源":"上游状态";
     $("reconnectState").textContent = running ? "本机模拟":labels[b.state] || "未知";
+    renderBridgeRuntime();
+  }
+
+  function renderBridgeRuntime() {
+    if (!state.draft || !state.applied) return;
+    var runtime = state.bridgeRuntime || {
+      state:"disabled", configured_real:state.applied.source === "bridge",
+      actual_source:state.applied.source === "bridge" ? "real":"simulation",
+      active_slot:-1, candidate_slot:-1, next_attempt_ms:0
+    };
+    $("configuredSource").textContent = state.applied.source === "bridge" ? "真实功率计":"模拟输出";
+    var activeKey = runtime.active_slot >= 0 ? state.applied.devices[runtime.active_slot] : null;
+    var activeDevice = activeKey ? devices[activeKey] : null;
+    $("actualSource").textContent = runtime.state === "fast_recovery"
+      ? "快速恢复中"
+      : runtime.actual_source === "simulation" && runtime.configured_real
+        ? "模拟降级"
+        : activeDevice ? "真实功率计 · " + activeDevice.name:"模拟引擎";
+    var seconds = Math.ceil((runtime.next_attempt_ms || 0) / 1000);
+    $("nextBridgeAttempt").textContent = seconds > 0 ? seconds + " 秒":"—";
+    $("retryBridgeBtn").hidden = !runtime.configured_real;
+    var fallback = runtime.actual_source === "simulation" && runtime.configured_real;
+    $("fallbackSimulationSummary").hidden = !fallback;
+    $("fallbackSimulationSummary").textContent = fallback
+      ? "降级输出：模拟 " + state.applied.simulation.power + " W / "
+        + state.applied.simulation.cadence + " rpm":"";
   }
   function setActive(selector, value, key) {
     document.querySelectorAll(selector).forEach(function (button) {
@@ -199,8 +249,10 @@
       var range = robotRange(config.simulation);
       return Math.round(config.simulation.weight * (range[0] + range[1]) / 2);
     }
-    if (state.runtime !== "normal") return 0;
-    if (state.rawPower === 0) return 0;
+    if (state.rawPower <= 0) return 0;
+    if (state.runtime !== "normal"
+        && !(state.bridge && state.bridge.temporary && state.bridge.tested
+          && state.bridge.valid)) return 0;
     if (config.calibration.mode === "watts") return Math.max(0, Math.min(2000, Math.round(state.rawPower + config.calibration.watts)));
     if (config.calibration.mode === "percent") return Math.max(0, Math.min(2000, Math.round(state.rawPower * (1 + config.calibration.percent / 100))));
     return state.rawPower;
@@ -277,6 +329,7 @@
     $("bridgeEditor").hidden = !ready;
     $("simulationEditor").hidden = state.draft.source !== "simulation";
     $("bridgeHeartHint").hidden = !ready;
+    $("selectedDeviceDetail").hidden = !ready;
     $("stopBridgeBtn").hidden = state.applied.source !== "bridge" || state.applied.sport !== "cycling";
     $("sourceSummary").textContent = bridgeSelected
       ? (state.applied.source === "bridge" && !isDirty()
@@ -295,6 +348,41 @@
     document.querySelectorAll("[data-broadcast]").forEach(function (input) {
       input.checked = state.draft.broadcast[input.dataset.broadcast];
     });
+    renderBridgeDevices();
+    renderBridgeRuntime();
+  }
+
+  function renderBridgeDevices() {
+    var list = $("bridgeDeviceList");
+    list.replaceChildren();
+    state.draft.devices.forEach(function(key,index) {
+      var item = devices[key], fragment = $("bridgeDeviceTemplate").content.cloneNode(true);
+      var row = fragment.querySelector("[data-device]");
+      row.dataset.device = key;
+      row.querySelector(".bridge-device-name b").textContent = item.name;
+      row.querySelector(".bridge-device-name span").textContent =
+        item.suffix + " · " + (index === 0 ? "首选":"备选 " + (index + 1));
+      var runtime = state.bridgeRuntime || {};
+      var activeKey = runtime.active_slot >= 0 ? state.applied.devices[runtime.active_slot] : null;
+      row.querySelector(".bridge-device-state").textContent = activeKey === key
+        && runtime.actual_source === "real" ? "当前使用":index === 0 ? "首选":"待命";
+      var prefer = row.querySelector('[data-action="prefer"]');
+      prefer.disabled = index === 0;
+      prefer.addEventListener("click",function() {
+        state.draft.devices.splice(index,1);
+        state.draft.devices.unshift(key);
+        state.draft.device = key;
+        renderAll(); edited();
+      });
+      row.querySelector('[data-action="delete"]').addEventListener("click",function() {
+        if (!window.confirm("删除已保存功率计“" + item.name + "”？")) return;
+        state.draft.devices.splice(index,1);
+        state.draft.device = state.draft.devices[0] || deviceKey("000000000000",0);
+        state.copyIdentity = false;
+        renderAll(); edited();
+      });
+      list.appendChild(fragment);
+    });
   }
 
   function fillInfo(id, info, name, missing) {
@@ -312,8 +400,12 @@
   }
 
   function renderIdentity() {
-    var device = devices[state.draft.device];
+    var device = devices[state.draft.device] || devices[state.draft.devices[0]]
+      || devices[deviceKey("000000000000",0)];
+    var canCopy = testedBridgeReady();
+    if (!canCopy) state.copyIdentity = false;
     $("copyIdentity").checked = state.copyIdentity;
+    $("copyIdentity").disabled = !canCopy;
     $("identityOptions").hidden = !state.copyIdentity;
     $("identityNameSource").value = state.nameSource;
     $("identityNameSource").options[0].disabled = !device.named;
@@ -326,7 +418,8 @@
   }
 
   function renderDevice() {
-    var device = devices[state.draft.device];
+    var device = devices[state.draft.device] || devices[state.draft.devices[0]]
+      || devices[deviceKey("000000000000",0)];
     $("selectedDeviceName").textContent = device.name;
     $("selectedDeviceMeta").textContent = "地址末尾 " + device.suffix + " · CPS";
     document.querySelector(".device-monogram").textContent = device.mark;
@@ -561,7 +654,8 @@
   function openModal(id) { modalFocus = document.activeElement; $(id).hidden = false; $(id).querySelector("button").focus(); }
   function closeModal(id) { $(id).hidden = true; if (modalFocus) modalFocus.focus(); }
   async function cancelTest() {
-    state.testCandidate = null;
+    state.testCandidate = null; state.pendingReplacementKey = null;
+    $("replaceBridgeConfirm").hidden = true;
     try {
       await api("bridge/scan",{stop:true});
       if (state.bridge && state.bridge.temporary) {
@@ -590,7 +684,10 @@
   async function scan() {
     if (state.testCandidate !== null) return;
     $("rescanBtn").disabled = true;
-    try { renderScan(await api("bridge/scan",{})); }
+    try {
+      await api("bridge/scan",{});
+      renderScan(await api("bridge/scan"));
+    }
     catch (e) { $("scanStatus").textContent = e.message; }
     finally { $("rescanBtn").disabled = false; }
   }
@@ -603,8 +700,12 @@
     data.devices.forEach(function(item) {
       var row = document.createElement("article"), text = document.createElement("div");
       var name = document.createElement("b"), meta = document.createElement("span"), button = document.createElement("button");
+      row.dataset.scanIndex = String(data.devices.indexOf(item));
+      row.dataset.address = item.address;
       name.textContent = item.name || "未命名功率计"; meta.textContent = item.address + " · " + item.rssi + " dBm";
-      text.append(name,meta); button.textContent = "选择并测试"; button.type = "button";
+      var saved = state.draft.devices.includes(deviceKey(item.address,item.addr_type));
+      text.append(name,meta); button.textContent = saved ? "已保存":"选择并测试"; button.type = "button";
+      button.disabled = saved;
       button.addEventListener("click",async function() {
         button.disabled = true;
         try {
@@ -623,7 +724,9 @@
     setBusy(true); state.message = "";
     var transaction = 0, confirmedFailure = false;
     try {
-      var body = close ? {revision:state.revision}:Object.assign(encode(pendingConfig()),{revision:state.revision,copy_identity:state.copyIdentity});
+      var body = close ? {revision:state.revision}:Object.assign(
+        encode(pendingConfig()),{revision:state.revision,copy_identity:state.copyIdentity});
+      if (!close && state.replaceSlot !== null) body.replace_slot = state.replaceSlot;
       var accepted = await api(close ? "close-wifi":"config",body);
       transaction = accepted.transaction;
       for (var n = 0; n < 20; n++) {
@@ -659,6 +762,28 @@
     try { await api("bridge/control",{action:stopping ? "stop":"resume"}); this.textContent = stopping ? "重新连接":"停止桥接"; this.dataset.armed = "false"; }
     catch(e) { showToast(e.message); }
   });
+  $("retryBridgeBtn").addEventListener("click",async function() {
+    this.disabled = true;
+    try {
+      await api("bridge/control",{action:"retry"});
+      showToast("已开始快速恢复");
+      await poll();
+    } catch(e) { showToast(e.message); }
+    finally { this.disabled = false; }
+  });
+  $("confirmBridgeReplaceBtn").addEventListener("click",function() {
+    if (!state.pendingReplacementKey) return;
+    var slot = Number($("replaceBridgeSlot").value);
+    if (!Number.isInteger(slot) || slot < 0 || slot >= state.draft.devices.length) return;
+    state.draft.devices[slot] = state.pendingReplacementKey;
+    state.draft.device = state.pendingReplacementKey;
+    state.replaceSlot = slot;
+    state.pendingReplacementKey = null;
+    $("replaceBridgeConfirm").hidden = true;
+    closeModal("scanModal");
+    renderAll(); edited();
+    showToast("替换已加入草稿，保存后生效");
+  });
   $("renewBtn").addEventListener("click",async function() {
     this.disabled = true;
     try { var data = await api("renew",{}); countdown(data.remaining_sec); showToast("配网时间已续期至 5 分钟"); }
@@ -683,9 +808,12 @@
     state.polling = true;
     try {
       var o = await api("runtime");
-      state.output = o; state.bridge = o.bridge; state.rawPower = o.bridge.raw_power;
+      state.output = o; state.bridge = o.bridge; state.bridgeRuntime = o.bridge_runtime;
+      state.rawPower = o.bridge.raw_power;
       $("meterConnection").textContent = o.bridge.valid ? "数据有效":o.bridge.connected ? "等待数据":"未连接";
-      state.runtime = o.bridge.valid ? "normal":"stale"; countdown(o.remaining_sec);
+      state.runtime = o.bridge_runtime && o.bridge_runtime.actual_source === "simulation"
+        ? "fallback":o.bridge.valid ? "normal":"stale";
+      countdown(o.remaining_sec);
       var key = rememberBridge(o.bridge);
       if (state.testCandidate && key === deviceKey(state.testCandidate.address,state.testCandidate.type)) {
         if (o.bridge.tested && o.bridge.valid) {
@@ -694,8 +822,27 @@
             state.draft.heart.enabled = false; state.draft.broadcast.heart = false; state.bridgeHeartInitialized = true;
           }
           state.nameSource = devices[key].named ? "meter":"board";
-          closeModal("scanModal"); renderDevice(); renderSource(); renderHeart(); edited();
-          showToast("测试通过，保存后才会切换实际输出");
+          if (state.draft.devices.includes(key)) {
+            closeModal("scanModal");
+          } else if (state.draft.devices.length < 3) {
+            state.draft.devices.push(key);
+            state.replaceSlot = null;
+            closeModal("scanModal");
+          } else {
+            state.pendingReplacementKey = key;
+            var select = $("replaceBridgeSlot");
+            select.replaceChildren();
+            state.draft.devices.forEach(function(savedKey,index) {
+              var option = document.createElement("option");
+              option.value = String(index);
+              option.textContent = (index + 1) + ". " + devices[savedKey].name;
+              select.appendChild(option);
+            });
+            $("replaceBridgeConfirm").hidden = false;
+            $("scanStatus").textContent = "测试通过；列表已满，请选择要替换的功率计";
+          }
+          renderDevice(); renderSource(); renderHeart(); edited();
+          if (!state.pendingReplacementKey) showToast("测试通过，保存后才会切换实际输出");
         } else if ([0,9].includes(o.bridge.state)) {
           state.testCandidate = null; $("scanStatus").textContent = "测试未通过，请唤醒功率计后重试";
         }

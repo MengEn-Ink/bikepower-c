@@ -83,6 +83,13 @@ def main():
         check(len(val) <= 15,
               f"{macro} = {val!r} 长度 {len(val)} > 15（NVS key 上限）")
 
+    check("NVS_KEY_BRIDGE_RECENT" in key_defs,
+          "缺少最近成功桥接设备 NVS key")
+    check(re.search(r"nvs_get_blob\s*\([^;]*NVS_KEY_BRIDGE_RECENT", nvs_src) is not None,
+          "最近成功桥接设备 key 缺少 blob 读取")
+    check(re.search(r"nvs_set_blob\s*\([^;]*NVS_KEY_BRIDGE_RECENT", nvs_src) is not None,
+          "最近成功桥接设备 key 缺少 blob 写入")
+
     # 总结
     print(f"\n{TAG} 结果: {g_pass} 通过, {g_fail} 失败")
     if g_fail == 0:

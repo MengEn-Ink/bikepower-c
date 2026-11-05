@@ -34,7 +34,12 @@ def main():
     check(len(parser.ids) == len(set(parser.ids)), "HTML id 唯一")
     check(not parser.external, "设备页不加载外部资源")
     check(all(x in html for x in ("<html", "<head", "<body", "viewport", "<!-- INLINE_CSS -->", "<!-- INLINE_JS -->")), "内联入口结构")
-    check(all(x in parser.ids for x in ("simulationEditor", "bridgeIntro", "bridgeEditor", "runningEditor", "sharedHeart", "scanResults")), "核心渐进界面")
+    check(all(x in parser.ids for x in (
+        "simulationEditor", "bridgeIntro", "bridgeEditor", "runningEditor",
+        "sharedHeart", "scanResults", "configuredSource", "actualSource",
+        "bridgeDeviceList", "bridgeDeviceTemplate", "nextBridgeAttempt",
+        "retryBridgeBtn", "sharedCalibrationHint", "fallbackSimulationSummary",
+        "replaceBridgeConfirm")), "核心渐进界面")
     check("data-runtime" not in html and "restoreDemoBtn" not in html, "禁止原型模拟操作进入设备页")
     check("prefers-color-scheme" not in css and "localStorage" not in js, "仅明亮主题")
     check("prefers-reduced-motion" in css and "text-align: center" in css, "动画与居中按钮")
@@ -44,12 +49,14 @@ def main():
     check("/api/device-templates" not in portal and "/api/ble-scan" not in portal, "移除旧模板与分析路由")
     check("revision:state.revision" in js and "accepted.transaction" in js, "保存使用 revision 与结果事务")
     check("state.draft.heart.enabled = false" in js and "bridgeReady()" in js, "测试后关闭心率与保存门槛")
+    check("bridge_devices" in js and "bridge_runtime" in js,
+          "三设备配置与实际来源运行状态")
     check("textContent" in js and ".innerHTML" not in js, "设备信息使用文本输出")
     spec = importlib.util.spec_from_file_location("inline_static", ROOT / "scripts/inline_static.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     parts = [module.minify_html(html), module.minify_css(css), module.minify_js(js)]
-    for value, limit, name in zip(parts, (21, 20, 65), ("HTML", "CSS", "JS")):
+    for value, limit, name in zip(parts, (21, 24, 65), ("HTML", "CSS", "JS")):
         size = len(value.encode())
         check(size <= limit * 1024, f"{name} {size} bytes 超过 {limit} KiB")
     size = len(module.inline_html(*parts).encode())

@@ -48,10 +48,10 @@ int main(void)
     assert(ble_scanner_serialize_results(text, sizeof(text)));
     assert(!strstr(text, "Heart") && strstr(text, "Meter"));
     int count = 0;
-    bridge_config_t config;
+    bridge_device_t device;
     uint32_t candidate = 0;
     for (unsigned i = 0; i < 12; i++) {
-        if (ble_scanner_candidate((s_generation << 4) | i, &config)) {
+        if (ble_scanner_candidate((s_generation << 4) | i, &device)) {
             count++;
             candidate = (s_generation << 4) | i;
         }
@@ -59,9 +59,10 @@ int main(void)
     assert(count == 3);
     assert(ble_scanner_serialize_results(text, 10) == 0);
     assert(ble_scanner_stop() == ESP_OK);
-    assert(ble_scanner_candidate(candidate, &config));
+    assert(ble_scanner_candidate(candidate, &device));
+    assert(device.bound && device.addr[0] != 0);
     assert(ble_scanner_start(8000) == ESP_OK);
-    assert(!ble_scanner_candidate(candidate, &config));
+    assert(!ble_scanner_candidate(candidate, &device));
     advertise(8, true, "");
     assert(ble_scanner_serialize_results(text, sizeof(text)) && strstr(text, "\"name\":\"\""));
     ble_scanner_stop();

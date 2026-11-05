@@ -45,6 +45,11 @@ int main(void)
     ble_config_service_set_commit_callback(commit);
     const struct ble_gatt_svc_def *svc = ble_config_service_definition();
     assert(svc->characteristics[8].arg == (void *)(uintptr_t)BLE_CONFIG_GROUP_BRIDGE);
+    assert(svc->characteristics[9].arg
+           == (void *)(uintptr_t)BLE_CONFIG_GROUP_BRIDGE_BACKUP_1);
+    assert(svc->characteristics[10].arg
+           == (void *)(uintptr_t)BLE_CONFIG_GROUP_BRIDGE_BACKUP_2);
+    assert(svc->characteristics[11].uuid == NULL);
     uint8_t begin[] = { BLE_CONFIG_OP_BEGIN, BLE_CONFIG_PROTOCOL_VERSION, 7, 0, 0, 0, 1, 0, 0, 0 };
     uint8_t finish[] = { BLE_CONFIG_OP_COMMIT, 7, 0, 0, 0, 1 };
     assert(control(begin, sizeof(begin)) == 0);
@@ -89,6 +94,6 @@ int main(void)
     assert(control(unknown, sizeof(unknown)) == 0);
     assert(s_response[2] == BLE_CONFIG_RESULT_PROTOCOL_MISMATCH);
     assert(s_lock_depth == 0);
-    puts("配置 GATT：提交确认、六组布局、过期 revision 与断连取消通过");
+    puts("配置 GATT：提交确认、八组布局、过期 revision 与断连取消通过");
     return 0;
 }

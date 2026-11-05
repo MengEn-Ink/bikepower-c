@@ -12,7 +12,6 @@
 #include "bikepower_config.h"
 #include "ble_bikepower.h"
 #include "ble_config_codec.h"
-#include "ble_power_bridge.h"
 #include "ble_scanner.h"
 #include "board_detect.h"
 #include "captive_portal.h"
@@ -34,10 +33,15 @@ static bool s_done_retry_logged;
 static bool s_ble_restart_requested;
 static wifi_portal_done_callback_t s_done_cb;
 static wifi_portal_config_callback_t s_config_cb;
+static wifi_portal_bridge_callback_t s_bridge_cb;
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static config_data_t s_config;
 static snapshot_t s_output;
 static running_snapshot_t s_running;
+static bridge_runtime_snapshot_t s_bridge_runtime = {
+    .active_slot = -1,
+    .candidate_slot = -1,
+};
 static uint32_t s_revision = 1;
 static uint32_t s_next_transaction;
 // 仅 HTTP 服务任务使用；构造、合并与发送串行复用，不在定时器或主任务中访问。
@@ -186,6 +190,14 @@ void wifi_portal_sync(const power_engine_t *engine)
     portEXIT_CRITICAL(&s_lock);
 }
 
+void wifi_portal_sync_bridge(const bridge_runtime_snapshot_t *snapshot)
+{
+    if (!snapshot) return;
+    portENTER_CRITICAL(&s_lock);
+    s_bridge_runtime = *snapshot;
+    portEXIT_CRITICAL(&s_lock);
+}
+
 bool wifi_portal_revision_matches(uint32_t revision)
 {
     portENTER_CRITICAL(&s_lock);
@@ -230,32 +242,68 @@ static esp_err_t h_favicon(httpd_req_t *req)
     return httpd_resp_send(req, NULL, 0);
 }
 
-static cJSON *bridge_object(const bridge_config_t *config)
+static cJSON *bridge_object(const ble_bridge_status_t *status)
 {
-    ble_bridge_status_t status = ble_power_bridge_status(config, (uint32_t)(esp_timer_get_time() / 1000));
     cJSON *object = cJSON_CreateObject();
-    if (!object) return NULL;
-    cJSON_AddNumberToObject(object, "state", status.state);
-    cJSON_AddBoolToObject(object, "connected", status.connected);
-    cJSON_AddBoolToObject(object, "temporary", status.temporary);
-    cJSON_AddBoolToObject(object, "tested", status.tested);
-    cJSON_AddBoolToObject(object, "valid", status.sample.valid);
-    cJSON_AddNumberToObject(object, "raw_power", status.sample.raw_power_w);
-    cJSON_AddNumberToObject(object, "power", status.sample.power_w);
-    cJSON_AddNumberToObject(object, "cadence", status.sample.cadence_half_rpm / 2.0);
-    cJSON_AddNumberToObject(object, "age_ms", status.sample.age_ms);
-    cJSON_AddNumberToObject(object, "error", status.error);
-    cJSON_AddStringToObject(object, "device_name", status.device_name);
+    if (!object || !status) return object;
+    cJSON_AddNumberToObject(object, "state", status->state);
+    cJSON_AddBoolToObject(object, "connected", status->connected);
+    cJSON_AddBoolToObject(object, "temporary", status->temporary);
+    cJSON_AddBoolToObject(object, "tested", status->tested);
+    cJSON_AddBoolToObject(object, "valid", status->sample.valid);
+    cJSON_AddNumberToObject(object, "raw_power", status->sample.raw_power_w);
+    cJSON_AddNumberToObject(object, "power", status->sample.power_w);
+    cJSON_AddNumberToObject(object, "cadence",
+                            status->sample.cadence_half_rpm / 2.0);
+    cJSON_AddNumberToObject(object, "age_ms", status->sample.age_ms);
+    cJSON_AddNumberToObject(object, "error", status->error);
+    cJSON_AddStringToObject(object, "device_name", status->device_name);
     char address[13];
-    for (size_t i = 0; i < 6; i++) snprintf(address + i * 2, 3, "%02x", status.peer.addr[i]);
+    for (size_t i = 0; i < 6; i++) {
+        snprintf(address + i * 2, 3, "%02x", status->peer.addr[i]);
+    }
     cJSON_AddStringToObject(object, "address", address);
-    cJSON_AddNumberToObject(object, "addr_type", status.peer.addr_type);
-    cJSON_AddStringToObject(object, "name", status.peer.name);
+    cJSON_AddNumberToObject(object, "addr_type", status->peer.addr_type);
+    cJSON_AddStringToObject(object, "name", status->peer.name);
     cJSON *identity = cJSON_AddObjectToObject(object, "identity");
     static const char *keys[] = { "manufacturer", "model", "serial", "hardware", "firmware", "software" };
     for (size_t i = 0; i < DEVICE_IDENTITY_FIELD_COUNT; i++) {
-        cJSON_AddStringToObject(identity, keys[i], status.identity.fields[i]);
+        cJSON_AddStringToObject(identity, keys[i], status->identity.fields[i]);
     }
+    return object;
+}
+
+static const char *bridge_runtime_state_name(bridge_failover_state_t state)
+{
+    static const char *names[] = {
+        "disabled",
+        "fast_recovery",
+        "live",
+        "fallback_simulation",
+        "background_probe",
+        "paused",
+    };
+    return state >= BRIDGE_FAILOVER_DISABLED && state <= BRIDGE_FAILOVER_PAUSED
+        ? names[state] : "disabled";
+}
+
+static cJSON *bridge_runtime_object(
+    const bridge_runtime_snapshot_t *snapshot)
+{
+    cJSON *object = cJSON_CreateObject();
+    if (!object || !snapshot) return object;
+    cJSON_AddStringToObject(object, "state",
+                            bridge_runtime_state_name(snapshot->state));
+    cJSON_AddBoolToObject(object, "configured_real",
+                          snapshot->configured_real);
+    cJSON_AddStringToObject(object, "actual_source",
+                            snapshot->actual_simulation
+                                ? "simulation" : "real");
+    cJSON_AddNumberToObject(object, "active_slot", snapshot->active_slot);
+    cJSON_AddNumberToObject(object, "candidate_slot",
+                            snapshot->candidate_slot);
+    cJSON_AddNumberToObject(object, "next_attempt_ms",
+                            snapshot->next_attempt_ms);
     return object;
 }
 
@@ -264,6 +312,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
     portENTER_CRITICAL(&s_lock);
     config_data_t config = s_config;
     uint32_t revision = s_revision;
+    bridge_runtime_snapshot_t bridge = s_bridge_runtime;
     portEXIT_CRITICAL(&s_lock);
     cJSON *object = cJSON_CreateObject();
     if (!object) return send_object(req, NULL, WIFI_JSON_STATE_CAPACITY);
@@ -305,7 +354,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
         cJSON_AddNumberToObject(pacer, "cadence", RUN_PACERS[i].cadence_spm);
         cJSON_AddItemToArray(run_pacers, pacer);
     }
-    cJSON_AddItemToObject(object, "bridge", bridge_object(&config.bridge));
+    cJSON_AddItemToObject(object, "bridge", bridge_object(&bridge.session));
     return send_object(req, object, WIFI_JSON_STATE_CAPACITY);
 }
 
@@ -320,6 +369,7 @@ static esp_err_t h_api_runtime(httpd_req_t *req)
     bool pending = s_transaction.pending;
     uint8_t result = s_transaction.result;
     uint8_t restart = s_transaction.restart;
+    bridge_runtime_snapshot_t bridge = s_bridge_runtime;
     portEXIT_CRITICAL(&s_lock);
     cJSON *object = cJSON_CreateObject();
     if (!object) return send_object(req, NULL, WIFI_JSON_RUNTIME_CAPACITY);
@@ -338,7 +388,9 @@ static esp_err_t h_api_runtime(httpd_req_t *req)
     cJSON_AddNumberToObject(object, "connections", ble_bikepower_conn_count());
     cJSON_AddNumberToObject(object, "remaining_sec", remaining_seconds());
     cJSON_AddBoolToObject(object, "closing", portal_closing());
-    cJSON_AddItemToObject(object, "bridge", bridge_object(&config.bridge));
+    cJSON_AddItemToObject(object, "bridge", bridge_object(&bridge.session));
+    cJSON_AddItemToObject(object, "bridge_runtime",
+                          bridge_runtime_object(&bridge));
     return send_object(req, object, WIFI_JSON_RUNTIME_CAPACITY);
 }
 
@@ -373,9 +425,39 @@ static bool merge_config(cJSON *body, const config_data_t *base, config_data_t *
     }
     bool printed = cJSON_PrintPreallocated(object, s_json_response, CONFIG_JSON_MAX_LEN, false);
     cJSON_Delete(object);
-    bool ok = printed && config_store_deserialize(s_json_response, out) && out->schema_ver == CONFIG_VERSION
-        && device_identity_text_valid((const uint8_t *)out->bridge.name, strlen(out->bridge.name));
+    bool ok = printed && config_store_deserialize(s_json_response, out)
+        && out->schema_ver == CONFIG_VERSION;
     return ok;
+}
+
+static int added_bridge_devices(const bridge_config_t *base,
+                                const bridge_config_t *requested,
+                                bridge_device_t *added)
+{
+    int count = 0;
+    for (int i = 0; i < requested->device_count; i++) {
+        if (power_bridge_find_device(base, &requested->devices[i]) < 0) {
+            if (added && count == 0) added[0] = requested->devices[i];
+            count++;
+        }
+    }
+    return count;
+}
+
+static bool replacement_slot_valid(cJSON *body,
+                                   const bridge_config_t *base,
+                                   const bridge_config_t *requested,
+                                   int added_count)
+{
+    if (base->device_count < BRIDGE_DEVICE_MAX || added_count == 0) return true;
+    cJSON *slot = cJSON_GetObjectItemCaseSensitive(body, "replace_slot");
+    if (added_count != 1 || !cJSON_IsNumber(slot)
+        || slot->valuedouble != slot->valueint || slot->valueint < 0
+        || slot->valueint >= base->device_count) {
+        return false;
+    }
+    return power_bridge_find_device(requested,
+                                    &base->devices[slot->valueint]) < 0;
 }
 
 static esp_err_t submit_config(httpd_req_t *req, bool close_wifi)
@@ -386,6 +468,7 @@ static esp_err_t submit_config(httpd_req_t *req, bool close_wifi)
     portENTER_CRITICAL(&s_lock);
     config_data_t base = s_config;
     bool busy = s_transaction.pending;
+    bridge_runtime_snapshot_t bridge = s_bridge_runtime;
     portEXIT_CRITICAL(&s_lock);
     cJSON *revision_field = cJSON_GetObjectItemCaseSensitive(body, "revision");
     uint32_t revision = cJSON_IsNumber(revision_field) && revision_field->valuedouble > 0
@@ -398,19 +481,23 @@ static esp_err_t submit_config(httpd_req_t *req, bool close_wifi)
     device_identity_t identity;
     device_identity_t *identity_ptr = NULL;
     bool copy_identity = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(body, "copy_identity"));
-    if (ok && (copy_identity || !power_bridge_config_equal(&base.bridge, &requested.bridge))) {
-        ble_bridge_status_t status = ble_power_bridge_status(&requested.bridge, (uint32_t)(esp_timer_get_time() / 1000));
-        bool same_peer = status.peer.bound && requested.bridge.bound
-            && status.peer.addr_type == requested.bridge.addr_type
-            && memcmp(status.peer.addr, requested.bridge.addr, 6) == 0;
-        if (requested.bridge.source == BRIDGE_SOURCE_REAL && !same_peer) ok = false;
-        if (requested.bridge.source == BRIDGE_SOURCE_REAL && !status.tested) ok = false;
-        if (copy_identity) {
-            if (!same_peer || !status.tested) ok = false;
-            else {
-                identity = status.identity;
-                identity_ptr = &identity;
-            }
+    bridge_device_t added = {0};
+    int added_count = ok
+        ? added_bridge_devices(&base.bridge, &requested.bridge, &added) : 0;
+    bool tested_new = added_count == 1 && bridge.session.temporary
+        && bridge.session.tested
+        && bridge_device_equal(&bridge.session.peer, &added);
+    if (ok && !replacement_slot_valid(body, &base.bridge,
+                                       &requested.bridge, added_count)) {
+        ok = false;
+    }
+    if (ok && added_count > 0 && !tested_new) ok = false;
+    if (ok && copy_identity) {
+        if (!tested_new) {
+            ok = false;
+        } else {
+            identity = bridge.session.identity;
+            identity_ptr = &identity;
         }
     }
     cJSON_Delete(body);
@@ -442,10 +529,15 @@ static esp_err_t h_api_scan(httpd_req_t *req)
     if (req->method == HTTP_POST) {
         if (portal_closing() || !remaining_seconds()) return send_json(req, "{\"ok\":false,\"error\":\"配网已结束\"}");
         cJSON *body = receive_object(req);
+        if (!body) return send_json(req, "{\"ok\":false,\"error\":\"无效请求\"}");
         cJSON *stop = cJSON_GetObjectItemCaseSensitive(body, "stop");
-        esp_err_t result = cJSON_IsTrue(stop) ? ble_scanner_stop() : ble_scanner_start(BLE_SCAN_DEFAULT_MS);
+        bridge_runtime_command_t command = cJSON_IsTrue(stop)
+            ? BRIDGE_RUNTIME_SCAN_STOP : BRIDGE_RUNTIME_SCAN_START;
+        esp_err_t result = s_bridge_cb
+            ? s_bridge_cb(command, NULL) : ESP_ERR_INVALID_STATE;
         cJSON_Delete(body);
         if (result != ESP_OK) return send_json(req, "{\"ok\":false,\"error\":\"扫描忙或蓝牙未就绪\"}");
+        return send_json(req, "{\"ok\":true,\"pending\":true}");
     }
     if (!ble_scanner_serialize_results(s_json_response, WIFI_JSON_SCAN_CAPACITY)) {
         return send_json(req, "{\"ok\":false,\"error\":\"扫描结果超限\"}");
@@ -460,23 +552,27 @@ static esp_err_t h_api_bridge_control(httpd_req_t *req)
     cJSON *action = cJSON_GetObjectItemCaseSensitive(body, "action");
     esp_err_t result = ESP_ERR_INVALID_ARG;
     if (cJSON_IsString(action) && strcmp(action->valuestring, "stop") == 0) {
-        result = ble_power_bridge_request_stop();
+        result = s_bridge_cb
+            ? s_bridge_cb(BRIDGE_RUNTIME_STOP, NULL) : ESP_ERR_INVALID_STATE;
     } else if (cJSON_IsString(action) && strcmp(action->valuestring, "test") == 0) {
         cJSON *candidate = cJSON_GetObjectItemCaseSensitive(body, "candidate");
-        bridge_config_t peer;
+        bridge_device_t peer;
         if (cJSON_IsNumber(candidate) && candidate->valuedouble >= 0
                 && candidate->valuedouble <= INT32_MAX
                 && ble_scanner_candidate((uint32_t)candidate->valuedouble, &peer)) {
-            result = ble_power_bridge_request(&peer, true);
+            result = s_bridge_cb
+                ? s_bridge_cb(BRIDGE_RUNTIME_TEST, &peer)
+                : ESP_ERR_INVALID_STATE;
         }
     } else if (cJSON_IsString(action) && strcmp(action->valuestring, "resume") == 0) {
-        portENTER_CRITICAL(&s_lock);
-        bridge_config_t peer = s_config.bridge;
-        int sport = s_config.sport_profile;
-        portEXIT_CRITICAL(&s_lock);
-        if (sport == SPORT_PROFILE_CYCLING && peer.source == BRIDGE_SOURCE_REAL) {
-            result = ble_power_bridge_request(&peer, false);
-        }
+        result = s_bridge_cb
+            ? s_bridge_cb(BRIDGE_RUNTIME_RESUME, NULL)
+            : ESP_ERR_INVALID_STATE;
+    } else if (cJSON_IsString(action)
+               && strcmp(action->valuestring, "retry") == 0) {
+        result = s_bridge_cb
+            ? s_bridge_cb(BRIDGE_RUNTIME_RETRY_NOW, NULL)
+            : ESP_ERR_INVALID_STATE;
     }
     cJSON_Delete(body);
     return send_json(req, result == ESP_OK ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"候选已失效或设备忙\"}");
@@ -571,8 +667,7 @@ esp_err_t wifi_portal_start(power_engine_t *engine)
 
 void wifi_portal_stop(void)
 {
-    ble_scanner_stop();
-    ble_power_bridge_portal_stop();
+    if (s_bridge_cb) s_bridge_cb(BRIDGE_RUNTIME_RESUME, NULL);
     if (s_timer) { esp_timer_stop(s_timer); esp_timer_delete(s_timer); s_timer = NULL; }
     if (s_httpd) { httpd_stop(s_httpd); s_httpd = NULL; }
     portENTER_CRITICAL(&s_lock);
@@ -583,6 +678,7 @@ void wifi_portal_stop(void)
 
 void wifi_portal_set_done_callback(wifi_portal_done_callback_t cb) { s_done_cb = cb; }
 void wifi_portal_set_config_callback(wifi_portal_config_callback_t cb) { s_config_cb = cb; }
+void wifi_portal_set_bridge_callback(wifi_portal_bridge_callback_t cb) { s_bridge_cb = cb; }
 bool wifi_portal_ble_restart_requested(void)
 {
     portENTER_CRITICAL(&s_lock);

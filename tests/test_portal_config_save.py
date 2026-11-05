@@ -41,16 +41,20 @@ def complete(base, result):
 
 def exercise(base):
     state = request_json(base + "/api/state")
+    assert state["config"]["schema_ver"] == 14
+    assert state["config"]["bridge_devices"] == []
     revision = state["revision"]
     payload = dict(state["config"], revision=revision, power=345, device_name="配置测试")
     runtime = complete(base, request_json(base + "/api/config", payload))
     assert runtime["result"] == 0 and runtime["power"] == 345
+    assert request_json(base + "/api/state")["config"]["schema_ver"] == 14
     assert not request_json(base + "/api/config", payload)["ok"]
     state = request_json(base + "/api/state")
     request_json(base + "/api/mock/fault", {"fail_save": True})
     result = complete(base, request_json(base + "/api/config", {"revision": state["revision"], "power": 400}))
     assert result["result"] != 0 and result["power"] == 345
-    scan = request_json(base + "/api/bridge/scan", {})
+    request_json(base + "/api/bridge/scan", {})
+    scan = request_json(base + "/api/bridge/scan")
     candidate = scan["devices"][0]
     request_json(base + "/api/bridge/control", {"action": "test", "candidate": candidate["candidate"]})
     for _ in range(50):
@@ -61,17 +65,88 @@ def exercise(base):
     assert result["power"] == 345 and result["bridge"]["tested"]
     state = request_json(base + "/api/state")
     result = complete(base, request_json(base + "/api/config", dict(
-        revision=state["revision"], cycling_source=1, bridge_bound=1,
-        bridge_address=candidate["address"], bridge_addr_type=candidate["addr_type"],
-        bridge_name=candidate["name"], bridge_calibration=1, bridge_watts=12, broadcast_mask=3)))
+        revision=state["revision"], cycling_source=1,
+        bridge_devices=[{"address": candidate["address"],
+                         "addr_type": candidate["addr_type"],
+                         "name": candidate["name"]}],
+        bridge_calibration=1, bridge_watts=12, broadcast_mask=3)))
     assert result["power"] == 250 and result["heartrate"] == 0
+    assert result["bridge_runtime"]["configured_real"]
+    assert result["bridge_runtime"]["actual_source"] == "real"
+    state = request_json(base + "/api/state")
+    calibration = complete(base, request_json(base + "/api/config", {
+        "revision": state["revision"], "bridge_watts": 20,
+    }))
+    assert calibration["result"] == 0 and calibration["power"] == 258
+    for expected in (1, 2):
+        request_json(base + "/api/bridge/scan", {})
+        scan = request_json(base + "/api/bridge/scan")
+        candidate = scan["devices"][expected]
+        request_json(base + "/api/bridge/control", {
+            "action": "test", "candidate": candidate["candidate"],
+        })
+        for _ in range(50):
+            if request_json(base + "/api/runtime")["bridge"]["tested"]:
+                break
+            time.sleep(0.02)
+        state = request_json(base + "/api/state")
+        devices = state["config"]["bridge_devices"] + [{
+            "address": candidate["address"], "addr_type": candidate["addr_type"],
+            "name": candidate["name"],
+        }]
+        complete(base, request_json(base + "/api/config", {
+            "revision": state["revision"], "bridge_devices": devices,
+        }))
+    state = request_json(base + "/api/state")
+    assert len(state["config"]["bridge_devices"]) == 3
+    request_json(base + "/api/bridge/scan", {})
+    scan = request_json(base + "/api/bridge/scan")
+    candidate = scan["devices"][3]
+    request_json(base + "/api/bridge/control", {
+        "action": "test", "candidate": candidate["candidate"],
+    })
+    for _ in range(50):
+        if request_json(base + "/api/runtime")["bridge"]["tested"]:
+            break
+        time.sleep(0.02)
+    replacement = list(state["config"]["bridge_devices"])
+    replacement[1] = {
+        "address": candidate["address"], "addr_type": candidate["addr_type"],
+        "name": candidate["name"],
+    }
+    rejected = request_json(base + "/api/config", {
+        "revision": state["revision"], "bridge_devices": replacement,
+    })
+    assert not rejected["ok"]
+    replaced = complete(base, request_json(base + "/api/config", {
+        "revision": state["revision"], "replace_slot": 1,
+        "bridge_devices": replacement,
+    }))
+    assert replaced["result"] == 0
+    request_json(base + "/api/mock/fault", {"fault": "all_missing"})
+    fallback = request_json(base + "/api/runtime")
+    assert fallback["bridge_runtime"]["state"] == "fallback_simulation"
+    assert fallback["bridge_runtime"]["actual_source"] == "simulation"
+    assert fallback["power"] > 0
+    request_json(base + "/api/bridge/control", {"action": "retry"})
+    assert request_json(base + "/api/runtime")["bridge_runtime"]["state"] == "fast_recovery"
+    request_json(base + "/api/mock/fault", {"fault": "backup_live"})
+    backup = request_json(base + "/api/runtime")
+    assert backup["bridge_runtime"]["state"] == "live"
+    assert backup["bridge_runtime"]["active_slot"] == 1
     request_json(base + "/api/mock/fault", {"fault": "zero"})
     assert request_json(base + "/api/runtime")["power"] == 0
     request_json(base + "/api/mock/fault", {"fault": "stale"})
-    assert request_json(base + "/api/runtime")["power"] == 0
+    stale = request_json(base + "/api/runtime")
+    assert stale["power"] > 0
+    assert stale["bridge_runtime"]["actual_source"] == "simulation"
     request_json(base + "/api/mock/fault", {})
     state = request_json(base + "/api/state")
-    complete(base, request_json(base + "/api/config", {"revision": state["revision"], "cycling_source": 0}))
+    complete(base, request_json(base + "/api/config", {
+        "revision": state["revision"],
+        "cycling_source": 0,
+        "bridge_devices": [],
+    }))
     before = request_json(base + "/api/state")["remaining_sec"]
     for _ in range(5):
         request_json(base + "/api/state")

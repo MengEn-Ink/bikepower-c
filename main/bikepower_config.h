@@ -92,6 +92,12 @@ typedef enum {
 #define BLE_CONFIG_BRIDGE_UUID_BYTES \
     0x21, 0x0b, 0x8c, 0x4a, 0x1f, 0x6d, 0x3e, 0x9b, \
     0x2a, 0x4f, 0x7a, 0x4c, 0x09, 0x00, 0x5a, 0x7a
+#define BLE_CONFIG_BRIDGE_BACKUP_1_UUID_BYTES \
+    0x21, 0x0b, 0x8c, 0x4a, 0x1f, 0x6d, 0x3e, 0x9b, \
+    0x2a, 0x4f, 0x7a, 0x4c, 0x0a, 0x00, 0x5a, 0x7a
+#define BLE_CONFIG_BRIDGE_BACKUP_2_UUID_BYTES \
+    0x21, 0x0b, 0x8c, 0x4a, 0x1f, 0x6d, 0x3e, 0x9b, \
+    0x2a, 0x4f, 0x7a, 0x4c, 0x0b, 0x00, 0x5a, 0x7a
 
 // ===== 特征值 UUID =====
 #define POWER_CHAR_UUID            0x2A63
@@ -116,6 +122,7 @@ typedef enum {
 #define NVS_NAMESPACE          "bikepower"
 #define NVS_KEY_SCHEMA_VER     "sv"
 #define NVS_KEY_BRIDGE         "bridge"
+#define NVS_KEY_BRIDGE_RECENT  "brrecent"
 #define NVS_KEY_POWER          "power"
 #define NVS_KEY_CADENCE        "cadence"
 #define NVS_KEY_MODE           "mode"
@@ -170,9 +177,6 @@ typedef enum {
 #define BLE_BRIDGE_TEST_MS           30000u
 #define BLE_BRIDGE_CONNECT_MS        8000u
 #define BLE_BRIDGE_NO_SAMPLE_MS      10000u
-#define BLE_BRIDGE_RECONNECT_MS      60000u
-#define BLE_BRIDGE_RETRY_MIN_MS      1000u
-#define BLE_BRIDGE_RETRY_MAX_MS      8000u
 #define BLE_BRIDGE_CPS_INPUT_MAX     64
 #define BLE_SCAN_READ_TIMEOUT_MS     10000  // 连接外部设备读取 DIS 的最长等待时间
 #define DEVICE_ANALYSIS_SAMPLE_MS    9000   // 外部运动设备短时连接采样窗口

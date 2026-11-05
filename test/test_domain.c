@@ -1328,6 +1328,112 @@ static void test_engine_blindspots(void)
     CHECK(!profile_set_ride_type_str(&p, NULL), "ride_type_str NULL 拒绝");
 }
 
+static bridge_device_t make_bridge_device(uint8_t type, uint8_t tail,
+                                          const char *name)
+{
+    bridge_device_t device = { .bound = 1, .addr_type = type };
+    device.addr[5] = tail;
+    strncpy(device.name, name, sizeof(device.name) - 1);
+    return device;
+}
+
+static void test_bridge_v14_json(void)
+{
+    printf("[test] 桥接 schema v14 三设备 JSON 与迁移\n");
+    config_data_t source;
+    config_store_defaults(&source);
+    source.bridge.source = BRIDGE_SOURCE_REAL;
+    source.bridge.device_count = 3;
+    source.bridge.devices[0] = make_bridge_device(0, 0x11, "Primary");
+    source.bridge.devices[1] = make_bridge_device(1, 0x22, "备用功率计");
+    source.bridge.devices[2] = make_bridge_device(0, 0x33, "Third");
+
+    char json[CONFIG_JSON_MAX_LEN];
+    size_t json_len = config_store_serialize(&source, json, sizeof(json));
+    CHECK(json_len > 0 && json_len < CONFIG_JSON_MAX_LEN,
+          "v14 三设备配置可在容量内序列化");
+    CHECK(strstr(json, "\"bridge_devices\":[") != NULL,
+          "v14 JSON 包含设备数组");
+
+    config_data_t restored;
+    CHECK(config_store_deserialize(json, &restored),
+          "v14 三设备配置可反序列化");
+    CHECK(power_bridge_config_equal(&source.bridge, &restored.bridge),
+          "v14 三设备 JSON 往返一致");
+
+    config_data_t v13 = source;
+    v13.schema_ver = 13;
+    v13.bridge.device_count = 1;
+    memset(&v13.bridge.devices[1], 0,
+           sizeof(v13.bridge.devices) - sizeof(v13.bridge.devices[0]));
+    CHECK(config_store_migrate(&v13), "v13 迁移到 v14");
+    CHECK(v13.schema_ver == 14 && v13.bridge.device_count == 1,
+          "v13 单设备绑定迁移后保留");
+
+    const char *legacy_json =
+        "{\"schema_ver\":13,\"cycling_source\":1,\"bridge_bound\":1,"
+        "\"bridge_addr_type\":1,\"bridge_address\":\"000000000044\","
+        "\"bridge_calibration\":1,\"bridge_watts\":-20,"
+        "\"bridge_percent_x10\":1000,\"bridge_name\":\"Legacy\"}";
+    CHECK(config_store_deserialize(legacy_json, &restored),
+          "v13 单设备 JSON 可迁移");
+    CHECK(restored.schema_ver == 14 && restored.bridge.device_count == 1,
+          "v13 JSON 迁移为 v14 单设备表");
+    CHECK(restored.bridge.devices[0].addr_type == 1
+              && restored.bridge.devices[0].addr[5] == 0x44
+              && strcmp(restored.bridge.devices[0].name, "Legacy") == 0,
+          "v13 JSON 设备身份完整保留");
+
+    config_data_t guard;
+    config_store_defaults(&guard);
+    guard.power = 321;
+    const char *too_many =
+        "{\"schema_ver\":14,\"bridge_devices\":["
+        "{\"addr_type\":0,\"address\":\"000000000001\",\"name\":\"A\"},"
+        "{\"addr_type\":0,\"address\":\"000000000002\",\"name\":\"B\"},"
+        "{\"addr_type\":0,\"address\":\"000000000003\",\"name\":\"C\"},"
+        "{\"addr_type\":0,\"address\":\"000000000004\",\"name\":\"D\"}]}";
+    CHECK(!config_store_deserialize(too_many, &guard),
+          "v14 拒绝超过三台设备");
+    CHECK(guard.power == 321, "超量设备失败不污染输出");
+
+    const char *duplicate =
+        "{\"schema_ver\":14,\"cycling_source\":1,\"bridge_devices\":["
+        "{\"addr_type\":0,\"address\":\"000000000011\",\"name\":\"A\"},"
+        "{\"addr_type\":0,\"address\":\"000000000011\",\"name\":\"B\"}]}";
+    CHECK(!config_store_deserialize(duplicate, &guard),
+          "v14 拒绝重复设备身份");
+
+    const char *bad_type =
+        "{\"schema_ver\":14,\"bridge_devices\":["
+        "{\"addr_type\":2,\"address\":\"000000000011\",\"name\":\"A\"}]}";
+    CHECK(!config_store_deserialize(bad_type, &guard),
+          "v14 拒绝非法地址类型");
+
+    const char *long_name =
+        "{\"schema_ver\":14,\"bridge_devices\":["
+        "{\"addr_type\":0,\"address\":\"000000000011\","
+        "\"name\":\"12345678901234567890123456789012\"}]}";
+    CHECK(!config_store_deserialize(long_name, &guard),
+          "v14 拒绝超过名称容量的设备");
+    CHECK(!config_store_deserialize(
+              "{\"schema_ver\":14,\"cycling_source\":1}", &guard),
+          "v14 缺少设备数组时拒绝");
+
+    const char short_legacy_address[] =
+        "{\"schema_ver\":13,\"bridge_bound\":1,"
+        "\"bridge_addr_type\":0,\"bridge_address\":\"\"}";
+    char *short_input = malloc(sizeof(short_legacy_address));
+    CHECK(short_input != NULL, "短地址边界输入分配成功");
+    if (short_input) {
+        memcpy(short_input, short_legacy_address, sizeof(short_legacy_address));
+        CHECK(!config_store_deserialize(short_input, &guard),
+              "旧配置空地址安全拒绝，不读取字符串末尾之外");
+        CHECK(guard.power == 321, "短地址解析失败不污染输出");
+        free(short_input);
+    }
+}
+
 static void test_config_store(void)
 {
     printf("[test] 配置 schema 默认/校验/迁移\n");
@@ -1547,7 +1653,9 @@ static void test_config_store(void)
 
     // 缺键：仅覆盖出现的字段，其余保持默认
     config_data_t partial;
-    CHECK(config_store_deserialize("{\"schema_ver\":5,\"power\":300}", &partial),
+    CHECK(config_store_deserialize(
+              "{\"schema_ver\":14,\"power\":300,\"bridge_devices\":[]}",
+              &partial),
           "部分键 JSON deserialize 成功");
     CHECK(partial.power == 300, "出现的 power 被覆盖");
     CHECK(partial.cadence == DEFAULT_CADENCE, "缺失的 cadence 保持默认");
@@ -1571,7 +1679,9 @@ static void test_config_store(void)
 
     // 越界值经反序列化后被 validate 夹紧
     config_data_t clamp;
-    CHECK(config_store_deserialize("{\"schema_ver\":5,\"power\":99999}", &clamp),
+    CHECK(config_store_deserialize(
+              "{\"schema_ver\":14,\"power\":99999,\"bridge_devices\":[]}",
+              &clamp),
           "越界 power JSON deserialize 成功");
     CHECK(clamp.power == POWER_MAX, "反序列化后 power 被夹到上限");
 
@@ -1618,6 +1728,33 @@ static void test_json_miniparse(void)
     CHECK(n == 0, "不存在键返回 0");
 
     CHECK(!json_get_str(json, "nonexistent", out, sizeof(out)), "不存在键返回 false");
+
+    const char *array =
+        "{\"items\":[{\"name\":\"A\\\\\\\"B\",\"nested\":{\"v\":1}},"
+        "{\"name\":\"C\"}],\"tail\":1}";
+    CHECK(json_get_object_array_count(array, "items") == 2,
+          "对象数组计数跳过字符串转义与嵌套对象");
+    char item[96];
+    CHECK(json_get_object_array_item(array, "items", 0, item, sizeof(item)),
+          "提取对象数组第一项");
+    CHECK(strstr(item, "\"nested\":{\"v\":1}") != NULL,
+          "对象数组项保留嵌套对象");
+    CHECK(json_get_object_array_item(array, "items", 1, item, sizeof(item)),
+          "提取对象数组第二项");
+    CHECK(strstr(item, "\"name\":\"C\"") != NULL,
+          "对象数组第二项内容正确");
+    CHECK(!json_get_object_array_item(array, "items", 2, item, sizeof(item)),
+          "越界对象数组项返回 false");
+    CHECK(json_get_object_array_count("{\"items\":[]}", "items") == 0,
+          "空对象数组计数为零");
+    CHECK(json_get_object_array_count("{}", "items") == -1,
+          "缺少对象数组返回 -1");
+    CHECK(json_get_object_array_count("{\"items\":[{\"x\":1}", "items") == -2,
+          "对象数组语法错误返回 -2");
+    char tiny_item[4];
+    CHECK(!json_get_object_array_item(array, "items", 0,
+                                      tiny_item, sizeof(tiny_item)),
+          "对象数组输出容量不足返回 false");
 
     // 缓冲区不足截断
     char small[5];
@@ -2003,7 +2140,7 @@ static void test_running_pacer_defaults(void)
     config_data_t c;
     config_store_defaults(&c);
 
-    CHECK(CONFIG_VERSION == 13, "配置 schema 版本升级到 13");
+    CHECK(CONFIG_VERSION == 14, "配置 schema 版本升级到 14");
     CHECK(c.run_mode == RUN_MODE_FIXED, "默认跑步模式为固定配速");
     CHECK(c.run_pacer_type == RUN_PACER_JOG, "默认跑步模板为慢跑");
     CHECK(c.run_pace_low_sec == 390, "默认跑步模板下限=6:30/km");
@@ -2421,6 +2558,7 @@ int main(void)
     test_irregular_notification_sampling();
     test_web_config_persistence_scenario();
     test_engine_blindspots();
+    test_bridge_v14_json();
     test_config_store();
     test_json_miniparse();
     test_device_templates();

@@ -16,5 +16,6 @@ idf_component_register(
          "ble_config_codec.c"
          "cps_input_codec.c"
          "power_bridge.c"
+         "bridge_failover.c"
     INCLUDE_DIRS "include"
 )

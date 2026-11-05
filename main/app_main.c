@@ -31,7 +31,7 @@
 #include "wifi_portal.h"
 #include "board_detect.h"
 #include "device_identity_store.h"
-#include "ble_power_bridge.h"
+#include "bridge_runtime.h"
 #include "esp_timer.h"
 
 static const char *TAG = "APP";
@@ -60,6 +60,19 @@ static bool s_ble_config_restart_pending = false;
 // DIS 身份覆盖写入 mailbox：host 任务只复制，主循环负责 NVS 落盘后再让 DIS 读值生效。
 static device_identity_t s_pending_identity;
 static bool s_has_pending_identity = false;
+
+static void on_bridge_recent(const bridge_device_t *device)
+{
+    if (!nvs_store_save_bridge_recent(device)) {
+        ESP_LOGW(TAG, "最近成功功率计提示保存失败，下次启动回退设备表顺序");
+    }
+}
+
+static esp_err_t on_wifi_bridge_command(bridge_runtime_command_t command,
+                                        const bridge_device_t *device)
+{
+    return bridge_runtime_request(command, device);
+}
 
 /**
  * DIS 身份覆盖写入回调（NimBLE host 任务上下文）。
@@ -309,18 +322,8 @@ static void process_pending_ble_config(void)
     s_engine = next;
     s_real_power_source = s_engine.bridge.source == BRIDGE_SOURCE_REAL;
     if (copy_identity) ble_bikepower_set_identity(&identity);
-    ble_bridge_status_t bridge_status = ble_power_bridge_status(&applied.bridge,
+    bridge_runtime_apply_config(&applied.bridge, applied.sport_profile,
         (uint32_t)(esp_timer_get_time() / 1000));
-    if (!power_bridge_config_equal(&previous.bridge, &applied.bridge)
-            || previous.sport_profile != applied.sport_profile
-            || (applied.bridge.source == BRIDGE_SOURCE_REAL
-                && (bridge_status.temporary || !bridge_status.connected))) {
-        if (applied.bridge.source == BRIDGE_SOURCE_REAL && applied.sport_profile == SPORT_PROFILE_CYCLING) {
-            ble_power_bridge_request(&applied.bridge, false);
-        } else {
-            ble_power_bridge_request_stop();
-        }
-    }
     power_engine_clear_dirty(&s_engine);
     app_state_refresh_led();
     if (restart_flags & BLE_CONFIG_RESTART_NAME) {
@@ -400,6 +403,8 @@ void app_main(void)
 
     power_engine_init(&s_engine);
     nvs_store_load(&s_engine);
+    static bridge_device_t bridge_recent;
+    bool have_bridge_recent = nvs_store_load_bridge_recent(&bridge_recent);
     power_engine_clear_dirty(&s_engine);
     ESP_LOGI(TAG, "功率引擎初始化 p=%dW c=%dRPM hr=%d mode=%d",
              s_engine.base_power, s_engine.cadence_base,
@@ -427,6 +432,7 @@ void app_main(void)
     app_state_set_wifi_exit(on_wifi_exit);
     wifi_portal_set_done_callback(on_wifi_done);  // 注册配网结束回调，由 wifi_portal 在保存/超时后调用
     wifi_portal_set_config_callback(on_wifi_config_commit);
+    wifi_portal_set_bridge_callback(on_wifi_bridge_command);
     wifi_portal_sync(&s_engine);
 
     ret = button_init(s_app_queue);
@@ -453,9 +459,16 @@ void app_main(void)
     ble_bikepower_set_device_name(s_engine.device_name);
     ble_bikepower_set_config_snapshot(&s_engine);
     esp_err_t ble_ret = ble_bikepower_start();
+    bool bridge_runtime_started = false;
     if (ble_ret != ESP_OK) {
         ESP_LOGE(TAG, "BLE 启动失败 ret=%d，进入错误恢复态", ble_ret);
         app_state_set_error();
+    } else {
+        bridge_runtime_set_recent_callback(on_bridge_recent);
+        bridge_runtime_init(&s_engine.bridge, s_engine.sport_profile,
+                            have_bridge_recent ? &bridge_recent : NULL,
+                            (uint32_t)(esp_timer_get_time() / 1000));
+        bridge_runtime_started = true;
     }
     domain_rng_seed(esp_random());
 
@@ -544,6 +557,16 @@ void app_main(void)
                 esp_err_t r = ble_bikepower_start();
                 if (r == ESP_OK) {
                     ESP_LOGI(TAG, "BLE 重试启动成功");
+                    if (!bridge_runtime_started) {
+                        bridge_runtime_set_recent_callback(on_bridge_recent);
+                        bridge_runtime_init(&s_engine.bridge,
+                            s_engine.sport_profile,
+                            have_bridge_recent ? &bridge_recent : NULL,
+                            (uint32_t)(esp_timer_get_time() / 1000));
+                        bridge_runtime_started = true;
+                    } else {
+                        bridge_runtime_request(BRIDGE_RUNTIME_RETRY_NOW, NULL);
+                    }
                     app_state_clear_error();
                 } else {
                     ESP_LOGE(TAG, "BLE 重试启动仍失败 ret=%d", r);
@@ -589,10 +612,7 @@ void app_main(void)
                         s_ble_config_restart_pending = false;
                         last_conn = 0;
                         app_state_clear_error();
-                        if (s_engine.bridge.source == BRIDGE_SOURCE_REAL
-                                && s_engine.sport_profile == SPORT_PROFILE_CYCLING) {
-                            ble_power_bridge_request(&s_engine.bridge, false);
-                        }
+                        bridge_runtime_request(BRIDGE_RUNTIME_RETRY_NOW, NULL);
                     } else {
                         ESP_LOGE(TAG, "BLE 重启失败 ret=%d", r);
                         app_state_set_error();
@@ -610,7 +630,11 @@ void app_main(void)
 
         snapshot_t s = s_engine.snapshot;
         uint32_t bridge_now = (uint32_t)(esp_timer_get_time() / 1000);
-        ble_power_bridge_tick(&s_engine.bridge, bridge_now);
+        bridge_runtime_tick(&s_engine.bridge, s_engine.sport_profile,
+                            bridge_now);
+        bridge_runtime_snapshot_t bridge =
+            bridge_runtime_snapshot(&s_engine.bridge, bridge_now);
+        wifi_portal_sync_bridge(&bridge);
         ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
         if (s_engine.sport_profile == SPORT_PROFILE_RUNNING) {
             running_snapshot_t rs = running_engine_snapshot(&s_engine.running, HR_LOOP_INTERVAL_MS);
@@ -618,15 +642,12 @@ void app_main(void)
             s.heartrate = running_hr;
             s_engine.snapshot.heartrate = running_hr;
             ble_bikepower_set_running_data(rs, (uint8_t)running_hr);
-        } else if (s_engine.bridge.source == BRIDGE_SOURCE_REAL) {
-            ble_bridge_status_t status = ble_power_bridge_status(&s_engine.bridge, bridge_now);
-            if (status.temporary || !status.peer.bound
-                    || status.peer.addr_type != s_engine.bridge.addr_type
-                    || memcmp(status.peer.addr, s_engine.bridge.addr, 6) != 0) {
-                status.sample = (bridge_snapshot_t) { 0 };
-            }
-            s = power_engine_bridge_snapshot(&s_engine, &status.sample);
-            ble_bikepower_set_bridge_data(&status.sample, (uint8_t)s.heartrate);
+        } else if (s_engine.bridge.source == BRIDGE_SOURCE_REAL
+                   && !bridge_runtime_uses_simulation()) {
+            s = power_engine_bridge_snapshot(&s_engine,
+                                             &bridge.session.sample);
+            ble_bikepower_set_bridge_data(&bridge.session.sample,
+                                          (uint8_t)s.heartrate);
         } else {
             s = power_engine_snapshot(&s_engine);
             ble_bikepower_set_data((uint16_t)s.power, (uint8_t)s.heartrate, (uint16_t)s.cadence);

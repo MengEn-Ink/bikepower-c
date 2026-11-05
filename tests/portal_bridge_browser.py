@@ -42,9 +42,11 @@ def main():
                 page.on("pageerror", lambda e: errors.append(str(e)))
                 page.goto(url)
                 expect(page.locator("#liveSubtitle")).to_contain_text("App 连接")
-                expect(page.locator("#schemaVersion")).to_have_text("schema v13")
+                expect(page.locator("#schemaVersion")).to_have_text("schema v14")
                 expect(page.locator("#heapValue")).to_contain_text("当前 117.2 KiB")
                 expect(page.locator("#heapValue")).to_contain_text("最低 95.7 KiB")
+                expect(page.locator("#sharedCalibrationHint")).to_have_text(
+                    "这组校正适用于全部已保存功率计")
                 expect(page.locator("#saveBtn")).to_be_disabled()
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
                 assert page.locator("button:visible").evaluate_all("els => els.every(e => getComputedStyle(e).textAlign === 'center')")
@@ -79,6 +81,9 @@ def main():
                 page.locator("#customIdentityName").fill("我的功率计")
                 page.locator("#saveBtn").click()
                 expect(page.locator("#headerDeviceName")).to_have_text("我的功率计")
+                expect(page.locator("#configuredSource")).to_have_text("真实功率计")
+                expect(page.locator("#actualSource")).to_contain_text("P505")
+                expect(page.locator("#bridgeDeviceList [data-device]")).to_have_count(1)
                 saved = page.request.get(url + "/api/state").json()
                 assert saved["identity"]["manufacturer"] == "Magene"
                 assert saved["identity"]["model"] == "P505"
@@ -86,12 +91,68 @@ def main():
                 expect(page.locator("#heartLiveValue")).to_have_text("—")
                 if screenshots:
                     page.screenshot(path=str(screenshots / f"core-bridge-{width}.png"), full_page=True)
+                for scan_index, expected_count in ((1, 2), (2, 3)):
+                    page.locator("#scanBtn").click()
+                    choice = page.locator(
+                        f'#scanResults [data-scan-index="{scan_index}"] button')
+                    expect(choice).to_be_enabled()
+                    choice.click()
+                    expect(page.locator("#scanModal")).to_be_hidden(timeout=10000)
+                    expect(page.locator("#bridgeDeviceList [data-device]")).to_have_count(
+                        expected_count)
+                    page.locator("#saveBtn").click()
+                    expect(page.locator("#saveState")).to_contain_text("已应用")
+                expect(page.locator("#bridgeDeviceList [data-device]")).to_have_count(3)
+                page.locator("#scanBtn").click()
+                fourth = page.locator('#scanResults [data-scan-index="3"] button')
+                expect(fourth).to_be_enabled()
+                fourth.click()
+                expect(page.locator("#replaceBridgeConfirm")).to_be_visible(timeout=10000)
+                page.locator("#replaceBridgeSlot").select_option("1")
+                page.locator("#confirmBridgeReplaceBtn").click()
+                expect(page.locator("#scanModal")).to_be_hidden()
+                expect(page.locator("#bridgeDeviceList [data-device]")).to_have_count(3)
+                page.locator("#saveBtn").click()
+                expect(page.locator("#saveState")).to_contain_text("已应用")
+                page.locator("#bridgeDeviceList [data-device]").nth(2).locator(
+                    '[data-action="prefer"]').click()
+                expect(page.locator("#bridgeDeviceList [data-device]").first).to_contain_text(
+                    "Stages")
+                page.locator("#saveBtn").click()
+                expect(page.locator("#saveState")).to_contain_text("已应用")
+                if screenshots:
+                    page.screenshot(
+                        path=str(screenshots / f"core-bridge-devices-{width}.png"),
+                        full_page=True)
+                page.once("dialog", lambda dialog: dialog.accept())
+                page.locator("#bridgeDeviceList [data-device]").first.locator(
+                    '[data-action="delete"]').click()
+                expect(page.locator("#bridgeDeviceList [data-device]")).to_have_count(2)
+                page.locator("#saveBtn").click()
+                expect(page.locator("#saveState")).to_contain_text("已应用")
+                page.request.post(url + "/api/mock/fault", data={"fault": "all_missing"})
+                expect(page.locator("#actualSource")).to_contain_text("模拟降级")
+                expect(page.locator("#nextBridgeAttempt")).to_contain_text("42 秒")
+                expect(page.locator("#fallbackSimulationSummary")).to_contain_text("315 W")
+                page.locator("#calibrationValue").fill("20")
+                page.locator("#saveBtn").click()
+                expect(page.locator("#saveState")).to_contain_text("已应用")
+                expect(page.locator("#heroMetricValue")).to_have_text("315")
+                if screenshots:
+                    page.screenshot(
+                        path=str(screenshots / f"core-bridge-fallback-{width}.png"),
+                        full_page=True)
+                page.locator("#retryBridgeBtn").click()
+                expect(page.locator("#actualSource")).to_contain_text("快速恢复")
+                page.request.post(url + "/api/mock/fault", data={"fault": "backup_live"})
+                expect(page.locator("#actualSource")).to_contain_text("真实功率计")
+                assert page.request.get(url + "/api/state").json()["identity"]["serial"] == "MOCK-4A29"
                 page.request.post(url + "/api/mock/fault", data={"fault": "zero"})
                 expect(page.locator("#heroMetricValue")).to_have_text("0")
                 page.request.post(url + "/api/mock/fault", data={"fault": "stale"})
-                expect(page.locator("#runtimeAlertTitle")).to_contain_text("归零")
+                expect(page.locator("#runtimeAlertTitle")).to_contain_text("模拟输出")
                 page.request.post(url + "/api/mock/fault", data={})
-                expect(page.locator("#heroMetricValue")).to_have_text("250")
+                expect(page.locator("#heroMetricValue")).to_have_text("258")
                 page.locator("#heartToggle").click()
                 page.locator("#saveBtn").click()
                 expect(page.locator("#heartLiveValue")).to_have_text("145")

@@ -34,13 +34,10 @@ typedef struct {
     uint32_t generation;
     uint32_t started_ms;
     uint32_t connected_ms;
-    uint32_t retry_until_ms;
-    uint32_t retry_at_ms;
-    uint32_t retry_delay_ms;
     bool command_pending;
     bool command_stop;
     bool command_temporary;
-    bridge_config_t command;
+    bridge_device_t command;
 } bridge_context_t;
 
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
@@ -208,9 +205,8 @@ static int gap_cb(struct ble_gap_event *event, void *arg)
             s_bridge.phase = PHASE_SERVICE;
             s_bridge.procedure_pending = false;
         } else {
+            s_bridge.desired = false;
             failed(event->connect.status);
-            s_bridge.retry_at_ms = now + s_bridge.retry_delay_ms;
-            if (s_bridge.retry_delay_ms < BLE_BRIDGE_RETRY_MAX_MS) s_bridge.retry_delay_ms *= 2;
         }
         break;
     case BLE_GAP_EVENT_DISCONNECT:
@@ -219,9 +215,18 @@ static int gap_cb(struct ble_gap_event *event, void *arg)
         s_bridge.terminating = false;
         s_bridge.status.connected = false;
         power_bridge_disconnect(&s_bridge.input);
-        failed(event->disconnect.reason);
-        s_bridge.retry_at_ms = now + s_bridge.retry_delay_ms;
-        if (s_bridge.retry_delay_ms < BLE_BRIDGE_RETRY_MAX_MS) s_bridge.retry_delay_ms *= 2;
+        if (s_bridge.desired) {
+            s_bridge.desired = false;
+            int error = s_bridge.status.state == BLE_BRIDGE_ERROR
+                && s_bridge.status.error ? s_bridge.status.error
+                                        : event->disconnect.reason;
+            failed(error);
+        } else {
+            s_bridge.status.error = 0;
+            s_bridge.status.state = BLE_BRIDGE_IDLE;
+            s_bridge.phase = PHASE_NONE;
+            s_bridge.procedure_pending = false;
+        }
         break;
     case BLE_GAP_EVENT_NOTIFY_RX:
         if (callback_current(event->notify_rx.conn_handle, arg)
@@ -240,15 +245,24 @@ static int gap_cb(struct ble_gap_event *event, void *arg)
     return 0;
 }
 
-esp_err_t ble_power_bridge_request(const bridge_config_t *peer, bool temporary)
+static bool peer_valid(const bridge_device_t *peer)
 {
-    if (!peer || !peer->bound) return ESP_ERR_INVALID_ARG;
-    bridge_config_t checked = *peer;
-    if (power_bridge_config_validate(&checked)) return ESP_ERR_INVALID_ARG;
+    if (!peer) return false;
+    bridge_config_t checked;
+    power_bridge_config_defaults(&checked);
+    checked.source = BRIDGE_SOURCE_REAL;
+    checked.device_count = 1;
+    checked.devices[0] = *peer;
+    return !power_bridge_config_validate(&checked);
+}
+
+esp_err_t ble_power_bridge_request(const bridge_device_t *peer, bool temporary)
+{
+    if (!peer_valid(peer)) return ESP_ERR_INVALID_ARG;
     portENTER_CRITICAL(&s_lock);
     bool busy = s_bridge.command_pending;
     if (!busy) {
-        s_bridge.command = checked;
+        s_bridge.command = *peer;
         s_bridge.command_temporary = temporary;
         s_bridge.command_stop = false;
         s_bridge.command_pending = true;
@@ -298,14 +312,13 @@ void ble_power_bridge_tick(const bridge_config_t *calibration, uint32_t now)
     if (s_bridge.command_pending) {
         bool promote = !s_bridge.command_stop && !s_bridge.command_temporary
             && handle != BLE_HS_CONN_HANDLE_NONE && !s_bridge.terminating
-            && s_bridge.command.addr_type == s_bridge.status.peer.addr_type
-            && memcmp(s_bridge.command.addr, s_bridge.status.peer.addr, 6) == 0;
+            && bridge_device_equal(&s_bridge.command,
+                                   &s_bridge.status.peer);
         if (promote) {
             s_bridge.command_pending = false;
             s_bridge.status.temporary = false;
             s_bridge.status.peer = s_bridge.command;
             s_bridge.desired = true;
-            s_bridge.retry_until_ms = now + BLE_BRIDGE_RECONNECT_MS;
         } else if (handle != BLE_HS_CONN_HANDLE_NONE || connecting) {
             stop = !s_bridge.terminating;
             s_bridge.terminating = true;
@@ -324,10 +337,8 @@ void ble_power_bridge_tick(const bridge_config_t *calibration, uint32_t now)
                 };
                 power_bridge_init(&s_bridge.input);
                 s_bridge.started_ms = now;
-                s_bridge.retry_until_ms = now + BLE_BRIDGE_RECONNECT_MS;
-                s_bridge.retry_at_ms = now;
-                s_bridge.retry_delay_ms = BLE_BRIDGE_RETRY_MIN_MS;
             } else {
+                s_bridge.status.error = 0;
                 s_bridge.status.state = BLE_BRIDGE_IDLE;
             }
         }
@@ -337,12 +348,16 @@ void ble_power_bridge_tick(const bridge_config_t *calibration, uint32_t now)
         s_bridge.desired = false;
         stop = !s_bridge.terminating;
         s_bridge.terminating = true;
+        s_bridge.status.error = 0;
         s_bridge.status.state = BLE_BRIDGE_IDLE;
         power_bridge_disconnect(&s_bridge.input);
     }
     if (s_bridge.desired && handle != BLE_HS_CONN_HANDLE_NONE) {
         uint32_t last = s_bridge.input.valid_samples ? s_bridge.input.last_sample_ms : s_bridge.connected_ms;
         if (s_bridge.status.state == BLE_BRIDGE_ERROR || now - last >= BLE_BRIDGE_NO_SAMPLE_MS) {
+            if (s_bridge.status.state != BLE_BRIDGE_ERROR) {
+                failed(BLE_HS_ETIMEOUT);
+            }
             stop = !s_bridge.terminating;
             s_bridge.terminating = true;
             power_bridge_disconnect(&s_bridge.input);
@@ -350,10 +365,6 @@ void ble_power_bridge_tick(const bridge_config_t *calibration, uint32_t now)
             bridge_snapshot_t snapshot = power_bridge_snapshot(&s_bridge.input, calibration, now);
             s_bridge.status.state = snapshot.valid ? BLE_BRIDGE_VALID
                 : s_bridge.status.tested ? BLE_BRIDGE_STALE : BLE_BRIDGE_WAITING;
-            if (snapshot.valid) {
-                s_bridge.retry_until_ms = now + BLE_BRIDGE_RECONNECT_MS;
-                s_bridge.retry_delay_ms = BLE_BRIDGE_RETRY_MIN_MS;
-            }
         }
         if (!s_bridge.terminating && !s_bridge.procedure_pending
                 && s_bridge.phase > PHASE_NONE && s_bridge.phase < PHASE_READY) {
@@ -363,22 +374,14 @@ void ble_power_bridge_tick(const bridge_config_t *calibration, uint32_t now)
         }
     }
     if (s_bridge.desired && handle == BLE_HS_CONN_HANDLE_NONE && !connecting) {
-        if ((int32_t)(now - s_bridge.retry_until_ms) >= 0) {
-            s_bridge.desired = false;
-            s_bridge.status.state = BLE_BRIDGE_ERROR;
-        } else if ((int32_t)(now - s_bridge.retry_at_ms) >= 0) {
-            connect = true;
-            s_bridge.connecting = true;
-            s_bridge.terminating = false;
-            s_bridge.generation++;
-            s_bridge.service_start = s_bridge.service_end = s_bridge.measurement = 0;
-            s_bridge.descriptor_end = s_bridge.cccd = s_bridge.read_index = 0;
-            s_bridge.phase = PHASE_NONE;
-            s_bridge.status.state = BLE_BRIDGE_CONNECTING;
-            s_bridge.retry_at_ms = now + BLE_BRIDGE_CONNECT_MS + s_bridge.retry_delay_ms;
-        } else {
-            s_bridge.status.state = BLE_BRIDGE_RETRYING;
-        }
+        connect = true;
+        s_bridge.connecting = true;
+        s_bridge.terminating = false;
+        s_bridge.generation++;
+        s_bridge.service_start = s_bridge.service_end = s_bridge.measurement = 0;
+        s_bridge.descriptor_end = s_bridge.cccd = s_bridge.read_index = 0;
+        s_bridge.phase = PHASE_NONE;
+        s_bridge.status.state = BLE_BRIDGE_CONNECTING;
     }
     action = s_bridge;
     portEXIT_CRITICAL(&s_lock);
@@ -396,9 +399,8 @@ void ble_power_bridge_tick(const bridge_config_t *calibration, uint32_t now)
         if (rc) {
             portENTER_CRITICAL(&s_lock);
             s_bridge.connecting = false;
+            s_bridge.desired = false;
             failed(rc);
-            s_bridge.retry_at_ms = now + s_bridge.retry_delay_ms;
-            if (s_bridge.retry_delay_ms < BLE_BRIDGE_RETRY_MAX_MS) s_bridge.retry_delay_ms *= 2;
             portEXIT_CRITICAL(&s_lock);
         }
     } else if (phase != PHASE_NONE) {
@@ -459,18 +461,8 @@ void ble_power_bridge_radio_stop(void)
     terminate(handle, connecting);
 }
 
-void ble_power_bridge_portal_stop(void)
-{
-    portENTER_CRITICAL(&s_lock);
-    bool temporary = s_bridge.status.temporary
-        || (s_bridge.command_pending && s_bridge.command_temporary);
-    portEXIT_CRITICAL(&s_lock);
-    if (temporary) ble_power_bridge_request_stop();
-}
-
 void ble_power_bridge_host_reset(void)
 {
-    uint32_t now = clock_ms();
     portENTER_CRITICAL(&s_lock);
     s_bridge.generation++;
     s_bridge.handle = BLE_HS_CONN_HANDLE_NONE;
@@ -480,7 +472,8 @@ void ble_power_bridge_host_reset(void)
     s_bridge.status.connected = false;
     s_bridge.phase = PHASE_NONE;
     s_bridge.status.state = BLE_BRIDGE_ERROR;
-    s_bridge.retry_at_ms = now + BLE_BRIDGE_RETRY_MIN_MS;
+    s_bridge.status.error = BLE_HS_ETIMEOUT;
+    s_bridge.desired = false;
     power_bridge_disconnect(&s_bridge.input);
     portEXIT_CRITICAL(&s_lock);
 }

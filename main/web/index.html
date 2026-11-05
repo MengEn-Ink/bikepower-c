@@ -150,8 +150,8 @@
               <span class="bridge-entry-index">02</span>
               <div>
                 <span>真实功率来源</span>
-                <h3>选择一台功率计</h3>
-                <p>测试通过前，当前模拟输出保持不变。</p>
+                <h3>添加第一台功率计</h3>
+                <p>最多保存三台；测试通过前，当前模拟输出保持不变。</p>
               </div>
             </div>
             <button class="primary-btn" id="bridgeStartScanBtn" type="button">选择功率计</button>
@@ -160,35 +160,64 @@
           <div id="bridgeEditor" hidden>
             <section class="editor-section">
               <div class="section-title">
-                <div><span>02</span><h3>来源设备</h3></div>
-                <button class="text-btn" id="scanBtn" type="button">更换功率计</button>
+                <div><span>02</span><h3>功率计主备</h3></div>
+                <button class="text-btn" id="scanBtn" type="button">添加功率计</button>
               </div>
-              <div class="device-row">
-                <div class="device-monogram">P5</div>
+              <div class="bridge-source-status" aria-live="polite">
                 <div>
-                  <b id="selectedDeviceName">P505-4A29</b>
-                  <span id="selectedDeviceMeta">地址末尾 A4:29 · CPS</span>
+                  <span>配置来源</span>
+                  <b id="configuredSource">模拟输出</b>
                 </div>
-                <span class="inline-state" id="meterConnection">待测试</span>
+                <div>
+                  <span>实际来源</span>
+                  <b id="actualSource">模拟引擎</b>
+                </div>
+                <div>
+                  <span>下次尝试</span>
+                  <b id="nextBridgeAttempt">—</b>
+                </div>
+                <button class="secondary-btn" id="retryBridgeBtn" type="button">立即重试</button>
               </div>
-              <div class="capability-row" id="deviceCapabilities">
-                <span>功率</span><span>真实踏频</span>
-              </div>
-              <div class="identity-heading"><b>功率计设备信息</b><span>DIS 设备信息</span></div>
-              <dl class="identity-grid" id="meterInfo"></dl>
-              <label class="copy-check"><input id="copyIdentity" type="checkbox"><span><b>复制设备信息到开发板</b><small>保存后应用厂商、型号、序列号及版本；未提供的字段保留开发板原值。</small></span></label>
-              <div id="identityOptions" hidden>
-                <label class="wide-field">开发板广播名称
-                  <select id="identityNameSource">
-                    <option value="meter">使用功率计名称</option>
-                    <option value="board">保留开发板名称</option>
-                    <option value="custom">自定义名称</option>
-                  </select>
-                </label>
-                <label class="wide-field" id="customNameField" hidden>自定义名称<input id="customIdentityName" type="text" maxlength="23" placeholder="输入开发板广播名称"></label>
-                <div class="identity-heading"><b>保存后的开发板信息</b><span>预览</span></div>
-                <dl class="identity-grid" id="identityPreview"></dl>
-                <p class="identity-note">仅复制名称与设备信息，不复制蓝牙地址。骑行 App 中可能出现同名设备。</p>
+              <div class="bridge-device-list" id="bridgeDeviceList"></div>
+              <template id="bridgeDeviceTemplate">
+                <div class="bridge-device-item" data-device>
+                  <div class="bridge-device-name"><b></b><span></span></div>
+                  <span class="bridge-device-state"></span>
+                  <div class="bridge-device-actions">
+                    <button class="icon-btn" type="button" data-action="prefer" title="设为首选" aria-label="设为首选">↑</button>
+                    <button class="icon-btn" type="button" data-action="delete" title="删除功率计" aria-label="删除功率计">×</button>
+                  </div>
+                </div>
+              </template>
+              <p class="bridge-fallback" id="fallbackSimulationSummary" hidden></p>
+              <div id="selectedDeviceDetail">
+                <div class="device-row">
+                  <div class="device-monogram">PM</div>
+                  <div>
+                    <b id="selectedDeviceName">未选择功率计</b>
+                    <span id="selectedDeviceMeta">扫描并测试后可查看设备信息</span>
+                  </div>
+                  <span class="inline-state" id="meterConnection">待测试</span>
+                </div>
+                <div class="capability-row" id="deviceCapabilities">
+                  <span>功率</span><span>真实踏频</span>
+                </div>
+                <div class="identity-heading"><b>功率计设备信息</b><span>DIS 设备信息</span></div>
+                <dl class="identity-grid" id="meterInfo"></dl>
+                <label class="copy-check"><input id="copyIdentity" type="checkbox"><span><b>复制设备信息到开发板</b><small>仅可复制本次新增功率计；自动接管备选不会改写开发板身份。</small></span></label>
+                <div id="identityOptions" hidden>
+                  <label class="wide-field">开发板广播名称
+                    <select id="identityNameSource">
+                      <option value="meter">使用功率计名称</option>
+                      <option value="board">保留开发板名称</option>
+                      <option value="custom">自定义名称</option>
+                    </select>
+                  </label>
+                  <label class="wide-field" id="customNameField" hidden>自定义名称<input id="customIdentityName" type="text" maxlength="23" placeholder="输入开发板广播名称"></label>
+                  <div class="identity-heading"><b>保存后的开发板信息</b><span>预览</span></div>
+                  <dl class="identity-grid" id="identityPreview"></dl>
+                  <p class="identity-note">仅复制名称与设备信息，不复制蓝牙地址。骑行 App 中可能出现同名设备。</p>
+                </div>
               </div>
               <button class="quiet-danger" id="stopBridgeBtn" type="button">停止桥接</button>
             </section>
@@ -198,6 +227,7 @@
                 <div><span>03</span><h3>功率校正</h3></div>
                 <p>实际 <b id="actualCalibration">+12 W</b></p>
               </div>
+              <p class="shared-calibration-hint" id="sharedCalibrationHint">这组校正适用于全部已保存功率计</p>
               <div class="segmented" role="group" aria-label="校正模式">
                 <button type="button" data-calibration="raw">原值</button>
                 <button class="is-active" type="button" data-calibration="watts">按瓦数</button>
@@ -373,6 +403,11 @@
       </header>
       <div class="scan-state"><i></i><span id="scanStatus">正在扫描附近 CPS 功率计…</span><button id="rescanBtn" type="button">重新扫描</button></div>
       <div class="device-results" id="scanResults"></div>
+      <div class="replace-bridge-confirm" id="replaceBridgeConfirm" hidden>
+        <label for="replaceBridgeSlot">已保存三台功率计，请选择替换项</label>
+        <select id="replaceBridgeSlot"></select>
+        <button class="primary-btn" id="confirmBridgeReplaceBtn" type="button">确认替换</button>
+      </div>
       <p class="modal-note">测试不会替换当前输出；保存后才会应用新设备。</p>
     </section>
   </div>

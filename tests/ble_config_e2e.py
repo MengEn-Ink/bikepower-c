@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """BikePower Config Service 真机端到端测试。
 
-覆盖六组配置读取、事务错误路径、全量写入、NVS 重启持久化、GATT 重建，
+覆盖八组配置读取、事务错误路径、全量写入、NVS 重启持久化、GATT 重建，
 并在 finally 中恢复测试前的完整配置，避免污染开发板。
 """
 
@@ -26,13 +26,15 @@ CONFIG_GROUP_UUIDS = {
     "led": "7a5a0005-4c7a-4f2a-9b3e-6d1f4a8c0b21",
     "identity": "7a5a0006-4c7a-4f2a-9b3e-6d1f4a8c0b21",
     "bridge": "7a5a0009-4c7a-4f2a-9b3e-6d1f4a8c0b21",
+    "bridge_backup_1": "7a5a000a-4c7a-4f2a-9b3e-6d1f4a8c0b21",
+    "bridge_backup_2": "7a5a000b-4c7a-4f2a-9b3e-6d1f4a8c0b21",
 }
 CONFIG_CONTROL_UUID = "7a5a0007-4c7a-4f2a-9b3e-6d1f4a8c0b21"
 DIS_FIRMWARE_UUID = "00002a26-0000-1000-8000-00805f9b34fb"
 HR_SERVICE_UUID = "0000180d-0000-1000-8000-00805f9b34fb"
 
 PROTOCOL_VERSION = 1
-GROUP_MASK_ALL = 0x3F
+GROUP_MASK_ALL = 0xFF
 OP_BEGIN = 0x01
 OP_COMMIT = 0x02
 OP_CANCEL = 0x03
@@ -63,7 +65,7 @@ def parse_meta(data):
         "<BBBBIHH", data
     )
     require(protocol == PROTOCOL_VERSION, f"协议版本不支持: {protocol}")
-    require((group_mask & GROUP_MASK_ALL) == GROUP_MASK_ALL, "设备未提供全部六组配置")
+    require((group_mask & GROUP_MASK_ALL) == GROUP_MASK_ALL, "设备未提供全部八组配置")
     require(revision != 0, "revision 不得为 0")
     require(max_len >= 15, f"最大组长度异常: {max_len}")
     require(reserved == 0, f"Meta 保留字段非 0: {reserved}")
@@ -122,6 +124,18 @@ def validate_groups(groups):
     require(16 <= len(bridge) <= 47 and bridge[0] == PROTOCOL_VERSION, "Bridge 组格式错误")
     require(len(bridge) == 16 + bridge[15], "Bridge 名称长度不匹配")
     bridge[16:].decode("utf-8")
+    for key in ("bridge_backup_1", "bridge_backup_2"):
+        backup = groups[key]
+        require(10 <= len(backup) <= 41 and backup[0] == PROTOCOL_VERSION,
+                f"{key} 组格式错误")
+        require(backup[1] in (0, 1), f"{key} bound 非法")
+        require(len(backup) == 10 + backup[9], f"{key} 名称长度不匹配")
+        if backup[1]:
+            require(backup[2] in (0, 1), f"{key} 地址类型非法")
+            backup[10:].decode("utf-8")
+        else:
+            require(backup[2:9] == bytes(7) and backup[9] == 0,
+                    f"{key} 空槽位格式错误")
     core = groups["core"]
     require(len(core) == 15 and core[0] == PROTOCOL_VERSION, "Core 组格式错误")
     require(core[14] & 0x07, "broadcast_mask 不得为空")
@@ -156,7 +170,7 @@ def _toggle_u16(data, offset, minimum, maximum):
 
 
 def make_modified_groups(original):
-    """每一组至少修改一个合法字段，验证六组写入而不切换 profile。"""
+    """修改八组字段并保持设备槽位连续，验证完整事务而不切换 profile。"""
     modified = {key: bytearray(value) for key, value in original.items()}
     _toggle_u16(modified["core"], 1, 0, 2000)
     _toggle_u16(modified["profile"], 1, 40, 150)
@@ -169,6 +183,30 @@ def make_modified_groups(original):
     e2e_name = "BikePower-E2E" if current_name != "BikePower-E2E" else "BikePower-E2F"
     modified["identity"] = bytearray(encode_identity(e2e_name))
     _toggle_u16(modified["bridge"], 13, 500, 1500)
+    primary = modified["bridge"]
+    if not primary[2]:
+        name = b"E2E-Primary"
+        primary[2:10] = bytes([1, 0, 0, 0, 0, 0, 0, 0x70])
+        primary[15:] = bytes([len(name)]) + name
+    used_identities = {bytes(primary[3:10])}
+    for index, key in enumerate(("bridge_backup_1", "bridge_backup_2"), start=1):
+        backup = modified[key]
+        name = f"E2E-Backup-{index}".encode("utf-8")
+        if backup[1]:
+            if backup[10:] == name:
+                name = f"E2F-Backup-{index}".encode("utf-8")
+            backup[9:] = bytes([len(name)]) + name
+        else:
+            backup = bytearray(
+                bytes([PROTOCOL_VERSION, 1, index & 1])
+                + bytes([0, 0, 0, 0, 0, 0x70 + index])
+                + bytes([len(name)])
+                + name
+            )
+            while bytes(backup[2:9]) in used_identities:
+                backup[8] = backup[8] + 1
+            modified[key] = backup
+        used_identities.add(bytes(backup[2:9]))
     result = {key: bytes(value) for key, value in modified.items()}
     validate_groups(result)
     return result

@@ -23,7 +23,9 @@ void board_firmware_name(char *buffer, size_t size) { snprintf(buffer, size, "ge
 ble_bridge_status_t ble_power_bridge_status(const bridge_config_t *config, uint32_t now)
 {
     (void)now;
-    ble_bridge_status_t status = { .peer = *config };
+    ble_bridge_status_t status = {0};
+    const bridge_device_t *peer = power_bridge_device(config, 0);
+    if (peer) status.peer = *peer;
     for (size_t i = 0; i < DEVICE_IDENTITY_FIELD_COUNT; i++) {
         memset(status.identity.fields[i], '"', DEVICE_IDENTITY_TEXT_MAX - 1);
     }
@@ -62,6 +64,15 @@ int main(void)
     assert(object);
     cJSON_Delete(object);
     config_store_defaults(&s_config);
+    s_config.bridge.source = BRIDGE_SOURCE_REAL;
+    s_config.bridge.device_count = BRIDGE_DEVICE_MAX;
+    for (int i = 0; i < BRIDGE_DEVICE_MAX; i++) {
+        s_config.bridge.devices[i].bound = 1;
+        s_config.bridge.devices[i].addr_type = i & 1;
+        s_config.bridge.devices[i].addr[5] = (uint8_t)(0x11 + i);
+        snprintf(s_config.bridge.devices[i].name,
+                 sizeof(s_config.bridge.devices[i].name), "Meter-%d", i);
+    }
     memset(s_config.device_name, '"', sizeof(s_config.device_name) - 1);
     memset(s_config.custom_pacer_name, '\\', sizeof(s_config.custom_pacer_name) - 1);
     memset(s_config.run_custom_name, '"', sizeof(s_config.run_custom_name) - 1);
@@ -71,11 +82,37 @@ int main(void)
     cJSON *config = cJSON_GetObjectItemCaseSensitive(object, "config");
     assert(!strcmp(cJSON_GetObjectItemCaseSensitive(config, "device_name")->valuestring,
                    s_config.device_name));
+    assert(cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(
+               config, "bridge_devices")) == BRIDGE_DEVICE_MAX);
     assert(!strstr(s_body, "响应超限"));
     cJSON_Delete(object);
+    bridge_runtime_snapshot_t bridge = {
+        .state = BRIDGE_FAILOVER_FALLBACK_SIMULATION,
+        .active_slot = -1,
+        .candidate_slot = 1,
+        .next_attempt_ms = 42000,
+        .configured_real = true,
+        .actual_simulation = true,
+        .session = {
+            .state = BLE_BRIDGE_ERROR,
+            .peer = s_config.bridge.devices[1],
+        },
+    };
+    wifi_portal_sync_bridge(&bridge);
     h_api_runtime(&req);
     object = cJSON_Parse(s_body);
     assert(object && cJSON_GetObjectItemCaseSensitive(object, "bridge"));
+    cJSON *runtime = cJSON_GetObjectItemCaseSensitive(object, "bridge_runtime");
+    assert(runtime);
+    assert(!strcmp(cJSON_GetObjectItemCaseSensitive(runtime, "state")->valuestring,
+                   "fallback_simulation"));
+    assert(cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(
+        runtime, "configured_real")));
+    assert(!strcmp(cJSON_GetObjectItemCaseSensitive(
+        runtime, "actual_source")->valuestring, "simulation"));
+    assert(cJSON_GetObjectItemCaseSensitive(runtime, "active_slot")->valueint == -1);
+    assert(cJSON_GetObjectItemCaseSensitive(runtime, "candidate_slot")->valueint == 1);
+    assert(cJSON_GetObjectItemCaseSensitive(runtime, "next_attempt_ms")->valueint == 42000);
     cJSON_Delete(object);
     wifi_portal_set_done_callback(done);
     arm_deadline();

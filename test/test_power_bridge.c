@@ -7,6 +7,134 @@
 #include "ble_config_codec.h"
 #include "ble_payload_codec.h"
 
+static bridge_device_t peer(uint8_t type, uint8_t tail, const char *name)
+{
+    bridge_device_t item = { .bound = 1, .addr_type = type };
+    item.addr[5] = tail;
+    strncpy(item.name, name, sizeof(item.name) - 1);
+    return item;
+}
+
+static void multi_device_config_cases(void)
+{
+    bridge_config_t config;
+    power_bridge_config_defaults(&config);
+    config.source = BRIDGE_SOURCE_REAL;
+    config.device_count = 3;
+    config.devices[0] = peer(0, 0x11, "Primary power meter");
+    config.devices[1] = peer(1, 0x22, "Backup power meter");
+    config.devices[2] = peer(1, 0x22, "Duplicate");
+    assert(power_bridge_config_validate(&config));
+    assert(config.device_count == 2);
+    assert(config.devices[0].addr[5] == 0x11);
+    assert(config.devices[1].addr[5] == 0x22);
+
+    uint8_t wire[BRIDGE_WIRE_MAX_LEN];
+    size_t length = power_bridge_config_encode(&config, wire, sizeof(wire));
+    assert(length > 47 && wire[0] == BRIDGE_WIRE_VERSION);
+    bridge_config_t restored;
+    assert(power_bridge_config_decode(wire, length, &restored));
+    assert(power_bridge_config_equal(&config, &restored));
+
+    config.calibration_mode = BRIDGE_CALIBRATION_OFFSET;
+    config.watts = 200;
+    assert(power_bridge_correct(&config, 0) == 0);
+    config.calibration_mode = BRIDGE_CALIBRATION_PERCENT;
+    config.percent_x10 = 1500;
+    assert(power_bridge_correct(&config, 0) == 0);
+}
+
+static void legacy_wire_migration_cases(void)
+{
+    static const uint8_t legacy[] = {
+        BRIDGE_WIRE_LEGACY_VERSION,
+        BRIDGE_SOURCE_REAL,
+        1,
+        1,
+        1, 2, 3, 4, 5, 6,
+        BRIDGE_CALIBRATION_OFFSET,
+        0xe7, 0xff,
+        0xe8, 0x03,
+        6,
+        'L', 'e', 'g', 'a', 'c', 'y',
+    };
+    bridge_config_t restored;
+    assert(power_bridge_config_decode(legacy, sizeof(legacy), &restored));
+    assert(restored.source == BRIDGE_SOURCE_REAL);
+    assert(restored.device_count == 1);
+    assert(restored.devices[0].bound);
+    assert(restored.devices[0].addr_type == 1);
+    assert(memcmp(restored.devices[0].addr, legacy + 4, 6) == 0);
+    assert(strcmp(restored.devices[0].name, "Legacy") == 0);
+    assert(restored.calibration_mode == BRIDGE_CALIBRATION_OFFSET);
+    assert(restored.watts == -25);
+    assert(restored.percent_x10 == 1000);
+}
+
+static void ble_config_group_cases(void)
+{
+    assert(BLE_CONFIG_GROUP_COUNT == 8);
+    assert(BLE_CONFIG_GROUP_MASK_ALL == 0xff);
+
+    config_data_t source;
+    config_store_defaults(&source);
+    source.bridge.source = BRIDGE_SOURCE_REAL;
+    source.bridge.calibration_mode = BRIDGE_CALIBRATION_OFFSET;
+    source.bridge.watts = -25;
+    source.bridge.device_count = 3;
+    source.bridge.devices[0] = peer(0, 0x11, "Primary");
+    source.bridge.devices[1] = peer(1, 0x22, "Backup one");
+    source.bridge.devices[2] = peer(0, 0x33, "Backup two");
+
+    uint8_t payload[BLE_CONFIG_GROUP_MAX_LEN];
+    size_t primary_len = ble_config_encode_group(BLE_CONFIG_GROUP_BRIDGE,
+                                                  &source, payload, sizeof(payload));
+    assert(primary_len == 16 + strlen(source.bridge.devices[0].name));
+    assert(primary_len <= BLE_CONFIG_GROUP_MAX_LEN);
+    assert(payload[0] == BLE_CONFIG_PROTOCOL_VERSION);
+    assert(payload[11] == 0xe7 && payload[12] == 0xff);
+
+    config_data_t decoded = source;
+    decoded.bridge.devices[0] = peer(1, 0x44, "Old primary");
+    assert(ble_config_decode_group(BLE_CONFIG_GROUP_BRIDGE,
+                                   payload, primary_len, &decoded));
+    assert(bridge_device_equal(&decoded.bridge.devices[0],
+                               &source.bridge.devices[0]));
+    assert(strcmp(decoded.bridge.devices[1].name, "Backup one") == 0);
+    assert(strcmp(decoded.bridge.devices[2].name, "Backup two") == 0);
+
+    const ble_config_group_t backup_groups[] = {
+        BLE_CONFIG_GROUP_BRIDGE_BACKUP_1,
+        BLE_CONFIG_GROUP_BRIDGE_BACKUP_2,
+    };
+    for (int i = 0; i < 2; i++) {
+        int slot = i + 1;
+        size_t length = ble_config_encode_group(backup_groups[i], &source,
+                                                payload, sizeof(payload));
+        assert(length > 0 && length <= BLE_CONFIG_GROUP_MAX_LEN);
+        decoded.bridge.devices[slot] = peer(1, (uint8_t)(0x70 + slot), "Old");
+        assert(ble_config_decode_group(backup_groups[i], payload, length, &decoded));
+        assert(bridge_device_equal(&decoded.bridge.devices[slot],
+                                   &source.bridge.devices[slot]));
+        assert(strcmp(decoded.bridge.devices[slot].name,
+                      source.bridge.devices[slot].name) == 0);
+    }
+
+    config_data_t removal = source;
+    memset(&removal.bridge.devices[1], 0, sizeof(removal.bridge.devices[1]));
+    size_t removal_len = ble_config_encode_group(BLE_CONFIG_GROUP_BRIDGE_BACKUP_1,
+                                                  &removal, payload, sizeof(payload));
+    assert(removal_len > 0);
+    decoded = source;
+    assert(ble_config_decode_group(BLE_CONFIG_GROUP_BRIDGE_BACKUP_1,
+                                   payload, removal_len, &decoded));
+    assert(!decoded.bridge.devices[1].bound);
+    assert(decoded.bridge.devices[2].bound);
+    assert(config_store_validate(&decoded));
+    assert(decoded.bridge.device_count == 2);
+    assert(decoded.bridge.devices[1].addr[5] == 0x33);
+}
+
 static void output_cases(void)
 {
     uint8_t out[10] = {0};
@@ -58,7 +186,7 @@ static void runtime_cases(void)
 {
     bridge_config_t config;
     power_bridge_config_defaults(&config);
-    assert(config.source == BRIDGE_SOURCE_SIMULATED && !config.bound);
+    assert(config.source == BRIDGE_SOURCE_SIMULATED && config.device_count == 0);
     assert(power_bridge_correct(&config, 123) == 123);
     config.calibration_mode = BRIDGE_CALIBRATION_OFFSET;
     config.watts = 25;
@@ -133,28 +261,31 @@ static void config_cases(void)
     c.power = 333;
     c.power_float = 5;
     assert(config_store_migrate(&c));
-    assert(c.schema_ver == 13 && c.power == 333 && c.power_float == 50);
-    assert(c.bridge.source == BRIDGE_SOURCE_SIMULATED && !c.bridge.bound);
+    assert(c.schema_ver == 14 && c.power == 333 && c.power_float == 50);
+    assert(c.bridge.source == BRIDGE_SOURCE_SIMULATED && c.bridge.device_count == 0);
     c.schema_ver = 12;
     c.power_float = 17;
     assert(config_store_migrate(&c));
-    assert(c.schema_ver == 13 && c.power_float == 17);
+    assert(c.schema_ver == 14 && c.power_float == 17);
 
     c.bridge.source = BRIDGE_SOURCE_REAL;
-    c.bridge.bound = 1;
-    c.bridge.addr_type = 1;
-    for (int i = 0; i < 6; i++) c.bridge.addr[i] = (uint8_t)(i + 1);
+    c.bridge.device_count = 1;
+    c.bridge.devices[0].bound = 1;
+    c.bridge.devices[0].addr_type = 1;
+    for (int i = 0; i < 6; i++) c.bridge.devices[0].addr[i] = (uint8_t)(i + 1);
     c.bridge.calibration_mode = BRIDGE_CALIBRATION_OFFSET;
     c.bridge.watts = -25;
-    strcpy(c.bridge.name, "功率计 \"A\"");
+    strcpy(c.bridge.devices[0].name, "功率计 \"A\"");
     uint8_t wire[BLE_CONFIG_GROUP_MAX_LEN];
     size_t n = ble_config_encode_group(BLE_CONFIG_GROUP_BRIDGE, &c, wire, sizeof(wire));
-    assert(n == 16 + strlen(c.bridge.name));
+    assert(n == 16 + strlen(c.bridge.devices[0].name));
     uint8_t invalid_name[BRIDGE_WIRE_MAX_LEN];
     memcpy(invalid_name, wire, n);
     invalid_name[16] = 0xc0;
     bridge_config_t invalid_config;
-    assert(!power_bridge_config_decode(invalid_name, n, &invalid_config));
+    assert(power_bridge_config_decode(invalid_name, n, &invalid_config));
+    assert(invalid_config.device_count == 0);
+    assert(invalid_config.source == BRIDGE_SOURCE_SIMULATED);
     assert(wire[11] == 0xe7 && wire[12] == 0xff);
     config_data_t restored;
     config_store_defaults(&restored);
@@ -173,13 +304,17 @@ static void config_cases(void)
     assert(!power_engine_set_erg_target(&engine, 250));
     config_store_from_engine(&engine, &restored);
     assert(power_bridge_config_equal(&c.bridge, &restored.bridge));
-    c.bridge.bound = 0;
+    c.bridge.device_count = 0;
+    memset(c.bridge.devices, 0, sizeof(c.bridge.devices));
     assert(config_store_validate(&c));
     assert(c.bridge.source == BRIDGE_SOURCE_SIMULATED);
 }
 
 int main(void)
 {
+    multi_device_config_cases();
+    legacy_wire_migration_cases();
+    ble_config_group_cases();
     codec_cases();
     runtime_cases();
     config_cases();

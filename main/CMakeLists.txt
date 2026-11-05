@@ -4,6 +4,7 @@ idf_component_register(
          "ble_config_service.c"
          "ble_scanner.c"
          "ble_power_bridge.c"
+         "bridge_runtime.c"
          "app_state.c"
          "button.c"
          "led.c"

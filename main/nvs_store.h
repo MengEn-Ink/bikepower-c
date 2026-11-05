@@ -26,3 +26,7 @@ void nvs_store_load(power_engine_t *e);
  * 特殊行为：只负责当前快照写入，不主动清除领域层 dirty 标记。
  */
 bool nvs_store_save(power_engine_t *e);
+
+/* 最近成功设备仅用于下次启动排序，不属于配置 schema。 */
+bool nvs_store_load_bridge_recent(bridge_device_t *device);
+bool nvs_store_save_bridge_recent(const bridge_device_t *device);
