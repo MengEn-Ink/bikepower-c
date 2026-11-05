@@ -24,6 +24,7 @@ void wifi_portal_set_config_callback(wifi_portal_config_callback_t callback);
 /* 应用主循环发布一致快照，并完成已接受的配置事务。 */
 void wifi_portal_sync(const power_engine_t *engine);
 bool wifi_portal_revision_matches(uint32_t revision);
+/* 成功结果必须携带 applied；缺失时按保存失败处理，未知事务不更新配置。 */
 void wifi_portal_config_result(uint32_t transaction, uint8_t result,
     uint8_t restart_flags, const config_data_t *applied);
 

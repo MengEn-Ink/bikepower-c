@@ -103,6 +103,9 @@
       var data = path === "renew" ? {remaining_sec:Number(await response.text())}:await response.json();
       if (data.ok === false) throw new Error(data.error || "设备拒绝操作");
       return data;
+    } catch (e) {
+      if (body !== undefined && (!response || (response.ok && (!data || data.ok !== false)))) e.resultUnknown = true;
+      throw e;
     } finally { clearTimeout(timeout); }
   }
   function setBusy(value) {
@@ -593,7 +596,7 @@
     if (!state.loaded || state.busy) return;
     if (!close && (!validFields() || (state.draft.source === "bridge" && !bridgeReady()))) return;
     setBusy(true); state.message = "";
-    var transaction = 0;
+    var transaction = 0, confirmedFailure = false;
     try {
       var body = close ? {revision:state.revision}:Object.assign(encode(pendingConfig()),{revision:state.revision,copy_identity:state.copyIdentity});
       var accepted = await api(close ? "close-wifi":"config",body);
@@ -601,7 +604,10 @@
       for (var n = 0; n < 20; n++) {
         var runtime = await api("runtime");
         if (runtime.transaction === transaction && !runtime.pending) {
-          if (runtime.result !== 0) throw new Error("配置未保存（错误 " + runtime.result + "），草稿已保留");
+          if (runtime.result !== 0) {
+            confirmedFailure = true;
+            throw new Error("配置未保存（错误 " + runtime.result + "），草稿已保留");
+          }
           if (close) { state.closed = true; $("wifiClosed").hidden = false; closeModal("closeModal"); }
           else { await load(false); showToast("配置已保存并应用"); }
           return;
@@ -610,9 +616,11 @@
       }
       throw new Error("设备尚未确认保存，请稍后核实结果");
     } catch (e) {
-      state.message = transaction ? "保存结果待核实：" + e.message:e.message;
-      showToast(state.message);
+      var message = !confirmedFailure && (transaction || e.resultUnknown)
+        ? "保存结果待核实，请核对设备配置：" + e.message:e.message;
+      showToast(message);
       try { await load(true); } catch (_) {}
+      state.message = message; updateDirty();
     } finally { setBusy(false); }
   }
   $("saveBtn").addEventListener("click",function() { save(false); });

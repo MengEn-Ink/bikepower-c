@@ -9,7 +9,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main(source="test_portal_runtime.c"):
     candidates = [Path(os.environ.get("IDF_PATH", "")),
                   Path.home() / "esp/esp-idf-v5.5.4"]
     json_source = next((base / "components/json/cJSON/cJSON.c" for base in candidates
@@ -31,7 +31,7 @@ def main():
             "-fsanitize=address,undefined", "-ffunction-sections", "-fdata-sections",
             "-I", str(folder), "-I", str(ROOT / "test"), "-I", str(json_source.parent),
             "-I", str(ROOT / "components/bikepower_domain/include"),
-            str(ROOT / "test/test_portal_runtime.c"), str(json_source), *map(str, sources),
+            str(ROOT / "test" / source), str(json_source), *map(str, sources),
             "-lm", *dead_strip, "-o", str(binary),
         ], check=True)
         subprocess.run([str(binary)], check=True)

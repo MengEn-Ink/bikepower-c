@@ -200,6 +200,7 @@ void wifi_portal_config_result(uint32_t transaction, uint8_t result,
     uint32_t deadline = now_sec() + WIFI_PORTAL_REBOOT_DELAY_SEC;
     portENTER_CRITICAL(&s_lock);
     if (s_transaction.pending && s_transaction.id == transaction) {
+        if (result == BLE_CONFIG_RESULT_SUCCESS && !applied) result = BLE_CONFIG_RESULT_SAVE_FAILED;
         if (result == BLE_CONFIG_RESULT_SUCCESS && applied) {
             s_config = *applied;
             s_revision++;
@@ -388,7 +389,9 @@ static esp_err_t submit_config(httpd_req_t *req, bool close_wifi)
     portEXIT_CRITICAL(&s_lock);
     cJSON *revision_field = cJSON_GetObjectItemCaseSensitive(body, "revision");
     uint32_t revision = cJSON_IsNumber(revision_field) && revision_field->valuedouble > 0
-        && revision_field->valuedouble <= UINT32_MAX ? (uint32_t)revision_field->valuedouble : 0;
+        && revision_field->valuedouble <= UINT32_MAX
+        && revision_field->valuedouble == (double)(uint32_t)revision_field->valuedouble
+        ? (uint32_t)revision_field->valuedouble : 0;
     config_data_t requested;
     bool ok = !busy && revision && wifi_portal_revision_matches(revision)
         && merge_config(body, &base, &requested);
