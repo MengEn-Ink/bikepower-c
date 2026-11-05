@@ -29,5 +29,5 @@ CPU 以 `10000 × (Δtotal - Δidle) / Δtotal` 得到万分比；首窗口、�
 
 - [x] 同步 `CHANGELOG.md`、`PROGRESS.md`、技术参考、用户手册、BLE Wiki、规则结构与文档索引。
 - [x] 运行 `python3 scripts/tools/quality_gate.py` 与双板构建，记录资源静态容量和实测缺口；构建未留同配置基线，未声称精确增量。
-- [ ] 按固件、Pages、文档分批新建中文 commit 并立即 push；检查 GitHub CI 和 Pages 公网入口。
+- [x] 按固件、Pages、文档分批新建中文 commit 并立即 push；检查 GitHub CI 和 Pages 公网入口。
 - [x] 不创建固件 tag/Release；当前正式刷写目录不能冒充已含遥测功能。

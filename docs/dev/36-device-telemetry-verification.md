@@ -65,4 +65,9 @@ python3 tests/ble_telemetry_e2e.py --seconds 30 --report tests/reports/telemetry
 
 - `6eacfb5`：真实采样、独立 GATT 服务及协议测试，已推送 main。
 - `50ca3c8`：设备状态 Pages、手机直链及浏览器回归，已推送 main。
-- 文档批同步协议、手册、构建结果和实物边界。最终 CI/Pages 与公网验证在流水线结束后补录。
+- `6b34641`：协议、手册、构建结果和实物边界，已推送 main；手机与离线手册均使用公网状态入口。
+- 该源码的 [CI 42039755165](https://github.com/MengEn-Ink/bikepower-c/actions/runs/42039755165) 成功，包含网页生命周期/DOM、完整浏览器矩阵与 quick 操作门禁。手机目录绝对入口修改后的本地浏览器矩阵也再次通过。
+- Pages 必须核对 checkout 日志中的实际源码提交，不能只依据部署任务的 `headSha` 或显示版本号；多批提交时它们可能对应不同提交。公网内容需包含状态路由，并逐字节核对三个实际 JS/CSS 资源。
+- [Pages 42040464349](https://github.com/MengEn-Ink/bikepower-c/actions/runs/42040464349) 成功，checkout 明确为 `6b34641`。公网站点的状态导航和手机入口正确，`device-telemetry.js`、`device-status.js`、`device-status.css` 均与本地逐字节一致。
+- 公网真实 HTTP 浏览器验证通过：390px 从手机目录进入状态页；390/1280px 浅深主题均验证未连接缺失值、CPU 独立窗口、关闭及主题切换，零 JS 异常、无横向溢出。手机浅色和桌面深色截图已复核。此验证没有注入任何遥测数据。
+- 最后仅补录本计划与验证记录，不改变已验证的固件或 Pages 代码。候选真机仍为 `NOT_RUN`，未创建 tag/Release。
