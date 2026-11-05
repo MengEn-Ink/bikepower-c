@@ -28,7 +28,7 @@ NimBLE host callout 每秒查询连接、RSSI、MTU、interval、latency 与 tim
 
 ## 网页行为
 
-入口 `#/device-status`，共享 `singleDevice` 连接。常驻栏每秒显示空闲堆、CPU 忙碌和板端信号；内存/CPU 以百分比和占用条表达，蓝牙保持 dBm/ms。点击指标打开非模态窗口，支持独立暂停、折叠、放大、拖动；桌面可调整大小，小屏自适应。页面与窗口不会各自建立连接。
+入口 `#/device-status`，共享 `singleDevice` 连接。常驻数值固定在右上角主题切换按钮左侧，以小字显示空闲堆 KiB 与空闲占比、CPU 忙碌与空闲占比、板端信号 dBm 与连接间隔 ms。趋势和 CPU 占用条保留在详情内。点击指标打开非模态窗口，支持独立暂停、折叠、放大、拖动；桌面可调整大小，小屏自适应。页面与窗口不会各自建立连接。
 
 最多保留 301 份完整快照和八组在途序号；严格校验长度、版本、数值与同序组合，丢弃过时或重复记录。boot 改变清历史；后台暂停停更判断，恢复清在途窗口；数据间隔超过三个周期不连线。暂停只冻结画面，释放调用现有全工具/跨标签页交接。旧固件缺少服务时提示候选升级，不显示示例数值。
 
@@ -71,3 +71,4 @@ python3 tests/ble_telemetry_e2e.py --seconds 30 --report tests/reports/telemetry
 - [Pages 42040464349](https://github.com/MengEn-Ink/bikepower-c/actions/runs/42040464349) 成功，checkout 明确为 `6b34641`。公网站点的状态导航和手机入口正确，`device-telemetry.js`、`device-status.js`、`device-status.css` 均与本地逐字节一致。
 - 公网真实 HTTP 浏览器验证通过：390px 从手机目录进入状态页；390/1280px 浅深主题均验证未连接缺失值、CPU 独立窗口、关闭及主题切换，零 JS 异常、无横向溢出。手机浅色和桌面深色截图已复核。此验证没有注入任何遥测数据。
 - 最后仅补录本计划与验证记录，不改变已验证的固件或 Pages 代码。候选真机仍为 `NOT_RUN`，未创建 tag/Release。
+- 常驻栏布局追加调整：指标移入右上角主题按钮左侧，手机状态页保留紧凑顶栏。`npm test --prefix tests/web-flash` 与 `npm run browser --prefix tests/web-flash` 通过；390/1280px 浅深主题验证同排位置、具体余量与百分比、点击详情、暂停恢复、断开清空与零横向溢出。手机浅色、桌面深色截图已复核，界面 detector 返回空列表；本次只修改 Pages 布局。
