@@ -115,9 +115,9 @@ Add-MpPreference -ExclusionPath "$env:USERPROFILE\.espressif"
 
 ## 三、编译速度优化
 
-### 3.1 ccache（最有效，已启用）
+### 3.1 ccache
 
-`sdkconfig.defaults` 已启用 `CONFIG_CCACHE_ENABLE=y`。项目脚本（`dev.ps1`、`build_all.ps1`）自动将 `CCACHE_DIR` 重定向到项目目录 `.ccache/`，避免沙箱限制和跨项目缓存污染。
+ccache 是构建工具设置，不是 sdkconfig 字段。安装 ccache 后，通过 ESP-IDF 的 `idf.py --ccache build` 启用；需要项目独立缓存时设置 `$env:CCACHE_DIR = "$PWD\.ccache"`。`dev.ps1 stats` 会读取项目 `.ccache/`，普通构建不会自动重定向缓存。下表为历史测量，实际速度取决于本机与缓存状态。
 
 - 首次编译：无加速（填缓存），命中率约 42%
 - fullclean + 重建：提速约 48%（实测 5:00 → 2:37），命中率约 63%
