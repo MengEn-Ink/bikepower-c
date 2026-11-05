@@ -30,13 +30,6 @@ typedef struct {
 board_type_t board_detect(void);
 
 /**
- * 获取当前板型（检测后的缓存值）。
- * 无参数。
- * 返回值：当前板型。
- */
-board_type_t board_get_type(void);
-
-/**
  * 获取当前板型的描述。
  * 无参数。
  * 返回值：指向当前板型描述表项的只读指针。

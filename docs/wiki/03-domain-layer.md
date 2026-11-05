@@ -313,9 +313,9 @@ LED 模式与颜色映射纯逻辑：
 - 骑行/跑步不同状态的默认 LED 模式
 - 颜色值（RGB）与模式关联
 
-### device_template.c / device_analysis.c
+### device_template.h / device_analysis.c
 
-- `device_template_t`：设备信息模板数据结构、校验
+- `device_template_t`：扫描、上游 DIS 读取与设备身份复制共用的数据结构；不提供旧门户模板库的增删和 JSON 接口
 - `device_analysis`：外部 BLE 设备运动数据解析（CPS/HRS/CSC/FTMS/RSC 通知解析）
 
 ### domain_rng.c

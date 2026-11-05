@@ -68,11 +68,6 @@ board_type_t board_detect(void)
     return s_board;
 }
 
-board_type_t board_get_type(void)
-{
-    return s_board;
-}
-
 const board_desc_t *board_get_desc(void)
 {
     return &s_board_desc[s_board];

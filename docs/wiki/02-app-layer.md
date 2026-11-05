@@ -255,7 +255,6 @@ static const board_desc_t s_board_desc[BOARD_TYPE_COUNT] = {
 | 函数 | 说明 |
 |------|------|
 | `board_detect()` | 执行板型检测（启动时调用一次） |
-| `board_get_type()` | 获取检测到的板型 |
 | `board_get_desc()` | 获取当前板型描述符 |
 | `board_firmware_name(buf, len)` | 生成固件名：`板型-v版本-stable稳定版-fix修复版-gGitID` |
 

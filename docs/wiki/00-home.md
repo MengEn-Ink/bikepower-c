@@ -83,7 +83,7 @@ bikepower-c/
 │   ├── button_logic.c              # 按钮语义纯逻辑
 │   ├── button_debounce.c           # 去抖与长按节拍纯逻辑
 │   ├── led_pattern.c               # LED 模式/颜色映射纯逻辑
-│   ├── device_template.c           # 设备信息模板领域逻辑
+│   ├── device_identity.c           # 设备身份复制与回退（共用设备信息结构）
 │   ├── device_analysis.c           # 外部设备运动数据分析
 │   ├── domain_rng.c                # 领域层随机数
 │   └── include/                    # 公开头文件 + domain_config.h

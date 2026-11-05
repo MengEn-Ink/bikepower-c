@@ -182,7 +182,7 @@ app_main.c
 | [button_logic.c](../../components/bikepower_domain/button_logic.c) | 按钮按压语义纯逻辑（短按/长按/自动重复/确认窗口） |
 | [button_debounce.c](../../components/bikepower_domain/button_debounce.c) | 去抖与长按节拍纯逻辑 |
 | [led_pattern.c](../../components/bikepower_domain/led_pattern.c) | LED 模式（慢闪/快闪/常亮/熄灭/WiFi）与颜色映射纯逻辑 |
-| [device_template.c](../../components/bikepower_domain/device_template.c) | 设备信息模板数据结构、默认值、校验 |
+| [device_template.h](../../components/bikepower_domain/include/device_template.h) | 扫描与 DIS 身份复制共用的数据结构；模板库由 Pages 管理 |
 | [device_analysis.c](../../components/bikepower_domain/device_analysis.c) | 外部 BLE 设备运动数据解析与能力摘要 |
 | [domain_rng.c](../../components/bikepower_domain/domain_rng.c) | 领域层随机数（不直接用 esp_random，保持 host 可测） |
 | `include/` | 公开头文件 + `domain_config.h`（领域层常量中心） |
