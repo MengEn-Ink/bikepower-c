@@ -1,5 +1,15 @@
 # 测试脚本使用说明
 
+## BLE 标准服务与兼容诊断
+
+- `python3 tests/test_ble_compatibility.py`：生产双 profile GATT 回调 ASan/UBSan、15 项快照/规则/报告校验及实际 Pages 浏览器回归，已接入总质量门禁。
+- `python3 tests/test_ble_standard_contract.py`：生产 FTMS 固定 Feature/范围、控制点容量与事务、状态通知、GAP 生命周期、跨特征 indication FIFO 的预留/确认/失败/旧 token 隔离，以及跑步 7 种通知掩码 ASan/UBSan；广播覆盖双模式 × 7 掩码 × 3 名称，校验 31 字节与 UTF-8 边界。
+- 页面回归覆盖快照固定、读失败和权限未知、报告导入导出、注入防护、双主题对比度、全部标签连接释放、在途 GATT、刷新暂停及场景改变后实测失效。
+- `python3 tests/ble_selftest.py --profile cycling`：实际读取 CPS Feature `08001000`、Sensor Location `05`、CSC Feature `0200`、FTMS 目标范围及标准属性。跑步使用 `--profile running --control` 验证目标速度与暂停/恢复；控制前必须订阅并 Request Control，Stop/Pause 需携带控制信息。
+- 私有广播、目标端握手、骑鬥与码表连续连接及长期数据稳定仍需原生采集和目标实测，未执行时记录 `NOT_RUN`。
+
+实现与本轮证据见 [BLE 兼容性诊断](../docs/dev/32-ble-compatibility-diagnosis.md)。
+
 ## 三设备桥接主备回归
 
 - `make -C test run`：领域层、三设备 wire、0W 校正与纯 C 主备状态机。

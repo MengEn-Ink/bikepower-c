@@ -94,9 +94,12 @@ bikepower-c/
 ├── tools/web/
 │   ├── ble-monitor.html      — Pages 工具台与移动使用手册
 │   ├── flash-session.js      — 串口刷写生命周期
+│   ├── ble-compatibility.js  — 固定快照、规则与报告
+│   ├── ble-compatibility-ui.js/.css — 诊断表单、连接交接与双主题
 │   └── pages-experience.css/.js — 功能分区、动效、按钮教学与页面更新信息
 ├── tests/
 │   ├── ble_selftest.py       — bleak 五服务 + FTMS ERG 自测
+│   ├── test_ble_standard_contract.py — 生产 FTMS/广播/控制事务 ASan/UBSan
 │   ├── stage3_conn_test.py   — 连接事件驱动状态机验证
 │   ├── stage5_portal_test.py — 配网门户 /api/xxx JSON 路由自测
 │   ├── check_portal_js.py    — TC-3a：对 main/web/app.js 跑 node --check

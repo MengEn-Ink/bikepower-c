@@ -86,9 +86,10 @@
 - `BLE-21`：未支持的 OpCode 必须返回 `Response Code + Not Supported`，禁止静默吞掉。
 - `BLE-22`：`SetTargetPower` 只负责解析目标功率并交给应用层回调，禁止在控制点回调内直接改动复杂状态机。
 - `BLE-23`：running profile 的 `StartResume`、`StopPause`、`Reset` 必须先确认应用事件已被可靠接收；未接收返回 `Operation Failed(0x04)` 且不得提前更新 FTMS Status，接收成功后才更新状态并返回 Success。
-- `BLE-23c`：Fitness Machine Status OpCode 与 Control Point 独立；Reset=`0x01`、Stopped/Paused by User=`0x02`、Started/Resumed by User=`0x03`，这三类通知必须为 1 字节。
+- `BLE-23c`：Fitness Machine Status OpCode 与 Control Point 独立；Reset=`0x01`、Started/Resumed by User=`0x04` 为 1 字节；Stopped/Paused by User=`0x02` 为 2 字节，第二字节为 Stop=`0x01` 或 Pause=`0x02`。
 - `BLE-23a`：跑步 Stop 后速度、步频、步幅归零且距离/用时冻结；Start 后恢复累计；Reset 清零累计但保持 Reset 前的运行/暂停态。
 - `BLE-23b`：ERG 目标、激活状态和运行时模式不得覆盖 `base_power` 或设置配置 dirty；NVS 导出时 ERG 必须规范化为 steady。
+- `BLE-23d`：FTMS 与配置响应共用有界 indication 队列；副作用前预留位置，异步提交持有独立 token；仅 EDONE 推进，status=0 不释放，失败终止连接，断连/复位/stop 清空。Feature 不随运行时来源变化；跑步 RSC 的发送条件须与 GATT 注册条件一致。
 
 ## 回调与中断安全
 

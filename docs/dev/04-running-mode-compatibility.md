@@ -70,7 +70,7 @@ GAP 广播包建议包含：
 
 ### 3.3 是否需要 Service Data
 
-首版不需要在广播包放 Service Data。Zwift/MyWhoosh 的跑步配速需要连接后订阅标准 GATT 特征，广播阶段只要能暴露正确服务 UUID 和可识别名称即可。Service Data 会挤占 31 字节预算，也会增加 App 兼容不确定性。
+当前广播已增加 FTMS Service Data，用于连接前识别跑步机类型；压缩主广播名称至最多 11 字节，并在扫描响应保留完整名。跑步配速仍通过连接后的标准 GATT 通知获取；不能以字段补齐代替 Zwift/MyWhoosh 实测。
 
 ---
 

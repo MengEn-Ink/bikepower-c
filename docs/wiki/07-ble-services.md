@@ -51,13 +51,17 @@ BikePower C 采用 NimBLE host 实现蓝牙 peripheral 角色，暴露标准蓝�
 
 | 服务 | UUID | 特征 | 属性 |
 |------|------|------|------|
-| Cycling Power Service (CPS) | `0x1818` | Power Measurement (`0x2A63`) | Read + Notify |
-| Heart Rate Service (HRS) | `0x180D` | Heart Rate Measurement (`0x2A37`) | Read + Notify |
-| Cycling Speed and Cadence (CSC) | `0x1816` | CSC Measurement (`0x2A5B`) | Read + Notify |
+| Cycling Power Service (CPS) | `0x1818` | Power Measurement (`0x2A63`) | Notify |
+| | | Cycling Power Feature (`0x2A65`) | Read，`08 00 10 00`：曲柄、非分布式总功率 |
+| | | Sensor Location (`0x2A5D`) | Read，`05`：左曲柄 |
+| Heart Rate Service (HRS) | `0x180D` | Heart Rate Measurement (`0x2A37`) | Notify |
+| Cycling Speed and Cadence (CSC) | `0x1816` | CSC Measurement (`0x2A5B`) | Notify |
+| | | CSC Feature (`0x2A5C`) | Read，`02 00`：曲柄转数 |
 | Fitness Machine Service (FTMS) | `0x1826` | Feature (`0x2ACC`) | Read |
-| | | Indoor Bike Data (`0x2AD2`) | Read + Notify |
-| | | Control Point (`0x2AD9`) | Write + Write No Rsp + Indicate |
-| | | Status (`0x2ADA`) | Read + Notify |
+| | | Supported Power Range (`0x2AD8`) | Read，0–2000W，增量 1W |
+| | | Indoor Bike Data (`0x2AD2`) | Notify |
+| | | Control Point (`0x2AD9`) | Write + Indicate |
+| | | Status (`0x2ADA`) | Notify |
 | Device Information Service (DIS) | `0x180A` | Manufacturer Name (`0x2A29`) | Read |
 | | | Model Number (`0x2A24`) | Read |
 | | | Firmware Revision (`0x2A26`) | Read |
@@ -66,15 +70,18 @@ BikePower C 采用 NimBLE host 实现蓝牙 peripheral 角色，暴露标准蓝�
 
 | 服务 | UUID | 特征 | 属性 |
 |------|------|------|------|
-| Running Speed and Cadence (RSC) | `0x1814` | RSC Measurement (`0x2A53`) | Read + Notify |
+| Running Speed and Cadence (RSC) | `0x1814` | RSC Measurement (`0x2A53`) | Notify |
 | | | RSC Feature (`0x2A54`) | Read |
 | | | Sensor Location (`0x2A5D`) | Read |
-| Heart Rate Service (HRS) | `0x180D` | Heart Rate Measurement (`0x2A37`) | Read + Notify |
+| Heart Rate Service (HRS) | `0x180D` | Heart Rate Measurement (`0x2A37`) | Notify |
 | Fitness Machine Service (FTMS) | `0x1826` | Feature (`0x2ACC`) | Read |
-| | | Treadmill Data (`0x2ACD`) | Read + Notify |
-| | | Control Point (`0x2AD9`) | Write + Write No Rsp + Indicate |
-| | | Status (`0x2ADA`) | Read + Notify |
+| | | Supported Speed Range (`0x2AD4`) | Read，3–25km/h，增量 0.01km/h |
+| | | Treadmill Data (`0x2ACD`) | Notify |
+| | | Control Point (`0x2AD9`) | Write + Indicate |
+| | | Status (`0x2ADA`) | Notify |
 | Device Information Service (DIS) | `0x180A` | （同上） | Read |
+
+新增 CPS/CSC 特征后，客户端可能保留旧 GATT 缓存，需删除旧配对后重新发现。骑鬥、码表等目标适配由 Pages「设备比对」采集固定快照与人工实测闭环，见 [兼容性诊断](../dev/32-ble-compatibility-diagnosis.md)；标准回归通过不替代目标端连接验收。
 
 ---
 
@@ -235,29 +242,38 @@ FTMS Treadmill 的 Total Distance 单位保持米；不要套用 RSC Measurement
 
 **骑行模式**：
 ```c
-{ 0x02, 0x40, 0x00, 0x00,   // Cadence + Power Measurement
+{ 0x02, 0x44, 0x00, 0x00,   // 踏频、心率、功率测量
   0x08, 0x00, 0x00, 0x00 }  // Target Power Setting
 ```
 
+两套 Feature 都保持固定，不随模拟/桥接切换变化；骑行心率能力对应桥接 Indoor Bike Data 的心率字段。真实功率桥接期间 Set Target Power 返回 Operation Failed，恢复模拟后可控制内置 ERG。
+
 **跑步模式**：
 ```c
-{ 0x04, 0x05, 0x00, 0x00,   // Distance + Heart Rate + Elapsed Time
-  0x02, 0x00, 0x00, 0x00 }  // Target Speed Setting
+{ 0x04, 0x14, 0x00, 0x00,
+  0x01, 0x00, 0x00, 0x00 }
 ```
 
-### FTMS Status（当前状态均为 1 字节）
+### FTMS Status（按状态决定长度）
 
 | 偏移 | 长度 | 字段 | 值/说明 |
 |------|------|------|---------|
-| 0 | 1 | Op Code | `0x01`=Reset，`0x02`=Stopped/Paused by User，`0x03`=Started/Resumed by User |
+| 0 | 1 | Op Code | `0x01`=Reset，`0x02`=Stopped/Paused by User，`0x04`=Started/Resumed by User |
+| 1 | 1 | Control Information | 仅 `0x02` 状态存在；`0x01`=Stop，`0x02`=Pause |
 
-Fitness Machine Status 和 Control Point 是两套独立的 OpCode 编号。当前使用的三种 Status 不带参数，因此通知长度严格为 1 字节；未来支持带参数的 Status 时必须按对应格式编码，不得固定补零。
+Fitness Machine Status 和 Control Point 是两套独立编号。Reset/Started 为 1 字节，Stopped/Paused 为 2 字节，不得固定补零。
 
 ---
 
 ## FTMS 控制点协议
 
 FTMS Control Point 采用写+指示（Indication）模式，客户端写命令后服务端通过 Indication 返回结果。
+
+客户端必须先订阅 indication，再 Request Control，其他控制需已获权；过程未确认时拒绝下一次写入（ATT `0x80`），未订阅返回 ATT `0x81`，未获权返回结果 `0x05`。空包、过长及非法长度被拒绝；Stop/Pause 命令需携带一字节控制信息。断开、协议栈复位和响应发送失败会释放控制权与事务。桥接不接受 ERG 目标。
+
+FTMS 与配置服务共享 `BLE_INDICATION_QUEUE_SIZE=8` 的静态 FIFO；操作前预留响应位置，异步配置 COMMIT 保留自己的 token。满队列返回 ATT 资源不足并禁止执行新操作。NOTIFY_TX `status=0` 仅代表发送，`BLE_HS_EDONE` 才释放在途条目；回调不递归发送，周期通知或后续入队推进队列。失败后终止连接，禁止在未知 ATT 状态下发送下一条；断连、复位及 stop 清理条目，旧 COMMIT 结果不能填入新连接的响应位置。发送失败后已接收的业务操作不会回滚。
+
+当前控制点未强制加密，不能宣称完整满足 FTMS Table 4.1 的 Encryption 要求；配对策略需另行设计并实测。
 
 ### 支持的 OpCode
 
@@ -319,13 +335,15 @@ FTMS Control Point 采用写+指示（Indication）模式，客户端写命令�
 ### 设备名处理
 
 - 设备名存于 `g_device_name[]`（最多 `DEVICE_NAME_MAX-1` 个字符）
-- 长度 ≤ `BLE_ADV_NAME_MAX_LEN`（18 字节）时完整放入广播包
-- 超过 18 字节时截断放入广播包，完整名放入 Scan Response
+- 长度 ≤ `BLE_ADV_NAME_MAX_LEN`（11 字节）时完整放入广播包
+- 超过 11 字节时按 UTF-8 边界截断，完整名放入 Scan Response
 - 通过 `ble_bikepower_set_device_name()` 设置，`ble_bikepower_refresh_device_name()` 热更新（已连接时不重启广播）
 
 ### 连接事件处理
 
-`gap_event_cb()` 处理三类 GAP 事件：
+主广播使用部分服务列表，FTMS 存在时带 5 字节 Service Data：`26 18 01 20 00`（骑行）或 `26 18 01 01 00`（跑步）。其 AD 总长 7 字节，主广播和扫描响应分别不超过 31 字节。
+
+`gap_event_cb()` 处理连接、广播、订阅与 indication 完成事件：
 
 | 事件 | 处理 |
 |------|------|

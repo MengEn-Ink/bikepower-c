@@ -1613,6 +1613,16 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
     </ol>
     <div class="guide-note">App 对 RSC 与 FTMS 的支持不同。若只有心率被识别，先确认 App 是否支持跑步传感器，再核对运动类型和广播项。</div>
   </section>
+  <section class="mg-sec" aria-labelledby="mg-compat-title">
+    <h2 class="mg-h" id="mg-compat-title">连接兼容性诊断</h2>
+    <p class="guide-intro">骑鬥或码表搜不到、连不上、连接后无数据时，先确认支持 BLE、搜索角色与当前运动模式。开发板只允许一个下游连接，先关闭占用它的网页或 App。</p>
+    <ol class="guide-list">
+      <li>电脑 Chrome / Edge 打开本站「设备比对」，填写目标、版本、系统和失败阶段，添加开发板与同一目标下正常的参考设备。</li>
+      <li>等待通知后冻结快照、分析服务与能力差异。读取失败和未授权会显示为未知；名称复制不会复制 GATT 或私有握手。</li>
+      <li>点击「释放连接并开始实测」，本站所有标签页暂停连接，刷新仍暂停。到目标端验证，再记录并导出诊断 JSON。</li>
+      <li>建议连续连接 5 次、稳定收数 30 分钟；关闭目标端连接后，结束实测并手动重新连接网页。</li>
+    </ol>
+  </section>
 
   <section class="mg-sec" aria-labelledby="mg-check-title">
     <h2 class="mg-h" id="mg-check-title"><span>06</span>拿起实物，逐项验收</h2>

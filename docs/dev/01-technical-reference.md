@@ -278,8 +278,10 @@ GAP 事件回调为 `gap_event_cb()`：
 对应特征 UUID 在 `bikepower_config.h` 中定义：
 
 - `POWER_CHAR_UUID = 0x2A63`
+- `POWER_FEATURE_CHAR_UUID = 0x2A65`
 - `HR_CHAR_UUID = 0x2A37`
 - `CSC_CHAR_UUID = 0x2A5B`
+- `CSC_FEATURE_CHAR_UUID = 0x2A5C`
 - `FTMS_FEATURE_CHAR_UUID = 0x2ACC`
 - `FTMS_CONTROL_POINT_CHAR_UUID = 0x2AD9`
 - `FTMS_POWER_CHAR_UUID = 0x2AD2`
@@ -287,6 +289,14 @@ GAP 事件回调为 `gap_event_cb()`：
 - `DIS_MANUFACTURER_CHAR_UUID = 0x2A29`
 - `DIS_MODEL_CHAR_UUID = 0x2A24`
 - `DIS_FIRMWARE_CHAR_UUID = 0x2A26`
+
+CPS/CSC Measurement 仅使用 Notify。CPS Feature 固定四字节 `08 00 10 00`（曲柄转数、非分布式总功率），CPS Sensor Location 复用 `SENSOR_LOCATION_CHAR_UUID=0x2A5D`，值 `05`（左曲柄）；CSC Feature 固定两字节 `02 00`（曲柄转数）。不声明未实现的轮速、校准或控制能力。`test_ble_cycling_services.py` 验证双 profile GATT 与读取回调，真机脚本 `ble_selftest.py` 验证实际读值和属性。服务变化后需清除客户端旧缓存，第三方 App/码表仍需实测。
+
+FTMS 跑步 Feature 为 `0414000001000000`，对应距离、心率、用时与目标速度；目标速度范围 `2AD4` 为 3–25km/h、增量 0.01km/h，目标功率范围 `2AD8` 为 0–2000W、增量 1W。HRS/RSC/FTMS 数据及状态使用 Notify，FTMS 控制点使用 Write + Indicate。主广播使用部分 UUID 列表，FTMS Service Data 声明可用状态与骑行/跑步机类型，名字最多 11 字节且按 UTF-8 截断。详见 [补测记录](33-ble-standard-test-plan.md)。
+
+骑行 FTMS Feature 固定为 `0244000008000000`，声明踏频、心率、功率和目标功率能力；模拟/桥接切换不改变能力位。桥接暂不可控时目标功率操作返回 Operation Failed。FTMS/配置 indication 共享 8 条静态预留队列，操作前预留、确认后推进，失败终止连接，旧 token 不跨连接复用。跑步 RSC 在功率位或踏频位任一启用时发送完整必需字段，与服务注册一致。专项证据见 [兼容复核](34-ble-compatibility-recheck.md)。
+
+Pages 兼容诊断保存固定双设备快照、授权范围、读失败、最近 120 条原始通知和场景；区分标准问题、候选原因与采集未知项。同源标签页及刷新共享连接暂停状态，在途连接完成也释放，结束实测后由用户手动连接。详见 [实现与验证](32-ble-compatibility-diagnosis.md)。
 
 DIS 读取内容来自编译期常量：
 
@@ -333,12 +343,12 @@ DIS 读取内容来自编译期常量：
 - `RequestControl`：直接 success
 - `SetTargetPower`：解析 `<h` 16-bit 功率值，调用 `g_erg_cb(target)`
 - `SetTargetSpeed`：先校验 `uint16` 速度（km/h*100）值域，再投递跑步目标速度事件
-- `StartResume`：可靠投递成功后发送 Fitness Machine Status `Started/Resumed by User = 0x03`
+- `StartResume`：可靠投递成功后发送 Fitness Machine Status `Started/Resumed by User = 0x04`
 - `StopPause`：可靠投递成功后发送 Fitness Machine Status `Stopped/Paused by User = 0x02`
 - `Reset`：可靠投递成功后发送 Fitness Machine Status `Reset = 0x01`
 - 其他：返回 not supported
 
-Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述三种状态都只有 1 字节，不发送固定长度补零。running profile 的 SetSpeed/Start/Stop/Reset 若应用回调未注册或事件队列未接收，返回 `Operation Failed`，且不提前修改 FTMS Status；`Invalid Parameter` 只表示带参数命令的值域非法。Success 表示事件已被主循环可靠接收，不代表 GATT 回调同步等待业务执行完成。
+Fitness Machine Status 和 Control Point 使用独立编号；Reset/Started 为 1 字节，Stopped/Paused 为 2 字节（第二字节为 Stop=1/Pause=2）。running profile 的 SetSpeed/Start/Stop/Reset 若应用回调未注册或事件队列未接收，返回 `Operation Failed`，且不提前修改 FTMS Status。Success 表示事件已被主循环可靠接收，不代表回调同步等待业务执行完成。客户端必须先订阅 indication、申请控制权并等待各次确认；未订阅返回 ATT 0x81，过程未完成返回 ATT 0x80，未获权结果为 0x05，断开/复位/响应失败清理状态。当前未强制 Encryption，配对策略是明确未完成的规范项。
 
 应用层注册的 `g_erg_cb` 实际是 `app_main.c` 里的 `on_erg_target()`。
 它不直接写引擎，而是投递 `APP_EVT_ERG_TARGET`，由主循环串行消费。

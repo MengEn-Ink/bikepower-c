@@ -4,6 +4,24 @@
 
 ## [未发布]
 
+### BLE 能力与稳定性专项复核（2026-11-05）
+- `main/ble_bikepower.c`、`main/ble_config_service.c/.h`、`main/bikepower_config.h`：FTMS/配置响应使用 8 条静态预留队列，操作前检查容量，异步 COMMIT 保留响应 token；确认后推进，发送失败终止连接，断连/复位/stop 清理。修正跑步部分掩码的 RSC 静默、稳定骑行 Feature 并补心率能力，桥接目标功率暂不可控返回 Operation Failed。
+- `tools/web/ble-compatibility.js`、`tools/web/ble-monitor.html`：补齐控制点/状态与范围诊断、Treadmill 解析与订阅；旧请求只清理自身连接代次，手动连接限制跨刷新保留。
+- `tests/test_ble_standard_contract.py`、`test/test_ble_config_service.c`、`tests/ble_selftest.py`：增加跨特征队列、容量/预留/失败/确认、7 种跑步掩码回归并同步固定能力；Pages 21 项及浏览器回归通过。最终构建/门禁与真机边界见 `docs/dev/34-ble-compatibility-recheck.md`。
+
+### BLE 标准一致性补测（2026-11-05）
+- CPS Feature 明确非分布式总功率；修正跑步 FTMS 能力位，补齐目标功率/速度范围，统一 HRS/RSC/FTMS 属性。广播改用部分 UUID 列表，增加 FTMS 设备类型，按 UTF-8 边界限制名字为 11 字节。
+- FTMS 控制增加订阅、控制权、串行与响应错误处理；严格拒绝空包、额外字节及非法 Stop/Pause 参数。修正启动状态为 0x04，停止/暂停状态携带控制信息；桥接不接受 ERG。
+- 新增生产函数 sanitizer 回归，覆盖 Feature/范围、全部现有控制操作、GAP 清理、发送失败及 42 种广播组合；同步 Pages 范围诊断、能力位解析及真机自测。
+- Host 6115/0、质量门禁 114 PASS / 2 工作区 WARN / 0 FAIL、quick 操作门禁和 180 秒 15 轮核心耐久通过；双板编译验证通过。真机与目标软件验收、FTMS 配对加密策略仍待完成，详见 `docs/dev/33-ble-standard-test-plan.md`。
+
+### BLE 标准特征与 Pages 兼容性诊断（2026-11-05）
+- 补齐 CPS Feature、CPS Sensor Location 与 CSC Feature；能力位只声明曲柄转数，CPS/CSC Measurement 按规范使用 Notify。新增生产 GATT/回调 sanitizer 回归，并同步真机读取与属性检查。
+- Pages 增加任意 BLE 软件/码表场景、固定双设备快照、标准/候选/未知诊断、通知证据和 JSON 报告。支持 RSC 与显式私有 UUID 授权；读取失败和授权范围未知不当作设备缺失。
+- 目标端实测前释放本站全部标签和在途连接，刷新后保持暂停，结束后允许手动连接；人工结果绑定快照和场景，修改后清除旧结果，导入保留人工证据身份。
+- 同步桌面、手机、离线手册及 BLE 技术规范。Host 6115/0、协议与 14 项规则回归、页面交接和双主题检查通过；双板编译 app 均 `0x113b60`，factory 剩余 72%。完整门禁与验收边界见 `docs/dev/32-ble-compatibility-diagnosis.md`。
+- 无 ESP32 USB 串口，实际广播/新特征读取、骑鬥/码表连接和长期稳定性为 `NOT_RUN`。当前修改未发布固件或创建 tag。
+
 ### 文档与 Pages 治理（2026-11-05）
 - README 精简为项目入口，开发流程链接到 Wiki；归档 12 份已执行阶段设计、计划与报告，保留历史镜像和未验收证据。
 - 删除五张旧 PNG、九张旧门户截图和十一张重复素材；修正五张 SVG 的共存、按钮、引脚与通知节拍，Pages 只从文档配图来源分发实际引用资源。

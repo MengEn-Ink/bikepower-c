@@ -27,6 +27,9 @@
 | [源码事实](dev/21-generated-project-facts.md) | 自动生成的版本、schema、路由与模块 |
 | [主备桥接规范](dev/28-bridge-failover-multi-device-design.md) | 当前三设备恢复与降级设计，实物验收待完成 |
 | [仓库治理报告](dev/31-repository-hygiene-report.md) | 本轮分支、代码、文档、资源与部署验证 |
+| [BLE 兼容性诊断](dev/32-ble-compatibility-diagnosis.md) | 标准特征补齐、固定快照、连接交接与目标端实测 |
+| [BLE 标准补测](dev/33-ble-standard-test-plan.md) | Feature/范围/广播/控制事务回归及实物验收边界 |
+| [BLE 能力复核](dev/34-ble-compatibility-recheck.md) | 当前 USB 连接证据、标准功率计差异与真机验收边界 |
 
 ## Code Wiki
 
