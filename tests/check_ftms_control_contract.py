@@ -37,12 +37,12 @@ def extract_function(source, name):
 
 
 def extract_case(function_source, label):
-    match = re.search(
+    matches = list(re.finditer(
         rf"case\s+{re.escape(label)}\s*:(.*?)(?=\n\s*(?:case\s+|default\s*:))",
         function_source,
         re.S,
-    )
-    return match.group(1) if match else ""
+    ))
+    return matches[-1].group(1) if matches else ""
 
 
 def main():
@@ -81,7 +81,7 @@ def main():
         "FTMS_RESULT_OPERATION_FAILED": 0x04,
         "FTMS_STATUS_RESET": 0x01,
         "FTMS_STATUS_STOPPED_PAUSED_BY_USER": 0x02,
-        "FTMS_STATUS_STARTED_RESUMED_BY_USER": 0x03,
+        "FTMS_STATUS_STARTED_RESUMED_BY_USER": 0x04,
     }
     for name, expected in expected_constants.items():
         actual = extract_define(config, name)
@@ -118,17 +118,17 @@ def main():
             "FTMS_OP_RESPONSE_CODE",
             "request_op",
             "result",
-            "indicate_one",
+            "indicate_try",
         )),
         "控制点响应使用 0x80/request/result 三字节 indication",
     )
 
     status_sender = extract_function(ble_c, "ftms_send_status")
     check(
-        "g_ftms_status_buf[1]" in ble_c
-        and "sizeof(g_ftms_status_buf)" in status_sender
+        "g_ftms_status_buf[2]" in ble_c
+        and "g_ftms_status_len" in status_sender
         and "notify_one" in status_sender,
-        "Reset/Stopped/Started Fitness Machine Status 使用单字节通知",
+        "Fitness Machine Status 按 Reset/Started 单字节、Stopped 双字节发送",
     )
 
     speed_case = extract_case(cp, "FTMS_OP_SET_TARGET_SPEED")
@@ -154,7 +154,7 @@ def main():
         branch = extract_case(cp, opcode)
         check(bool(branch), f"存在 {opcode} 分支")
         callback_pos = branch.find(control)
-        status_pos = branch.find(f"ftms_send_status({status})")
+        status_pos = branch.find(f"ftms_send_status({status},")
         success_pos = branch.rfind("FTMS_RESULT_SUCCESS")
         check(
             callback_pos >= 0

@@ -75,6 +75,9 @@ static size_t g_cps_len = BLE_PAYLOAD_CPS_LEN;
 static bool s_bridge_csc_valid;
 static uint8_t g_hr_buf[BLE_PAYLOAD_HRS_LEN];
 static uint8_t g_csc_buf[BLE_PAYLOAD_CSC_LEN];
+// Feature 仅声明生产通知支持的曲柄转数，不声明轮速、扭矩或多位置能力。
+static const uint8_t g_cps_feature_buf[4] = { 0x08, 0x00, 0x10, 0x00 };
+static const uint8_t g_csc_feature_buf[2] = { 0x02, 0x00 };
 static uint8_t g_rsc_buf[BLE_PAYLOAD_RSC_LEN];
 static uint8_t g_rsc_feature_buf[2] = { 0x07, 0x00 };
 static uint8_t g_sensor_location = 0x05;
@@ -86,16 +89,27 @@ static uint8_t g_ftms_resp_buf[3];
 
 // FTMS 静态特征值：前 4 字节为 machine feature，后 4 字节为 target setting feature。
 static const uint8_t g_ftms_cycling_feature_buf[8] = {
-    0x02, 0x40, 0x00, 0x00, // cadence + power measurement
+    0x02, 0x44, 0x00, 0x00,
     0x08, 0x00, 0x00, 0x00, // target power setting
 };
 static const uint8_t g_ftms_running_feature_buf[8] = {
-    0x04, 0x05, 0x00, 0x00, // distance + heart rate + elapsed time
-    0x02, 0x00, 0x00, 0x00, // target speed setting
+    0x04, 0x14, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00,
 };
-// 当前实现使用的 Reset/Stopped/Started 状态均为单字节 OpCode；带参数的
-// Fitness Machine Status 必须按各自格式另行编码，不能用固定长度补零。
-static uint8_t g_ftms_status_buf[1] = { FTMS_STATUS_RESET };
+static const uint8_t g_ftms_power_range_buf[6] = {
+    POWER_MIN & 0xff, (POWER_MIN >> 8) & 0xff,
+    POWER_MAX & 0xff, (POWER_MAX >> 8) & 0xff, 1, 0,
+};
+static const uint8_t g_ftms_speed_range_buf[6] = {
+    RUN_SPEED_X100_MIN & 0xff, (RUN_SPEED_X100_MIN >> 8) & 0xff,
+    RUN_SPEED_X100_MAX & 0xff, (RUN_SPEED_X100_MAX >> 8) & 0xff, 1, 0,
+};
+static atomic_bool g_ftms_subscribed = false;
+static atomic_bool g_ftms_control = false;
+static atomic_bool g_ftms_pending = false;
+// Reset/Started 为单字节；Stopped/Paused 带一字节控制信息。
+static uint8_t g_ftms_status_buf[2] = { FTMS_STATUS_RESET };
+static size_t g_ftms_status_len = 1;
 
 static ble_erg_cb_t g_erg_cb = NULL;
 static ble_erg_clear_cb_t g_erg_clear_cb = NULL;
@@ -110,6 +124,24 @@ static atomic_bool g_start_failed = false;
 // 通知互斥锁：保证 notify_tick 回调与 ble_bikepower_stop 的 deinit 互斥，
 // stop 在释放 NimBLE 前必须先拿到锁，确保没有 notify 回调正在访问协议栈（消除 UAF 窗口）。
 static SemaphoreHandle_t g_notify_lock = NULL;
+
+// 单连接 indication 队列；预留条目也计入容量，异步 COMMIT 保留自己的响应位置。
+// BEGIN_INDICATION_STATE
+typedef struct {
+    uint32_t token;
+    uint16_t connection;
+    uint16_t handle;
+    uint8_t length;
+    bool ready;
+    uint8_t payload[BLE_CONFIG_CONTROL_RESPONSE_LEN];
+} ble_indication_entry_t;
+static portMUX_TYPE s_indication_lock = portMUX_INITIALIZER_UNLOCKED;
+static ble_indication_entry_t s_indications[BLE_INDICATION_QUEUE_SIZE];
+static uint8_t s_indication_head, s_indication_count;
+static uint32_t s_indication_sequence;
+static bool s_indication_active, s_indication_failed;
+static atomic_uint_least32_t g_ftms_response_token;
+// END_INDICATION_STATE
 
 // DIS 身份覆盖：由应用层落盘后通过 ble_bikepower_set_identity() 写入，host 任务只读。
 static portMUX_TYPE g_identity_lock = portMUX_INITIALIZER_UNLOCKED;
@@ -126,7 +158,12 @@ static ble_identity_write_cb_t g_identity_write_cb = NULL;
 static int start_advertising(void);
 // 发送单个特征通知/indication（定义在通知模块），FTMS 控制点回调需提前用于推送响应。
 static void notify_one(uint16_t handle, const uint8_t *buf, size_t len);
-static void indicate_one(uint16_t handle, const uint8_t *buf, size_t len);
+static void indicate_one(uint32_t token, const uint8_t *buf, size_t len);
+static bool indicate_try(uint16_t handle, const uint8_t *buf, size_t len);
+static uint32_t indication_reserve(uint16_t connection, uint16_t handle);
+static void indication_reset(void);
+static void indication_complete(uint16_t connection, uint16_t handle, int status);
+static void indication_pump_nolock(void);
 
 // ============================ GATT 访问回调 ============================
 
@@ -211,6 +248,24 @@ static int csc_access_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *
     return BLE_ATT_ERR_UNLIKELY;
 }
 
+static int cps_feature_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        return chr_read_buf(ctxt, g_cps_feature_buf, sizeof(g_cps_feature_buf));
+    }
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+static int csc_feature_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        return chr_read_buf(ctxt, g_csc_feature_buf, sizeof(g_csc_feature_buf));
+    }
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
 static int rsc_measurement_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
@@ -249,16 +304,25 @@ static int ftms_feat_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
         const uint8_t *buf = (g_profile == SPORT_PROFILE_RUNNING)
             ? g_ftms_running_feature_buf
             : g_ftms_cycling_feature_buf;
-        portENTER_CRITICAL(&s_data_lock);
-        bool real = s_output.real;
-        portEXIT_CRITICAL(&s_data_lock);
-        if (g_profile == SPORT_PROFILE_CYCLING && real) {
-            uint8_t bridge_feature[8];
-            memcpy(bridge_feature, buf, sizeof(bridge_feature));
-            bridge_feature[4] = 0;
-            return chr_read_buf(ctxt, bridge_feature, sizeof(bridge_feature));
-        }
         return chr_read_buf(ctxt, buf, sizeof(g_ftms_cycling_feature_buf));
+    }
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+static int ftms_power_range_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        return chr_read_buf(ctxt, g_ftms_power_range_buf, sizeof(g_ftms_power_range_buf));
+    }
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+static int ftms_speed_range_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ch; (void)ah; (void)arg;
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        return chr_read_buf(ctxt, g_ftms_speed_range_buf, sizeof(g_ftms_speed_range_buf));
     }
     return BLE_ATT_ERR_UNLIKELY;
 }
@@ -300,7 +364,7 @@ static int ftms_treadmill_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ct
 static int ftms_status_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_buf(ctxt, g_ftms_status_buf, sizeof(g_ftms_status_buf));
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) return chr_read_measurement(ctxt, g_ftms_status_buf, 0, &g_ftms_status_len);
     return BLE_ATT_ERR_UNLIKELY;
 }
 
@@ -317,27 +381,34 @@ static void ftms_send_response(uint8_t request_op, uint8_t result)
     g_ftms_resp_buf[0] = FTMS_OP_RESPONSE_CODE;
     g_ftms_resp_buf[1] = request_op;
     g_ftms_resp_buf[2] = result;
-    indicate_one(g_ftms_cp_handle, g_ftms_resp_buf, sizeof(g_ftms_resp_buf));
+    if (!indicate_try(g_ftms_cp_handle, g_ftms_resp_buf, sizeof(g_ftms_resp_buf))) {
+        g_ftms_pending = false;
+        g_ftms_control = false;
+        ESP_LOGW(TAG, "FTMS 响应发送失败，控制权已释放");
+    }
 }
 
 /**
- * 发布无附加参数的 FTMS Fitness Machine Status。
+ * 发布 FTMS Fitness Machine Status。
  * status：Fitness Machine Status 特征自己的操作码，不是 Control Point 操作码。
+ * parameter：Stopped/Paused 的控制信息，其他状态忽略。
  * 返回值：无。
- * 特殊行为：当前支持的 Reset/Stopped/Started 状态均严格发送 1 字节。
+ * 特殊行为：Reset/Started 为 1 字节，Stopped/Paused 为 2 字节。
  */
-static void ftms_send_status(uint8_t status)
+static void ftms_send_status(uint8_t status, uint8_t parameter)
 {
     portENTER_CRITICAL(&s_data_lock);
     g_ftms_status_buf[0] = status;
+    g_ftms_status_buf[1] = parameter;
+    g_ftms_status_len = status == FTMS_STATUS_STOPPED_PAUSED_BY_USER ? 2 : 1;
     portEXIT_CRITICAL(&s_data_lock);
-    notify_one(g_ftms_status_handle, g_ftms_status_buf, sizeof(g_ftms_status_buf));
+    notify_one(g_ftms_status_handle, g_ftms_status_buf, g_ftms_status_len);
 }
 
 /**
  * 处理 FTMS Control Point 写访问。
  * 解析客户端下发的控制点指令，并驱动 ERG 回调、状态更新和响应通知。
- * ch：连接句柄，未使用。
+ * ch：连接句柄，必须为当前下游连接。
  * ah：属性句柄，未使用。
  * ctxt：GATT 访问上下文。
  * arg：自定义参数，未使用。
@@ -346,23 +417,60 @@ static void ftms_send_status(uint8_t status)
  */
 static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
-    (void)ch; (void)ah; (void)arg;
+    (void)ah; (void)arg;
     if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
+    if (ch != g_conn_handle || g_stopping || !g_ready) return BLE_ATT_ERR_UNLIKELY;
+    if (!g_ftms_subscribed) return FTMS_ATT_ERR_CCCD_IMPROPERLY_CONFIGURED;
+    if (g_ftms_pending) return FTMS_ATT_ERR_PROCEDURE_IN_PROGRESS;
 
     uint8_t buf[FTMS_CP_BUF_SIZE];
     uint16_t len = 0;
     int rc = ble_hs_mbuf_to_flat(ctxt->om, buf, sizeof(buf), &len);
-    if (rc != 0 || len < 1) return 0;
+    if (rc != 0 || len < 1) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
 
     uint8_t op = buf[0];
-    ESP_LOGI(TAG, "FTMS控制点写入 op=0x%02x len=%d", op, len);
+    g_ftms_response_token = indication_reserve(ch, g_ftms_cp_handle);
+    if (!g_ftms_response_token) return BLE_ATT_ERR_INSUFFICIENT_RES;
+    g_ftms_pending = true;
+    if (op != FTMS_OP_REQUEST_CONTROL && !g_ftms_control) {
+        ftms_send_response(op, FTMS_RESULT_CONTROL_NOT_PERMITTED);
+        return g_ftms_pending ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    }
+    size_t expected_len = 0;
     switch (op) {
     case FTMS_OP_REQUEST_CONTROL:
+    case FTMS_OP_START_RESUME:
+    case FTMS_OP_RESET:
+        expected_len = 1;
+        break;
+    case FTMS_OP_STOP_PAUSE:
+        expected_len = 2;
+        break;
+    case FTMS_OP_SET_TARGET_POWER:
+    case FTMS_OP_SET_TARGET_SPEED:
+        expected_len = 3;
+        break;
+    default:
+        break;
+    }
+    if ((expected_len && len != expected_len)
+            || (op == FTMS_OP_STOP_PAUSE && buf[1] != 1 && buf[1] != 2)) {
+        ftms_send_response(op, FTMS_RESULT_INVALID_PARAM);
+        return g_ftms_pending ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    }
+    ESP_LOGD(TAG, "FTMS控制点写入 op=0x%02x len=%d", op, len);
+    switch (op) {
+    case FTMS_OP_REQUEST_CONTROL:
+        g_ftms_control = true;
         ftms_send_response(FTMS_OP_REQUEST_CONTROL, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_SET_TARGET_POWER:
-        if (g_profile == SPORT_PROFILE_RUNNING) {
-            ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
+        portENTER_CRITICAL(&s_data_lock);
+        bool real = s_output.real;
+        portEXIT_CRITICAL(&s_data_lock);
+        if (g_profile == SPORT_PROFILE_RUNNING || real) {
+            ftms_send_response(op, real && g_profile == SPORT_PROFILE_CYCLING
+                ? FTMS_RESULT_OPERATION_FAILED : FTMS_RESULT_NOT_SUPPORTED);
             break;
         }
         if (len < 3) {
@@ -409,7 +517,7 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
             ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
             break;
         }
-        ftms_send_status(FTMS_STATUS_STARTED_RESUMED_BY_USER);
+        ftms_send_status(FTMS_STATUS_STARTED_RESUMED_BY_USER, 0);
         ftms_send_response(FTMS_OP_START_RESUME, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_STOP_PAUSE:
@@ -421,7 +529,7 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
         if (g_profile != SPORT_PROFILE_RUNNING && g_erg_clear_cb) {
             g_erg_clear_cb(FTMS_OP_STOP_PAUSE);
         }
-        ftms_send_status(FTMS_STATUS_STOPPED_PAUSED_BY_USER);
+        ftms_send_status(FTMS_STATUS_STOPPED_PAUSED_BY_USER, buf[1]);
         ftms_send_response(FTMS_OP_STOP_PAUSE, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_RESET:
@@ -433,14 +541,14 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
         if (g_profile != SPORT_PROFILE_RUNNING && g_erg_clear_cb) {
             g_erg_clear_cb(FTMS_OP_RESET);
         }
-        ftms_send_status(FTMS_STATUS_RESET);
+        ftms_send_status(FTMS_STATUS_RESET, 0);
         ftms_send_response(FTMS_OP_RESET, FTMS_RESULT_SUCCESS);
         break;
     default:
         ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
         break;
     }
-    return 0;
+    return g_ftms_pending ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
 // ============================ DIS 读取（支持身份覆盖） ============================
@@ -561,8 +669,14 @@ static const struct ble_gatt_svc_def cycling_gatt_svcs[] = {
         .characteristics = (struct ble_gatt_chr_def[]){
             { .uuid = BLE_UUID16_DECLARE(POWER_CHAR_UUID),
               .access_cb = cps_access_cb,
-              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .flags = BLE_GATT_CHR_F_NOTIFY,
               .val_handle = &g_cps_val_handle },
+            { .uuid = BLE_UUID16_DECLARE(POWER_FEATURE_CHAR_UUID),
+              .access_cb = cps_feature_cb,
+              .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(SENSOR_LOCATION_CHAR_UUID),
+              .access_cb = sensor_location_cb,
+              .flags = BLE_GATT_CHR_F_READ },
             { 0 }
         }
     },
@@ -572,7 +686,7 @@ static const struct ble_gatt_svc_def cycling_gatt_svcs[] = {
         .characteristics = (struct ble_gatt_chr_def[]){
             { .uuid = BLE_UUID16_DECLARE(HR_CHAR_UUID),
               .access_cb = hr_access_cb,
-              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .flags = BLE_GATT_CHR_F_NOTIFY,
               .val_handle = &g_hr_val_handle },
             { 0 }
         }
@@ -583,8 +697,11 @@ static const struct ble_gatt_svc_def cycling_gatt_svcs[] = {
         .characteristics = (struct ble_gatt_chr_def[]){
             { .uuid = BLE_UUID16_DECLARE(CSC_CHAR_UUID),
               .access_cb = csc_access_cb,
-              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .flags = BLE_GATT_CHR_F_NOTIFY,
               .val_handle = &g_csc_val_handle },
+            { .uuid = BLE_UUID16_DECLARE(CSC_FEATURE_CHAR_UUID),
+              .access_cb = csc_feature_cb,
+              .flags = BLE_GATT_CHR_F_READ },
             { 0 }
         }
     },
@@ -595,17 +712,20 @@ static const struct ble_gatt_svc_def cycling_gatt_svcs[] = {
             { .uuid = BLE_UUID16_DECLARE(FTMS_FEATURE_CHAR_UUID),
               .access_cb = ftms_feat_cb,
               .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(FTMS_POWER_RANGE_CHAR_UUID),
+              .access_cb = ftms_power_range_cb,
+              .flags = BLE_GATT_CHR_F_READ },
             { .uuid = BLE_UUID16_DECLARE(FTMS_POWER_CHAR_UUID),
               .access_cb = ftms_bike_cb,
-              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .flags = BLE_GATT_CHR_F_NOTIFY,
               .val_handle = &g_ftms_bike_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_CONTROL_POINT_CHAR_UUID),
               .access_cb = ftms_cp_cb,
-              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_INDICATE,
+              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE,
               .val_handle = &g_ftms_cp_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_STATUS_CHAR_UUID),
               .access_cb = ftms_status_cb,
-              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .flags = BLE_GATT_CHR_F_NOTIFY,
               .val_handle = &g_ftms_status_handle },
             { 0 }
         }
@@ -639,7 +759,7 @@ static const struct ble_gatt_svc_def running_gatt_svcs[] = {
         .characteristics = (struct ble_gatt_chr_def[]){
             { .uuid = BLE_UUID16_DECLARE(RSC_MEASUREMENT_CHAR_UUID),
               .access_cb = rsc_measurement_cb,
-              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .flags = BLE_GATT_CHR_F_NOTIFY,
               .val_handle = &g_rsc_val_handle },
             { .uuid = BLE_UUID16_DECLARE(RSC_FEATURE_CHAR_UUID),
               .access_cb = rsc_feature_cb,
@@ -656,7 +776,7 @@ static const struct ble_gatt_svc_def running_gatt_svcs[] = {
         .characteristics = (struct ble_gatt_chr_def[]){
             { .uuid = BLE_UUID16_DECLARE(HR_CHAR_UUID),
               .access_cb = hr_access_cb,
-              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .flags = BLE_GATT_CHR_F_NOTIFY,
               .val_handle = &g_hr_val_handle },
             { 0 }
         }
@@ -668,17 +788,20 @@ static const struct ble_gatt_svc_def running_gatt_svcs[] = {
             { .uuid = BLE_UUID16_DECLARE(FTMS_FEATURE_CHAR_UUID),
               .access_cb = ftms_feat_cb,
               .flags = BLE_GATT_CHR_F_READ },
+            { .uuid = BLE_UUID16_DECLARE(FTMS_SPEED_RANGE_CHAR_UUID),
+              .access_cb = ftms_speed_range_cb,
+              .flags = BLE_GATT_CHR_F_READ },
             { .uuid = BLE_UUID16_DECLARE(FTMS_TREADMILL_CHAR_UUID),
               .access_cb = ftms_treadmill_cb,
-              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .flags = BLE_GATT_CHR_F_NOTIFY,
               .val_handle = &g_ftms_treadmill_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_CONTROL_POINT_CHAR_UUID),
               .access_cb = ftms_cp_cb,
-              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_INDICATE,
+              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE,
               .val_handle = &g_ftms_cp_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_STATUS_CHAR_UUID),
               .access_cb = ftms_status_cb,
-              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+              .flags = BLE_GATT_CHR_F_NOTIFY,
               .val_handle = &g_ftms_status_handle },
             { 0 }
         }
@@ -736,6 +859,10 @@ static void build_active_gatt_svcs(void)
 // 重置所有特征值句柄，确保未注册服务的通知被 notify 守卫跳过。
 static void reset_svc_handles(void)
 {
+    indication_reset();
+    g_ftms_subscribed = false;
+    g_ftms_control = false;
+    g_ftms_pending = false;
     g_cps_val_handle = 0;
     g_hr_val_handle = 0;
     g_csc_val_handle = 0;
@@ -871,16 +998,124 @@ static void notify_one(uint16_t handle, const uint8_t *buf, size_t len)
     xSemaphoreGive(g_notify_lock);
 }
 
-static void indicate_one(uint16_t handle, const uint8_t *buf, size_t len)
+static void indication_reset(void)
 {
-    if (!g_notify_lock || xSemaphoreTake(g_notify_lock, pdMS_TO_TICKS(BLE_NOTIFY_LOCK_WAIT_MS)) != pdTRUE) return;
-    // 未注册服务的句柄为 0，跳过 indication。
-    uint16_t connection = g_conn_handle;
-    if (!g_stopping && g_ready && handle != 0 && connection != BLE_HS_CONN_HANDLE_NONE) {
-        struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
-        if (om) ble_gatts_indicate_custom(connection, handle, om);
+    portENTER_CRITICAL(&s_indication_lock);
+    s_indication_head = s_indication_count = 0;
+    s_indication_active = s_indication_failed = false;
+    g_ftms_response_token = 0;
+    portEXIT_CRITICAL(&s_indication_lock);
+}
+
+static uint32_t indication_reserve(uint16_t connection, uint16_t handle)
+{
+    uint32_t token = 0;
+    portENTER_CRITICAL(&s_indication_lock);
+    if (!g_stopping && g_ready && handle && connection == g_conn_handle
+            && connection != BLE_HS_CONN_HANDLE_NONE && !s_indication_failed
+            && s_indication_count < BLE_INDICATION_QUEUE_SIZE) {
+        if (++s_indication_sequence == 0) ++s_indication_sequence;
+        token = s_indication_sequence;
+        uint8_t tail = (s_indication_head + s_indication_count++) % BLE_INDICATION_QUEUE_SIZE;
+        s_indications[tail] = (ble_indication_entry_t){
+            .token = token, .connection = connection, .handle = handle,
+        };
     }
-    xSemaphoreGive(g_notify_lock);
+    portEXIT_CRITICAL(&s_indication_lock);
+    return token;
+}
+
+static void indication_complete(uint16_t connection, uint16_t handle, int status)
+{
+    portENTER_CRITICAL(&s_indication_lock);
+    if (status && s_indication_active && s_indication_count
+            && s_indications[s_indication_head].connection == connection
+            && s_indications[s_indication_head].handle == handle) {
+        if (handle == g_ftms_cp_handle) {
+            g_ftms_pending = false;
+            if (status != BLE_HS_EDONE) g_ftms_control = false;
+        }
+        if (status == BLE_HS_EDONE) {
+            s_indication_head = (s_indication_head + 1) % BLE_INDICATION_QUEUE_SIZE;
+            --s_indication_count;
+            s_indication_active = false;
+        } else {
+            // 失败后不能假定 ATT 已空闲；终止连接，再由断连清理恢复。
+            s_indication_failed = true;
+        }
+    }
+    portEXIT_CRITICAL(&s_indication_lock);
+}
+
+// 调用者持通知互斥锁；标记在途后才能调用可能同步产生 NOTIFY_TX 的 NimBLE API。
+static void indication_pump_nolock(void)
+{
+    ble_indication_entry_t entry = {0};
+    bool failed;
+    portENTER_CRITICAL(&s_indication_lock);
+    failed = s_indication_failed;
+    if (!failed && !s_indication_active && s_indication_count
+            && s_indications[s_indication_head].ready && !g_stopping && g_ready
+            && s_indications[s_indication_head].connection == g_conn_handle) {
+        entry = s_indications[s_indication_head];
+        s_indication_active = true;
+    }
+    portEXIT_CRITICAL(&s_indication_lock);
+    if (failed) {
+        if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE && !g_stopping) {
+            ble_gap_terminate(g_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+        }
+        return;
+    }
+    if (!entry.token) return;
+    struct os_mbuf *om = ble_hs_mbuf_from_flat(entry.payload, entry.length);
+    int rc = om ? ble_gatts_indicate_custom(entry.connection, entry.handle, om) : BLE_HS_ENOMEM;
+    if (rc) {
+        portENTER_CRITICAL(&s_indication_lock);
+        if (s_indication_count && s_indication_active
+                && s_indications[s_indication_head].token == entry.token) {
+            s_indication_failed = true;
+            if (entry.handle == g_ftms_cp_handle) {
+                g_ftms_pending = false;
+                g_ftms_control = false;
+            }
+        }
+        portEXIT_CRITICAL(&s_indication_lock);
+    }
+}
+
+static bool indication_submit(uint32_t token, const uint8_t *buf, size_t len)
+{
+    bool accepted = false;
+    if (!token || !buf || !len || len > BLE_CONFIG_CONTROL_RESPONSE_LEN) return false;
+    portENTER_CRITICAL(&s_indication_lock);
+    for (uint8_t i = 0; i < s_indication_count && !s_indication_failed; i++) {
+        ble_indication_entry_t *entry =
+            &s_indications[(s_indication_head + i) % BLE_INDICATION_QUEUE_SIZE];
+        if (entry->token == token && !entry->ready && entry->connection == g_conn_handle) {
+            memcpy(entry->payload, buf, len);
+            entry->length = (uint8_t)len;
+            entry->ready = accepted = true;
+            break;
+        }
+    }
+    portEXIT_CRITICAL(&s_indication_lock);
+    if (accepted && g_notify_lock && xSemaphoreTake(g_notify_lock, 0) == pdTRUE) {
+        indication_pump_nolock();
+        xSemaphoreGive(g_notify_lock);
+    }
+    return accepted;
+}
+
+static bool indicate_try(uint16_t handle, const uint8_t *buf, size_t len)
+{
+    if (handle != g_ftms_cp_handle) return false;
+    return indication_submit(g_ftms_response_token, buf, len);
+}
+
+static void indicate_one(uint32_t token, const uint8_t *buf, size_t len)
+{
+    (void)indication_submit(token, buf, len);
 }
 
 /**
@@ -901,13 +1136,14 @@ static void notify_tick(void *arg)
         return;
     }
     ble_output_snapshot_t data = output_snapshot();
+    indication_pump_nolock();
     uint8_t mask = data.mask;
     portENTER_CRITICAL(&s_data_lock);
     if (g_profile == SPORT_PROFILE_RUNNING) pack_running(&data);
     else pack_all(&data);
     portEXIT_CRITICAL(&s_data_lock);
     if (g_profile == SPORT_PROFILE_RUNNING) {
-        if ((mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) == (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) {
+        if (mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) {
             notify_one_nolock(g_rsc_val_handle, g_rsc_buf, sizeof(g_rsc_buf));
         }
         if (mask & BROADCAST_FIELD_HEARTRATE) notify_one_nolock(g_hr_val_handle, g_hr_buf, sizeof(g_hr_buf));
@@ -955,6 +1191,10 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
     switch (event->type) {
     case BLE_GAP_EVENT_CONNECT:
         if (event->connect.status == 0) {
+            indication_reset();
+            g_ftms_subscribed = false;
+            g_ftms_control = false;
+            g_ftms_pending = false;
             g_conn_handle = event->connect.conn_handle;
             ESP_LOGI(TAG, "设备已连接 handle=%d", g_conn_handle);
         } else {
@@ -966,6 +1206,10 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "设备已断开 reason=%d", event->disconnect.reason);
         g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+        indication_reset();
+        g_ftms_subscribed = false;
+        g_ftms_control = false;
+        g_ftms_pending = false;
         ble_config_service_disconnect();
         rc = start_advertising();
         if (rc != 0 && !g_stopping) mark_start_failed("断开后重广播失败", rc);
@@ -973,6 +1217,19 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
     case BLE_GAP_EVENT_ADV_COMPLETE:
         rc = start_advertising();
         if (rc != 0 && !g_stopping) mark_start_failed("广播完成后重广播失败", rc);
+        return 0;
+    case BLE_GAP_EVENT_SUBSCRIBE:
+        if (event->subscribe.conn_handle == g_conn_handle
+                && event->subscribe.attr_handle == g_ftms_cp_handle) {
+            g_ftms_subscribed = event->subscribe.cur_indicate != 0;
+            if (!g_ftms_subscribed) g_ftms_control = false;
+        }
+        return 0;
+    case BLE_GAP_EVENT_NOTIFY_TX:
+        if (event->notify_tx.conn_handle == g_conn_handle && event->notify_tx.indication) {
+            indication_complete(event->notify_tx.conn_handle,
+                                event->notify_tx.attr_handle, event->notify_tx.status);
+        }
         return 0;
     default:
         return 0;
@@ -1023,14 +1280,22 @@ static int start_advertising(void)
     // 广播包空间有限：主广播放 App/码表按设备类型过滤时最关键的服务，完整能力由连接后 GATT 发现获取。
     fields.uuids16 = (adv_uuid_count > 0) ? adv_uuids : NULL;
     fields.num_uuids16 = adv_uuid_count;
-    fields.uuids16_is_complete = 1;
-    // 31 字节广播包预算：flags(3) + 完整 16 位 UUID 列表(2+N×2) 占 5+2N 字节，
-    // 留给名字 AD 26-2N 字节即最多 BLE_ADV_NAME_MAX_LEN 个字符。超出部分（完整名）放 scan response，
-    // 避免 ble_gap_adv_set_fields 因 EMSGSIZE 静默失败导致设备搜不到。
+    fields.uuids16_is_complete = 0;
+    uint8_t ftms_service_data[5] = { 0x26, 0x18, 0x01, 0x00, 0x00 };
+    if (power_on || cadence_on) {
+        ftms_service_data[3] = g_profile == SPORT_PROFILE_RUNNING ? 0x01 : 0x20;
+        fields.svc_data_uuid16 = ftms_service_data;
+        fields.svc_data_uuid16_len = sizeof(ftms_service_data);
+    }
+    // 31 字节预算：flags(3) + 部分 UUID 列表(最多8) + FTMS Service Data(7)。
+    // 名字含 AD 头最多13字节，完整名放扫描响应，避免广播设置因 EMSGSIZE 失败。
     size_t name_len = strlen(device_name);
     fields.name = (uint8_t *)device_name;
     if (name_len > BLE_ADV_NAME_MAX_LEN) {
         fields.name_len = BLE_ADV_NAME_MAX_LEN;
+        while (fields.name_len && (device_name[fields.name_len] & 0xc0) == 0x80) {
+            fields.name_len--;
+        }
         fields.name_is_complete = 0;
     } else {
         fields.name_len = name_len;
@@ -1114,6 +1379,10 @@ static void on_reset(int reason)
     // 复位后旧连接句柄已失效且不会有断开事件，清理以免 conn_count 误报已连接、
     // notify_tick 持续向失效句柄发通知。
     g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+    indication_reset();
+    g_ftms_subscribed = false;
+    g_ftms_control = false;
+    g_ftms_pending = false;
 }
 
 /**
@@ -1316,7 +1585,7 @@ esp_err_t ble_bikepower_start(void)
 {
     g_stopping = false;
     g_start_failed = false;
-    ble_config_service_reset(indicate_one, config_dis_profile_access_cb);
+    ble_config_service_reset(indication_reserve, indicate_one, config_dis_profile_access_cb);
     if (!g_notify_lock) {
         g_notify_lock = xSemaphoreCreateMutex();
         if (!g_notify_lock) {
@@ -1440,6 +1709,7 @@ bool ble_bikepower_stop(void)
         ESP_LOGE(TAG, "nimble_port_stop 失败 rc=%d 射频可能仍被占用", rc);
     }
     g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+    indication_reset();
     g_ready = false;
     g_start_failed = false;
 

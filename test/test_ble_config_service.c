@@ -9,9 +9,17 @@ static unsigned s_responses;
 static config_data_t s_submitted;
 static bool s_accept = true;
 
-static void indicate(uint16_t handle, const uint8_t *data, size_t length)
+static bool s_capacity = true;
+static uint32_t reserve(uint16_t connection, uint16_t handle)
 {
     (void)handle;
+    assert(connection == 1 && s_lock_depth == 0);
+    return s_capacity ? 1 : 0;
+}
+
+static void indicate(uint32_t token, const uint8_t *data, size_t length)
+{
+    assert(token == 1);
     assert(s_lock_depth == 0);
     assert(length == sizeof(s_response));
     memcpy(s_response, data, length);
@@ -41,7 +49,7 @@ int main(void)
     power_engine_t engine;
     power_engine_init(&engine);
     ble_config_service_set_snapshot(&engine);
-    ble_config_service_reset(indicate, NULL);
+    ble_config_service_reset(reserve, indicate, NULL);
     ble_config_service_set_commit_callback(commit);
     const struct ble_gatt_svc_def *svc = ble_config_service_definition();
     assert(svc->characteristics[8].arg == (void *)(uintptr_t)BLE_CONFIG_GROUP_BRIDGE);
@@ -52,6 +60,9 @@ int main(void)
     assert(svc->characteristics[11].uuid == NULL);
     uint8_t begin[] = { BLE_CONFIG_OP_BEGIN, BLE_CONFIG_PROTOCOL_VERSION, 7, 0, 0, 0, 1, 0, 0, 0 };
     uint8_t finish[] = { BLE_CONFIG_OP_COMMIT, 7, 0, 0, 0, 1 };
+    s_capacity = false;
+    assert(control(begin, sizeof(begin)) == BLE_ATT_ERR_INSUFFICIENT_RES);
+    s_capacity = true;
     assert(control(begin, sizeof(begin)) == 0);
     assert(s_response[2] == BLE_CONFIG_RESULT_SUCCESS);
     assert(control(begin, sizeof(begin)) == 0);

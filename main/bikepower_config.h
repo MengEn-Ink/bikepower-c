@@ -101,8 +101,10 @@ typedef enum {
 
 // ===== 特征值 UUID =====
 #define POWER_CHAR_UUID            0x2A63
+#define POWER_FEATURE_CHAR_UUID    0x2A65
 #define HR_CHAR_UUID               0x2A37
 #define CSC_CHAR_UUID              0x2A5B
+#define CSC_FEATURE_CHAR_UUID      0x2A5C
 #define RSC_MEASUREMENT_CHAR_UUID  0x2A53
 #define RSC_FEATURE_CHAR_UUID      0x2A54
 #define SENSOR_LOCATION_CHAR_UUID  0x2A5D
@@ -111,6 +113,8 @@ typedef enum {
 #define FTMS_TREADMILL_CHAR_UUID   0x2ACD
 #define FTMS_POWER_CHAR_UUID       0x2AD2
 #define FTMS_STATUS_CHAR_UUID      0x2ADA
+#define FTMS_POWER_RANGE_CHAR_UUID 0x2AD8
+#define FTMS_SPEED_RANGE_CHAR_UUID 0x2AD4
 #define DIS_MANUFACTURER_CHAR_UUID 0x2A29
 #define DIS_MODEL_CHAR_UUID        0x2A24
 #define DIS_FIRMWARE_CHAR_UUID     0x2A26
@@ -172,6 +176,7 @@ typedef enum {
 #define BLE_NOTIFY_INTERVAL_MS       1000   // 通知间隔
 #define BLE_RETRY_TICKS              100    // BLE 启动失败重试节拍数（每拍50ms → 5s）
 #define BLE_NOTIFY_LOCK_WAIT_MS      10     // 通知互斥锁短等待上限：锁持有为微秒级，避免阻塞 NimBLE 任务
+#define BLE_INDICATION_QUEUE_SIZE    8
 #define BLE_SCAN_DEFAULT_MS          8000   // 模板库扫描附近 BLE 设备的默认时长
 #define BLE_SCAN_MAX_RESULTS         12     // 扫描结果缓存上限，避免配网态占用过多内存
 #define BLE_BRIDGE_TEST_MS           30000u
@@ -180,9 +185,9 @@ typedef enum {
 #define BLE_BRIDGE_CPS_INPUT_MAX     64
 #define BLE_SCAN_READ_TIMEOUT_MS     10000  // 连接外部设备读取 DIS 的最长等待时间
 #define DEVICE_ANALYSIS_SAMPLE_MS    9000   // 外部运动设备短时连接采样窗口
-// 广播包名字 AD 字段最大字符数。31 字节预算 - flags(3) - 完整16位UUID列表(8) = 20 字节给名字 AD，
-// 减去 AD 头(2) 得 18 个字符；超出部分完整名走 scan response。
-#define BLE_ADV_NAME_MAX_LEN         18
+// 主广播预算：flags(3) + 部分 UUID 列表(8) + FTMS Service Data(7) + 名字头(2)。
+// 名字最多 11 字节，按 UTF-8 边界截断；完整名走 scan response。
+#define BLE_ADV_NAME_MAX_LEN         11
 #define BLE_CONFIG_CONTROL_BUF_SIZE  16
 #define BLE_CONFIG_INITIAL_REVISION  1
 
@@ -199,13 +204,16 @@ typedef enum {
 #define FTMS_RESULT_NOT_SUPPORTED 0x02
 #define FTMS_RESULT_INVALID_PARAM 0x03
 #define FTMS_RESULT_OPERATION_FAILED 0x04
+#define FTMS_RESULT_CONTROL_NOT_PERMITTED 0x05
+#define FTMS_ATT_ERR_PROCEDURE_IN_PROGRESS 0x80
+#define FTMS_ATT_ERR_CCCD_IMPROPERLY_CONFIGURED 0x81
 #define FTMS_CP_BUF_SIZE          20     // FTMS控制点接收缓冲区大小（字节）
 
 // ===== FTMS Fitness Machine Status OpCode（0x2ADA 通知） =====
 // Status OpCode 与 Control Point OpCode 是两套独立编号，不得直接镜像。
 #define FTMS_STATUS_RESET                    0x01
 #define FTMS_STATUS_STOPPED_PAUSED_BY_USER   0x02
-#define FTMS_STATUS_STARTED_RESUMED_BY_USER  0x03
+#define FTMS_STATUS_STARTED_RESUMED_BY_USER  0x04
 
 // ===== 应用事件队列 =====
 #define APP_EVENT_QUEUE_LEN          16     // app_main 事件队列深度

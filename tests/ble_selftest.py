@@ -21,11 +21,15 @@ from ble_protocol import parse_cps, parse_rsc, parse_treadmill
 
 DEVICE_NAME = "BikePower"
 CPS_UUID = "00002a63-0000-1000-8000-00805f9b34fb"
+CPS_FEATURE_UUID = "00002a65-0000-1000-8000-00805f9b34fb"
 HR_UUID = "00002a37-0000-1000-8000-00805f9b34fb"
 CSC_UUID = "00002a5b-0000-1000-8000-00805f9b34fb"
+CSC_FEATURE_UUID = "00002a5c-0000-1000-8000-00805f9b34fb"
 FTMS_BIKE_UUID = "00002ad2-0000-1000-8000-00805f9b34fb"
 FTMS_TREADMILL_UUID = "00002acd-0000-1000-8000-00805f9b34fb"
 FTMS_FEATURE_UUID = "00002acc-0000-1000-8000-00805f9b34fb"
+FTMS_POWER_RANGE_UUID = "00002ad8-0000-1000-8000-00805f9b34fb"
+FTMS_SPEED_RANGE_UUID = "00002ad4-0000-1000-8000-00805f9b34fb"
 FTMS_CP_UUID = "00002ad9-0000-1000-8000-00805f9b34fb"
 RSC_UUID = "00002a53-0000-1000-8000-00805f9b34fb"
 RSC_FEATURE_UUID = "00002a54-0000-1000-8000-00805f9b34fb"
@@ -173,18 +177,66 @@ async def check_ftms_feature(client, found, expected_machine_mask, expected_targ
     except Exception as e:
         print(f"  FTMS Feature: 读取失败 {type(e).__name__}")
         return False
-    if len(data) < 8:
+    if len(data) != 8:
         print(f"  FTMS Feature: 长度异常 {len(data)}")
         return False
     machine = struct.unpack_from("<I", data, 0)[0]
     target = struct.unpack_from("<I", data, 4)[0]
-    ok_machine = (machine & expected_machine_mask) == expected_machine_mask
-    ok_target = (target & expected_target_mask) == expected_target_mask
+    ok_machine = machine == expected_machine_mask
+    ok_target = target == expected_target_mask
+    for bit, uuid, expected in [
+        (3, FTMS_POWER_RANGE_UUID, struct.pack("<hhH", 0, 2000, 1)),
+        (0, FTMS_SPEED_RANGE_UUID, struct.pack("<HHH", 300, 2500, 1)),
+    ]:
+        if target & (1 << bit):
+            try:
+                actual = bytes(await client.read_gatt_char(uuid))
+                characteristic = client.services.get_characteristic(uuid)
+                valid = actual == expected and set(characteristic.properties) == {"read"}
+            except Exception:
+                valid = False
+            print(f"  FTMS 范围 {uuid}: {'通过' if valid else '失败'}")
+            ok_target = valid and ok_target
+    measurement = FTMS_TREADMILL_UUID if PROFILE == "running" else FTMS_BIKE_UUID
+    for uuid, expected in [
+        (measurement, {"notify"}), (HR_UUID, {"notify"}),
+        (FTMS_CP_UUID, {"write", "indicate"}),
+    ]:
+        characteristic = client.services.get_characteristic(uuid)
+        properties = set(characteristic.properties) if characteristic else set()
+        ok_machine = (properties == expected) and ok_machine
     print(
         "  FTMS Feature: machine=0x%08x target=0x%08x %s"
         % (machine, target, "通过" if ok_machine and ok_target else "失败")
     )
     return ok_machine and ok_target
+
+
+async def check_cycling_features(client, found):
+    """校验必需的只读能力值与 Measurement 的 Notify 属性。"""
+    ok = True
+    for uuid, expected in [
+        (CPS_FEATURE_UUID, bytes.fromhex("08001000")),
+        (CSC_FEATURE_UUID, bytes.fromhex("0200")),
+        (SENSOR_LOCATION_UUID, bytes.fromhex("05")),
+    ]:
+        try:
+            characteristic = client.services.get_characteristic(uuid)
+            properties = set(characteristic.properties) if characteristic else set()
+            actual = bytes(await client.read_gatt_char(uuid)) if uuid in found else None
+            valid = actual == expected and "read" in properties and not properties.intersection(
+                {"write", "write-without-response", "notify", "indicate"}
+            )
+        except Exception as exc:
+            print(f"  骑行 Feature {uuid}: 读取失败 {type(exc).__name__}")
+            valid = False
+        print(f"  骑行 Feature {uuid}: {'通过' if valid else '失败'}")
+        ok = valid and ok
+    for uuid in [CPS_UUID, CSC_UUID]:
+        characteristic = client.services.get_characteristic(uuid)
+        properties = set(characteristic.properties) if characteristic else set()
+        ok = ("notify" in properties and "read" not in properties) and ok
+    return ok
 
 
 async def run_running_profile(client, found):
@@ -207,8 +259,8 @@ async def run_running_profile(client, found):
     ftms_feature_ok = await check_ftms_feature(
         client,
         found,
-        expected_machine_mask=0x00000504,
-        expected_target_mask=0x00000002,
+        expected_machine_mask=0x00001404,
+        expected_target_mask=0x00000001,
     )
     rsc_feature_ok = False
     if RSC_FEATURE_UUID in found:
@@ -304,7 +356,7 @@ async def run_running_profile(client, found):
 
             print("下发 running StopPause(0x08)")
             stop_result = await write_ftms_cp_and_wait(
-                client, cp_responses, OP_STOP_PAUSE
+                client, cp_responses, OP_STOP_PAUSE, payload=b"\x02"
             )
             control_results["StopPause"] = stop_result
             if stop_result != CP_RESULT_SUCCESS:
@@ -502,8 +554,11 @@ async def main():
 
         services = [
             ("CPS", CPS_UUID),
+            ("CPS-Feature", CPS_FEATURE_UUID),
+            ("CPS-SensorLocation", SENSOR_LOCATION_UUID),
             ("HR", HR_UUID),
             ("CSC", CSC_UUID),
+            ("CSC-Feature", CSC_FEATURE_UUID),
             ("FTMS-Bike", FTMS_BIKE_UUID),
             ("FTMS-CP", FTMS_CP_UUID),
         ]
@@ -515,10 +570,11 @@ async def main():
                 missing.append(label)
 
         dis_ok = await check_dis(client, found)
+        cycling_features_ok = await check_cycling_features(client, found)
         ftms_feature_ok = await check_ftms_feature(
             client,
             found,
-            expected_machine_mask=0x00004002,
+            expected_machine_mask=0x00004402,
             expected_target_mask=0x00000008,
         )
 
@@ -638,7 +694,7 @@ async def main():
         stop_power = None
         if FTMS_CP_UUID in found:
             print("下发 Stop/Pause(0x08) — 期望退出 ERG")
-            await client.write_gatt_char(FTMS_CP_UUID, bytes([OP_STOP_PAUSE]), response=True)
+            await client.write_gatt_char(FTMS_CP_UUID, bytes([OP_STOP_PAUSE, 0x01]), response=True)
             await asyncio.sleep(3)
             stop_power = last_power[0]
             print(f"Stop/Pause 后功率 ~{stop_power}W")
@@ -652,13 +708,14 @@ async def main():
         print("--- 结果 ---")
         print(f"  五服务齐全: {'通过' if ok_services else '失败(' + ','.join(missing) + ')'}")
         print(f"  DIS 设备信息: {'通过' if dis_ok else '失败'}")
+        print(f"  骑行标准特征: {'通过' if cycling_features_ok else '失败'}")
         print(f"  FTMS Feature: {'通过' if ftms_feature_ok else '失败'}")
         print(f"  CPS 通知:   {'通过' if ok_notify else '失败'}")
         print(f"  FTMS-CP 响应: {'通过' if ok_cp_resp else '失败(' + cp_detail + ')'}")
         print(f"  ERG 功率收敛: {'通过' if ok_erg else '失败'}")
         print(f"  Stop/Pause 响应: {'通过' if ok_stop_resp else '失败'}")
         print(f"  BLE payload 解析: {'通过' if not parse_errors else '失败(' + '; '.join(parse_errors[:3]) + ')'}")
-        ok = ok_notify and ok_services and ftms_feature_ok and ok_cp_resp and ok_erg and ok_stop_resp and dis_ok and not parse_errors
+        ok = ok_notify and ok_services and cycling_features_ok and ftms_feature_ok and ok_cp_resp and ok_erg and ok_stop_resp and dis_ok and not parse_errors
         print("总判定:", "通过" if ok else "失败")
         return 0 if ok else 1
 

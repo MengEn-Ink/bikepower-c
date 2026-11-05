@@ -4,10 +4,12 @@
 #include "ble_bikepower.h"
 
 /** 通知由 BLE 生命周期模块负责；配置服务只提供待发送字节。 */
-typedef void (*ble_config_indicate_cb_t)(uint16_t handle, const uint8_t *data, size_t length);
+typedef void (*ble_config_indicate_cb_t)(uint32_t token, const uint8_t *data, size_t length);
+/** 操作前预留响应位置；0 表示资源不足，调用者不得执行操作。 */
+typedef uint32_t (*ble_config_reserve_cb_t)(uint16_t connection, uint16_t handle);
 
 /** 初始化事务和句柄；回调在 NimBLE 启动前注册，运行期间不更换。 */
-void ble_config_service_reset(ble_config_indicate_cb_t indicate,
+void ble_config_service_reset(ble_config_reserve_cb_t reserve, ble_config_indicate_cb_t indicate,
                               ble_gatt_access_fn *identity_access);
 
 /** 返回静态配置 GATT 表，所有运动 profile 共用。 */

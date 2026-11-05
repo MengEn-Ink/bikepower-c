@@ -66,8 +66,12 @@ check("BLE_UUID16_INIT(FTMS_SERVICE_UUID)" in running_branch,
       "跑步主广播包含 Fitness Machine Service")
 
 print(f"\n{TAG} [S3] 广播包预算")
-check(name_max == 18,
-      f"BLE_ADV_NAME_MAX_LEN 为 18，匹配 flags + 3 个 16-bit UUID 的 31 字节预算 (实际={name_max})")
+check(name_max == 11,
+      f"BLE_ADV_NAME_MAX_LEN 为 11，容纳 FTMS Service Data 的 31 字节预算 (实际={name_max})")
+check("fields.uuids16_is_complete = 0" in ble_src,
+      "主广播使用部分服务列表，完整能力由 GATT 发现")
+check("fields.svc_data_uuid16_len = sizeof(ftms_service_data)" in ble_src,
+      "主广播发布 FTMS UUID、可用状态和设备类型")
 check("完整名走 scan response" in config_src and "rsp_fields.name" in ble_src,
       "完整设备名保留在 scan response")
 check("HR_SERVICE_UUID" in adv_block,

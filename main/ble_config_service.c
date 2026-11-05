@@ -17,12 +17,14 @@ static uint16_t s_control_handle;
 static uint8_t s_response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
 static ble_config_commit_cb_t s_commit_cb;
 static ble_config_indicate_cb_t s_indicate_cb;
+static ble_config_reserve_cb_t s_reserve_cb;
 static ble_gatt_access_fn *s_identity_access;
 static struct {
     bool active;
     bool committing;
     uint32_t id;
     uint32_t revision;
+    uint32_t response_token;
     uint8_t written;
     config_data_t staging;
 } s_transaction;
@@ -64,7 +66,7 @@ static bool snapshot_equal(const config_data_t *lhs, const config_data_t *rhs)
     return true;
 }
 
-static void send_response(uint8_t opcode, uint8_t result, uint8_t restart,
+static void send_response(uint32_t token, uint8_t opcode, uint8_t result, uint8_t restart,
                            uint32_t transaction, uint32_t revision)
 {
     uint8_t response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
@@ -73,7 +75,7 @@ static void send_response(uint8_t opcode, uint8_t result, uint8_t restart,
     portENTER_CRITICAL(&s_lock);
     memcpy(s_response, response, sizeof(response));
     portEXIT_CRITICAL(&s_lock);
-    if (s_indicate_cb) s_indicate_cb(s_control_handle, response, sizeof(response));
+    if (s_indicate_cb) s_indicate_cb(token, response, sizeof(response));
 }
 
 static int meta_access(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
@@ -127,7 +129,7 @@ static int group_access(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
 
 static int control_access(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
-    (void)ch; (void)ah; (void)arg;
+    (void)ah; (void)arg;
     if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
         uint8_t response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
         portENTER_CRITICAL(&s_lock);
@@ -141,6 +143,8 @@ static int control_access(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt 
     if (ble_hs_mbuf_to_flat(ctxt->om, payload, sizeof(payload), &length) || !length) {
         return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
     }
+    uint32_t token = s_reserve_cb ? s_reserve_cb(ch, s_control_handle) : 0;
+    if (!token) return BLE_ATT_ERR_INSUFFICIENT_RES;
     uint8_t opcode = payload[0];
     uint8_t result = BLE_CONFIG_RESULT_SUCCESS;
     uint32_t transaction = 0;
@@ -189,6 +193,7 @@ static int control_access(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt 
                 base_revision = s_transaction.revision;
                 s_transaction.active = false;
                 s_transaction.committing = true;
+                s_transaction.response_token = token;
                 submit = true;
             }
             portEXIT_CRITICAL(&s_lock);
@@ -216,7 +221,7 @@ static int control_access(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt 
             portEXIT_CRITICAL(&s_lock);
         }
     } else result = BLE_CONFIG_RESULT_PROTOCOL_MISMATCH;
-    send_response(opcode, result, 0, transaction, revision);
+    send_response(token, opcode, result, 0, transaction, revision);
     return 0;
 }
 
@@ -256,8 +261,10 @@ static const struct ble_gatt_svc_def s_service = {
     }
 };
 
-void ble_config_service_reset(ble_config_indicate_cb_t indicate, ble_gatt_access_fn *identity)
+void ble_config_service_reset(ble_config_reserve_cb_t reserve,
+                              ble_config_indicate_cb_t indicate, ble_gatt_access_fn *identity)
 {
+    s_reserve_cb = reserve;
     s_indicate_cb = indicate;
     s_identity_access = identity;
     s_control_handle = 0;
@@ -334,6 +341,7 @@ void ble_config_service_commit_result(uint32_t transaction, uint8_t result,
     s_transaction.committing = false;
     s_transaction.written = 0;
     uint32_t revision = s_revision;
+    uint32_t token = s_transaction.response_token;
     portEXIT_CRITICAL(&s_lock);
-    send_response(BLE_CONFIG_OP_COMMIT, result, restart, transaction, revision);
+    send_response(token, BLE_CONFIG_OP_COMMIT, result, restart, transaction, revision);
 }
