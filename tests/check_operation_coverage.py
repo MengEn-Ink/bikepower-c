@@ -37,6 +37,9 @@ REQUIRED_IDS = [
     "OP-WIFI-001",
     "OP-STAB-001",
     "OP-STAB-002",
+    "OP-STAB-003",
+    "OP-STAB-004",
+    "OP-STAB-005",
     "OP-REL-001",
     "OP-MANUAL-001",
 ]
@@ -60,6 +63,10 @@ REQUIRED_COMMANDS = [
     "python3 tests/stage5_portal_test.py",
     "python3 tests/check_config_consistency.py",
     "python3 tests/check_operation_coverage.py",
+    "python3 tests/portal_exception_browser.py",
+    "python3 tests/test_pages_exceptions.py",
+    "python3 tests/test_portal_faults.py",
+    "python3 tests/test_device_gate_commands.py",
 ]
 
 

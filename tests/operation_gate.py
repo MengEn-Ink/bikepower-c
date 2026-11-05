@@ -187,6 +187,7 @@ def quick_steps(gate):
     run_step(gate, "BLE 重连 harness 单测", "python3 tests/test_ble_reconnect_harness.py", 30)
     run_step(gate, "BLE profile harness 单测", "python3 tests/test_device_profile_harness.py", 30)
     run_step(gate, "BLE running 分阶段 harness 单测", "python3 tests/test_ble_running_harness.py", 30)
+    run_step(gate, "设备门禁板型命令契约", "python3 tests/test_device_gate_commands.py", 30)
     run_step(gate, "WiFi 完成事件契约", "python3 tests/check_wifi_done_contract.py", 30)
     run_step(gate, "FTMS 控制点契约", "python3 tests/check_ftms_control_contract.py", 30)
     run_step(gate, "Mock 保存回显", "python3 tests/test_portal_config_save.py", 60)
@@ -198,11 +199,14 @@ def quick_steps(gate):
     run_step(gate, "门户结构", "python3 tests/check_portal_structure.py", 60)
     run_step(gate, "门户 JS", "python3 tests/check_portal_js.py", 60)
     run_step(gate, "压缩门户手机与桌面交互", "python3 tests/check_portal_render.py", 180)
+    run_step(gate, "门户 HTTP 异常与恢复 E2E", "python3 tests/portal_exception_browser.py", 180)
+    run_step(gate, "Pages BLE 事务异常与重试 E2E", "python3 tests/test_pages_exceptions.py", 120)
 
 
 def full_steps(gate, build):
     quick_steps(gate)
     run_step(gate, "生产门户容量与超时 ASan/UBSan", "python3 tests/test_portal_runtime.py", 60)
+    run_step(gate, "生产门户 HTTP 事务故障 ASan/UBSan", "python3 tests/test_portal_faults.py", 60)
     run_step(gate, "配置一致性", "python3 tests/check_config_consistency.py", 60)
     run_step(gate, "NVS schema", "python3 tests/check_nvs_schema.py", 60)
     run_step(gate, "板型描述表", "python3 tests/check_board_desc.py", 60)
@@ -223,6 +227,7 @@ def full_steps(gate, build):
 
 
 def device_steps(gate, port, run_portal, device_profile, board):
+    board_env = f"BIKEPOWER_EXPECT_BOARD={shlex.quote(board)} " if board else ""
     if port:
         run_step(
             gate,
@@ -237,14 +242,14 @@ def device_steps(gate, port, run_portal, device_profile, board):
         run_step(
             gate,
             "BLE 骑行 profile 自测",
-            "python3 tests/device_profile_harness.py --profile cycling",
+            board_env + "python3 tests/device_profile_harness.py --profile cycling",
             120,
             acceptance_item="ble_cycling",
         )
         run_step(
             gate,
             "BLE 跑步 profile 会话自测",
-            "python3 tests/device_profile_harness.py --profile running",
+            board_env + "python3 tests/device_profile_harness.py --profile running",
             150,
             acceptance_item="ble_running",
         )
@@ -252,7 +257,7 @@ def device_steps(gate, port, run_portal, device_profile, board):
         run_step(
             gate,
             "BLE 骑行 profile 自测",
-            "python3 tests/ble_selftest.py --profile cycling 12 250",
+            board_env + "python3 tests/ble_selftest.py --profile cycling 12 250",
             90,
             acceptance_item="ble_cycling",
         )
@@ -276,7 +281,7 @@ def device_steps(gate, port, run_portal, device_profile, board):
         run_step(
             gate,
             "BLE 跑步 profile 会话自测",
-            "python3 tests/ble_selftest.py --profile running --control 12",
+            board_env + "python3 tests/ble_selftest.py --profile running --control 12",
             120,
             acceptance_item="ble_running",
         )
