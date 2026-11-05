@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "defaultActionId": "wifi-portal-mock",
+  "actions": [
+    {
+      "id": "wifi-portal-mock",
+      "name": "WiFi 配置端 Mock",
+      "command": "python3 tests/mock_server.py --bind 127.0.0.1 --port 8080",
+      "cwd": ".",
+      "background": true,
+      "source": "agent",
+      "readiness": {
+        "outputPatterns": [
+          "Mock server: http://127.0.0.1:8080"
+        ],
+        "timeoutMs": 10000
+      },
+      "open": {
+        "type": "preview",
+        "url": "http://127.0.0.1:8080/",
+        "urlFromOutput": false
+      }
+    }
+  ]
+}
