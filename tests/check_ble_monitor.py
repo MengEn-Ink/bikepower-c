@@ -55,8 +55,8 @@ def main():
 
     required_html_tokens = [
         ("navigator.bluetooth.requestDevice", "支持首次授权选择 BikePower 设备"),
-        ("filters:CYCLING_SERVICE_FILTERS", "首次设备选择仅显示广播骑行相关服务的设备"),
-        ("CYCLING_SERVICE_SET.has", "连接后复核设备实际提供骑行相关 GATT 服务"),
+        ("filters:[...CYCLING_SERVICE_FILTERS", "首次选择覆盖运动服务及明确授权的参考服务"),
+        ("CYCLING_SERVICE_SET.has", "连接后复核运动或明确授权的参考 GATT 服务"),
         ("navigator.bluetooth.getDevices", "支持已授权设备自动重连"),
         ("watchAdvertisements", "刷新后等待已授权设备重新广播再自动连接"),
         ("LAST_DEVICE_KEY", "记住上次连接的设备并优先自动连接"),
@@ -204,8 +204,8 @@ def main():
     for service_name in ("cpsService", "hrService", "cscService", "ftmsService"):
         check(service_name in cycling_filter_src,
               f"设备选择器包含 {service_name} 骑行服务过滤条件", failures)
-    check("rscService" not in cycling_filter_src,
-          "仅 RSC 跑步设备不会进入骑行设备选择列表", failures)
+    check("rscService" in cycling_filter_src,
+          "RSC 跑步设备可进入兼容性参考列表", failures)
 
     # ---------- 新手引导（onboarding tour） ----------
     onboarding_tokens = [

@@ -15,6 +15,9 @@ d.classList.toggle("dark",t==="dark");
 var m=document.getElementById("theme-color-meta");if(m)m.setAttribute("content",t==="light"?"#fbfbfc":"#0b0b0b");})();
 </script>
 <title>BikePower 实时信号监控与固件刷写</title>
+<link rel="stylesheet" href="./ble-compatibility.css">
+<script src="./ble-compatibility.js"></script>
+<script defer src="./ble-compatibility-ui.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=JetBrains+Mono:wght@400;500;700&display=swap">
@@ -1544,6 +1547,16 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
     </ol>
     <div class="guide-note">App 对 RSC 与 FTMS 的支持不同。若只有心率被识别，先确认 App 是否支持跑步传感器，再核对运动类型和广播项。</div>
   </section>
+  <section class="mg-sec" aria-labelledby="mg-compat-title">
+    <h2 class="mg-h" id="mg-compat-title">连接兼容性诊断</h2>
+    <p class="guide-intro">骑鬥或码表搜不到、连不上、连接后无数据时，先确认支持 BLE、搜索角色与当前运动模式。开发板只允许一个下游连接，先关闭占用它的网页或 App。</p>
+    <ol class="guide-list">
+      <li>电脑 Chrome / Edge 打开本站「设备比对」，填写目标、版本、系统和失败阶段，添加开发板与同一目标下正常的参考设备。</li>
+      <li>等待通知后冻结快照、分析服务与能力差异。读取失败和未授权会显示为未知；名称复制不会复制 GATT 或私有握手。</li>
+      <li>点击「释放连接并开始实测」，本站所有标签页暂停连接，刷新仍暂停。到目标端验证，再记录并导出诊断 JSON。</li>
+      <li>建议连续连接 5 次、稳定收数 30 分钟；关闭目标端连接后，结束实测并手动重新连接网页。</li>
+    </ol>
+  </section>
 
   <section class="mg-sec" aria-labelledby="mg-check-title">
     <h2 class="mg-h" id="mg-check-title"><span>06</span>拿起实物，逐项验收</h2>
@@ -1937,6 +1950,56 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 
   <!-- ============ 模式三：多设备比对 ============ -->
   <section id="mode-compare" class="hidden">
+    <section class="card compatibility" id="compatibility-diagnosis" aria-labelledby="compat-title">
+      <div class="card-head">
+        <div><span class="eyebrow">BLE COMPATIBILITY</span><h2 id="compat-title">为什么目标端连不上？</h2></div>
+        <span class="badge warn" id="compat-status" role="status">等待设备快照</span>
+      </div>
+      <p class="compat-lead">添加开发板与一台在同一目标端连接正常的设备，冻结蓝牙快照后对比。目标可填写任意支持 BLE 的软件或码表；结论绑定版本、系统与设备角色。</p>
+      <div class="compat-fields">
+        <label>目标软件 / 码表<input id="compat-target" maxlength="100" placeholder="例如：骑鬥、码表型号"></label>
+        <label>目标版本<input id="compat-version" maxlength="100" placeholder="软件或码表固件版本"></label>
+        <label>系统 / 平台<input id="compat-platform" maxlength="100" placeholder="例如：Android、Windows"></label>
+        <label>设备角色<select id="compat-role"><option value="power">功率计</option><option value="cadence">踏频</option><option value="heart-rate">心率</option><option value="trainer">智能骑行台</option><option value="running">跑步传感器</option></select></label>
+        <label>失败阶段<select id="compat-stage"><option value="connect">连不上</option><option value="discover">搜不到</option><option value="disconnect">频繁断开</option><option value="data">连接后无数据</option><option value="control">控制失败</option></select></label>
+      </div>
+      <details class="compat-permissions">
+        <summary>参考设备使用私有服务？补充 UUID 授权</summary>
+        <label for="compat-private-uuids">已知服务 UUID（逗号或换行分隔，最多 16 个）</label>
+        <textarea id="compat-private-uuids" rows="2" placeholder="完整 128 位 UUID 或 4 位标准 UUID"></textarea>
+        <p>填写后重新点下方「添加设备」授权。浏览器仅能枚举授权范围内的服务，不能读取硬件 MAC、完整广播或目标软件的握手。未知私有协议需原生采集协助分析。</p>
+      </details>
+      <div class="compat-fields compat-pair">
+        <label>开发板<select id="compat-board"><option value="">选择已添加设备</option></select></label>
+        <label>正常参考设备<select id="compat-reference"><option value="">选择已添加设备</option></select></label>
+      </div>
+      <div class="actions compat-actions"><button class="btn alt" id="compat-add-device" type="button" onclick="addCompareDevice()">添加 / 连接设备</button><span class="hint">每次连接一台，可直接选择实时监控中的设备。</span></div>
+      <label class="compat-check"><input type="checkbox" id="compat-reference-works">已确认参考设备在上述目标、版本与角色下连接正常</label>
+      <div class="actions compat-actions">
+        <button class="btn primary" id="compat-capture">冻结两台设备快照</button>
+        <button class="btn alt" id="compat-analyze">分析固定快照</button>
+        <button class="btn alt" id="compat-export">导出诊断 JSON</button>
+        <label class="btn ghost" for="compat-import">导入诊断 JSON</label><input class="compat-file" type="file" id="compat-import" accept=".json,application/json">
+      </div>
+      <p class="hint" id="compat-snapshots">快照独立于实时列表。连接后等待通知，再冻结；重新冻结或更改场景会清除旧实测结果。</p>
+      <div id="compat-results" class="compat-results" aria-live="polite"></div>
+      <div class="compat-handoff">
+        <h3>把连接交给目标端</h3>
+        <p>释放本站所有标签页的连接并暂停自动重连，然后在软件 / 码表测试。其他网站与 App 的连接需自行关闭。</p>
+        <div class="actions"><button class="btn primary" id="compat-handoff">释放连接并开始实测</button><button class="btn alt" id="compat-resume">结束实测，允许手动连接</button></div>
+        <p id="compat-handoff-status" role="status">网页连接尚未暂停</p>
+        <div class="compat-fields compat-outcomes">
+          <label>发现设备<select id="compat-result-discovery"></select></label>
+          <label>建立连接<select id="compat-result-connection"></select></label>
+          <label>数据稳定<select id="compat-result-data"></select></label>
+          <label>断开重连<select id="compat-result-reconnect"></select></label>
+          <label>控制操作<select id="compat-result-control"></select></label>
+        </div>
+        <label class="compat-notes">实测备注<textarea id="compat-test-notes" rows="3" maxlength="2000" placeholder="记录连接次数、持续时间、异常与固件版本。建议连续连接 5 次、稳定收数 30 分钟。"></textarea></label>
+        <button class="btn alt" id="compat-save-test">保存人工实测记录</button>
+        <p class="hint" id="compat-test-status">尚无实测记录。网页分析不会自动证明目标端兼容。</p>
+      </div>
+    </section>
     <div class="card">
       <div class="card-head">
         <h2>设备比对 · 模板写入开发板</h2>
@@ -2488,10 +2551,19 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="ch-meta">
               <div class="ch-kicker">WEB TOOLS</div>
               <h2 class="ch-title">网页工具台 · 设备比对与模板写入</h2>
-              <p class="ch-desc">想让开发板在骑行 App 里显示得像另一台真实设备？用「设备比对」读取参考设备的身份信息，复制为模板，再一键写入开发板。</p>
+              <p class="ch-desc">用「设备比对」诊断软件或码表连接失败，也可读取参考设备身份并写入模板。身份复制只改变名称和 DIS 字段。</p>
             </div>
           </header>
           <div class="ch-body">
+            <h3 class="ch-sub">连接兼容性诊断 · 从快照到目标端实测</h3>
+            <ol class="m-steps">
+              <li><p>填写任意 BLE 软件或码表的名称、版本、平台、设备角色及失败阶段；连接开发板和同一目标下正常的参考设备，确认参考条件。</p></li>
+              <li><p>等待通知后「冻结两台设备快照」，分析服务、特征属性、Feature 能力值和原始通知。快照固定，不随实时值改变；重新冻结或修改场景会清除旧实测结果。</p></li>
+              <li><p>已知私有服务可补充 UUID 后重新授权。浏览器只能访问授权范围，未采集、读取失败不等于设备缺失；完整广播、硬件 MAC 和目标软件握手需原生工具采集。</p></li>
+              <li><p>点「释放连接并开始实测」后本站所有标签页暂停连接，刷新后仍暂停。在目标端验证发现、连接、数据、重连及可选控制；建议连续连接 5 次、稳定收数 30 分钟。</p></li>
+              <li><p>保存人工记录并导出 JSON。导入记录仍是人工证据；关闭目标端连接后，结束实测并手动重新连接网页。</p></li>
+            </ol>
+            <div class="m-callout">开发板仅支持一个下游连接。网页占用可能导致目标搜不到或连不上；身份复制不能补齐 GATT、Feature 或私有控制协议。诊断建议需在具体目标版本上验证。</div>
             <h3 class="ch-sub">进站连接：蓝牙是主连接，USB 串口只用于刷写</h3>
             <p class="m-p">打开工具台会先弹出<b>蓝牙连接门</b>（类似钱包网站进站先连接钱包）：点「连接蓝牙设备」并在浏览器弹窗里选中设备即可。本站点授权过的设备会直接列出，点一下免弹窗直连；刷新页面时会自动重连上次的设备。连接成功后默认打开本手册，并在页面<b>右上角常驻连接胶囊</b>：绿点 = 已连接，红点 = 已断开（点击可一键重连），黄点 = 连接中或镜像其他标签页。点胶囊可查看厂商 / 型号 / 固件，切换设备、断开或直接写入身份。</p>
             <div class="m-callout">USB 数据线与 Web Serial 只在「固件刷写」页使用；刷完后拔掉数据线也没关系，其余所有工具都走蓝牙。不想马上连接可点「先看手册，稍后连接」，本次会话内不再弹出。</div>
@@ -2776,6 +2848,7 @@ const UUIDS = {
   cscMeasurement:"00002a5b-0000-1000-8000-00805f9b34fb",
   rscMeasurement:"00002a53-0000-1000-8000-00805f9b34fb",
   ftmsIndoorBike:"00002ad2-0000-1000-8000-00805f9b34fb",
+  ftmsTreadmill:"00002acd-0000-1000-8000-00805f9b34fb",
   ftmsStatus:"00002ada-0000-1000-8000-00805f9b34fb",
   ftmsControlPoint:"00002ad9-0000-1000-8000-00805f9b34fb",
   ftmsFeature:"00002acc-0000-1000-8000-00805f9b34fb",
@@ -2808,7 +2881,7 @@ const CUSTOM_UUID_NAMES = {
 };
 const IDENTITY_PROFILE_UUID = "7a5a0008-4c7a-4f2a-9b3e-6d1f4a8c0b21";
 const CYCLING_SERVICE_UUIDS = [
-  UUIDS.cpsService, UUIDS.hrService, UUIDS.cscService, UUIDS.ftmsService,
+  UUIDS.cpsService, UUIDS.hrService, UUIDS.cscService, UUIDS.ftmsService, UUIDS.rscService,
 ];
 const CYCLING_SERVICE_FILTERS = CYCLING_SERVICE_UUIDS.map(uuid=>({services:[uuid]}));
 const CYCLING_SERVICE_SET = new Set(CYCLING_SERVICE_UUIDS);
@@ -2820,6 +2893,44 @@ const ALL_OPTIONAL_SERVICES = [
   "0000181c-0000-1000-8000-00805f9b34fb",
   "0000181d-0000-1000-8000-00805f9b34fb",
 ];
+const COMPATIBILITY_HANDOFF_KEY="bikepower.compatibility.handoff.v1";
+const COMPATIBILITY_MANUAL_KEY="bikepower.compatibility.manual.v1";
+let bleCompatibilityPaused=false;
+let bleCompatibilityManualRequired=false;
+try{
+  bleCompatibilityPaused=localStorage.getItem(COMPATIBILITY_HANDOFF_KEY)==="1";
+  bleCompatibilityManualRequired=localStorage.getItem(COMPATIBILITY_MANUAL_KEY)==="1";
+}catch(e){}
+let bleConnectionEpoch=0;
+const pageGattDevices=new Set();
+const pageGattPermissions=new WeakMap();
+const pageGattEpochs=new WeakMap();
+function compatibilityHandoffActive(){return bleCompatibilityPaused;}
+function disconnectPageGatt(device,epoch){
+  if(compatibilityHandoffActive()||pageGattEpochs.get(device)===epoch){
+    try{device.gatt.disconnect();}catch(e){}
+  }
+}
+function allowManualPageConnection(){
+  if(compatibilityHandoffActive())return;
+  bleCompatibilityManualRequired=false;
+  autoLinkUserDisconnected=false;
+  try{localStorage.setItem(COMPATIBILITY_MANUAL_KEY,"0");}catch(e){}
+}
+function assertBleConnection(device,epoch){
+  if(compatibilityHandoffActive()||epoch!==bleConnectionEpoch){
+    disconnectPageGatt(device,epoch);
+    throw new Error("目标端实测期间网页连接已暂停，请先结束实测。");
+  }
+}
+async function connectPageGatt(device,epoch){
+  assertBleConnection(device,epoch);
+  pageGattDevices.add(device);
+  pageGattEpochs.set(device,epoch);
+  const server=await device.gatt.connect();
+  assertBleConnection(device,epoch);
+  return server;
+}
 const DIS_CHARS = [
   ["manufacturer","厂商","00002a29-0000-1000-8000-00805f9b34fb"],
   ["model","型号","00002a24-0000-1000-8000-00805f9b34fb"],
@@ -3127,12 +3238,24 @@ function handleNotify(rec,serviceKey,event){
   try{
     markNotify(rec,serviceKey);
     const view=event.target.value;
+    const uuid=event.target.uuid||({cps:UUIDS.cpsMeasurement,hr:UUIDS.hrMeasurement,csc:UUIDS.cscMeasurement,rsc:UUIDS.rscMeasurement,ftms:UUIDS.ftmsIndoorBike,treadmill:UUIDS.ftmsTreadmill})[serviceKey];
+    if(uuid&&view){
+      if(!rec.compatibilitySamples)rec.compatibilitySamples=[];
+      rec.compatibilitySamples.push({uuid,at:Date.now(),raw:hexDump(new Uint8Array(view.buffer,view.byteOffset,view.byteLength))});
+      if(rec.compatibilitySamples.length>120)rec.compatibilitySamples.splice(0,rec.compatibilitySamples.length-120);
+    }
     const latest=rec.latest;
     if(serviceKey==="cps"){const p=parseCyclingPower(view);latest.power=p.power;if(p.power<0||p.power>ANOMALY_LIMITS.powerMax)recordAnomaly("power",p.power+" W");}
     else if(serviceKey==="hr"){const hr=parseHeartRate(view);latest.hr=hr;if(hr<ANOMALY_LIMITS.hrMin||hr>ANOMALY_LIMITS.hrMax)recordAnomaly("heartrate",hr+" BPM");}
     else if(serviceKey==="csc"){const c=parseCsc(rec,view);if(c!==null){latest.cadence=c;if(c>ANOMALY_LIMITS.cadenceMax)recordAnomaly("cadence",c+" RPM");}}
     else if(serviceKey==="ftms"){const d=parseIndoorBike(view);if(d.speed!==null&&latest.speed===null)latest.speed=d.speed;if(d.cadence!==null&&latest.cadence===null)latest.cadence=Math.round(d.cadence);if(d.power!==null){latest.ftmsPower=d.power;if(d.power<0||d.power>ANOMALY_LIMITS.powerMax)recordAnomaly("power",d.power+" W(FTMS)");}}
     else if(serviceKey==="rsc"){const d=parseRsc(view);latest.speed=d.speed;latest.cadence=d.cadence;latest.distance=d.distanceM;if(d.speed>ANOMALY_LIMITS.speedMaxKmh)recordAnomaly("speed",d.speed.toFixed(2)+" km/h");}
+    else if(serviceKey==="treadmill"&&window.BikePowerCompatibility){
+      const d=window.BikePowerCompatibility.decodePacket(uuid,hexDump(new Uint8Array(view.buffer,view.byteOffset,view.byteLength)));
+      if(d.speedKmh!==undefined)latest.speed=d.speedKmh;
+      if(d.distanceM!==undefined)latest.distance=d.distanceM;
+      if(d.heartRateBpm!==undefined)latest.hr=d.heartRateBpm;
+    }
     appendSignalHistory(rec);
     renderRealtime(rec);
     gattLiveUpdate(rec,event.target);
@@ -4007,13 +4130,20 @@ function prepareForFlash(){
 
 /* ==================== 通用：连接任意 BLE 设备 ==================== */
 async function requestDevice(){
+  if(compatibilityHandoffActive()){log("目标端实测期间网页连接已暂停，请先结束实测。","warn");return null;}
   if(flashSession&&flashSession.isBusy()){log("请先关闭串口安装/日志会话再连接蓝牙","warn");return null;}
   if(!checkSupport())return null;
   try{
+    const epoch=bleConnectionEpoch;
+    const extra=currentMode==="compare"&&window.BikePowerCompatibilityUI?window.BikePowerCompatibilityUI.privateServices():[];
+    const optionalServices=[...new Set([...ALL_OPTIONAL_SERVICES,...extra])];
     const device=await navigator.bluetooth.requestDevice({
-      filters:CYCLING_SERVICE_FILTERS,
-      optionalServices:ALL_OPTIONAL_SERVICES,
+      filters:[...CYCLING_SERVICE_FILTERS,...extra.map(uuid=>({services:[uuid]}))],
+      optionalServices,
     });
+    assertBleConnection(device,epoch);
+    pageGattPermissions.set(device,optionalServices);
+    allowManualPageConnection();
     return device;
   }catch(err){
     if(err.name==="NotFoundError"){log("用户取消了设备选择","warn");}
@@ -4045,37 +4175,44 @@ async function readDeviceInfo(server){
 
 async function enumerateServices(server){
   const services=[];
+  services.coverage={scope:"authorized",enumeration:"complete",allowedServices:[]};
   let reads=0;
   try{
     const svcs=await server.getPrimaryServices();
     for(const svc of svcs){
-      const entry={uuid:svc.uuid,name:svcName(svc.uuid),isPrimary:true,characteristics:[]};
+      const entry={uuid:svc.uuid,name:svcName(svc.uuid),isPrimary:true,enumeration:"complete",characteristics:[]};
       try{
         const chars=await svc.getCharacteristics();
         for(const ch of chars){
-          const item={uuid:ch.uuid,name:charName(ch.uuid),properties:propFlags(ch),value:null,raw:null};
+          const item={uuid:ch.uuid,name:charName(ch.uuid),properties:propFlags(ch),value:null,raw:null,
+            readStatus:ch.properties.read?"skipped":"not-readable",readError:""};
           // 读取一次可读特征的当前值，用于 GATT 列表中文解析；限制次数避免拖慢连接
           if(ch.properties.read&&reads<48){
             reads++;
-            try{const v=await ch.readValue();item.raw=hexDump(new Uint8Array(v.buffer,v.byteOffset,v.byteLength));item.value=decodeGattValue(ch.uuid,v);}
-            catch(err){item.value="读取失败："+(err.message||err.name);}
+            try{const v=await ch.readValue();item.raw=hexDump(new Uint8Array(v.buffer,v.byteOffset,v.byteLength));item.readStatus="ok";item.value=decodeGattValue(ch.uuid,v);}
+            catch(err){item.readStatus=item.raw===null?"failed":"ok";item.readError=err.message||err.name;item.value="读取/解析失败："+item.readError;}
           }
           entry.characteristics.push(item);
         }
       }catch(err){
+        entry.enumeration="failed";
+        services.coverage.enumeration="partial";
         entry.characteristics.push({uuid:"",name:"读取特征失败: "+err.message,properties:""});
       }
       services.push(entry);
     }
   }catch(err){
+    services.coverage.enumeration="failed";
     log("GATT 服务枚举失败: "+err.message,"warn");
   }
   return services;
 }
 
 async function connectAndCollect(device){
+  const epoch=bleConnectionEpoch;
+  assertBleConnection(device,epoch);
   if(flashSession&&flashSession.isBusy())throw new Error("串口会话期间禁止新建 BLE 会话");
-  const rec={device,server:null,info:{},services:[],connectedAt:new Date().toISOString(),
+  const rec={device,server:null,info:{},services:[],compatibilitySamples:[],connectedAt:new Date().toISOString(),
     latest:{power:null,hr:null,cadence:null,speed:null,ftmsPower:null,distance:null},
     lastNotifyAt:0,cscPrev:null,staleOpen:false,subscriptions:{},notifyTimes:{},history:[],lastHistoryAt:0,lastHistoryTrimAt:0,
     sessionStartedAt:Date.now(),sessionEndedAt:0,
@@ -4094,21 +4231,28 @@ async function connectAndCollect(device){
     }
   });
   try{
-    rec.server=await device.gatt.connect();
+    rec.server=await connectPageGatt(device,epoch);
     log("GATT 已连接: "+(device.name||"(无名)"));
     rec.info=await readDeviceInfo(rec.server);
+    assertBleConnection(device,epoch);
     log("DIS 信息读取完成");
     rec.services=await enumerateServices(rec.server);
+    assertBleConnection(device,epoch);
+    rec.gattCoverage={...rec.services.coverage,allowedServices:pageGattPermissions.get(device)||ALL_OPTIONAL_SERVICES,
+      scope:pageGattPermissions.has(device)?"authorized":"unknown"};
     log("已枚举 "+rec.services.length+" 个 GATT 服务");
-    if(!rec.services.some(service=>CYCLING_SERVICE_SET.has(service.uuid.toLowerCase()))){
+    if(!rec.services.some(service=>CYCLING_SERVICE_SET.has(service.uuid.toLowerCase())||(pageGattPermissions.get(device)||[]).includes(service.uuid.toLowerCase()))){
       try{rec.server.disconnect();}catch(e){}
-      throw new Error("该设备未提供骑行功率、心率、骑行速度/踏频或智能骑行台服务，已过滤");
+      throw new Error("该设备未提供运动服务或已明确授权的参考服务，已过滤");
     }
     await readDeviceConfig(rec);
+    assertBleConnection(device,epoch);
     await subscribeNotifications(rec);
+    assertBleConnection(device,epoch);
     if(anomalyTimer)clearInterval(anomalyTimer);
     anomalyTimer=setInterval(checkAnomalies,1000);
   }catch(err){
+    disconnectPageGatt(device,epoch);
     log("连接/读取失败: "+err.message,"error");
     throw err;
   }
@@ -4122,6 +4266,7 @@ async function subscribeNotifications(rec){
     ["csc",UUIDS.cscService,UUIDS.cscMeasurement],
     ["rsc",UUIDS.rscService,UUIDS.rscMeasurement],
     ["ftms",UUIDS.ftmsService,UUIDS.ftmsIndoorBike],
+    ["treadmill",UUIDS.ftmsService,UUIDS.ftmsTreadmill],
   ];
   for(const [key,svcUuid,charUuid] of map){
     try{
@@ -4147,7 +4292,7 @@ async function connectAuthorized(){
     addCompareDeviceFromExisting(candidate);
     return;
   }
-  autoLinkUserDisconnected=false;
+  allowManualPageConnection();
   const ok=await autoConnect("manual");
   if(!ok)log("没有可连接的已授权设备，请先点击扫描并连接设备","warn");
 }
@@ -4162,6 +4307,7 @@ async function connectAnyDevice(){
 
 /* 统一的单设备连接入口：手动选择、刷新自动连接、断线重连、跨标签页关联都走这里 */
 async function connectSingleWith(device,source="picker",timeoutMs=20000){
+  if(compatibilityHandoffActive())return false;
   if(flashSession&&flashSession.isBusy())return false;
   if(singleDevice&&singleDevice.server){const previous=singleDevice;singleDevice=null;try{previous.server.disconnect();}catch(e){}}
   mirrorState=null;
@@ -4174,7 +4320,8 @@ async function connectSingleWith(device,source="picker",timeoutMs=20000){
   setLinkState("connecting",device);setText("monitor-device-name",device.name||"未命名设备");
   try{
     let timer=null;
-    const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{try{device.gatt.disconnect();}catch(e){}reject(new Error("连接超时（"+Math.round(timeoutMs/1000)+" 秒），设备可能不在附近或未上电"));},timeoutMs);});
+    const epoch=bleConnectionEpoch;
+    const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{disconnectPageGatt(device,epoch);reject(new Error("连接超时（"+Math.round(timeoutMs/1000)+" 秒），设备可能不在附近或未上电"));},timeoutMs);});
     const rec=await Promise.race([connectAndCollect(device),timeout]).finally(()=>clearTimeout(timer));
     singleDevice=rec;
     renderSingleDevice(rec);
@@ -4462,6 +4609,7 @@ function clearCompareDevices(){
 }
 
 function renderCompareTable(){
+  if(window.BikePowerCompatibilityUI)window.BikePowerCompatibilityUI.refreshDevices();
   const wrap=$("compare-table-wrap");
   const table=$("compare-table");
   renderCompareFlow();
@@ -4656,11 +4804,14 @@ async function inspectorConnect(){
   if(!device) return;
   inspectorBadge("连接中…","warn");
   try{
+    const epoch=bleConnectionEpoch;
     if(inspectorState.rec && inspectorState.rec.server){ try{inspectorState.rec.server.disconnect();}catch(e){} }
     const rec={device, server:null, services:[], info:{}, latest:{}, subscriptions:{}, notifyTimes:{}, history:[]};
-    rec.server=await device.gatt.connect();
+    rec.server=await connectPageGatt(device,epoch);
     rec.info=await readDeviceInfo(rec.server);
+    assertBleConnection(device,epoch);
     rec.services=await enumerateServices(rec.server);
+    assertBleConnection(device,epoch);
     device.addEventListener("gattserverdisconnected", ()=>{
       inspectorBadge("已断开","err"); inspectorState.subscriptions.clear(); renderInspectorTree();
       log("[inspector] 设备已断开","warn");
@@ -4898,6 +5049,7 @@ async function sha256Hex(input){
 }
 
 async function runHealthCheck(){
+  if(compatibilityHandoffActive()){log("请先结束目标端实测再检查网页连接。","warn");return;}
   if(healthState.running){ log("[health] 已在运行","warn"); return; }
   resetHealthCheck();
   healthState.running=true;
@@ -4925,9 +5077,10 @@ async function runHealthCheck(){
     const device=await requestDevice();
     if(!device){ setHealthStep("device","fail","未选择设备或权限被拒绝。"); healthFinalize(false); return; }
     const t0=performance.now();
+    const epoch=bleConnectionEpoch;
     healthState.device=device;
     device.addEventListener("gattserverdisconnected", ()=>{ log("[health] 设备在检查期间断开","warn"); });
-    const server=await device.gatt.connect();
+    const server=await connectPageGatt(device,epoch);
     healthState.server=server;
     const connectMs=Math.round(performance.now()-t0);
     setHealthStep("device","pass","已连接 <code>"+escapeHtml(device.name||"(无名)")+"</code>","连接耗时 "+connectMs+" ms · deviceId 已哈希");
@@ -4935,6 +5088,7 @@ async function runHealthCheck(){
     // Step 4: DIS
     setHealthStep("dis","running","读取 DIS 特征…");
     const info=await readDeviceInfo(server);
+    assertBleConnection(device,epoch);
     healthState.info=info;
     const filled=Object.values(info).filter(v=>v).length;
     if(filled===0){ setHealthStep("dis","warn","设备未提供可读的 DIS 特征。"); }
@@ -4943,6 +5097,7 @@ async function runHealthCheck(){
     // Step 5: GATT enum
     setHealthStep("gatt","running","枚举 Primary Services…");
     const services=await enumerateServices(server);
+    assertBleConnection(device,epoch);
     healthState.services=services;
     let totalChars=0, notifyChars=0, readChars=0, writeChars=0;
     services.forEach(s=>s.characteristics.forEach(c=>{ totalChars++; if(c.properties.includes("notify")||c.properties.includes("indicate")) notifyChars++; if(c.properties.includes("read")) readChars++; if(c.properties.includes("write")) writeChars++; }));
@@ -4957,6 +5112,7 @@ async function runHealthCheck(){
       ["csc",UUIDS.cscService,UUIDS.cscMeasurement],
       ["rsc",UUIDS.rscService,UUIDS.rscMeasurement],
       ["ftms",UUIDS.ftmsService,UUIDS.ftmsIndoorBike],
+      ["treadmill",UUIDS.ftmsService,UUIDS.ftmsTreadmill],
     ];
     const subs=[];
     for(const [key,su,cu] of subMap){
@@ -5169,7 +5325,7 @@ const GATT_CUSTOM_CN={
 const SENSOR_LOCATION_CN=["其他","鞋面","鞋内","臀部","前轮","左曲柄","右曲柄","左踏板","右踏板","前轮毂","后勾爪","链条","后轮","后轮毂","胸部","中轴"];
 const BODY_LOCATION_CN=["其他","胸部","手腕","手指","手掌","耳垂","脚部"];
 const APPEARANCE_CN={0:"未知",0x0340:"心率传感器",0x0341:"心率胸带",0x0440:"跑步速度传感器",0x0441:"鞋内跑步传感器",0x0480:"骑行设备",0x0481:"骑行码表",0x0482:"速度传感器",0x0483:"踏频传感器",0x0484:"功率计",0x0485:"速度与踏频传感器"};
-const FTMS_MACHINE_FEATURES=["平均速度","踏频","总距离","坡度","海拔增益","步数","阻力等级","步幅计数","能量消耗","心率","代谢当量","已用时间","剩余时间","功率测量","力 / 皮带","用户数据保留"];
+const FTMS_MACHINE_FEATURES=["平均速度","踏频","总距离","坡度","海拔增益","配速","步数","阻力等级","步幅计数","能量消耗","心率","代谢当量","已用时间","剩余时间","功率测量","力 / 皮带","用户数据保留"];
 const FTMS_TARGET_FEATURES=["目标速度","目标坡度","目标阻力","目标功率（ERG）","目标心率","目标能量","目标步数","目标步幅","目标距离","目标训练时长","两区心率时间","三区心率时间","五区心率时间","室内骑行模拟","车轮周长","Spin Down 校准","目标踏频"];
 const CPS_FEATURES=["踏板功率平衡","累计扭矩","车轮转数","曲柄转数","极值幅度","极值角度","上 / 下死点角","累计能量","偏移补偿指示","偏移补偿","内容屏蔽","多传感器位置","曲柄长度调整","链条长度调整","链条重量调整","跨距调整","传感器测量方式","仪表方向","因子校准日期","增强偏移补偿"];
 const FTMS_STATUS_CN={0x01:"器材已复位",0x02:"已被用户停止 / 暂停",0x03:"已被安全键停止",0x04:"已被用户启动 / 恢复",0x05:"目标速度已变更",0x06:"目标坡度已变更",0x07:"目标阻力已变更",0x08:"目标功率已变更",0x09:"目标心率已变更",0x0a:"目标能量已变更",0x12:"室内骑行模拟参数已变更",0x13:"车轮周长已变更",0x14:"Spin Down 状态",0x15:"目标踏频已变更",0xff:"控制权已丢失"};
@@ -5369,7 +5525,7 @@ const TAB_ID=Math.random().toString(36).slice(2,8);
 const RECONNECT_DELAYS=[1500,3000,6000,10000,15000,30000];
 let autoLinkEnabled=true;
 let autoLinkBusy=false;
-let autoLinkUserDisconnected=false;
+let autoLinkUserDisconnected=bleCompatibilityManualRequired;
 let reconnectTimer=null;
 let reconnectAttempt=0;
 let tabBus=null;
@@ -5378,12 +5534,34 @@ let mirrorState=null;
 let lastRelayAt=0;
 
 function isSingleConnected(){return !!(singleDevice&&singleDevice.server&&singleDevice.server.connected);}
+function setCompatibilityHandoff(active,publish=true){
+  if(bleCompatibilityPaused!==!!active)bleConnectionEpoch++;
+  bleCompatibilityPaused=!!active;
+  bleCompatibilityManualRequired=true;
+  autoLinkUserDisconnected=true;
+  clearTimeout(reconnectTimer);
+  mirrorState=null;
+  if(active){
+    const records=[singleDevice,...compareDevices,inspectorState.rec];
+    const devices=new Set([...pageGattDevices,...records.filter(Boolean).map(r=>r.device),healthState.device].filter(Boolean));
+    devices.forEach(device=>{try{device.gatt.disconnect();}catch(e){}});
+    records.filter(Boolean).forEach(rec=>{try{if(rec.server)rec.server.disconnect();}catch(e){}});
+    try{if(healthState.server)healthState.server.disconnect();}catch(e){}
+  }
+  setAutoLinkStatus(active?"目标端实测：本站网页连接已暂停，刷新后仍保持暂停。":"实测已结束，请手动连接设备。");
+  if(publish){
+    try{localStorage.setItem(COMPATIBILITY_HANDOFF_KEY,active?"1":"0");}catch(e){}
+    try{localStorage.setItem(COMPATIBILITY_MANUAL_KEY,"1");}catch(e){}
+    tabBusPost({type:"compatibility-handoff",active:!!active});
+  }
+  if(window.BikePowerCompatibilityUI)window.BikePowerCompatibilityUI.renderHandoff();
+}
 function setAutoLinkStatus(text,kind=""){const el=$("autolink-status");if(el){el.textContent=text;el.className="autolink-status"+(kind?" "+kind:"");}}
 function setAutoLinkEnabled(on){
   autoLinkEnabled=!!on;try{localStorage.setItem(AUTOLINK_KEY,on?"1":"0");}catch(e){}
   if(!on){clearTimeout(reconnectTimer);setAutoLinkStatus("自动连接已关闭：刷新或断线后需手动连接。");return;}
   setAutoLinkStatus("自动连接已开启。");
-  if(!isSingleConnected()){autoLinkUserDisconnected=false;autoConnect("auto");}
+  if(!isSingleConnected()&&!bleCompatibilityManualRequired){autoLinkUserDisconnected=false;autoConnect("auto");}
 }
 function rememberDevice(rec){try{localStorage.setItem(LAST_DEVICE_KEY,JSON.stringify({id:rec.device.id,name:rec.device.name||"",at:Date.now()}));}catch(e){}}
 function lastDevice(){try{return JSON.parse(localStorage.getItem(LAST_DEVICE_KEY)||"null");}catch(e){return null;}}
@@ -5406,6 +5584,8 @@ function waitForAdvertisement(device,ms){
   });
 }
 async function autoConnect(reason){
+  const epoch=bleConnectionEpoch;
+  if(compatibilityHandoffActive()||(autoLinkUserDisconnected&&reason!=="manual"))return false;
   if(flashSession&&flashSession.isBusy())return false;
   if(!autoLinkEnabled&&reason!=="manual")return false;
   if(isSingleConnected())return true;
@@ -5416,6 +5596,7 @@ async function autoConnect(reason){
   try{
     const peer=[...tabPeers.values()].find(p=>p.connected&&p.deviceId);
     const devices=await orderedAuthorizedDevices(peer&&peer.deviceId);
+    if(compatibilityHandoffActive()||epoch!==bleConnectionEpoch)return false;
     if(!devices.length){setAutoLinkStatus("本站点还没有已授权设备：请先点「扫描并连接设备」完成一次授权。");if(gateOpen&&gateState()==="auto")setGate("choose");return false;}
     for(const device of devices.slice(0,4)){
       if(isSingleConnected())return true;
@@ -5424,10 +5605,11 @@ async function autoConnect(reason){
       if(!viaPeer){
         setAutoLinkStatus("正在寻找「"+name+"」的广播…","busy");
         const adv=await waitForAdvertisement(device,6000);
+        if(compatibilityHandoffActive()||epoch!==bleConnectionEpoch)return false;
         if(adv==="timeout"){log("自动连接：6 秒内未收到「"+name+"」的广播，跳过","warn");continue;}
       }
       setAutoLinkStatus((viaPeer?"正在关联其他标签页已连接的「":"正在连接「")+name+"」…","busy");
-      try{await connectSingleWith(device,viaPeer?"tab":(reason==="reconnect"?"reconnect":"auto"),15000);return true;}
+      try{return !!(await connectSingleWith(device,viaPeer?"tab":(reason==="reconnect"?"reconnect":"auto"),15000));}
       catch(err){log("自动连接「"+name+"」失败："+err.message,"warn");}
     }
     if(!isSingleConnected())setAutoLinkStatus("附近没有发现已授权设备。确认开发板已上电，或点「扫描并连接设备」。","err");
@@ -5462,6 +5644,7 @@ function onSingleDeviceDisconnected(rec){
 }
 function scheduleReconnect(delay){
   clearTimeout(reconnectTimer);
+  if(compatibilityHandoffActive())return;
   if(reconnectAttempt>=RECONNECT_DELAYS.length){setAutoLinkStatus("已连续重连 "+RECONNECT_DELAYS.length+" 次未成功，停止自动重连。请检查设备后手动连接。","err");return;}
   const wait=delay||RECONNECT_DELAYS[reconnectAttempt];reconnectAttempt++;
   setAutoLinkStatus("连接已断开，"+Math.round(wait/1000)+" 秒后进行第 "+reconnectAttempt+" 次自动重连…","busy");
@@ -5482,6 +5665,8 @@ function tabBusPing(){
 }
 function tabBusReceive(message){
   if(!message||message.tab===TAB_ID)return;
+  if(message.type==="compatibility-handoff"){setCompatibilityHandoff(message.active===true,false);return;}
+  if(compatibilityHandoffActive())return;
   const peer=tabPeers.get(message.tab)||{connected:false,deviceId:null,name:""};
   peer.seen=Date.now();tabPeers.set(message.tab,peer);
   if(message.type==="hello"){tabBusPing();}
@@ -5501,6 +5686,7 @@ function tabBusReceive(message){
   renderTabRelay();
 }
 async function maybeFollowPeer(tab,peer){
+  if(compatibilityHandoffActive())return;
   if(!autoLinkEnabled||autoLinkUserDisconnected||isSingleConnected()||autoLinkBusy)return;
   if(mirrorState&&mirrorState.tab===tab)return;
   const ok=await autoConnect("tab");
@@ -5552,10 +5738,19 @@ function initAutoLink(){
   const box=$("autolink-enabled");if(box)box.checked=autoLinkEnabled;
   try{if(typeof BroadcastChannel!=="undefined"){tabBus=new BroadcastChannel(TAB_BUS_NAME);tabBus.onmessage=event=>tabBusReceive(event.data);}}catch(e){tabBus=null;}
   window.addEventListener("storage",event=>{if(event.key===TAB_BUS_NAME&&event.newValue){try{tabBusReceive(JSON.parse(event.newValue));}catch(err){}}});
+  window.addEventListener("storage",event=>{if(event.key===COMPATIBILITY_HANDOFF_KEY)setCompatibilityHandoff(event.newValue==="1",false);});
+  window.addEventListener("storage",event=>{
+    if(event.key===COMPATIBILITY_MANUAL_KEY){
+      bleCompatibilityManualRequired=event.newValue==="1";
+      autoLinkUserDisconnected=bleCompatibilityManualRequired||compatibilityHandoffActive();
+    }
+  });
   window.addEventListener("beforeunload",()=>tabBusPost({type:"bye"}));
   setInterval(()=>{tabBusPing();renderTabRelay();},3000);
   tabBusPost({type:"hello"});
   renderTabRelay();
+  if(compatibilityHandoffActive()){setCompatibilityHandoff(true,false);return;}
+  if(bleCompatibilityManualRequired){setAutoLinkStatus("实测已结束，请手动连接设备。");return;}
   if(!navigator.bluetooth){setAutoLinkStatus("此浏览器不支持 Web Bluetooth，请使用桌面 Chrome / Edge。","err");return;}
   if(!navigator.bluetooth.getDevices){setAutoLinkStatus("此浏览器不支持 getDevices()，刷新后需手动连接；多标签页仍可镜像数据。","err");return;}
   if(!autoLinkEnabled){setAutoLinkStatus("自动连接已关闭。");return;}
@@ -5654,7 +5849,7 @@ function onCapsuleClick(event){
 function closeCapPanel(){const panel=$("cap-panel");if(panel)panel.classList.add("hidden");const b=$("cap-btn");if(b)b.setAttribute("aria-expanded","false");}
 async function reconnectFromCapsule(){
   if(!singleDevice)return openGate({force:true});
-  autoLinkUserDisconnected=false;
+  allowManualPageConnection();
   try{await connectSingleWith(singleDevice.device,"reconnect");}catch(err){log("重新连接失败："+err.message,"warn");openGate({force:true,state:"error",message:err.message});}
 }
 function capsuleArrive(){
@@ -5738,7 +5933,7 @@ async function gateConnectPicker(){
 }
 async function gateConnectKnown(i){const d=gateKnown[i];if(d&&!gateBusy)await gateRun(d,"auto");}
 async function gateRun(device,source){
-  gateBusy=true;autoLinkUserDisconnected=false;
+  gateBusy=true;allowManualPageConnection();
   setGate("connecting",{name:device.name||"未命名设备"});
   try{const rec=await connectSingleWith(device,source);gateBusy=false;await gateSuccess(rec);}
   catch(err){setGate("error",{message:err.message});}
@@ -5836,6 +6031,7 @@ async function initLinkUi(){
     else closeCapPanel();
   });
   renderLinkCapsule();renderManualLinkbar();
+  if(compatibilityHandoffActive())return;
   const route=routeFromHash(location.hash);
   if(route.mode==="flash")return;                      // 刷写页只用 USB 串口，不打扰
   let skipped=false;try{skipped=sessionStorage.getItem(GATE_SKIP_KEY)==="1";}catch(e){}
@@ -5843,6 +6039,7 @@ async function initLinkUi(){
   gateReturnMode=route.mode!=="manual"?route.mode:null; // 深链进来的，连接后回到原工具页
   if(!navigator.bluetooth){openGate({state:"unsupported"});return;}
   const known=await orderedAuthorizedDevices();
+  if(compatibilityHandoffActive())return;
   if(isSingleConnected()||mirrorState)return;
   if(known.length&&autoLinkEnabled){const last=lastDevice();openGate({state:"auto",name:(last&&last.name)||known[0].name||"上次的设备"});}
   else openGate({state:"choose"});

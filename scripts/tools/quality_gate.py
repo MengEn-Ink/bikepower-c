@@ -391,6 +391,8 @@ STATIC_CHECKS = [
     ("tests/test_maintenance_tools.py", "维护工具功能回归"),
     ("tests/test_ble_config_service.py", "生产 BLE 配置 GATT 回调 ASan/UBSan"),
     ("tests/test_ble_runtime.py", "生产 BLE 同轮通知快照 ASan/UBSan"),
+    ("tests/test_ble_compatibility.py", "BLE 标准特征与 Pages 兼容诊断回归"),
+    ("tests/test_ble_standard_contract.py", "生产 FTMS 标准与广播事务 ASan/UBSan"),
     ("tests/test_portal_runtime.py", "生产门户容量与超时 ASan/UBSan"),
     ("tests/test_portal_faults.py", "生产门户 HTTP 事务故障 ASan/UBSan"),
     ("tests/test_device_gate_commands.py", "设备门禁板型命令契约"),
