@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>BikePower · 设备状态设计原型</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="mock.js"></script>
+  <script defer src="api.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="#overview">Bike<span>Power</span><small>/c</small></a>
+    <nav class="tools" aria-label="Pages 工具上下文">
+      <span>使用手册</span><span>固件刷写</span><span>实时监控</span><span>设备比对</span>
+      <b aria-current="page">设备状态</b><span>通知检查</span><span>健康检查</span>
+    </nav>
+    <button id="theme" class="button quiet" type="button" aria-label="切换浅色与深色主题">深色外观</button>
+  </header>
+  <div class="prototype-bar">
+    <span><b>布局评审原型</b> · 所有数据均为演示，未连接真实开发板</span>
+    <a href="assessment.md">查看实现链路与设计说明 ↗</a>
+  </div>
+  <section class="resident-monitor" aria-label="页面常驻监控">
+    <div class="resident-status"><i id="resident-dot" class="dot live-dot"></i><div><b>常驻监控</b><span id="resident-state">离线演示 · 每秒更新</span></div></div>
+    <button class="resident-item memory-color" data-open-window="memory" type="button"><span>内存余量</span><b id="resident-heap" class="live-number">—</b><small>查看详情 ↗</small></button>
+    <button class="resident-item cpu-color" data-open-window="cpu" type="button"><span>CPU</span><b id="resident-cpu" class="live-number">未启用</b><small>查看详情 ↗</small></button>
+    <button class="resident-item bluetooth-color" data-open-window="bluetooth" type="button"><span>蓝牙 RSSI</span><b id="resident-rssi" class="live-number">—</b><small>查看详情 ↗</small></button>
+    <button id="open-window" class="button primary" type="button">打开监控窗口</button>
+  </section>
+  <main class="page">
+    <section class="connection" aria-label="共享蓝牙连接">
+      <div class="connection-left"><i id="connection-dot" class="dot"></i><strong id="connection-name">BikePower C</strong><span id="connection-state">已连接 · 演示</span><span class="connection-note">与实时监控共用连接</span></div>
+      <button id="connection-action" class="button" type="button">释放连接</button>
+    </section>
+    <div class="page-heading">
+      <div><p class="eyebrow">DEVICE ACTIVITY</p><h1>设备状态<span class="heading-dot">.</span></h1><p class="subtitle">看清资源余量、运行节拍与蓝牙链路。</p></div>
+      <div class="actions">
+        <label class="scenario-label" for="scenario">演示场景<select id="scenario">
+          <option value="normal">正常运行</option><option value="low">内存偏低</option>
+          <option value="stale">遥测中断</option><option value="high">CPU 高负载 · 规划</option><option value="weak">信号偏弱</option><option value="legacy">旧固件</option><option value="disconnected">未连接</option>
+        </select></label>
+        <button id="pause" class="button" type="button">暂停页面</button>
+        <button id="export" class="button primary" type="button">导出演示报告</button>
+      </div>
+    </div>
+    <div id="notice" class="notice" role="status" aria-live="polite"></div>
+    <section class="metric-strip" aria-label="关键运行指标">
+      <article class="metric memory-color" id="memory-card">
+        <div class="metric-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19v-3M10 19v-3M14 19v-3M18 19v-3M8 11V8M12 11V8M16 11V8"/><rect x="2" y="4" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg><span>内存空闲比例</span><span class="source">板端</span></div>
+        <div class="metric-number"><b id="heap-value" class="live-number">—</b><span id="heap-unit">%</span><span id="heap-chip" class="chip">余量充足</span></div>
+        <div class="composition-labels"><span id="memory-free-label">空闲 —</span><span id="memory-used-label">已用 —</span></div>
+        <div class="bar"><i id="heap-bar"></i><em title="80 KiB 项目警戒线"></em></div>
+        <p id="heap-caption">启动最低 — · 最大连续块 —</p>
+        <div id="memory-spark" class="sparkline" aria-hidden="true"></div>
+        <button class="text-button" data-open-window="memory" type="button">打开内存监控窗口 ↗</button>
+      </article>
+      <article class="metric cpu-color" id="cpu-card">
+        <div class="metric-label"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg><span>CPU 使用率</span><span class="source">演示已启用</span></div>
+        <div class="metric-number"><b id="cpu-value" class="live-number">—</b><span id="cpu-unit"></span></div>
+        <div class="composition-labels"><span id="cpu-busy-label">忙碌 —</span><span id="cpu-idle-label">空闲 —</span></div>
+        <div class="bar cpu-bar"><i id="cpu-bar"></i><em title="80% 演示高负载提示线"></em></div>
+        <p id="cpu-caption" class="cpu-caption">CPU 演示采样 · 每秒更新</p>
+        <button id="cpu-demo" class="text-button" type="button">查看 CPU 统计规划 →</button>
+        <div id="cpu-spark" class="sparkline" aria-hidden="true"></div>
+        <button class="text-button" data-open-window="cpu" type="button">打开 CPU 监控窗口 ↗</button>
+      </article>
+      <article class="metric bluetooth-color" id="bluetooth-card">
+        <div class="metric-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg><span>蓝牙链路</span><span class="source">板端 + 网页</span></div>
+        <div class="metric-number"><b id="rssi-value" class="live-number">—</b><span id="rssi-unit">dBm</span><span id="ble-chip" class="chip">持续收样</span></div>
+        <p id="ble-caption">最近通知 — · 接收间隔 P95 —</p>
+        <span class="metric-foot">RSSI 为开发板接收网页端信号的强度</span>
+        <div id="bluetooth-spark" class="sparkline" aria-hidden="true"></div>
+        <button class="text-button" data-open-window="bluetooth" type="button">打开蓝牙监控窗口 ↗</button>
+      </article>
+    </section>
+    <div class="workspace">
+      <section class="activity-panel">
+        <div class="panel-toolbar">
+          <nav class="tabs" aria-label="资源分类">
+            <button type="button" data-tab="overview" class="selected" aria-pressed="true">总览</button>
+            <button type="button" data-tab="memory" aria-pressed="false">内存</button>
+            <button type="button" data-tab="cpu" aria-pressed="false">CPU</button>
+            <button type="button" data-tab="bluetooth" aria-pressed="false">蓝牙</button>
+            <button type="button" data-tab="events" aria-pressed="false">事件</button>
+          </nav>
+          <div class="range" aria-label="趋势时窗"><button type="button" data-range="60" aria-pressed="true" class="selected">60 秒</button><button type="button" data-range="300" aria-pressed="false">5 分钟</button></div>
+        </div>
+        <div class="chart-heading"><div><h2 id="chart-title">内存余量</h2><p id="chart-subtitle">同一采样时间轴 · 示例历史</p></div><span id="chart-readout" class="mono">—</span></div>
+        <div id="chart" class="chart"></div>
+        <div id="chart-foot" class="chart-foot"></div>
+        <div class="details-heading"><h2 id="detail-title">任务快照</h2><label class="search"><span class="sr-only">搜索明细</span><input id="search" type="search" placeholder="筛选任务名称"></label></div>
+        <p id="detail-subtitle" class="detail-subtitle">栈余量为任务启动以来的最低空闲值 · 不是每个任务的堆内存占用</p>
+        <div id="table" class="table-wrap"></div>
+        <div class="panel-foot"><span id="sample-state">—</span><span id="sample-count">—</span></div>
+      </section>
+      <aside class="sidebar">
+        <section class="side-section"><div class="side-title"><h2>当前设备</h2><span class="small-tag">开发板</span></div>
+          <dl class="facts"><div><dt>硬件</dt><dd>ESP32-C3</dd></div><div><dt>固件</dt><dd id="firmware">遥测候选 · 示例</dd></div><div><dt>模式</dt><dd>骑行 / 模拟</dd></div><div><dt>运行时长</dt><dd id="uptime">—</dd></div><div><dt>CPU 主频</dt><dd>160 MHz</dd></div><div><dt>WiFi</dt><dd>未开启</dd></div><div><dt>遥测能力</dt><dd id="capability">内存 / 系统 / 链路</dd></div></dl>
+        </section>
+        <section class="side-section"><div class="side-title"><h2>连接与采样</h2><span id="sampling-badge" class="small-tag">1 Hz</span></div>
+          <dl class="facts"><div><dt>采样序号</dt><dd id="sequence">—</dd></div><div><dt>连接间隔</dt><dd id="interval">—</dd></div><div><dt>ATT MTU</dt><dd id="mtu">—</dd></div><div><dt>发送失败 / 尝试</dt><dd id="tx">—</dd></div><div><dt>本次连接断开</dt><dd id="disconnects">—</dd></div></dl>
+          <p class="side-note">通知送入协议栈成功，不代表目标 App 已收到。页面后台暂停时不判定无线丢包。</p>
+        </section>
+        <section class="side-section"><div class="side-title"><h2>最近事件</h2><button id="all-events" class="text-button" type="button">全部 →</button></div><ol id="event-list" class="event-list"></ol></section>
+        <section class="connection-tip"><h2>准备测试骑行 App？</h2><p>网页占用唯一外设连接。释放后，开发板重新广播，供 App 或码表连接。</p><button id="release-bottom" class="button" type="button">释放网页连接</button></section>
+      </aside>
+    </div>
+    <footer class="footer"><span>借鉴 Mac 活动监视器的信息组织 · 延续 BikePower Pages 视觉</span><span>规划评审 · 不代表固件验收结果</span></footer>
+  </main>
+  <dialog id="monitor-window" class="monitor-window" aria-labelledby="window-title">
+    <header id="window-drag-handle" class="window-titlebar">
+      <div><span class="window-kicker">独立详情窗口 · 离线演示</span><h2 id="window-title">设备活动监控</h2></div>
+      <div class="window-controls">
+        <button id="window-minimize" class="button quiet" type="button" aria-label="折叠监控窗口">折叠</button>
+        <button id="window-maximize" class="button quiet" type="button" aria-label="放大监控窗口">放大</button>
+        <button id="window-close" class="button quiet" type="button" aria-label="关闭监控窗口">关闭</button>
+      </div>
+    </header>
+    <div class="window-body">
+      <div class="window-toolbar">
+        <nav class="tabs" aria-label="窗口指标分类"><button data-window-tab="memory" type="button" aria-pressed="true" class="selected">内存</button><button data-window-tab="cpu" type="button" aria-pressed="false">CPU</button><button data-window-tab="bluetooth" type="button" aria-pressed="false">蓝牙</button></nav>
+        <div class="window-actions"><span id="window-live-state">实时演示</span><button id="window-pause" class="button" type="button">暂停窗口</button></div>
+      </div>
+      <p class="window-hint">页面与窗口共用演示采样，暂停各自画面不会停止另一处更新。桌面可拖动标题栏、拖动右下角调整大小。</p>
+      <div id="window-metrics" class="window-metrics"></div>
+      <div class="window-chart-heading"><h3 id="window-chart-title">详细趋势</h3><div class="range"><button type="button" data-window-range="60" class="selected" aria-pressed="true">60 秒</button><button type="button" data-window-range="300" aria-pressed="false">5 分钟</button></div></div>
+      <div id="window-chart" class="chart"></div>
+      <div id="window-table" class="table-wrap"></div>
+      <footer class="window-footer"><span id="window-sample">—</span><span>模拟数据 · 无真实蓝牙调用</span></footer>
+    </div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

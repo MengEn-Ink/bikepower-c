@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>BikePower · 设备状态设计原型</title>
+  <style>
+:root{color-scheme:light;--bg:#f1f2f5;--panel:#fff;--panel-2:#f5f6f8;--ink:#14161a;--muted:#5b5f67;--line:#dce0e6;--line-soft:#ebedf0;--accent:#946600;--fill:#f5c451;--green:#14804a;--red:#cc3437;--blue:#2160c4;--sans:"Avenir Next","PingFang SC","Microsoft YaHei",sans-serif;--mono:Menlo,"SFMono-Regular",Consolas,monospace;--shadow:0 8px 32px rgba(20,22,26,.035)}
+:root[data-theme=dark]{color-scheme:dark;--bg:#0b0b0b;--panel:#100f0e;--panel-2:#171614;--ink:#f4f3f1;--muted:#9a968f;--line:#2e2c29;--line-soft:#24221f;--accent:#f5c451;--green:#6fd39a;--red:#ff6b6b;--blue:#6aa8ff;--shadow:0 8px 32px rgba(0,0,0,.12)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit}button,a,select{touch-action:manipulation}button{cursor:pointer}a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}button:disabled{opacity:.45;cursor:not-allowed}svg{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}h1,h2,p{margin:0}h2{font-size:16px;font-weight:600}.mono{font-family:var(--mono)}.masthead{display:flex;align-items:center;gap:32px;min-height:72px;background:var(--panel);padding:12px 32px;border-bottom:1px solid var(--line)}.brand{font-size:24px;letter-spacing:-1px;font-weight:700;white-space:nowrap;color:var(--ink)}.brand span{color:var(--accent)}.brand small{font-size:14px;color:var(--muted);margin-left:8px}.tools{display:flex;gap:24px;flex:1;align-items:center;color:var(--muted);font-size:12px;flex-wrap:wrap}.tools b{color:var(--ink);padding:8px 0;border-bottom:2px solid var(--accent)}.prototype-bar{display:flex;justify-content:space-between;gap:16px;padding:8px 32px;color:var(--muted);font-size:12px;background:var(--panel-2);border-bottom:1px solid var(--line)}.prototype-bar b{color:var(--ink);font-weight:600}.page{max-width:1440px;margin:auto;padding:24px 32px}.button{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 16px;min-height:36px;border-radius:6px;font-size:12px;white-space:nowrap;transition:background .12s,border-color .12s}.button:hover{background:var(--panel-2);border-color:var(--muted)}.button.primary{background:var(--fill);border-color:var(--fill);color:#17120b;font-weight:600}.button.primary:hover{background:#eab534}.button.quiet{background:transparent}.text-button{border:0;background:none;padding:0;color:var(--accent);font-size:12px;min-height:28px;text-align:left}.text-button:hover{text-decoration:underline}.connection{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--panel);border:1px solid var(--line);border-radius:8px}.connection-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.connection-left>span{color:var(--muted);font-size:12px}.connection-note{border-left:1px solid var(--line);padding-left:12px}.dot{height:8px;width:8px;border-radius:50%;background:var(--green)}.dot.off{background:var(--muted)}.page-heading{display:flex;justify-content:space-between;gap:24px;align-items:center;margin:32px 0 24px}.eyebrow{color:var(--muted);font:12px var(--mono);letter-spacing:2px;margin-bottom:8px}h1{font-size:32px;line-height:1.2;font-weight:600;letter-spacing:-1px}.heading-dot{color:var(--accent)}.subtitle{color:var(--muted);margin-top:8px}.actions{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}.scenario-label{display:flex;flex-direction:column;color:var(--muted);gap:4px;font-size:12px}.scenario-label select{padding:8px 32px 8px 12px;min-height:36px;border-radius:6px;border:1px solid var(--line);color:var(--ink);background:var(--panel)}.notice{padding:12px 16px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--green);color:var(--muted);border-radius:6px;margin-bottom:16px;font-size:12px}.notice.warn{border-left-color:var(--accent)}.notice.error{border-left-color:var(--red)}.notice b{color:var(--ink)}.metric-strip{display:grid;grid-template-columns:1.1fr 1fr 1.1fr;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden;margin-bottom:24px;box-shadow:var(--shadow)}.metric{padding:20px 24px;min-width:0}.metric+.metric{border-left:1px solid var(--line)}.metric-label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}.metric-label svg{width:20px;height:20px}.source{margin-left:auto;font-size:12px;color:var(--muted)}.metric-number{display:flex;align-items:baseline;gap:8px;margin:16px 0 12px}.metric-number b{font:400 32px/1.1 var(--mono);letter-spacing:-1px}.metric-number>span{font-size:12px;color:var(--muted)}.chip{margin-left:auto;color:var(--green)!important;border:1px solid var(--line);padding:2px 8px;border-radius:4px}.chip.warn{color:var(--red)!important}.metric p{font-size:12px;color:var(--muted);margin-top:8px}.metric-foot{display:block;color:var(--muted);font-size:12px;margin-top:8px}.bar{height:4px;background:var(--panel-2);position:relative;margin:16px 0}.bar i{display:block;height:100%;background:var(--green);transition:width .15s}.bar em{position:absolute;left:25%;height:8px;width:1px;top:-2px;background:var(--accent)}.bar.warn i{background:var(--red)}.cpu-caption{margin-top:24px!important}.workspace{display:grid;grid-template-columns:minmax(0,1fr) 288px;gap:24px;align-items:start}.activity-panel{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}.panel-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;border-bottom:1px solid var(--line)}.tabs,.range{display:flex;gap:4px;flex-wrap:wrap}.tabs button,.range button{border:1px solid transparent;border-radius:4px;padding:8px 12px;color:var(--muted);background:none;font-size:12px}.tabs button:hover,.range button:hover{color:var(--ink);background:var(--panel-2)}.tabs button.selected{color:var(--ink);background:var(--panel-2);border-color:var(--line)}.range button{padding:4px 8px}.range button.selected{color:var(--accent);border-color:var(--line)}.chart-heading{padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;gap:16px}.chart-heading p{font-size:12px;color:var(--muted);margin-top:4px}.chart-heading>span{font-size:12px;color:var(--green)}.chart{min-height:248px;padding:8px 16px}.chart svg{width:100%;height:auto;display:block;font:12px var(--mono)}.chart .grid{stroke:var(--line-soft);stroke-width:1}.chart .axis{fill:var(--muted);stroke:none;font-size:12px}.chart .series{stroke:var(--green);stroke-width:2}.chart .series.blue{stroke:var(--blue)}.chart .series.secondary{stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 4}.chart .threshold{stroke:var(--accent);stroke-width:1;stroke-dasharray:4 4}.chart .area{fill:var(--green);fill-opacity:.045;stroke:none}.chart-foot{padding:0 24px 16px;color:var(--muted);font-size:12px;display:flex;gap:16px;flex-wrap:wrap}.legend{display:inline-flex;align-items:center;gap:8px}.legend i{width:16px;height:2px;background:var(--green)}.legend.second i{background:var(--muted)}.legend.warn i{background:var(--accent)}.empty-chart{min-height:232px;display:flex;align-items:center;justify-content:center;text-align:center;flex-direction:column;gap:8px;color:var(--muted);padding:24px}.empty-chart b{color:var(--ink);font-size:16px;font-weight:500}.empty-chart span{font-size:12px;max-width:420px}.details-heading{border-top:1px solid var(--line);padding:20px 24px 8px;display:flex;justify-content:space-between;gap:16px;align-items:center}.search input{width:180px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);border-radius:4px;padding:8px 12px;font-size:12px}.detail-subtitle{font-size:12px;color:var(--muted);padding:0 24px 16px}.table-wrap{padding:0 24px 16px;overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}th{color:var(--muted);font-weight:400;text-align:left;background:var(--panel-2)}th,td{padding:12px;border-bottom:1px solid var(--line-soft)}th:first-child,td:first-child{padding-left:12px}td:nth-child(n+2){font-family:var(--mono)}tr:hover td{background:var(--panel-2)}.panel-foot{border-top:1px solid var(--line);padding:12px 24px;color:var(--muted);display:flex;justify-content:space-between;gap:16px;font:12px var(--mono)}.sidebar{display:flex;flex-direction:column;gap:16px}.side-section{border:1px solid var(--line);background:var(--panel);padding:20px;border-radius:8px}.side-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px}.side-title h2,.connection-tip h2{font-size:14px}.small-tag{border:1px solid var(--line);color:var(--muted);font:12px var(--mono);padding:2px 4px;border-radius:4px}.facts{margin:0}.facts>div{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:12px}.facts>div:last-child{border-bottom:0}.facts dt{color:var(--muted)}.facts dd{margin:0;text-align:right;font-family:var(--mono)}.side-note{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.6}.event-list{list-style:none;padding:0;margin:0}.event-list li{position:relative;padding:0 0 16px 16px;border-left:1px solid var(--line);margin-left:4px;color:var(--muted);font-size:12px}.event-list li:last-child{padding-bottom:0;border-left:0}.event-list li:before{content:"";position:absolute;left:-3px;top:6px;width:5px;height:5px;border-radius:50%;background:var(--muted)}.event-list li.alert:before{background:var(--red)}.event-list time{font:12px var(--mono);display:block;margin-bottom:4px}.event-list b{display:block;color:var(--ink);font-weight:500}.connection-tip{padding:16px 20px;border-left:2px solid var(--accent);background:var(--panel-2)}.connection-tip p{font-size:12px;color:var(--muted);margin:8px 0 12px}.connection-tip .button{width:100%}.footer{display:flex;justify-content:space-between;gap:16px;margin-top:24px;color:var(--muted);font-size:12px;padding-bottom:16px}.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);background:var(--ink);color:var(--panel);padding:12px 24px;border-radius:6px;font-size:12px;box-shadow:var(--shadow);z-index:10}.toast[hidden]{display:none}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+:root{--cpu:#a26f00;--memory-wash:rgba(20,128,74,.05);--cpu-wash:rgba(162,111,0,.05);--bluetooth-wash:rgba(33,96,196,.05);--danger-wash:rgba(204,52,55,.06)}
+:root[data-theme=dark]{--cpu:#f5c451;--memory-wash:rgba(111,211,154,.06);--cpu-wash:rgba(245,196,81,.06);--bluetooth-wash:rgba(106,168,255,.06);--danger-wash:rgba(255,107,107,.08)}
+.resident-monitor{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:24px;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 32px;box-shadow:var(--shadow)}
+.resident-status{display:flex;align-items:center;gap:12px;margin-right:auto}.resident-status b{display:block;font-size:12px}.resident-status span{display:block;font:12px var(--mono);color:var(--muted)}
+.resident-item{display:grid;grid-template-columns:auto auto;align-items:center;gap:0 12px;text-align:left;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 12px;min-height:44px;color:var(--ink)}
+.resident-item:hover{background:var(--panel-2);border-color:var(--line)}.resident-item>span{font-size:12px;color:var(--muted)}.resident-item b{font:500 16px var(--mono);grid-column:2;grid-row:1 / 3}.resident-item small{font-size:12px;color:var(--muted)}
+.memory-color{--metric-color:var(--green);--metric-wash:var(--memory-wash)}.cpu-color{--metric-color:var(--cpu);--metric-wash:var(--cpu-wash)}.bluetooth-color{--metric-color:var(--blue);--metric-wash:var(--bluetooth-wash)}
+.resident-item b,.metric .metric-number b{color:var(--metric-color)}.metric{border-top:3px solid var(--metric-color);background:var(--metric-wash);transition:background .3s,border-color .3s}
+.metric-label svg{color:var(--metric-color)}.metric-alert{--metric-color:var(--red);--metric-wash:var(--danger-wash)}.resident-item.metric-alert{background:var(--danger-wash);border-color:var(--red)}
+.metric .text-button{display:block;margin-top:4px;color:var(--metric-color)}.metric .cpu-caption{margin-top:8px!important}
+.sparkline{height:48px;margin:12px 0 4px}.sparkline svg{width:100%;height:48px}.spark-series{stroke:var(--green);stroke-width:2;fill:none}.spark-series.cpu{stroke:var(--cpu)}.spark-series.bluetooth{stroke:var(--blue)}
+.metric .bar{height:10px;background:var(--line);border-radius:4px;margin:8px 0 12px}.metric .bar i{border-radius:4px;transition:width .5s ease,background .3s}.metric .bar em{height:16px;top:-3px}.cpu-bar i{background:var(--cpu)}.cpu-bar em{left:80%;background:var(--cpu)}.cpu-bar.warn i{background:var(--red)}
+.composition-labels{display:flex;justify-content:space-between;gap:12px;font:12px var(--mono);color:var(--muted)}.composition-labels span:first-child{color:var(--metric-color,var(--green))}.composition{padding:12px 16px 4px}.composition.cpu .composition-labels span:first-child{color:var(--cpu)}
+.composition-track{height:16px;background:var(--line);border-radius:4px;margin:8px 0;overflow:hidden}.composition-track i{display:block;background:var(--green);height:100%;transition:width .5s ease}.composition.cpu .composition-track i{background:var(--cpu)}
+.percent-cell{display:flex;align-items:center;gap:12px;min-width:176px}.percent-cell b{font:500 12px var(--mono);min-width:48px;text-align:right;color:var(--cpu)}.percent-track{height:12px;background:var(--line-soft);border-radius:3px;flex:1;overflow:hidden}.percent-track i{display:block;height:100%;background:var(--cpu);transition:width .5s ease}.percent-track.idle i{background:var(--muted)}
+.task-percent-table td:nth-child(2){min-width:208px}.task-percent-table td:nth-child(2){font-family:var(--mono)}
+@media(prefers-reduced-motion:reduce){.metric .bar i,.composition-track i,.percent-track i{transition:none}}
+.chart .series.cpu{stroke:var(--cpu)}.chart .area.cpu{fill:var(--cpu)}.chart .area.blue{fill:var(--blue)}.chart .sample-point{fill:var(--green);stroke:var(--panel);stroke-width:2}.chart .sample-point.cpu{fill:var(--cpu)}.chart .sample-point.blue{fill:var(--blue)}
+.monitor-window{position:fixed;z-index:40;left:clamp(16px,12vw,240px);top:112px;margin:0;width:min(880px,calc(100vw - 48px));height:min(720px,calc(100dvh - 144px));min-width:420px;min-height:300px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);padding:0;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);resize:both;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.22)}
+.monitor-window[data-metric=memory]{--window-color:var(--green);--window-wash:var(--memory-wash)}.monitor-window[data-metric=cpu]{--window-color:var(--cpu);--window-wash:var(--cpu-wash)}.monitor-window[data-metric=bluetooth]{--window-color:var(--blue);--window-wash:var(--bluetooth-wash)}
+.monitor-window.window-alert{--window-color:var(--red);--window-wash:var(--danger-wash)}
+.window-titlebar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid var(--line);border-top:3px solid var(--window-color);background:var(--panel-2);cursor:grab;touch-action:none;user-select:none}
+.window-titlebar:active{cursor:grabbing}.window-kicker{display:block;font:12px var(--mono);color:var(--muted);margin-bottom:4px}.window-titlebar h2{font-size:16px}.window-controls{display:flex;gap:4px}.window-controls .button{padding:4px 8px;min-height:32px}
+.window-body{height:calc(100% - 88px);overflow:auto;overscroll-behavior:contain;padding:16px 20px}.window-toolbar,.window-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.window-actions>span{font:12px var(--mono);color:var(--window-color)}
+.window-hint{font-size:12px;color:var(--muted);margin:12px 0 16px}.window-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.window-metrics article{padding:16px;border:1px solid var(--line);border-left:3px solid var(--window-color);background:var(--window-wash);border-radius:6px;min-width:0}.window-metrics span{display:block;color:var(--muted);font-size:12px;margin-bottom:8px}.window-metrics b{color:var(--window-color);font:500 20px var(--mono)}
+.window-chart-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:20px}.window-chart-heading h3{font-size:14px;font-weight:500;margin:0}.window-body .chart{padding:8px 0;min-height:180px}.window-body .table-wrap{padding:0}.window-footer{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font:12px var(--mono);border-top:1px solid var(--line);padding-top:16px;margin-top:16px}
+.monitor-window.collapsed{height:auto!important;min-height:0;resize:none}.monitor-window.collapsed .window-body{display:none}.monitor-window.maximized{inset:16px!important;width:calc(100vw - 32px)!important;height:calc(100dvh - 32px)!important;resize:none}
+.monitor-window.maximized.collapsed{height:auto!important;bottom:auto!important}
+.toast{z-index:60}
+@media(prefers-reduced-motion:no-preference){
+  .live-dot{animation:live-pulse 2s ease-in-out infinite}.pulsing-point{animation:point-pulse 1s ease-out infinite}.monitor-window[open]{animation:window-in .2s ease-out}.chart .series{transition:opacity .15s}
+  body[data-live=false] .live-dot,body[data-live=false] .pulsing-point{animation-play-state:paused}
+  .monitor-window[data-live=false] .pulsing-point{animation-play-state:paused}.monitor-window[data-live=true] .pulsing-point{animation-play-state:running}
+  @keyframes live-pulse{0%,100%{box-shadow:0 0 0 0 var(--memory-wash)}50%{box-shadow:0 0 0 6px var(--memory-wash)}}
+  @keyframes point-pulse{0%{stroke-width:1;opacity:.6}100%{stroke-width:3;opacity:1}}
+  @keyframes window-in{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+}
+@media(max-width:1100px){.resident-monitor{gap:8px;padding:8px 24px}.resident-item{padding:4px 8px;gap:0 8px}.resident-item b{font-size:14px}.resident-status span{max-width:160px}}
+@media(max-width:760px){.resident-status{display:none}.resident-monitor{justify-content:space-between;padding:8px 16px}.resident-item{display:flex;flex-direction:column;align-items:flex-start;gap:4px}.resident-item small{display:none}.resident-monitor>.button{padding:8px;font-size:12px}}
+@media(max-width:520px){.resident-monitor{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.resident-item{padding:4px;min-width:0}.resident-item b{font-size:13px;white-space:nowrap}.resident-monitor>.button{grid-column:1 / -1;min-height:28px;padding:4px 8px}.metric+.metric{border-top:3px solid var(--metric-color)!important}}
+@media(max-width:600px){.monitor-window{left:12px!important;top:84px!important;width:calc(100vw - 24px)!important;min-width:0;height:calc(100dvh - 100px);resize:none;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px)}.monitor-window.maximized{inset:12px!important;width:calc(100vw - 24px)!important;height:calc(100dvh - 24px)!important}.window-titlebar{padding:12px;gap:8px}.window-kicker{font-size:12px;letter-spacing:-.5px}.window-titlebar h2{font-size:14px}.window-controls .button{padding:4px 6px}.window-body{padding:12px;height:calc(100% - 76px)}.window-toolbar{gap:8px;flex-wrap:wrap}.window-metrics{gap:8px}.window-metrics article{padding:12px 8px}.window-metrics b{font-size:14px}.window-footer{flex-direction:column;gap:4px}.window-hint{line-height:1.6}}
+@media(min-width:1024px) and (prefers-reduced-motion:no-preference){.metric-strip,.workspace{animation:appear .24s both}.workspace{animation-delay:.08s}@keyframes appear{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
+@media(max-width:1100px){.masthead{gap:24px;padding:12px 24px}.tools{gap:12px}.page{padding:24px}.workspace{grid-template-columns:minmax(0,1fr) 256px;gap:16px}.metric{padding:20px 16px}.source{display:none}.page-heading{align-items:flex-start}.metric-number b{font-size:24px}}
+@media(max-width:900px){.workspace{grid-template-columns:1fr}.sidebar{display:grid;grid-template-columns:1fr 1fr;align-items:start}.tools{display:none}.masthead .brand{flex:1}.page-heading{flex-direction:column;gap:16px}.metric-strip{grid-template-columns:1fr 1fr 1fr}.metric-number{flex-wrap:wrap}.chip{margin-left:0}.panel-toolbar{padding:16px}.actions{width:100%}.prototype-bar{padding:8px 24px}.connection-note{display:none}}
+@media(max-width:520px){.page{padding:16px}.masthead{padding:12px 16px;min-height:64px}.prototype-bar{padding:8px 16px;flex-direction:column;gap:4px}.connection{gap:8px;padding:12px}.connection-left{gap:4px 8px}.connection-left strong{font-size:12px}.connection-left>span{flex-basis:100%;padding-left:16px}.connection .button{padding:8px}.page-heading{margin-top:24px}h1{font-size:28px}.metric-strip{grid-template-columns:1fr}.metric+.metric{border-left:0;border-top:1px solid var(--line)}.metric{padding:16px 20px}.metric-number{margin:12px 0 8px}.metric-number b{font-size:32px}.chip{margin-left:auto}.source{display:block}.cpu-caption{margin-top:8px!important}.sidebar{grid-template-columns:1fr}.panel-toolbar{align-items:flex-start;flex-direction:column;gap:8px}.tabs button{padding:8px 12px}.chart-heading,.details-heading{padding-left:16px;padding-right:16px}.chart-heading{gap:8px}.chart-heading>span{font-size:12px}.details-heading{flex-direction:column;align-items:flex-start}.search,.search input{width:100%}.detail-subtitle,.chart-foot{padding-left:16px;padding-right:16px}.table-wrap{padding-left:16px;padding-right:16px}.chart{padding:8px;min-height:176px}.chart svg{min-height:168px}.panel-foot{padding:12px 16px;flex-wrap:wrap}.footer{flex-direction:column;gap:4px}.scenario-label{flex:1}.actions>.button{padding:8px 12px}.connection-tip{padding-bottom:calc(16px + env(safe-area-inset-bottom))}}
+
+</style>
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="#overview">Bike<span>Power</span><small>/c</small></a>
+    <nav class="tools" aria-label="Pages 工具上下文">
+      <span>使用手册</span><span>固件刷写</span><span>实时监控</span><span>设备比对</span>
+      <b aria-current="page">设备状态</b><span>通知检查</span><span>健康检查</span>
+    </nav>
+    <button id="theme" class="button quiet" type="button" aria-label="切换浅色与深色主题">深色外观</button>
+  </header>
+  <div class="prototype-bar">
+    <span><b>布局评审原型</b> · 所有数据均为演示，未连接真实开发板</span>
+    <span>手机预览 · 单文件离线版</span>
+  </div>
+  <section class="resident-monitor" aria-label="页面常驻监控">
+    <div class="resident-status"><i id="resident-dot" class="dot live-dot"></i><div><b>常驻监控</b><span id="resident-state">离线演示 · 每秒更新</span></div></div>
+    <button class="resident-item memory-color" data-open-window="memory" type="button"><span>内存余量</span><b id="resident-heap" class="live-number">—</b><small>查看详情 ↗</small></button>
+    <button class="resident-item cpu-color" data-open-window="cpu" type="button"><span>CPU</span><b id="resident-cpu" class="live-number">未启用</b><small>查看详情 ↗</small></button>
+    <button class="resident-item bluetooth-color" data-open-window="bluetooth" type="button"><span>蓝牙 RSSI</span><b id="resident-rssi" class="live-number">—</b><small>查看详情 ↗</small></button>
+    <button id="open-window" class="button primary" type="button">打开监控窗口</button>
+  </section>
+  <main class="page">
+    <section class="connection" aria-label="共享蓝牙连接">
+      <div class="connection-left"><i id="connection-dot" class="dot"></i><strong id="connection-name">BikePower C</strong><span id="connection-state">已连接 · 演示</span><span class="connection-note">与实时监控共用连接</span></div>
+      <button id="connection-action" class="button" type="button">释放连接</button>
+    </section>
+    <div class="page-heading">
+      <div><p class="eyebrow">DEVICE ACTIVITY</p><h1>设备状态<span class="heading-dot">.</span></h1><p class="subtitle">看清资源余量、运行节拍与蓝牙链路。</p></div>
+      <div class="actions">
+        <label class="scenario-label" for="scenario">演示场景<select id="scenario">
+          <option value="normal">正常运行</option><option value="low">内存偏低</option>
+          <option value="stale">遥测中断</option><option value="high">CPU 高负载 · 规划</option><option value="weak">信号偏弱</option><option value="legacy">旧固件</option><option value="disconnected">未连接</option>
+        </select></label>
+        <button id="pause" class="button" type="button">暂停页面</button>
+        <button id="export" class="button primary" type="button">导出演示报告</button>
+      </div>
+    </div>
+    <div id="notice" class="notice" role="status" aria-live="polite"></div>
+    <section class="metric-strip" aria-label="关键运行指标">
+      <article class="metric memory-color" id="memory-card">
+        <div class="metric-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19v-3M10 19v-3M14 19v-3M18 19v-3M8 11V8M12 11V8M16 11V8"/><rect x="2" y="4" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg><span>内存空闲比例</span><span class="source">板端</span></div>
+        <div class="metric-number"><b id="heap-value" class="live-number">—</b><span id="heap-unit">%</span><span id="heap-chip" class="chip">余量充足</span></div>
+        <div class="composition-labels"><span id="memory-free-label">空闲 —</span><span id="memory-used-label">已用 —</span></div>
+        <div class="bar"><i id="heap-bar"></i><em title="80 KiB 项目警戒线"></em></div>
+        <p id="heap-caption">启动最低 — · 最大连续块 —</p>
+        <div id="memory-spark" class="sparkline" aria-hidden="true"></div>
+        <button class="text-button" data-open-window="memory" type="button">打开内存监控窗口 ↗</button>
+      </article>
+      <article class="metric cpu-color" id="cpu-card">
+        <div class="metric-label"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg><span>CPU 使用率</span><span class="source">演示已启用</span></div>
+        <div class="metric-number"><b id="cpu-value" class="live-number">—</b><span id="cpu-unit"></span></div>
+        <div class="composition-labels"><span id="cpu-busy-label">忙碌 —</span><span id="cpu-idle-label">空闲 —</span></div>
+        <div class="bar cpu-bar"><i id="cpu-bar"></i><em title="80% 演示高负载提示线"></em></div>
+        <p id="cpu-caption" class="cpu-caption">CPU 演示采样 · 每秒更新</p>
+        <button id="cpu-demo" class="text-button" type="button">查看 CPU 统计规划 →</button>
+        <div id="cpu-spark" class="sparkline" aria-hidden="true"></div>
+        <button class="text-button" data-open-window="cpu" type="button">打开 CPU 监控窗口 ↗</button>
+      </article>
+      <article class="metric bluetooth-color" id="bluetooth-card">
+        <div class="metric-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg><span>蓝牙链路</span><span class="source">板端 + 网页</span></div>
+        <div class="metric-number"><b id="rssi-value" class="live-number">—</b><span id="rssi-unit">dBm</span><span id="ble-chip" class="chip">持续收样</span></div>
+        <p id="ble-caption">最近通知 — · 接收间隔 P95 —</p>
+        <span class="metric-foot">RSSI 为开发板接收网页端信号的强度</span>
+        <div id="bluetooth-spark" class="sparkline" aria-hidden="true"></div>
+        <button class="text-button" data-open-window="bluetooth" type="button">打开蓝牙监控窗口 ↗</button>
+      </article>
+    </section>
+    <div class="workspace">
+      <section class="activity-panel">
+        <div class="panel-toolbar">
+          <nav class="tabs" aria-label="资源分类">
+            <button type="button" data-tab="overview" class="selected" aria-pressed="true">总览</button>
+            <button type="button" data-tab="memory" aria-pressed="false">内存</button>
+            <button type="button" data-tab="cpu" aria-pressed="false">CPU</button>
+            <button type="button" data-tab="bluetooth" aria-pressed="false">蓝牙</button>
+            <button type="button" data-tab="events" aria-pressed="false">事件</button>
+          </nav>
+          <div class="range" aria-label="趋势时窗"><button type="button" data-range="60" aria-pressed="true" class="selected">60 秒</button><button type="button" data-range="300" aria-pressed="false">5 分钟</button></div>
+        </div>
+        <div class="chart-heading"><div><h2 id="chart-title">内存余量</h2><p id="chart-subtitle">同一采样时间轴 · 示例历史</p></div><span id="chart-readout" class="mono">—</span></div>
+        <div id="chart" class="chart"></div>
+        <div id="chart-foot" class="chart-foot"></div>
+        <div class="details-heading"><h2 id="detail-title">任务快照</h2><label class="search"><span class="sr-only">搜索明细</span><input id="search" type="search" placeholder="筛选任务名称"></label></div>
+        <p id="detail-subtitle" class="detail-subtitle">栈余量为任务启动以来的最低空闲值 · 不是每个任务的堆内存占用</p>
+        <div id="table" class="table-wrap"></div>
+        <div class="panel-foot"><span id="sample-state">—</span><span id="sample-count">—</span></div>
+      </section>
+      <aside class="sidebar">
+        <section class="side-section"><div class="side-title"><h2>当前设备</h2><span class="small-tag">开发板</span></div>
+          <dl class="facts"><div><dt>硬件</dt><dd>ESP32-C3</dd></div><div><dt>固件</dt><dd id="firmware">遥测候选 · 示例</dd></div><div><dt>模式</dt><dd>骑行 / 模拟</dd></div><div><dt>运行时长</dt><dd id="uptime">—</dd></div><div><dt>CPU 主频</dt><dd>160 MHz</dd></div><div><dt>WiFi</dt><dd>未开启</dd></div><div><dt>遥测能力</dt><dd id="capability">内存 / 系统 / 链路</dd></div></dl>
+        </section>
+        <section class="side-section"><div class="side-title"><h2>连接与采样</h2><span id="sampling-badge" class="small-tag">1 Hz</span></div>
+          <dl class="facts"><div><dt>采样序号</dt><dd id="sequence">—</dd></div><div><dt>连接间隔</dt><dd id="interval">—</dd></div><div><dt>ATT MTU</dt><dd id="mtu">—</dd></div><div><dt>发送失败 / 尝试</dt><dd id="tx">—</dd></div><div><dt>本次连接断开</dt><dd id="disconnects">—</dd></div></dl>
+          <p class="side-note">通知送入协议栈成功，不代表目标 App 已收到。页面后台暂停时不判定无线丢包。</p>
+        </section>
+        <section class="side-section"><div class="side-title"><h2>最近事件</h2><button id="all-events" class="text-button" type="button">全部 →</button></div><ol id="event-list" class="event-list"></ol></section>
+        <section class="connection-tip"><h2>准备测试骑行 App？</h2><p>网页占用唯一外设连接。释放后，开发板重新广播，供 App 或码表连接。</p><button id="release-bottom" class="button" type="button">释放网页连接</button></section>
+      </aside>
+    </div>
+    <footer class="footer"><span>借鉴 Mac 活动监视器的信息组织 · 延续 BikePower Pages 视觉</span><span>规划评审 · 不代表固件验收结果</span></footer>
+  </main>
+  <dialog id="monitor-window" class="monitor-window" aria-labelledby="window-title">
+    <header id="window-drag-handle" class="window-titlebar">
+      <div><span class="window-kicker">独立详情窗口 · 离线演示</span><h2 id="window-title">设备活动监控</h2></div>
+      <div class="window-controls">
+        <button id="window-minimize" class="button quiet" type="button" aria-label="折叠监控窗口">折叠</button>
+        <button id="window-maximize" class="button quiet" type="button" aria-label="放大监控窗口">放大</button>
+        <button id="window-close" class="button quiet" type="button" aria-label="关闭监控窗口">关闭</button>
+      </div>
+    </header>
+    <div class="window-body">
+      <div class="window-toolbar">
+        <nav class="tabs" aria-label="窗口指标分类"><button data-window-tab="memory" type="button" aria-pressed="true" class="selected">内存</button><button data-window-tab="cpu" type="button" aria-pressed="false">CPU</button><button data-window-tab="bluetooth" type="button" aria-pressed="false">蓝牙</button></nav>
+        <div class="window-actions"><span id="window-live-state">实时演示</span><button id="window-pause" class="button" type="button">暂停窗口</button></div>
+      </div>
+      <p class="window-hint">页面与窗口共用演示采样，暂停各自画面不会停止另一处更新。桌面可拖动标题栏、拖动右下角调整大小。</p>
+      <div id="window-metrics" class="window-metrics"></div>
+      <div class="window-chart-heading"><h3 id="window-chart-title">详细趋势</h3><div class="range"><button type="button" data-window-range="60" class="selected" aria-pressed="true">60 秒</button><button type="button" data-window-range="300" aria-pressed="false">5 分钟</button></div></div>
+      <div id="window-chart" class="chart"></div>
+      <div id="window-table" class="table-wrap"></div>
+      <footer class="window-footer"><span id="window-sample">—</span><span>模拟数据 · 无真实蓝牙调用</span></footer>
+    </div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<script>
+"use strict";
+// 全部数据仅用于设计演示，不是设备测量或验收证据。
+window.DeviceStatusMock = {
+  device: {name:"BikePower C", uptime:3664, heapCapacity:320, interval:30, mtu:23, attempts:1800},
+  scenarios: {
+    normal:{heap:186.4,min:171.2,largest:128,rssi:-57,p95:1018,age:.2,failures:0,disconnects:0,sequence:1842},
+    low:{heap:72.6,min:68.1,largest:31.8,rssi:-61,p95:1044,age:.3,failures:2,disconnects:0,sequence:1842},
+    stale:{heap:182.8,min:171.2,largest:126,rssi:-79,p95:2480,age:8.4,failures:4,disconnects:0,sequence:1834},
+    high:{heap:178.8,min:169.4,largest:119,rssi:-58,p95:1114,age:.2,failures:0,disconnects:0,sequence:1842},
+    weak:{heap:184.1,min:171.2,largest:126,rssi:-84,p95:1560,age:.7,failures:5,disconnects:0,sequence:1842},
+    legacy:{heap:null,min:null,largest:null,rssi:null,p95:null,age:null,failures:null,disconnects:0,sequence:null},
+    disconnected:{heap:null,min:null,largest:null,rssi:null,p95:null,age:null,failures:null,disconnects:1,sequence:null}
+  },
+  tasks:[
+    {name:"main",cpu:4.2,priority:5,stack:2864,status:"就绪"},
+    {name:"nimble_host",cpu:6.8,priority:21,stack:3128,status:"阻塞"},
+    {name:"esp_timer",cpu:3.1,priority:22,stack:2432,status:"阻塞"},
+    {name:"button_task",cpu:.4,priority:5,stack:1808,status:"阻塞"},
+    {name:"Tmr Svc",cpu:.3,priority:1,stack:1472,status:"阻塞"},
+    {name:"其他任务",cpu:3.6,priority:null,stack:null,status:"汇总"},
+    {name:"IDLE",cpu:81.6,priority:0,stack:864,status:"就绪"}
+  ],
+  events:[
+    {time:"00:01:04",title:"首份遥测快照",detail:"内存、系统、链路能力可用",source:"设备"},
+    {time:"00:01:03",title:"遥测订阅完成",detail:"每秒采样 · 基础包支持 MTU 23",source:"网页"},
+    {time:"00:01:02",title:"网页蓝牙连接建立",detail:"沿用工具台共享连接",source:"网页"},
+    {time:"00:00:00",title:"设备启动",detail:"启动标识已更新",source:"设备"}
+  ],
+  sample(scenario,tick){
+    const base=this.scenarios[scenario];
+    const sample={...base,cpu:null,uptime:this.device.uptime+tick,attempts:this.device.attempts+tick*3,tick};
+    if(base.heap===null)return sample;
+    if(scenario==="stale")return {...sample,cpu:18.4,uptime:this.device.uptime,attempts:this.device.attempts,age:base.age+tick};
+    const wave=Math.sin(tick*.35), slow=Math.sin(tick*.11);
+    sample.heap=base.heap+wave*2.4+slow*1.2;
+    sample.largest=base.largest+wave*1.4;
+    sample.cpu=(scenario==="high"?88:18.4)+wave*(scenario==="high"?4:3)+slow*1.2;
+    sample.rssi=Math.round(base.rssi+wave*2);
+    sample.p95=Math.round(base.p95+slow*12);
+    sample.age=base.age;
+    sample.sequence=base.sequence+tick;
+    return sample;
+  },
+  series(scenario,metric,count){
+    const sample=this.scenarios[scenario];
+    return Array.from({length:count},(_,i)=>{
+      const t=i/Math.max(count-1,1);
+      if(metric==="memory"){
+        const end=sample.heap||186.4;
+        return scenario==="low"?186.4-(186.4-end)*t+Math.sin(i*.55)*2:end+Math.sin(i*.5)*2.2+Math.cos(i*.17)*1.3;
+      }
+      if(metric==="largest")return (sample.largest||128)+Math.sin(i*.5)*1.3;
+      if(metric==="cpu")return 18.4+Math.sin(i*.4)*3+Math.cos(i*.11)*2;
+      if(metric==="rssi")return (sample.rssi||-57)+Math.sin(i*.36)*2;
+      return scenario==="stale"?1000+Math.pow(t,4)*1480:1000+Math.sin(i*.7)*12+Math.cos(i*.29)*6;
+    });
+  }
+};
+
+"use strict";
+window.DeviceStatusApi = {
+  // 演示接入层；正式实现应从共享 GATT 连接解码遥测，不能改用云端 HTTP。
+  async connectDemo(){
+    await new Promise(resolve=>setTimeout(resolve,350));
+    return {isDemo:true,connected:true,capabilities:["system","memory","link"]};
+  },
+  async readDemoSnapshot(scenario){
+    return {isDemo:true,...window.DeviceStatusMock.scenarios[scenario]};
+  }
+};
+
+"use strict";
+(() => {
+  const mock=window.DeviceStatusMock, api=window.DeviceStatusApi;
+  const state={scenario:"normal",tab:"overview",range:60,paused:false,cpu:true,search:"",snapshot:null,latest:null,connecting:false,
+    tick:0,history:[],frozenHistory:null,windowTab:"memory",windowRange:60,windowPaused:false,windowSnapshot:null,windowHistory:null};
+  const $=id=>document.getElementById(id);
+  const fmt=value=>value===null||value===undefined?"—":Number(value).toFixed(1);
+  const text=(id,value)=>{
+    const el=$(id), changed=el.textContent!==String(value);
+    el.textContent=value;
+    if(changed&&el.classList.contains("live-number")&&el.animate&&!window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+      el.animate([{opacity:.5,transform:"translateY(3px)"},{opacity:1,transform:"translateY(0)"}],{duration:220,easing:"ease-out"});
+  };
+  const escape=value=>String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const hasTelemetry=()=>!["legacy","disconnected"].includes(state.scenario);
+  const freePercent=s=>s.heap/mock.device.heapCapacity*100;
+  const taskPercent=(task,s)=>task.name==="IDLE"?100-s.cpu:task.cpu/18.4*s.cpu;
+  function percentBar(value,color="cpu"){
+    return '<span class="percent-cell"><span class="percent-track '+color+'"><i style="width:'+Math.max(0,Math.min(100,value)).toFixed(2)+'%"></i></span><b>'+fmt(value)+'%</b></span>';
+  }
+  function composition(label,value,other,color){
+    return '<div class="composition '+color+'"><div class="composition-labels"><span>'+escape(label)+" "+fmt(value)+'%</span><span>'+escape(other)+" "+fmt(100-value)+'%</span></div><div class="composition-track" role="img" aria-label="'+escape(label+" "+fmt(value)+"%，"+other+" "+fmt(100-value)+"%")+'"><i style="width:'+value.toFixed(2)+'%"></i></div></div>';
+  }
+  function taskTable(s,query=""){
+    const tasks=mock.tasks.filter(t=>[t.name,t.status].join(" ").toLowerCase().includes(query.toLowerCase()));
+    return '<table class="task-percent-table"><thead><tr><th>任务</th><th>CPU 占比 · 0–100%</th><th>最低空闲栈</th><th>状态</th></tr></thead><tbody>'+
+      (tasks.length?tasks.map(t=>'<tr><td>'+escape(t.name)+'</td><td>'+(state.cpu?percentBar(taskPercent(t,s),t.name==="IDLE"?"idle":"cpu"):"未启用")+'</td><td>'+escape(t.stack===null?"—":t.stack+" B")+'</td><td>'+escape(t.status)+"</td></tr>").join(""):'<tr><td colspan="4">没有匹配的任务</td></tr>')+"</tbody></table>";
+  }
+  let toastTimer;
+  function toast(message){text("toast",message);$("toast").hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{$("toast").hidden=true;},3000);}
+  function rows(headers,data){
+    const filtered=data.filter(row=>row.join(" ").toLowerCase().includes(state.search.toLowerCase()));
+    return '<table><thead><tr>'+headers.map(h=>"<th>"+escape(h)+"</th>").join("")+'</tr></thead><tbody>'+
+      (filtered.length?filtered.map(row=>"<tr>"+row.map(v=>"<td>"+escape(v)+"</td>").join("")+"</tr>").join(""):'<tr><td colspan="'+headers.length+'">没有匹配的明细</td></tr>')+"</tbody></table>";
+  }
+  function svgPlot(metric,min,max,unit,secondary,options={}){
+    const range=options.range||state.range, history=options.history||(state.paused?state.frozenHistory:state.history);
+    const samples=history.slice(-range-1), count=samples.length;
+    const field={memory:"heap",cpu:"cpu",rssi:"rssi",interval:"p95",largest:"largest"}[metric];
+    const normalize=value=>metric==="memory"&&unit==="%"?value/mock.device.heapCapacity*100:value;
+    const values=samples.map(s=>s?normalize(s[field]):null);
+    const x=i=>56+i/(count-1)*648,y=v=>204-(Math.max(min,Math.min(max,v))-min)/(max-min)*164;
+    const points=data=>data.map((v,i)=>x(i).toFixed(1)+","+y(v).toFixed(1)).join(" ");
+    const lines=[0,1,2,3,4].map(i=>{
+      const v=min+(max-min)*i/4, py=y(v);
+      return '<line class="grid" x1="56" y1="'+py+'" x2="704" y2="'+py+'"/><text class="axis" x="44" y="'+(py+4)+'" text-anchor="end">'+Math.round(v)+'</text>';
+    }).join("");
+    const firstMissing=values.indexOf(null), cutoff=firstMissing<0?count:firstMissing;
+    if(!cutoff)return '<div class="empty-chart"><b>当前时间窗没有有效样本</b><span>保留数据缺口，等待新的完整快照。</span></div>';
+    const valid=values.slice(0,cutoff), pointString=points(valid);
+    const endX=x(valid.length-1);
+    const color=metric==="cpu"?" cpu":metric==="rssi"||metric==="interval"?" blue":"";
+    const main='<polygon class="area'+color+'" points="56,204 '+pointString+' '+endX+',204"/><polyline class="series'+color+'" points="'+pointString+'"/><circle class="sample-point'+color+(state.scenario==="stale"?"":" pulsing-point")+'" cx="'+endX+'" cy="'+y(valid[valid.length-1])+'" r="3"/>';
+    const second=secondary?'<polyline class="series secondary" points="'+points(samples.slice(0,cutoff).map(s=>normalize(s.largest)))+'"/>':"";
+    const thresholdValue=metric==="memory"?(unit==="%"?80/mock.device.heapCapacity*100:80):80;
+    const threshold=["memory","cpu"].includes(metric)?'<line class="threshold" x1="56" y1="'+y(thresholdValue)+'" x2="704" y2="'+y(thresholdValue)+'"/><text class="axis" x="704" y="'+(y(thresholdValue)-8)+'" text-anchor="end">'+(metric==="cpu"?"高负载提示 80% · 示例":"警戒线 80 KiB / "+fmt(80/mock.device.heapCapacity*100)+"%")+'</text>':"";
+    return '<svg viewBox="0 0 744 248" role="img" aria-label="'+escape(unit+"趋势示例")+'"><text class="axis" x="56" y="24">'+escape(unit)+'</text>'+lines+threshold+main+second+'<text class="axis" x="56" y="232">−'+(range===60?"60 秒":"5 分钟")+'</text><text class="axis" x="380" y="232" text-anchor="middle">−'+(range===60?"30 秒":"2.5 分钟")+'</text><text class="axis" x="704" y="232" text-anchor="end">'+(state.paused&&!options.history?"暂停时刻":"现在")+'</text></svg>';
+  }
+  function renderChart(){
+    const s=state.snapshot;
+    const titles={overview:"内存空闲比例",memory:"内存比例与连续空间",cpu:"CPU 使用率",bluetooth:"板端 RSSI",events:"事件时间线"};
+    text("chart-title",titles[state.tab]);
+    text("chart-subtitle",state.scenario==="stale"?"遥测停更 · 保留最后有效片段":"同一采样时间轴 · 示例历史");
+    $("chart-readout").textContent=!hasTelemetry()?"无遥测":state.paused?"页面已暂停":state.scenario==="stale"?"停更 "+fmt(s.age)+" 秒":"演示采样 · 1 Hz";
+    $("chart-foot").innerHTML="";
+    if(!hasTelemetry()){
+      $("chart").innerHTML='<div class="empty-chart"><b>'+ (state.scenario==="legacy"?"已连接，固件尚未支持遥测":"连接开发板后查看运行状态")+'</b><span>'+ (state.scenario==="legacy"?"运动通知仍然可用；升级支持遥测的候选固件后，可显示内存与链路信息。":"正式功能使用 Pages 共享蓝牙连接；本原型只演示连接后的界面。")+'</span></div>';
+      return;
+    }
+    if(state.tab==="cpu"&&!state.cpu){
+      $("chart").innerHTML='<div class="empty-chart"><b>CPU 运行统计未启用</b><span>CPU 主频不能换算成使用率。启用统计并完成开销验证后，显示采样窗口内的忙碌比例与任务占用。</span></div>';
+      $("chart-foot").textContent="可点上方「查看 CPU 统计规划」预览第二阶段效果。";return;
+    }
+    if(state.tab==="events"){
+      $("chart").innerHTML='<div class="empty-chart"><b>把变化放回发生的时间</b><span>设备事件使用运行时间；网页连接事件使用本地时间。设备重启后按启动标识建立新会话。</span></div>';
+      $("chart-foot").textContent="下方表格展示当前会话的事件来源与解释。";return;
+    }
+    let plot;
+    if(state.tab==="cpu"){
+      plot=composition("忙碌",s.cpu,"空闲","cpu")+svgPlot("cpu",0,100,"%",false);
+      $("chart-foot").textContent="规划示例：忙碌 "+fmt(s.cpu)+"% · 空闲 "+fmt(100-s.cpu)+"% · 按采样窗口内运行计数差计算";
+    }else if(state.tab==="bluetooth"){
+      plot=svgPlot("rssi",-100,-30,"dBm",false);
+      $("chart-foot").textContent="板端 RSSI 是信号强度；请结合通知间隔和发送失败一起判断。";
+    }else{
+      plot=composition("空闲",freePercent(s),"已用","memory")+svgPlot("memory",0,100,"%",true);
+      $("chart-foot").innerHTML='<span class="legend"><i></i>空闲堆比例</span><span class="legend second"><i></i>最大连续块 / 总堆</span><span class="legend warn"><i></i>80 KiB = 25% · 示例容量</span>';
+    }
+    $("chart").innerHTML=plot;
+  }
+  function currentEvents(){
+    const list=mock.events.map(e=>({...e}));
+    if(state.scenario==="low")list.unshift({time:"01:01:04",title:"空闲堆低于项目警戒线",detail:fmt(state.snapshot.heap)+" KiB，继续观察连续空间与最低值",source:"设备",alert:true});
+    if(state.scenario==="stale")list.unshift({time:"01:01:04",title:"遥测已停更 "+fmt(state.snapshot.age)+" 秒",detail:"GATT 仍连接；原因需要进一步核对",source:"网页",alert:true});
+    if(state.scenario==="high")list.unshift({time:"01:01:04",title:"CPU 高负载规划演示",detail:"仅展示未来统计能力与高负载提示",source:"演示",alert:true});
+    if(state.scenario==="weak")list.unshift({time:"01:01:04",title:"蓝牙信号偏弱",detail:"同时观察接收间隔与板端发送失败",source:"演示",alert:true});
+    if(state.scenario==="legacy")return [{time:"00:00:02",title:"未发现遥测能力",detail:"旧固件仅提供运动数据与配置",source:"网页"}];
+    if(state.scenario==="disconnected")return [{time:"00:00:03",title:"网页连接已释放",detail:"实时值已清空，开发板可供其他客户端连接",source:"网页"}];
+    return list;
+  }
+  function renderTable(){
+    const s=state.snapshot;
+    const names={overview:"任务快照",memory:"内存明细",cpu:"任务 CPU 分布",bluetooth:"链路明细",events:"会话事件"};
+    text("detail-title",names[state.tab]);
+    $("search").placeholder=state.tab==="events"?"筛选事件内容":state.tab==="overview"||state.tab==="cpu"?"筛选任务名称":"筛选指标";
+    const captions={overview:"栈余量为任务启动以来的最低空闲值 · 不是每个任务的堆内存占用",memory:"所有堆指标使用相同可分配内存口径 · 不以芯片总 SRAM 计算占用",cpu:"规划能力 · 数据为示例；任务 CPU 与 IDLE 在同一窗口内统计",bluetooth:"板端与网页分开记录 · 不把序号缺口直接命名为无线丢包",events:"启动标识区分重启 · 事件来源区分设备与网页"};
+    text("detail-subtitle",captions[state.tab]);
+    if(!hasTelemetry()&&state.tab!=="events"){
+      $("table").innerHTML=rows(["状态","说明"],[[state.scenario==="legacy"?"遥测不可用":"未连接","无实时数据，不以 0 代替缺失"]]);return;
+    }
+    if(state.tab==="overview"||state.tab==="cpu"){
+      $("table").innerHTML=taskTable(s,state.search);
+    }else if(state.tab==="memory"){
+      $("table").innerHTML=rows(["指标","数值","来源"],[
+        ["内存空闲比例",fmt(freePercent(s))+"%","空闲 / 同口径总堆"],["内存已用比例",fmt(100-freePercent(s))+"%","已用 / 同口径总堆"],
+        ["当前空闲堆",fmt(s.heap)+" KiB","板端"],["启动以来最低空闲堆",fmt(s.min)+" KiB","板端"],
+        ["最大连续空闲块",fmt(s.largest)+" KiB","板端"],["同口径总堆容量","320.0 KiB","示例容量"],
+        ["项目警戒阈值","80.0 KiB","现有配置"],["项目严重阈值","20.0 KiB","现有配置"]
+      ]);
+    }else if(state.tab==="bluetooth"){
+      $("table").innerHTML=rows(["指标","数值","口径"],[
+        ["板端 RSSI",s.rssi+" dBm","开发板接收端"],["GATT 连接间隔","30 ms","协商值 / 示例"],
+        ["ATT MTU","23 B","协商值 / 示例"],["最近遥测年龄",fmt(s.age)+" s","网页前台"],
+        ["通知间隔 P95",s.p95+" ms","网页接收时间"],["发送失败 / 尝试",s.failures+" / "+s.attempts,"设备应用提交"],
+        ["网页缺失采样","未归因","序号缺口 ≠ 无线丢包"],["遥测角色","peripheral","不是上游功率计链路"]
+      ]);
+    }else $("table").innerHTML=rows(["会话时间","事件","来源","解释"],currentEvents().map(e=>[e.time,e.title,e.source,e.detail]));
+  }
+  function render(){
+    const s=state.snapshot, available=hasTelemetry(), linked=state.scenario!=="disconnected";
+    text("heap-value",available?fmt(freePercent(s)):"—");text("heap-unit",available?"%":"");
+    text("heap-caption",available?"空闲 "+fmt(s.heap)+" / "+fmt(mock.device.heapCapacity)+" KiB · 启动最低 "+fmt(s.min)+" KiB":"等待固件遥测能力");
+    text("memory-free-label",available?"空闲 "+fmt(freePercent(s))+"%":"空闲 —");
+    text("memory-used-label",available?"已用 "+fmt(100-freePercent(s))+"%":"已用 —");
+    $("heap-bar").style.width=available?(s.heap/mock.device.heapCapacity*100)+"%":"0";
+    $("heap-bar").parentElement.classList.toggle("warn",state.scenario==="low");
+    text("heap-chip",!available?"无数据":state.scenario==="low"?"低于警戒":state.scenario==="stale"?"历史值":"余量充足");
+    $("heap-chip").classList.toggle("warn",state.scenario==="low");
+    text("cpu-value",available&&state.cpu?fmt(s.cpu):"—");text("cpu-unit",available&&state.cpu?"%":"");
+    text("cpu-caption",available&&state.cpu?"主频 160 MHz · CPU 示例采样":"未开启运行统计");
+    text("cpu-busy-label",available&&state.cpu?"忙碌 "+fmt(s.cpu)+"%":"忙碌 —");
+    text("cpu-idle-label",available&&state.cpu?"空闲 "+fmt(100-s.cpu)+"%":"空闲 —");
+    $("cpu-bar").style.width=available&&state.cpu?s.cpu+"%":"0";
+    $("cpu-bar").parentElement.classList.toggle("warn",available&&state.cpu&&s.cpu>=80);
+    text("cpu-demo",state.cpu?"模拟 CPU 统计未启用 →":"开启 CPU 百分比演示 →");
+    $("cpu-demo").disabled=!available;
+    text("rssi-value",s.rssi===null?"—":s.rssi);text("rssi-unit",available?"dBm":"");
+    text("ble-caption",available?"最近通知 "+fmt(s.age)+" s · 接收间隔 P95 "+s.p95+" ms":"板端链路数据不可用");
+    text("ble-chip",!available?"无遥测":state.scenario==="stale"?"数据停更":state.scenario==="weak"?"信号偏弱":"持续收样");
+    $("ble-chip").classList.toggle("warn",["stale","weak"].includes(state.scenario));
+    text("connection-state",linked?"已连接 · 演示":"未连接 · 演示");
+    $("connection-dot").classList.toggle("off",!linked);
+    text("connection-action",state.connecting?"正在连接演示…":linked?"释放连接":"连接演示设备");
+    $("connection-action").disabled=state.connecting;
+    $("release-bottom").disabled=!linked;
+    $("pause").disabled=!available;text("pause",state.paused?"继续页面":"暂停页面");
+    $("scenario").value=state.scenario;
+    const notices={
+      normal:"<b>持续收样。</b> 内存与 CPU 用百分比观察余量，蓝牙保留 dBm 和间隔；当前均为离线演示数据。",
+      low:"<b>内存低于警戒线。</b> 当前空闲堆 "+fmt(s.heap)+" KiB，低于项目现有 80 KiB 阈值；观察是否继续下降。",
+      stale:"<b>遥测中断，已冻结最后值。</b> "+fmt(s.age)+" 秒未更新，不能仅凭网页接收间隔判断无线丢包。",
+      high:"<b>CPU 高负载规划演示。</b> 当前示例 "+fmt(s.cpu)+"%，展示高负载颜色与动画；实际固件统计尚未接入。",
+      weak:"<b>蓝牙信号偏弱。</b> 示例 RSSI "+s.rssi+" dBm；信号强弱不能直接证明无线丢包。",
+      legacy:"<b>蓝牙已连接，固件尚未支持遥测。</b> 运动数据仍可在实时监控查看；本页不显示虚构的运行指标。",
+      disconnected:"<b>网页连接已释放。</b> 实时值已清空。正式功能中，开发板可重新广播供骑行 App 或码表连接。"
+    };
+    $("notice").innerHTML=state.paused&&available?"<b>页面已暂停。</b> 演示采样与独立窗口继续更新；继续页面后回到最新快照。":notices[state.scenario];
+    $("notice").className="notice"+(["low","high"].includes(state.scenario)?" error":["stale","legacy","weak"].includes(state.scenario)||state.paused?" warn":"");
+    text("firmware",state.scenario==="legacy"?"v4.2.1 · 示例旧版":"遥测候选 · 示例");
+    text("uptime",available?duration(s.uptime):"—");
+    text("capability",available?"内存 / CPU 演示 / 链路":state.scenario==="legacy"?"未提供遥测":"等待连接");
+    text("sampling-badge",available?"1 Hz":"—");
+    text("sequence",s.sequence===null?"—":"#"+s.sequence);
+    text("interval",available?"30 ms":"—");text("mtu",available?"23 B":"—");
+    text("tx",available?s.failures+" / "+s.attempts:"—");text("disconnects",linked?"0 次":"1 次 · 示例");
+    $("event-list").innerHTML=currentEvents().slice(0,3).map(e=>'<li class="'+(e.alert?"alert":"")+'"><time>'+escape(e.time)+'</time><b>'+escape(e.title)+'</b>'+escape(e.detail)+"</li>").join("");
+    text("sample-state",!available?"无有效遥测":state.paused?"已暂停画面":state.scenario==="stale"?"历史快照 · 未更新":"示例快照 · 不是实测");
+    text("sample-count",available?"窗口 "+state.range+" s · 示例":"等待遥测");
+    document.querySelectorAll("[data-tab]").forEach(b=>{const active=b.dataset.tab===state.tab;b.classList.toggle("selected",active);b.setAttribute("aria-pressed",String(active));});
+    document.querySelectorAll("[data-range]").forEach(b=>{const active=Number(b.dataset.range)===state.range;b.classList.toggle("selected",active);b.setAttribute("aria-pressed",String(active));b.disabled=!available;});
+    renderChart();renderTable();renderResident();renderWindow();
+  }
+  async function changeScenario(value){
+    await api.readDemoSnapshot(value);
+    state.scenario=value;state.paused=false;state.windowPaused=false;state.tick=0;
+    if(value==="high")state.cpu=true;
+    state.history=Array.from({length:301},(_,i)=>{
+      if(value==="stale"&&i>291)return null;
+      return mock.sample(value,i-300);
+    });
+    state.latest=mock.sample(value,0);state.snapshot={...state.latest};
+    state.frozenHistory=null;state.windowSnapshot=null;state.windowHistory=null;render();
+  }
+  function changeTab(tab){
+    state.tab=tab;state.search="";$("search").value="";location.hash=tab;render();
+  }
+  function readHash(){
+    const tab=location.hash.slice(1);if(["overview","memory","cpu","bluetooth","events"].includes(tab)){state.tab=tab;state.search="";$("search").value="";if(state.snapshot)render();}
+  }
+  $("scenario").addEventListener("change",e=>changeScenario(e.target.value));
+  document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>changeTab(b.dataset.tab)));
+  document.querySelectorAll("[data-range]").forEach(b=>b.addEventListener("click",()=>{state.range=Number(b.dataset.range);render();}));
+  $("search").addEventListener("input",e=>{state.search=e.target.value;renderTable();});
+  $("all-events").addEventListener("click",()=>changeTab("events"));
+  $("pause").addEventListener("click",()=>{
+    state.paused=!state.paused;
+    if(state.paused)state.frozenHistory=state.history.slice();
+    else{state.snapshot={...state.latest};state.frozenHistory=null;}
+    render();
+  });
+  $("cpu-demo").addEventListener("click",()=>{state.cpu=!state.cpu;if(state.cpu)changeTab("cpu");else render();});
+  async function connectionAction(){
+    if(state.connecting)return;
+    if(state.scenario!=="disconnected"){await changeScenario("disconnected");toast("已释放演示连接；本原型没有操作真实蓝牙。");return;}
+    state.connecting=true;render();
+    try{await api.connectDemo();await changeScenario("normal");toast("演示设备已连接。全部数值仍为示例。");}
+    finally{state.connecting=false;render();}
+  }
+  $("connection-action").addEventListener("click",connectionAction);
+  $("release-bottom").addEventListener("click",connectionAction);
+  $("theme").addEventListener("click",()=>{
+    const dark=document.documentElement.dataset.theme!=="dark";document.documentElement.dataset.theme=dark?"dark":"light";text("theme",dark?"浅色外观":"深色外观");
+  });
+  $("export").addEventListener("click",()=>{
+    const report={isDemo:true,notice:"设计原型示例，不能用于设备验收",exportedAt:new Date().toISOString(),scenario:state.scenario,cpuPlanningDemo:state.cpu,telemetry:state.latest,pagePaused:state.paused,windowPaused:state.windowPaused,events:currentEvents()};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:"application/json"}));
+    const a=document.createElement("a");a.href=url;a.download="bikepower-device-status-DEMO.json";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast("已导出演示报告，内含示例数据声明。");
+  });
+  function duration(seconds){
+    return [Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(v=>String(v).padStart(2,"0")).join(":");
+  }
+  function sparkline(field,min,max,color){
+    const history=(state.paused?state.frozenHistory:state.history).slice(-31);
+    const points=history.map((s,i)=>s?i*8+","+ (44-(s[field]-min)/(max-min)*36).toFixed(1):null).filter(Boolean);
+    return '<svg viewBox="0 0 240 52"><polyline class="spark-series '+color+'" points="'+points.join(" ")+'"/></svg>';
+  }
+  function renderResident(){
+    const s=state.snapshot,available=hasTelemetry(),live=available&&!state.paused&&state.scenario!=="stale";
+    text("resident-heap",available?fmt(freePercent(s))+"% 空闲":"—");
+    text("resident-cpu",!available?"—":state.cpu?fmt(s.cpu)+"%":"未启用");
+    text("resident-rssi",available?s.rssi+" dBm":"—");
+    text("resident-state",!available?"无遥测 · 演示":state.paused?"页面暂停 · 窗口独立更新":state.scenario==="stale"?"数据停更 · 历史值":"离线演示 · 每秒更新");
+    $("resident-dot").classList.toggle("off",!live);
+    document.body.dataset.live=String(live);
+    ["memory","cpu","bluetooth"].forEach((type,i)=>{
+      const alert=available&&((i===0&&s.heap<80)||(i===1&&state.cpu&&s.cpu>=80)||(i===2&&s.rssi<=-80));
+      $(type+"-card").classList.toggle("metric-alert",alert);
+      document.querySelector('.resident-item[data-open-window="'+type+'"]').classList.toggle("metric-alert",alert);
+    });
+    $("memory-spark").innerHTML=available?sparkline("heap",0,mock.device.heapCapacity,"memory"):"";
+    $("cpu-spark").innerHTML=available&&state.cpu?sparkline("cpu",0,100,"cpu"):"";
+    $("bluetooth-spark").innerHTML=available?sparkline("rssi",-100,-30,"bluetooth"):"";
+  }
+  function renderWindow(){
+    const dialog=$("monitor-window");if(!dialog.open)return;
+    const s=state.windowPaused?state.windowSnapshot:state.latest;
+    const history=state.windowPaused?state.windowHistory:state.history;
+    const type=state.windowTab,available=hasTelemetry(),active=available&&state.scenario!=="stale"&&!state.windowPaused;
+    dialog.dataset.metric=type;dialog.dataset.live=String(active);
+    dialog.classList.toggle("window-alert",available&&((type==="memory"&&s.heap<80)||(type==="cpu"&&state.cpu&&s.cpu>=80)||(type==="bluetooth"&&s.rssi<=-80)));
+    text("window-title",{memory:"内存活动监控",cpu:"CPU 活动监控",bluetooth:"蓝牙链路监控"}[type]);
+    text("window-live-state",!available?"无遥测":state.windowPaused?"窗口暂停":state.scenario==="stale"?"遥测停更":"● 实时演示");
+    $("window-pause").disabled=!available;text("window-pause",state.windowPaused?"继续窗口":"暂停窗口");
+    text("window-sample",available?"快照 #"+s.sequence+" · 运行 "+duration(s.uptime):"等待有效遥测");
+    document.querySelectorAll("[data-window-tab]").forEach(b=>{const selected=b.dataset.windowTab===type;b.classList.toggle("selected",selected);b.setAttribute("aria-pressed",String(selected));});
+    document.querySelectorAll("[data-window-range]").forEach(b=>{const selected=Number(b.dataset.windowRange)===state.windowRange;b.classList.toggle("selected",selected);b.setAttribute("aria-pressed",String(selected));b.disabled=!available;});
+    let metrics=[],data=[],plot="";
+    const options={range:state.windowRange,history};
+    if(!available){
+      metrics=[["状态","无遥测"],["能力",state.scenario==="legacy"?"旧固件":"未连接"]];
+      plot='<div class="empty-chart"><b>无有效遥测数据</b><span>窗口保留，等待重新连接或支持遥测的固件。</span></div>';
+      data=[["当前状态","—","不将缺失值显示为 0"]];
+    }else if(type==="memory"){
+      metrics=[["空闲比例",fmt(freePercent(s))+"%"],["已用比例",fmt(100-freePercent(s))+"%"],["最大连续块",fmt(s.largest)+" KiB"]];
+      plot=composition("空闲",freePercent(s),"已用","memory")+svgPlot("memory",0,100,"%",true,options);
+      data=[["当前空闲堆",fmt(s.heap)+" KiB",fmt(freePercent(s))+"% 总堆"],["启动最低空闲",fmt(s.min)+" KiB",fmt(s.min/mock.device.heapCapacity*100)+"% 总堆"],["可分配容量",fmt(mock.device.heapCapacity)+" KiB","同口径 / 示例"],["警戒阈值","80.0 KiB","25% / 示例容量"],["严重阈值","20.0 KiB","6.25% / 示例容量"]];
+    }else if(type==="cpu"){
+      metrics=[["CPU 忙碌",state.cpu?fmt(s.cpu)+"%":"未启用"],["CPU 空闲",state.cpu?fmt(100-s.cpu)+"%":"—"],["配置主频","160 MHz"]];
+      plot=state.cpu?composition("忙碌",s.cpu,"空闲","cpu")+svgPlot("cpu",0,100,"%",false,options):'<div class="empty-chart"><b>CPU 统计规划</b><span>开启页面上的 CPU 规划演示后，窗口同步显示变化；不代表固件已支持。</span></div>';
+      data=mock.tasks.map(t=>[t.name,state.cpu?fmt(taskPercent(t,s))+"%":"未启用",t.stack===null?"—":t.stack+" B 最低空闲栈"]);
+    }else{
+      metrics=[["板端 RSSI",s.rssi+" dBm"],["接收间隔 P95",s.p95+" ms"],["发送失败",s.failures+" / "+s.attempts]];
+      plot=svgPlot("rssi",-100,-30,"dBm",false,options)+svgPlot("interval",800,2800,"ms",false,options);
+      data=[["最近遥测年龄",fmt(s.age)+" s","网页前台"],["协商连接间隔","30 ms","示例"],["ATT MTU","23 B","示例"],["链路角色","peripheral","开发板 ↔ 网页"]];
+    }
+    $("window-metrics").innerHTML=metrics.map(m=>'<article><span>'+escape(m[0])+'</span><b>'+escape(m[1])+'</b></article>').join("");
+    text("window-chart-title",type==="bluetooth"?"信号强度与接收间隔":type==="memory"?"内存百分比 · 同口径总堆":"CPU 百分比 · 规划示例");
+    $("window-chart").innerHTML=plot;
+    // 窗口明细独立于页面搜索，不借用页面筛选状态。
+    $("window-table").innerHTML=available&&type==="cpu"?taskTable(s):'<table><thead><tr><th>指标 / 任务</th><th>数值</th><th>口径</th></tr></thead><tbody>'+data.map(r=>"<tr>"+r.map(v=>"<td>"+escape(v)+"</td>").join("")+"</tr>").join("")+"</tbody></table>";
+  }
+  let windowOpener=null;
+  function openWindow(type){
+    const dialog=$("monitor-window");windowOpener=document.activeElement;
+    if(type)state.windowTab=type;
+    dialog.classList.remove("collapsed");
+    text("window-minimize","折叠");
+    if(!dialog.open)dialog.show();
+    renderWindow();
+  }
+  document.querySelectorAll("[data-open-window]").forEach(b=>b.addEventListener("click",()=>openWindow(b.dataset.openWindow)));
+  $("open-window").addEventListener("click",()=>openWindow(["memory","cpu","bluetooth"].includes(state.tab)?state.tab:"memory"));
+  $("window-close").addEventListener("click",()=>{$("monitor-window").close();});
+  $("monitor-window").addEventListener("close",()=>{if(windowOpener)windowOpener.focus();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("monitor-window").open){e.preventDefault();$("monitor-window").close();}});
+  $("window-minimize").addEventListener("click",()=>{
+    const collapsed=$("monitor-window").classList.toggle("collapsed");text("window-minimize",collapsed?"展开":"折叠");
+  });
+  $("window-maximize").addEventListener("click",()=>{
+    const dialog=$("monitor-window"),maximized=dialog.classList.toggle("maximized");
+    dialog.classList.remove("collapsed");text("window-minimize","折叠");
+    ["left","top","width","height"].forEach(p=>dialog.style.removeProperty(p));
+    text("window-maximize",maximized?"还原":"放大");
+  });
+  document.querySelectorAll("[data-window-tab]").forEach(b=>b.addEventListener("click",()=>{state.windowTab=b.dataset.windowTab;renderWindow();}));
+  document.querySelectorAll("[data-window-range]").forEach(b=>b.addEventListener("click",()=>{state.windowRange=Number(b.dataset.windowRange);renderWindow();}));
+  $("window-pause").addEventListener("click",()=>{
+    state.windowPaused=!state.windowPaused;
+    if(state.windowPaused){state.windowSnapshot={...state.latest};state.windowHistory=state.history.slice();}
+    else{state.windowSnapshot=null;state.windowHistory=null;}
+    renderWindow();
+  });
+  let drag=null;
+  const handle=$("window-drag-handle"),dialog=$("monitor-window");
+  handle.addEventListener("pointerdown",e=>{
+    if(e.target.closest("button")||e.button!==0||dialog.classList.contains("maximized")||window.innerWidth<=600)return;
+    const r=dialog.getBoundingClientRect();drag={dx:e.clientX-r.left,dy:e.clientY-r.top};
+    handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener("pointermove",e=>{
+    if(!drag)return;
+    dialog.style.left=Math.max(8,Math.min(window.innerWidth-dialog.offsetWidth-8,e.clientX-drag.dx))+"px";
+    dialog.style.top=Math.max(8,Math.min(window.innerHeight-72,e.clientY-drag.dy))+"px";
+  });
+  handle.addEventListener("pointerup",()=>{drag=null;});
+  handle.addEventListener("pointercancel",()=>{drag=null;});
+  handle.addEventListener("lostpointercapture",()=>{drag=null;});
+  window.addEventListener("resize",()=>{
+    if(!dialog.open)return;
+    const r=dialog.getBoundingClientRect();
+    if(r.right>window.innerWidth||r.top>window.innerHeight-72){dialog.style.removeProperty("left");dialog.style.removeProperty("top");}
+  });
+  setInterval(()=>{
+    if(!state.latest||!hasTelemetry()||document.hidden)return;
+    state.tick++;
+    const previous=state.latest;
+    state.latest=mock.sample(state.scenario,state.tick);
+    state.latest.min=Math.min(previous.min,state.latest.min,state.latest.heap);
+    state.history.push(state.scenario==="stale"?null:{...state.latest});
+    if(state.history.length>301)state.history.shift();
+    if(!state.paused)state.snapshot={...state.latest};
+    render();
+  },1000);
+  window.addEventListener("hashchange",readHash);readHash();changeScenario("normal");
+})();
+
+</script>
+</body>
+</html>
