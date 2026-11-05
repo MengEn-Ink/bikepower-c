@@ -38,6 +38,7 @@ svg { fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; st
 .sport-switch button { min-height:42px; border:0; border-radius:6px; background:transparent; color:var(--muted); font-weight:800; }
 .sport-switch button.is-active { background:var(--surface); color:var(--ink); box-shadow:0 1px 2px #14161a14; }
 .workspace { display:grid; grid-template-columns:minmax(0,.9fr) minmax(440px,1.1fr); overflow:hidden; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+.workspace.is-mode-pending { grid-template-columns:1fr; }
 .live-pane { min-width:0; padding:18px; border-right:1px solid var(--line); background:var(--surface-2); }
 .editor-pane { min-width:0; padding:16px 20px 24px; }
 .editor-pane.is-busy { pointer-events:none; opacity:.7; }

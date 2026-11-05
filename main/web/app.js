@@ -141,6 +141,7 @@
     fillPresets();
     [["firmwareVersion",data.firmware_version],["boardType",data.board],
       ["gitSha",data.git_sha],["buildTime",data.build_time]].forEach(function(x) { $(x[0]).textContent = x[1]; });
+    $("schemaVersion").textContent = "schema v" + data.config.schema_ver;
     $("headerFirmware").textContent = "固件 v" + data.firmware_version;
     if (!preserve) renderAll(); else updateDirty();
     return data;
@@ -169,18 +170,27 @@
     $("chainSourceState").textContent = active ? labels[b.state]:"等待已绑定功率计";
     $("chainTransform").textContent = calibrationText(c);
     $("liveStatus").className = "status-chip " + (valid ? "status-chip--ok":"status-chip--warn");
-    $("liveStatus").textContent = bridge ? (active ? labels[b.state]:"上游未连接"):"模拟运行";
+    $("liveStatus").textContent = running ? "跑步广播中":bridge ? (active ? labels[b.state]:"上游未连接"):"模拟运行";
     $("runtimeAlert").className = "runtime-alert" + (valid ? "":" is-warn");
-    $("runtimeAlertTitle").textContent = bridge ? (valid ? "桥接正在运行":"真实数据不可用，功率归零"):"模拟输出正在运行";
-    $("runtimeAlertText").textContent = bridge ? (valid ? "功率与踏频来自同一台功率计。":"请检查功率计；可重新连接或选择模拟后保存。"):"输出由设备本机平滑生成。";
+    $("runtimeAlertTitle").textContent = running ? "跑步模拟正在运行":bridge ? (valid ? "桥接正在运行":"真实数据不可用，功率归零"):"模拟输出正在运行";
+    $("runtimeAlertText").textContent = running ? "速度与步频由设备本机平滑生成。":bridge ? (valid ? "功率与踏频来自同一台功率计。":"请检查功率计；可重新连接或选择模拟后保存。"):"输出由设备本机平滑生成。";
     $("packetCount").textContent = b.valid ? (b.age_ms / 1000).toFixed(1) + " 秒":"—";
-    $("crankState").textContent = b.cadence > 0 ? "踏频有效":"未提供或已停止";
-    $("reconnectState").textContent = labels[b.state] || "未知";
+    $("eventStateLabel").textContent = running ? "步频状态":"曲柄事件";
+    $("crankState").textContent = running ? (o.cadence > 0 ? "步频有效":"已停止"):(b.cadence > 0 ? "踏频有效":"未提供或已停止");
+    $("appServices").textContent = running ? "RSC / HRS / FTMS":"CPS / CSC / FTMS";
+    $("upstreamStateLabel").textContent = running ? "会话来源":"上游状态";
+    $("reconnectState").textContent = running ? "本机模拟":labels[b.state] || "未知";
   }
   function setActive(selector, value, key) {
     document.querySelectorAll(selector).forEach(function (button) {
-      button.classList.toggle("is-active", button.dataset[key] === value);
+      var active = button.dataset[key] === value;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", String(active));
     });
+  }
+
+  function sportModePending() {
+    return !!state.draft && !!state.applied && state.draft.sport !== state.applied.sport;
   }
 
   function outputPower(config) {
@@ -230,6 +240,10 @@
     $("saveBtn").textContent = bridgePending
       ? "选择功率计后继续"
       : (state.draft.source === "bridge" && state.draft.sport === "cycling" ? "保存并启用桥接" : "保存并应用");
+    if (sportModePending()) {
+      $("saveBtn").textContent = "保存并切换到" + (state.draft.sport === "running" ? "跑步":"骑行");
+      $("saveHint").textContent = state.busy ? "正在切换运动模式…":"保存后 BLE 服务将短暂重建";
+    }
     if (!validSimulation()) $("saveHint").textContent = "请检查体重和强度范围";
   }
 
@@ -240,10 +254,19 @@
   }
 
   function renderSport() {
+    var pending = sportModePending();
     setActive("[data-sport]", state.draft.sport, "sport");
     $("cyclingEditor").hidden = state.draft.sport !== "cycling";
     $("runningEditor").hidden = state.draft.sport !== "running";
     $("editorTitle").textContent = state.draft.sport === "cycling" ? "骑行输出" : "跑步输出";
+    document.querySelector(".workspace").classList.toggle("is-mode-pending", pending);
+    document.querySelector(".live-pane").hidden = pending;
+    document.querySelector(".editor-pane").style.maxWidth = pending ? "760px":"";
+    document.querySelector(".editor-pane").style.margin = pending ? "auto":"";
+    $("modeSwitchNotice").hidden = !pending;
+    $("modeSwitchTitle").textContent = state.draft.sport === "running" ? "跑步模式尚未应用":"骑行模式尚未应用";
+    $("modeSwitchText").textContent = "保存后设备将重建" + (state.draft.sport === "running" ? "跑步":"骑行")
+      + "广播，当前 BLE 连接可能短暂断开。";
   }
 
   function renderSource() {
@@ -261,7 +284,8 @@
         : (ready ? "功率计已测试，等待保存" : "尚未选择功率计"))
       : "本机平滑模拟";
     $("broadcastIndex").textContent = bridgeSelected ? (ready ? "04" : "03") : "03";
-    $("heartIndex").textContent = bridgeSelected ? (ready ? "05" : "04") : "04";
+    $("heartIndex").textContent = state.draft.sport === "running" ? "02"
+      : bridgeSelected ? (ready ? "05" : "04") : "04";
     var powerCheck = document.querySelector('[data-broadcast="power"]');
     powerCheck.disabled = state.draft.source === "bridge";
     if (powerCheck.disabled) {
@@ -411,6 +435,7 @@
   function renderRunning() {
     setActive("[data-run-mode]", state.draft.running.mode, "runMode");
     var run = state.draft.running;
+    $("runModeSummary").textContent = run.mode === "fixed" ? "固定配速":"配速档";
     $("runRobotFields").hidden = run.mode === "fixed";
     $("fixedPaceFields").hidden = run.mode !== "fixed";
     $("runCustomFields").hidden = run.preset !== "custom";
@@ -644,6 +669,15 @@
     $("wifiTimer").textContent = String(Math.floor(seconds / 60)).padStart(2,"0") + ":" + String(seconds % 60).padStart(2,"0");
     $("wifiTimer").classList.toggle("is-low",seconds <= 60);
   }
+  async function refreshMemory() {
+    try {
+      var memory = await api("mem_stats");
+      $("heapValue").textContent = "当前 " + (memory.free / 1024).toFixed(1)
+        + " KiB · 最低 " + (memory.min_free / 1024).toFixed(1) + " KiB";
+    } catch (_) {
+      $("heapValue").textContent = "不可用";
+    }
+  }
   async function poll() {
     if (state.polling || state.closed || !state.loaded) return;
     state.polling = true;
@@ -682,9 +716,11 @@
     } finally { state.polling = false; }
   }
   document.querySelector(".editor-pane").classList.add("is-busy");
-  load(false).then(function() { setBusy(false); poll(); }).catch(function(e) {
+  load(false).then(function() { setBusy(false); refreshMemory(); poll(); }).catch(function(e) {
     $("saveState").textContent = e.message + "；请刷新页面重试";
   });
-  setInterval(poll,1000); setInterval(renderTimer,1000);
+  setInterval(poll,1000);
+  setInterval(renderTimer,1000);
+  setInterval(refreshMemory,10000);
   document.addEventListener("visibilitychange",function() { if (!document.hidden) poll(); });
 }());
