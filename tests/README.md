@@ -1,5 +1,9 @@
 # 测试脚本使用说明
 
+## 设备状态遥测
+
+离线回归：`python3 tests/test_device_telemetry.py` 和 `node tests/test_device_telemetry.cjs`；浏览器回归 `node tests/test_device_status_browser.cjs` 使用受控协议输入，不构成实物验收。实际设备刷入候选后执行 `python3 tests/ble_telemetry_e2e.py --seconds 30 --report tests/reports/telemetry-device.json`，验证四组通知、CPU、RSSI、堆门限、退订与两次连接；测试前释放网页和 App。协议与验收边界见 [遥测验证](../docs/dev/36-device-telemetry-verification.md)。
+
 ## BLE 标准服务与兼容诊断
 
 - `python3 tests/test_ble_compatibility.py`：生产双 profile GATT 回调 ASan/UBSan、15 项快照/规则/报告校验及实际 Pages 浏览器回归，已接入总质量门禁。

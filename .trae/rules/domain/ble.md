@@ -19,6 +19,8 @@
 
 ## 服务清单
 
+- `BLE-4a`：独立遥测服务 `7a5a1000` 在两套 profile 中均保持只读；四组 Read/Notify 固定 20 字节且同轮同序号。RSSI 仅由 host 上下文低频缓存，GATT 不执行 HCI 查询；退订/断连/stop 清理生命周期。不得加入运动广播、NVS schema 或配置 revision。
+
 - `BLE-4`：GATT 必须维持当前 profile 对应的服务组合，不得把 cycling 与 running 服务随意混装。
 - `CPS`：Cycling Power Service，UUID `0x1818`
 - `HRS`：Heart Rate Service，UUID `0x180D`

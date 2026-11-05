@@ -20,6 +20,12 @@
 
 ## 服务架构总览
 
+### 独立设备遥测
+
+源码候选额外注册 `7a5a1000` 只读服务，由 `ble_telemetry_service.c` 维护；四个 Read/Notify 特征与一个 Meta Read 特征在 cycling/running 中均存在。不进入运动广播或配置事务，不修改运动服务布局。`device_telemetry_runtime.c` 每秒采集堆、CPU 与主任务栈；纯 C `device_telemetry` 编码器和窗口函数可 host 测试。host callout 查询 RSSI，通知复用 `g_notify_lock`，退订/断开清理，停止 host 后释放 callout。
+
+协议、CPU/内存口径、Pages 订阅生命周期、测试结果与待实物验证项见 [设备遥测协议与验证](../dev/36-device-telemetry-verification.md)。
+
 BikePower C 采用 NimBLE host 实现蓝牙 peripheral 角色，暴露标准蓝牙 SIG 定义的运动传感器服务集，与码表/骑行 App 兼容。
 
 当前桥接实现额外使用一个受控 central 上游连接，peripheral 仍只接受一个下游。真实来源只转发 CPS 功率及同源曲柄踏频；无曲柄时 CPS 为 4 字节功率包，CSC 不发送模拟曲柄。桥接 FTMS 不补模拟速度，按实际字段设置 flags。心率可选模拟，首次桥接默认关闭。私有配置服务共八组：原五组不变，`0009` 为主设备与共享校正，`000a/000b` 为备选身份；BLE 分组版本保持 1，NVS 三设备 wire 版本为 2。流程与事务见 [门户说明](08-wifi-portal.md)。

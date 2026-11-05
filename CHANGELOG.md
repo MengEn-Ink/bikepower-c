@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+### 设备状态与真实遥测（2026-11-05）
+- 新增独立只读 BLE 四组快照：同口径堆、CPU/主任务窗口、板端 RSSI/连接参数、发送计数；20 字节 MTU 23 兼容，订阅/断开/stop 受现有通知生命周期保护。
+- CPU 默认启用 FreeRTOS esp_timer 运行统计，不扫描完整任务表；Pages 内存/CPU 百分比、占用条、真实趋势、常驻栏和独立浮窗共用一份连接。手机支持状态直链，蓝牙仍取决于浏览器能力。
+- 新增 C 人工真值与实际 GATT ASan/UBSan、网页解码/并发取消/回滚、手机桌面双主题交互回归和只读真机验收脚本；既有 Host 6115/0、BLE 标准与协议测试通过。详细构建、门禁、部署结果及 `NOT_RUN` 边界见 `docs/dev/36-device-telemetry-verification.md`。
+
 ### BLE 能力与稳定性专项复核（2026-11-05）
 - `main/ble_bikepower.c`、`main/ble_config_service.c/.h`、`main/bikepower_config.h`：FTMS/配置响应使用 8 条静态预留队列，操作前检查容量，异步 COMMIT 保留响应 token；确认后推进，发送失败终止连接，断连/复位/stop 清理。修正跑步部分掩码的 RSC 静默、稳定骑行 Feature 并补心率能力，桥接目标功率暂不可控返回 Operation Failed。
 - `tools/web/ble-compatibility.js`、`tools/web/ble-monitor.html`：补齐控制点/状态与范围诊断、Treadmill 解析与订阅；旧请求只清理自身连接代次，手动连接限制跨刷新保留。

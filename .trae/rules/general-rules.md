@@ -58,6 +58,8 @@ bikepower-c/
 │   ├── board_detect.c/.h     — 运行时板型检测（通用 ESP32-C3 / M5Stamp C3）
 │   ├── ble_bikepower.c/.h    — NimBLE 五服务 + FTMS ERG
 │   ├── ble_config_service.c/.h — 八组 GATT 配置、revision 与提交事务
+│   ├── ble_telemetry_service.c/.h — 四组只读 GATT 快照、订阅与 host RSSI 缓存
+│   ├── device_telemetry_runtime.c/.h — 每秒堆/CPU/主任务栈采样与真实构建身份
 │   ├── bridge_runtime.c/.h   — 三设备定向恢复、实际来源与 Portal 命令
 │   ├── ble_power_bridge.c/.h — 单台上游 CPS 定向连接、DIS 与通知
 │   ├── ble_scanner.c/.h      — 仅用户触发的 CPS 候选扫描与代次隔离
@@ -83,6 +85,7 @@ bikepower-c/
 │   ├── button_debounce.c     — 去抖与长按节拍纯逻辑
 │   ├── led_pattern.c         — LED 模式/颜色映射纯逻辑
 │   ├── domain_rng.c          — 随机数
+│   ├── device_telemetry.c    — 20 字节遥测编码与 CPU 窗口
 │   └── include/              — 头文件 + domain_config.h
 ├── scripts/
 │   ├── inline_static.py      — 编译时把 web/app.css + web/app.js 内联到 web/index.html，生成 main/web_index_html.h
@@ -96,7 +99,9 @@ bikepower-c/
 │   ├── flash-session.js      — 串口刷写生命周期
 │   ├── ble-compatibility.js  — 固定快照、规则与报告
 │   ├── ble-compatibility-ui.js/.css — 诊断表单、连接交接与双主题
-│   └── pages-experience.css/.js — 功能分区、动效、按钮教学与页面更新信息
+│   ├── pages-experience.css/.js — 功能分区、动效、按钮教学与页面更新信息
+│   ├── device-telemetry.js   — 同序快照组合、真实值解码与订阅生命周期
+│   └── device-status.css/.js — 常驻指标、趋势和独立窗口，含手机状态直链
 ├── tests/
 │   ├── ble_selftest.py       — bleak 五服务 + FTMS ERG 自测
 │   ├── test_ble_standard_contract.py — 生产 FTMS/广播/控制事务 ASan/UBSan
