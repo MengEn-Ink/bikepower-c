@@ -19,6 +19,8 @@
 - `power_engine.c`
 - `running_engine.c`
 - `config_store.c`
+- `bridge_failover.c`（最近成功优先、两轮快速恢复、模拟降级与低频轮转）
+- `power_bridge.c` / `ble_config_codec.c`（三设备 wire、0W 校正与八组配置）
 - `device_template.c`
 - `device_analysis.c`
 - `ble_payload_codec.c`（CPS/CSC/HRS/FTMS/RSC 生产 payload 编码）
@@ -54,6 +56,12 @@
 - `bikepower_config.h` 中 BLE UUID、设备名、版本号等常量
 
 离线 vectors/fake harness 只证明编码和编排契约，不能替代 NimBLE GATT、射频链路或标准客户端真机验收。
+
+桥接恢复改动还须运行 `make -C test run`、`tests/test_bridge_session.py`、
+`tests/check_bridge_failover_contract.py`、`tests/test_ble_config_e2e.py`。
+生产会话、扫描和运行时由同一 ASan/UBSan harness 验证；
+三设备定向接管、重启排序、全离线模拟连续性、低频恢复、真实 0W 和无线共存仍须实物验收，
+条件不具备时明确 `NOT_RUN`。
 
 ### `TC-3`：配网自测
 

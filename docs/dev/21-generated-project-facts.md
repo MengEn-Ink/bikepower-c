@@ -3,12 +3,12 @@
 > 由 `python3 scripts/tools/doc_facts.py --write` 生成；请修改源码后重新生成，不手工编辑。
 
 - 固件版本：v4.2.1
-- 配置 schema：13
+- 配置 schema：14
 - 配网超时：300 秒，仅显式续期
 - BLE 通知周期：1000 毫秒
 - 已注册 HTTP 路由：23 个（按 method + URI 计数）
-- 板级生产模块：14 个
-- 领域生产模块：17 个
+- 板级生产模块：15 个
+- 领域生产模块：18 个
 
 ## HTTP 路由
 
@@ -43,6 +43,7 @@
 - `main/ble_config_service.c`
 - `main/ble_scanner.c`
 - `main/ble_power_bridge.c`
+- `main/bridge_runtime.c`
 - `main/app_state.c`
 - `main/button.c`
 - `main/led.c`
@@ -54,6 +55,7 @@
 - `main/captive_portal.c`
 - `components/bikepower_domain/ble_config_codec.c`
 - `components/bikepower_domain/ble_payload_codec.c`
+- `components/bikepower_domain/bridge_failover.c`
 - `components/bikepower_domain/button_debounce.c`
 - `components/bikepower_domain/button_logic.c`
 - `components/bikepower_domain/config_store.c`

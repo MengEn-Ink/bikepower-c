@@ -57,9 +57,10 @@ bikepower-c/
 │   ├── led.c/.h              — LED 任务（通用板 GPIO12 四态 / M5Stamp SK6812 RGB）
 │   ├── board_detect.c/.h     — 运行时板型检测（通用 ESP32-C3 / M5Stamp C3）
 │   ├── ble_bikepower.c/.h    — NimBLE 五服务 + FTMS ERG
-│   ├── ble_config_service.c/.h — 六组 GATT 配置、revision 与提交事务
-│   ├── ble_power_bridge.c/.h — 上游 CPS 静态连接、DIS、通知与重连
-│   ├── ble_scanner.c/.h      — CPS 候选扫描与代次隔离
+│   ├── ble_config_service.c/.h — 八组 GATT 配置、revision 与提交事务
+│   ├── bridge_runtime.c/.h   — 三设备定向恢复、实际来源与 Portal 命令
+│   ├── ble_power_bridge.c/.h — 单台上游 CPS 定向连接、DIS 与通知
+│   ├── ble_scanner.c/.h      — 仅用户触发的 CPS 候选扫描与代次隔离
 │   ├── nvs_store.c/.h        — NVS 配置持久化桥接
 │   ├── radio_ctrl.c/.h       — BLE/WiFi 射频软切换（唯一 RF 开关）
 │   ├── wifi_portal.c/.h      — HTTP 配网门户（v3.2.0 起仅 /api/xxx JSON 接口，HTML 由 web/ 内联）
@@ -72,6 +73,7 @@ bikepower-c/
 ├── components/bikepower_domain/   — 纯 C 领域层（可 host 单测）
 │   ├── power_engine.c        — 功率/踏频数据引擎
 │   ├── power_bridge.c        — 真实功率校正、踏频差分与失效保护
+│   ├── bridge_failover.c     — 三设备快速恢复、模拟降级与低频轮转
 │   ├── cps_input_codec.c     — 上游 CPS 可选字段长度检查及解码
 │   ├── hr_model.c            — 心率模型
 │   ├── profile.c             — 用户配置 + 范围校验
@@ -146,11 +148,11 @@ bikepower-c/
             │
    ┌────────┼────────┬─────────┬──────────┬───────────┐
    │        │        │         │          │           │
-button.c  led.c  app_state.c  ble_bikepower.c  nvs_store.c  radio_ctrl.c→wifi_portal.c
+button.c  led.c  app_state.c  ble_bikepower.c  bridge_runtime.c  nvs_store.c  radio_ctrl.c→wifi_portal.c
    │        │        │         │          (board_detect.c 供 button/led 取引脚)
    └────────┴───→ app_queue (Queue)
                     │
-            components/bikepower_domain (power_engine/hr_model/profile/config_store/button_logic/led_pattern)
+            components/bikepower_domain (power_engine/power_bridge/bridge_failover/hr_model/profile/config_store/button_logic/led_pattern)
 ```
 
 ## 运行时数据流
@@ -160,6 +162,9 @@ button.c  led.c  app_state.c  ble_bikepower.c  nvs_store.c  radio_ctrl.c→wifi_
 连接轮询(app_main) → APP_EVT_CONN_CHANGED ┤→ 调功/确认窗口/配网触发
                                           │→ led_set_pattern
 power_engine.snapshot → ble_bikepower_set_data → BLE 通知
+bridge_failover → bridge_runtime → ble_power_bridge 定向会话
+                            ├→ 最近成功 NVS 提示
+                            └→ 实际来源快照 → Portal / BLE 输出选择
 ```
 
 ## 模块互斥约束

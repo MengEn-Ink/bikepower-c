@@ -1,5 +1,16 @@
 # 测试脚本使用说明
 
+## 三设备桥接主备回归
+
+- `make -C test run`：领域层、三设备 wire、0W 校正与纯 C 主备状态机。
+- `python3 tests/test_bridge_session.py`：ASan/UBSan 执行生产会话、扫描及 `bridge_runtime`；覆盖单设备终态、最近成功优先、两轮降级、低频恢复、手动暂停与临时测试。
+- `python3 tests/check_bridge_failover_contract.py`：主任务接线、Portal mailbox 与自动路径不扫描契约，已接入 quick/full 和质量门禁。
+- `python3 tests/portal_bridge_browser.py --screenshot-dir <目录>`：生产压缩页面的三设备列表、首选/删除/满容量替换、实际来源、模拟降级及 0W 预览。
+- `python3 tests/ble_config_e2e.py --port <串口> --board <板型>`：八组配置事务、NVS 重启持久化与完整原配置恢复；离线帧回归使用 `tests/test_ble_config_e2e.py`。
+
+离线替身不能证明真实主备接管、重启自动连接、真实 0W 或无线共存。
+结果见 [本轮验证报告](../docs/dev/30-local-cleanup-verification-report.md)，实物条件不具备时明确 `NOT_RUN`。
+
 ## 稳定性异常端到端回归
 
 - `python3 tests/portal_exception_browser.py`：实际压缩页面在 320/390/1440 宽度验证读取失败/非法 JSON、轮询断网恢复、外部 revision、保存失败重试、成功响应丢失、重复点击、异事务等待超时、扫描取消及关闭失败重试。
@@ -17,7 +28,7 @@
 
 ## 自动优化新增验证
 
-- `python3 tests/test_ble_config_service.py`：ASan/UBSan 执行生产六组配置 GATT 回调，覆盖提交拒收、重复 BEGIN、revision 和断连取消。
+- `python3 tests/test_ble_config_service.py`：ASan/UBSan 执行生产八组配置 GATT 回调，覆盖提交拒收、重复 BEGIN、revision 和断连取消。
 - `python3 tests/test_ble_runtime.py`：编译生产快照发布/采集/打包函数，验证模拟、桥接、跑步同轮字段一致。
 - `python3 tests/test_portal_runtime.py`：使用本地 ESP-IDF cJSON 执行生产门户 handler，验证最长转义、超限 JSON、300 秒续期、done 重试/代次与重启取清；替身不能证明无线共存。
 - `python3 tests/test_maintenance_tools.py`：门禁参数、源码事实漂移、Markdown 标题/重复标题/引用链接/代码块边界。
@@ -191,9 +202,9 @@ python3 scripts/tools/device_acceptance.py init --board generic-c3 --operator "�
 | `.github/workflows/deploy-web-tools.yml` | CI 成功或 GitHub Release 发布后部署 Pages；缺失完整固件时阻断覆盖 |
 | `tests/check_ble_monitor.py` | 静态门禁，检查监控、刷写交互、Pages 工作流和门禁接入是否漂移 |
 | `tests/test_prepare_web_flash_site.py` | 离线验证双板选择、SHA256、manifest、GitHub-only CLI、降级和路径安全 |
-| `tests/ble_config_e2e.py` | 真机验证六组全量配置读取/修改、事务错误路径、NVS 重启持久化、GATT 重建，并恢复原配置 |
-| `tests/test_ble_config_e2e.py` | 无设备验证 Config Service 小端帧、六组变更和非法输入夹具 |
-| `tests/device_profile_ble_harness.py` | 不启动 WiFi，通过 Config Service 临时切换另一 GATT profile，执行 selftest 后恢复六组原配置 |
+| `tests/ble_config_e2e.py` | 真机验证八组全量配置读取/修改、事务错误路径、NVS 重启持久化、GATT 重建，并恢复原配置 |
+| `tests/test_ble_config_e2e.py` | 无设备验证 Config Service 小端帧、八组变更、连续且不重复的设备槽位和非法输入夹具 |
+| `tests/device_profile_ble_harness.py` | 不启动 WiFi，通过 Config Service 临时切换另一 GATT profile，执行 selftest 后恢复八组原配置 |
 | `tests/check_github_workflows.py` | 校验最小权限、CI→Pages 依赖、治理资产与 GitHub-only 发布契约 |
 
 ```bash
@@ -226,7 +237,7 @@ python3 tests/operation_gate.py --level device --run-portal \
   --board generic-c3 --operator "验收人" --port /dev/cu.usbmodem101
 ```
 
-`--run-portal` 会先用 `device_profile_harness.py` 分别验证 cycling 和 running：测试阶段强制 `broadcast_mask=7`，running 强制带 `--control`，逐 opcode 等待 indication，并按 moving → Stop 冻结 → paused Reset 清零且保持暂停 → Resume 恢复四阶段采集实际多样本，严格判断 RSC/Treadmill 累计增长或冻结。之后再执行广播项数据面与门户测试；harness 会在 `finally` 恢复原始 `sport_profile`、`broadcast_mask` 和测试期间可能改写的完整 running 持久配置。广播 monitor 若恢复原配置失败会直接判定 FAIL，不得以已完成数据采样掩盖配置污染。未传 `--run-portal` 时用 `--device-profile cycling|running` 声明当前固件实际 profile；门禁先验证当前 profile，再由 `device_profile_ble_harness.py` 通过 Config Service 临时切换并验证另一 profile，全程不启动 WiFi，最后恢复六组原配置。
+`--run-portal` 会先用 `device_profile_harness.py` 分别验证 cycling 和 running：测试阶段强制 `broadcast_mask=7`，running 强制带 `--control`，逐 opcode 等待 indication，并按 moving → Stop 冻结 → paused Reset 清零且保持暂停 → Resume 恢复四阶段采集实际多样本，严格判断 RSC/Treadmill 累计增长或冻结。之后再执行广播项数据面与门户测试；harness 会在 `finally` 恢复原始 `sport_profile`、`broadcast_mask` 和测试期间可能改写的完整 running 持久配置。广播 monitor 若恢复原配置失败会直接判定 FAIL，不得以已完成数据采样掩盖配置污染。未传 `--run-portal` 时用 `--device-profile cycling|running` 声明当前固件实际 profile；门禁先验证当前 profile，再由 `device_profile_ble_harness.py` 通过 Config Service 临时切换并验证另一 profile，全程不启动 WiFi，最后恢复八组原配置。
 
 ### F. 串口日志工具
 

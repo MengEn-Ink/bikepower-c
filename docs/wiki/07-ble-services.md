@@ -22,7 +22,7 @@
 
 BikePower C 采用 NimBLE host 实现蓝牙 peripheral 角色，暴露标准蓝牙 SIG 定义的运动传感器服务集，与码表/骑行 App 兼容。
 
-当前桥接实现额外使用一个受控 central 上游连接，peripheral 仍只接受一个下游。真实来源只转发 CPS 功率及同源曲柄踏频；无曲柄时 CPS 为 4 字节功率包，CSC 不发送模拟曲柄。桥接 FTMS 不补模拟速度，按实际字段设置 flags。心率可选模拟，首次桥接默认关闭。私有配置服务增加 Bridge 第六组，原五组布局不变。流程与事务见 [门户说明](08-wifi-portal.md)。
+当前桥接实现额外使用一个受控 central 上游连接，peripheral 仍只接受一个下游。真实来源只转发 CPS 功率及同源曲柄踏频；无曲柄时 CPS 为 4 字节功率包，CSC 不发送模拟曲柄。桥接 FTMS 不补模拟速度，按实际字段设置 flags。心率可选模拟，首次桥接默认关闭。私有配置服务共八组：原五组不变，`0009` 为主设备与共享校正，`000a/000b` 为备选身份；BLE 分组版本保持 1，NVS 三设备 wire 版本为 2。流程与事务见 [门户说明](08-wifi-portal.md)。
 
 ### 核心设计原则
 
@@ -408,7 +408,7 @@ ble_bikepower_set_data()            notify_tick()
 - `g_conn_handle`、`g_ready` / `g_stopping` / `g_start_failed`、profile 和 mask 使用 C11 原子。
 - `s_output` 与通知缓冲/长度使用 `s_data_lock`；同轮通知只采集一次完整输入。
 - GATT 在锁内复制 payload 与长度，锁外追加到 mbuf。
-- `ble_config_service` 用独立短锁管理六组配置和 revision；提交回调、BLE indication 与 NVS 在锁外。
+- `ble_config_service` 用独立短锁管理八组配置和 revision；提交回调、BLE indication 与 NVS 在锁外。
 - 配置快照发布与提交结果由主任务串行调用；回调在 NimBLE 启动前注册，运行期间不更换。
 
 ---

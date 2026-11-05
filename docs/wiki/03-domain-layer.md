@@ -206,6 +206,33 @@ dt = 0.05s（50ms 节拍）
 
 ---
 
+## power_bridge.c — 三设备配置与功率校正
+
+**头文件**：[power_bridge.h](../../components/bikepower_domain/include/power_bridge.h)
+
+桥接配置固定最多保存三台设备，设备身份由 `addr_type + addr[6]` 共同组成。
+校验会删除无效地址、控制字符名称和重复身份，并压紧设备数组。全部设备共享
+同一组原值、固定瓦数偏移或百分比校正；原始功率小于等于 0 时直接返回 0，
+不会因正偏移产生虚假功率。
+
+NVS bridge wire v2 使用 `[version][source][count][calibration][watts][percent]`
+头部和变长设备项；解码继续兼容 wire v1 单设备格式。CPS 样本要求两份合法
+通知后生效，曲柄差分处理 16 位回绕，3 秒过期或断线后旧样本失效。
+
+## bridge_failover.c — 主备恢复纯状态机
+
+**头文件**：[bridge_failover.h](../../components/bikepower_domain/include/bridge_failover.h)
+
+状态机不依赖 ESP-IDF 或 NimBLE，只输出 connect/stop/persist_recent 动作：
+
+- 冷启动按最近成功设备优先，再按保存顺序定向连接。
+- 异常断连后开启 60 秒快速窗口，最多遍历全部设备两轮。
+- 全部失败后进入模拟降级，持久配置来源保持真实。
+- 降级期间每 60 秒轮转一台已保存设备做定向探测，不启动后台扫描。
+- 任一设备产生两份合法样本后恢复真实输出，并提示应用层更新最近成功身份。
+
+---
+
 ## config_store.c — 配置 Schema 管理
 
 **头文件**：[config_store.h](../../components/bikepower_domain/include/config_store.h)
@@ -214,23 +241,27 @@ dt = 0.05s（50ms 节拍）
 
 ### 当前 Schema 版本
 
-`CONFIG_VERSION = 12`
+`CONFIG_VERSION = 14`
 
 ### 迁移路径
 
 | 从版本 | 到版本 | 迁移操作 |
 |--------|--------|----------|
-| v6 | v12 | 补 `run_pace_float_sec` 默认值并逐级迁移 |
-| v7 | v12 | 补 `run_cadence_float` 默认值并逐级迁移 |
-| v8 | v12 | 补 `broadcast_mask = BROADCAST_FIELD_ALL` 并逐级迁移 |
-| v9 | v12 | 补跑步参数（mode/pacer/pace 范围/custom_name） |
-| v10 | v12 | 先进入 v11，再执行 v11 的选择性浮动迁移 |
+| v6 | v14 | 补 `run_pace_float_sec` 默认值并逐级迁移 |
+| v7 | v14 | 补 `run_cadence_float` 默认值并逐级迁移 |
+| v8 | v14 | 补 `broadcast_mask = BROADCAST_FIELD_ALL` 并逐级迁移 |
+| v9 | v14 | 补跑步参数（mode/pacer/pace 范围/custom_name） |
+| v10 | v14 | 先进入 v11，再继续逐级迁移 |
 | v11 | v12 | `power_float=5`（历史默认）改为 50，其他自定义值不变 |
-| 未知 | v12 | 回退到默认配置 |
+| v12 | v13 | 补默认桥接配置，保持模拟来源且无绑定 |
+| v13 | v14 | 单设备身份迁移到三设备表槽位 0，共享校正保持不变 |
+| 未知 | v14 | 回退到默认配置 |
 
-### config_t 字段
+### config_data_t 字段
 
-`config_t` 是 NVS 存储和 JSON 序列化的中间结构，包含所有持久化字段（约 40 个）。
+`config_data_t` 是 NVS 存储和 JSON 序列化的中间结构。桥接字段包含
+`bridge_devices` 对象数组和共享校正；序列化仍保留槽位 0 的旧单设备别名，
+用于兼容既有客户端。
 
 ### 关键函数
 
@@ -240,7 +271,7 @@ dt = 0.05s（50ms 节拍）
 | `config_store_validate(c)` | 范围夹紧，返回是否有修正 |
 | `config_store_migrate(c)` | schema 版本迁移（修改 c->schema_ver） |
 | `config_store_serialize(c, buf, len)` | 序列化为 JSON 字符串 |
-| `config_store_deserialize(c, json)` | 从 JSON 反序列化（缺失字段保留默认） |
+| `config_store_deserialize(json, c)` | 从 JSON 反序列化；schema v14 要求提供合法 `bridge_devices`，其他缺失字段采用默认值 |
 
 ---
 
@@ -248,22 +279,23 @@ dt = 0.05s（50ms 节拍）
 
 **头文件**：[json_miniparse.h](../../components/bikepower_domain/include/json_miniparse.h)
 
-专为 HTTP 请求体解析设计，**无动态内存分配**，顺序扫描提取字段。
+用于配置 JSON 的字段与对象数组提取，**无动态内存分配**。生产 HTTP 请求体由 cJSON 解析，再由配置层处理。
 
 ### 特性
 
-- 支持提取字符串、整数、布尔值字段
-- 自动处理 JSON 转义（`\"`、`\\`、`\n` 等）
+- 简单字段提取支持工具生成格式的字符串与整数；字符串提取不解码转义
+- 对象数组遍历会跳过字符串转义及嵌套对象，按索引复制受输出缓冲区大小限制
+- 配置层另行校验数组最多三项、设备身份和名称，并处理名称反转义
 - 不构建完整 DOM，适合嵌入式场景
-- 遇到不认识的字段跳过，不报错
 
 ### 关键函数
 
 | 函数 | 说明 |
 |------|------|
-| `json_extract_string(json, key, out, out_len)` | 提取字符串字段 |
-| `json_extract_int(json, key, out_val)` | 提取整数字段 |
-| `json_extract_bool(json, key, out_val)` | 提取布尔字段 |
+| `json_get_str(json, key, out, out_len)` | 提取简单字符串，不解析转义 |
+| `json_get_int(json, key)` | 提取整数，缺失返回 0 |
+| `json_get_object_array_count(json, key)` | 返回对象数组元素数；缺失为 -1，格式错误为 -2 |
+| `json_get_object_array_item(json, key, index, out, out_len)` | 提取指定对象元素 |
 
 ---
 
@@ -307,7 +339,8 @@ LED 模式与颜色映射纯逻辑：
 | 心率模型 | `HR_TAU_RISE=30`, `HR_TAU_FALL=60`, `HRV_RSA_AMPLITUDE=2.0` 等 |
 | 随机游走 | `FLUCT_WALK_HOLD_LOOPS=60`, `FLUCT_WALK_TAU=0.8f` |
 | 跑步 | `RUN_SPEED_X100_MIN/MAX`, `RUN_CADENCE_MIN/MAX` 等 |
-| 配置 | `CONFIG_VERSION=12`, `DEVICE_NAME_MAX=24` |
+| 配置 | `CONFIG_VERSION=14`, `DEVICE_NAME_MAX=24` |
+| 桥接 | `BRIDGE_DEVICE_MAX=3`, `BRIDGE_WIRE_VERSION=2`, `BRIDGE_FAST_WINDOW_MS=60000`, `BRIDGE_BACKGROUND_INTERVAL_MS=60000` |
 | 节拍 | `HR_LOOP_INTERVAL_MS=50` |
 | 广播 | `BROADCAST_FIELD_POWER/CADENCE/HR/RUNNING`, `BROADCAST_FIELD_ALL` |
 | 运动 profile | `SPORT_PROFILE_CYCLING=0`, `SPORT_PROFILE_RUNNING=1` |

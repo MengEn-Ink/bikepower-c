@@ -59,7 +59,8 @@
 | [自动优化验证报告](dev/22-automatic-optimization-report.md) | 本轮验证结果、镜像身份、剩余硬件与人工项 |
 | [稳定性异常验证报告](dev/25-stability-exception-test-report.md) | 基线缺陷、修复、三层异常回归、双板构建与实物验收边界 |
 | [WiFi 配置端运动模式交互设计](dev/26-wifi-portal-sport-mode-ux-design.md) | 草稿与已应用 profile 的显示规则、跑步语义收敛及测试边界 |
-| [WiFi 配置端运动模式交互计划](dev/27-wifi-portal-sport-mode-ux-plan.md) | 生产 DOM 浏览器 TDD、最小实现、资源预算和回归步骤 |
+| [桥接自动恢复与多设备备选设计](dev/28-bridge-failover-multi-device-design.md) | 三设备身份、最近成功优先、60 秒快速恢复、模拟降级和低频定向探测规范 |
+| [源码清理与验证报告](dev/30-local-cleanup-verification-report.md) | 桥接残留清理、短地址修复、自动化验证与实物边界 |
 
 ## 🗄️ archive/ — 历史 / 归档（仅供追溯）
 
@@ -82,6 +83,8 @@
 | [Top 5 协议稳定性设计](archive/14-top5-protocol-stability-design.md) | 已实现的 CPS/FTMS、跑步会话、ERG 与 WiFi 可靠性修复 |
 | [自动优化实施计划](archive/15-automatic-optimization-plan.md) | 已完成的维护工具、BLE 并发、门户容量与自动验证步骤 |
 | [稳定性异常验证计划](archive/16-stability-exception-test-plan.md) | 已执行的网页、BLE 配置事务与生产 HTTP handler 故障矩阵 |
+| [WiFi 配置端运动模式交互计划](archive/17-wifi-portal-sport-mode-ux-plan.md) | 已执行的生产 DOM 浏览器回归、语义与资源预算步骤 |
+| [桥接自动恢复与多设备备选实施计划](archive/18-bridge-failover-multi-device-implementation-plan.md) | 已执行的 schema v14、八组配置、运行时与 Portal 步骤；实物验收单独记录 |
 
 ## 🤖 AI 助手
 

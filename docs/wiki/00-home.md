@@ -56,8 +56,9 @@ bikepower-c/
 │   ├── led.c/h                     # LED 灯效任务（GPIO/SK6812）
 │   ├── board_detect.c/h            # 运行时板型检测
 │   ├── ble_bikepower.c/h           # NimBLE 五服务 + FTMS ERG
-│   ├── ble_config_service.c/h      # 六组配置 GATT 与事务
-│   ├── ble_power_bridge.c/h        # 上游连接、DIS、订阅与重连
+│   ├── ble_config_service.c/h      # 八组配置 GATT 与事务
+│   ├── bridge_runtime.c/h          # 三设备恢复、主任务快照与 Portal 邮箱
+│   ├── ble_power_bridge.c/h        # 单设备上游连接、DIS 与订阅
 │   ├── ble_scanner.c/h             # 有界 CPS 候选扫描
 │   ├── radio_ctrl.c/h              # BLE/WiFi 射频软切换（唯一 RF 入口）
 │   ├── wifi_portal.c/h             # HTTP 配网门户（/api/xxx JSON）
@@ -76,6 +77,8 @@ bikepower-c/
 │   ├── running_engine.c            # 跑步模式引擎
 │   ├── profile.c                   # 用户档案（体重/FTP/阈值心率/配速机器人）
 │   ├── config_store.c              # 配置 schema/defaults/validate/migrate/serialize
+│   ├── power_bridge.c              # 三设备身份、wire 编码与真实功率校正
+│   ├── bridge_failover.c           # 快速恢复、模拟降级与低频轮转
 │   ├── json_miniparse.c            # 轻量 JSON 字段提取
 │   ├── button_logic.c              # 按钮语义纯逻辑
 │   ├── button_debounce.c           # 去抖与长按节拍纯逻辑

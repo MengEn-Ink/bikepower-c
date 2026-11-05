@@ -34,15 +34,15 @@
 - `GET /`（返回内联 HTML 整页，CSS/JS 由 `scripts/inline_static.py` 在编译时内联到 `index.html`）
 - `GET /favicon.ico`（204）
 - `GET /.well-known/captive-portal`（RFC 8910 Captive Portal API，返回 `application/captive+json`，引导系统打开 `http://192.168.4.1/`）
-- `GET /api/state`（config/identity/revision/bridge/固件详情/预设/remaining_sec/closing）
-- `GET /api/runtime`（实际输出、桥接新鲜度、跑步累计与事务结果）
+- `GET /api/state`（config/identity/revision/bridge_runtime/固件详情/预设/remaining_sec/closing）
+- `GET /api/runtime`（实际输出、桥接会话与实际来源、跑步累计和事务结果）
 - `GET /api/time`（纯数字剩余秒数）
 - `POST /api/renew`（续期，返回新的剩余秒数）
 - `GET /api/mem_stats`（`{"free":..,"min_free":..}`）
 - `POST /api/config`（提交 revision 配置，返回 transaction，runtime 确认落盘）
 - `POST /api/close-wifi`（保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE）
 - `GET/POST /api/bridge/scan`（本轮 CPS 候选、启动/停止扫描）
-- `POST /api/bridge/control`（test/stop/resume）
+- `POST /api/bridge/control`（test/stop/resume/retry）
 - Captive Portal 探测端点：`/generate_204`、`/gen_204`、`/hotspot-detect.html`、`/library/test/success.html`、`/ncsi.txt`、`/connecttest.txt`、`/canonical.html`、`/success.txt`、`/redirect`、`/kindle-wifi/wifistub.html`
 - `WIFI-14`：路由注册必须集中维护，避免分散在多个函数里造成行为漂移。
 - `WIFI-30`：前端三件套 `main/web/index.html + app.css + app.js` 由 `scripts/inline_static.py` 在编译时内联为 `main/web_index_html.h`，C 侧 `GET /` 直接吐出整页。修改前端后无需手写头文件，构建系统自动重新生成。
@@ -61,7 +61,7 @@
 ## 配网表单字段
 
 - `WIFI-18`：门户表单字段必须与领域层和 NVS 字段一一对应。
-- `WIFI-19`：当前通过 fetch 提交 schema v13 数值配置与 revision，字段名称与 config_store 一致：
+- `WIFI-19`：当前通过 fetch 提交 schema v14 数值配置与 revision，字段名称与 config_store 一致：
 - `mode`（0=固定，1=机器人；ERG 是训练会话态，不持久化）
 - `device_name`
 - `power`
@@ -72,8 +72,11 @@
 - `cadence_float`（踏频浮动幅度 ±RPM，0-20）
 - `hr_float`（固定心率浮动幅度 ±BPM，0-20）
 - `weight`、`ftp`、`thr_hr`、`ride_type`
-- `cycling_source`、`bridge_bound`、`bridge_address`、`bridge_addr_type`、`bridge_calibration`、`bridge_watts`、`bridge_percent_x10`、`bridge_name`
-- `WIFI-20`：模拟配置与真实来源独立持久化；实际桥接功率及踏频不覆盖模拟基础参数。运行时 ERG 不覆盖基础功率或配置 dirty。
+- `cycling_source`、`bridge_devices`（最多三项，每项为 `addr_type/address/name`）、`bridge_calibration`、`bridge_watts`、`bridge_percent_x10`
+- `bridge_bound`、`bridge_address`、`bridge_addr_type`、`bridge_name` 是槽位 0 的兼容别名，不得替代 `bridge_devices` 多设备真值
+- `replace_slot` 仅在满三台后新增一台时提交，不属于持久字段；新增设备必须匹配当前已通过两样本测试的临时会话
+- `WIFI-19a`：`bridge_runtime` 必须区分 `configured_real` 与 `actual_source`，并提供 state、active_slot、candidate_slot、next_attempt_ms；`retry` 只触发立即定向恢复，不启动扫描。
+- `WIFI-20`：模拟配置与真实来源独立持久化；实际桥接功率及踏频不覆盖模拟基础参数。主备失败后的模拟降级只改变运行时实际来源，不得覆盖持久配置。运行时 ERG 不覆盖基础功率或配置 dirty。
 - `WIFI-21`：新增配置项必须同步领域常量、config_store 解析/迁移、NVS/BLE codec、wifi_portal 快照、前端、mock、自测及文档。
 - `WIFI-28`：所有 `/api/xxx` JSON 响应和 `GET /` 内联 HTML 必须设置 `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`，防止浏览器缓存导致页面回退时显示旧数据（v3.2.0 起由 `set_no_store_headers()` 统一注入）。
 - `WIFI-29`：v3.2.0 起前端为 SPA 单页面，无多页隐藏表单；`/api/config` 接收的 JSON 必须包含 `WIFI-19` 列出的全部可变字段，前端 `app.js` 提交时统一构造完整 payload。
@@ -88,3 +91,4 @@
 
 - `WIFI-26`：WiFi 门户行为改动后，必须复核 `tests/stage5_portal_test.py`。
 - `WIFI-27`：若改动涉及按钮进入配网或超时退出链路，必须连同 `app_state.c`、`radio_ctrl.c` 的状态流一起检查。
+- `WIFI-27a`：桥接门户改动必须运行生产 handler、mock 浏览器回归和 `tests/check_bridge_failover_contract.py`；离线结果不得代替多台真实 CPS、热点与下游 App 的共存验收。

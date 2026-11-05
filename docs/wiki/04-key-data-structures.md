@@ -166,13 +166,13 @@ typedef struct {
 } running_snapshot_t;
 ```
 
-### config_t — NVS/JSON 配置中间结构
+### config_data_t — NVS/JSON 配置中间结构
 
 **定义位置**：[config_store.h](../../components/bikepower_domain/include/config_store.h)
 
-这是持久化和序列化用的结构，包含所有需要保存的字段（schema_ver、功率、踏频、模式、心率、体重、FTP、阈值心率、ride_type、自定义W/kg、设备名、LED 配置、运动 profile、广播掩码、跑步参数等），约 40 个字段。
+这是持久化和序列化用的结构，包含 schema_ver、功率、踏频、模式、心率、用户档案、设备名、LED、运动 profile、广播掩码、跑步参数及 `bridge_config_t`。桥接配置固定保存最多三个 `bridge_device_t`，包含地址类型、六字节地址与名称，三台设备共享校正参数；设备身份不按名称匹配。
 
-通过 `config_to_engine()` 和 `engine_to_config()` 在 `config_t` 和 `power_engine_t` 之间转换。
+通过 `config_store_apply_to_engine()` 和 `config_store_from_engine()` 在 `config_data_t` 和 `power_engine_t` 之间转换。最近成功身份为独立 NVS 提示，不属于此配置结构；运行时实际来源也不会覆盖持久化来源。
 
 ### led_config_t — LED 自定义配置
 

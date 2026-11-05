@@ -64,6 +64,11 @@
 
 参考图片：[architecture.png](../images/architecture.png)
 
+真实功率桥接由应用层 `bridge_runtime` 协调：它在主任务中消费纯 C
+`bridge_failover` 的动作，驱动单设备 `ble_power_bridge` 会话和手动
+`ble_scanner`，并把运行时快照同步给门户。自动恢复只做已知地址的定向连接，
+不会在后台启动扫描。
+
 ---
 
 ## 模块依赖关系（DAG）
@@ -77,8 +82,11 @@ app_main.c
    ├── led.c
    │     └── board_detect.h (引脚/驱动类型)
    ├── ble_bikepower.c
-   │     ├── ble_config_service.c (六组配置事务)
-   │     └── ble_power_bridge.c (上游 CPS)
+   │     └── ble_config_service.c (八组配置事务)
+   ├── bridge_runtime.c
+   │     ├── bridge_failover.c (领域层主备状态机)
+   │     ├── ble_power_bridge.c (单设备上游 CPS 会话)
+   │     └── ble_scanner.c (仅手动扫描)
    ├── radio_ctrl.c
    │     └── wifi_portal.c
    │           └── captive_portal.c
@@ -115,6 +123,7 @@ app_main.c
 - `app_queue`（QueueHandle_t，深度 16）：按钮事件、连接变化、ERG 目标、配网结束等统一投递点
 - `s_btn_sem`（SemaphoreHandle_t）：GPIO ISR → button_task 唤醒信号
 - 共享输出 `s_output`：主循环锁内整体发布，通知定时器每轮采集一次；静态 payload/动态长度同样受短临界区保护，生命周期单值使用 C11 原子
+- 桥接运行时：主任务独占 `bridge_runtime` 与 `bridge_failover`，Portal 只读取同步快照并经 callback mailbox 投递扫描、测试、暂停、恢复或立即重试命令
 
 ---
 
@@ -146,9 +155,10 @@ app_main.c
 | [led.c/h](../../main/led.c) | GPIO/RGB 双板灯效 |
 | [board_detect.c/h](../../main/board_detect.c) | 板型描述、检测与固件名称 |
 | [ble_bikepower.c/h](../../main/ble_bikepower.c) | 运动 GATT、广播、通知、FTMS 与生命周期 |
-| [ble_config_service.c/h](../../main/ble_config_service.c) | 六组配置与 revision 事务 |
-| [ble_power_bridge.c/h](../../main/ble_power_bridge.c) | 上游 CPS 连接、DIS、订阅与重连 |
-| [ble_scanner.c/h](../../main/ble_scanner.c) | 有界 CPS 扫描与候选代次 |
+| [ble_config_service.c/h](../../main/ble_config_service.c) | 八组配置与 revision 事务 |
+| [bridge_runtime.c/h](../../main/bridge_runtime.c) | 三设备恢复协调、实际来源选择、最近成功提示和 Portal 命令 |
+| [ble_power_bridge.c/h](../../main/ble_power_bridge.c) | 单台已知 CPS 的定向连接、DIS、订阅与样本快照 |
+| [ble_scanner.c/h](../../main/ble_scanner.c) | 用户主动触发的有界 CPS 扫描与候选代次 |
 | [radio_ctrl.c/h](../../main/radio_ctrl.c) | 射频共存唯一入口与失败兜底 |
 | [wifi_portal.c/h](../../main/wifi_portal.c) | HTTP JSON、配置事务、超时与静态页面 |
 | [captive_portal.c/h](../../main/captive_portal.c) | DNS 与门户探测 |
@@ -165,6 +175,8 @@ app_main.c
 | [hr_model.c](../../components/bikepower_domain/hr_model.c) | 负荷功率滤波、FTP 6 区映射与锚点压缩、心率平滑（tau 升 30s/降 60s）、HRV 慢游走与输出限速 |
 | [running_engine.c](../../components/bikepower_domain/running_engine.c) | 跑步模式：速度/配速/步频生成、配速机器人、RSC 数据 |
 | [profile.c](../../components/bikepower_domain/profile.c) | 用户档案（体重/FTP/阈值心率）、配速机器人表（Coco/Yumi/Jacques/Genie/Constance/自定义） |
+| [power_bridge.c](../../components/bikepower_domain/power_bridge.c) | 三设备配置、wire v1/v2、校正、0W 保护与同源踏频 |
+| [bridge_failover.c](../../components/bikepower_domain/bridge_failover.c) | 最近成功优先、两轮快速恢复、模拟降级和低频轮转纯状态机 |
 | [config_store.c](../../components/bikepower_domain/config_store.c) | schema/defaults/校验/迁移/序列化；版本以源码事实摘要为准 |
 | [json_miniparse.c](../../components/bikepower_domain/json_miniparse.c) | 轻量 JSON 字段提取器（无动态分配，用于 HTTP 请求解析） |
 | [button_logic.c](../../components/bikepower_domain/button_logic.c) | 按钮按压语义纯逻辑（短按/长按/自动重复/确认窗口） |

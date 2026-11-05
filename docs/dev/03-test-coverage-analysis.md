@@ -9,7 +9,8 @@
 代码行数变化频繁且不能代表覆盖质量，本矩阵不再手工记录易漂移的行数；规模分析需要时以当前工作区 `wc -l` 或覆盖工具结果为准。
 
 生产模块与 schema 清单以 [源码事实摘要](21-generated-project-facts.md) 为准；
-断言数量和真机结果以本轮 [验证报告](22-automatic-optimization-report.md) 为准。
+断言数量和真机结果以本轮 [清理验证报告](30-local-cleanup-verification-report.md) 与
+[PROGRESS](../../PROGRESS.md) 为准；历史自动优化报告只证明对应候选。
 
 ### 领域层 `components/bikepower_domain/`（纯 C，host 可测）
 
@@ -23,11 +24,12 @@
 | `device_template.c` | 外部 BLE 设备模板、合并和服务标记 | ✅ host 单测 |
 | `device_analysis.c` | 外部 BLE 运动数据解析、统计和 JSON 输出 | ✅ host 单测 |
 | `ble_payload_codec.c` | CPS/CSC/HRS/FTMS/RSC 生产 payload 编码 | ✅ host 编译 + 独立 golden vectors |
-| `ble_config_codec.c` | 六组 BLE 配置协议 | ✅ host 单测 + 实际 GATT 回调回归 |
+| `ble_config_codec.c` | 八组 BLE 配置协议 | ✅ host 单测 + 实际 GATT 回调回归 |
 | `cps_input_codec.c` | 真实 CPS 可选字段、回绕与踏频解析 | ✅ host 单测 |
 | `power_bridge.c` | 校正、0W、过期和绑定配置 | ✅ host 单测 |
+| `bridge_failover.c` | 最近成功优先、两轮恢复、模拟降级与低频轮转 | ✅ host 单测 |
 | `device_identity.c` | DIS 字段编码与校验 | ✅ host 单测 |
-| `json_miniparse.c` | 扁平 JSON 字段提取（配网请求体解析） | ✅ host 单测 |
+| `json_miniparse.c` | JSON 字段与有界对象数组提取 | ✅ host 单测 |
 | `button_logic.c` | 按压时长分类（短按/长按/确认） | ✅ host 单测 |
 | `led_pattern.c` | LED 模式、颜色与闪烁节拍 | ✅ host 单测 |
 | `button_debounce.c` | 按钮去抖/长按节拍判定 | ✅ host 单测 |
@@ -41,8 +43,9 @@
 | 文件 | 职责 | 可测性分类 |
 |------|------|-----------|
 | `ble_bikepower.c` | BLE 骑行/跑步服务、通知发送、FTMS 控制点 | 🟡 payload 由生产 codec + vectors 覆盖；GATT/NimBLE 链路仍须真机 |
-| `ble_config_service.c` | 六组配置 GATT 与 revision 事务 | 🟡 生产回调 ASan/UBSan；NimBLE/NVS 链路须真机 |
-| `ble_power_bridge.c` | 上游 CPS 连接、订阅、DIS 和重连 | 🟡 生产会话 ASan/UBSan；真实功率计共存须实物 |
+| `ble_config_service.c` | 八组配置 GATT 与 revision 事务 | 🟡 生产回调 ASan/UBSan；NimBLE/NVS 链路须真机 |
+| `bridge_runtime.c` | 主备协调、Portal 邮箱与实际来源快照 | 🟡 生产适配层 ASan/UBSan；重启、接管与共存须实物 |
+| `ble_power_bridge.c` | 单设备上游 CPS 连接、订阅与 DIS | 🟡 生产会话 ASan/UBSan；真实功率计共存须实物 |
 | `ble_scanner.c` | BLE Central/Observer 扫描、读取与运动数据采样 | 🟡 静态契约 + 真机外设必测 |
 | `wifi_portal.c` | HTTP 配网门户（纯 `/api/xxx` JSON） | 🟡 生产 handler/cJSON 容量与超时 ASan/UBSan；WiFi/HTTP 链路须真机 |
 | `radio_ctrl.c` | WiFi/BLE 射频共存与失败兜底 | 🟡 WiFi 启停真机必测 |
@@ -66,7 +69,7 @@
 
 | 层 | 入口 | 覆盖对象 | 状态 |
 |----|------|---------|------|
-| TC-1 host 单测 | `test/test_domain` | 当前领域层生产模块 | 固定/16 种子统计、24 小时等效快照、边界、会话与迁移；结果见当前验证报告 |
+| TC-1 host 单测 | `make -C test run` | 领域层、三设备 wire 和主备状态机 | 固定/16 种子统计、24 小时等效快照、边界、会话与迁移；结果见当前验证报告 |
 | TC-1 FIT 基准 | `tests/analyze_fit_reference.py` | 附件 1Hz 功率/踏频/心率统计 | ✅ SHA-256 与 `tests/fixtures/ride_reference_metrics.json` 固定复验 |
 | TC-3a JS 静态 | `tests/check_portal_js.py` | `main/web/app.js` node --check | ✅ |
 | TC-3c 常量一致性 | `tests/check_config_consistency.py` | config 头文件 ↔ 文档 | ✅ |
@@ -82,12 +85,14 @@
 | TC-BLE-ADV 广播字段 | `tests/check_ble_advertising_fields.py` | 骑行/跑步主广播服务 UUID 与广播包名字预算 | ✅ |
 | TC-BLE-VEC 协议 vectors | `tests/test_ble_protocol_vectors.py` | 人工固定 hex；生产 C encoder 与 Python parser 独立交叉校验 | ✅ |
 | TC-BLE-RUNTIME 生产通知 | `tests/test_ble_runtime.py` | 模拟/桥接/跑步同轮快照 | ✅ ASan/UBSan |
-| TC-BLE-SERVICE 生产配置 | `tests/test_ble_config_service.py` | 六组、提交拒收、busy、revision 和断连取消 | ✅ ASan/UBSan |
+| TC-BLE-SERVICE 生产配置 | `tests/test_ble_config_service.py` | 八组、提交拒收、busy、revision 和断连取消 | ✅ ASan/UBSan |
+| TC-BRIDGE-RUNTIME 主备恢复 | `tests/test_bridge_session.py`、`tests/check_bridge_failover_contract.py` | 单设备终态、扫描暂停、主任务协调、模拟降级与定向探测 | ✅ ASan/UBSan + 静态契约；无线行为仍须实物 |
+| TC-BRIDGE-PORTAL 多设备交互 | `tests/portal_bridge_browser.py`、`tests/test_portal_config_save.py` | 三设备增加/首选/删除/满容量替换、降级显示与共享校正 | ✅ 生产压缩 DOM + mock |
 | TC-PORTAL-RUNTIME 生产门户 | `tests/test_portal_runtime.py` | 最长字段转义、超限、续期、done 重试/代次与重启取清 | ✅ 实际 IDF cJSON + ASan/UBSan |
 | TC-EXCEPTION 门户网页 | `tests/portal_exception_browser.py` | 三屏宽实际压缩 DOM：读取/JSON/轮询恢复、revision、失败重试、丢响应、重复点击、扫描取消、关闭 | ✅ 本地 mock 与 HTTP 注入 |
 | TC-EXCEPTION Pages | `tests/test_pages_exceptions.py` | 实际表单/编码/响应匹配：13 类事务场景、监听器释放、零未处理异常及恢复重试 | ✅ Characteristic 传输替身 |
 | TC-EXCEPTION HTTP | `tests/test_portal_faults.py` | 实际接收/提交/回调/runtime：输入边界、revision、拒收、串事务、失败/重试、关闭和空成功结果 | ✅ 实际 cJSON + ASan/UBSan；NVS 结果注入 |
-| TC-BLE-CONFIG 配置 E2E 离线回归 | `tests/test_ble_config_e2e.py` | Meta/Control 小端帧、五组合法修改、非法值和 GATT 掩码变更 | ✅ |
+| TC-BLE-CONFIG 配置 E2E 离线回归 | `tests/test_ble_config_e2e.py` | Meta/Control 小端帧、八组合法修改、非法值和 GATT 掩码变更 | ✅ |
 | TC-BLE-RECON 重连 harness | `tests/test_ble_reconnect_harness.py` | fake scanner/client 验证两轮独立扫描、连接、显式断开 | ✅ |
 | TC-BLE-RUNNING running harness | `tests/test_ble_running_harness.py` | opcode indication 等待、严格增长/冻结 helper 与 moving/pause/reset/resume 四阶段结构 | ✅ |
 | TC-BLE-PROFILE profile harness | `tests/test_device_profile_harness.py` | 切换 profile、测试阶段强制 mask=7、running `--control` 参数与 finally 恢复原配置 | ✅ |
@@ -99,7 +104,7 @@
 | 层 | 入口 | 覆盖对象 | 状态 |
 |----|------|---------|------|
 | TC-2 cycling BLE 自测 | `tests/ble_selftest.py --profile cycling` | CPS/HRS/CSC/FTMS Bike/DIS + ERG 控制 | 🟡 当前工作区待重新执行 |
-| TC-2 Config Service E2E | `tests/ble_config_e2e.py --port <串口> --board <板型>` | 五组全量读写、revision/CANCEL/缺组/非法值、NVS 重启持久化、GATT 重建、原配置恢复 | 🟡 当前工作区待重新执行 |
+| TC-2 Config Service E2E | `tests/ble_config_e2e.py --port <串口> --board <板型>` | 八组全量读写、revision/CANCEL/缺组/非法值、NVS 重启持久化、GATT 重建、原配置恢复 | 🟡 当前工作区待重新执行 |
 | TC-2 running BLE 自测 | `tests/ble_selftest.py --profile running --control` | 逐 opcode indication；moving → Stop 冻结 → paused Reset 清零保持暂停 → Resume 四阶段 RSC/Treadmill 多样本 | 🟡 当前工作区待重新执行 |
 | TC-2 profile 编排 | `tests/device_profile_harness.py` | 配网态切换互斥 GATT profile，测试强制 mask=7，finally 恢复原配置 | 🟡 当前工作区待重新执行 |
 | TC-2 双次重连 | `tests/stage3_conn_test.py` | 两轮各自重新扫描、连接、显式断开与恢复广播 | 🟡 当前工作区待重新执行 |

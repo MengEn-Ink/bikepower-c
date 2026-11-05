@@ -3,12 +3,13 @@
 <!-- stability: tier-2 (稳定，随测试链路调整) -->
 <!-- rule-id-prefix: DT -->
 
-> 本流程用于所有涉及设备行为的改动。用户已明确要求当前任务不要编译，因此本文件是流程定义，不代表本次执行。
+> 本流程用于所有涉及设备行为的改动；实际执行范围与未执行原因记录在本轮验证报告，不在通用规则中保留一次性任务指令。
 
 ## 标准流程
 
 1. `DT-1`：编译前门禁
-- 运行 `make -C test && ./test/test_domain`
+- 运行 `make -C test run`
+- 桥接恢复改动追加 `python3 tests/test_bridge_session.py` 与 `python3 tests/check_bridge_failover_contract.py`
 - 运行 `python3 tests/test_portal_config_save.py`
 - 运行 `python3 tests/test_core_flow_endurance.py`
 - 运行相关静态门禁：`check_config_consistency.py` / `check_portal_js.py` / `check_portal_structure.py` / `check_nvs_schema.py` / `check_tasks_wdt.py` / `check_board_desc.py`
@@ -27,7 +28,7 @@
 - 验证五服务、DIS 读值、通知和 FTMS 控制点基本行为
 6. `DT-5a`：BLE 全量配置读写与 NVS 持久化
 - 运行 `python3 tests/ble_config_e2e.py --port <port> --board <板型>`
-- 验证五组读取、事务错误拒绝、五组修改、重启持久化、GATT 重建，并确认测试结束后原配置已恢复
+- 验证八组读取、事务错误拒绝、八组修改、重启持久化、GATT 重建，并确认测试结束后原配置已恢复
 7. `DT-6`：连接状态测试
 - 运行 `python3 tests/stage3_conn_test.py`
 - 验证状态机收到连接和断开事件

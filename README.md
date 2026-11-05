@@ -48,7 +48,8 @@ BikePower C 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，�
 
 - 支持标准 BLE 骑行相关服务，可被主流骑行 App 识别
 - 模拟功率、踏频、心率、设备信息等训练数据
-- 真实功率计桥接：仅转发功率及同源踏频，支持固定瓦数或百分比校正，停踩保持 0W、3 秒过期归零
+- 真实功率计桥接：最多保存 3 台 CPS 功率计，重启及异常断连后按最近成功设备优先定向恢复；60 秒快速恢复失败时自动降级为完整模拟输出，并每 60 秒轮转探测一台已保存设备
+- 桥接校正在全部已保存设备间共享，支持固定瓦数或百分比校正；真实 0W 永远输出 0W，3 秒过期清除旧桥接样本
 - 支持 FTMS ERG 控制，适合训练模式联动
 - 提供实体按钮操作，不依赖屏幕也能快速调功
 - 提供 LED 状态提示，方便判断当前设备状态
@@ -226,8 +227,9 @@ bikepower-c/
 │   ├── button.c
 │   ├── led.c
 │   ├── ble_bikepower.c
-│   ├── ble_config_service.c/.h   # 六组 GATT 配置事务与 revision
-│   ├── ble_power_bridge.c        # 上游 CPS 连接、订阅、DIS 与重连
+│   ├── ble_config_service.c/.h   # 八组 GATT 配置事务与 revision
+│   ├── bridge_runtime.c/.h       # 三设备定向恢复、模拟降级与 Portal 命令
+│   ├── ble_power_bridge.c        # 单台上游 CPS 连接、订阅与 DIS
 │   ├── ble_scanner.c             # 有界功率计候选扫描
 │   ├── radio_ctrl.c
 │   ├── wifi_portal.c
@@ -238,7 +240,7 @@ bikepower-c/
 │   │   └── app.js
 │   └── bikepower_config.h
 ├── components/
-│   └── bikepower_domain/          # 纯 C 领域层，host 单测覆盖
+│   └── bikepower_domain/          # 纯 C 领域层，含 bridge_failover 主备状态机
 ├── scripts/                       # 构建、烧录、静态资源内联和串口守护入口
 ├── tools/web/                     # Pages 工具台、页面动效与按钮教学模块
 ├── docs/

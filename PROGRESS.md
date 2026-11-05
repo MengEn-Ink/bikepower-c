@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-11-05 源码清理与文档治理
+
+- [x] 清除单设备重试常量、无生产调用接口和只写字段，补主任务/邮箱/快照契约与测试产物忽略规则。
+- [x] ASan 精确短 JSON 复现并修复旧配置空地址越界；八组 E2E 夹具补主设备并防身份重复，已有备选保留地址。
+- [x] 用户手册按钮方向、500ms 阈值及 3s 确认窗口对齐源码；同步八组/三设备 Code Wiki、测试入口和规则，归档两份已执行计划。
+- [x] full operation gate 36 项及 3 分钟 15 轮耐久通过；修复项独立复验，最终 host/ASan/UBSan 6178/0。
+- [x] 总质量门禁 `--no-build`：111 PASS / 2 dirty WARN / 0 FAIL；双板独立编译通过，app 均为 `0x113ac0`，factory 剩余 72%。
+- [x] 源码事实、56 文档链接、30 操作覆盖矩阵及 diff 格式通过。
+- `NOT_RUN`：当前候选实物验收，未检测到 ESP32 USB 串口。编译产物仅用于本地验证，未发布或打 tag。
+- 详见 [源码清理与验证报告](docs/dev/30-local-cleanup-verification-report.md)。
+
+## 2026-11-05 桥接主备恢复与多设备备选
+
+- [x] schema v14、最多三台设备、地址类型 + 地址身份、bridge wire v2 与 v13/wire v1 迁移完成。
+- [x] 八组 BLE 配置事务完成；`0009` 保留主设备及共享校正，`000a/000b` 保存两个备选设备。
+- [x] 最近成功优先、60 秒两轮快速恢复、失败后完整模拟输出、每 60 秒轮转定向探测和立即重试完成；自动路径不扫描。
+- [x] 三设备共享校正，真实 0W 不做偏移或比例计算；两份合法 0W 样本可确认来源。
+- [x] Portal 三设备列表、首选/删除/满容量替换、配置/实际来源、倒计时与模拟降级交互完成；320/1440 三设备及 320 降级截图无横向溢出。
+- [x] 主备静态契约已接入 operation gate 与总质量门禁。
+- [x] 初轮 host 6175/0、桥接 sanitizer/八组协议/schema 专项、full operation gate 与 3 分钟 15 轮耐久通过；清理后结果见上节。
+- [x] 初轮 quality gate 111 PASS / 2 dirty WARN / 0 FAIL；WARN 仅为当时未提交工作树及跳过最近提交 whitespace 检查。
+- [x] 初轮 generic-c3 与 m5stamp-c3 双板构建通过：app 均为 `0x113af0`，factory 分区剩余 72%；该轮本地 merged bin 与校验文件不覆盖清理后的源码。
+- [x] 旧真机证据绑定 Git `bf32b11`，脚本对当前基线 `255f82a` 正确拒绝；随后以空证据目录完成仅本地构建，测试报告明确未收录真机证据。
+- `NOT_RUN`：两台以上真实或可控 CPS 来源的主备接管。
+- `NOT_RUN`：重启后最近成功设备自动连接。
+- `NOT_RUN`：全部设备离线后完整模拟输出连续性。
+- `NOT_RUN`：设备恢复后每 60 秒低频探测并自动切回。
+- `NOT_RUN`：真实热点、下游 App、上游功率计三方共存且空闲堆保持大于 80 KiB。
+- `NOT_RUN`：原值、固定偏移、比例三种校正下的真实 0W。
+- 设计与步骤见 [桥接主备设计](docs/dev/28-bridge-failover-multi-device-design.md) 和 [实施计划归档](docs/archive/18-bridge-failover-multi-device-implementation-plan.md)；未经上述实物证据不得发布或打 tag。
+
 ## 2026-11-05 WiFi 配置端交互收敛
 
 - [x] profile 草稿与已应用模式不一致时隐藏旧实时输出，保存后才恢复对应实时数据；保存失败保留草稿并可重试。
@@ -15,7 +46,7 @@
 - [x] 320/390/1440 生产压缩 DOM、正反切换、异常恢复及视觉检查通过；quick 操作门禁通过，Host 6146/0。
 - [x] 内联 74,932 bytes，较 72,386 bytes 基线增加 2,546 bytes，低于 3 KiB 增量目标及 110 KiB 门禁。
 - [ ] 真实热点、手机 Safari 和配网态最低堆水位仍需实物验收；本轮未修改 API、NVS、BLE 协议或固件 C。
-- 设计与步骤见 [交互设计](docs/dev/26-wifi-portal-sport-mode-ux-design.md) 和 [实施计划](docs/dev/27-wifi-portal-sport-mode-ux-plan.md)。
+- 设计与步骤见 [交互设计](docs/dev/26-wifi-portal-sport-mode-ux-design.md) 和 [实施计划归档](docs/archive/17-wifi-portal-sport-mode-ux-plan.md)。
 
 ## 2026-11-05 当前稳定性与异常覆盖
 

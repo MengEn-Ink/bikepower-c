@@ -30,11 +30,12 @@
 4. [配置加载]
    nvs_store_load(&s_engine)
      ├─ 打开 namespace "bikepower"
-     ├─ 无旧值：config_store_defaults() → config_to_engine() → nvs_store_save()（回写默认）
+     ├─ 无旧值：config_store_defaults() → config_store_apply_to_engine() → nvs_store_save()（回写默认）
      └─ 有旧值：读取所有键 → config_store_migrate()（schema 升级）
                   → config_store_validate()（范围夹紧）
-                  → config_to_engine()
+                  → config_store_apply_to_engine()
                   → 若有迁移/夹紧，再次保存
+   nvs_store_load_bridge_recent(&bridge_recent)  // 独立读取最近成功身份提示
    power_engine_clear_dirty(&s_engine)  // 初始加载后清脏标记
 
 5. [事件队列创建]
@@ -66,6 +67,8 @@
    app_state_set_wifi_trigger(on_wifi_trigger)
    app_state_set_wifi_exit(on_wifi_exit)
    wifi_portal_set_done_callback(on_wifi_done)
+   wifi_portal_set_config_callback(on_wifi_config_commit)
+   wifi_portal_set_bridge_callback(on_wifi_bridge_command)
 
 10. [按钮初始化]
     button_init(s_app_queue)
@@ -90,6 +93,7 @@
       ├─ 创建 BLE 通知定时器（1s 周期 esp_timer）
       └─ nimble_port_freertos_init()（启动 nimble_host 任务）
     失败则 app_state_set_error()（进入 ST_ERROR_RECOVERY，主循环周期重试）
+    成功后注册最近成功回调，并调用 bridge_runtime_init()，只按已保存地址定向恢复
 
 13. [看门狗订阅]
     esp_task_wdt_add(NULL)  // 主循环订阅 WDT
@@ -156,11 +160,14 @@
 │     app_state_tick()  // 检查确认窗口超时                        │
 │                                                                 │
 │  ⑧ [快照生成 + BLE 数据更新]                                     │
+│     bridge_runtime_tick() → wifi_portal_sync_bridge()           │
 │     if sport_profile == RUNNING:                                │
 │         rs = running_engine_snapshot(&s_engine.running, dt)    │
 │         running_hr = power_engine_running_heartrate(&s_engine,  │
 │                                                     rs.speed)   │
 │         ble_bikepower_set_running_data(rs, running_hr)          │
+│     else if 已配置真实来源 && !bridge_runtime_uses_simulation(): │
+│         使用运行时真实样本 → ble_bikepower_set_bridge_data()    │
 │     else:                                                       │
 │         s = power_engine_snapshot(&s_engine)                   │
 │         ble_bikepower_set_data(s.power, s.hr, s.cadence)       │

@@ -350,13 +350,13 @@ nvs_store_load(engine)
     ├─ 读取 schema version ("sv")
     ├─ 若 namespace 不存在：
     │     ├─ config_store_defaults(&c)
-    │     ├─ config_to_engine(&c, engine)
+    │     ├─ config_store_apply_to_engine(&c, engine)
     │     └─ nvs_store_save(engine)（回写默认值）
     ├─ 若存在旧值：
     │     ├─ 读取所有键值
     │     ├─ config_store_migrate(&c)（schema 升级）
     │     ├─ config_store_validate(&c)（范围夹紧）
-    │     ├─ config_to_engine(&c, engine)
+    │     ├─ config_store_apply_to_engine(&c, engine)
     │     └─ 若发生 migration/clamp，再保存一次修正值
     └─ nvs_close()
 ```
@@ -375,6 +375,24 @@ nvs_store_load(engine)
 
 设备门户已移除模板库和未注册的旧存储模块。历史 `ble_tpl` 槽位不主动擦除，
 当前 DIS 持久化由 `device_identity_store` 负责。
+
+---
+
+## bridge_runtime.c — 三设备主备运行时
+
+**文件**：[bridge_runtime.c](../../main/bridge_runtime.c) / [bridge_runtime.h](../../main/bridge_runtime.h)
+
+应用主任务初始化并驱动 `bridge_failover`，按最近成功身份和已保存设备表定向恢复；
+`ble_power_bridge` 只处理单设备连接、DIS、订阅、样本有效性和终态，不再独占重试窗口。
+快速恢复最多两轮且不超过 60 秒，失败后使用完整模拟输出，每 60 秒轮转探测一台设备。
+
+HTTP 通过 `bridge_runtime_request()` 的有界邮箱提交扫描、测试、停止、恢复和立即重试。
+`bridge_runtime_tick()`、配置应用和运行快照仅由应用主任务调用，Portal 读取
+`wifi_portal_sync_bridge()` 发布的副本。最近成功提示通过主任务回调交给 NVS；
+它不改变配置来源或 revision。自动路径不扫描，手动扫描期间暂停自动恢复。
+
+完整契约与实物验收边界见 [技术参考](../dev/01-technical-reference.md) 和
+[本轮验证报告](../dev/30-local-cleanup-verification-report.md)。
 
 ---
 

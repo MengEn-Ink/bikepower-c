@@ -23,7 +23,9 @@
 - `button.c`：中断驱动按钮任务，通用板 `GPIO9`，M5Stamp C3 `GPIO3`
 - `led.c`：独立灯效任务，通用板 `GPIO12` 普通 LED，M5Stamp C3 `GPIO2` SK6812 RGB
 - `ble_bikepower.c`：NimBLE 运动服务、生命周期、通知打包与 FTMS 控制点
-- `ble_config_service.c`：六组配置 GATT、staging/revision、提交结果和断连取消；应用 API 仍由 `ble_bikepower` 包装
+- `ble_config_service.c`：八组配置 GATT、staging/revision、提交结果和断连取消；应用 API 仍由 `ble_bikepower` 包装
+- `bridge_runtime.c`：协调三设备主备状态机、单设备会话、手动扫描和最近成功提示
+- `ble_power_bridge.c`：单台已知 CPS 设备的定向连接、订阅、DIS 与样本快照
 - `radio_ctrl.c`：WiFi/BLE 射频共用唯一入口
 - `wifi_portal.c`：`esp_http_server` 配网页面（SoftAP 由 `radio_ctrl.c` 启动）
 - `nvs_store.c`：NVS 与领域层配置对象桥接
@@ -109,7 +111,7 @@
 当 namespace `bikepower` 不存在时，逻辑是：
 
 1. `config_store_defaults(&c)`
-2. `config_to_engine(&c, e)`
+2. `config_store_apply_to_engine(&c, e)`
 3. `nvs_store_save(e)` 回写默认值
 
 如果存在旧值，则：
@@ -117,7 +119,7 @@
 1. 从键 `sv`、`power`、`cadence`、`mode`、`hr`、`hashr`、`pfloat`、`cfloat`、`hrfloat`、`pstep`、`weight`、`ftp`、`thr_hr`、`ride`、`cwkglo`、`cwkghi`、`cname`、`sport`、`bmask`、`rspeed`、`rpacef`、`rcad`、`rcadf`、`rmode`、`rpacer`、`rplo`、`rphi`、`rcname`、`devname` 和 `led*` 场景配置读取
 2. `config_store_migrate(&c)`
 3. `config_store_validate(&c)`
-4. `config_to_engine(&c, e)`
+4. `config_store_apply_to_engine(&c, e)`
 5. 若发生 migration 或 clamp，再保存一次修正后结果
 
 因此启动时即完成：
@@ -209,7 +211,7 @@ ready/stopping/failed/profile/mask/连接句柄使用 C11 原子；释放 NimBLE
 
 ## 第四章：BLE 服务详解
 
-运动服务与生命周期位于 `main/ble_bikepower.c`，六组配置事务位于
+运动服务与生命周期位于 `main/ble_bikepower.c`，八组配置事务位于
 `main/ble_config_service.c`，字节编码位于纯 C 领域 codec。
 模块可提供以下 GATT 服务（运动服务按 `broadcast_mask` 动态过滤注册，DIS 和 BikePower Config Service 始终注册）：
 
@@ -356,15 +358,17 @@ Fitness Machine Status 和 Control Point 使用独立的 OpCode 编号；上述�
 | Identity | `7a5a0006-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | BLE 设备名 |
 | Control | `7a5a0007-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write/Indicate | BEGIN、COMMIT、CANCEL 与最终结果 |
 | DIS Profile | `7a5a0008-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 设备信息服务（DIS）身份覆盖：厂商、型号、序列号、硬件 / 固件 / 软件版本 |
-| Bridge | `7a5a0009-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 真实来源、绑定地址与类型、校正及显示名 |
+| Bridge | `7a5a0009-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 来源、共享校正和主设备身份 |
+| Bridge Backup 1 | `7a5a000a-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 第一台备选设备身份 |
+| Bridge Backup 2 | `7a5a000b-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 第二台备选设备身份 |
 
-**DIS 身份覆盖（`7a5a0008`）**：线格式 `[version=1][count=6]` 后接 6 个 `[len][UTF-8]` 字段，顺序为厂商 `2A29`、型号 `2A24`、序列号 `2A25`、硬件版本 `2A27`、固件版本 `2A26`、软件版本 `2A28`；每字段最多 31 字节，拒绝控制字符与截断 UTF-8。空字段表示该项回退为固件内置值，全空写入会清除 NVS 中的覆盖（namespace `bp_ident` / key `dis`）。它独立于五组配置事务与 schema 迁移：NimBLE host 回调只做解码并投递到应用 mailbox（上一笔未落盘时拒绝写入），主循环写 NVS 成功后才刷新 DIS 读值。部分手机系统会缓存 DIS，写入后需在 App 中删除设备重新搜索。实现：`components/bikepower_domain/device_identity.c`、`main/device_identity_store.c`。
+**DIS 身份覆盖（`7a5a0008`）**：线格式 `[version=1][count=6]` 后接 6 个 `[len][UTF-8]` 字段，顺序为厂商 `2A29`、型号 `2A24`、序列号 `2A25`、硬件版本 `2A27`、固件版本 `2A26`、软件版本 `2A28`；每字段最多 31 字节，拒绝控制字符与截断 UTF-8。空字段表示该项回退为固件内置值，全空写入会清除 NVS 中的覆盖（namespace `bp_ident` / key `dis`）。它独立于八组配置事务与 schema 迁移：NimBLE host 回调只做解码并投递到应用 mailbox（上一笔未落盘时拒绝写入），主循环写 NVS 成功后才刷新 DIS 读值。部分手机系统会缓存 DIS，写入后需在 App 中删除设备重新搜索。实现：`components/bikepower_domain/device_identity.c`、`main/device_identity_store.c`。
 
-协议版本当前为 `1`，所有多字节整数显式使用小端编码，不把 C struct 直接放上线传输。配置按六组拆分，Bridge 组最长 47 字节，适配当前 NimBLE MTU 64。字符串不携带结尾 `\0`，而是使用单字节 UTF-8 长度前缀；设备名最多 23 字节，自定义骑行/跑步名称最多 31 字节。Bridge UUID 为 `7a5a0009-4c7a-4f2a-9b3e-6d1f4a8c0b21`，包含来源、绑定、地址类型及地址、校正和显示名；原五组线格式不变。
+协议版本当前为 `1`，所有多字节整数显式使用小端编码，不把 C struct 直接放上线传输。配置按八组拆分，单组上限 48 字节，适配当前 NimBLE MTU 64。字符串不携带结尾 `\0`，而是使用单字节 UTF-8 长度前缀；设备名最多 23 字节，自定义骑行/跑步名称最多 31 字节。`0009` 保留原主设备布局并携带来源与共享校正，`000a/000b` 各携带一个备选身份；Core/Profile/Running/LED/Identity 的既有线格式不变。
 
 保存流程如下：
 
-1. 页面读取 Meta 与六组配置，记录当前 revision；旧固件缺少 Bridge 时使用原五组。
+1. 页面按 Meta 的 group mask 读取配置并记录当前 revision；当前固件暴露八组，旧固件可只暴露五组或六组。
 2. 页面向 Control 写 `BEGIN(protocol, transaction_id, revision)`；设备拒绝旧 revision、零事务号或并发事务。
 3. 页面写入设备支持的完整配置组；每组先解码到事务 staging，不改正式引擎，也不写 NVS。
 4. 页面写 `COMMIT(transaction_id, required_mask)`；缺组、事务号不一致或 revision 变化都会失败。
@@ -745,7 +749,7 @@ v3.2.0 起配网门户前后端分离：
 - `POST /api/close-wifi`（保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE）
 - `GET /api/bridge/scan`（读取本轮 CPS 候选列表与扫描状态）
 - `POST /api/bridge/scan`（用户启动或停止有界扫描，候选编号包含代次）
-- `POST /api/bridge/control`（test 临时测试、stop 停止、resume 重试已绑定功率计）
+- `POST /api/bridge/control`（test 临时测试、stop 暂停、resume 恢复、retry 立即重试）
 
 Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Location: /` 和短文本 body `Redirect to the captive portal`。这与 ESP-IDF captive_portal 示例保持一致：iOS Captive Network Assistant 对“只有空 302”的响应兼容性较差，带 body 的 303 更稳；404 兜底则用于覆盖 Chrome/Chromium `browsernetworktime/*` 等新增或变化的系统探测路径。DHCP Option 114 走 `/.well-known/captive-portal` JSON API，避免新系统把 HTML 首页当作 Captive Portal API 解析失败而不弹窗。
 
@@ -756,9 +760,12 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 - `/api/time`：返回剩余秒数
 - `/api/renew`：续期
 - `/api/mem_stats`：返回 `free` 和 `min_free`
-- `/api/bridge/*`：仅连接真实功率计；测试期间保持原输出，收到两份有效通知后才允许保存来源。复制有效 DIS 字段到 `bp_ident`，缺失字段保留原值。
-- schema v13：桥接 blob 使用显式小端编码；v12 迁移默认模拟且无绑定。BLE 配置保留原五组并增加 Bridge 第六组。
+- `/api/bridge/*`：仅手动扫描 CPS；测试期间保持原输出，收到两份合法通知（包括 0W）后才允许保存新增设备。复制有效 DIS 字段到 `bp_ident`，缺失字段保留原值。
+- schema v14：桥接 blob 使用最多三台设备的 wire v2 显式小端编码，并兼容读取 wire v1；v13 单设备绑定迁移到设备表槽位 0。设备身份由“地址类型 + 地址”组成，满三台后新增设备必须显式提交 `replace_slot`。
+- `/api/runtime.bridge_runtime`：分别返回持久配置来源和运行时实际来源，以及主备状态、活动槽位、候选槽位和下次尝试倒计时；HTTP 任务只读主循环同步的快照并通过 mailbox 投递命令。
 - 配网默认 300 秒，读取、扫描和临时测试不自动续期。
+
+桥接自动恢复不使用扫描。冷启动按“最近成功设备 → 后续已保存设备”的顺序定向连接，异常断连时优先从断连设备开始；60 秒快速窗口最多轮询两轮。全部失败后仅把运行时实际来源切换为完整模拟数据，持久配置仍保持真实来源；此后每 60 秒定向探测一台已保存设备，成功后自动恢复真实输出并更新最近成功提示。运行状态由纯 C `bridge_failover` 决策，`bridge_runtime` 负责调用单设备会话和最近成功 NVS。
 
 ### 8.4 超时恢复
 
@@ -789,7 +796,7 @@ deadline、closing、done 与重启请求都在 `s_lock` 下读写；done 回调
 
 ### 8.5 前端反馈与 JSON 安全
 
-核心门户采用单页明亮高密度布局，固定模式与配速机器人共用区域，自定义收敛到机器人档位。模板库和 LED 编辑移到电脑工具。真实来源按“选择→扫描→两样本临时测试→配置→保存应用”渐进披露，测试不提前改变实际输出；首次默认关闭心率。支持 DIS 有效字段复制、功率计/开发板/自定义名称、原始与校正值预览。前端区分草稿、已应用配置和实际输出，保存携带 revision，轮询 transaction 确认 NVS 结果，失败保留草稿。默认配网 300 秒，仅显式续期延长。内联资源上限 110 KiB，按钮居中，动画遵循 reduced-motion。详细接口与验证见 `docs/wiki/08-wifi-portal.md`。
+核心门户采用单页明亮高密度布局，固定模式与配速机器人共用区域，自定义收敛到机器人档位。模板库和 LED 编辑移到电脑工具。真实来源按“选择→扫描→两样本临时测试→配置→保存应用”渐进披露，测试不提前改变实际输出；首次默认关闭心率。页面可管理最多三台设备，支持设为首选、删除和满容量替换，并分别展示配置来源、实际来源、恢复状态、倒计时和立即重试。共享校正明确作用于全部已保存设备。支持 DIS 有效字段复制、功率计/开发板/自定义名称、原始与校正值预览。前端区分草稿、已应用配置和实际输出，保存携带 revision，轮询 transaction 确认 NVS 结果，失败保留草稿。默认配网 300 秒，仅显式续期延长。内联资源上限 110 KiB，按钮居中，动画遵循 reduced-motion。详细接口与验证见 `docs/wiki/08-wifi-portal.md`。
 
 `wifi_portal.c` 用 cJSON 构造和转义 JSON，HTTP 服务任务独占 8192 字节共享输出区，
 state/runtime/scan 容量分别由 `WIFI_JSON_STATE_CAPACITY=8192`、
@@ -828,6 +835,8 @@ namespace 固定为：
 - `NVS_KEY_CUSTOM_WKG_HI = "cwkghi"`
 - `NVS_KEY_CUSTOM_NAME = "cname"`
 - `NVS_KEY_DEVICE_NAME = "devname"`
+- `NVS_KEY_BRIDGE = "bridge"`
+- `NVS_KEY_BRIDGE_RECENT = "brrecent"`
 - `NVS_KEY_LED_SILENT = "ledsil"`
 - `NVS_KEY_LED_WAIT_MODE = "ledwm"`
 - `NVS_KEY_LED_WAIT_COLOR = "ledwc"`
@@ -858,20 +867,22 @@ namespace 固定为：
 
 领域层配置版本在 `domain_config.h` 中：
 
-`CONFIG_VERSION = 13`
+`CONFIG_VERSION = 14`
 
-v12→v13 新增 `bridge_config_t`，默认模拟、无上游绑定、无校正，不自动扫描或连接。v11→v12 的历史 ±5W→±50W 迁移仍逐级执行。NVS `bridge` 保存最长 47 字节显式小端配置编码，禁止写入 C 结构体；BLE 配置服务新增第六组 `7a5a0009`，原五组字节布局不变。
+v13→v14 把原单设备绑定迁移到固定三设备表的槽位 0，其他槽位保持为空；NVS `bridge` 升为最长 125 字节的 wire v2，并继续兼容读取最长 47 字节的 wire v1。`brrecent` 只保存最近成功设备的地址类型和地址，作为下次定向连接排序提示，不复制名称或校正参数。v12→v13 仍负责补充默认桥接配置，v11→v12 的历史 ±5W→±50W 迁移继续逐级执行。持久化禁止直接写入 C 结构体。
 
 桥接领域模块 `cps_input_codec` 完整跳过 CPS 可选字段后读取功率及曲柄事件；`power_bridge` 要求两份有效样本，3 秒过期、断线立即失效。校正支持 ±200W 偏移或 50.0–150.0% 比例，输出夹紧到 0–2000W，原始功率 ≤0 时保持 0W。曲柄计数和时间差采用 16 位回绕，非法差值或曲柄停更不会输出旧踏频。桥接无曲柄 CPS 为 4 字节，有曲柄为 8 字节；桥接 FTMS 使用 More Data 位省略速度，仅编码真实踏频、校正功率及可选模拟心率。
 
 `config_store_migrate()` 负责把旧 `schema_ver` 升级到当前版本。当前策略是：
 
-- v6 -> v12：保留已有配置，补 `run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT`，并继续逐级迁移
-- v7 -> v12：保留已有配置，补 `run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT`，并继续逐级迁移
-- v8 -> v12：补 `broadcast_mask = BROADCAST_FIELD_ALL`，并继续逐级迁移
-- v9 -> v12：保留既有跑步速度、配速浮动、步频、步频浮动，补 `run_mode`、`run_pacer_type`、`run_pace_low_sec`、`run_pace_high_sec`、`run_custom_name`
-- v10 -> v12：先进入 v11，保留其他当前字段，再执行 v11 的选择性功率浮动迁移
+- v6 -> v14：保留已有配置，补 `run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT`，并继续逐级迁移
+- v7 -> v14：保留已有配置，补 `run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT`，并继续逐级迁移
+- v8 -> v14：补 `broadcast_mask = BROADCAST_FIELD_ALL`，并继续逐级迁移
+- v9 -> v14：保留既有跑步速度、配速浮动、步频、步频浮动，补 `run_mode`、`run_pacer_type`、`run_pace_low_sec`、`run_pace_high_sec`、`run_custom_name`
+- v10 -> v14：先进入 v11，保留其他当前字段，再执行 v11 的选择性功率浮动迁移
 - v11 -> v12：仅当 `power_float == POWER_FLOAT_LEGACY_DEFAULT`（±5 W）时改为 `POWER_FLOAT_DEFAULT`（±50 W）；其他值视为用户自定义并保持不变
+- v12 -> v13：补充默认桥接配置，保持模拟来源且无绑定
+- v13 -> v14：保留原单设备身份与共享校正参数，把设备放入槽位 0
 - 未知旧版本：回退默认配置
 
 这意味着 v6-v11 升级到当前版本时会保留主要用户配置，并修复历史默认浮动过小的问题；更早或无法识别的 schema 会安全回默认，避免异常配置导致新固件启动异常。

@@ -25,7 +25,7 @@
 | `OP-SAVE-001` | 骑行数值保存：功率、踏频、心率、心率锁定、浮动、按钮步进 | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` | 真机保存后刷新网页确认 |
 | `OP-SAVE-002` | 跑步数值保存：配速、配速浮动、步频、步频浮动、心率 | `python3 tests/test_portal_config_save.py`、`make -C test run` | MyWhoosh/Zwift 跑步速度显示人工确认 |
 | `OP-SAVE-003` | 用户资料与自定义机器人：体重、FTP、阈值心率、功体比上下限、昵称 | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` | 真机网页自定义机器人 UI 人工确认 |
-| `OP-SAVE-004` | BLE Config Service 五组全量读取/修改、事务错误拒绝、NVS 重启持久化和 GATT 重建；测试后恢复原配置 | `python3 tests/test_ble_config_e2e.py`、`python3 tests/ble_config_e2e.py --port <串口> --board <板型>` | Web Bluetooth 首次授权与页面表单交互仍需人工确认 |
+| `OP-SAVE-004` | BLE Config Service 八组全量读取/修改、事务错误拒绝、NVS 重启持久化和 GATT 重建；测试后恢复原配置 | `python3 tests/test_ble_config_e2e.py`、`python3 tests/ble_config_e2e.py --port <串口> --board <板型>` | Web Bluetooth 首次授权与页面表单交互仍需人工确认 |
 | `OP-BTN-001` | 短按减功率、长按连续加功率、非 steady 模式拒绝按钮调功 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮手感和重复节拍人工确认 |
 | `OP-BTN-002` | 长按 2 秒进入 WiFi 二次确认窗口，确认后触发配网 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮 + LED 确认窗口人工确认 |
 | `OP-BTN-003` | 确认窗口超时取消，回到 BLE 活动态，不误开 WiFi | `make -C test run` | 实体按钮等待 3 秒人工确认 |
@@ -51,6 +51,11 @@
 | `OP-MANUAL-001` | 物理按钮、LED 颜色/闪烁、手机 Captive Portal、真实 Zwift/MyWhoosh 课程 | `python3 scripts/tools/device_acceptance.py validate` 校验记录结构 | 必须人工记录 `PASS`、`FAIL` 或 `NOT_RUN`；`NOT_RUN` 不能冒充通过 |
 
 ## 三、统一门禁命令
+
+桥接主备专项运行 `make -C test run`、`python3 tests/test_bridge_session.py`、
+`python3 tests/check_bridge_failover_contract.py`、`python3 tests/portal_bridge_browser.py`。
+这些入口覆盖三设备表、单候选会话、主任务 mailbox、模拟降级、低频恢复与设备草稿管理；
+真实设备接管、重启排序、真实 0W 和 WiFi/BLE 共存仍须单独记录实物证据。
 
 开发期快速门禁：
 
