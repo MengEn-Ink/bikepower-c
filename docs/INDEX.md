@@ -58,6 +58,8 @@
 | [源码事实摘要](dev/21-generated-project-facts.md) | 从源码生成版本、schema、路由和模块清单；不推断验收通过 |
 | [自动优化验证报告](dev/22-automatic-optimization-report.md) | 本轮验证结果、镜像身份、剩余硬件与人工项 |
 | [稳定性异常验证报告](dev/25-stability-exception-test-report.md) | 基线缺陷、修复、三层异常回归、双板构建与实物验收边界 |
+| [WiFi 配置端运动模式交互设计](dev/26-wifi-portal-sport-mode-ux-design.md) | 草稿与已应用 profile 的显示规则、跑步语义收敛及测试边界 |
+| [WiFi 配置端运动模式交互计划](dev/27-wifi-portal-sport-mode-ux-plan.md) | 生产 DOM 浏览器 TDD、最小实现、资源预算和回归步骤 |
 
 ## 🗄️ archive/ — 历史 / 归档（仅供追溯）
 

@@ -7,6 +7,16 @@
 
 ---
 
+## 2026-11-05 WiFi 配置端交互收敛
+
+- [x] profile 草稿与已应用模式不一致时隐藏旧实时输出，保存后才恢复对应实时数据；保存失败保留草稿并可重试。
+- [x] 跑步模式统一广播、速度/步频、服务列表和本机会话术语；配置段编号连续，固定配速/配速档摘要及运动按钮选中语义同步。
+- [x] schema、当前和最低空闲堆读取现有真实接口，不再展示硬编码诊断值。
+- [x] 320/390/1440 生产压缩 DOM、正反切换、异常恢复及视觉检查通过；quick 操作门禁通过，Host 6146/0。
+- [x] 内联 74,932 bytes，较 72,386 bytes 基线增加 2,546 bytes，低于 3 KiB 增量目标及 110 KiB 门禁。
+- [ ] 真实热点、手机 Safari 和配网态最低堆水位仍需实物验收；本轮未修改 API、NVS、BLE 协议或固件 C。
+- 设计与步骤见 [交互设计](docs/dev/26-wifi-portal-sport-mode-ux-design.md) 和 [实施计划](docs/dev/27-wifi-portal-sport-mode-ux-plan.md)。
+
 ## 2026-11-05 当前稳定性与异常覆盖
 
 - [x] 压缩生产门户三屏宽 HTTP 异常、草稿保留、revision、丢响应/重复保存/等待超时、扫描取消和关闭重试。
@@ -18,7 +28,7 @@
 - [x] 最终镜像通用 C3 串口、cycling/running、六组配置/NVS、双次重连、308.2 秒/258 条 CPS 耐久通过；扫描/连接/空通知失败均 0，完整原配置恢复并回读一致，独立 dirty 证据绑定镜像 SHA256。
 - [ ] 真实热点、真实功率计三方共存、M5 实物、手机 Safari、按钮/LED、标准 App、掉电和真实 flash 写失败。
 - [x] 修复及回归 `d3c9b8d`、板型及门禁 `4c3e6ac` 已提交推送至 main；文档治理 78 PASS / 2 dirty WARN / 0 FAIL，两份已执行计划归档。
-- 详见 [稳定性异常报告](docs/dev/25-stability-exception-test-report.md)。最终提交远端 CI 待核实；未发布。
+- 详见 [稳定性异常报告](docs/dev/25-stability-exception-test-report.md)。最终提交远端 CI `41944208570` 已成功；未发布。
 
 ## 2026-11-04 Pages 分区与移动手册
 
