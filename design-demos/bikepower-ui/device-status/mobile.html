@@ -55,6 +55,28 @@
 @media(max-width:900px){.workspace{grid-template-columns:1fr}.sidebar{display:grid;grid-template-columns:1fr 1fr;align-items:start}.tools{display:none}.masthead .brand{flex:1}.page-heading{flex-direction:column;gap:16px}.metric-strip{grid-template-columns:1fr 1fr 1fr}.metric-number{flex-wrap:wrap}.chip{margin-left:0}.panel-toolbar{padding:16px}.actions{width:100%}.prototype-bar{padding:8px 24px}.connection-note{display:none}}
 @media(max-width:520px){.page{padding:16px}.masthead{padding:12px 16px;min-height:64px}.prototype-bar{padding:8px 16px;flex-direction:column;gap:4px}.connection{gap:8px;padding:12px}.connection-left{gap:4px 8px}.connection-left strong{font-size:12px}.connection-left>span{flex-basis:100%;padding-left:16px}.connection .button{padding:8px}.page-heading{margin-top:24px}h1{font-size:28px}.metric-strip{grid-template-columns:1fr}.metric+.metric{border-left:0;border-top:1px solid var(--line)}.metric{padding:16px 20px}.metric-number{margin:12px 0 8px}.metric-number b{font-size:32px}.chip{margin-left:auto}.source{display:block}.cpu-caption{margin-top:8px!important}.sidebar{grid-template-columns:1fr}.panel-toolbar{align-items:flex-start;flex-direction:column;gap:8px}.tabs button{padding:8px 12px}.chart-heading,.details-heading{padding-left:16px;padding-right:16px}.chart-heading{gap:8px}.chart-heading>span{font-size:12px}.details-heading{flex-direction:column;align-items:flex-start}.search,.search input{width:100%}.detail-subtitle,.chart-foot{padding-left:16px;padding-right:16px}.table-wrap{padding-left:16px;padding-right:16px}.chart{padding:8px;min-height:176px}.chart svg{min-height:168px}.panel-foot{padding:12px 16px;flex-wrap:wrap}.footer{flex-direction:column;gap:4px}.scenario-label{flex:1}.actions>.button{padding:8px 12px}.connection-tip{padding-bottom:calc(16px + env(safe-area-inset-bottom))}}
 
+/* 离线手机版沿用右上角紧凑监控布局。 */
+.masthead{position:sticky;top:0;z-index:30}
+.masthead-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+.masthead .resident-monitor{position:static;display:flex;gap:8px;padding:0;background:none;border:0;box-shadow:none;min-height:0}
+.masthead .resident-status,.masthead #open-window{display:none}
+.masthead .resident-item{display:grid;grid-template-columns:auto auto;gap:0 4px;padding:4px;border:0;background:transparent;min-height:0;border-radius:4px;text-align:left}
+.masthead .resident-item span{font-size:11px}
+.masthead .resident-item b{font:600 12px/1.5 var(--sans);white-space:nowrap}
+.masthead .resident-item small{display:block;grid-column:1 / -1;font:11px/1.5 var(--sans);color:var(--muted)}
+.masthead .resident-item:hover{background:var(--panel-2)}
+.masthead #theme{font-size:11px;padding:6px 8px}
+:root:not([data-theme=dark]){--cpu:#8a5b00}
+@media(max-width:520px){
+  .masthead{padding:8px 12px;min-height:56px;gap:0}
+  .masthead>.brand{display:none}
+  .masthead-actions{width:100%;gap:4px}
+  .masthead .resident-monitor{margin-right:auto;gap:3px}
+  .masthead .resident-item{padding:3px 2px}
+  .masthead .resident-item span,.masthead .resident-item small{font-size:11px}
+  .masthead .resident-item b{font-size:11px}
+}
+@media(max-width:360px){.masthead .resident-item>span{display:none}.masthead .resident-item{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -64,26 +86,28 @@
       <span>使用手册</span><span>固件刷写</span><span>实时监控</span><span>设备比对</span>
       <b aria-current="page">设备状态</b><span>通知检查</span><span>健康检查</span>
     </nav>
-    <button id="theme" class="button quiet" type="button" aria-label="切换浅色与深色主题">深色外观</button>
+    <div class="masthead-actions">
+      <section class="resident-monitor" aria-label="页面常驻监控">
+        <div class="resident-status"><i id="resident-dot" class="dot live-dot"></i><div><b>常驻监控</b><span id="resident-state">离线演示 · 每秒更新</span></div></div>
+        <button class="resident-item memory-color" data-open-window="memory" type="button" title="查看内存详情"><span>堆</span><b id="resident-heap" class="live-number">—</b><small id="resident-memory-percent">—</small></button>
+        <button class="resident-item cpu-color" data-open-window="cpu" type="button" title="查看 CPU 详情"><span>CPU</span><b id="resident-cpu" class="live-number">—</b><small id="resident-cpu-free">—</small></button>
+        <button class="resident-item bluetooth-color" data-open-window="bluetooth" type="button" title="查看蓝牙详情"><span>信号</span><b id="resident-rssi" class="live-number">—</b><small>示例数据</small></button>
+        <button id="open-window" class="button primary" type="button">打开监控窗口</button>
+      </section>
+      <button id="theme" class="button quiet" type="button" aria-label="切换浅色与深色主题">深色</button>
+    </div>
   </header>
   <div class="prototype-bar">
     <span><b>布局评审原型</b> · 所有数据均为演示，未连接真实开发板</span>
     <span>手机预览 · 单文件离线版</span>
   </div>
-  <section class="resident-monitor" aria-label="页面常驻监控">
-    <div class="resident-status"><i id="resident-dot" class="dot live-dot"></i><div><b>常驻监控</b><span id="resident-state">离线演示 · 每秒更新</span></div></div>
-    <button class="resident-item memory-color" data-open-window="memory" type="button"><span>内存余量</span><b id="resident-heap" class="live-number">—</b><small>查看详情 ↗</small></button>
-    <button class="resident-item cpu-color" data-open-window="cpu" type="button"><span>CPU</span><b id="resident-cpu" class="live-number">未启用</b><small>查看详情 ↗</small></button>
-    <button class="resident-item bluetooth-color" data-open-window="bluetooth" type="button"><span>蓝牙 RSSI</span><b id="resident-rssi" class="live-number">—</b><small>查看详情 ↗</small></button>
-    <button id="open-window" class="button primary" type="button">打开监控窗口</button>
-  </section>
   <main class="page">
     <section class="connection" aria-label="共享蓝牙连接">
       <div class="connection-left"><i id="connection-dot" class="dot"></i><strong id="connection-name">BikePower C</strong><span id="connection-state">已连接 · 演示</span><span class="connection-note">与实时监控共用连接</span></div>
       <button id="connection-action" class="button" type="button">释放连接</button>
     </section>
     <div class="page-heading">
-      <div><p class="eyebrow">DEVICE ACTIVITY</p><h1>设备状态<span class="heading-dot">.</span></h1><p class="subtitle">看清资源余量、运行节拍与蓝牙链路。</p></div>
+      <div><h1>设备状态<span class="heading-dot">.</span></h1><p class="subtitle">看清资源余量、运行节拍与蓝牙链路。</p></div>
       <div class="actions">
         <label class="scenario-label" for="scenario">演示场景<select id="scenario">
           <option value="normal">正常运行</option><option value="low">内存偏低</option>
@@ -473,7 +497,7 @@ window.DeviceStatusApi = {
   $("connection-action").addEventListener("click",connectionAction);
   $("release-bottom").addEventListener("click",connectionAction);
   $("theme").addEventListener("click",()=>{
-    const dark=document.documentElement.dataset.theme!=="dark";document.documentElement.dataset.theme=dark?"dark":"light";text("theme",dark?"浅色外观":"深色外观");
+    const dark=document.documentElement.dataset.theme!=="dark";document.documentElement.dataset.theme=dark?"dark":"light";text("theme",dark?"浅色":"深色");
   });
   $("export").addEventListener("click",()=>{
     const report={isDemo:true,notice:"设计原型示例，不能用于设备验收",exportedAt:new Date().toISOString(),scenario:state.scenario,cpuPlanningDemo:state.cpu,telemetry:state.latest,pagePaused:state.paused,windowPaused:state.windowPaused,events:currentEvents()};
@@ -491,8 +515,10 @@ window.DeviceStatusApi = {
   }
   function renderResident(){
     const s=state.snapshot,available=hasTelemetry(),live=available&&!state.paused&&state.scenario!=="stale";
-    text("resident-heap",available?fmt(freePercent(s))+"% 空闲":"—");
+    text("resident-heap",available?fmt(s.heap)+" KiB":"—");
+    text("resident-memory-percent",available?fmt(freePercent(s))+"% 空闲":"—");
     text("resident-cpu",!available?"—":state.cpu?fmt(s.cpu)+"%":"未启用");
+    text("resident-cpu-free",available&&state.cpu?fmt(100-s.cpu)+"% 空闲":"—");
     text("resident-rssi",available?s.rssi+" dBm":"—");
     text("resident-state",!available?"无遥测 · 演示":state.paused?"页面暂停 · 窗口独立更新":state.scenario==="stale"?"数据停更 · 历史值":"离线演示 · 每秒更新");
     $("resident-dot").classList.toggle("off",!live);

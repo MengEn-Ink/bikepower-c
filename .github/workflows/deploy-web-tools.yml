@@ -48,6 +48,8 @@ jobs:
             --site-dir "${RUNNER_TEMP}/bikepower-pages" \
             --github-repo "${GITHUB_REPOSITORY}" \
             --require-firmware
+          cp design-demos/bikepower-ui/device-status/mobile.html \
+            "${RUNNER_TEMP}/bikepower-pages/device-status-mobile.html"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
