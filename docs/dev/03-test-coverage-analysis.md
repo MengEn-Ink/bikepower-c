@@ -84,6 +84,9 @@
 | TC-BLE-RUNTIME 生产通知 | `tests/test_ble_runtime.py` | 模拟/桥接/跑步同轮快照 | ✅ ASan/UBSan |
 | TC-BLE-SERVICE 生产配置 | `tests/test_ble_config_service.py` | 六组、提交拒收、busy、revision 和断连取消 | ✅ ASan/UBSan |
 | TC-PORTAL-RUNTIME 生产门户 | `tests/test_portal_runtime.py` | 最长字段转义、超限、续期、done 重试/代次与重启取清 | ✅ 实际 IDF cJSON + ASan/UBSan |
+| TC-EXCEPTION 门户网页 | `tests/portal_exception_browser.py` | 三屏宽实际压缩 DOM：读取/JSON/轮询恢复、revision、失败重试、丢响应、重复点击、扫描取消、关闭 | ✅ 本地 mock 与 HTTP 注入 |
+| TC-EXCEPTION Pages | `tests/test_pages_exceptions.py` | 实际表单/编码/响应匹配：13 类事务场景、监听器释放、零未处理异常及恢复重试 | ✅ Characteristic 传输替身 |
+| TC-EXCEPTION HTTP | `tests/test_portal_faults.py` | 实际接收/提交/回调/runtime：输入边界、revision、拒收、串事务、失败/重试、关闭和空成功结果 | ✅ 实际 cJSON + ASan/UBSan；NVS 结果注入 |
 | TC-BLE-CONFIG 配置 E2E 离线回归 | `tests/test_ble_config_e2e.py` | Meta/Control 小端帧、五组合法修改、非法值和 GATT 掩码变更 | ✅ |
 | TC-BLE-RECON 重连 harness | `tests/test_ble_reconnect_harness.py` | fake scanner/client 验证两轮独立扫描、连接、显式断开 | ✅ |
 | TC-BLE-RUNNING running harness | `tests/test_ble_running_harness.py` | opcode indication 等待、严格增长/冻结 helper 与 moving/pause/reset/resume 四阶段结构 | ✅ |

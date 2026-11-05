@@ -75,7 +75,7 @@ Web Bluetooth/Web Serial 原生授权、标准骑行 App 和可选 72h 老化保
 复现 `device_identity.c` 的 `strnlen` 隐式声明错误。C11 模式下需显式启用 POSIX 声明。
 四个宿主机 harness 编译命令补齐 `-D_POSIX_C_SOURCE=200809L`，固件源码不变。
 本地 GCC 语法/严格告警检查以及 macOS 实际 ASan/UBSan 回归全部通过。
-GCC 检查使用本地交叉工具链，不宣称完成 Linux ASan 运行；远端 CI 需提交推送后验证。
+GCC 检查使用本地交叉工具链，本机结果不代表 Linux ASan 运行；后续基线 `5c97e96` 的远端 [CI 41867471119](https://github.com/MengEn-Ink/bikepower-c/actions/runs/41867471119) 已完成且成功。
 修复后的完整 quick 门禁已通过，报告为 `build/automatic-operation-quick-final.md`。
 生产门户 cJSON 回归放在 full 操作门禁，quick 不引入本地 ESP-IDF 源码依赖；
 完整质量门禁仍执行该生产回归，不把缺依赖计为通过。
@@ -90,7 +90,7 @@ GCC 检查使用本地交叉工具链，不宣称完成 Linux ASan 运行；远�
 - `5305a04`：并行 Pages 体验与独立离线手册。
 - 文档与规则单独提交，涵盖本报告、历史归档和源码事实摘要。
 
-远端 CI 当前排队，尚未确认新提交部署完成；未创建 tag 或 Release。
+后续基线 `5c97e96` 的工程 CI `41867471119` 与 Pages 部署 `41869049536` 均已成功；原失败运行保留历史结果。此结论不覆盖后续稳定性异常修复提交；未创建 tag 或 Release。
 提交源码不改变上文实际验收镜像的 dirty 身份，不将旧证据改记为新 HEAD 通过。
 
 ## 保留与清理

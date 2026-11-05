@@ -1,5 +1,20 @@
 # 测试脚本使用说明
 
+## 稳定性异常端到端回归
+
+- `python3 tests/portal_exception_browser.py`：实际压缩页面在 320/390/1440 宽度验证读取失败/非法 JSON、轮询断网恢复、外部 revision、保存失败重试、成功响应丢失、重复点击、异事务等待超时、扫描取消及关闭失败重试。
+- `python3 tests/test_pages_exceptions.py`：Node Playwright 执行生产表单、编码和实际 BLE 响应匹配；13 类事务场景覆盖订阅失败、BEGIN/组/COMMIT 拒绝与传输失败、BEGIN 丢响应、异事务/异 opcode、损坏响应、超时、断连、CANCEL 失败及恢复重试，断言监听器释放与零未处理异常。
+- `python3 tests/test_portal_faults.py`：ASan/UBSan 执行生产 HTTP 接收→提交→主任务回调→runtime；覆盖请求缓冲分配失败、非法/超长/截断/分段/超时输入、小数及过期 revision、忙拒收、串事务、保存失败与重试、关闭和缺失 applied 的成功结果。
+- `python3 tests/test_device_gate_commands.py`：双板/双 profile 设备门禁命令契约，确保显式板型传给直接自测；双板构建后不从根 sdkconfig 错猜设备。
+
+前两个入口已加入 quick/full 操作门禁；生产 cJSON 故障回归加入 full 与完整质量门禁。
+浏览器需要 Python Playwright、`tests/web-flash` 的 Node 依赖与 Chromium；
+安装参考 `.github/workflows/ci.yml`。cJSON 回归使用本地 ESP-IDF 源码。
+传输和 NVS 结果注入不能替代真实热点、flash 写失败、真实功率计和手机原生授权验收。
+验证结果见 [异常验证报告](../docs/dev/25-stability-exception-test-report.md)，执行计划已 [归档](../docs/archive/16-stability-exception-test-plan.md)。
+设备验证前复用构建目录时须显式 `idf.py ... reconfigure build`，核对日志中的
+`BIKEPOWER_GIT_SHA` 和实际镜像 SHA256；CMake 缓存的旧 Git 标识不能作为当前镜像身份。
+
 ## 自动优化新增验证
 
 - `python3 tests/test_ble_config_service.py`：ASan/UBSan 执行生产六组配置 GATT 回调，覆盖提交拒收、重复 BEGIN、revision 和断连取消。

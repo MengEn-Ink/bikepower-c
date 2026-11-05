@@ -10,6 +10,7 @@
 | Host 领域层/协议 | 功率、踏频、心率、运行会话、配置 schema、BLE payload golden vectors、Config E2E 协议帧 | `make -C test run`、`python3 tests/test_ble_protocol_vectors.py`、`python3 tests/test_ble_config_e2e.py` |
 | 离线 harness | 双次重连、running 四阶段、profile 全广播测试/恢复、FTMS 接纳和 WiFi done 可靠性契约 | `python3 tests/test_ble_reconnect_harness.py`、`python3 tests/test_ble_running_harness.py`、`python3 tests/test_device_profile_harness.py`、`python3 tests/check_ftms_control_contract.py`、`python3 tests/check_wifi_done_contract.py` |
 | Mock 网页层 | `/api/config` 保存回显、网页核心流程、设备模板、关闭 WiFi | `python3 tests/test_portal_config_save.py`、`python3 tests/test_core_flow_endurance.py` |
+| 异常 E2E/生产 handler | 实际门户/Pages DOM、实际响应匹配、HTTP 接收和事务结果故障注入 | `python3 tests/portal_exception_browser.py`、`python3 tests/test_pages_exceptions.py`、`python3 tests/test_portal_faults.py` |
 | 静态门禁 | 门户结构、JS、常量、NVS、任务/WDT、板型、操作矩阵、Pages 网页刷写站点 | `python3 tests/check_operation_coverage.py`、`python3 tests/check_ble_monitor.py`、`python3 tests/test_prepare_web_flash_site.py` 等 |
 | 真机自动化 | 串口启动、全量配置读写/NVS 持久化/GATT 重建、互斥 cycling/running GATT profile、FTMS ERG/跑步会话、配网门户 HTTP、5 分钟设备耐久 | `python3 tests/ble_config_e2e.py`、`python3 tests/ble_selftest.py`、`python3 tests/device_profile_harness.py`、`python3 tests/stage5_portal_test.py`、`python3 tests/device_soak_5min.py` |
 | 人工门禁 | 物理按钮手感、LED 肉眼灯效、手机 Captive Portal、Zwift/MyWhoosh 真实课程（P1，不阻塞发版） | `scripts/tools/device_acceptance.py` + 本文“人工门禁记录” |
@@ -41,8 +42,11 @@
 | `OP-RUN-001` | 跑步 RSC 速度、步频、步幅、0.1m 距离单位与 running/paused flags | `make -C test run`、`python3 tests/test_ble_protocol_vectors.py`、`python3 tests/ble_selftest.py --profile running --control` | Zwift/MyWhoosh 跑步数据人工确认 |
 | `OP-RUN-002` | 逐 opcode 等待 indication；moving 累计增长 → Stop 冻结 → paused Reset 清零且保持暂停 → Resume 恢复增长；队列拒绝返回 Operation Failed | `make -C test run`、`python3 tests/test_ble_running_harness.py`、`python3 tests/ble_selftest.py --profile running --control` | 每阶段至少两个独立样本；标准跑步客户端控制点人工确认 |
 | `OP-WIFI-001` | WiFi done 队列满时 pending latch 最终可达；重复完成事件幂等清理 | `python3 tests/check_wifi_done_contract.py` | 真机队列压力与配网退出待验收 |
-| `OP-STAB-001` | NVS schema、常量、板型、任务/WDT、门户结构不漂移 | `python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 tests/check_board_desc.py`、`python3 tests/check_tasks_wdt.py`、`python3 tests/check_operation_coverage.py` | 无 |
+| `OP-STAB-001` | NVS schema、常量、板型、任务/WDT、门户结构不漂移；显式板型传给 BLE/HTTP profile 门禁 | `python3 tests/check_config_consistency.py`、`python3 tests/check_nvs_schema.py`、`python3 tests/check_board_desc.py`、`python3 tests/check_tasks_wdt.py`、`python3 tests/check_operation_coverage.py`、`python3 tests/test_device_gate_commands.py` | 无 |
 | `OP-STAB-002` | 3 分钟核心流程耐久（mock）+ 5 分钟真机设备耐久（反复连接/通知） | `python3 tests/test_core_flow_endurance.py`、`python3 tests/device_soak_5min.py` | 发版阻塞项为 5 分钟真机耐久；更长老化按风险可选追加 |
+| `OP-STAB-003` | 门户断网/非法响应、外部 revision、保存拒绝/丢响应/重复点击/异事务等待超时、扫描取消和关闭重试 | `python3 tests/portal_exception_browser.py` | 压缩生产 DOM + 本地 mock；真实热点链路需另验收 |
+| `OP-STAB-004` | Pages BEGIN/组/COMMIT 失败、错帧/异事务/超时/断连，监听器清理、无未处理异常、恢复重试 | `python3 tests/test_pages_exceptions.py` | 实际匹配函数 + Characteristic 替身；手机原生授权仍人工 |
+| `OP-STAB-005` | HTTP 非法/截断/超长/分段/超时输入、整数 revision、主任务拒收、串事务、保存失败/重试、关闭和空成功结果 | `python3 tests/test_portal_faults.py` | 实际生产 handler + cJSON/ASan；回调结果注入不证明真实 flash 故障 |
 | `OP-REL-001` | 发布产物门禁：10 个上传附件、SHA256、manifest、zip 内容、Git ID 和真机证据不漂移 | `python3 scripts/tools/check_release_artifacts.py --require-pushed --require-device-evidence`、`python3 tests/check_release_gate.py`、`python3 tests/test_release_artifacts.py` | 正式发布前必须从已提交并已推送源码重新构建，且当前 Git 的 P0 证据全部通过 |
 | `OP-MANUAL-001` | 物理按钮、LED 颜色/闪烁、手机 Captive Portal、真实 Zwift/MyWhoosh 课程 | `python3 scripts/tools/device_acceptance.py validate` 校验记录结构 | 必须人工记录 `PASS`、`FAIL` 或 `NOT_RUN`；`NOT_RUN` 不能冒充通过 |
 
@@ -84,6 +88,9 @@ python3 tests/test_device_profile_harness.py
 python3 tests/check_ftms_control_contract.py
 python3 tests/check_wifi_done_contract.py
 python3 tests/test_portal_config_save.py
+python3 tests/portal_exception_browser.py
+python3 tests/test_pages_exceptions.py
+python3 tests/test_portal_faults.py
 python3 tests/test_core_flow_endurance.py
 python3 tests/ble_selftest.py --profile cycling
 python3 tests/ble_selftest.py --profile running --control

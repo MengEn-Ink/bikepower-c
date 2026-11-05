@@ -129,6 +129,14 @@
 - 固件生成前强制执行
 - `main/web/`、`tests/mock_server.py`、按钮/心率/配置字段相关改动
 
+### `TC-EXCEPTION`：稳定性异常端到端回归
+
+- 门户实际压缩网页：`tests/portal_exception_browser.py`，覆盖读取、轮询恢复、外部 revision、失败重试、响应丢失、重复点击、扫描取消和关闭。
+- Pages 实际表单与 BLE 响应匹配：`tests/test_pages_exceptions.py`，覆盖事务拒绝/传输失败、错误响应、超时/断连、监听器释放和恢复重试；禁止用替换响应匹配函数的用例代替本门禁。
+- 生产 HTTP handler：`tests/test_portal_faults.py`，使用实际 cJSON、ASan/UBSan，覆盖输入接收边界、revision、回调拒收、结果/关闭与重试。
+- 网页与 Pages 配置事务变更运行对应浏览器门禁；HTTP 提交/完成变更还必须运行生产故障回归。前两项接入 quick/full，实际 cJSON 仅 full，完整质量门禁包含三项。
+- 注入结果只证明生产控制流，不代表真实 NVS 写失败或无线共存已验证；报告分别记录设备与离线证据。
+
 ## 选择规则
 
 - `TC-4`：纯治理文档或规则改动可不跑测试，但要做一致性复核。

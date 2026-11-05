@@ -55,9 +55,9 @@
 | [核心设备门户全量重写设计](dev/15-core-portal-rewrite-design.md) | 明主题现场控制台、Pages 高级配置分工、设备模板端到端删除、真实功率桥接和 110 KiB 资源门禁 |
 | [核心门户与桥接实施计划](dev/16-core-portal-bridge-implementation-plan.md) | 领域、上游会话、配置事务、门户及短固件名称的实施与验收 |
 | [核心门户与桥接测试报告](dev/17-core-portal-bridge-test-report.md) | 本轮工作区候选的离线、构建与真机证据及未覆盖项 |
-| [自动优化实施计划](dev/18-automatic-optimization-plan.md) | 维护工具、BLE 配置模块与并发、门户容量、文档治理和自动验证 |
 | [源码事实摘要](dev/21-generated-project-facts.md) | 从源码生成版本、schema、路由和模块清单；不推断验收通过 |
 | [自动优化验证报告](dev/22-automatic-optimization-report.md) | 本轮验证结果、镜像身份、剩余硬件与人工项 |
+| [稳定性异常验证报告](dev/25-stability-exception-test-report.md) | 基线缺陷、修复、三层异常回归、双板构建与实物验收边界 |
 
 ## 🗄️ archive/ — 历史 / 归档（仅供追溯）
 
@@ -78,6 +78,8 @@
 | [稳定交付证据链设计](archive/12-stable-delivery-design.md) | 已实施的证据模型及发布校验设计 |
 | [稳定交付证据链实施计划](archive/13-stable-delivery-plan.md) | 已完成工具实现的历史执行步骤 |
 | [Top 5 协议稳定性设计](archive/14-top5-protocol-stability-design.md) | 已实现的 CPS/FTMS、跑步会话、ERG 与 WiFi 可靠性修复 |
+| [自动优化实施计划](archive/15-automatic-optimization-plan.md) | 已完成的维护工具、BLE 并发、门户容量与自动验证步骤 |
+| [稳定性异常验证计划](archive/16-stability-exception-test-plan.md) | 已执行的网页、BLE 配置事务与生产 HTTP handler 故障矩阵 |
 
 ## 🤖 AI 助手
 
