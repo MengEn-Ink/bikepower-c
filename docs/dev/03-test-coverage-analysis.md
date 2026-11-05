@@ -9,7 +9,7 @@
 代码行数变化频繁且不能代表覆盖质量，本矩阵不再手工记录易漂移的行数；规模分析需要时以当前工作区 `wc -l` 或覆盖工具结果为准。
 
 生产模块与 schema 清单以 [源码事实摘要](21-generated-project-facts.md) 为准；
-断言数量和真机结果以本轮 [清理验证报告](30-local-cleanup-verification-report.md) 与
+断言数量以本轮 [仓库治理报告](31-repository-hygiene-report.md) 为准；上一轮真机边界见 [历史清理报告](../archive/30-local-cleanup-verification-report.md) 与
 [PROGRESS](../../PROGRESS.md) 为准；历史自动优化报告只证明对应候选。
 
 ### 领域层 `components/bikepower_domain/`（纯 C，host 可测）

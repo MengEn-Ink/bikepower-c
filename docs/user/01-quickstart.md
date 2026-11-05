@@ -66,5 +66,5 @@ BikePower C 已永久放弃设备内 OTA 升级。后续升级、重刷或恢复
 ## 5. 下一步
 
 - 完整按钮操作、LED 灯效、配网字段、骑行模式与 FAQ：见 [用户手册](02-user-manual.md)
-- 固件升级：当前 v4.1.1 已永久放弃设备内 OTA，普通用户升级统一走仓库 GitHub Pages；Pages 临时不可用时使用[备用烧录入口](https://easyhey.com/?firmware=MOD220)
+- 固件升级：设备内 OTA 已移除，普通用户升级统一走仓库 GitHub Pages；网页展示的正式 Release 版本与当前源码候选分别核对
 - 硬件接线、供电与排障：见 [硬件指南](03-hardware.md)

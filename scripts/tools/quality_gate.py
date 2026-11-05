@@ -315,7 +315,7 @@ required_assets = [
     "docs/archive/12-stable-delivery-design.md",
     "docs/archive/13-stable-delivery-plan.md",
     "docs/archive/14-top5-protocol-stability-design.md",
-    "docs/dev/13-project-review-and-optimization.md",
+    "docs/archive/19-project-review-and-optimization.md",
     "docs/archive/01-cidf-nimble-rewrite.md",
     "docs/archive/02-micropython-vs-c-comparison.md",
     "scripts/tools/generate_release_docs.py",
@@ -444,13 +444,17 @@ if options.level == "docs":
 STATIC_CHECKS += [
     ("scripts/tools/doc_facts.py", "源码事实摘要"),
     ("scripts/tools/check_markdown_links.py", "Markdown 相对链接与锚点"),
+    ("scripts/tools/sync_user_docs.py", "手机离线手册来源一致性"),
 ]
 for rel_path, name in STATIC_CHECKS:
     full = os.path.join(PROJECT, rel_path)
     if not os.path.exists(full):
         fail(f"{name}: 脚本缺失 {rel_path}")
         continue
-    out, rc = run_cmd([python_exe, full], cwd=PROJECT)
+    run_args = [python_exe, full]
+    if rel_path == "scripts/tools/sync_user_docs.py":
+        run_args.append("--check")
+    out, rc = run_cmd(run_args, cwd=PROJECT)
     if rc == 0:
         ok(f"{name} 通过")
     elif any(marker in out for marker in ENV_MISSING_MARKERS):

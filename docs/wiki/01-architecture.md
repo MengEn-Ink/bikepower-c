@@ -62,7 +62,7 @@
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-参考图片：[architecture.png](../images/architecture.png)
+参考图片：[架构](../images/architecture.svg)
 
 真实功率桥接由应用层 `bridge_runtime` 协调：它在主任务中消费纯 C
 `bridge_failover` 的动作，驱动单设备 `ble_power_bridge` 会话和手动

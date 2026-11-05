@@ -28,7 +28,7 @@ ST_ERROR_RECOVERY ← (BLE 启动失败) → (BLE 重试成功) → ST_BLE_ACTIV
 | `ST_REBOOTING` | 5 | — | 预留（当前未使用） |
 | `ST_ERROR_RECOVERY` | 6 | 错误模式 | BLE 启动失败，主循环周期重试 |
 
-状态机图参考：[button-led-state.png](../images/button-led-state.png)
+状态机图参考：[按钮状态](../images/button-led-state.svg)
 
 ---
 

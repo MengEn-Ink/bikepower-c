@@ -391,7 +391,7 @@ HTTP 通过 `bridge_runtime_request()` 的有界邮箱提交扫描、测试、�
 它不改变配置来源或 revision。自动路径不扫描，手动扫描期间暂停自动恢复。
 
 完整契约与实物验收边界见 [技术参考](../dev/01-technical-reference.md) 和
-[本轮验证报告](../dev/30-local-cleanup-verification-report.md)。
+[历史清理验证报告](../archive/30-local-cleanup-verification-report.md)；当前精简结果见 [仓库治理报告](../dev/31-repository-hygiene-report.md)。
 
 ---
 

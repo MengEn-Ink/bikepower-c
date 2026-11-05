@@ -2,7 +2,7 @@
 
 <!-- stability: tier-1 (极稳定，仅随硬件变更) -->
 <!-- rule-id-prefix: HC -->
-> 只记录约束和禁止项，详细行为见 docs/archive/01-cidf-nimble-rewrite.md 对应章节。
+> 只记录约束和禁止项，当前行为见 docs/dev/01-technical-reference.md；历史重写方案只用于追溯。
 
 ## ESP32-C3 硬件限制
 
@@ -36,8 +36,8 @@
 - 去抖、计时、自动重复在 button_task（任务上下文）完成，不在 ISR。
 - 阈值与 `bikepower_config.h` 一致（SHORT_PRESS_MS / WIFI_BTN_HOLD_MS / CONFIRM_WINDOW_MS / BTN_AUTO_REPEAT_MS）。
 
-### LED（GPIO12, 高电平有效）
-- 独立 led_task 驱动，四态 OFF/SLOW(1s)/SOLID/FAST(200ms)。
+### LED（通用板 GPIO12，低电平有效；M5Stamp C3 GPIO2，SK6812）
+- 独立 led_task 驱动，默认 OFF/SLOW(1s)/SOLID/FAST(200ms)，支持自定义灯效和静默。
 - **禁止**：使用 GPIO12~17 的 QSPI 模式（被 Flash 占用）。
 
 ## FreeRTOS / 中断安全

@@ -1,6 +1,6 @@
 # 桥接自动恢复与多设备备选实施计划
 
-> 归档于 2026-11-05：源码实现与自动化步骤已执行，原检查框及命令保留为历史计划，不作为执行证据。当前设计见 [主备恢复规范](../dev/28-bridge-failover-multi-device-design.md)，验证结果及未执行实物项见 [清理验证报告](../dev/30-local-cleanup-verification-report.md)。
+> 归档于 2026-11-05：源码实现与自动化步骤已执行，原检查框及命令保留为历史计划，不作为执行证据。当前设计见 [主备恢复规范](../dev/28-bridge-failover-multi-device-design.md)，当时验证及未执行实物项见 [清理验证报告](30-local-cleanup-verification-report.md)。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `test-driven-development` for every production change; execute this plan task-by-task with review checkpoints.
 

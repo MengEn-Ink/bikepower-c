@@ -3,7 +3,7 @@
 > 日期：2026-11-05
 > 状态：实现与离线验证已完成，实物验收待补齐
 > 范围：真实功率桥接的冷启动恢复、异常重连、模拟降级、三设备备选与 Portal 管理
-> 当前结果见 [源码清理与验证报告](30-local-cleanup-verification-report.md)；实施步骤已 [归档](../archive/18-bridge-failover-multi-device-implementation-plan.md)。
+> 当前治理结果见 [仓库治理报告](31-repository-hygiene-report.md)，上一轮源码证据见 [清理报告归档](../archive/30-local-cleanup-verification-report.md)；实施步骤已 [归档](../archive/18-bridge-failover-multi-device-implementation-plan.md)。
 
 ## 1. 背景
 

@@ -449,8 +449,9 @@ python3 tests/check_ble_monitor.py
 ```bash
 python3 scripts/tools/check_release_artifacts.py \
     --release-dir build/release \
-    --version 4.1.1 \
+    --version <当前版本> \
     --git-sha <sha>
+python3 tests/test_release_artifacts.py
 ```
 
 校验内容：

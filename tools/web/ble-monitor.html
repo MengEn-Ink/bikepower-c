@@ -1509,13 +1509,14 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
   <section class="mg-sec" aria-labelledby="mg-wifi-title">
     <h2 class="mg-h" id="mg-wifi-title"><span>03</span>用手机修改设备配置</h2>
     <p class="guide-intro">Pages 是手册与电脑工具台。设备配置页在开发板自己的热点里，需要先连接热点。</p>
+    <div class="guide-note"><strong>版本说明：</strong>网页烧录提供正式 Release。下文新版门户与三设备主备桥接对应当前源码候选，仍待实物验收；页面更新不代表这些功能已经发布。请先核对设备固件版本。</div>
     <ol class="guide-list">
       <li><b>进入配网：</b>操作键长按至少 2 秒，松开；看到确认快闪后，在 3 秒内再按一次。</li>
       <li><b>连接热点：</b>手机 WiFi 设置选择 <code>BikePower-XXXXXX</code>，密码 <code>12345678</code>。“无互联网”属于正常现象，请选择保持连接。</li>
       <li><b>使用自动弹窗：</b>连接热点后，手机会自动弹出配置窗口，直接按页面提示操作。若没有弹出，再打开 Safari 或 Chrome，手动输入 <code>http://192.168.4.1</code>；弹窗无法正常操作时，也可用完整浏览器打开。</li>
       <li><b>选择运动和输出：</b>切换骑行 / 跑步，填写必要参数。骑行可选模拟固定模式、配速机器人或真实来源；自定义档用于设置强度范围。</li>
       <li><b>保存并核对：</b>点击页面保存按钮，等待成功提示，再核对回显和 App 数据。失败时保留页面，检查输入后重试。</li>
-      <li><b>结束配网：</b>默认开放 5 分钟。需要更多时间时主动续期，并以实际倒计时为准；完成后可保存并关闭 WiFi，或等待超时关闭。</li>
+      <li><b>结束配网：</b>默认开放 5 分钟。需要更多时间时主动续期，并以实际倒计时为准；先保存成功，再点击“关闭 WiFi”并确认，或等待超时关闭。</li>
     </ol>
     <div class="guide-note">普通配网期间 BLE 继续工作。修改运动类型或广播服务，保存可能引起短暂断连，需要重新配对。热点关闭后，设备页暂时无法访问属于正常现象。</div>
   </section>
@@ -1525,12 +1526,12 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
     <div class="guide-flow" aria-label="功率桥接流程"><span>真实功率计</span><b>→</b><span>盒子校正</span><b>→</b><span>骑行 App</span></div>
     <ol class="guide-list">
       <li><b>唤醒功率计：</b>转动曲柄让它广播；若被其他 App 占用，先断开。</li>
-      <li><b>选择真实来源：</b>在设备配网页主动扫描，按设备信息选择功率计。点击测试，确认收到功率样本。</li>
+      <li><b>选择真实来源：</b>在设备配网页主动扫描，选择支持 CPS 的功率计；无名称设备也可使用。点击测试，等待两份合法功率样本确认来源。</li>
       <li><b>设置校正：</b>固定偏移：200 W + 10 W = 210 W；比例：200 W × 105% = 210 W。两种方式择一，也可不校正。</li>
       <li><b>核对身份与心率：</b>按需复制已读取的设备信息或自定义盒子名称。真实来源默认关闭心率广播；手动开启后，心率仍来自模拟。</li>
-      <li><b>保存切换：</b>测试成功不等于正式切换。保存后核对原始值、校正值和连接状态，再让骑行 App 连接盒子的广播名称。</li>
+      <li><b>保存主备：</b>最多保存三台设备，可设首选、删除或替换。校正由三台共享；测试成功不等于正式切换，保存后核对原始值、校正值和连接状态，再让骑行 App 连接盒子的广播名称。</li>
     </ol>
-    <div class="guide-note"><strong>停踩与断线保护：</strong>真实输入 0 W 时保持 0 W，不叠加正偏移；超过 3 秒没有新样本会归零。断开后会尝试重连，需要实物确认恢复。仅桥接功率和同源踏频，不接入独立心率计。</div>
+    <div class="guide-note"><strong>停踩与断线保护：</strong>真实输入 0 W 时保持 0 W，固定偏移和比例均不作用于 0 W；旧样本超过 3 秒会清除。重启或断开后，按最近成功设备优先定向恢复，60 秒内最多两轮；失败后改为完整模拟输出，并每 60 秒轮转探测一台已保存设备。持久配置仍保留真实来源。仅桥接功率和同源踏频，恢复及 WiFi 共存需要实物确认。</div>
   </section>
 
   <section class="mg-sec" aria-labelledby="mg-run-title">
@@ -2016,11 +2017,12 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           <h1>像读<em>一本小书</em>，<br>熟悉这台骑行伙伴。</h1>
           <p class="lead">这份手册面向第一次使用 BikePower 的普通骑行用户。按节顺序读下来大约 10 分钟，覆盖烧录、蓝牙连接、按钮操作、WiFi 配网、骑行与跑步模式、全部设置项与常见故障。遇到问题随时跳到对应章节即可。</p>
           <div class="manual-meta">
-            <div><span>固件版本</span><b>v4.2.1</b></div>
+            <div><span>手册源码版本</span><b>v4.2.1 候选</b></div>
             <div><span>默认 BLE 名</span><b>BikePower</b></div>
             <div><span>配网地址</span><b>http://192.168.4.1</b></div>
             <div><span>章节</span><b>16 节 · 12 分钟</b></div>
           </div>
+          <div class="m-callout">网页刷写提供正式 Release。下文新版门户和三设备主备对应当前源码候选，仍待实物验收；页面更新不代表固件已发布。先核对设备版本，旧版本界面可能不同。</div>
 
           <!-- 蓝牙连接状态条：未连接时提示连接；连接后按设备角色推荐下一步 -->
           <div class="linkbar" id="manual-linkbar">
@@ -2166,26 +2168,26 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
                 <tr><td>短按一次</td><td>功率减少一个步进</td><td>骑行中临时降低强度</td></tr>
                 <tr><td>按住约 <code>0.5s</code> 后继续按住</td><td>持续增加功率</td><td>骑行中快速升强度</td></tr>
                 <tr><td>长按超过 <code>2s</code> 后松开</td><td>进入配网确认窗口</td><td>准备修改网页设置</td></tr>
-                <tr><td>确认窗口内再按一次</td><td>打开 WiFi 配网页</td><td>修改功率、设备名、LED 等配置</td></tr>
+                <tr><td>确认窗口内再按一次</td><td>打开 WiFi 配网页</td><td>修改功率、设备名和按钮步进</td></tr>
                 <tr><td>确认窗口内不再操作</td><td>自动取消</td><td>防误触</td></tr>
               </tbody>
             </table>
             <figure class="m-fig">
               <div class="m-fig-head"><span><b>按钮 / LED 状态机</b></span><span class="m-fig-tag">DIAGRAM 3-1</span></div>
               <div class="m-fig-body">
-                <div class="m-wide" data-zoom="./manual-images/button-led-state.png" data-zoom-title="按钮 / LED 状态机"><img src="./manual-images/button-led-state.png" alt="按钮 / LED 状态机" loading="lazy"></div>
+                <div class="m-wide" data-zoom="./manual-images/button-led-state.svg" data-zoom-title="按钮 / LED 状态机"><img src="./manual-images/button-led-state.svg" alt="按钮 / LED 状态机" loading="lazy"></div>
                 <div class="m-fig-cap">
                   <b>图注</b>
                   <div>按钮触发状态在<b>空闲 → 调功 → 配网确认 → WiFi 配网</b>间流转，LED 的闪烁节奏即当前状态。</div>
                   <ul>
-                    <li><span>绿色 = 短按触发</span></li>
-                    <li><span>橙色 = 长按触发</span></li>
-                    <li><span>洋红 = BLE 事件触发</span></li>
+                    <li><span>短按减功；按住 0.5 秒后每 200ms 加功</span></li>
+                    <li><span>长按满 2 秒松开，回滚临时调功并进入 3 秒确认窗口</span></li>
+                    <li><span>普通配网保持 BLE 在线，关闭或超时结束</span></li>
                   </ul>
                 </div>
               </div>
             </figure>
-            <div class="m-callout">按钮调功步进默认 <code>20 W</code>，可在网页「设置 → 配置设备 → 物理按钮」里修改为 <code>5-50 W</code>。</div>
+            <div class="m-callout">按钮调功步进默认 <code>20 W</code>，在设备配网页「设备设置」中可改为 <code>5-50 W</code>。调功示例适用于模拟固定骑行模式。</div>
           </div>
         </section>
 
@@ -2206,8 +2208,8 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
               <li><p>在确认窗口内<b>再按一次</b>按钮。</p></li>
               <li><p>手机连接热点 <code>BikePower-XXXXXX</code>，密码 <code>12345678</code>。</p></li>
               <li><p>连接热点后，使用手机<b>自动弹出的配置窗口</b>；未弹出时，再打开浏览器访问 <code>http://192.168.4.1</code>。</p></li>
-              <li><p>修改配置后点击「<b>保存配置</b>」或「<b>保存设置</b>」。</p></li>
-              <li><p>不再修改时点击「<b>保存并关闭 WiFi</b>」，等待约 <code>5s</code> 后热点关闭。</p></li>
+              <li><p>修改配置后点击「<b>保存并应用</b>」；切换运动类型时显示「<b>保存并切换到跑步 / 骑行</b>」。等待保存成功提示。</p></li>
+              <li><p>不再修改时点击「<b>关闭 WiFi</b>」并确认；先保存草稿，关闭操作不会提交未保存的修改。</p></li>
             </ol>
             <div class="m-callout">配网期间 BLE 会保持工作，骑行 App 通常可以继续接收数据。手机提示「此网络无互联网」是正常现象，继续保持连接即可。</div>
           </div>
@@ -2219,34 +2221,19 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="ch-num">05</div>
             <div class="ch-meta">
               <div class="ch-kicker">CYCLING</div>
-              <h2 class="ch-title">首页 · 骑行模式</h2>
-              <p class="ch-desc">首页顶部可以在骑行与跑步之间切换。骑行模式向骑行 App 广播功率、踏频、心率与训练机数据。</p>
+              <h2 class="ch-title">设备配网 · 骑行模式</h2>
+              <p class="ch-desc">设备配网页顶部选择骑行。功率来源可选模拟或真实，模拟下的固定模式与配速机器人互斥。</p>
             </div>
           </header>
           <div class="ch-body">
-            <figure class="m-fig">
-              <div class="m-fig-head"><span><b>骑行首页</b></span><span class="m-fig-tag">SCREEN 5-1</span></div>
-              <div class="m-fig-body">
-                <div class="m-phone" data-zoom="./manual-images/home.png" data-zoom-title="骑行首页"><img src="./manual-images/home.png" alt="骑行首页" loading="lazy"></div>
-                <div class="m-fig-cap">
-                  <b>图注</b>
-                  <div><b>骑行输出</b>卡片内选择「固定」或配速机器人，每张卡片下方的 <kbd>−</kbd> / <kbd>+</kbd> 调整浮动范围。</div>
-                  <ul>
-                    <li><span>顶部骑行 / 跑步模式切换</span></li>
-                    <li><span>功率 / 踏频 / 心率三条广播开关</span></li>
-                    <li><span>底部「保存配置」与「保存并关闭 WiFi」</span></li>
-                  </ul>
-                </div>
-              </div>
-            </figure>
             <h3 class="ch-sub">操作顺序</h3>
             <ol class="m-steps">
-              <li><p>选择顶部模式：<b>固定模式</b>手动设定，<b>配速机器人</b>按体重和 W/kg 自动换算。</p></li>
+              <li><p>选择模拟来源：<b>固定模式</b>手动设定，<b>配速机器人</b>按体重和 W/kg 自动换算。</p></li>
               <li><p>固定模式下，直接修改<b>固定功率、固定踏频、目标心率</b>。</p></li>
-              <li><p>用每张卡片下方的 <kbd>−</kbd> / <kbd>+</kbd> 调整<b>浮动范围</b>。</p></li>
-              <li><p>如需固定心率，打开「<b>锁定心率</b>」；关闭后心率会跟随功率算法变化。</p></li>
+              <li><p>调整各项<b>浮动范围</b>；范围越大，训练 App 中的变化越明显。</p></li>
+              <li><p>心率可选<b>联动</b>或<b>锁死</b>；联动随强度变化，锁死以填写值为目标。</p></li>
               <li><p>配速机器人模式下选择档位；选择「自定义」后可改昵称和 W/kg 上下限。</p></li>
-              <li><p>点击「<b>保存配置</b>」立即生效。修改完成后点击「<b>保存并关闭 WiFi</b>」退出配网。</p></li>
+              <li><p>点击「<b>保存并应用</b>」，等待保存成功，再核对实时值。修改完成后可关闭 WiFi。</p></li>
             </ol>
             <div class="m-callout"><b>模式建议：</b>想明确固定在某个瓦数附近 → 固定模式；想按体重模拟跟骑强度 → 配速机器人；使用训练 App 的 ERG 课程 → 让 App 下发目标功率，手动功率可能暂不生效。</div>
           </div>
@@ -2258,34 +2245,19 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="ch-num">06</div>
             <div class="ch-meta">
               <div class="ch-kicker">RUNNING</div>
-              <h2 class="ch-title">首页 · 跑步模式</h2>
-              <p class="ch-desc">跑步模式向 Zwift、MyWhoosh 等跑步入口广播跑步速度、步频和心率。</p>
+              <h2 class="ch-title">设备配网 · 跑步模式</h2>
+              <p class="ch-desc">跑步使用 RSC、HRS、FTMS 与 DIS 服务；与骑行 GATT 表互斥。App 支持情况需实际确认。</p>
             </div>
           </header>
           <div class="ch-body">
-            <figure class="m-fig">
-              <div class="m-fig-head"><span><b>跑步首页</b></span><span class="m-fig-tag">SCREEN 6-1</span></div>
-              <div class="m-fig-body">
-                <div class="m-phone" data-zoom="./manual-images/home-running.png" data-zoom-title="跑步首页"><img src="./manual-images/home-running.png" alt="跑步首页" loading="lazy"></div>
-                <div class="m-fig-cap">
-                  <b>图注</b>
-                  <div>点击顶部<b>跑步</b>切换到跑步模式。固定配速按钮覆盖 <code>3:00</code>-<code>7:00</code> 常用值。</div>
-                  <ul>
-                    <li><span>顶部切换到「跑步」</span></li>
-                    <li><span>固定配速 / 自定义模板二选一</span></li>
-                    <li><span>步频 / 心率设置与骑行一致</span></li>
-                  </ul>
-                </div>
-              </div>
-            </figure>
             <ol class="m-steps">
-              <li><p>点击首页顶部「<b>跑步</b>」。</p></li>
-              <li><p>选择固定配速或<b>自定义模板</b>；固定配速可点击 <code>3:00</code> 到 <code>7:00</code> 的常用按钮。</p></li>
-              <li><p>自定义模板可修改名称和<b>快 / 慢配速区间</b>，固件会在区间内生成自然变化。</p></li>
+              <li><p>点击顶部「<b>跑步</b>」。未保存时实时区隐藏，页面提示保存并切换，避免把旧骑行输出当成跑步数据。</p></li>
+              <li><p>固定模式填写速度；配速机器人选择档位，或用<b>自定义</b>设置快 / 慢配速区间。</p></li>
               <li><p>设置<b>步频</b>和步频浮动。</p></li>
               <li><p>设置目标心率；联动模式按跑步强度变化，锁死模式按填写值输出。</p></li>
-              <li><p>点击「<b>保存配置</b>」，固件会按跑步模式重建 BLE 广播。</p></li>
+              <li><p>点击「<b>保存并切换</b>」，成功后按跑步模式重建 GATT。App 可能需要删除旧配对并重新搜索。</p></li>
             </ol>
+            <div class="m-callout">兼容 App 可开始 / 恢复、停止 / 暂停或重置。暂停时速度、步频、步幅归零，累计距离和用时冻结；重置清零累计但保持运行 / 暂停态。当前不支持 App 远程设置跑步速度。</div>
           </div>
         </section>
 
@@ -2295,26 +2267,12 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="ch-num">07</div>
             <div class="ch-meta">
               <div class="ch-kicker">PROFILE</div>
-              <h2 class="ch-title">设置 · 用户资料</h2>
+              <h2 class="ch-title">设备配网 · 用户资料</h2>
               <p class="ch-desc">用户资料会影响功率区间、心率区间和配速机器人计算。</p>
             </div>
           </header>
           <div class="ch-body">
-            <figure class="m-fig">
-              <div class="m-fig-head"><span><b>用户资料设置</b></span><span class="m-fig-tag">SCREEN 7-1</span></div>
-              <div class="m-fig-body">
-                <div class="m-phone" data-zoom="./manual-images/settings-profile.png" data-zoom-title="用户资料设置"><img src="./manual-images/settings-profile.png" alt="用户资料设置" loading="lazy"></div>
-                <div class="m-fig-cap">
-                  <b>图注</b>
-                  <div>设置页首个入口。填完后点击底部「<b>保存设置</b>」生效。</div>
-                  <ul>
-                    <li><span>底部切换到「设置」</span></li>
-                    <li><span>选择「用户资料」标签</span></li>
-                    <li><span>填写体重 / FTP / 阈值心率</span></li>
-                  </ul>
-                </div>
-              </div>
-            </figure>
+            <p>在设备配网页的用户资料区填写；点击「保存并应用」提交，并等待成功回显。</p>
             <table class="m-tbl">
               <thead><tr><th>字段</th><th>范围</th><th>说明</th></tr></thead>
               <tbody>
@@ -2332,35 +2290,18 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="ch-num">08</div>
             <div class="ch-meta">
               <div class="ch-kicker">DEVICE</div>
-              <h2 class="ch-title">设置 · 配置设备</h2>
-              <p class="ch-desc">修改蓝牙名称，进入设备模板、物理按钮和 LED 指示等扩展设置。</p>
+              <h2 class="ch-title">设备配网 · 名称与广播</h2>
+              <p class="ch-desc">设备设置区修改蓝牙名称与广播项；真实来源还可按读取到的有效 DIS 信息设置身份。</p>
             </div>
           </header>
           <div class="ch-body">
-            <figure class="m-fig">
-              <div class="m-fig-head"><span><b>配置设备页</b></span><span class="m-fig-tag">SCREEN 8-1</span></div>
-              <div class="m-fig-body">
-                <div class="m-phone" data-zoom="./manual-images/settings-device.png" data-zoom-title="配置设备页"><img src="./manual-images/settings-device.png" alt="配置设备页" loading="lazy"></div>
-                <div class="m-fig-cap">
-                  <b>图注</b>
-                  <div>设备名称卡片右侧的编辑按钮用于修改名称。扩展入口通向模板、按钮、LED。</div>
-                  <ul>
-                    <li><span>点击设备名称右侧编辑按钮</span></li>
-                    <li><span>输入新名称后点击对勾</span></li>
-                    <li><span>底部「保存设置」最终提交</span></li>
-                  </ul>
-                </div>
-              </div>
-            </figure>
             <h3 class="ch-sub">修改蓝牙名称</h3>
             <ol class="m-steps">
-              <li><p>进入「<b>设置 → 配置设备</b>」。</p></li>
-              <li><p>在设备名称卡片右侧点击<b>编辑</b>按钮。</p></li>
-              <li><p>输入新的设备名称。</p></li>
-              <li><p>点击<b>对勾</b>确认。</p></li>
-              <li><p>点击底部「<b>保存设置</b>」。</p></li>
+              <li><p>展开「<b>设备设置</b>」，填写简短、易辨认的设备名称。</p></li>
+              <li><p>核对当前运动类型对应的功率 / 速度、踏频 / 步频和心率广播项。</p></li>
+              <li><p>点击「<b>保存并应用</b>」并等待成功。名称或服务变化时，App 可能需要重新搜索。</p></li>
             </ol>
-            <div class="m-callout warn"><b>注意：</b>只输入名称但不点对勾，不会进入保存流程。名称建议简短，便于骑行 App 搜索识别。</div>
+            <div class="m-callout">当前门户没有旧版设备模板库。电脑工具台的设备比对与身份写入见第 16 节；它与真实功率来源选择是两项不同操作。</div>
           </div>
         </section>
 
@@ -2370,26 +2311,12 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="ch-num">09</div>
             <div class="ch-meta">
               <div class="ch-kicker">BUTTON STEP</div>
-              <h2 class="ch-title">设置 · 物理按钮</h2>
+              <h2 class="ch-title">设备配网 · 按钮步进</h2>
               <p class="ch-desc">修改每次短按或长按调功的步进。推荐 10 W / 15 W / 20 W。</p>
             </div>
           </header>
           <div class="ch-body">
-            <figure class="m-fig">
-              <div class="m-fig-head"><span><b>物理按钮设置</b></span><span class="m-fig-tag">SCREEN 9-1</span></div>
-              <div class="m-fig-body">
-                <div class="m-phone" data-zoom="./manual-images/settings-button.png" data-zoom-title="物理按钮设置"><img src="./manual-images/settings-button.png" alt="物理按钮设置" loading="lazy"></div>
-                <div class="m-fig-cap">
-                  <b>图注</b>
-                  <div>通过 <kbd>−</kbd> / <kbd>+</kbd> 快速调节步进，推荐 10 / 15 / 20 W。</div>
-                  <ul>
-                    <li><span>设置 → 配置设备 → 物理按钮</span></li>
-                    <li><span>点击 ± 调整步进值</span></li>
-                    <li><span>底部保存设置</span></li>
-                  </ul>
-                </div>
-              </div>
-            </figure>
+            <p>在「设备设置」填写按钮步进，范围 <code>5-50 W</code>，默认 <code>20 W</code>。保存成功后用于模拟固定骑行调功，按钮阈值仍为 0.5 秒开始加功、2 秒松开进入配网确认。</p>
           </div>
         </section>
 
@@ -2399,26 +2326,11 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="ch-num">10</div>
             <div class="ch-meta">
               <div class="ch-kicker">LED</div>
-              <h2 class="ch-title">设置 · LED 指示</h2>
-              <p class="ch-desc">给待连接、已连接、配网中、二次确认、异常 5 种状态分别配置灯效和颜色。</p>
+              <h2 class="ch-title">电脑工具台 · LED 指示</h2>
+              <p class="ch-desc">LED 高级编辑在本电脑工具台「设备 NVS」中。连接开发板，先读配置，再修改、写入并核对回读。</p>
             </div>
           </header>
           <div class="ch-body">
-            <figure class="m-fig">
-              <div class="m-fig-head"><span><b>LED 指示设置</b></span><span class="m-fig-tag">SCREEN 10-1</span></div>
-              <div class="m-fig-body">
-                <div class="m-phone" data-zoom="./manual-images/settings-led.png" data-zoom-title="LED 指示设置"><img src="./manual-images/settings-led.png" alt="LED 指示设置" loading="lazy"></div>
-                <div class="m-fig-cap">
-                  <b>图注</b>
-                  <div>按状态选择灯效和颜色，RGB 板会同时应用颜色与呼吸效果。</div>
-                  <ul>
-                    <li><span>设置 → 配置设备 → LED 指示</span></li>
-                    <li><span>按状态选择灯效 + 颜色</span></li>
-                    <li><span>底部「保存设置」</span></li>
-                  </ul>
-                </div>
-              </div>
-            </figure>
             <table class="m-tbl">
               <thead><tr><th>状态</th><th>含义</th></tr></thead>
               <tbody>
@@ -2431,25 +2343,10 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             </table>
             <div class="m-callout">灯效可选<b>关闭、常亮、慢闪、快闪、双闪、呼吸</b>。普通单色 LED 只体现亮灭节奏，RGB 板同时体现颜色。</div>
             <h3 class="ch-sub">静默模式</h3>
-            <figure class="m-fig">
-              <div class="m-fig-head"><span><b>LED 静默模式</b></span><span class="m-fig-tag">SCREEN 10-2</span></div>
-              <div class="m-fig-body">
-                <div class="m-phone" data-zoom="./manual-images/settings-led-silent.png" data-zoom-title="LED 静默模式"><img src="./manual-images/settings-led-silent.png" alt="LED 静默模式" loading="lazy"></div>
-                <div class="m-fig-cap">
-                  <b>图注</b>
-                  <div>打开「静默模式」后，下方状态的灯效和颜色选择会自动隐藏，所有状态保持灭灯。</div>
-                  <ul>
-                    <li><span>勾选顶部「静默模式」</span></li>
-                    <li><span>所有状态的灯效下拉隐藏</span></li>
-                    <li><span>适合夜骑 / 卧室场景</span></li>
-                  </ul>
-                </div>
-              </div>
-            </figure>
             <ol class="m-steps">
               <li><p>夜骑、卧室或不想被灯光打扰时，<b>打开静默模式</b>，所有状态都灭灯。</p></li>
               <li><p>需要重新设置颜色和闪烁方式时，<b>先关闭静默模式</b>。</p></li>
-              <li><p>修改后点击「<b>保存设置</b>」。</p></li>
+              <li><p>修改后提交配置，等待写入成功并核对回读。</p></li>
             </ol>
           </div>
         </section>
@@ -2459,35 +2356,20 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           <header class="ch-head">
             <div class="ch-num">11</div>
             <div class="ch-meta">
-              <div class="ch-kicker">TEMPLATE</div>
-              <h2 class="ch-title">设置 · 设备模板</h2>
-              <p class="ch-desc">从附近 BLE 设备读取基础信息并复制到本设备，让 BikePower 在 App 中显示更易识别的名称和信息。</p>
+              <div class="ch-kicker">POWER BRIDGE</div>
+              <h2 class="ch-title">设备配网 · 真实功率主备</h2>
+              <p class="ch-desc">真实功率与同源踏频转发到骑行 App。最多保存三台 CPS 功率计，共享一套校正。</p>
             </div>
           </header>
           <div class="ch-body">
-            <figure class="m-fig">
-              <div class="m-fig-head"><span><b>设备模板设置</b></span><span class="m-fig-tag">SCREEN 11-1</span></div>
-              <div class="m-fig-body">
-                <div class="m-phone" data-zoom="./manual-images/settings-templates.png" data-zoom-title="设备模板设置"><img src="./manual-images/settings-templates.png" alt="设备模板设置" loading="lazy"></div>
-                <div class="m-fig-cap">
-                  <b>图注</b>
-                  <div>扫描附近 BLE 设备，读取别名后保存为模板；需要时一键复制到本设备。</div>
-                  <ul>
-                    <li><span>设置 → 配置设备 → 设备模板</span></li>
-                    <li><span>点击「扫描附近蓝牙设备」</span></li>
-                    <li><span>选中目标设备读取并保存</span></li>
-                  </ul>
-                </div>
-              </div>
-            </figure>
             <ol class="m-steps">
-              <li><p>进入「<b>设置 → 配置设备 → 设备模板</b>」。</p></li>
-              <li><p>点击「<b>扫描附近蓝牙设备</b>」。</p></li>
-              <li><p>在扫描结果中选择目标设备，点击读取信息。</p></li>
-              <li><p>确认模板别名后<b>保存模板</b>。</p></li>
-              <li><p>需要使用时，点击「<b>复制到本设备</b>」。</p></li>
-              <li><p>返回配置设备页，确认名称变化后点击「<b>保存设置</b>」。</p></li>
+              <li><p>转动曲柄唤醒功率计，解除其他 App 占用；在设备配网页选择「<b>真实</b>」来源并主动扫描。</p></li>
+              <li><p>选择命中 <b>CPS</b> 的设备，无名称也可用；点击测试，等待两份合法样本确认来源，0 W 样本也有效。</p></li>
+              <li><p>可保存三台主备设备，设置首选、删除或满容量替换；固定瓦数、比例或不校正三选一，三台共享。</p></li>
+              <li><p>核对名称和有效 DIS 字段；真实来源默认关闭心率，手动开启后心率仍为模拟。</p></li>
+              <li><p>点击「<b>保存并启用桥接</b>」正式应用；查看配置来源、实际来源、连接状态以及原始与校正值。</p></li>
             </ol>
+            <div class="m-callout">真实 0 W 保持 0 W，超过 3 秒的旧样本清除。重启或断线后按最近成功设备优先定向恢复，60 秒内最多两轮；失败后完整模拟输出，每 60 秒轮转探测一台已保存设备。不会后台扫描，也不会把持久来源改回模拟。真实主备切换与 WiFi 共存仍需实物验收。</div>
           </div>
         </section>
 
@@ -2497,26 +2379,12 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="ch-num">12</div>
             <div class="ch-meta">
               <div class="ch-kicker">ABOUT</div>
-              <h2 class="ch-title">设置 · 关于</h2>
+              <h2 class="ch-title">设备配网 · 设备信息</h2>
               <p class="ch-desc">查看当前设备板型、固件版本和编译时间；排查版本问题时可随问题现象一起反馈。</p>
             </div>
           </header>
           <div class="ch-body">
-            <figure class="m-fig">
-              <div class="m-fig-head"><span><b>关于页面</b></span><span class="m-fig-tag">SCREEN 12-1</span></div>
-              <div class="m-fig-body">
-                <div class="m-phone" data-zoom="./manual-images/settings-about.png" data-zoom-title="关于页面"><img src="./manual-images/settings-about.png" alt="关于页面" loading="lazy"></div>
-                <div class="m-fig-cap">
-                  <b>图注</b>
-                  <div>排查固件问题时，把这一页的板型 / 版本 / 构建时间与现象一起反馈即可。</div>
-                  <ul>
-                    <li><span>设置 → 关于</span></li>
-                    <li><span>查看板型 + 固件版本 + 编译时间</span></li>
-                    <li><span>可直接截图反馈</span></li>
-                  </ul>
-                </div>
-              </div>
-            </figure>
+            <p>展开门户「设备」区，记录板型、固件版本、Git ID 与构建时间。报告问题时附上这些字段及复现步骤。Pages 页底的页面更新时间与设备固件版本分别核对。</p>
           </div>
         </section>
 
@@ -2527,22 +2395,22 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="ch-meta">
               <div class="ch-kicker">SAVE</div>
               <h2 class="ch-title">保存和退出配网</h2>
-              <p class="ch-desc">两个保存按钮对应不同生命周期。推荐的日常保存顺序。</p>
+              <p class="ch-desc">保存提交整份草稿，成功后再核对已应用配置。默认配网 300 秒，只有主动续期才延长。</p>
             </div>
           </header>
           <div class="ch-body">
             <table class="m-tbl">
               <thead><tr><th>按钮</th><th>作用</th></tr></thead>
               <tbody>
-                <tr><td><b>保存配置 / 保存设置</b></td><td>保存当前页面配置，WiFi 继续保持打开</td></tr>
-                <tr><td><b>保存并关闭 WiFi</b></td><td>保存首页配置，并在约 5s 后关闭热点</td></tr>
+                <tr><td><b>保存并应用 / 保存并切换 / 保存并启用桥接</b></td><td>保存整份草稿，WiFi 保持打开；运动类型变化时切换 GATT</td></tr>
+                <tr><td><b>关闭 WiFi</b></td><td>确认后关闭热点，不提交未保存草稿</td></tr>
               </tbody>
             </table>
             <h3 class="ch-sub">推荐流程</h3>
             <ol class="m-steps">
-              <li><p>先在首页和设置页完成<b>所有修改</b>。</p></li>
-              <li><p>每个页面改完后点击对应的<b>保存按钮</b>。</p></li>
-              <li><p>最后回到首页，点击「<b>保存并关闭 WiFi</b>」。</p></li>
+              <li><p>在同一个设备配网页完成<b>所有修改</b>。</p></li>
+              <li><p>点击保存，等待设备确认落盘。失败时保留草稿，修正输入或重新读取后重试。</p></li>
+              <li><p>保存成功后点击「<b>关闭 WiFi</b>」并确认，或等待倒计时结束；需要更多时间时主动续期。</p></li>
               <li><p>手机会断开 <code>BikePower-XXXXXX</code> 热点，设备回到日常 BLE 使用状态。</p></li>
             </ol>
             <div class="m-callout warn"><b>如果只关闭浏览器或直接断电</b>，最后一次未保存的修改<b>可能不会保留</b>。</div>
@@ -2575,7 +2443,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
               </details>
               <details>
                 <summary><span class="q">Q04</span><span style="flex:1">保存后 App 没变化</span><span class="plus"></span></summary>
-                <div class="a">先确认点的是「保存配置」或「保存设置」。如果改的是蓝牙名称，部分 App 需要<b>断开后重新扫描</b>才能看到新名称。</div>
+                <div class="a">先确认保存成功且回显正确。切换运动类型或广播项会重建 GATT；修改蓝牙名称后，部分 App 需要<b>断开并重新扫描</b>才能看到变化。</div>
               </details>
               <details>
                 <summary><span class="q">Q05</span><span style="flex:1">功率变化不符合预期</span><span class="plus"></span></summary>
@@ -2583,7 +2451,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
               </details>
               <details>
                 <summary><span class="q">Q06</span><span style="flex:1">LED 选项不见了</span><span class="plus"></span></summary>
-                <div class="a">检查是否打开了<b>静默模式</b>。静默模式开启后，普通状态的灯效和颜色选择会隐藏；关闭静默模式后可继续编辑。</div>
+                <div class="a">新版设备门户的 LED 高级编辑移到电脑工具台「设备 NVS」。连接开发板读取配置，关闭静默模式后再编辑并写入。</div>
               </details>
               <details>
                 <summary><span class="q">Q07</span><span style="flex:1">如何更新固件</span><span class="plus"></span></summary>
@@ -2607,8 +2475,8 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="m-tldr">
               <div><div class="n">01</div><div class="k">上电连接</div><div class="b">给设备通电，等待 LED 慢闪，在骑行 App 内搜索并连接 BikePower。</div></div>
               <div><div class="n">02</div><div class="k">长按进配网</div><div class="b">长按按钮超过 2 秒松开，看到快闪后再按一次，手机连接 BikePower-XXXXXX 热点并访问 192.168.4.1。</div></div>
-              <div><div class="n">03</div><div class="k">修改保存</div><div class="b">在网页里修改首页或设置页参数，每页改完点击「保存配置」或「保存设置」。</div></div>
-              <div><div class="n">04</div><div class="k">保存并关闭</div><div class="b">回到首页点击「保存并关闭 WiFi」，约 5 秒后热点关闭，回到日常 BLE 使用。</div></div>
+              <div><div class="n">03</div><div class="k">修改保存</div><div class="b">在设备配网页修改参数，点击「保存并应用」，等待成功回显。</div></div>
+              <div><div class="n">04</div><div class="k">关闭热点</div><div class="b">先保存成功，再点击「关闭 WiFi」并确认，回到日常 BLE 使用。</div></div>
             </div>
           </div>
         </section>
@@ -4633,16 +4501,16 @@ const MANUAL_META = {
   "ch02":{num:2,title:"上电后连接骑行 App",kicker:"CONNECT",points:["默认蓝牙名称 BikePower","App 支持多种设备类型时按功率计 / 心率计搜索","LED 慢闪 = 广播中 · 常亮 = 已连接"]},
   "ch03":{num:3,title:"按钮日常操作",kicker:"BUTTON",points:["短按 = 功率 −1 步进（默认 20 W）","按住 0.5 s 后持续加功率","长按 ≥2 s 松开 → 二次按键 → 进入 WiFi 配网"]},
   "ch04":{num:4,title:"进入 WiFi 配网页",kicker:"WIFI",points:["长按 2s → 松开 → 窗口内再按一次 → 开热点","热点 SSID = BikePower-XXXXXX · 密码 = 12345678","手机提示「无互联网」是正常现象"]},
-  "ch05":{num:5,title:"首页 · 骑行模式",kicker:"CYCLING",points:["固定模式：手动设功率 / 踏频 / 心率","配速机器人：按体重 + W/kg 自动换算","浮动越大，App 看到的数值变化越明显"]},
-  "ch06":{num:6,title:"首页 · 跑步模式",kicker:"RUNNING",points:["固定配速支持 3:00 - 7:00 常用按钮","自定义模板在区间内生成自然变化","兼容的跑步 App 可远程控速 / 开始 / 停止"]},
-  "ch07":{num:7,title:"设置 · 用户资料",kicker:"PROFILE",points:["体重影响配速机器人功率换算","FTP 用于功率区间显示","阈值心率用于心率区间显示"]},
-  "ch08":{num:8,title:"设置 · 配置设备",kicker:"DEVICE",points:["编辑名称后必须点对勾才会进入保存流程","名称建议简短，便于骑行 App 识别","包含设备模板 / 物理按钮 / LED 指示 3 个扩展入口"]},
-  "ch09":{num:9,title:"设置 · 物理按钮",kicker:"BUTTON STEP",points:["可选范围 5-50 W","步进越大 → 调功越快，越小 → 越细","保存设置后立即生效"]},
-  "ch10":{num:10,title:"设置 · LED 指示",kicker:"LED",points:["普通单色 LED 只体现亮灭节奏","M5Stamp C3 等 RGB 板会同时体现颜色","静默模式一键关闭所有指示"]},
-  "ch11":{num:11,title:"设置 · 设备模板",kicker:"TEMPLATE",points:["模板库最多保存 5 个","扫描仅展示带名称且包含骑行服务的设备","复制模板后必须保存设置才生效"]},
-  "ch12":{num:12,title:"设置 · 关于",kicker:"ABOUT",points:["显示板型 (generic-c3 / m5stamp-c3)","显示固件版本号和构建时间","反馈问题时附上该页信息"]},
-  "ch13":{num:13,title:"保存和退出配网",kicker:"SAVE",points:["保存配置 / 设置 → WiFi 继续保持打开","保存并关闭 WiFi → 约 5 秒后关闭热点","直接关浏览器或断电可能丢失未保存修改"]},
-  "ch14":{num:14,title:"常见问题",kicker:"TROUBLESHOOT",points:["搜不到 BLE / 进不了配网 / 无互联网","保存无效 / 功率不符 / LED 选项消失","固件升级统一走网页烧录"]},
+  "ch05":{num:5,title:"设备配网 · 骑行模式",kicker:"CYCLING",points:["固定模式与配速机器人互斥","配速机器人按体重 + W/kg 换算","保存成功后核对实时输出"]},
+  "ch06":{num:6,title:"设备配网 · 跑步模式",kicker:"RUNNING",points:["固定速度或配速机器人","未保存的运动切换隐藏旧实时值","支持开始 / 暂停 / 重置，不支持远程设速度"]},
+  "ch07":{num:7,title:"设备配网 · 用户资料",kicker:"PROFILE",points:["体重影响配速机器人功率换算","FTP 用于功率区间与心率模型","阈值心率用于心率强度"]},
+  "ch08":{num:8,title:"设备配网 · 名称与广播",kicker:"DEVICE",points:["在设备设置区修改名称","保存后可能需要重新配对","身份写入与真实来源选择分别操作"]},
+  "ch09":{num:9,title:"设备配网 · 按钮步进",kicker:"BUTTON STEP",points:["范围 5-50 W，默认 20 W","用于模拟固定骑行调功","保存成功后生效"]},
+  "ch10":{num:10,title:"电脑工具台 · LED 指示",kicker:"LED",points:["在设备 NVS 中读取并编辑","普通单色 LED 表示节奏，RGB 板表示颜色","写入后回读核对"]},
+  "ch11":{num:11,title:"设备配网 · 真实功率主备",kicker:"POWER BRIDGE",points:["最多三台 CPS，无名称也可用","共享校正，真实 0 W 保持 0 W","60 秒恢复失败后模拟，低频定向探测"]},
+  "ch12":{num:12,title:"设备配网 · 设备信息",kicker:"ABOUT",points:["展开设备区","记录板型、版本、Git ID 与构建时间","页面更新与固件发布分别核对"]},
+  "ch13":{num:13,title:"保存和退出配网",kicker:"SAVE",points:["整份草稿保存，失败保留修改","默认 300 秒，仅主动续期延长","先保存，再关闭 WiFi 并确认"]},
+  "ch14":{num:14,title:"常见问题",kicker:"TROUBLESHOOT",points:["搜不到 BLE / 进不了配网 / 无互联网","保存后核对回显，服务变化重新配对","固件升级统一走网页烧录"]},
   "ch15":{num:15,title:"记住这 4 步",kicker:"TL;DR",points:["连接 → 进配网 → 保存 → 关闭 WiFi","适合贴在设备旁或打印","任何陌生场景都按这 4 步就对了"]},
   "ch16":{num:16,title:"设备比对与模板写入",kicker:"WEB TOOLS",points:["按 GATT 私有服务识别开发板，不看设备名","参考设备只读，只向开发板写入","写入后回读校验，可一键恢复内置值"]},
 };

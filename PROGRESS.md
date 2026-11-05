@@ -1,6 +1,6 @@
 # BikePower C — 项目进度
 
-> 基线方案：[docs/archive/01-cidf-nimble-rewrite.md](docs/archive/01-cidf-nimble-rewrite.md)
+> 当前行为：[技术参考](docs/dev/01-technical-reference.md)；早期重写背景见 [归档](docs/archive/01-cidf-nimble-rewrite.md)
 > 当前固件版本：v4.2.1（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
@@ -12,6 +12,8 @@
 - [x] 清理六个祖先关系明确的已合并本地与远端分支；移除旧工作树并保留历史报告。
 - [x] 删除未参与生产功能的 C 模板库实现和未调用板型接口，保留扫描与 DIS 身份数据结构。
 - [x] 精简后 Host 6115/0、桥接生产会话/扫描/主备 sanitizer 及板型门禁通过。
+- [x] README 收敛为入口，12 份阶段设计/报告归档，删除 25 张旧图或重复图，五组技术图修正并统一 SVG 来源。
+- [x] 核对 Pages 桌面/手机手册、当前保存与关闭流程、跑步控制范围和三设备桥接；离线手册改为从 Pages 生成并门禁检查。
 - 文档、配图和 Pages 本轮结果见 [仓库治理报告](docs/dev/31-repository-hygiene-report.md)。
 
 ## 2026-11-05 源码清理与文档治理
@@ -23,7 +25,7 @@
 - [x] 总质量门禁 `--no-build`：111 PASS / 2 dirty WARN / 0 FAIL；双板独立编译通过，app 均为 `0x113ac0`，factory 剩余 72%。
 - [x] 源码事实、56 文档链接、30 操作覆盖矩阵及 diff 格式通过。
 - `NOT_RUN`：当前候选实物验收，未检测到 ESP32 USB 串口。编译产物仅用于本地验证，未发布或打 tag。
-- 详见 [源码清理与验证报告](docs/dev/30-local-cleanup-verification-report.md)。
+- 详见 [源码清理与验证报告归档](docs/archive/30-local-cleanup-verification-report.md)。
 
 ## 2026-11-05 桥接主备恢复与多设备备选
 
@@ -53,7 +55,7 @@
 - [x] 320/390/1440 生产压缩 DOM、正反切换、异常恢复及视觉检查通过；quick 操作门禁通过，Host 6146/0。
 - [x] 内联 74,932 bytes，较 72,386 bytes 基线增加 2,546 bytes，低于 3 KiB 增量目标及 110 KiB 门禁。
 - [ ] 真实热点、手机 Safari 和配网态最低堆水位仍需实物验收；本轮未修改 API、NVS、BLE 协议或固件 C。
-- 设计与步骤见 [交互设计](docs/dev/26-wifi-portal-sport-mode-ux-design.md) 和 [实施计划归档](docs/archive/17-wifi-portal-sport-mode-ux-plan.md)。
+- 当前交互见 [技术参考](docs/dev/01-technical-reference.md)，历史设计与步骤见 [交互设计归档](docs/archive/29-wifi-portal-sport-mode-ux-design.md) 和 [实施计划归档](docs/archive/17-wifi-portal-sport-mode-ux-plan.md)。
 
 ## 2026-11-05 当前稳定性与异常覆盖
 
@@ -66,7 +68,7 @@
 - [x] 最终镜像通用 C3 串口、cycling/running、六组配置/NVS、双次重连、308.2 秒/258 条 CPS 耐久通过；扫描/连接/空通知失败均 0，完整原配置恢复并回读一致，独立 dirty 证据绑定镜像 SHA256。
 - [ ] 真实热点、真实功率计三方共存、M5 实物、手机 Safari、按钮/LED、标准 App、掉电和真实 flash 写失败。
 - [x] 修复及回归 `d3c9b8d`、板型及门禁 `4c3e6ac` 已提交推送至 main；文档治理 78 PASS / 2 dirty WARN / 0 FAIL，两份已执行计划归档。
-- 详见 [稳定性异常报告](docs/dev/25-stability-exception-test-report.md)。最终提交远端 CI `41944208570` 已成功；未发布。
+- 详见 [稳定性异常报告归档](docs/archive/28-stability-exception-test-report.md)。最终提交远端 CI `41944208570` 已成功；未发布。
 
 ## 2026-11-04 Pages 分区与移动手册
 
@@ -89,7 +91,7 @@
 - [x] generic-c3 独立镜像启动、cycling/running、六组配置/NVS、GATT 重建、双次重连与 307 秒耐久通过；258 条 CPS，扫描/连接/空通知失败均 0，原配置恢复。
 - [x] 补齐 C11 harness 的 POSIX 声明宏，本地 GCC 严格告警及 macOS ASan/UBSan 通过；后续基线 `5c97e96` 的远端 CI `41867471119` 成功。
 - [ ] 热点 HTTP、真实功率计三方共存、M5 实物、Safari/手机、实体按钮/LED、标准 App 与原生浏览器授权。
-- 证据见 [自动优化报告](docs/dev/22-automatic-optimization-report.md)；代码已分批提交推送，实际验收镜像仍绑定构建时 dirty 身份，旧候选包与旧证据保留，未发布。
+- 证据见 [自动优化报告归档](docs/archive/26-automatic-optimization-report.md)；代码已分批提交推送，实际验收镜像仍绑定构建时 dirty 身份，旧候选包与旧证据保留，未发布。
 
 ## 2026-11-04 核心门户与真实功率桥接实施
 
@@ -101,7 +103,7 @@
 - [x] 修复后 quality gate `101 PASS / 2 WARN / 0 FAIL`，full operation gate 通过，3 分钟耐久 17 轮无失败；WARN 为未提交工作区及由此跳过的历史提交 whitespace 检查。
 - [x] 精简固件名称及双板正式构建；修复真机配置事务栈溢出，启动复测通过。
 - [x] 固件及 DIS 标识按 `<板型>-v4.2.1` 统一；Pages 源码补齐来源与校正表单，六组保存、绑定保留及旧固件五组降级浏览器回归通过。Pages 已随 `5305a04` 部署。
-- [x] 正式镜像启动、骑行/跑步、六组配置/NVS、GATT 重建、双次重连与 5 分钟耐久；302.2 秒、259 条 CPS、0 扫描/连接/空通知失败。测试后恢复原配置，报告见 `docs/dev/17-core-portal-bridge-test-report.md`。
+- [x] 正式镜像启动、骑行/跑步、六组配置/NVS、GATT 重建、双次重连与 5 分钟耐久；302.2 秒、259 条 CPS、0 扫描/连接/空通知失败。测试后恢复原配置，报告见 `docs/archive/23-core-portal-bridge-test-report.md`。
 - [ ] 配网及上下游桥接共存：macOS 热点关联 `-3900`，附近无独立真实功率计；M5Stamp 真机、Safari、物理按钮/LED 与骑行 App 人工验收未覆盖。
 
 ## 2026-10-30 v4.2.1 发布验收
@@ -416,5 +418,5 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 - 物理按钮/LED 灯效需人工确认，自动化测试只能覆盖 BLE 连接驱动的状态迁移
 - 配网门户动态测试（stage5_portal_test.py）需本机连 BikePower-XXXXXX 热点；本机不能切换 WiFi 时改用 `tests/mock_server.py` 本地调试，或换另一台机器执行
 - `test/` 与 `tests/` 目录职责不同不合并（评估结论见 [tests/README.md](tests/README.md) 第六章）：`test/` 放 ESP-IDF 约定的 host 单测（纯 C），`tests/` 放所有 Python/Shell 设备测试与静态门禁
-- P0 协议与可靠性修复设计见 [归档规格](docs/archive/14-top5-protocol-stability-design.md)，持续待办见 [优化清单](docs/dev/13-project-review-and-optimization.md)。修复实现已完成，硬件和人工验收按当前镜像证据判定，不把自动化全绿等同于全部验收完成。
+- P0 协议与可靠性修复设计见 [归档规格](docs/archive/14-top5-protocol-stability-design.md)，历史优化清单见 [复审归档](docs/archive/19-project-review-and-optimization.md)。修复实现已完成，硬件和人工验收按当前镜像证据判定，不把自动化全绿等同于全部验收完成。
 - GitHub Release、Actions 和 Pages 已收敛为单一链路；v4.1.1 双板固件在线 SHA256 与 manifest 已自动复核，generic-c3 / m5stamp-c3 浏览器真机刷写仍待确认。

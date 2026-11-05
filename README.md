@@ -1,269 +1,81 @@
 # BikePower C
 
-BikePower C 是一个运行在 ESP32-C3 上的蓝牙骑行功率计模拟器，面向智能骑行台、训练 App 和 DIY 骑行设备场景。它把原来的 MicroPython 版本完整重写为 C + ESP-IDF + NimBLE，让设备更稳定，也更适合长期使用和二次开发。
+运行在 ESP32-C3 上的蓝牙骑行与跑步模拟器，使用 C11、ESP-IDF v5.5.4 和 NimBLE。开机通过 BLE 工作，按钮二次确认后才开启临时 WiFi 配网。
 
-## 项目简介
+[在线工具台与网页刷写](https://mengen-ink.github.io/bikepower-c/) · [快速上手](docs/user/01-quickstart.md) · [用户手册](docs/user/02-user-manual.md) · [文档索引](docs/INDEX.md)
 
-如果你只想知道它能做什么，可以把它理解成一块“小型骑行训练控制盒”：开机后通过蓝牙广播，被骑行 App 配对后就能模拟功率、踏频、心率等数据；需要改配置时，再用按钮进入 WiFi 配网页面。
+## 能力与版本
 
-## 适配开发板
+- 骑行：模拟功率、踏频、心率，支持固定模式、配速机器人及 FTMS ERG。
+- 跑步：模拟速度、步频、心率与累计距离，支持 FTMS 开始、暂停、重置；骑行与跑步 GATT 表互斥。
+- 真实功率桥接：最多保存三台 CPS 功率计，共享固定瓦数或比例校正；真实 0 W 保持 0 W。重启或断线后定向恢复，60 秒快速恢复失败后完整模拟输出，并每 60 秒轮转探测已保存设备。
+- 设备配网：参数保存到 NVS，普通配网保持 BLE 在线，默认 300 秒，仅主动续期延长。
+- 电脑工具台：网页刷写、实时监控、设备比对、配置读写及健康检查；手机访问同一地址阅读手册。
 
-固件支持自动检测板型，无需手动配置。当前适配的开发板：
+**网页刷写只提供正式 GitHub Release。** 当前源码中的新版门户与三设备主备桥接属于候选实现，仍待真实功率计/WiFi 共存、M5Stamp C3、手机 Safari 和第三方 App 实物验收。页面部署、自动化通过与固件发布分别记录，当前状态见 [PROGRESS](PROGRESS.md)。
 
-| 开发板 | LED | 按钮 | 检测方式 |
-|--------|-----|------|----------|
-| 通用 ESP32-C3 开发板 | GPIO12 普通 LED（低电平点亮） | GPIO9（内部上拉） | 默认板型 |
-| [M5Stamp C3](https://shop.m5stack.com/products/m5stamp-c3-mate-with-pin-headers) | GPIO2 SK6812 RGB LED | GPIO3（外部上拉） | GPIO3 按钮上拉自动识别 |
+## 硬件
 
-**自动检测原理**：启动时将 GPIO3 配置为输入下拉，读取电平——通用板 GPIO3 悬空下拉读低，M5Stamp C3 的 GPIO3 接按钮（外部上拉到 3.3V）读高。检测完成后 GPIO3 恢复，后续按钮初始化重新配置。
+| 板型 | 操作按钮 | 状态 LED |
+|---|---|---|
+| 通用 ESP32-C3 | GPIO9，按下为低电平 | GPIO12，低电平点亮 |
+| M5Stamp C3 | GPIO3，外部上拉 | GPIO2，SK6812 RGB |
 
-**M5Stamp C3 LED 颜色映射**：
+启动时用 GPIO3 输入下拉检测外部上拉，识别后恢复引脚。详细接线、供电与检测限制见 [硬件指南](docs/user/03-hardware.md)。
 
-| LED 颜色 | 设备状态 |
-|----------|----------|
-| 蓝色慢闪 | BLE 广播中 |
-| 绿色常亮 | BLE 已连接 |
-| 黄色快闪 | 等待二次确认 |
-| 青色慢闪 | WiFi 配网中 |
-| 熄灭 | 非活动态 |
+![双板型引脚](docs/images/hardware-pinout.svg)
 
-## 硬件接线图说明
+## 烧录与日常使用
 
-下表列出当前固件默认使用的 ESP32-C3 主要引脚和接口用途：
+1. 电脑 Chrome / Edge 打开[在线工具台](https://mengen-ink.github.io/bikepower-c/)，用数据 USB 线连接开发板。
+2. 选择正确板型，核对正式版本、文件名与 SHA256，点击“连接串口并刷写”并主动选择串口。
+3. 按安装弹窗提示完成，释放串口后复位或重新上电，在运动 App 中搜索 `BikePower`。
 
-| 引脚 / 接口 | 用途 | 说明 |
-|------|------|------|
-| `GPIO9` / `GPIO3` | 物理按钮 | 通用板用 GPIO9，M5Stamp C3 用 GPIO3；内部上拉，按下为低电平 |
-| `GPIO12` / `GPIO2` | 状态 LED | 通用板用 GPIO12 普通 LED，M5Stamp C3 用 GPIO2 SK6812 RGB LED |
-| `5V / USB` | 供电 | 可通过开发板 USB 口供电，也可由稳定 5V 电源输入 |
-| `3V3` | 板载逻辑电源 | 给外设供电时要注意总电流预算 |
-| `GND` | 地线 | 所有外设地必须共地 |
-| `UART0` | 调试串口 | 用于烧录、日志输出和故障排查；通常走开发板自带 USB 转串口 |
+完整刷写流程与恢复方法见 [快速上手](docs/user/01-quickstart.md)。设备内 OTA 已移除，升级统一走电脑网页刷写。
 
-![硬件引脚对照](docs/images/hardware-pinout.png)
+默认按钮操作适用于模拟固定骑行模式：
 
-更详细的硬件建议见 [docs/user/03-hardware.md](docs/user/03-hardware.md)。
+| 操作 | 行为 |
+|---|---|
+| 短按 | 功率减小 20W |
+| 按住超过 0.5s | 每 200ms 增加 20W |
+| 按住满 2s 后松开 | 回滚本次临时调功，进入配网确认 |
+| 在 3s 确认窗口内再按 | 开启 WiFi 配网 |
+| 确认窗口内不操作 | 自动取消，保持 BLE 工作 |
 
-## 核心功能清单
+配网时连接 `BikePower-XXXXXX`，密码 `12345678`；使用手机自动弹窗，或手动打开 `http://192.168.4.1`。点击“保存并应用”并等待成功回显，再点击“关闭 WiFi”并确认，或等待倒计时结束。关闭热点不提交未保存草稿；运动类型或广播服务改变时，App 可能需要重新配对。
 
-- 支持标准 BLE 骑行相关服务，可被主流骑行 App 识别
-- 模拟功率、踏频、心率、设备信息等训练数据
-- 真实功率计桥接：最多保存 3 台 CPS 功率计，重启及异常断连后按最近成功设备优先定向恢复；60 秒快速恢复失败时自动降级为完整模拟输出，并每 60 秒轮转探测一台已保存设备
-- 桥接校正在全部已保存设备间共享，支持固定瓦数或百分比校正；真实 0W 永远输出 0W，3 秒过期清除旧桥接样本
-- 支持 FTMS ERG 控制，适合训练模式联动
-- 提供实体按钮操作，不依赖屏幕也能快速调功
-- 提供 LED 状态提示，方便判断当前设备状态
-- 支持 WiFi 配网门户，可在手机浏览器里修改核心参数
-- 设备门户采用明亮高密度布局，固定模式和配速机器人统一配置；配网默认 5 分钟，仅主动续期延长
-- 支持配置保存，重启后继续使用上一次设置
-- 支持配置 JSON 序列化能力，领域层可做配置导入/导出、备份/恢复和 host 单测覆盖
-- 提供静态门禁聚合与标准化 Release 构建脚本，便于发版前统一验证和产出 merged bin
+默认 LED 慢闪表示广播、常亮表示已连接、快闪表示确认窗口；配网慢闪。M5Stamp C3 对应蓝/绿/黄/青色，自定义和静默配置以设备实际设置为准。详见 [用户手册](docs/user/02-user-manual.md)；手机离线阅读见 [离线手册](docs/user/pages-mobile-guide.html)。
 
-## 软件架构
+## 开发与验证
 
-项目采用三层结构，目的是把“设备怎么接”“训练逻辑怎么算”“用户怎么操作”分开处理，后续维护更清晰：
+应用层位于 `main/`；纯 C 领域算法位于 `components/bikepower_domain/`，可在宿主机测试。BLE 配置、上游桥接与 RF 生命周期分别由专属模块维护。
 
-- 应用层：位于 `main/`，负责按钮、LED、BLE、WiFi 配网、状态机和主循环
-- 领域层：位于 `components/bikepower_domain/`，负责功率引擎、心率模型、用户配置和训练逻辑
-- 硬件层：基于 ESP-IDF、FreeRTOS、NimBLE、GPIO、NVS、WiFi 等底层能力，为上层提供驱动和运行环境
+| 目录 | 用途 |
+|---|---|
+| `main/web/` | 设备门户，构建时内联 |
+| `tools/web/` | Pages 电脑工具台与手机手册 |
+| `test/`、`tests/` | Host 单测、协议向量、静态门禁、浏览器与真机工具 |
+| `scripts/` | 构建、烧录、串口守护与维护工具 |
+| `docs/` | 使用说明、当前技术规范、Code Wiki 与历史归档 |
 
-![架构图](docs/images/architecture.png)
-
-按钮与灯效状态切换可参考：
-
-![状态机](docs/images/button-led-state.png)
-
-主循环和数据更新流程可参考：
-
-![数据流](docs/images/main-loop-flow.png)
-
-WiFi 配网的射频共用流程可参考（v3.1.3 起为共存模式，BLE 不停）：
-
-![WiFi/BLE 射频共用流程](docs/images/rf-wifi-flow.png)
-
-## 固件烧录、构建与发布
-
-### 普通用户：网页端在线烧录
-
-普通用户不需要安装 ESP-IDF、esptool 或乐鑫 Flash Download Tool。项目自带的 BLE Monitor 会由 GitHub Actions 部署为 GitHub Pages，并在同一页面自动显示最新 Release 的版本、发布时间、固件文件和 SHA256，按板型一键发起刷写。
-
-Pages 地址：[https://mengen-ink.github.io/bikepower-c/](https://mengen-ink.github.io/bikepower-c/)。部署状态可在 `Deploy BLE Monitor and Web Flasher` 工作流中确认。
-
-手机访问同一地址可阅读详细手册，包含按钮四场景演示、配网、真实功率桥接、跑步、排障及实物自查清单；演示不操作设备，也不代替真机验收。离线阅读见 [手机使用手册](docs/user/pages-mobile-guide.html)。页底页面更新时间来自部署构建元数据，与固件 Release 发布时间分别展示。
-
-在 GitHub Pages 尚未启用或临时不可用时，可继续使用备用入口：[https://easyhey.com/?firmware=MOD220](https://easyhey.com/?firmware=MOD220)。
-
-项目已永久放弃设备内 OTA 升级路径。后续固件升级、重刷和恢复出厂固件统一走电脑端网页烧录；这不会让设备开机连接互联网，也不会恢复设备内 OTA。
-
-操作步骤：
-
-1. 使用桌面版 Chrome 或 Edge 打开项目 GitHub Pages；若 Pages 临时不可用则打开备用入口。
-2. 用支持数据传输的 USB 线把 ESP32-C3 开发板连接到电脑。
-3. 选择 `通用 ESP32-C3` 或 `M5Stamp C3`，核对网页显示的最新版本和固件文件名。
-4. 点击“连接串口并刷写”。
-5. 在浏览器弹出的串口列表中，选择类似 `USB JTAG/serial debug unit` 的端口；Windows 上通常显示为 `COMx`，macOS 上通常显示为 `cu.usbmodem*`。
-6. 按网页提示确认并等待烧录完成。
-7. 烧录完成后重新上电，或按一下开发板的 RST 复位键。
-
-![网页端选择串口](docs/images/web-flash-serial-port.jpg)
-
-网页刷写依赖 HTTPS 和 Web Serial。浏览器出于安全原因必须由用户点击按钮并主动选择串口，网页不能静默选择设备。如果列表里看不到开发板，优先更换一根支持数据传输的 USB 线，再重新插拔开发板并刷新网页。少数开发板需要按住 BOOT 键再点击连接或开始烧录，进度开始后即可松开。
-
-维护者首次部署时在仓库 `Settings → Pages` 把 Source 设为 `GitHub Actions`，然后手动运行 `Deploy BLE Monitor and Web Flasher`：
-
-- 固件唯一来源是当前 GitHub 仓库的最新 Release，工作流使用最小权限的内置 `GITHUB_TOKEN` 获取附件，不需要额外发布凭据。
-- `main` 的 CI 成功后部署页面；GitHub Release 发布后立即刷新固件，另保留每日同步和手动触发。
-- 工作流只接受当前 tag 对应的 generic-c3 / m5stamp-c3 merged bin 和各自 `.sha256`，校验成功后才会放入 Pages artifact。
-- 正式部署使用严格模式，找不到任何受支持板型的固件或摘要不匹配时工作流失败，不会用不可刷写站点覆盖已有 Pages。
-
-### 开发者：本地编译并烧录
-
-开发者推荐使用专用脚本自动识别 ESP-IDF 和开发板串口，编译并烧录当前工作区最新版正式固件：
+准备 ESP-IDF 环境后执行：
 
 ```bash
-./scripts/flash_latest.sh
-```
-
-常用选项：
-
-```bash
-./scripts/flash_latest.sh --port /dev/ttyACM0 --monitor
-./scripts/flash_latest.sh --erase
-./scripts/flash_latest.sh --portal-test-auto-config
-```
-
-其中 `--erase` 仅用于开发者从旧的双 OTA 分区布局切换到当前 4MB 单 factory 布局时全量擦写；`--portal-test-auto-config` 会刷启动后自动进入配网的测试固件，正式使用不要加。
-
-`flash_latest.sh` 会在正式 build 前执行 `idf.py reconfigure`，确保网页和 BLE DIS 中展示的 Git ID、编译时间来自当前源码状态；如果检测到 `build_all.sh` 留下的临时板型配置缓存，也会先清理，避免 CMake 继续引用已删除的 `sdkconfig.board.tmp`。
-
-也可以手动准备 ESP-IDF 环境，再在项目根目录执行：
-
-```bash
-idf.py set-target esp32c3
 idf.py build
-idf.py -p <port> flash
-idf.py -p <port> monitor
+make -C test run
+python3 scripts/tools/quality_gate.py --no-build
 ```
 
-`<port>` 请替换为你的实际串口，例如 macOS 下常见 `/dev/cu.usbmodem*`，Linux 下常见 `/dev/ttyUSB0` 或 `/dev/ttyACM0`。
+需要烧录时使用 `./scripts/flash_latest.sh`；双板构建使用 `./scripts/build_all.sh`。构建、真机证据和发布流程统一见 [构建与测试](docs/wiki/09-build-and-test.md)，分发固件必须是校验后的 merged bin。
 
-### 发行版构建
-
-发版构建使用 `scripts/build_all.sh`。该脚本可编译 generic-c3 / m5stamp-c3 双板型产物（也可按板型参数只构建单板），先运行 host、mock、3 分钟核心流程耐久和静态门禁，再生成 merged bin、SHA256、manifest、测试报告、核心流程明细、用户文档副本和 release 总包 zip；`--dry-run` 只预览，不编译、不写文件、不打 tag、不创建 Release。
+本地门户预览：
 
 ```bash
-./scripts/build_all.sh --dry-run
-./scripts/build_all.sh
+python3 tests/mock_server.py --bind 127.0.0.1 --port 8080
+python3 scripts/tools/serve_ble_monitor.py
 ```
 
-每次生成可分发固件时，`build/release/` 必须包含参与发布板型的 `<板型>-v<版本>.bin` 合并固件、`.sha256`、`manifest.txt`、`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/` 和 `bikepower-c-v<版本>.zip` 总包。Git ID 与构建时间在 manifest 单独保留。测试报告记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行项必须写明原因。
+分别访问 `http://127.0.0.1:8080/` 和 `http://127.0.0.1:8766/`。Pages 预览不拉取发行固件，刷写入口显示不可用。
 
-真机自动测试按板型分别记录到 `tests/reports/device-acceptance-generic-c3.json` 和 `tests/reports/device-acceptance-m5stamp-c3.json`。本地构建允许没有证据；证据存在且匹配当前版本时，`build_all.sh` 会将其收录到总包 `evidence/`。正式上传要求**参与发布板型**的当前固件版本、Git ID 和 5 项 P0 自动项（串口启动、BLE 全量配置读写与 NVS 持久化、骑行 BLE、重连、5 分钟设备耐久）全部为 `PASS`；跑步 profile、配网门户、广播项以及按钮/LED/手机/第三方 App 为 P1，允许 `NOT_RUN` 但必须在测试报告明示。
-
-```bash
-python3 scripts/tools/device_acceptance.py validate --strict \
-  --file tests/reports/device-acceptance-generic-c3.json
-python3 scripts/tools/device_acceptance.py validate --strict \
-  --file tests/reports/device-acceptance-m5stamp-c3.json
-python3 scripts/tools/check_release_artifacts.py \
-  --require-pushed \
-  --require-device-evidence
-python3 tests/test_release_artifacts.py
-```
-
-正式发布使用 `python3 scripts/tools/publish_github_release.py --dry-run` 预检，再由同一脚本通过已推送 tag 创建 GitHub Release。脚本会自动复用严格检查，要求参与发布板型的 P0 真机证据；默认单板 `generic-c3`，可用 `--boards generic-c3,m5stamp-c3` 指定多板。已存在的 Release 不允许覆盖。
-
-提交前推荐先跑聚合门禁：
-
-```bash
-python3 scripts/tools/quality_gate.py
-```
-
-## 使用说明
-
-设备的日常操作很简单，主要靠一个按钮：
-
-- 短按：功率减小 `20W`
-- 按住约 `0.5s` 以上：持续调功，每 `200ms` 增加 `20W`
-- 长按并保持到 `2s` 以上再松开：进入“配网确认”窗口
-- 在确认窗口内再按一次：正式进入 WiFi 配网模式
-- 如果确认窗口内没有再次按键：约 `3s` 后自动取消，回到蓝牙工作状态
-
-## 配网说明
-
-进入配网模式后，设备会保持 BLE 在线继续通知，同时打开自己的 WiFi 热点。普通用户按下面顺序操作即可：
-
-1. 长按按钮至少 `2s`，松开后看到 LED 进入确认提示
-2. 在确认时间内再按一次按钮
-3. 手机连接设备发出的 WiFi AP：`BikePower-XXXXXX`（后 6 位因设备而异），密码 `12345678`
-4. 打开浏览器访问 `192.168.4.1`
-5. 修改需要的配置参数
-6. 点击保存，页面会显示“已保存到设备”，配置实时生效到 BLE 通知，骑行 App 立即看到新值
-7. 倒计时结束后 WiFi 自动关闭，蓝牙全程未断开，回到骑行 App 继续骑行即可
-
-> 注：WiFi 与 BLE 共存（`CONFIG_ESP_COEX_SW_COEXIST_ENABLE`），配网期间骑行 App 不会断连；仅在 WiFi 资源初始化失败的极端情况下才会降级为停 BLE + 重启。
-
-## LED 灯效说明
-
-| LED 表现 | 设备状态 | 用户如何理解 |
-|------|------|------|
-| 慢闪 | BLE 广播中 | 设备已开机，正在等待手机或 App 连接 |
-| 常亮 | BLE 已连接 | 已配对成功，正在正常工作 |
-| 快闪 | 等待二次确认 | 你刚完成长按，设备在等你确认是否进入配网 |
-| 慢闪 | WiFi 配网中 | 设备已切到配网模式，可连热点改配置 |
-| 熄灭 | 非活动态 | 设备暂时不在正常广播状态 |
-
-## 项目目录结构
-
-```text
-bikepower-c/
-├── README.md
-├── AGENTS.md
-├── PROGRESS.md
-├── main/
-│   ├── app_main.c
-│   ├── app_state.c
-│   ├── board_detect.c
-│   ├── button.c
-│   ├── led.c
-│   ├── ble_bikepower.c
-│   ├── ble_config_service.c/.h   # 八组 GATT 配置事务与 revision
-│   ├── bridge_runtime.c/.h       # 三设备定向恢复、模拟降级与 Portal 命令
-│   ├── ble_power_bridge.c        # 单台上游 CPS 连接、订阅与 DIS
-│   ├── ble_scanner.c             # 有界功率计候选扫描
-│   ├── radio_ctrl.c
-│   ├── wifi_portal.c
-│   ├── captive_portal.c
-│   ├── web/                      # 前端三件套（v3.2.0 起独立，编译时内联到固件）
-│   │   ├── index.html
-│   │   ├── app.css
-│   │   └── app.js
-│   └── bikepower_config.h
-├── components/
-│   └── bikepower_domain/          # 纯 C 领域层，含 bridge_failover 主备状态机
-├── scripts/                       # 构建、烧录、静态资源内联和串口守护入口
-├── tools/web/                     # Pages 工具台、页面动效与按钮教学模块
-├── docs/
-│   ├── INDEX.md
-│   ├── user/        # 产品使用说明（快速上手/手册/硬件）
-│   ├── dev/         # 开发与技术（技术参考/固件安全/测试覆盖）
-│   ├── archive/     # 历史归档（仅供追溯）
-│   └── images/
-├── tests/                         # 设备测试、静态门禁、mock 和串口工具
-├── test/                          # 领域层 host 单测
-│   ├── Makefile
-│   └── test_domain.c
-├── partitions.csv
-└── sdkconfig.defaults
-```
-
-维护工具：`python3 scripts/tools/quality_gate.py` 默认包含固件构建；
-纯文档使用 `--level docs`，已单独构建时可使用 `--no-build`（明确跳过构建）。
-源码版本、schema、路由与模块清单见 [自动生成事实摘要](docs/dev/21-generated-project-facts.md)，
-以 `python3 scripts/tools/doc_facts.py --write` 更新，Markdown 相对链接与锚点由
-`python3 scripts/tools/check_markdown_links.py` 校验。
-
-## 引用
-
-- [PROGRESS.md](PROGRESS.md)：查看当前开发进度、已完成阶段和已知限制
-- [AGENTS.md](AGENTS.md)：查看本项目的协作规范、验证要求和文档入口
+文档改动运行 `python3 scripts/tools/quality_gate.py --level docs`；源码事实由 `doc_facts.py --write` 更新，手机离线手册由 `sync_user_docs.py` 同步。协作规则见 [AGENTS](AGENTS.md)，当前实现见 [技术参考](docs/dev/01-technical-reference.md)，历史变化见 [CHANGELOG](CHANGELOG.md)。

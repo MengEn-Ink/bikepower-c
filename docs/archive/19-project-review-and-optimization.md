@@ -1,5 +1,7 @@
 # 项目复审与优化清单
 
+> 归档于 2026-11-05：保留历史复审与优化状态；当前实现及待验收项见 [技术参考](../dev/01-technical-reference.md) 和 [PROGRESS](../../PROGRESS.md)。
+
 > 审查日期：2026-10-22
 >
 > 基线：BikePower C v4.1.1，提交 `d0ecc8e` 之后的工作区
@@ -11,7 +13,7 @@
 > 最新跟进（2026-11-04/05）：自动优化实现已完成；完整质量/操作门禁、host 6146/0、
 > 双板独立构建及生产 GATT/快照/cJSON ASan/UBSan 已通过。通用板本轮镜像
 > 已通过自动真机验收及 307 秒耐久；真实功率计共存、M5 实物与手机/标准客户端等保持待办。
-> 当前结果以 [自动优化报告](22-automatic-optimization-report.md) 为准，下文审查证据保留历史时间口径。
+> 当时结果见 [自动优化报告](26-automatic-optimization-report.md)，下文审查证据保留历史时间口径。
 
 ## 一、结论
 
@@ -158,7 +160,7 @@
 2026-11-04 自动优化跟进：配置 GATT 已拆分为 `ble_config_service`；通知输入/读取、
 生命周期、应用 mailbox 与门户关闭状态已明确锁/原子/单主任务契约；state/runtime/scan
 容量已集中并用生产 cJSON 验证；事实摘要、分层质量门禁及 Markdown 锚点校验已实现。
-具体证据与未覆盖项见 [自动优化报告](22-automatic-optimization-report.md)。
+具体证据与未覆盖项见 [自动优化报告](26-automatic-optimization-report.md)。
 后续只在具体问题需要时继续拆分 HTTP handler、扫描器或前端，避免为行数引入额外层。
 
 ### P1-1 大模块拆分

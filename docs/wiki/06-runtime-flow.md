@@ -6,7 +6,7 @@
 
 ## 启动流程
 
-参考图片：[main-loop-flow.png](../images/main-loop-flow.png)
+参考图片：[主循环](../images/main-loop-flow.svg)
 
 ### 完整初始化顺序
 
@@ -234,7 +234,7 @@
 
 ## 配网完整数据流
 
-参考图片：[rf-wifi-flow.png](../images/rf-wifi-flow.png)
+参考图片：[WiFi 共存](../images/rf-wifi-flow.svg)
 
 ```
 [ST_BLE_ACTIVE] 按钮长按 ≥2s 释放
@@ -260,21 +260,22 @@
        │    └─ wifi_portal_start(engine)              │
        │         ├─ esp_timer 1s 周期超时检查         │
        │         ├─ HTTP 服务器 :80                   │
-       │         └─ 注册 27 个 URI handler            │
+       │         └─ 注册业务与 Captive Portal 路由     │
        │                                              │
        │  [用户手机连接热点]                           │
        │  [浏览器访问 192.168.4.1]                     │
        │  [GET / 返回内联 HTML（CSS/JS 已内联）]      │
-       │  [前端 SPA 通过 XHR 调用 /api/xxx]            │
-       │  [POST /api/config 保存配置到引擎+dirty]      │
-       │  [GET /api/state 拉取实时状态]                │
+       │  [前端通过 fetch 调用 /api/xxx]              │
+       │  [POST /api/config 提交 revision 事务]       │
+       │  [主任务校验 → 应用/落盘 → 发布结果]          │
+       │  [GET /api/runtime 核对事务与实时输出]        │
        │                                              │
-       ├─ 超时（180s）或 POST /api/close-wifi:       │
+       ├─ 超时（300s）或关闭事务成功:                │
        │    arm_closing() → 5s 收尾 → portal_done()  │
        │                                              │
        ▼                                              │
 portal_done()（esp_timer 任务）                       │
-  └─ for 5次重试: xQueueSend(APP_EVT_WIFI_DONE) ──────┘
+  └─ done 回调投递 APP_EVT_WIFI_DONE，满队列用 latch ┘
        │
        ▼
 主循环消费 APP_EVT_WIFI_DONE:
@@ -295,8 +296,8 @@ portal_done()（esp_timer 任务）                       │
 ```
 配置变更发生时：
   - 按钮调功 → power_engine_adjust_power() → dirty = true
-  - 网页保存 → h_config() → 直接 nvs_store_save()（即时落盘）
-  - ERG 目标 → power_engine_set_erg_target() → dirty = true
+  - 网页/GATT 保存 → 提交事务 → 主任务校验、应用并落盘
+  - ERG 目标 → 仅运行时目标，不设置 dirty，不覆盖 base_power
   - 模式切换 → power_engine_set_mode() → dirty = true
 
 主循环心跳（每 10s）：
@@ -306,7 +307,7 @@ portal_done()（esp_timer 任务）                       │
 ```
 
 这个策略保证：
-- 按钮调功后最长 10s 内自动持久化，断电不丢失
+- 按钮调功在下次 10s 检查时尝试持久化，落盘前断电仍可能丢失
 - 配网页保存即时落盘，用户看到"已保存"时已写入 NVS
 - 不每次调功都写 flash（减少 flash 磨损）
 

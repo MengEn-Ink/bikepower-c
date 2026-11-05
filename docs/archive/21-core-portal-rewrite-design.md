@@ -1,10 +1,12 @@
 # 核心设备门户全量重写设计
 
+> 归档于 2026-11-05：阶段设计已实施，当前门户职责、交互和资源边界统一见 [技术参考](../dev/01-technical-reference.md) 与 [门户 Wiki](../wiki/08-wifi-portal.md)。
+
 日期：2026-11-04
 
 状态：用户已确认第二版交互并授权实施与功能测试，实施中。
 
-关联设计：[真实功率桥接与网页交互设计](14-real-power-bridge-web-design.md)
+关联历史设计：[真实功率桥接与网页交互设计](20-real-power-bridge-web-design.md)
 
 ## 1. 目标
 

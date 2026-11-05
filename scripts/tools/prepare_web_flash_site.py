@@ -391,6 +391,17 @@ def initialize_site(source_dir, site_dir):
     monitor = site_dir / "ble-monitor.html"
     if not monitor.is_file():
         raise RuntimeError("站点源目录缺少 ble-monitor.html")
+    images = set(re.findall(
+        r"manual-images/([A-Za-z0-9_.-]+\.(?:svg|png|jpg))",
+        monitor.read_text(encoding="utf-8"),
+    ))
+    for name in sorted(images):
+        canonical = ROOT / "docs" / "images" / name
+        if not canonical.is_file():
+            raise RuntimeError(f"手册配图不存在: {name}")
+        destination = site_dir / "manual-images" / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(canonical, destination)
     shutil.copy2(monitor, site_dir / "index.html")
     commit = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,

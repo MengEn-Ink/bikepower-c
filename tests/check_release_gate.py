@@ -17,6 +17,7 @@ BUILD_ALL_PS1 = ROOT / "scripts" / "build_all.ps1"
 PUBLISH = ROOT / "scripts" / "tools" / "publish_github_release.py"
 README = ROOT / "README.md"
 TECH_REF = ROOT / "docs" / "dev" / "01-technical-reference.md"
+BUILD_DOC = ROOT / "docs" / "wiki" / "09-build-and-test.md"
 OP_DOC = ROOT / "docs" / "dev" / "05-operation-test-gate.md"
 QUALITY_GATE = ROOT / "scripts" / "tools" / "quality_gate.py"
 OP_GATE = ROOT / "tests" / "operation_gate.py"
@@ -44,6 +45,7 @@ def main():
     publish_src = PUBLISH.read_text(encoding="utf-8")
     readme_src = README.read_text(encoding="utf-8")
     tech_ref_src = TECH_REF.read_text(encoding="utf-8")
+    build_doc_src = BUILD_DOC.read_text(encoding="utf-8")
     op_doc_src = OP_DOC.read_text(encoding="utf-8")
     quality_gate_src = QUALITY_GATE.read_text(encoding="utf-8")
     op_gate_src = OP_GATE.read_text(encoding="utf-8")
@@ -79,16 +81,17 @@ def main():
           "publish_github_release.py 正式发布强制完整 P0 证据", failures)
     check(all(token in publish_src for token in ('"gh"', '"release"', '"create"', '"--verify-tag"')),
           "publish_github_release.py 通过已推送 tag 创建 GitHub Release", failures)
-    check("check_release_artifacts.py" in readme_src,
-          "README 记录 release 产物门禁命令", failures)
+    check("docs/wiki/09-build-and-test.md" in readme_src
+          and "check_release_artifacts.py" in build_doc_src,
+          "README 链接构建文档，构建文档记录 release 产物门禁命令", failures)
     check("check_release_artifacts.py" in tech_ref_src,
           "技术参考记录 release 产物门禁命令", failures)
     check("tests/check_release_gate.py" in quality_gate_src,
           "quality_gate.py 聚合 release 产物门禁静态检查", failures)
     check("tests/test_release_artifacts.py" in quality_gate_src,
           "quality_gate.py 聚合 release 产物门禁功能样例", failures)
-    check("tests/test_release_artifacts.py" in readme_src and "tests/test_release_artifacts.py" in tech_ref_src,
-          "README 和技术参考记录 release 产物门禁功能样例", failures)
+    check("tests/test_release_artifacts.py" in build_doc_src and "tests/test_release_artifacts.py" in tech_ref_src,
+          "构建文档和技术参考记录 release 产物门禁功能样例", failures)
     check("tests/check_release_gate.py" in op_gate_src and "tests/test_release_artifacts.py" in op_gate_src,
           "operation_gate.py full 模式聚合 release 产物门禁", failures)
     check("check_release_artifacts.py" in op_doc_src and "test_release_artifacts.py" in op_doc_src,

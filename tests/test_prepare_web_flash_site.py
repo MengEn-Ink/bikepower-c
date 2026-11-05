@@ -32,6 +32,25 @@ class WebFlashSiteTest(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
+    def test_site_materializes_referenced_canonical_manual_image(self):
+        (self.source / "ble-monitor.html").write_text(
+            '<img src="manual-images/hardware-pinout.svg">',
+            encoding="utf-8",
+        )
+        site = web_flash.initialize_site(self.source, self.base / "site")
+        self.assertEqual(
+            (site / "manual-images/hardware-pinout.svg").read_bytes(),
+            (ROOT / "docs/images/hardware-pinout.svg").read_bytes(),
+        )
+
+    def test_site_rejects_missing_manual_image(self):
+        (self.source / "ble-monitor.html").write_text(
+            '<img src="manual-images/missing-image.svg">',
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(RuntimeError, "配图不存在"):
+            web_flash.initialize_site(self.source, self.base / "site")
+
     def test_site_records_page_build_separately_from_firmware_release(self):
         with patch.object(web_flash, "utc_now", return_value="2026-11-04T10:56:24Z"):
             site = web_flash.initialize_site(self.source, self.base / "site")

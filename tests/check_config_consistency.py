@@ -36,7 +36,7 @@ PROJECT_CONTEXT = ROOT / ".trae" / "memory" / "project-context.md"
 WIFI_RULES = ROOT / ".trae" / "rules" / "domain" / "wifi.md"
 WIKI_HOME = ROOT / "docs" / "wiki" / "00-home.md"
 PROTOCOL_DESIGN = ROOT / "docs" / "archive" / "14-top5-protocol-stability-design.md"
-REVIEW_AND_OPTIMIZATION = ROOT / "docs" / "dev" / "13-project-review-and-optimization.md"
+REVIEW_AND_OPTIMIZATION = ROOT / "docs" / "archive" / "19-project-review-and-optimization.md"
 TECH_REF = ROOT / "docs" / "dev" / "01-technical-reference.md"
 QUICKSTART = ROOT / "docs" / "user" / "01-quickstart.md"
 USER_MANUAL = ROOT / "docs" / "user" / "02-user-manual.md"
@@ -506,18 +506,16 @@ print(f"\n{TAG} [S4e] 文档索引阶段范围一致性")
 
 check("阶段 0-9 完成情况" not in doc_index_src,
       "docs/INDEX.md 不含过时阶段 0-9 项目进度描述")
-stage_numbers = [int(n) for n in re.findall(r'^\|\s*(\d+)\s*\|', progress_src, re.MULTILINE)]
-max_stage = max(stage_numbers) if stage_numbers else 0
-check(f"阶段 0-{max_stage} 完成情况" in doc_index_src,
-      f"docs/INDEX.md 含阶段 0-{max_stage} 项目进度描述")
+check("](../PROGRESS.md)" in doc_index_src,
+      "docs/INDEX.md 链接当前项目进度，阶段清单由 PROGRESS 维护")
 check(not DOCS_SUPERPOWERS.exists(),
       "docs/superpowers 工作目录已归档，不应重新出现")
 check(WIKI_HOME.is_file() and "wiki/00-home.md" in doc_index_src,
       "Code Wiki 首页使用小写 kebab-case 路径并已收录索引")
 check(PROTOCOL_DESIGN.is_file() and "archive/14-top5-protocol-stability-design.md" in doc_index_src,
       "已完成 Top 5 协议稳定性设计位于 archive 并已收录索引")
-check(REVIEW_AND_OPTIMIZATION.is_file() and "dev/13-project-review-and-optimization.md" in doc_index_src,
-      "项目复审与优化清单位于规范 dev 目录并已收录索引")
+check(REVIEW_AND_OPTIMIZATION.is_file() and "archive/19-project-review-and-optimization.md" in doc_index_src,
+      "历史项目复审与优化清单位于 archive 并已收录索引")
 docs_with_local_urls = []
 broken_doc_links = []
 for markdown_path in DOCS_ROOT.rglob("*.md"):

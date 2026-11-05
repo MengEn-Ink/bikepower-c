@@ -1,119 +1,74 @@
-# BikePower C — 文档索引
+# BikePower C 文档索引
 
-项目文档按维度分目录管理：`user/` 产品使用、`dev/` 开发与技术、`wiki/` Code Wiki（代码级完整参考）、`archive/` 历史归档、`images/` 配图。
+源码是实现依据；[PROGRESS](../PROGRESS.md) 记录当前进度及待验收项，[技术参考](dev/01-technical-reference.md) 说明当前行为，[规则](../.trae/rules/general-rules.md) 定义约束。Wiki 展开代码细节，`archive/` 只保存历史设计与证据。
 
-权威顺序：`PROGRESS.md` 负责当前进度和待验收项，`dev/01-technical-reference.md` 负责当前实现行为，`.trae/rules/` 负责可强制执行约束；`wiki/` 是便于浏览的代码级展开，发生冲突时必须回到源码和上述权威文档核对。`archive/` 只用于历史追溯，不作为当前实现依据。
+## 用户入口
 
----
+| 文档 | 用途 |
+|---|---|
+| [项目首页](../README.md) | 能力、版本边界、使用与开发入口 |
+| [快速上手](user/01-quickstart.md) | 首次烧录、连接与恢复 |
+| [用户手册](user/02-user-manual.md) | 按钮、配网、模拟、真实来源与跑步 |
+| [硬件指南](user/03-hardware.md) | 双板接线、检测与供电 |
+| [手机离线手册](user/pages-mobile-guide.html) | 从 Pages 手机手册生成的离线阅读版 |
+| [在线工具台](https://mengen-ink.github.io/bikepower-c/) | 正式固件刷写、BLE 工具与手机手册 |
 
-## 📚 wiki/ — Code Wiki（代码级完整参考）
+## 当前开发文档
 
-面向开发者，由代码直接生成/维护的结构化技术 Wiki，覆盖完整架构、模块职责、数据结构、运行时流程。
+| 文档 | 用途 |
+|---|---|
+| [技术参考](dev/01-technical-reference.md) | 运行时、协议、配置和门户行为 |
+| [固件安全](dev/02-firmware-security.md) | 编译加固及硬件安全方案 |
+| [测试覆盖分析](dev/03-test-coverage-analysis.md) | 模块覆盖与证据边界 |
+| [跑步兼容性](dev/04-running-mode-compatibility.md) | 跑步 App、RSC/FTMS 适配口径 |
+| [操作门禁](dev/05-operation-test-gate.md) | 操作覆盖矩阵与人工项 |
+| [Windows 构建](dev/08-windows-build-guide.md) | 环境、编译与排障 |
+| [智能家居调研](dev/09-smart-home-integration.md) | 尚未实施的接入路线 |
+| [源码事实](dev/21-generated-project-facts.md) | 自动生成的版本、schema、路由与模块 |
+| [主备桥接规范](dev/28-bridge-failover-multi-device-design.md) | 当前三设备恢复与降级设计，实物验收待完成 |
+| [仓库治理报告](dev/31-repository-hygiene-report.md) | 本轮分支、代码、文档、资源与部署验证 |
 
-| 文档 | 说明 |
-|------|------|
-| [Code Wiki 首页](wiki/00-home.md) | Wiki 目录、代码结构速览、关键设计原则、运行时架构图 |
-| [整体架构](wiki/01-architecture.md) | 三层架构概览、模块依赖 DAG、任务模型、目录详解、编译时资源处理、分区表 |
-| [应用层模块](wiki/02-app-layer.md) | app_main、app_state、button、led、board_detect、radio_ctrl、captive_portal、nvs_store、设备身份和功率桥接 |
-| [领域层模块](wiki/03-domain-layer.md) | power_engine（三模式分层动态）、hr_model（五层心率）、running_engine、profile（配速机器人）、config_store、json_miniparse、button_logic、led_pattern |
-| [关键数据结构](wiki/04-key-data-structures.md) | app_evt_t、board_desc_t、power_engine_t、snapshot_t、ride_dynamics_t、profile_t、hr_state_t、running_engine_t、config_t、led_config_t、device_template_t |
-| [状态机与事件](wiki/05-state-machine-and-events.md) | 7 态状态迁移图、10 种事件类型、按钮语义阈值、交互流程、长按回滚机制 |
-| [运行时数据流](wiki/06-runtime-flow.md) | 14 步启动流程、主循环 50ms 节拍、BLE 通知双时间尺度、配网完整时序、脏标记落盘、11 种异常恢复路径 |
-| [BLE 服务详解](wiki/07-ble-services.md) | 5+1 服务 UUID、两种运动 profile GATT 表、6 种数据包格式、FTMS 控制点 OpCode/Result Code、广播参数、双时间尺度通知、g_notify_lock 线程安全、DIS 字段 |
-| [WiFi 配网门户](wiki/08-wifi-portal.md) | HTTP 路由、300 秒超时、JSON API、Captive Portal、revision 保存、真实功率计扫描与前端内联 |
-| [构建与测试](wiki/09-build-and-test.md) | idf.py 构建流程、CMake 配置、flash_latest.sh 一键烧录、build_all.sh 双板型发布、GitHub Pages 网页刷写、host 单测、静态门禁脚本、BLE 自测、mock server、产物校验 |
-| [硬件约束与平台限制](wiki/10-hardware-constraints.md) | ESP32-C3 规格、双板型 GPIO 分配、内存预算（80KB/20KB 告警线）、WiFi/BLE 共存硬约束、ISR 安全规则、FreeRTOS 任务模型、WDT 配置、禁止事项 |
+## Code Wiki
 
----
+| 文档 | 用途 |
+|---|---|
+| [首页](wiki/00-home.md) | 代码导航 |
+| [整体架构](wiki/01-architecture.md) | 分层与依赖 |
+| [应用层](wiki/02-app-layer.md) | 主任务、状态机、外设与桥接 |
+| [领域层](wiki/03-domain-layer.md) | 模拟、配置与纯 C 算法 |
+| [数据结构](wiki/04-key-data-structures.md) | 公开结构与字段 |
+| [状态机](wiki/05-state-machine-and-events.md) | 按钮、事件与状态 |
+| [运行时数据流](wiki/06-runtime-flow.md) | 启动、50ms 主循环、1000ms 通知 |
+| [BLE 服务](wiki/07-ble-services.md) | GATT、编解码与控制点 |
+| [WiFi 门户](wiki/08-wifi-portal.md) | API、事务与共存生命周期 |
+| [构建与测试](wiki/09-build-and-test.md) | 开发、双板构建、真机与发布流程 |
+| [硬件约束](wiki/10-hardware-constraints.md) | 引脚、内存、RF 与 ISR |
 
-## 🚴 user/ — 产品使用说明
+## 历史归档
 
-面向普通用户 / 骑行爱好者。
+已执行计划、阶段设计与旧验收报告保留原时间、镜像身份和未覆盖项，不作为当前候选验收结论。
 
-| 文档 | 说明 |
-|------|------|
-| [快速上手](user/01-quickstart.md) | 第一次使用：烧录固件 + 首次连接，其余细节链到手册 |
-| [用户手册](user/02-user-manual.md) | 完整操作：按钮、LED、配网字段、骑行模式、FAQ、技术规格 |
-| [硬件指南](user/03-hardware.md) | 推荐开发板、引脚定义、接线、供电、排障 |
-| [README](../README.md) | 项目简介、功能清单、构建/门禁/Release 入口、配图说明、引脚表、LED 灯效 |
+| 归档 | 内容 |
+|---|---|
+| [01 重写](archive/01-cidf-nimble-rewrite.md)、[02 技术栈对比](archive/02-micropython-vs-c-comparison.md) | 早期选型 |
+| [03 审查](archive/03-review-checklist.md)、[04 内存评估](archive/04-memory-and-feature-assessment.md) | 早期验证 |
+| [06 路线图](archive/06-roadmap-v316.md)、[07 移除 OTA](archive/07-remove-ota-plan.md) | 旧功能与分区演进 |
+| [08 跑步方案](archive/08-running-mode-full-upgrade-plan.md)、[09 跑步计划](archive/09-running-mode-implementation-plan.md) | 历史跑步设计 |
+| [10 优化设计](archive/10-project-optimization-design.md)、[11 优化计划](archive/11-project-optimization-plan.md) | 工程治理 |
+| [12 证据链设计](archive/12-stable-delivery-design.md)、[13 证据链计划](archive/13-stable-delivery-plan.md) | 发布门禁演进 |
+| [14 协议稳定性](archive/14-top5-protocol-stability-design.md) | CPS/FTMS 与可靠性 |
+| [15 自动优化计划](archive/15-automatic-optimization-plan.md)、[16 异常测试计划](archive/16-stability-exception-test-plan.md) | 已执行测试步骤 |
+| [17 运动交互计划](archive/17-wifi-portal-sport-mode-ux-plan.md)、[18 主备计划](archive/18-bridge-failover-multi-device-implementation-plan.md) | 已执行候选实现步骤 |
+| [19 项目复审](archive/19-project-review-and-optimization.md) | 历史问题清单与处理状态 |
+| [20 真实桥接设计](archive/20-real-power-bridge-web-design.md)、[21 门户设计](archive/21-core-portal-rewrite-design.md) | 已被当前规范吸收的阶段方案 |
+| [22 门户计划](archive/22-core-portal-bridge-implementation-plan.md)、[23 门户报告](archive/23-core-portal-bridge-test-report.md) | 历史执行与设备证据 |
+| [24 Pages 设计](archive/24-pages-layout-motion-design.md)、[25 Pages 计划](archive/25-pages-experience-implementation-plan.md) | 工具台设计演进 |
+| [26 自动优化报告](archive/26-automatic-optimization-report.md)、[27 Pages 报告](archive/27-pages-experience-test-report.md) | 历史自动化证据 |
+| [28 异常报告](archive/28-stability-exception-test-report.md)、[29 运动交互设计](archive/29-wifi-portal-sport-mode-ux-design.md) | 历史稳定性与交互证据 |
+| [30 源码清理报告](archive/30-local-cleanup-verification-report.md) | 上一轮清理和未验收边界 |
 
-## 🔧 dev/ — 开发与技术
+## 配图与维护
 
-面向开发者 / 维护者 / 后续接手者。
+配图唯一来源为 `images/`：[引脚](images/hardware-pinout.svg)、[架构](images/architecture.svg)、[按钮状态](images/button-led-state.svg)、[主循环](images/main-loop-flow.svg)、[WiFi 共存](images/rf-wifi-flow.svg) 与[真实串口选择截图](images/web-flash-serial-port.jpg)。Pages 构建只分发实际引用的图片。
 
-| 文档 | 说明 |
-|------|------|
-| [技术参考](dev/01-technical-reference.md) | 三层架构、启动流程、BLE 服务、配网链路、配置 JSON、测试门禁（基于当前实现） |
-| [固件防提取/防反编译](dev/02-firmware-security.md) | 编译层加固（已实现）+ Flash 加密/Secure Boot 方案与选型 |
-| [测试覆盖率分析](dev/03-test-coverage-analysis.md) | 领域层/应用层模块清单、覆盖矩阵、固件随附测试报告规则 |
-| [跑步模式兼容性调研与适配方案](dev/04-running-mode-compatibility.md) | Zwift/MyWhoosh 跑步模式 BLE 兼容口径、广播/GATT 数据需求、分阶段落地方案 |
-| [操作覆盖矩阵与测试门禁](dev/05-operation-test-gate.md) | 模式切换、保存、按钮、网页、BLE、异常稳定性的操作级门禁矩阵与人工项记录规则 |
-| [Windows 环境编译指南](dev/08-windows-build-guide.md) | Windows 下环境配置、编译流程、速度优化（ccache/Defender/Ninja）、排障 |
-| [智能家居平台接入调研](dev/09-smart-home-integration.md) | 米家官方接入、Matter、Home Assistant/MQTT 网关等路径对比与分阶段建议 |
-| [项目复审与优化清单](dev/13-project-review-and-optimization.md) | 2026-10-22 全仓代码审查、源码卫生、文档治理结果与分级优化 backlog |
-| [真实功率桥接与网页交互设计](dev/14-real-power-bridge-web-design.md) | 桥接同一功率计的真实功率与真实踏频；心率模拟或关闭，含校正、断线保护与短时网页监测 |
-| [核心设备门户全量重写设计](dev/15-core-portal-rewrite-design.md) | 明主题现场控制台、Pages 高级配置分工、设备模板端到端删除、真实功率桥接和 110 KiB 资源门禁 |
-| [核心门户与桥接实施计划](dev/16-core-portal-bridge-implementation-plan.md) | 领域、上游会话、配置事务、门户及短固件名称的实施与验收 |
-| [核心门户与桥接测试报告](dev/17-core-portal-bridge-test-report.md) | 本轮工作区候选的离线、构建与真机证据及未覆盖项 |
-| [源码事实摘要](dev/21-generated-project-facts.md) | 从源码生成版本、schema、路由和模块清单；不推断验收通过 |
-| [自动优化验证报告](dev/22-automatic-optimization-report.md) | 本轮验证结果、镜像身份、剩余硬件与人工项 |
-| [稳定性异常验证报告](dev/25-stability-exception-test-report.md) | 基线缺陷、修复、三层异常回归、双板构建与实物验收边界 |
-| [WiFi 配置端运动模式交互设计](dev/26-wifi-portal-sport-mode-ux-design.md) | 草稿与已应用 profile 的显示规则、跑步语义收敛及测试边界 |
-| [桥接自动恢复与多设备备选设计](dev/28-bridge-failover-multi-device-design.md) | 三设备身份、最近成功优先、60 秒快速恢复、模拟降级和低频定向探测规范 |
-| [源码清理与验证报告](dev/30-local-cleanup-verification-report.md) | 桥接残留清理、短地址修复、自动化验证与实物边界 |
-
-## 🗄️ archive/ — 历史 / 归档（仅供追溯）
-
-以下文档对应历史版本或已完成的一次性工作，**不代表当前实现或验收状态**，仅作背景追溯。
-
-| 文档 | 说明 |
-|------|------|
-| [重写方案](archive/01-cidf-nimble-rewrite.md) | 从 MicroPython 到 C 的分阶段重写路线图（早期设计背景） |
-| [MicroPython vs C 对比](archive/02-micropython-vs-c-comparison.md) | 两种技术栈的性能/内存/复杂度对比（选型阶段） |
-| [优化审查清单](archive/03-review-checklist.md) | v3.1.0 多板型/发行流程/配网网页全链路复查（已完成） |
-| [内存与新功能评估](archive/04-memory-and-feature-assessment.md) | v3.1.3 各场景内存实测、满负载分析、扩展可行性 |
-| [v3.1.6 迭代规划](archive/06-roadmap-v316.md) | 在线 OTA + FTMS 扩展 + 内存优化规划（OTA 已于 v4.0.0 移除，仅供追溯） |
-| [移除 OTA + 网页端精简方案](archive/07-remove-ota-plan.md) | v4.0.0 移除在线 OTA + 家庭网络、分区表改单 factory、网页端精简方案 |
-| [历史跑步模式完整升级方案](archive/08-running-mode-full-upgrade-plan.md) | 历史方案，包含已移除的坡度/控制点设想，仅供追溯 |
-| [历史跑步模式完整升级实施计划](archive/09-running-mode-implementation-plan.md) | 历史执行计划，包含已移除的坡度/控制点批次，仅供追溯 |
-| [项目优化设计归档](archive/10-project-optimization-design.md) | 历史优化设计，当前结果已合入代码、门禁和文档 |
-| [项目优化执行计划归档](archive/11-project-optimization-plan.md) | 历史执行计划，原 `docs/superpowers` 工作目录已归档 |
-| [稳定交付证据链设计](archive/12-stable-delivery-design.md) | 已实施的证据模型及发布校验设计 |
-| [稳定交付证据链实施计划](archive/13-stable-delivery-plan.md) | 已完成工具实现的历史执行步骤 |
-| [Top 5 协议稳定性设计](archive/14-top5-protocol-stability-design.md) | 已实现的 CPS/FTMS、跑步会话、ERG 与 WiFi 可靠性修复 |
-| [自动优化实施计划](archive/15-automatic-optimization-plan.md) | 已完成的维护工具、BLE 并发、门户容量与自动验证步骤 |
-| [稳定性异常验证计划](archive/16-stability-exception-test-plan.md) | 已执行的网页、BLE 配置事务与生产 HTTP handler 故障矩阵 |
-| [WiFi 配置端运动模式交互计划](archive/17-wifi-portal-sport-mode-ux-plan.md) | 已执行的生产 DOM 浏览器回归、语义与资源预算步骤 |
-| [桥接自动恢复与多设备备选实施计划](archive/18-bridge-failover-multi-device-implementation-plan.md) | 已执行的 schema v14、八组配置、运行时与 Portal 步骤；实物验收单独记录 |
-
-## 🤖 AI 助手
-
-| 文档/规则 | 说明 |
-|----------|------|
-| [AGENTS.md](../AGENTS.md) | AI 助手入口，必读优先级、硬性规则、验证要求 |
-| [project-context.md](../.trae/memory/project-context.md) | 项目记忆（用户偏好、架构决策、踩坑记录） |
-| [general-rules.md](../.trae/rules/general-rules.md) | 项目结构、模块边界、提交流程、文档命名规范 |
-| [coding-style.md](../.trae/rules/coding-style.md) | C/ESP-IDF 代码风格 |
-| [hardware-constraints.md](../.trae/rules/hardware-constraints.md) | ESP32-C3 硬件约束 |
-| [wifi-ble-mutex.md](../.trae/rules/wifi-ble-mutex.md) | WiFi/BLE 射频共用规则 |
-
-## 📊 images/ — 配图
-
-| 图片 | 说明 |
-|------|------|
-| ![硬件引脚对照](images/hardware-pinout.png) | 通用 ESP32-C3 与 M5Stamp C3 的按钮、LED、板型检测差异 |
-| ![架构图](images/architecture.png) | 三层软件架构：应用层→领域层→硬件层（双板适配） |
-| ![按钮&LED 状态机](images/button-led-state.png) | 按钮操作、LED 四态、状态迁移 |
-| ![主循环数据流](images/main-loop-flow.png) | 50ms 节拍的事件消费→BLE通知全流程 |
-| ![WiFi/BLE 射频共用流程](images/rf-wifi-flow.png) | 二次确认进入配网：BLE 保持在线→启 WiFi→保存/超时→关闭 WiFi 回 BLE |
-
-## 📋 进度与变更
-
-| 文档 | 说明 |
-|------|------|
-| [项目进度](../PROGRESS.md) | 阶段 0-15 完成情况、第七轮 P0 真机验收清单、待确认项、已知限制 |
-| [更新日志](../CHANGELOG.md) | 版本历史与变更记录 |
-| [手机离线使用手册](user/pages-mobile-guide.html) | 按钮动画、配网、真实桥接、跑步与实物自查 |
-| [Pages 分区与动效方案](dev/19-pages-layout-motion-design.md) | 已批准的工具分区与更新信息语义 |
-| [Pages 实施计划](dev/20-pages-experience-implementation-plan.md) | 页面、元数据与部署检查进度 |
-| [Pages 验证报告](dev/23-pages-experience-test-report.md) | 浏览器回归、离线验证及线上未部署状态 |
+[AGENTS](../AGENTS.md) · [更新日志](../CHANGELOG.md) · [项目规则](../.trae/rules/general-rules.md) · [编码风格](../.trae/rules/coding-style.md) · [硬件约束](../.trae/rules/hardware-constraints.md) · [RF 共存](../.trae/rules/wifi-ble-mutex.md)

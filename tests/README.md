@@ -9,7 +9,7 @@
 - `python3 tests/ble_config_e2e.py --port <串口> --board <板型>`：八组配置事务、NVS 重启持久化与完整原配置恢复；离线帧回归使用 `tests/test_ble_config_e2e.py`。
 
 离线替身不能证明真实主备接管、重启自动连接、真实 0W 或无线共存。
-结果见 [本轮验证报告](../docs/dev/30-local-cleanup-verification-report.md)，实物条件不具备时明确 `NOT_RUN`。
+历史结果见 [清理验证报告](../docs/archive/30-local-cleanup-verification-report.md)，本轮结果见 [仓库治理报告](../docs/dev/31-repository-hygiene-report.md)，实物条件不具备时明确 `NOT_RUN`。
 
 ## 稳定性异常端到端回归
 
@@ -22,7 +22,7 @@
 浏览器需要 Python Playwright、`tests/web-flash` 的 Node 依赖与 Chromium；
 安装参考 `.github/workflows/ci.yml`。cJSON 回归使用本地 ESP-IDF 源码。
 传输和 NVS 结果注入不能替代真实热点、flash 写失败、真实功率计和手机原生授权验收。
-验证结果见 [异常验证报告](../docs/dev/25-stability-exception-test-report.md)，执行计划已 [归档](../docs/archive/16-stability-exception-test-plan.md)。
+历史验证见 [异常报告](../docs/archive/28-stability-exception-test-report.md)，执行计划已 [归档](../docs/archive/16-stability-exception-test-plan.md)。
 设备验证前复用构建目录时须显式 `idf.py ... reconfigure build`，核对日志中的
 `BIKEPOWER_GIT_SHA` 和实际镜像 SHA256；CMake 缓存的旧 Git 标识不能作为当前镜像身份。
 
@@ -408,7 +408,7 @@ idf.py build
 
 `test-report.md` 必须如实记录编译、host、mock、核心流程耐久、静态门禁、真机和人工项结果；未执行的烧录、BLE、配网、按钮或 LED 验证必须写明原因，不能按通过处理。`user-manual.md` 由 `docs/user/` 生成，更新固件交互时必须先同步源文档。总包命名为 `bikepower-c-v<版本>.zip`，用于一次性分发两个板型固件和随附文档；Git ID 保留在 manifest。
 
-桥接真实数据面测试使用 `cps_peripheral_fixture.py`（macOS CoreBluetooth 独立 CPS 上游）与 `bridge_device_e2e.py`（开发板 HTTP + 下游 bleak）。必须先连接开发板热点，再运行夹具和 E2E；验证两样本临时测试、保存后切源、偏移/比例、0W、过期归零和重连，结束恢复原模拟配置。夹具不能代替真实功率计 DIS 兼容性验证。当前测试结果见 [本轮报告](../docs/dev/17-core-portal-bridge-test-report.md)。
+桥接真实数据面测试使用 `cps_peripheral_fixture.py`（macOS CoreBluetooth 独立 CPS 上游）与 `bridge_device_e2e.py`（开发板 HTTP + 下游 bleak）。必须先连接开发板热点，再运行夹具和 E2E；验证两样本临时测试、保存后切源、偏移/比例、0W、过期归零和重连，结束恢复原模拟配置。夹具不能代替真实功率计 DIS 兼容性验证。历史结果见 [门户报告](../docs/archive/23-core-portal-bridge-test-report.md)。
 
 若 `tests/reports/device-acceptance-<板型>.json` 存在且匹配当前版本，构建脚本会复制到 `build/release/evidence/`，同时写入 manifest、测试报告和总包。无设备环境允许不带证据完成本地构建；`publish_github_release.py` 正式双板发布前会严格阻断任一板型证据缺失、Git ID 不一致、tag 未推送或 P0 未通过。
 

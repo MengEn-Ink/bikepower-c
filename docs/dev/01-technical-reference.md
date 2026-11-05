@@ -2,7 +2,7 @@
 
 本文面向开发者、维护者和后续接手者。
 内容基于当前仓库实现撰写，重点对应 `main/`、`components/bikepower_domain/`、`tests/` 和 `docs/images/`。
-阅读顺序建议配合 [architecture.png](../images/architecture.png)、[main-loop-flow.png](../images/main-loop-flow.png)、[button-led-state.png](../images/button-led-state.png) 和 [rf-wifi-flow.png](../images/rf-wifi-flow.png) 一起看。
+阅读顺序建议配合 [架构](../images/architecture.svg)、[主循环](../images/main-loop-flow.svg)、[按钮状态](../images/button-led-state.svg) 和 [WiFi 共存](../images/rf-wifi-flow.svg) 一起看。
 
 当前固件版本为 `v4.2.1`。
 运行环境为 `ESP-IDF v5.5.4 + NimBLE + FreeRTOS`，目标芯片为 `ESP32-C3`。
@@ -67,7 +67,7 @@
 - `esp_timer`：毫秒/微秒计时与定时回调
 - Task WDT：主循环和长任务保护
 
-对应关系可直接对照 [architecture.png](../images/architecture.png)。
+对应关系可直接对照 [架构图](../images/architecture.svg)。
 如果后续要重构，建议维持“三层职责不交叉”的基本形状。
 
 ## 第二章：启动流程
@@ -686,7 +686,7 @@ Stop/Pause、Reset 或 BLE 断开会调用 `power_engine_clear_erg_target()`，�
 WiFi 配网链路分布在 `app_state.c`、`radio_ctrl.c`、`wifi_portal.c`。
 当前配网默认使用 ESP-IDF coex 共存模式：BLE 保持在线继续通知，WiFi SoftAP 负责本地门户；仅共存初始化失败兜底时才主动停 BLE。
 
-![WiFi/BLE 射频共用流程](../images/rf-wifi-flow.png)
+![WiFi/BLE 射频共用流程](../images/rf-wifi-flow.svg)
 
 ### 8.1 射频共用入口
 
@@ -724,7 +724,7 @@ SoftAP 由 `radio_ctrl_start_wifi_ap()` 启动，HTTP 门户由 `wifi_portal_sta
 
 v3.2.0 起配网门户前后端分离：
 - 前端三件套 `main/web/index.html + app.css + app.js` 由 `scripts/inline_static.py` 在编译时内联为 `web_index_html.h`，C 侧 `GET /` 原样吐出整页 HTML（CSS/JS 已内联，兼容 iOS Captive Portal WebView 不加载外部资源）。
-- 业务接口全部走 `/api/xxx` JSON，前端 SPA 通过 `XMLHttpRequest` 调用并自行渲染。
+- 业务接口全部走 `/api/xxx` JSON，前端通过 `fetch` 调用并自行渲染。
 
 `start_httpd()` 使用 `HTTPD_DEFAULT_CONFIG()`，并设置：
 
@@ -746,7 +746,7 @@ v3.2.0 起配网门户前后端分离：
 - `POST /api/renew`（续期，返回新的剩余秒数）
 - `GET /api/mem_stats`（`{"free":..,"min_free":..}`）
 - `POST /api/config`（提交带 revision 的配置，返回 transaction；轮询 runtime 确认落盘结果）
-- `POST /api/close-wifi`（保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE）
+- `POST /api/close-wifi`（提交带 revision 的关闭事务，持久化当前已应用配置后进入 5 秒收尾窗口；不提交网页草稿）
 - `GET /api/bridge/scan`（读取本轮 CPS 候选列表与扫描状态）
 - `POST /api/bridge/scan`（用户启动或停止有界扫描，候选编号包含代次）
 - `POST /api/bridge/control`（test 临时测试、stop 暂停、resume 恢复、retry 立即重试）
@@ -756,7 +756,7 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 其中：
 
 - `/api/config`：保存配置并实时生效到 BLE 通知
-- `/api/close-wifi`：保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE
+- `/api/close-wifi`：关闭事务落盘当前已应用配置后进入 5 秒收尾窗口，不提交未保存草稿
 - `/api/time`：返回剩余秒数
 - `/api/renew`：续期
 - `/api/mem_stats`：返回 `free` 和 `min_free`
@@ -784,7 +784,7 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 1. `arm_deadline()` 设定截止时间
 2. `esp_timer_start_periodic(..., 1000000)` 每秒检查一次
 3. `shutdown_check_cb()` 判断是否超时
-4. 超时或保存并关闭 WiFi 后调用 `portal_done()`
+4. 超时或关闭事务成功后的收尾窗口结束时调用 `portal_done()`
 5. `portal_done()` 通过返回 `bool` 的 done 回调投递 `APP_EVT_WIFI_DONE`
 6. 队列满时 `on_wifi_done()` 设置 `s_pending_wifi_done`，由主循环在任何 BLE-not-ready 提前返回前消费
 7. 状态机在 app_main 上下文幂等调用 `radio_ctrl_exit_wifi()`；错误恢复态也会清理 HTTP/DNS/SoftAP，但保持错误状态
@@ -795,6 +795,8 @@ deadline、closing、done 与重启请求都在 `s_lock` 下读写；done 回调
 未接收保持下一秒重试。重启请求使用锁内取清。回调仅在启动前注册。
 
 ### 8.5 前端反馈与 JSON 安全
+
+运动草稿与已应用 profile 不同时，整个旧实时区隐藏，编辑区单栏展示待切换提示；保存成功才恢复新 profile 实时输出，失败或结果未知继续保留草稿。切回已应用模式立即恢复实时区。跑步使用速度、步频、RSC/HRS/FTMS 与本机模拟术语，运动按钮同步 `aria-pressed`。保存按钮为“保存并应用”、切换运动或启用桥接时相应变化；“关闭 WiFi”单独确认，不提交未保存草稿。
 
 核心门户采用单页明亮高密度布局，固定模式与配速机器人共用区域，自定义收敛到机器人档位。模板库和 LED 编辑移到电脑工具。真实来源按“选择→扫描→两样本临时测试→配置→保存应用”渐进披露，测试不提前改变实际输出；首次默认关闭心率。页面可管理最多三台设备，支持设为首选、删除和满容量替换，并分别展示配置来源、实际来源、恢复状态、倒计时和立即重试。共享校正明确作用于全部已保存设备。支持 DIS 有效字段复制、功率计/开发板/自定义名称、原始与校正值预览。前端区分草稿、已应用配置和实际输出，保存携带 revision，轮询 transaction 确认 NVS 结果，失败保留草稿。默认配网 300 秒，仅显式续期延长。内联资源上限 110 KiB，按钮居中，动画遵循 reduced-motion。详细接口与验证见 `docs/wiki/08-wifi-portal.md`。
 
@@ -1023,7 +1025,7 @@ ISR 内禁止日志。
 
 ### 11.3 GPIO 与板型适配
 
-当前固件支持运行时板型检测，可对照 [hardware-pinout.png](../images/hardware-pinout.png)。
+当前固件支持运行时板型检测，可对照 [硬件引脚](../images/hardware-pinout.svg)。
 
 通用 ESP32-C3 开发板使用：
 

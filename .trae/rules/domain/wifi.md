@@ -40,7 +40,7 @@
 - `POST /api/renew`（续期，返回新的剩余秒数）
 - `GET /api/mem_stats`（`{"free":..,"min_free":..}`）
 - `POST /api/config`（提交 revision 配置，返回 transaction，runtime 确认落盘）
-- `POST /api/close-wifi`（保存配置后进入 5 秒收尾窗口，再关闭 WiFi 回到 BLE）
+- `POST /api/close-wifi`（带 revision 的关闭事务；落盘已应用配置后 5 秒收尾，不提交未保存网页草稿）
 - `GET/POST /api/bridge/scan`（本轮 CPS 候选、启动/停止扫描）
 - `POST /api/bridge/control`（test/stop/resume/retry）
 - Captive Portal 探测端点：`/generate_204`、`/gen_204`、`/hotspot-detect.html`、`/library/test/success.html`、`/ncsi.txt`、`/connecttest.txt`、`/canonical.html`、`/success.txt`、`/redirect`、`/kindle-wifi/wifistub.html`

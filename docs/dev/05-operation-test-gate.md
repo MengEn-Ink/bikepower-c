@@ -31,7 +31,7 @@
 | `OP-BTN-003` | 确认窗口超时取消，回到 BLE 活动态，不误开 WiFi | `make -C test run` | 实体按钮等待 3 秒人工确认 |
 | `OP-WEB-001` | 网页保存回显与字段映射，不丢字段、不串字段 | `python3 tests/test_portal_config_save.py`、`python3 tests/check_portal_structure.py` | 手机浏览器保存流程人工确认 |
 | `OP-WEB-002` | 越界/非法输入保持旧值或夹紧，不写入危险配置 | `make -C test run`、`python3 tests/test_portal_config_save.py` | 手动输入异常值抽查 |
-| `OP-WEB-003` | 续期、倒计时、保存并关闭 WiFi、设备模板扫描/保存/应用/删除 | `python3 tests/test_core_flow_endurance.py`、`python3 tests/stage5_portal_test.py` | 手机连接 AP 后配网入口人工确认 |
+| `OP-WEB-003` | 续期、倒计时、保存应用、独立关闭 WiFi、CPS 候选扫描/测试与三设备管理 | `python3 tests/test_core_flow_endurance.py`、`python3 tests/portal_bridge_browser.py`、`python3 tests/stage5_portal_test.py` | 手机连接 AP 后配网入口人工确认 |
 | `OP-WEB-004` | GitHub Pages 发布 BLE Monitor；自动获取双板最新 Release、验证 SHA256、生成 ESP Web Tools manifest；无完整 Release 时安全禁用刷写 | `python3 tests/check_ble_monitor.py`、`python3 tests/test_prepare_web_flash_site.py` | 首次启用 Pages 后人工确认 HTTPS、串口选择和两个板型各一次真机刷写 |
 | `OP-BCAST-001` | 顶部功率/踏频/心率多选默认全开；取消项隐藏对应窗口且保存后停止对应 BLE 通知；至少保留一项 | `make -C test run`、`python3 tests/test_portal_config_save.py`、`python3 tests/check_portal_structure.py` | Zwift/MyWhoosh 中按开启项观察数据源 |
 | `OP-BCAST-002` | BOOT 按钮按启用项选择目标：单项启用时直接调该项，多项启用时骑行优先功率、跑步优先配速/速度；长按 WiFi 确认回滚本次调节 | `make -C test run`、`python3 tests/test_core_flow_endurance.py` | 实体按钮在不同开关组合下人工确认 |

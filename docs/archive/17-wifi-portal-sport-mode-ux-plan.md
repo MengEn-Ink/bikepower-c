@@ -1,6 +1,6 @@
 # WiFi 配置端运动模式交互实施计划
 
-> 归档于 2026-11-05：生产页面实现与自动化步骤已执行，保留原计划用于追溯。当前交互规范见 [设计说明](../dev/26-wifi-portal-sport-mode-ux-design.md)，实物待验收项见 [PROGRESS](../../PROGRESS.md)。
+> 归档于 2026-11-05：生产页面实现与自动化步骤已执行，保留原计划用于追溯。历史设计见 [设计说明](29-wifi-portal-sport-mode-ux-design.md)，当前规范见 [技术参考](../dev/01-technical-reference.md)，实物待验收项见 [PROGRESS](../../PROGRESS.md)。
 
 > **For agentic workers:** 按任务顺序执行；每个生产代码改动前必须先看到对应浏览器断言因缺少行为而失败。
 

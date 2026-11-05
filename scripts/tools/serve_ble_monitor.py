@@ -3,8 +3,10 @@
 import argparse
 import functools
 import os
+import tempfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from prepare_web_flash_site import initialize_site, write_unavailable
 
 ROOT = Path(__file__).resolve().parents[2]
 WEB_DIR = ROOT / "tools" / "web"
@@ -27,18 +29,20 @@ def main():
     if not WEB_DIR.is_dir():
         raise SystemExit(f"目录不存在: {WEB_DIR}")
 
-    handler = functools.partial(NoCacheHandler, directory=str(WEB_DIR))
-    server = ThreadingHTTPServer((args.host, args.port), handler)
-    url = f"http://{args.host}:{args.port}/ble-monitor.html"
-    print(f"BikePower BLE monitor: {url}")
-    print(f"web 目录: {WEB_DIR}")
-    print("请用 Chrome / Edge 打开；Web Bluetooth 首次连接需要用户点击授权。")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n已停止")
-    finally:
-        server.server_close()
+    with tempfile.TemporaryDirectory(prefix="bikepower-pages-preview-") as temporary:
+        site = initialize_site(WEB_DIR, Path(temporary) / "site")
+        write_unavailable(site, ["本地预览；正式固件请到在线工具站查看"])
+        handler = functools.partial(NoCacheHandler, directory=str(site))
+        server = ThreadingHTTPServer((args.host, args.port), handler)
+        url = f"http://{args.host}:{args.port}/ble-monitor.html"
+        print(f"BikePower BLE monitor: {url}")
+        print("请用 Chrome / Edge 打开；Web Bluetooth 首次连接需要用户点击授权。")
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("\n已停止")
+        finally:
+            server.server_close()
 
 
 if __name__ == "__main__":
