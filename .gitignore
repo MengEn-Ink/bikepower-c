@@ -42,3 +42,6 @@ test/test_domain.exe
 test/ble_codec_cli
 test/ble_codec_cli.exe
 test/test_power_bridge
+test/test_power_bridge.exe
+test/test_bridge_failover
+test/test_bridge_failover.exe
