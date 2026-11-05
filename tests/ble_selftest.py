@@ -18,6 +18,7 @@ import sys
 
 from bleak import BleakScanner, BleakClient
 from ble_protocol import parse_cps, parse_rsc, parse_treadmill
+from ble_telemetry import uuid as telemetry_uuid, decode_meta as telemetry_meta
 
 DEVICE_NAME = "BikePower"
 CPS_UUID = "00002a63-0000-1000-8000-00805f9b34fb"
@@ -549,6 +550,12 @@ async def main():
     async with BleakClient(dev) as client:
         print("已连接")
         found = {c.uuid for s in client.services for c in s.characteristics}
+        if telemetry_uuid(1) in found:
+            meta = telemetry_meta(bytes(await client.read_gatt_char(telemetry_uuid(1))))
+            for group in range(4):
+                characteristic = client.services.get_characteristic(telemetry_uuid(group + 2))
+                assert characteristic and "read" in characteristic.properties and "notify" in characteristic.properties
+            print(f"遥测元数据：{meta}；长期通知验收使用 ble_telemetry_e2e.py")
         if PROFILE == "running":
             return await run_running_profile(client, found)
 

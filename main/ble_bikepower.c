@@ -26,6 +26,7 @@
 #include "bikepower_config.h"
 #include "ble_config_codec.h"
 #include "ble_config_service.h"
+#include "ble_telemetry_service.h"
 #include "ble_payload_codec.h"
 #include "domain_config.h"
 #include "running_engine.h"
@@ -978,7 +979,8 @@ static void notify_one_nolock(uint16_t handle, const uint8_t *buf, size_t len)
     // 未注册服务的句柄为 0，跳过通知避免向不存在的特征发通知。
     if (handle == 0) return;
     struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
-    if (om) ble_gatts_notify_custom(connection, handle, om);
+    if (om) ble_telemetry_service_tx(ble_gatts_notify_custom(connection, handle, om), false);
+    else ble_telemetry_service_tx(0, true);
 }
 
 /**
@@ -1130,7 +1132,10 @@ static void notify_tick(void *arg)
     (void)arg;
     // 持锁后再检查标志并访问协议栈：stop 会先拿同一把锁才 deinit NimBLE，
     // 保证本回调要么完整在 deinit 前执行、要么 stop 等待本回调结束，消除 UAF 窗口。
-    if (!g_notify_lock || xSemaphoreTake(g_notify_lock, 0) != pdTRUE) return;
+    if (!g_notify_lock || xSemaphoreTake(g_notify_lock, 0) != pdTRUE) {
+        ble_telemetry_service_lock_skipped();
+        return;
+    }
     if (g_stopping || !g_ready || g_conn_handle == BLE_HS_CONN_HANDLE_NONE) {
         xSemaphoreGive(g_notify_lock);
         return;
@@ -1156,6 +1161,7 @@ static void notify_tick(void *arg)
         if ((mask & BROADCAST_FIELD_CADENCE) && s_bridge_csc_valid) notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
         if (mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, g_ftms_bike_len);
     }
+    ble_telemetry_service_notify(notify_one_nolock);
     xSemaphoreGive(g_notify_lock);
 }
 
@@ -1196,6 +1202,7 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
             g_ftms_control = false;
             g_ftms_pending = false;
             g_conn_handle = event->connect.conn_handle;
+            ble_telemetry_service_connect(event->connect.conn_handle);
             ESP_LOGI(TAG, "设备已连接 handle=%d", g_conn_handle);
         } else {
             ESP_LOGW(TAG, "连接失败 status=%d，重新广播", event->connect.status);
@@ -1211,6 +1218,7 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         g_ftms_control = false;
         g_ftms_pending = false;
         ble_config_service_disconnect();
+        ble_telemetry_service_disconnect();
         rc = start_advertising();
         if (rc != 0 && !g_stopping) mark_start_failed("断开后重广播失败", rc);
         return 0;
@@ -1219,6 +1227,9 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         if (rc != 0 && !g_stopping) mark_start_failed("广播完成后重广播失败", rc);
         return 0;
     case BLE_GAP_EVENT_SUBSCRIBE:
+        if (event->subscribe.conn_handle == g_conn_handle) {
+            ble_telemetry_service_subscribe(event->subscribe.attr_handle, event->subscribe.cur_notify != 0);
+        }
         if (event->subscribe.conn_handle == g_conn_handle
                 && event->subscribe.attr_handle == g_ftms_cp_handle) {
             g_ftms_subscribed = event->subscribe.cur_indicate != 0;
@@ -1359,6 +1370,7 @@ static void on_sync(void)
     }
     // 广播成功启动后才标记为就绪状态
     g_ready = true;
+    ble_telemetry_service_sync();
     g_start_failed = false;
     ESP_LOGI(TAG, "BLE 就绪，profile=%s",
              g_profile == SPORT_PROFILE_RUNNING ? "RSC+HRS+FTMS+DIS" : "CPS+HRS+CSC+FTMS+DIS");
@@ -1379,6 +1391,7 @@ static void on_reset(int reason)
     // 复位后旧连接句柄已失效且不会有断开事件，清理以免 conn_count 误报已连接、
     // notify_tick 持续向失效句柄发通知。
     g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+    ble_telemetry_service_disconnect();
     indication_reset();
     g_ftms_subscribed = false;
     g_ftms_control = false;
@@ -1619,6 +1632,13 @@ esp_err_t ble_bikepower_start(void)
         nimble_port_deinit();
         return ESP_FAIL;
     }
+    rc = ble_telemetry_service_register();
+    if (rc != 0) {
+        ESP_LOGE(TAG, "遥测 GATT 注册失败 rc=%d", rc);
+        ble_telemetry_service_deinit();
+        nimble_port_deinit();
+        return ESP_FAIL;
+    }
 
     char device_name[DEVICE_NAME_MAX];
     portENTER_CRITICAL(&s_data_lock);
@@ -1633,6 +1653,7 @@ esp_err_t ble_bikepower_start(void)
     err = esp_timer_create(&targs, &g_notify_timer);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "创建通知定时器失败 err=%d", err);
+        ble_telemetry_service_deinit();
         nimble_port_deinit();
         return err;
     }
@@ -1641,6 +1662,7 @@ esp_err_t ble_bikepower_start(void)
         ESP_LOGE(TAG, "启动通知定时器失败 err=%d", err);
         esp_timer_delete(g_notify_timer);
         g_notify_timer = NULL;
+        ble_telemetry_service_deinit();
         nimble_port_deinit();
         return err;
     }
@@ -1694,6 +1716,7 @@ bool ble_bikepower_stop(void)
         }
         have_notify_lock = true;
     }
+    ble_telemetry_service_stop();
 
     if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
         ble_gap_terminate(g_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
@@ -1703,6 +1726,7 @@ bool ble_bikepower_stop(void)
     int rc = nimble_port_stop();
     bool released = (rc == 0);
     if (released) {
+        ble_telemetry_service_deinit();
         nimble_port_deinit();
         ESP_LOGI(TAG, "蓝牙已停用 释放射频");
     } else {

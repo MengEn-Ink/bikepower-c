@@ -193,6 +193,7 @@ rm -rf "$RELEASE_DIR/evidence"
 echo ""
 echo "=== 构建前测试门禁：host / mock / static ==="
 make -C test run
+python3 tests/test_device_telemetry.py
 python3 tests/test_bridge_session.py
 python3 tests/check_portal_render.py
 python3 tests/test_portal_config_save.py

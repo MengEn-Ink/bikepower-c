@@ -4,6 +4,12 @@
  */
 #pragma once
 
+/* 独立只读遥测 UUID，按 NimBLE 小端格式；不加入运动广播。 */
+#define BLE_TELEMETRY_UUID_BYTES(id) \
+    0x21, 0x0b, 0x8c, 0x4a, 0x1f, 0x6d, 0x3e, 0x9b, \
+    0x2a, 0x4f, 0x7a, 0x4c, (id), 0x10, 0x5a, 0x7a
+#define BLE_TELEMETRY_INTERVAL_MS 1000
+
 // ===== 板型枚举 =====
 // 新增板型：在此追加枚举值（保持 BOARD_TYPE_COUNT 末位），
 // 并在 board_detect.c 的 s_board_desc[] 表里补一行即可，无需改动 led/button 等模块。

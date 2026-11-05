@@ -22,7 +22,7 @@ CONFIG_CODEC_SRC := $(DOMAIN)/ble_config_codec.c
 TEST_SRCS := test_domain.c $(DOMAIN_SRCS) $(CODEC_SRC) $(CONFIG_CODEC_SRC)
 
 .PHONY: all run clean
-all: test_domain ble_codec_cli test_power_bridge test_bridge_failover
+all: test_domain ble_codec_cli test_power_bridge test_bridge_failover test_device_telemetry
 
 test_domain: $(TEST_SRCS)
 	$(CC) $(CFLAGS) -o $@ $(TEST_SRCS) -lm
@@ -37,11 +37,15 @@ test_bridge_failover: test_bridge_failover.c $(DOMAIN)/bridge_failover.c \
 		$(DOMAIN)/power_bridge.c $(DOMAIN)/device_identity.c
 	$(CC) $(CFLAGS) -o $@ $^
 
+test_device_telemetry: test_device_telemetry.c $(DOMAIN)/device_telemetry.c
+	$(CC) $(CFLAGS) -o $@ $^
+
 run: all
 	./test_domain
 	./test_power_bridge
 	./test_bridge_failover
+	./test_device_telemetry
 
 clean:
 	rm -f test_domain test_domain.exe ble_codec_cli ble_codec_cli.exe \
-		test_power_bridge test_bridge_failover
+		test_power_bridge test_bridge_failover test_device_telemetry

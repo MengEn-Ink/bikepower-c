@@ -12,6 +12,7 @@ idf_component_register(
          "led_pattern.c"
          "button_debounce.c"
          "ble_payload_codec.c"
+         "device_telemetry.c"
          "ble_config_codec.c"
          "cps_input_codec.c"
          "power_bridge.c"

@@ -295,7 +295,7 @@ struct ble_gap_event {
     int type;
     struct {int status;uint16_t conn_handle;} connect;
     struct {int reason;} disconnect;
-    struct {uint16_t conn_handle,attr_handle;bool cur_indicate;} subscribe;
+    struct {uint16_t conn_handle,attr_handle;bool cur_indicate,cur_notify;} subscribe;
     struct {uint16_t conn_handle,attr_handle;bool indication;int status;} notify_tx;
 };
 static atomic_bool g_ftms_subscribed,g_ftms_control,g_ftms_pending;
@@ -303,6 +303,9 @@ static uint16_t g_ftms_cp_handle=9;
 static int ads,closed;
 static int start_advertising(void) {ads++;return 0;}
 static void ble_config_service_disconnect(void) {closed++;}
+static void ble_telemetry_service_connect(uint16_t connection) {(void)connection;}
+static void ble_telemetry_service_disconnect(void) {}
+static void ble_telemetry_service_subscribe(uint16_t handle,bool notify) {(void)handle;(void)notify;}
 static void mark_start_failed(const char *reason,int rc) {(void)reason;(void)rc;assert(false);}
 static void ble_power_bridge_host_reset(void) {}
 static void indication_reset(void) {}
@@ -463,6 +466,8 @@ static bool s_bridge_csc_valid=true;
 static unsigned counts[7];
 static void notify_one_nolock(uint16_t h,const uint8_t *b,size_t n)
 {(void)b;(void)n;if(h)counts[h]++;}
+static void ble_telemetry_service_notify(void (*send)(uint16_t,const uint8_t*,size_t)) {(void)send;}
+static void ble_telemetry_service_lock_skipped(void) {}
 """
 
 TICK_CHECKS = r"""

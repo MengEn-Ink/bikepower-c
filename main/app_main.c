@@ -20,6 +20,7 @@
 #include "bikepower_config.h"
 #include "ble_bikepower.h"
 #include "ble_config_codec.h"
+#include "device_telemetry_runtime.h"
 #include "domain_rng.h"
 #include "power_engine.h"
 #include "nvs_store.h"
@@ -530,6 +531,7 @@ void app_main(void)
             app_state_handle_event(&e);
         }
         ble_bikepower_set_config_snapshot(&s_engine);
+        device_telemetry_sample((uint8_t)app_state_get(), (uint8_t)s_engine.sport_profile);
         wifi_portal_sync(&s_engine);
         process_pending_ble_config();
         ble_bikepower_set_config_snapshot(&s_engine);
