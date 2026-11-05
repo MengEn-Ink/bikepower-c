@@ -8,7 +8,7 @@ assert.ok(fs.existsSync(path.join(root,"device-status.js")),"缺少设备状态�
 (async()=>{
   const browser=await chromium.launch({headless:true});
   try{
-    for(const theme of ["light","dark"])for(const width of [390,1280]){
+    for(const theme of ["light","dark"])for(const width of [320,390,900,1280]){
       const page=await browser.newPage({viewport:{width,height:900}});
       const errors=[];page.on("pageerror",e=>errors.push(e.message));
       await page.route("**/*",route=>{

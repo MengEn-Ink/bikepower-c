@@ -66,3 +66,7 @@
   .telemetry-window-head h3{font-size:15px}
   .telemetry-window-head button{font-size:11px}
 }
+@media(max-width:360px){
+  body.device-status-mobile .telemetry-metric>span{display:none}
+  body.device-status-mobile .theme-btn,body.device-status-mobile .help-btn,body.device-status-mobile .cap-btn{width:28px;min-width:28px}
+}
