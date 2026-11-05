@@ -1438,6 +1438,9 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 <script src="./flash-session.js"></script>
 <link rel="stylesheet" href="./pages-experience.css">
 <script defer src="./pages-experience.js"></script>
+<link rel="stylesheet" href="./device-status.css">
+<script defer src="./device-telemetry.js"></script>
+<script defer src="./device-status.js"></script>
 </head>
 <body>
 <!-- ============ 移动端引导页：手机只读，引导到桌面端操作（< 900px 显示） ============ -->
@@ -1463,7 +1466,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
   </section>
 
   <nav class="guide-index" aria-label="使用手册目录">
-    <a href="#mg-steps-title">快速上手</a><a href="#mg-button-title">按钮演示</a><a href="#mg-wifi-title">手机配网</a><a href="#mg-bridge-title">真实桥接</a><a href="#mg-run-title">跑步模式</a><a href="#mg-check-title">实物验收</a><a href="#mg-faq-title">遇到问题</a>
+    <a href="#mg-steps-title">快速上手</a><a href="#mg-button-title">按钮演示</a><a href="#mg-wifi-title">手机配网</a><a href="#mg-bridge-title">真实桥接</a><a href="#mg-run-title">跑步模式</a><a href="#mg-check-title">实物验收</a><a href="#mg-faq-title">遇到问题</a><a href="#/device-status">设备状态</a>
   </nav>
   <section class="mg-desk" aria-labelledby="mg-desk-title">
     <div class="mg-desk-head"><span class="mg-num">→</span><div><h2 id="mg-desk-title">请在电脑上打开本页</h2><p>桌面版 Chrome 或 Edge，HTTPS 访问</p></div></div>
@@ -1631,6 +1634,10 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <span class="mode-desc">并排对比多台设备信息</span>
       </button>
       </div><div class="tool-cluster" role="group" aria-label="诊断工具"><span class="cluster-label">诊断</span>
+      <button class="mode-btn" data-mode="device-status" onclick="switchMode('device-status')">
+        <svg class="ico" aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path d="M3 19h18M6 16V9m6 7V5m6 11V12" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <span class="mode-title">设备状态</span><span class="mode-desc">内存、CPU 百分比与蓝牙链路</span>
+      </button>
       <button class="mode-btn" data-mode="inspector" onclick="switchMode('inspector')">
         <span class="ico" aria-hidden="true">⟡</span>
         <span class="mode-title">通知检查器</span>
@@ -2688,6 +2695,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
   </section>
 
   <!-- ============ 模式六：一键健康检查 ============ -->
+  <section id="mode-device-status" class="hidden"></section>
   <section id="mode-health" class="hidden">
     <div class="card">
       <div class="card-head">
@@ -2886,6 +2894,7 @@ const CYCLING_SERVICE_UUIDS = [
 const CYCLING_SERVICE_FILTERS = CYCLING_SERVICE_UUIDS.map(uuid=>({services:[uuid]}));
 const CYCLING_SERVICE_SET = new Set(CYCLING_SERVICE_UUIDS);
 const ALL_OPTIONAL_SERVICES = [
+  "7a5a1000-4c7a-4f2a-9b3e-6d1f4a8c0b21",
   UUIDS.cpsService, UUIDS.hrService, UUIDS.cscService, UUIDS.rscService,
   UUIDS.ftmsService, UUIDS.disService, UUIDS.basService, UUIDS.configService,
   "00001819-0000-1000-8000-00805f9b34fb",
@@ -3891,9 +3900,9 @@ async function saveDeviceConfig(event){
 
 /* ==================== 模式切换与路由 ==================== */
 // 每个工具页都有独立链接：#/manual #/flash #/monitor #/compare #/inspector #/health；#chNN 直达手册章节
-const MODE_ROUTES={manual:"manual",flash:"flash",monitor:"connect",connect:"connect",compare:"compare",inspector:"inspector",health:"health"};
-const MODE_SLUG={manual:"manual",flash:"flash",connect:"monitor",compare:"compare",inspector:"inspector",health:"health"};
-const MODE_TITLE={manual:"使用手册",flash:"固件刷写",connect:"实时监控",compare:"设备比对",inspector:"通知检查器",health:"健康检查"};
+const MODE_ROUTES={manual:"manual",flash:"flash",monitor:"connect",connect:"connect",compare:"compare",inspector:"inspector",health:"health","device-status":"device-status"};
+const MODE_SLUG={manual:"manual",flash:"flash",connect:"monitor",compare:"compare",inspector:"inspector",health:"health","device-status":"device-status"};
+const MODE_TITLE={manual:"使用手册",flash:"固件刷写",connect:"实时监控",compare:"设备比对",inspector:"通知检查器",health:"健康检查","device-status":"设备状态"};
 function routeFromHash(hash){
   const raw=String(hash||"").replace(/^#\/?/,"").trim().toLowerCase();
   if(/^ch\d{2}$/.test(raw))return {mode:"manual",chapter:raw};
@@ -3936,6 +3945,7 @@ function switchMode(mode,opts){
   $("mode-compare").classList.toggle("hidden",mode!=="compare");
   $("mode-inspector").classList.toggle("hidden",mode!=="inspector");
   $("mode-health").classList.toggle("hidden",mode!=="health");
+  $("mode-device-status").classList.toggle("hidden",mode!=="device-status");
   $("mode-manual").classList.toggle("hidden",mode!=="manual");
   if(typeof applyIdeLayout==="function")applyIdeLayout();
   if(mode==="connect")loadTemplates();
@@ -3943,6 +3953,7 @@ function switchMode(mode,opts){
   if(mode==="inspector")refreshInspectorFromCurrent();
   if(mode==="health")renderHealthSteps();
   if(mode==="manual"){initManualOnce();refreshLaunchpad();}
+  if(window.BikePowerStatus)window.BikePowerStatus.mode();
 }
 
 /* ==================== Web Bluetooth 支持检测 ==================== */
@@ -4221,6 +4232,7 @@ async function connectAndCollect(device){
     rec.sessionEndedAt=Date.now();
     log("设备 '"+(device.name||"(无名)")+"' 已断开","warn");
     if(singleDevice===rec){
+      if(window.BikePowerStatus)window.BikePowerStatus.detach();
       if(rec.configState&&rec.configState.expectedDisconnectMessage)log("配置保存后的预期断连：设备正在重建 GATT","data");
       else recordAnomaly("disconnect","设备连接已关闭");
       const state=$("single-device-state");if(state){state.textContent="已断开";state.className="badge err";}
@@ -4309,6 +4321,7 @@ async function connectAnyDevice(){
 async function connectSingleWith(device,source="picker",timeoutMs=20000){
   if(compatibilityHandoffActive())return false;
   if(flashSession&&flashSession.isBusy())return false;
+  if(window.BikePowerStatus)window.BikePowerStatus.detach();
   if(singleDevice&&singleDevice.server){const previous=singleDevice;singleDevice=null;try{previous.server.disconnect();}catch(e){}}
   mirrorState=null;
   anomalies={};resetTraceInteraction();
@@ -4326,6 +4339,7 @@ async function connectSingleWith(device,source="picker",timeoutMs=20000){
     singleDevice=rec;
     renderSingleDevice(rec);
     onSingleDeviceConnected(rec,source);
+    if(window.BikePowerStatus)window.BikePowerStatus.attach(rec);
     return rec;
   }catch(err){
     $("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+escapeHtml(err.message)+'</div>';
