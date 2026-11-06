@@ -33,6 +33,8 @@ class MaintenanceToolsTest(unittest.TestCase):
         self.assertEqual(parse(["--level", "docs"]).level, "docs")
         self.assertFalse(parse([]).strict)
         self.assertTrue(parse(["--strict"]).strict)
+        self.assertEqual(parse(["--build-dir", "build-review"]).build_dir, "build-review")
+        self.assertEqual(namespace["find_python"](), __import__("sys").executable)
         with self.assertRaises(SystemExit):
             parse(["--level", "unknown"])
 

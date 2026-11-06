@@ -182,6 +182,8 @@ def quick_steps(gate):
     run_step(gate, "上游桥接会话与扫描 ASan/UBSan", "python3 tests/test_bridge_session.py", 60)
     run_step(gate, "桥接主备恢复静态契约", "python3 tests/check_bridge_failover_contract.py", 30)
     run_step(gate, "生产配置 GATT ASan/UBSan", "python3 tests/test_ble_config_service.py", 60)
+    run_step(gate, "审查固定输入回归", "python3 tests/test_audit_regressions.py", 60)
+    run_step(gate, "控制确认与CCCD回归", "python3 tests/test_control_delivery.py", 60)
     run_step(gate, "生产通知快照 ASan/UBSan", "python3 tests/test_ble_runtime.py", 60)
     run_step(gate, "BLE 协议 golden vectors", "python3 tests/test_ble_protocol_vectors.py", 60)
     run_step(gate, "BLE 配置 E2E 离线协议回归", "python3 tests/test_ble_config_e2e.py", 30)

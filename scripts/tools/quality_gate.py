@@ -62,9 +62,6 @@ def fail(msg):
 
 def find_python():
     """返回可用的 Python 解释器路径。"""
-    for py in ["python3", "python"]:
-        if shutil.which(py):
-            return py
     return sys.executable
 
 
@@ -193,6 +190,7 @@ def ensure_idf():
 
 def parse_options(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--build-dir", default="build", help="ESP-IDF 构建目录，可使用独立候选目录")
     parser.add_argument("--no-build", action="store_true",
                         help="跳过 ESP-IDF 构建，仍运行 host 和全部专项门禁")
     parser.add_argument("--level", choices=("full", "docs"), default="full",
@@ -214,7 +212,9 @@ elif idf_result is None:
 else:
     idf_path, py_exe = idf_result
     idf_py = os.path.join(idf_path, "tools", "idf.py") if idf_path else "idf.py"
-    out, rc = run_cmd([py_exe, idf_py, "build"])
+    out, rc = run_cmd([py_exe, idf_py, "-B", options.build_dir, "-D", "SDKCONFIG_DEFAULTS=sdkconfig.defaults", "reconfigure"])
+    if rc == 0:
+        out, rc = run_cmd([py_exe, idf_py, "-B", options.build_dir, "build"])
     last_lines = "\n".join(out.strip().splitlines()[-5:])
     if rc == 0 and ("Project build complete" in out or "write_flash" in out):
         ok("idf.py build 通过")
@@ -394,6 +394,8 @@ STATIC_CHECKS = [
     ("tests/test_persistent_store.py", "生产 NVS 双槽原子提交与故障恢复 ASan/UBSan"),
     ("tests/test_mock_server_shutdown.py", "mock 服务终止信号与清理回归"),
     ("tests/test_ble_config_service.py", "生产 BLE 配置 GATT 回调 ASan/UBSan"),
+    ("tests/test_audit_regressions.py", "审查固定输入生产回归 ASan/UBSan"),
+    ("tests/test_control_delivery.py", "控制确认与CCCD生产回归 ASan/UBSan"),
     ("tests/test_ble_runtime.py", "生产 BLE 同轮通知快照 ASan/UBSan"),
     ("tests/test_ble_compatibility.py", "BLE 标准特征与 Pages 兼容诊断回归"),
     ("tests/test_ble_standard_contract.py", "生产 FTMS 标准与广播事务 ASan/UBSan"),

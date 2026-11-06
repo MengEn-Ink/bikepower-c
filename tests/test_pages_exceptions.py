@@ -8,4 +8,5 @@ if __name__ == "__main__":
     node = shutil.which("node")
     if not node:
         raise RuntimeError("未找到 node")
-    subprocess.run([node, str(Path(__file__).with_name("test_pages_exception_browser.cjs"))], check=True)
+    for filename in ("test_pages_exception_browser.cjs", "test_pages_bridge_browser.cjs", "test_pages_audit_browser.cjs"):
+        subprocess.run([node, str(Path(__file__).with_name(filename))], check=True)
