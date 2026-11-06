@@ -233,6 +233,11 @@ python3 scripts/tools/device_acceptance.py init --board generic-c3 --operator "�
 | `tools/web/pages-experience.css` / `.js` | 功能分区、响应布局、按钮四场景教学与独立页面更新时间；教学不操作硬件 |
 | `tests/test_pages_experience.cjs` | 固定时刻验证长按回滚、确认/超时、短按和页面时间信息 |
 | `tests/test_pages_experience_browser.cjs` | 两主题 × 六宽度真实操作、播放/暂停/逐步、减少动画、锚点、验收勾选与桌面导航 |
+| `tests/test_pages_operation_demos.cjs` | 独立教学模型：持按/回滚/确认边界、草稿失败重试、0W 与连接交接 |
+| `tests/test_pages_operation_demos_browser.cjs` | 浅深主题四宽度、真实控件与键盘持按、减少动画、离线、无 BLE/串口设备请求 |
+| `tests/test_phone_operation_demos_browser.cjs` | 生产页控件与像素对齐、真实保存失败/重试/关闭、扫描与0W、跑步/名称/骑行、单屏与离线隔离 |
+| `scripts/tools/build_phone_demo.py --check` | 检查手机屏幕来源与生产 HTML/CSS/JS 是否一致 |
+| `scripts/tools/export_operation_demo.py` | 生成设备/手机双入口的独立离线交互 HTML |
 | `scripts/tools/serve_ble_monitor.py` | 从 `tools/web/` 启动无缓存本地 HTTP 服务，默认 `http://127.0.0.1:8766/ble-monitor.html` |
 | `scripts/tools/prepare_web_flash_site.py` | 获取 GitHub Release、验证 merged bin SHA256、生成固件索引与 manifest；独立生成 `site-info.json` 页面构建时间及源码提交 |
 | `.github/workflows/deploy-web-tools.yml` | CI 成功或 GitHub Release 发布后部署 Pages；缺失完整固件时阻断覆盖 |

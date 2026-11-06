@@ -34,6 +34,8 @@
 | [设备遥测协议与验证](dev/36-device-telemetry-verification.md) | 20 字节记录、CPU 口径、浏览器回归与实测边界 |
 | [项目审查与优化](dev/37-project-review-and-optimization.md) | 配置保存修复、字符串与测试退出回归、残余风险和证据 |
 | [持久化稳定性加固](dev/38-persistence-stability-hardening.md) | 双槽快照、联合提交、迁移与故障恢复、严格门禁 |
+| [Pages 操作演示](dev/39-pages-operation-demos.md) | 合宙官方参考、BOOT 配网/保存/校正/连接交接、动画交付与验证 |
+| [手机实体演示方案与实施](dev/40-phone-operation-demo-plan.md) | 设备/手机两类入口、真实页面复用、隔离与对齐验收 |
 
 ## Code Wiki
 

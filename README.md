@@ -4,6 +4,8 @@
 
 [在线工具台与网页刷写](https://mengen-ink.github.io/bikepower-c/) · [快速上手](docs/user/01-quickstart.md) · [用户手册](docs/user/02-user-manual.md) · [文档索引](docs/INDEX.md)
 
+Pages 手册分为设备按键与手机操作：手机机身内复用实际配置页，支持保存失败重试、功率计测试与跑步切换。可查看 [离线操作演示](design-demos/bikepower-ui/operation-demos/index.html) 与 [配网动画](design-demos/bikepower-ui/operation-demos/wifi.gif)；线上页面通过 GitHub Actions 发布，部署状态以最新工作流为准。
+
 ## 能力与版本
 
 - 骑行：模拟功率、踏频、心率，支持固定模式、配速机器人及 FTMS ERG。

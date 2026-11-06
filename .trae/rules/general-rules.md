@@ -100,6 +100,10 @@ bikepower-c/
 │   ├── ble-compatibility.js  — 固定快照、规则与报告
 │   ├── ble-compatibility-ui.js/.css — 诊断表单、连接交接与双主题
 │   ├── pages-experience.css/.js — 功能分区、动效、按钮教学与页面更新信息
+│   ├── operation-demos.css/.js — 官方板图位置示意、按键练习、保存/校正/连接交接教学
+│   ├── phone-operation-demos.css/.js — 手机机身、真实控件时间轴与单实例生命周期
+│   ├── phone-demo-adapter.js — 演示屏幕的内存接口与消息校验
+│   ├── phone-portal-source.js — 由 build_phone_demo.py 从生产配置页生成的离线屏幕来源
 │   ├── device-telemetry.js   — 同序快照组合、真实值解码与订阅生命周期
 │   └── device-status.css/.js — 常驻指标、趋势和独立窗口，含手机状态直链
 ├── tests/
