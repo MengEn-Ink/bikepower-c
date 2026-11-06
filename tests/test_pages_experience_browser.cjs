@@ -57,13 +57,27 @@ const root = path.join(__dirname, '../tools/web');
           await demo.getByRole('button', { name: '逐步演示', exact: true }).click();
           assert.equal(await demo.getAttribute('data-playing'), 'false');
           assert.equal(await demo.locator('[data-demo-power]').textContent(), '180');
-          await page.getByRole('link', { name: '实物验收', exact: true }).click();
-          const checkbox = page.locator('.guide-checks input').first();
-          await checkbox.check();
-          assert.equal(await checkbox.isChecked(), true);
-          await page.getByRole('link', { name: '遇到问题', exact: true }).click();
-          assert.match(await page.locator('#mg-faq-title').textContent(), /注意事项/);
-          assert.ok(await page.getByText('配网要先松开，再在 3 秒内按一次。', { exact: true }).isVisible());
+          await page.getByRole('link', { name: '项目介绍', exact: true }).click();
+          assert.ok(await page.locator('#mg-about-title').isVisible());
+          await page.getByRole('link', { name: '使用场景', exact: true }).click();
+          assert.equal(await page.locator('.mg-scene-list article').count(), 4);
+          assert.equal(await page.locator('.mobile-guide .guide-faq, .mobile-guide [data-operation-guide]').count(), 0);
+          assert.equal(await page.locator('#mg-steps-title, #mg-check-title, #mg-faq-title').count(), 0);
+          assert.ok(await page.locator('.mg-about').getByText(/不是实际运动测量/).count());
+          const mobileContract = await page.locator('.mobile-guide').evaluate(root => {
+            const sections = ['.mg-hero', '.mg-about', '[aria-labelledby="mg-button-title"]', '.mg-scenes', '.mg-desk'];
+            const tops = sections.map(selector => root.querySelector(selector).getBoundingClientRect().top);
+            return {
+              ordered: tops.every((top, i) => i === 0 || top > tops[i - 1]),
+              links: [...root.querySelectorAll('.guide-index a')].every(link => root.querySelector(link.getAttribute('href'))),
+              oldSections: root.querySelectorAll('#mg-steps-title, #mg-wifi-title, #mg-bridge-title, #mg-run-title, #mg-compat-title, #mg-check-title').length,
+              demos: root.querySelectorAll('[data-operation-demos]').length
+            };
+          });
+          assert.deepEqual(mobileContract, { ordered: true, links: true, oldSections: 0, demos: 1 });
+          await page.locator('#mg-theme-btn').click();
+          assert.equal(await page.locator('html').getAttribute('data-theme'), theme === 'light' ? 'dark' : 'light');
+          await page.locator('#mg-theme-btn').click();
           if (width === 390) {
             await page.getByRole('link', { name: '按钮演示', exact: true }).click();
             await page.screenshot({ path: '/tmp/bikepower-pages-mobile-' + theme + '.png', animations: 'disabled' });
@@ -71,9 +85,11 @@ const root = path.join(__dirname, '../tools/web');
         } else {
           const gate = page.locator('#connect-gate');
           if (await gate.isVisible()) await gate.getByRole('button', { name: '稍后连接', exact: true }).click();
+          await page.locator('[data-nav-cluster="device"] > summary').click();
           await page.locator('.mode-btn[data-mode="flash"]').click();
           assert.equal(await page.locator('#mode-flash').isVisible(), true);
           assert.equal(await page.locator('.mode-btn[data-mode="flash"]').getAttribute('aria-current'), 'page');
+          await page.locator('[data-nav-cluster="diagnostics"] > summary').click();
           await page.locator('.mode-btn[data-mode="health"]').click();
           assert.equal(await page.locator('#mode-health').isVisible(), true);
           assert.equal(await page.locator('.tool-cluster').count(), 3);

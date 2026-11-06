@@ -91,7 +91,7 @@
       if(typeof sample.at!=="number"||!Number.isFinite(sample.at)||sample.at<0)throw new Error("通知时间不合法");
       return {uuid:normalizeUuid(sample.uuid),at:sample.at,raw:canonicalHex(sample.raw)||""};
     });
-    return {id,name:text(value.name),capturedAt,info,
+    return {id,deviceKey:text(value.deviceKey),name:text(value.name),capturedAt,info,
       coverage:{scope:coverage.scope==="authorized"?"authorized":"unknown",
         enumeration:enumeration(coverage.enumeration),allowedServices:[...new Set(allowedServices)].sort()},
       services,samples};
@@ -100,6 +100,7 @@
     if(!record||!record.device)throw new Error("请先连接并选择设备");
     return validateSnapshot({
       id:record.device.id+"@"+Date.now()+"-"+Math.random().toString(16).slice(2,10),
+      deviceKey:record.device.id,
       name:record.device.name||"未命名设备",capturedAt:new Date().toISOString(),info:record.info||{},
       coverage:record.gattCoverage||{scope:"unknown",enumeration:"unknown",allowedServices:[]},
       services:(record.services||[]).map(service=>({
@@ -364,6 +365,48 @@
       "使用「释放连接并开始实测」，暂停本站所有标签页的自动连接；其他 App 需自行断开。");
     return {verdict:"待目标端验证",findings,differences: differences.slice(0,192),signals};
   }
+  function compareCapabilities(board,reference){
+    board=validateSnapshot(board);reference=validateSnapshot(reference);
+    const rows=[];
+    const add=(category,labelText,left,right,certainty,action)=>rows.push({category,label:labelText,board:left,reference:right,certainty,action});
+    if(board.name!==reference.name)add("identity","蓝牙名称",board.name,reference.name,"observed","身份不同不等于兼容失败；仅在目标筛选身份时做单独验证。");
+    for(const key of INFO_KEYS)if(board.info[key]!==reference.info[key])add("identity","DIS "+key,board.info[key]||"未读取",reference.info[key]||"未读取",board.info[key]&&reference.info[key]?"observed":"unknown","核对身份读取结果，不能用复制身份替代GATT功能实现。");
+    const services=new Set([...board.services,...reference.services].map(s=>s.uuid));
+    const absent=(snapshot,uuid)=>snapshot.coverage.scope==="authorized"&&snapshot.coverage.enumeration==="complete"&&snapshot.coverage.allowedServices.includes(uuid);
+    for(const uuid of services){
+      const left=board.services.find(s=>s.uuid===uuid),right=reference.services.find(s=>s.uuid===uuid);
+      if(!left||!right){
+        const certainty=absent(!left?board:reference,uuid)?"observed":"unknown";
+        add("service",label(uuid),left?"已观察到":"未观察到",right?"已观察到":"未观察到",certainty,certainty==="unknown"?"补充服务UUID授权并重新采集，不能将未授权判为缺失。":"核对骑行模式和服务开关，按目标角色决定是否补齐服务。");
+      }
+      for(const char of new Set([...(left?.characteristics||[]),...(right?.characteristics||[])].map(c=>c.uuid))){
+        const a=left?.characteristics.find(c=>c.uuid===char),b=right?.characteristics.find(c=>c.uuid===char);
+        const charLabel=label(uuid)+" / "+label(char);
+        if(!a||!b){
+          const missing=!a?left:right;
+          const certain=missing?missing.enumeration==="complete":absent(!a?board:reference,uuid);
+          add("characteristic",charLabel,a?"已观察到":"未观察到",b?"已观察到":"未观察到",certain?"observed":"unknown",certain?"按标准与目标角色补齐特征、属性及对应运行逻辑；不要只添加空特征。":"完成服务/特征枚举后再判断缺口。");
+          continue;
+        }
+        if(a.properties!==b.properties)add("property",charLabel+" · 属性",a.properties,b.properties,"observed","核对Read/Notify/Write/Indicate与订阅、控制响应实现。");
+        if(a.raw!==b.raw||a.readStatus!==b.readStatus){
+          const known=a.readStatus==="ok"&&b.readStatus==="ok";
+          const feature=!!FEATURE_LENGTHS[shortUuid(char)];
+          add(feature?"feature":"value",charLabel+" · 读取值",a.readStatus==="ok"?(feature?featureSummary(char,a.raw):a.raw):a.readStatus,b.readStatus==="ok"?(feature?featureSummary(char,b.raw):b.raw):b.readStatus,known?"observed":"unknown",known?(feature?"对照能力位与通知/控制实际实现；只声明已实现功能。":"区分身份、范围与实时值，不应机械复制第三方数值。"):"重新读取；读取失败不是零值或不支持。");
+        }
+      }
+    }
+    for(const uuid of new Set([...board.samples,...reference.samples].map(s=>s.uuid))){
+      const a=board.samples.filter(s=>s.uuid===uuid),b=reference.samples.filter(s=>s.uuid===uuid);
+      if(!a.length||!b.length){add("notification",label(uuid)+" · 通知样本",a.length+" 条",b.length+" 条","unknown","让设备实际工作并采集通知；无样本不等于不支持。");continue;}
+      const shapes=samples=>[...new Set(samples.map(s=>{try{const p=decodePacket(uuid,s.raw);return hexBytes(s.raw).length+" B / flags "+(p.flags===undefined?"无":p.flags.toString(16));}catch(e){return "格式异常 "+e.message;}}))].sort().join("；");
+      if(shapes(a)!==shapes(b))add("payload",label(uuid)+" · 帧结构",shapes(a),shapes(b),"observed","按flags和可选字段解析；不同字段布局不必然违规，核对目标端需要的字段。");
+      const interval=samples=>{const sorted=samples.map(s=>s.at).sort((x,y)=>x-y);const gaps=sorted.slice(1).map((n,i)=>n-sorted[i]).sort((x,y)=>x-y);return gaps.length?gaps[Math.floor(gaps.length/2)]:null;};
+      const x=interval(a),y=interval(b);
+      if(x!==null&&y!==null&&Math.abs(x-y)>Math.max(100,Math.min(x,y)*.2))add("frequency",label(uuid)+" · 间隔中位",x+" ms",y+" ms","observed","核对目标端通知新鲜度；短采样窗口不能证明长期稳定性。");
+    }
+    return rows;
+  }
   return {SCHEMA,MAX_FILE_BYTES,MAX_SAMPLES,normalizeUuid,shortUuid,label,validateSnapshot,
-    validateContext,capture,decodePacket,featureSummary,analyze,makeReport,importReport};
+    validateContext,capture,decodePacket,featureSummary,analyze,compareCapabilities,makeReport,importReport};
 });

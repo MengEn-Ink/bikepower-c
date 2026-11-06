@@ -4,7 +4,7 @@
   const scenes = {
     short: { title: "短按减功率", duration: 1200, steps: [0, 300, 1000] },
     adjust: { title: "按住持续调功", duration: 2000, steps: [0, 500, 900, 1300, 1700] },
-    wifi: { title: "长按 + 二次确认", duration: 4300, steps: [0, 500, 2100, 2300, 3300, 4000] },
+    wifi: { title: "长按 + 二次确认 · 开启 WiFi 配网", duration: 4300, steps: [0, 500, 2100, 2300, 3300, 4000] },
     cancel: { title: "不确认，自动取消", duration: 6000, steps: [0, 2100, 2300, 3800, 5400] }
   };
   function buttonFrame(scene, elapsed) {
@@ -13,23 +13,23 @@
     const t = Math.max(0, Math.min(Number(elapsed) || 0, config.duration));
     const release = scene === "short" ? 300 : scene === "adjust" ? 1500 : 2300;
     const pressed = t < release || scene === "wifi" && t >= 3300 && t < 3500;
-    let power = 200, state = "ble", text = "按下设备操作键，开始计时。";
+    let power = 200, state = "ble", text = scene === "wifi" ? "长按 + 二次确认用于开启设备 WiFi 热点，再用手机进入配置页。先按住操作键满 2 秒。" : "按下设备操作键，开始计时。";
     if (scene === "short") {
       if (t >= release) { power = 180; text = "轻按松开，目标减少 20 W。"; }
     } else {
       const hold = Math.min(t, release, 1999);
       if (hold >= 500) power += (Math.floor((hold - 500) / 200) + 1) * 20;
-      if (t >= 500) text = "继续按住，目标逐步增加。";
+      if (t >= 500) text = scene === "wifi" ? "继续按住；满 2 秒后松开，随后二次确认开启 WiFi 配网。期间临时调功会回滚。" : "继续按住，目标逐步增加。";
       if (scene === "adjust" && t >= release) text = "不到 2 秒松开，保留调节结果。";
       if (scene !== "adjust" && t >= 2000) text = "满 2 秒了，现在松开。";
       if (scene !== "adjust" && t >= release) {
         power = 200;
         state = "confirm";
-        text = "灯快闪了，3 秒内再按一次。目标恢复原值。";
+        text = scene === "wifi" ? "已松开，3 秒内再按一次即可开启 WiFi 热点；尚未确认时热点不会开启。目标已恢复原值。" : "灯快闪了，3 秒内再按一次。目标恢复原值。";
       }
       if (scene === "wifi" && t >= 3300) {
         state = "wifi";
-        text = "热点已开启。去手机 WiFi 连接 BikePower-XXXXXX。";
+        text = "WiFi 热点已开启。手机连接 BikePower-XXXXXX，密码 12345678；保持无互联网连接，自动弹出或手动打开 http://192.168.4.1 进入配置页。";
       }
       if (scene === "cancel" && t >= 5300) {
         state = "ble";
@@ -72,9 +72,11 @@
       host.querySelector("[data-demo-time]").textContent = (frame.elapsed / 1000).toFixed(1) + " s";
       host.querySelector("[data-demo-fill]").style.transform = "scaleX(" + frame.progress + ")";
       host.querySelector("[data-demo-state]").textContent = {
-        ble: "蓝牙工作", confirm: "等待二次确认", wifi: "WiFi 配网"
+        ble: "蓝牙工作", confirm: "等待二次确认", wifi: "WiFi 热点已开启"
       }[frame.state];
       host.querySelector("[data-demo-text]").textContent = frame.text;
+      const wifiGuide = host.querySelector("[data-demo-wifi-guide]");
+      if (wifiGuide) wifiGuide.classList.toggle("hidden", scene !== "wifi");
       const ledLabel = host.querySelector("[data-demo-led-label]");
       if (ledLabel) ledLabel.textContent = frame.state === "confirm" ? "指示灯 · 快闪确认" : frame.state === "wifi" ? "指示灯 · 配网节奏" : "指示灯 · 慢闪";
       host.querySelector("[data-demo-key]").textContent = frame.pressed ? "按住" : "松开";
@@ -143,7 +145,23 @@
     }
     paint(false);
   }
+  function initNavigation() {
+    const groups = [...document.querySelectorAll("[data-nav-cluster]")];
+    const close = () => groups.forEach(group => { group.open = false; });
+    groups.forEach(group => group.addEventListener("toggle", () => {
+      if (group.open) groups.forEach(other => { if (other !== group) other.open = false; });
+    }));
+    document.addEventListener("click", event => {
+      if (!event.target.closest(".mode-select")) close();
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key !== "Escape") return;
+      const active = groups.find(group => group.open);
+      if (active) { close(); active.querySelector("summary").focus(); }
+    });
+  }
   async function init() {
+    initNavigation();
     document.querySelectorAll("[data-button-demo]").forEach(initDemo);
     if (location.protocol === "file:") {
       document.querySelectorAll("[data-page-release]").forEach(el => el.textContent = "本地预览 · 未发布");

@@ -23,6 +23,9 @@ test('短按减一步；中长按累加；2秒松开回滚后等待确认', () =
 });
 test('二次按下才进入配网；不确认会超时恢复蓝牙', () => {
   assert.equal(api.buttonFrame('wifi', 3400).state, 'wifi');
+  assert.match(api.scenes.wifi.title, /开启 WiFi 配网/);
+  assert.match(api.buttonFrame('wifi', 0).text, /热点.*手机.*配置页/);
+  assert.match(api.buttonFrame('wifi', 3400).text, /BikePower-XXXXXX.*12345678.*192\.168\.4\.1/);
   assert.equal(api.buttonFrame('cancel', 5400).state, 'ble');
   assert.equal(api.buttonFrame('cancel', 5400).power, 200);
 });

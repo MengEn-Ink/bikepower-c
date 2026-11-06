@@ -1436,7 +1436,6 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 </style>
 <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
 <script src="./flash-session.js"></script>
-<link rel="stylesheet" href="./pages-experience.css">
 <link rel="stylesheet" href="./operation-demos.css">
 <link rel="stylesheet" href="./phone-operation-demos.css">
 <script defer src="./phone-portal-source.js"></script>
@@ -1446,6 +1445,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 <link rel="stylesheet" href="./device-status.css">
 <script defer src="./device-telemetry.js"></script>
 <script defer src="./device-status.js"></script>
+<link rel="stylesheet" href="./pages-experience.css">
 </head>
 <body>
 <!-- ============ 移动端引导页：手机只读，引导到桌面端操作（< 900px 显示） ============ -->
@@ -1458,20 +1458,35 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
     <span class="mg-bar-right"><span class="mg-chip">移动端 · 只读</span><button class="theme-btn" id="mg-theme-btn" type="button" data-theme-toggle data-source="system" aria-label="切换亮 / 暗主题" title="切换亮 / 暗主题" onclick="toggleTheme()"><svg class="ti-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="ti-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></span>
   </header>
 
-  <section class="mg-hero">
-    <h1>看一遍，<br>就会<em>操作</em>。</h1>
-    <p>先播放演示，再到设备上动手。</p>
+  <section class="mg-hero" aria-labelledby="mg-project-title">
+    <h1 id="mg-project-title">让运动数据，<br>连上你的应用。</h1>
+    <p>BikePower 是开源的蓝牙骑行与跑步工具：模拟运动数据、桥接真实功率计，也帮助排查骑行 App 与码表的适配差异。</p>
   </section>
 
-  <nav class="guide-index" aria-label="使用手册目录">
-    <a href="#mg-steps-title">快速上手</a><a href="#mg-button-title">按钮演示</a><a href="#mg-wifi-title">手机配网</a><a href="#mg-bridge-title">真实桥接</a><a href="#mg-run-title">跑步模式</a><a href="#mg-check-title">实物验收</a><a href="#mg-faq-title">遇到问题</a><a href="https://mengen-ink.github.io/bikepower-c/#/device-status">设备状态</a>
+  <nav class="guide-index" aria-label="移动首页导航">
+    <a href="#mg-about-title">项目介绍</a><a href="#mg-button-title">按钮演示</a><a href="#mg-scenes-title">使用场景</a><a href="#mg-desk-title">电脑工具</a>
   </nav>
+  <section class="mg-sec mg-about" aria-labelledby="mg-about-title">
+    <h2 class="mg-h" id="mg-about-title">一个设备，连接运动与调试。</h2>
+    <p>基于 ESP32-C3 的开源项目，把开发板变成蓝牙骑行 / 跑步数据源。手机连接设备热点即可修改参数，电脑端可查看实时信号、采集设备信息和分析差异。</p>
+    <div class="mg-capabilities" aria-label="项目能力"><span>骑行 / 跑步</span><span>真实功率桥接</span><span>手机配置</span><span>蓝牙适配排查</span></div>
+    <p class="mg-scope">模拟数据用于体验、开发与测试，不是实际运动测量；真实来源以功率计数据为准。</p>
+  </section>
   <section class="mg-sec" aria-labelledby="mg-button-title">
     <h2 class="mg-h" id="mg-button-title">设备按键，手机操作</h2>
     <div class="operation-demos" data-operation-demos><p>正在准备操作演示…</p></div>
   </section>
+  <section class="mg-sec mg-scenes" aria-labelledby="mg-scenes-title">
+    <h2 class="mg-h" id="mg-scenes-title">你可以这样使用。</h2>
+    <div class="mg-scene-list">
+      <article><h3>调试骑行数据链路</h3><p>用可配置的模拟功率、踏频和心率，检查应用的设备连接、读数与数据处理。</p></article>
+      <article><h3>桥接真实功率计</h3><p>接收功率计数据，进行固定瓦数或比例校正，再通过开发板输出。</p></article>
+      <article><h3>验证跑步模式</h3><p>切换速度、步频与心率等跑步数据，测试应用对跑步传感器的读取。</p></article>
+      <article><h3>排查骑行端适配</h3><p>分别采集正常第三方设备和开发板，比较服务、能力位与通知差异，定位需要补齐的功能。</p></article>
+    </div>
+  </section>
   <section class="mg-desk" aria-labelledby="mg-desk-title">
-    <div class="mg-desk-head"><span class="mg-num">→</span><div><h2 id="mg-desk-title">请在电脑上打开本页</h2><p>桌面版 Chrome 或 Edge，HTTPS 访问</p></div></div>
+    <div class="mg-desk-head"><div><h2 id="mg-desk-title">需要采集或刷写？到电脑端。</h2><p>实时监控、蓝牙信息比对与固件刷写，使用电脑 Chrome 或 Edge。</p></div></div>
     <code class="mg-url" id="mg-url">https://mengen-ink.github.io/bikepower-c/</code>
     <div class="mg-actions">
       <button class="btn primary big" id="mg-copy" type="button" onclick="mgCopyLink()">复制桌面端链接</button>
@@ -1480,60 +1495,8 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
     <p class="mg-copied" id="mg-copied" role="status" aria-live="polite"></p>
   </section>
 
-  <section class="mg-sec" aria-labelledby="mg-steps-title">
-    <h2 class="mg-h" id="mg-steps-title">第一次使用</h2>
-    <p class="guide-intro">已预装的设备，直接看“连接 App”。</p>
-    <details class="guide-faq"><summary>电脑安装 · 播放步骤</summary><div data-operation-guide="install"></div></details>
-    <div data-operation-guide="connect"></div>
-  </section>
-
-  <section class="mg-sec" aria-labelledby="mg-wifi-title">
-    <h2 class="mg-h" id="mg-wifi-title">手机修改配置</h2>
-    <div data-operation-guide="hotspot"></div>
-    <details class="guide-faq"><summary>设置骑行 · 播放步骤</summary><div data-operation-guide="cycling"></div></details>
-    <details class="guide-faq"><summary>保存与退出 · 播放步骤</summary><div data-operation-guide="exit"></div></details>
-  </section>
-
-  <section class="mg-sec" aria-labelledby="mg-bridge-title">
-    <h2 class="mg-h" id="mg-bridge-title">接入真实功率计</h2>
-    <div data-operation-guide="upstream"></div>
-  </section>
-
-  <section class="mg-sec" aria-labelledby="mg-run-title">
-    <h2 class="mg-h" id="mg-run-title">切换跑步</h2>
-    <div data-operation-guide="running"></div>
-  </section>
-  <section class="mg-sec" aria-labelledby="mg-compat-title">
-    <h2 class="mg-h" id="mg-compat-title">连不上，先这样试</h2>
-    <div data-operation-guide="troubleshoot"></div>
-    <details class="guide-faq"><summary>电脑比对与诊断 · 播放步骤</summary><div data-operation-guide="compare"></div></details>
-  </section>
-
-  <section class="mg-sec" aria-labelledby="mg-check-title">
-    <h2 class="mg-h" id="mg-check-title">动手确认一下</h2>
-    <details class="guide-faq"><summary>看懂指示灯 · 播放演示</summary><div data-operation-guide="lights"></div></details>
-    <div class="guide-checks">
-      <label><input type="checkbox"><span>App 能连接，读数持续更新。</span></label>
-      <label><input type="checkbox"><span>长按松开，再按后能连接热点。</span></label>
-      <label><input type="checkbox"><span>保存成功，重新接电后设置仍在。</span></label>
-      <label><input type="checkbox"><span>使用真实功率计时，停踩回到 0 W。</span></label>
-    </div>
-    <p class="guide-intro">动画是模拟教学，实际状态请在设备与 App 上确认。</p>
-  </section>
-
-  <section class="mg-sec" aria-labelledby="mg-faq-title">
-    <h2 class="mg-h" id="mg-faq-title">注意事项</h2>
-    <div class="important-notes"><ul>
-      <li>配网要先松开，再在 3 秒内按一次。</li>
-      <li>热点“无互联网”正常，保持连接。</li>
-      <li>保存成功后再退出；关闭页面不会保存。</li>
-      <li>App 配对前，释放网页连接。</li>
-      <li>页面更新不会升级设备，界面以安装版本为准。</li>
-    </ul></div>
-  </section>
-
   <section class="mg-sec" aria-labelledby="mg-facts-title">
-    <h2 class="mg-h" id="mg-facts-title"><span>08</span>基本信息</h2>
+    <h2 class="mg-h" id="mg-facts-title">基本信息</h2>
     <dl class="mg-facts">
       <div><dt>最新正式固件</dt><dd id="mg-fw">正在读取 Release</dd></div>
       <div><dt>默认蓝牙名</dt><dd>BikePower</dd></div>
@@ -1557,44 +1520,28 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
       </div>
     </div>
     <nav class="mode-select" data-tour="nav" aria-label="工具模式">
-      <div class="tool-cluster" role="group" aria-label="上手工具"><span class="cluster-label">上手</span>
-      <button class="mode-btn mode-home" data-mode="manual" onclick="switchMode('manual')">
-        <span class="ico" aria-hidden="true">¶</span>
-        <span class="mode-title">使用手册</span>
-        <span class="mode-desc">首页：安装、连接与工具导航</span>
-      </button>
-      <button class="mode-btn" data-mode="flash" onclick="switchMode('flash')">
-        <span class="ico" aria-hidden="true">↓</span>
-        <span class="mode-title">固件刷写</span>
-        <span class="mode-desc">把最新固件烧录到开发板</span>
-      </button>
-      </div><div class="tool-cluster" role="group" aria-label="设备工具"><span class="cluster-label">设备</span>
-      <button class="mode-btn" data-mode="connect" onclick="switchMode('connect')">
-        <span class="ico" aria-hidden="true">●</span>
-        <span class="mode-title">实时监控</span>
-        <span class="mode-desc">读取设备信息与实时数据</span>
-      </button>
-      <button class="mode-btn" data-mode="compare" onclick="switchMode('compare')">
-        <span class="ico" aria-hidden="true">＝</span>
-        <span class="mode-title">设备比对</span>
-        <span class="mode-desc">并排对比多台设备信息</span>
-      </button>
-      </div><div class="tool-cluster" role="group" aria-label="诊断工具"><span class="cluster-label">诊断</span>
-      <button class="mode-btn" data-mode="device-status" onclick="switchMode('device-status')">
-        <svg class="ico" aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path d="M3 19h18M6 16V9m6 7V5m6 11V12" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-        <span class="mode-title">设备状态</span><span class="mode-desc">内存、CPU 百分比与蓝牙链路</span>
-      </button>
-      <button class="mode-btn" data-mode="inspector" onclick="switchMode('inspector')">
-        <span class="ico" aria-hidden="true">⟡</span>
-        <span class="mode-title">通知检查器</span>
-        <span class="mode-desc">订阅任意特征、查看原始 BLE 通知 Hex</span>
-      </button>
-      <button class="mode-btn" data-mode="health" onclick="switchMode('health')">
-        <span class="ico" aria-hidden="true">◉</span>
-        <span class="mode-title">健康检查</span>
-        <span class="mode-desc">一键环境/GATT/通知诊断并导出报告</span>
-      </button>
-      </div>
+      <details class="tool-cluster" data-nav-cluster="guide">
+        <summary>使用指南</summary>
+        <div class="cluster-menu">
+          <button class="mode-btn mode-home" data-mode="manual" onclick="switchMode('manual')"><span class="mode-title">使用手册</span><span class="mode-desc">先看演示，再亲手操作</span></button>
+        </div>
+      </details>
+      <details class="tool-cluster" data-nav-cluster="device">
+        <summary>设备工具</summary>
+        <div class="cluster-menu">
+          <button class="mode-btn" data-mode="flash" onclick="switchMode('flash')"><span class="mode-title">固件刷写</span><span class="mode-desc">通过 USB 安装或更新固件</span></button>
+          <button class="mode-btn" data-mode="connect" onclick="switchMode('connect')"><span class="mode-title">实时监控</span><span class="mode-desc">查看信号、配置与设备信息</span></button>
+          <button class="mode-btn" data-mode="compare" onclick="switchMode('compare')"><span class="mode-title">设备比对</span><span class="mode-desc">采集两侧蓝牙信息并分析差异</span></button>
+        </div>
+      </details>
+      <details class="tool-cluster" data-nav-cluster="diagnostics">
+        <summary>诊断</summary>
+        <div class="cluster-menu">
+          <button class="mode-btn" data-mode="device-status" onclick="switchMode('device-status')"><span class="mode-title">设备状态</span><span class="mode-desc">内存、CPU 与蓝牙链路</span></button>
+          <button class="mode-btn" data-mode="inspector" onclick="switchMode('inspector')"><span class="mode-title">通知检查器</span><span class="mode-desc">原始通知与协议解析</span></button>
+          <button class="mode-btn" data-mode="health" onclick="switchMode('health')"><span class="mode-title">健康检查</span><span class="mode-desc">逐步诊断并导出报告</span></button>
+        </div>
+      </details>
     </nav>
     <div class="masthead-right">
       <button class="theme-btn" id="theme-btn" type="button" data-theme-toggle data-source="system" aria-label="切换亮 / 暗主题" title="切换亮 / 暗主题" onclick="toggleTheme()"><svg class="ti-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="ti-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
@@ -1680,7 +1627,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 
       <main class="fw-main">
         <div class="card-head fw-headline">
-          <h2>固件刷写</h2>
+          <div><h2>固件刷写</h2><p class="page-lead">选择版本，连接 USB 数据线，按提示完成安装与校验。</p></div>
           <span class="fw-head-actions">
             <button class="btn alt sm" type="button" onclick="openFlashGuide()">刷写向导 · 一步步来</button>
             <span class="badge warn" id="firmware-status">正在获取最新版本</span>
@@ -1788,6 +1735,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 
   <!-- ============ 模式二：连接蓝牙设备 ============ -->
   <section id="mode-connect" class="hidden">
+    <header class="page-heading"><div><h2>实时监控</h2><p>连接设备，查看功率、踏频、心率与同一时间轴上的信号。</p></div><span class="page-context">蓝牙连接 · 本机会话</span></header>
     <div class="monitor-grid" data-left="on" data-right="on">
       <button class="rail-reopen left" type="button" onclick="toggleIdePane('left')" title="展开设备侧栏（Ctrl+B）">设备 ▸</button>
       <aside class="monitor-rail" data-tour="rail" aria-label="设备侧栏">
@@ -1903,12 +1851,21 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 
   <!-- ============ 模式三：多设备比对 ============ -->
   <section id="mode-compare" class="hidden">
+    <header class="page-heading"><div><h2>骑行端适配排查</h2><p>采集正常第三方设备和开发板，找出蓝牙能力差异，定位需要补齐的功能。</p></div><span class="page-context">只读采集 · 保存后比对</span></header>
     <section class="card compatibility" id="compatibility-diagnosis" aria-labelledby="compat-title">
       <div class="card-head">
-        <div><span class="eyebrow">BLE COMPATIBILITY</span><h2 id="compat-title">为什么目标端连不上？</h2></div>
+        <div><span class="eyebrow">BLE COMPATIBILITY</span><h2 id="compat-title">采集两侧设备信息</h2></div>
         <span class="badge warn" id="compat-status" role="status">等待设备快照</span>
       </div>
-      <p class="compat-lead">添加开发板与一台在同一目标端连接正常的设备，冻结蓝牙快照后对比。目标可填写任意支持 BLE 的软件或码表；结论绑定版本、系统与设备角色。</p>
+      <p class="compat-lead">先采集在骑行 App / 码表中正常工作的第三方设备，再采集开发板。两份信息分别保存，断开设备后仍可比对。</p>
+      <div class="capture-settings"><label>连接方式<select id="compat-connection-mode"><option value="sequential">逐台采集（推荐）</option><option value="simultaneous">尝试同时连接两台</option></select></label><span id="compat-connection-note">逐台连接，保存后释放；不依赖双连能力。</span></div>
+      <div class="capture-slots">
+        <article class="capture-slot" data-capture-side="reference"><div class="capture-slot-head"><h3>第三方正常设备</h3><span class="badge muted" id="compat-reference-state">未采集</span></div><div id="compat-reference-summary" class="capture-summary">选择功率计、心率带或骑行台。</div><div class="actions"><button class="btn primary" id="compat-collect-reference" type="button">连接并采集第三方设备</button><button class="btn ghost" id="compat-export-reference" type="button">导出这份信息</button></div></article>
+        <article class="capture-slot" data-capture-side="board"><div class="capture-slot-head"><h3>BikePower 开发板</h3><span class="badge muted" id="compat-board-state">未采集</span></div><div id="compat-board-summary" class="capture-summary">采集开发板当前安装的蓝牙能力。</div><div class="actions"><button class="btn primary" id="compat-collect-board" type="button">连接并采集开发板</button><button class="btn ghost" id="compat-export-board" type="button">导出这份信息</button></div></article>
+      </div>
+      <div class="capture-progress" role="status" id="compat-collection-progress">只读采集：GATT 服务、特征、属性、读取值与 10 秒通知样本；不写设备参数。</div>
+      <div class="actions capture-actions"><button class="btn alt" id="compat-release-capture" type="button">释放采集连接</button><button class="btn ghost" id="compat-clear-snapshots" type="button">清除本地两份信息</button><span id="compat-storage-status">信息保存在本浏览器，可分别导出备份。</span></div>
+      <details class="compat-context"><summary>骑行端场景（帮助定位差异，可选）</summary>
       <div class="compat-fields">
         <label>目标软件 / 码表<input id="compat-target" maxlength="100" placeholder="例如：骑鬥、码表型号"></label>
         <label>目标版本<input id="compat-version" maxlength="100" placeholder="软件或码表固件版本"></label>
@@ -1916,27 +1873,30 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <label>设备角色<select id="compat-role"><option value="power">功率计</option><option value="cadence">踏频</option><option value="heart-rate">心率</option><option value="trainer">智能骑行台</option><option value="running">跑步传感器</option></select></label>
         <label>失败阶段<select id="compat-stage"><option value="connect">连不上</option><option value="discover">搜不到</option><option value="disconnect">频繁断开</option><option value="data">连接后无数据</option><option value="control">控制失败</option></select></label>
       </div>
+      <label class="compat-check"><input type="checkbox" id="compat-reference-works">第三方设备在此骑行端、版本与角色下工作正常</label>
+      </details>
       <details class="compat-permissions">
         <summary>参考设备使用私有服务？补充 UUID 授权</summary>
         <label for="compat-private-uuids">已知服务 UUID（逗号或换行分隔，最多 16 个）</label>
         <textarea id="compat-private-uuids" rows="2" placeholder="完整 128 位 UUID 或 4 位标准 UUID"></textarea>
-        <p>填写后重新点下方「添加设备」授权。浏览器仅能枚举授权范围内的服务，不能读取硬件 MAC、完整广播或目标软件的握手。未知私有协议需原生采集协助分析。</p>
+        <p>填写后重新采集授权。浏览器只能读取已授权的服务；完整广播包、加密握手和未知私有协议需要原生采集补充。</p>
       </details>
+      <details class="compat-existing"><summary>已有连接信息 · 可直接保存快照</summary>
       <div class="compat-fields compat-pair">
         <label>开发板<select id="compat-board"><option value="">选择已添加设备</option></select></label>
         <label>正常参考设备<select id="compat-reference"><option value="">选择已添加设备</option></select></label>
       </div>
       <div class="actions compat-actions"><button class="btn alt" id="compat-add-device" type="button" onclick="addCompareDevice()">添加 / 连接设备</button><span class="hint">每次连接一台，可直接选择实时监控中的设备。</span></div>
-      <label class="compat-check"><input type="checkbox" id="compat-reference-works">已确认参考设备在上述目标、版本与角色下连接正常</label>
+      <button class="btn alt" id="compat-capture">保存已有两台快照</button>
+      </details>
       <div class="actions compat-actions">
-        <button class="btn primary" id="compat-capture">冻结两台设备快照</button>
-        <button class="btn alt" id="compat-analyze">分析固定快照</button>
+        <button class="btn primary" id="compat-analyze">找出差异并分析</button>
         <button class="btn alt" id="compat-export">导出诊断 JSON</button>
         <label class="btn ghost" for="compat-import">导入诊断 JSON</label><input class="compat-file" type="file" id="compat-import" accept=".json,application/json">
       </div>
       <p class="hint" id="compat-snapshots">快照独立于实时列表。连接后等待通知，再冻结；重新冻结或更改场景会清除旧实测结果。</p>
       <div id="compat-results" class="compat-results" aria-live="polite"></div>
-      <div class="compat-handoff">
+      <details class="compat-handoff"><summary>修复后到骑行端复测 · 记录结果</summary>
         <h3>把连接交给目标端</h3>
         <p>释放本站所有标签页的连接并暂停自动重连，然后在软件 / 码表测试。其他网站与 App 的连接需自行关闭。</p>
         <div class="actions"><button class="btn primary" id="compat-handoff">释放连接并开始实测</button><button class="btn alt" id="compat-resume">结束实测，允许手动连接</button></div>
@@ -1951,11 +1911,10 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <label class="compat-notes">实测备注<textarea id="compat-test-notes" rows="3" maxlength="2000" placeholder="记录连接次数、持续时间、异常与固件版本。建议连续连接 5 次、稳定收数 30 分钟。"></textarea></label>
         <button class="btn alt" id="compat-save-test">保存人工实测记录</button>
         <p class="hint" id="compat-test-status">尚无实测记录。网页分析不会自动证明目标端兼容。</p>
-      </div>
+      </details>
     </section>
-    <div class="card">
-      <div class="card-head">
-        <h2>设备比对 · 模板写入开发板</h2>
+    <details class="card compare-legacy"><summary>身份模板工具（仅复制名称与 DIS，不补齐蓝牙功能）</summary>      <div class="card-head">
+        <h2>身份模板工具</h2>
         <div class="actions">
           <button class="btn primary" onclick="addCompareDevice()">添加设备</button>
           <button class="btn alt hidden" id="compare-add-current" onclick="addCurrentToCompare()">加入监控中的设备</button>
@@ -1990,7 +1949,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
       <div id="compare-table-wrap" class="hidden" style="margin-top:16px;overflow-x:auto">
         <table class="compare-table" id="compare-table"></table>
       </div>
-    </div>
+    </details>
   </section>
 
   <!-- ============ 模式四：用户手册 ============ -->
@@ -2029,8 +1988,9 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
       <!-- 中：正文 -->
       <article class="manual-content" id="manual-content">
         <section class="manual-hero">
-          <h1>先看一次，<br>再<em>亲手操作</em>。</h1>
-          <p class="lead">播放短演示，跟着做。已预装的设备可直接连接 App。</p>
+          <h1>先看动作，再亲手操作。</h1>
+          <p class="lead">设备按键、手机配置、电脑工具，跟着演示完成每一步。</p>
+          <div class="home-actions"><a class="btn primary" href="#operations">看操作演示</a><button class="btn ghost" type="button" onclick="switchMode('connect')">打开实时监控</button></div>
           <section class="task-start" aria-label="选择使用任务">
             <h2>今天想完成哪一步？</h2>
             <div class="task-options">
@@ -2601,7 +2561,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
   <section id="mode-inspector" class="hidden">
     <div class="card">
       <div class="card-head">
-        <h2>BLE 原始通知检查器</h2>
+        <div><h2>通知检查器</h2><p class="page-lead">选择特征订阅，逐帧查看原始字节与协议解析。</p></div>
         <span class="badge muted" id="inspector-badge">未连接</span>
       </div>
       <div class="flash-step">
@@ -2661,7 +2621,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
   <section id="mode-health" class="hidden">
     <div class="card">
       <div class="card-head">
-        <h2>一键健康检查</h2>
+        <div><h2>健康检查</h2><p class="page-lead">从浏览器环境到设备通知，逐步检查并保存诊断报告。</p></div>
         <span class="badge muted" id="health-badge">等待运行</span>
       </div>
       <div class="flash-step">
@@ -3933,6 +3893,13 @@ function switchMode(mode,opts){
   document.querySelectorAll(".mode-btn").forEach(b=>{
     b.classList.toggle("active",b.dataset.mode===mode);
     if(b.dataset.mode===mode)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");
+  });
+  document.querySelectorAll(".tool-cluster").forEach(group=>{
+    const active=!!group.querySelector('.mode-btn[data-mode="'+mode+'"]');
+    group.classList.toggle("is-active",active);
+    const summary=group.querySelector("summary");
+    if(summary){if(active)summary.setAttribute("aria-current","true");else summary.removeAttribute("aria-current");}
+    group.open=false;
   });
   $("mode-flash").classList.toggle("hidden",mode!=="flash");
   $("mode-connect").classList.toggle("hidden",mode!=="connect");
@@ -6042,7 +6009,7 @@ async function initLinkUi(){
   renderLinkCapsule();renderManualLinkbar();
   if(compatibilityHandoffActive())return;
   const route=routeFromHash(location.hash);
-  if(route.mode==="flash")return;                      // 刷写页只用 USB 串口，不打扰
+  if(route.mode==="flash"||route.mode==="compare")return;
   let skipped=false;try{skipped=sessionStorage.getItem(GATE_SKIP_KEY)==="1";}catch(e){}
   if(skipped)return;                                   // 本次会话已选择「稍后连接」
   gateReturnMode=route.mode!=="manual"?route.mode:null; // 深链进来的，连接后回到原工具页

@@ -10,7 +10,7 @@ const root = path.join(__dirname, '..');
 const sandbox = { window: {} };
 vm.runInNewContext(fs.readFileSync(path.join(root, 'tools/web/phone-portal-source.js'), 'utf8'), sandbox);
 const embedded = sandbox.window.BikePowerPhoneSource;
-const production = name => fs.readFileSync(path.join(root, 'main/web', name), 'utf8');
+const production = name => fs.readFileSync(path.join(root, 'main/web', name), 'utf8').replace(/\r\n/g, '\n');
 assert.ok(embedded.includes(production('app.css')), '屏幕必须使用当前生产 CSS');
 assert.ok(embedded.includes(production('app.js')), '屏幕必须使用当前生产 JS');
 const adapter = embedded.match(/<script>([\s\S]*?)<\/script>/)[1];
@@ -42,10 +42,13 @@ const reference = production('index.html').replace('<!-- INLINE_CSS -->', '<styl
     await screen.locator('body').evaluate(async () => {
       await Promise.all(document.getAnimations().map(animation => animation.finished));
     });
+    await original.emulateMedia({ reducedMotion: 'reduce' });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     const shape = node => [...node.querySelectorAll('button,input,select,.topbar,.actionbar')].filter(n => n.getClientRects().length)
       .map(n => { const r = n.getBoundingClientRect(); return [n.id, n.textContent.trim(), r.x, r.y, r.width, r.height]; });
     assert.deepEqual(await screen.locator('body').evaluate(shape), await original.locator('body').evaluate(shape),
       '同一视口的控件位置、尺寸及标签与原页面一致');
+    await iframe.scrollIntoViewIfNeeded();
     const box = await iframe.boundingBox();
     const actualPixels = await page.screenshot({ clip: box, animations: 'disabled', caret: 'hide' });
     const referencePixels = await original.screenshot({ animations: 'disabled', caret: 'hide' });

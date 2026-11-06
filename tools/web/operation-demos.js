@@ -96,19 +96,19 @@
       <g class="board-labels" fill="currentColor" font-size="14"><text x="240" y="259">操作键</text><text x="9" y="287">复位</text><text x="242" y="410">指示灯</text><text x="150" y="432" text-anchor="middle" font-size="12">底部接电</text></g>
     </svg>`;
   }
-  function buttonMarkup() {
+  function buttonMarkup(withPhone = false) {
     return `<div class="button-demo" data-button-demo data-state="ble" data-pressed="true" data-playing="false">
       <div class="demo-scenes" role="group" aria-label="选择按钮操作演示">
         <button type="button" data-demo-scene="short" aria-pressed="false">短按减功率</button>
         <button type="button" data-demo-scene="adjust" aria-pressed="false">按住持续调功</button>
-        <button type="button" data-demo-scene="wifi" aria-pressed="true">长按 + 二次确认</button>
+        <button type="button" data-demo-scene="wifi" aria-pressed="true">开启 WiFi 配网</button>
         <button type="button" data-demo-scene="cancel" aria-pressed="false">不确认，自动取消</button>
       </div>
-      <div class="demo-head"><b data-demo-title>长按 + 二次确认</b><time data-demo-time>0.0 s</time></div>
+      <div class="demo-head"><b data-demo-title>长按 + 二次确认 · 开启 WiFi 配网</b><time data-demo-time>0.0 s</time></div>
       <div class="demo-stage"><div class="demo-light-field" aria-hidden="true"></div><div class="demo-board">${boardMarkup()}<span class="demo-caption" data-demo-key>按住</span></div>
         <div class="demo-metric">示例目标功率<strong><span data-demo-power>200</span><small>W</small></strong>
           <span class="demo-state" data-demo-state>蓝牙工作</span><span class="demo-countdown" data-demo-countdown>满 2 秒后松开</span>
-          <ol class="demo-sequence"><li data-demo-phase="hold">按住 2 秒</li><li data-demo-phase="release">松开，看快闪</li><li data-demo-phase="confirm">3 秒内再按</li></ol>
+          <ol class="demo-sequence"><li data-demo-phase="hold">按住 2 秒</li><li data-demo-phase="release">松开，看快闪</li><li data-demo-phase="confirm">再按，开启热点</li></ol>
           <span class="demo-led-label" data-demo-led-label>指示灯 · 慢闪</span>
         </div>
       </div>
@@ -116,6 +116,16 @@
       <p class="demo-text" data-demo-text></p>
       <div class="demo-controls"><button type="button" class="btn primary" data-demo-play aria-pressed="false">播放演示</button><button type="button" class="btn" data-demo-step>下一步</button><button type="button" class="btn ghost" data-demo-reset>重置</button></div>
       <span class="demo-caption" data-demo-caption role="status" aria-live="polite"></span>
+      <div class="wifi-connect-guide" data-demo-wifi-guide>
+        <h3>开启热点，进入手机版配置页</h3>
+        <p>长按操作键满 2 秒后松开，再在 3 秒内按一次，才会开启设备 WiFi 热点；不是连接家庭 WiFi。</p>
+        <ol>
+          <li><b>手机连接设备热点</b><span>在手机 WiFi 设置中选择 <code>BikePower-XXXXXX</code>，密码 <code>12345678</code>。“无互联网”是正常提示，请保持连接。</span></li>
+          <li><b>打开手机版配置页</b><span>等待自动弹出的配置页；未弹出时，在手机浏览器输入 <code>http://192.168.4.1</code>。当前 Pages 网站不是设备配置页。</span></li>
+          <li><b>保存后退出</b><span>修改参数，点“保存并应用”，等成功提示后再关闭 WiFi。热点默认 5 分钟，配置未完成可主动续期。</span></li>
+        </ol>
+        ${withPhone ? '<button class="btn" type="button" data-demo-phone>看手机配置演示</button>' : ''}
+      </div>
     </div>`;
   }
   function suiteMarkup() {
@@ -123,7 +133,7 @@
       ["button", "按钮配网"], ["save", "保存生效"], ["bridge", "功率校正"], ["handoff", "连接交接"]
     ].map(([key, title], i) => `<button type="button" data-operation-tab="${key}" aria-pressed="${i === 0}">${title}</button>`).join("")}</nav>
       <p class="operation-disclaimer">模拟演示 · 可以放心练习</p>
-      <section data-operation-panel="button">${buttonMarkup()}
+      <section data-operation-panel="button">${buttonMarkup(true)}
         <details class="practice"><summary>亲手按住，练一次</summary><div class="practice-body">
           <p>按住下方按钮 2 秒，松开，再按一次。键盘使用空格或 Enter。</p>
           <div class="practice-row"><button type="button" class="btn primary practice-key" data-practice-key>按住练习</button><output data-practice-output>200 W · 蓝牙工作</output><button type="button" class="btn ghost" data-practice-reset>重新练习</button></div>
@@ -232,11 +242,11 @@
       ["保存成功，再关闭热点。", 0, ["已保存 · 已关闭热点", "等待配对"], "返回 App", "working"],
       ["连接 App，确认读数。", 1, ["已生效", "200 W / 80 rpm"], "开始使用", "success"]
     ], note: "未预装的设备先用电脑安装；每次修改都要等保存成功。" },
-    compare: { title: "复制名称与设备信息", device: "computer", labels: ["参考设备", "BikePower"], frames: [
-      ["电脑打开设备比对，添加两台设备。", 0, ["已读取", "已连接"], "查看差异", "ready"],
-      ["选择要复制的名称与设备信息。", 0, ["名称与设备信息", "等待保存"], "写入 BikePower", "working"],
-      ["保存后重新配对，再实际检查。", 1, ["保持不变", "已保存 · 回读一致"], "释放连接", "success"]
-    ], note: "复制信息不保证兼容。测试 App 前释放网页连接；可导出诊断报告。" }
+    compare: { title: "采集与分析蓝牙差异", device: "computer", labels: ["第三方正常设备", "BikePower 设备"], frames: [
+      ["先连接第三方设备，保存服务、特征和通知信息。", 0, ["快照已保存 · 可断开", "待采集"], "采集 BikePower", "ready"],
+      ["再采集 BikePower，分别保存两侧信息。", 1, ["已保存", "快照已保存"], "找出差异", "working"],
+      ["对照差异补齐功能，再到骑行端复测。", 1, ["正常参考", "服务 / 能力 / 通知差异"], "导出差异报告", "success"]
+    ], note: "默认逐台采集，可尝试双连。未授权和未采集不当缺失；页面不自动修改固件。" }
   };
   function guideScreen(name, position) {
     const guide = guides[name], frame = guide.frames[position];
@@ -309,7 +319,7 @@
     const instructions = {
       hold: "正在按住。满 2 秒后松开，随后进入确认窗口。",
       confirm: "已松开，临时调功回滚。请在 3 秒内再按一次。",
-      wifi: "二次确认成功！到手机 WiFi 设置连接 BikePower-XXXXXX。",
+      wifi: "二次确认成功，WiFi 热点已开启。手机连接 BikePower-XXXXXX（密码 12345678），再打开 http://192.168.4.1 配置参数。",
       ble: "蓝牙工作。可以短按调功，或按住至少 2 秒练习配网。"
     };
     let lastExerciseMode = "";
@@ -485,10 +495,28 @@
     });
     hero.after(operations);
     operations.after(tools);
+    const tasks = hero.querySelector(".task-start");
+    if (tasks) { tasks.classList.add("home-tasks"); operations.after(tasks); }
+    const information = document.createElement("details");
+    information.className = "home-information";
+    information.innerHTML = "<summary>浏览器支持与设备基础信息</summary>";
+    [".platform-guide", ".manual-meta", ".operation-caution"].forEach(selector => {
+      const node = hero.querySelector(selector);
+      if (node) information.append(node);
+    });
+    tools.after(information);
     const title = document.createElement("div");
     title.className = "manual-more";
     title.innerHTML = "<h2>其他步骤，展开看演示</h2>";
-    tools.after(title);
+    information.after(title);
+    const toc = document.querySelector(".manual-toc");
+    if (toc) {
+      const directory = document.createElement("details");
+      directory.className = "home-directory";
+      directory.innerHTML = "<summary>查找具体操作 · 详细目录</summary>";
+      directory.append(toc);
+      title.after(directory);
+    }
     content.querySelectorAll('a[href^="#ch"]').forEach(link => link.addEventListener("click", () => {
       const target = document.getElementById(link.hash.slice(1));
       if (target && target.tagName === "DETAILS") target.open = true;

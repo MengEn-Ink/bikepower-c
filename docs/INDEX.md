@@ -36,6 +36,8 @@
 | [持久化稳定性加固](dev/38-persistence-stability-hardening.md) | 双槽快照、联合提交、迁移与故障恢复、严格门禁 |
 | [Pages 操作演示](dev/39-pages-operation-demos.md) | 合宙官方参考、BOOT 配网/保存/校正/连接交接、动画交付与验证 |
 | [手机实体演示方案与实施](dev/40-phone-operation-demo-plan.md) | 设备/手机两类入口、真实页面复用、隔离与对齐验收 |
+| [Pages 全站布局更新](dev/41-pages-layout-refresh.md) | 轻导航、演示主导首页、工具页排版与回归边界 |
+| [骑行端适配差异采集](dev/42-cycling-compatibility-capture.md) | 两侧独立保存、顺序/双连、差异解析与补齐方向 |
 | [鬥骑序列号修复](dev/43-qidou-serial-fix.md) | USB证据、非空默认序列号、配置保留刷写与待App复测 |
 
 ## Code Wiki

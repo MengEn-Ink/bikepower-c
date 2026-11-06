@@ -50,13 +50,18 @@ const web = path.join(root, 'tools/web');
         await demo.getByRole('button', { name: '下一步', exact: true }).click();
         assert.equal(await demo.getAttribute('data-state'), 'wifi');
         assert.equal(await demo.locator('[data-demo-power]').textContent(), '200');
+        assert.match(await demo.locator('[data-demo-title]').textContent(), /开启 WiFi 配网/);
+        assert.match(await demo.locator('[data-demo-state]').textContent(), /热点已开启/);
+        assert.match(await demo.locator('[data-demo-wifi-guide]').innerText(), /12345678.*配置页/s);
+        assert.match(await demo.locator('[data-demo-text]').textContent(), /192\.168\.4\.1/);
         if (width === 390 || width === 1280) {
           await suite.screenshot({ path: '/tmp/bikepower-operation-' + width + '-' + theme + '.png' });
         }
         await demo.getByRole('button', { name: '重置', exact: true }).click();
         await demo.getByRole('button', { name: '播放演示', exact: true }).click();
         await page.waitForFunction(selector => document.querySelector(selector).dataset.playing === 'true', (width < 900 ? '.mobile-guide' : '#mode-manual') + ' [data-button-demo]');
-        await suite.locator('[data-operation-tab="phone"]').click();
+        await demo.locator('[data-demo-phone]').click();
+        assert.match(await suite.locator('.phone-entry-note').textContent(), /192\.168\.4\.1/);
         assert.equal(await demo.getAttribute('data-playing'), 'false', '切换场景暂停隐藏演示');
         await suite.locator('.phone-demo[data-ready="true"]').waitFor();
         const screen = suite.frameLocator('iframe');
@@ -82,22 +87,25 @@ const web = path.join(root, 'tools/web');
         assert.equal(await page.evaluate(() => window.demoDeviceRequests), 0, '教学无无线或串口请求');
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), '页面横向溢出');
         assert.deepEqual(errors, []);
-        assert.doesNotMatch(await scope.innerText(), /合宙|ESP32|CORE-ESP/);
-        const stepGuide = width < 900 ? scope.locator('[data-operation-guide="hotspot"]') : scope.locator('#ch04');
-        if (width >= 900) await stepGuide.locator('summary').click();
-        const guide = stepGuide.locator('.guide-animation');
-        await guide.locator('[data-guide-next]').click();
-        assert.match(await guide.locator('[data-guide-caption]').textContent(), /12345678/);
-        await guide.locator('[data-guide-next]').click();
-        assert.match(await guide.locator('[data-guide-stage]').textContent(), /192\.168\.4\.1/);
-        assert.equal(await guide.getAttribute('data-playing'), 'false');
-        await page.emulateMedia({ reducedMotion: 'no-preference' });
-        await guide.locator('[data-guide-play]').click();
-        assert.equal(await guide.getAttribute('data-playing'), 'true');
-        if (width >= 900) await stepGuide.locator('summary').click();
-        else await suite.scrollIntoViewIfNeeded();
-        await page.waitForFunction(selector => document.querySelector(selector).dataset.playing === 'false',
-          (width < 900 ? '.mobile-guide [data-operation-guide="hotspot"]' : '#ch04') + ' .guide-animation');
+        assert.doesNotMatch(await suite.innerText(), /合宙|ESP32|CORE-ESP/);
+        if (width >= 900) {
+          const stepGuide = scope.locator('#ch04');
+          await stepGuide.locator('summary').click();
+          const guide = stepGuide.locator('.guide-animation');
+          await guide.locator('[data-guide-next]').click();
+          assert.match(await guide.locator('[data-guide-caption]').textContent(), /12345678/);
+          await guide.locator('[data-guide-next]').click();
+          assert.match(await guide.locator('[data-guide-stage]').textContent(), /192\.168\.4\.1/);
+          assert.equal(await guide.getAttribute('data-playing'), 'false');
+          await page.emulateMedia({ reducedMotion: 'no-preference' });
+          await guide.locator('[data-guide-play]').click();
+          assert.equal(await guide.getAttribute('data-playing'), 'true');
+          await stepGuide.locator('summary').click();
+          await page.waitForFunction(() => document.querySelector('#ch04 .guide-animation').dataset.playing === 'false');
+        } else {
+          assert.equal(await scope.locator('[data-operation-guide], .guide-faq').count(), 0, '移动端删除重复二级教程区');
+          assert.equal(await scope.locator('.mg-scene-list article').count(), 4, '移动端以使用场景替代');
+        }
         await suite.locator('[data-operation-tab="button"]').click();
         await demo.locator('[data-demo-reset]').click();
         const glow = await demo.locator('[data-led-halo]').evaluate(node => ({

@@ -22,9 +22,9 @@ def render():
         "./manual-images/luatos-core-esp32c3-official-reference.png",
         "https://wiki.luatos.com/chips/esp32c3/board.html",
     )
-    css += (ROOT / "tools/web/pages-experience.css").read_text(encoding="utf-8")
     css += (ROOT / "tools/web/operation-demos.css").read_text(encoding="utf-8")
     css += (ROOT / "tools/web/phone-operation-demos.css").read_text(encoding="utf-8")
+    css += (ROOT / "tools/web/pages-experience.css").read_text(encoding="utf-8")
     css += "\n.mobile-guide{display:block!important;max-width:560px;margin:auto}.mg-hero h1{font-size:40px}.mg-hero p{font-size:15px}.mobile-guide [id]{scroll-margin-top:75px}\n"
     script = render_phone()
     script += (ROOT / "tools/web/phone-operation-demos.js").read_text(encoding="utf-8")

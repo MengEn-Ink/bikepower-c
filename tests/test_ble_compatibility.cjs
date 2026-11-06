@@ -247,4 +247,19 @@ test('输入限制拒绝未知版本、畸形 UUID、无穷时间、巨大文件
   assert.throws(() => api.validateSnapshot(duplicate), /重复/);
 });
 
+test('差异覆盖双方服务与未知权限，不机械复制实时值',()=>{
+ const a=snapshot(),b=snapshot('reference');
+ a.services.push({uuid:uuid('180d'),enumeration:'complete',characteristics:[{uuid:uuid('2a37'),properties:'notify',raw:null,readStatus:'not-readable'}]});
+ b.services[0].characteristics[1].raw='00 00 00 00';
+ const rows=api.compareCapabilities(a,b);
+ assert.ok(rows.some(r=>r.category==='service'&&r.label.includes('180d')&&r.certainty==='unknown'));
+ assert.ok(rows.some(r=>r.category==='feature'&&r.label.includes('2a65')));
+ a.services[0].characteristics[1].readStatus='failed';a.services[0].characteristics[1].raw=null;
+ assert.ok(api.compareCapabilities(a,b).some(r=>r.category==='feature'&&r.certainty==='unknown'));
+});
+test('单侧报告与稳定设备标识保留，可先后导入',()=>{
+ const a=snapshot();a.deviceKey='stable-board';
+ const out=api.importReport(JSON.stringify(api.makeReport(context,a,null,null)));
+ assert.equal(out.snapshots.board.deviceKey,'stable-board');assert.equal(out.snapshots.reference,null);
+});
 module.exports = { snapshot, context };

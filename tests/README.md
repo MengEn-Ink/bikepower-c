@@ -1,5 +1,17 @@
 # 测试脚本使用说明
 
+## 骑行端适配采集回归
+
+- `node tests/test_pages_capture_browser.cjs`：实际Pages两侧只读采集、默认逐台、双连失败保留、稳定标识、刷新、单側导入导出与差异展示，外部BLE为替身，采样等待加速；已接入浏览器入口。
+- `node --test tests/test_ble_compatibility.cjs`：23項模型回归，包括双向差异与未知权限。
+- 实际双BLE连接及目标App仍待实物验收，见 [采集记录](../docs/dev/42-cycling-compatibility-capture.md)。
+
+## Pages 全站布局回归
+
+- `node tests/test_pages_layout_browser.cjs`：浅深主题 × 900/1280/1600 px，七个原路由、三分区导航、激活态、菜单关闭/键盘焦点、首页内容顺序、顶栏文字与横向溢出；已接入 `npm run browser --prefix tests/web-flash`。
+- 可用 `BIKEPOWER_CHROMIUM_PATH` 显式指定现有 Chromium 可执行文件；未指定时沿用 Playwright 默认。只启动独立无头测试，不读取用户浏览器资料，不触发真实蓝牙或串口请求。
+- 本轮变化及实物/Safari 未覆盖边界见 [布局更新记录](../docs/dev/41-pages-layout-refresh.md)。
+
 ## 协议及 Pages 审查修复回归
 
 - `python3 tests/test_audit_regressions.py`：生产 CPS 扩展与截断、uint64 累计/饱和/暂停/Reset、同脚步幅和 FTMS 完整记录。
@@ -232,7 +244,7 @@ python3 scripts/tools/device_acceptance.py init --board generic-c3 --operator "�
 | `tools/web/ble-monitor.html` | Web Bluetooth 客户端、全量 NVS 配置编辑器与 ESP Web Tools 刷写页；实时曲线支持四档时间范围、逐点读数、统计、暂停和 CSV 导出 |
 | `tools/web/pages-experience.css` / `.js` | 功能分区、响应布局、按钮四场景教学与独立页面更新时间；教学不操作硬件 |
 | `tests/test_pages_experience.cjs` | 固定时刻验证长按回滚、确认/超时、短按和页面时间信息 |
-| `tests/test_pages_experience_browser.cjs` | 两主题 × 六宽度真实操作、播放/暂停/逐步、减少动画、锚点、验收勾选与桌面导航 |
+| `tests/test_pages_experience_browser.cjs` | 两主题 × 六宽度真实操作、播放/暂停/逐步、减少动画、移动介绍/场景/锚点/主题、旧教程无残留与桌面导航 |
 | `tests/test_pages_operation_demos.cjs` | 独立教学模型：持按/回滚/确认边界、草稿失败重试、0W 与连接交接 |
 | `tests/test_pages_operation_demos_browser.cjs` | 浅深主题四宽度、真实控件与键盘持按、减少动画、离线、无 BLE/串口设备请求 |
 | `tests/test_phone_operation_demos_browser.cjs` | 生产页控件与像素对齐、真实保存失败/重试/关闭、扫描与0W、跑步/名称/骑行、单屏与离线隔离 |
