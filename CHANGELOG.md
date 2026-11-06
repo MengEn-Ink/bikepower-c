@@ -2,7 +2,7 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
-## [未发布]
+## [4.3.0] - 2026-11-06
 
 ### 设备状态与真实遥测（2026-11-05）
 - Pages 增加 `device-status-mobile.html` 手机原型在线预览，复用单文件离线版；右上角数值、占比、主题和详情交互支持 320/390px，所有数值明确为演示数据。
@@ -115,6 +115,16 @@
 - 切换入口：桌面顶栏「帮助」左侧、移动端引导页顶栏各一个日 / 月切换按钮；帮助菜单新增「主题跟随系统」。默认跟随系统 `prefers-color-scheme`，手动选择写入 `localStorage`（`bikepower.theme.v1`）后覆盖系统设置，多标签页同步；首帧前由 `<head>` 小脚本定主题，不闪屏。
 - 覆盖范围：连接门、右上角连接胶囊、实时读数与曲线、IDE 侧栏 / 底部面板 / 状态栏、确认弹窗、手册与灯箱、新手引导遮罩、刷写页与 ESP Web Tools 刷写弹窗（改为读取主题变量，可穿透 shadow DOM）。
 - 验证：`tests/check_ble_monitor.py` 新增亮色令牌、切换入口、偏好 key、跟随系统、ESP 弹窗取色，以及“暗色表面色只在令牌中定义一次”回归；Playwright 亮 / 暗两主题 × 7 个工具页 + 连接门 + 移动引导页无横向溢出、同屏实心金按钮 ≤ 1、切换 / 刷新保持 / 恢复跟随系统 / 系统实时切换、页面 0 JS error；注入 Web Bluetooth 假设备验证亮色下真实解析与曲线渲染路径。真机 BLE 与 Web Serial 刷写未在本次变更中重新执行。
+
+### 发布验证（2026-11-06）
+
+- 版本决议：HEAD `ab9062a` 相对 `v4.2.1`（`e8acb35`）领先 45 个提交且含实质固件改动，故取 **4.3.0**，不与既有 tag 同名复用到不同字节。
+- 构建：清理旧根 `sdkconfig`（备份为 `sdkconfig.stale-4.2.1-*.bak`），由 `sdkconfig.defaults` + `CONFIG_BOARD_GENERIC_C3=y` 生成配置，产物 `0x1155f0`（1136272 字节，app SHA256 `2ce668bca569b3a32d3b1a34fddf0a3ff73b66a8ce36d51c4fae477f259fc132`）；核对项全 PASS（4.3.0 / esp32c3 / MAX_CCCDS=16 / 运行统计与 esp_timer 开启 / 4MB / 未误选 M5Stamp / HEAD=ab9062a）。构建日志仅有 NimBLE 第三方 `key_rc` 未使用告警与 ESP_ROM_ELF_DIR 未定义提示。
+- 合并与烧录：`merge_bin` 生成 `generic-c3-v4.3.0.bin`（1201808 字节），按 `write_flash 0x0` 单文件烧录后分段回读，bootloader / partition / app 三段 SHA256 与源产物一致。整段 `verify_flash` 会跳过 NVS 0xFF 空洞而误报，故改用分段比对。
+- 门禁：`check_config_consistency.py` 282 通过 / 0 失败；host 6115 通过 / 0 失败；BLE 标准契约、协议向量、桥接生产会话 ASan/UBSan、遥测人工真值通过；门户三档宽度（320/390/1440）保存失败/桥接/运行断言通过；Windows 侧 14 项静态与 mock 门禁 exit=0；10 分钟核心流程耐久 46 轮通过。
+- 真机（generic-c3 / COM204）：串口启动无致命异常；骑行五服务、DIS、标准特征、FTMS Feature、CPS 通知、FTMS-CP 响应、ERG 收敛与 Stop/Pause 通过；双次扫描/连接/断开通过；5 分钟耐久 10 轮 324.4 秒、204 条 CPS、扫描与连接失败 0、空通知轮次 0；新增遥测四组通知、CPU、RSSI、堆（>80KiB）、退订与双次重连通过，45 秒探针 boot id 不变；八组配置读写、错误路径、NVS 重启持久化、GATT 重建与恢复全部通过。
+- 已知限制与未执行项（如实记为 `NOT_RUN`）：跑步 RSC/FTMS 真机、门户手机端、按钮短/长按、LED 灯效、WiFi 二次确认、Zwift 与跑步 App 联调未在本轮执行，其中按钮/LED/手机端需人工确认。
+- 环境注意事项：Windows 以已配对身份自动重连开发板时会占用唯一外设链路并导致停止广播（其他主机扫描/连接失败），测试采用复位后立即抢占连接规避；板载 DIS 身份覆盖（NVS `bp_ident`，当前 `PM_2.97_251011`）会使 DIS 固件版本偏离编译值，验收时临时清空并在测试后原样写回。上述均为设备/主机侧状态，不影响镜像内容。
 
 ## [4.2.1] - 2026-10-30
 

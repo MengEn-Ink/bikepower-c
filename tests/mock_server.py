@@ -43,7 +43,7 @@ DEVICES = [
 IDENTITY = {"manufacturer": "Magene", "model": "P505", "serial": "MOCK-4A29",
             "hardware": "1.0", "firmware": "2.1", "software": ""}
 BOARD_IDENTITY = {"manufacturer": "BikePower", "model": "Generic-C3", "serial": "",
-                  "hardware": "1.0", "firmware": "4.2.1", "software": ""}
+                  "hardware": "1.0", "firmware": "4.3.0", "software": ""}
 LIMITS = {
     "schema_ver": (14, 14),
     "power": (0, 2000), "cadence": (20, 120), "heartrate": (60, 200),
@@ -245,7 +245,7 @@ def state():
     tick()
     return {"config": copy.deepcopy(CONFIG), "revision": STATE["revision"], "bridge": bridge(),
             "identity": copy.deepcopy(BOARD_IDENTITY),
-            "firmware_version": "4.2.1", "firmware_name": "generic-c3-v4.2.1",
+            "firmware_version": "4.3.0", "firmware_name": "generic-c3-v4.3.0",
             "board": "generic-c3", "git_sha": "mock", "build_time": "mock",
             "remaining_sec": remaining(), "closing": STATE["closing"],
             "pacers": [{"id": i, "low": lo, "high": hi, "name": name} for i, (lo, hi, name) in enumerate(PACERS)],

@@ -1,11 +1,22 @@
 # BikePower C — 项目进度
 
 > 当前行为：[技术参考](docs/dev/01-technical-reference.md)；早期重写背景见 [归档](docs/archive/01-cidf-nimble-rewrite.md)
-> 当前固件版本：v4.2.1（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v4.3.0（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
 ---
+
+## 2026-11-06 v4.3.0 正式发布验证
+
+- [x] 版本统一 4.3.0（`main/bikepower_config.h` 固件/修复版、AGENTS、PROGRESS、CHANGELOG、docs、Pages 工具与 mock），`check_config_consistency.py` 282 通过 / 0 失败。
+- [x] 从全新 `sdkconfig.defaults` 生成 generic-c3 配置构建，`verify_build.py` 全部 PASS：版本 4.3.0、target esp32c3、`MAX_CCCDS=16`、运行统计与 esp_timer 开启、4MB、未误选 M5Stamp、HEAD=ab9062a；app `0x1155f0`，app SHA256 `2ce668bc…fc132`。
+- [x] 合并单文件 `build/release/generic-c3-v4.3.0.bin`（1201808 字节）已烧录并按 bootloader/partition/app 三段回读比对，全部一致；整段 `verify_flash` 因合并镜像含 NVS 空洞不适用，改用分段比对。
+- [x] host 单测 6115 通过 / 0 失败（含遥测四组人工真值、桥接主备、生产会话 ASan/UBSan）；BLE 标准契约与协议向量通过；门户三档宽度（320/390/1440）渲染与保存/桥接/运行断言通过。Windows 侧 14 项静态与 mock 门禁全部 exit=0。
+- [x] 真机（COM204 / 10:20:BA:CC:34:52 / generic-c3）：串口启动 ROM 标志与无致命异常；骑行五服务 + FTMS ERG 收敛 + Stop/Pause 通过；双次扫描/连接/断开通过；5 分钟耐久 10 轮 324.4 秒、204 条 CPS、扫描/连接失败 0；新增遥测四组通知、CPU、RSSI、堆、退订与双次重连通过（45 秒探针 boot id 未变）；八组配置读写、错误路径、NVS 重启持久化、GATT 重建与恢复通过。
+- `NOT_RUN`：跑步 RSC/FTMS 真机、门户手机端、按钮短/长按、LED 灯效、WiFi 二次确认、Zwift 与跑步 App 联调未在本轮执行（按钮/LED/手机项需人工）。
+- 已知环境行为：开发板被 Windows 以已配对身份自动重连时会占满唯一外设链路并停止广播，其他主机扫描/连接失败；测试通过复位后立即抢占连接规避。DIS 身份覆盖（NVS `bp_ident`，当前为 `PM_2.97_251011`）会让 DIS 固件版本偏离编译值，验收时临时清空并在测试后原样写回。
+- 证据：`tests/reports/device-acceptance-generic-c3.json`（firmware=4.3.0 / git=ab9062a，P0 5/5 PASS，strict 校验通过）；日志见 `tests/reports/release-ab9062a-20261106/`。
 
 ## 2026-11-05 设备状态与 CPU 遥测
 
@@ -143,7 +154,7 @@
 
 ## 2026-11-04 核心门户与真实功率桥接实施
 
-- 发布门禁：代码提交与合并已获授权，v4.2.1 候选固件须用户手动验证并明确批准后才能发布。
+- 发布门禁：代码提交与合并已获授权，v4.3.0 候选固件须用户手动验证并明确批准后才能发布。
 - [x] 桥接领域、配置 schema v13、BLE 第六组及 NVS 显式编码；保留历史配置迁移。
 - [x] host `6146/0`、桥接解析/校正/失效/配置往返 suite、13 个协议固定向量交叉校验通过。
 - [x] 上游静态连接/订阅/DIS/重连、主循环统一输出和 revision 配置事务；生产会话与扫描 ASan/UBSan 通过。

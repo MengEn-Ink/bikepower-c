@@ -233,7 +233,7 @@ idf.py -p <port> flash
 
 ```bash
 python3 esptool.py --chip esp32c3 merge_bin \
-    -o generic-c3-v4.2.1.bin \
+    -o generic-c3-v4.3.0.bin \
     --flash_mode dio --flash_freq 80m --flash_size 4MB \
     0x0 build/bootloader/bootloader.bin \
     0x8000 build/partition_table/partition-table.bin \
@@ -397,15 +397,15 @@ build_all.sh 执行顺序:
 从 `main/bikepower_config.h` 提取：
 
 ```c
-#define FIRMWARE_VERSION       "4.2.1"
+#define FIRMWARE_VERSION       "4.3.0"
 #define FIRMWARE_STABLE_VERSION "4.0.0"
-#define FIRMWARE_FIX_VERSION   "4.2.1"
+#define FIRMWARE_FIX_VERSION   "4.3.0"
 ```
 
 产物文件名格式：
 `bikepower-c-<board>-v<VERSION>.bin`
 
-示例：`generic-c3-v4.2.1.bin`。Git ID 与构建时间保留在 manifest；正式构建显式关闭 `PORTAL_TEST_AUTO_CONFIG`，不继承测试缓存。
+示例：`generic-c3-v4.3.0.bin`。Git ID 与构建时间保留在 manifest；正式构建显式关闭 `PORTAL_TEST_AUTO_CONFIG`，不继承测试缓存。
 
 ---
 

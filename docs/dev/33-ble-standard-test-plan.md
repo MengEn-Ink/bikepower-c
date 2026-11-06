@@ -46,9 +46,9 @@
 | Host | `make -C test run`：6115/0；功率桥接及三设备状态机通过 |
 | Pages | `test_ble_compatibility.py`：15/15 规则测试及生产页面交接/双主题回归通过；新规则检查 FTMS 目标范围及属性 |
 | 总质量门禁 | `python3 scripts/tools/quality_gate.py --no-build`：114 PASS / 2 未提交工作区 WARN / 0 FAIL；包含协议 vectors、重连/profile harness、门户/Pages、文档链接及离线手册 |
-| 核心耐久 | `test_core_flow_endurance.py`：180.0 秒、15 轮通过；[报告](../../build/standard-core-flow-endurance.md) |
-| 操作门禁 | `operation_gate.py --level quick` 全通过；[报告](../../build/standard-operation-quick.md) |
-| 双板正式配置 | 隔离 `build/compat-generic-c3`、`build/compat-m5stamp-c3`，ESP-IDF v5.5.4 编译通过，factory 分区余量 72%；[通用日志](../../build/standard-generic-build.log)、[M5 日志](../../build/standard-m5stamp-build.log) |
+| 核心耐久 | `test_core_flow_endurance.py`：180.0 秒、15 轮通过；`build/standard-core-flow-endurance.md` |
+| 操作门禁 | `operation_gate.py --level quick` 全通过；`build/standard-operation-quick.md` |
+| 双板正式配置 | 隔离 `build/compat-generic-c3`、`build/compat-m5stamp-c3`，ESP-IDF v5.5.4 编译通过，factory 分区余量 72%；`build/standard-generic-build.log`、`build/standard-m5stamp-build.log` |
 | 真机扫描 | 仅 Bluetooth/debug-console/wlan-debug 串口，无 ESP32 USB 串口；烧录、实际广播/读取/控制、真实无线耐久均 NOT_RUN |
 
 新测试断言直接运行生产函数，不模拟正确业务结果。C golden bytes 手工维护；广播包含双模式 × 7 掩码 × 短名/23 字节 ASCII/中文名共 42 个组合。控制涵盖所有现有操作、两端边界、错误长度、未获权、重入、应用拒绝、响应发送失败。GAP 验证发送成功尚未确认时维持 pending，确认/错误后释放，并隔离其他句柄。Indication 测试验证零等待锁、分配与协议栈返回码、断开/停止守卫。

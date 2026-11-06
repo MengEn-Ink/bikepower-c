@@ -49,7 +49,7 @@
 - Pages：15 条诊断规则与页面交接、双主题浏览器回归通过。
 - 核心流程离线耐久：180 秒、15 轮通过。
 
-证据见 [标准补测记录](33-ble-standard-test-plan.md)、[质量日志](../../build/standard-quality.log)、[通用编译](../../build/standard-generic-build.log)、[M5 编译](../../build/standard-m5stamp-build.log)。
+证据见 [标准补测记录](33-ble-standard-test-plan.md)、`build/standard-quality.log`、`build/standard-generic-build.log`、`build/standard-m5stamp-build.log`。
 
 ## 验收边界与下一阶段选择
 
@@ -92,7 +92,7 @@
 | 最终文档门禁 | 79 PASS / 2 未提交工作区 WARN / 0 FAIL |
 | 双板正式配置编译 | generic-c3、m5stamp-c3 均通过，app `0x1143b0`，factory 剩余 72% |
 
-日志：[生产回归](../../build/recheck-standard.log)、[质量门禁](../../build/recheck-quality.log)、[文档门禁](../../build/recheck-docs.log)、[通用编译](../../build/recheck-generic-build.log)、[M5 编译](../../build/recheck-m5stamp-build.log)。剩余规范差距见 [HTML 审查报告](../../build/standard-review.html) 与 [Markdown 报告](../../build/standard-review.md)；已修复项不重复列为未解决缺陷。上述结果来自提交前验证；未打 tag 或发布固件。
+日志：`build/recheck-standard.log`、`build/recheck-quality.log`、`build/recheck-docs.log`、`build/recheck-generic-build.log`、`build/recheck-m5stamp-build.log`。剩余规范差距见 `build/standard-review.html` 与 `build/standard-review.md`；已修复项不重复列为未解决缺陷。上述结果来自提交前验证；未打 tag 或发布固件。
 
 ### 提交合并记录
 
