@@ -1,5 +1,14 @@
 # 测试脚本使用说明
 
+## 协议及 Pages 审查修复回归
+
+- `python3 tests/test_audit_regressions.py`：生产 CPS 扩展与截断、uint64 累计/饱和/暂停/Reset、同脚步幅和 FTMS 完整记录。
+- `python3 tests/test_control_delivery.py`：实际控制点、CCCD 发送守卫及主循环 mailbox；忙拒绝、应用后确认、失效票据、RSC uint32 dm 与精度。
+- `node tests/test_pages_audit_browser.cjs`：CSC 轮+曲柄/回绕、FTMS 连续更新、来源新鲜度、截断不污染、八组完整读取与 revision fence。
+- 桥接 DOM 及上述浏览器回归已接 `npm run browser --prefix tests/web-flash`、Pages 异常回归入口、quick/full 与严格质量门禁。
+- `python3 scripts/tools/quality_gate.py --build-dir build-review --strict`：独立候选目录构建，并用当前解释器运行专项，避免旧 CMake defaults 或 Python 环境漂移。
+- 真实桥接关闭 FTMS，模拟骑行保留 FTMS；本轮仅宿主和浏览器替身，不证明配对、物理 flash、真实 App 或认证通过。
+
 ## 持久化稳定性加固
 
 - `python3 tests/test_persistent_store.py`：ASan/UBSan 编译生产快照/NVS/身份模块；immediate-write 替身覆盖失败、截断、回读损坏、模拟掉电、重启、旧键迁移、代次回绕和 1000 次保存重载。
@@ -67,7 +76,7 @@ quick 保持无 ESP-IDF 依赖。宿主机 C11 编译显式启用 `_POSIX_C_SOUR
 
 ## 核心门户与桥接新增验证
 
-- `node tests/test_pages_bridge_browser.cjs`：Pages 浅暗主题真实 DOM 编辑、六组校正保存、绑定保留、未绑定保护、旧固件五组降级、手机引导与键盘焦点；BLE 事务响应为替身，不能代替真机验收。
+- `node tests/test_pages_bridge_browser.cjs`：Pages 浅暗主题真实 DOM 编辑、八组校正保存、绑定保留、未绑定保护、旧固件五组降级、手机引导与键盘焦点；BLE 事务响应为替身，不能代替真机验收。
 
 - `python3 tests/test_bridge_session.py`：ASan/UBSan 执行生产会话与扫描代码，覆盖 CCCD、DIS、代次、两样本、过期、重连和取消。
 - `python3 tests/check_portal_render.py`：生产压缩页面在 320/390/1440 宽度验证保存失败、桥接、0W、过期、身份复制、心率、跑步和关闭 WiFi。

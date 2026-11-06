@@ -84,7 +84,7 @@
 
 1. `ESP_LOGI(TAG, "BikePower C 启动...")`
 2. `nvs_flash_init()`
-3. 如遇 `ESP_ERR_NVS_NO_FREE_PAGES` 或 `ESP_ERR_NVS_NEW_VERSION_FOUND`，执行 `nvs_flash_erase()` 后重试
+3. NVS 初始化失败时不擦除分区；保留介质，进入只读默认配置，跳过快照及最近上游加载，BLE 可继续启动
 4. `power_engine_init(&s_engine)`
 5. `nvs_store_load(&s_engine)`
 6. `power_engine_clear_dirty(&s_engine)`
@@ -188,7 +188,7 @@
 通知每轮采集一次完整快照，保证各特征来自同一轮输入；固定长度纯 C 二进制
 codec 在短临界区内写通知缓冲，GATT 锁内复制缓冲与动态长度，锁外写 mbuf。
 ready/stopping/failed/profile/mask/连接句柄使用 C11 原子；释放 NimBLE 仍受
-`g_notify_lock` 保护。应用 mailbox 通过临界区读写，队列优先、pending fallback；
+`g_notify_lock` 保护。应用 mailbox 通过临界区读写；控制命令使用有界单槽、满槽拒绝，其他幂等事件保留队列优先与 pending fallback；
 引擎和 radio_ctrl 暂停态由主任务独占。
 
 真正的 BLE 通知由 `ble_bikepower.c` 里的 `notify_tick()` 定时器回调完成。
@@ -233,7 +233,8 @@ ready/stopping/failed/profile/mask/连接句柄使用 C11 原子；释放 NimBLE
 广播入口是 `start_advertising()`。
 广播包 16-bit UUID 按当前 `broadcast_mask` 动态拼装，仅包含已注册服务：
 
-- 骑行全开：`POWER_SERVICE_UUID` + `CSC_SERVICE_UUID` + `FTMS_SERVICE_UUID`
+- 模拟骑行全开：`POWER_SERVICE_UUID` + `CSC_SERVICE_UUID` + `FTMS_SERVICE_UUID`
+- 配置为真实桥接：只声明 CPS/CSC（可选 HRS）；不注册、广播或通知 FTMS，即使暂时模拟降级也不改变布局
 - 跑步全开：`RSC_SERVICE_UUID` + `FTMS_SERVICE_UUID`
 - `HR_SERVICE_UUID` 仅在 HEARTRATE 启用时放入 scan response
 
@@ -269,7 +270,7 @@ GAP 事件回调为 `gap_event_cb()`：
 - CPS：8 字节
 - `g_hr_buf[2]`
 - `g_csc_buf[5]`
-- FTMS Indoor Bike：按广播掩码为 8/6/4 字节
+- 模拟 FTMS Indoor Bike：按广播掩码为 8/6/6 字节，单记录均包含速度且 More Data=0
 - FTMS Treadmill：10 字节
 - RSC Measurement：10 字节
 - `g_ftms_resp_buf[3]`
@@ -295,9 +296,9 @@ GAP 事件回调为 `gap_event_cb()`：
 
 CPS/CSC Measurement 仅使用 Notify。CPS Feature 固定四字节 `08 00 10 00`（曲柄转数、非分布式总功率），CPS Sensor Location 复用 `SENSOR_LOCATION_CHAR_UUID=0x2A5D`，值 `05`（左曲柄）；CSC Feature 固定两字节 `02 00`（曲柄转数）。不声明未实现的轮速、校准或控制能力。`test_ble_cycling_services.py` 验证双 profile GATT 与读取回调，真机脚本 `ble_selftest.py` 验证实际读值和属性。服务变化后需清除客户端旧缓存，第三方 App/码表仍需实测。
 
-FTMS 跑步 Feature 为 `0414000001000000`，对应距离、心率、用时与目标速度；目标速度范围 `2AD4` 为 3–25km/h、增量 0.01km/h，目标功率范围 `2AD8` 为 0–2000W、增量 1W。HRS/RSC/FTMS 数据及状态使用 Notify，FTMS 控制点使用 Write + Indicate。主广播使用部分 UUID 列表，FTMS Service Data 声明可用状态与骑行/跑步机类型，名字最多 11 字节且按 UTF-8 截断。详见 [补测记录](33-ble-standard-test-plan.md)。
+FTMS 跑步 Feature 为 `0414000001000000`，对应距离、心率、用时与目标速度；目标速度范围 `2AD4` 为 3–25km/h、增量 0.01km/h，目标功率范围 `2AD8` 为 0–2000W、增量 1W。HRS/RSC/FTMS 数据及状态使用 Notify，FTMS 控制点使用 Write + Indicate + Write Encryption；采用无输入输出、非 bonding 的 Secure Connections Just Works，真实配对尚待验收。主广播使用部分 UUID 列表，FTMS Service Data 声明可用状态与骑行/跑步机类型，名字最多 11 字节且按 UTF-8 截断。详见 [补测记录](33-ble-standard-test-plan.md)。
 
-骑行 FTMS Feature 固定为 `0244000008000000`，声明踏频、心率、功率和目标功率能力；模拟/桥接切换不改变能力位。桥接暂不可控时目标功率操作返回 Operation Failed。FTMS/配置 indication 共享 8 条静态预留队列，操作前预留、确认后推进，失败终止连接，旧 token 不跨连接复用。跑步 RSC 在功率位或踏频位任一启用时发送完整必需字段，与服务注册一致。专项证据见 [兼容复核](34-ble-compatibility-recheck.md)。
+模拟骑行 FTMS Feature 固定为 `0244000008000000`；真实桥接按用户选择不提供 FTMS。来源配置改变时等待断连后重建 GATT；上游掉线和模拟降级不触发服务重建。FTMS/配置 indication 共享 8 条静态预留队列，操作前预留、确认后推进，失败终止连接，旧 token 不跨连接复用。跑步 RSC 在功率位或踏频位任一启用时发送完整必需字段，与服务注册一致。专项证据见 [兼容复核](34-ble-compatibility-recheck.md)。
 
 Pages 兼容诊断保存固定双设备快照、授权范围、读失败、最近 120 条原始通知和场景；区分标准问题、候选原因与采集未知项。同源标签页及刷新共享连接暂停状态，在途连接完成也释放，结束实测后由用户手动连接。详见 [实现与验证](32-ble-compatibility-diagnosis.md)。
 
@@ -317,9 +318,9 @@ DIS 读取内容来自编译期常量：
 
 - CPS：`flags=0x0020`，2 字节有符号功率、2 字节累计曲柄转数、2 字节曲柄事件时间，总长 8 字节。
 - CSC：`flags=0x02`，crank-only，总长 5 字节。
-- FTMS Indoor Bike：全开 `0x0044/8B`、仅踏频 `0x0004/6B`、仅功率 `0x0041/4B`。
+- FTMS Indoor Bike：全开 `0x0044/8B`、仅踏频 `0x0004/6B`、仅功率 `0x0040/6B`。
 - FTMS Treadmill：`flags=0x0504`，速度、uint24 米制距离、心率、用时，总长 10 字节。
-- RSC：运行/暂停 flags 分别为 `0x07/0x03`；Total Distance 使用 0.1m 单位，领域层米值在 BLE 边界乘 10；RSC Feature 为 2 字节 `0x0007`。
+- RSC：运行/暂停 flags 分别为 `0x07/0x03`；Total Distance 使用 0.1m 单位，领域层从 uint64 毫米累计直接导出饱和 uint32 dm，保留 0.1m 精度；RSC Feature 为 2 字节 `0x0007`。协议步频为同一脚频率，业务总 steps/min 按 `(总步频+1)/2` 四舍五入；同脚步幅对应 10km/h、170 总步频为约 196cm。
 
 ### 4.4 FTMS 控制点 OpCode 状态机
 
@@ -346,15 +347,16 @@ DIS 读取内容来自编译期常量：
 - `RequestControl`：直接 success
 - `SetTargetPower`：解析 `<h` 16-bit 功率值，调用 `g_erg_cb(target)`
 - `SetTargetSpeed`：先校验 `uint16` 速度（km/h*100）值域，再投递跑步目标速度事件
-- `StartResume`：可靠投递成功后发送 Fitness Machine Status `Started/Resumed by User = 0x04`
-- `StopPause`：可靠投递成功后发送 Fitness Machine Status `Stopped/Paused by User = 0x02`
-- `Reset`：可靠投递成功后发送 Fitness Machine Status `Reset = 0x01`
+- `StartResume`：应用主循环执行成功后发送 Fitness Machine Status `Started/Resumed by User = 0x04`
+- `StopPause`：应用主循环执行成功后发送 Fitness Machine Status `Stopped/Paused by User = 0x02`
+- `Reset`：应用主循环执行成功后撤销控制权、清累计并恢复默认目标速度，再发送 Fitness Machine Status `Reset = 0x01`
 - 其他：返回 not supported
 
-Fitness Machine Status 和 Control Point 使用独立编号；Reset/Started 为 1 字节，Stopped/Paused 为 2 字节（第二字节为 Stop=1/Pause=2）。running profile 的 SetSpeed/Start/Stop/Reset 若应用回调未注册或事件队列未接收，返回 `Operation Failed`，且不提前修改 FTMS Status。Success 表示事件已被主循环可靠接收，不代表回调同步等待业务执行完成。客户端必须先订阅 indication、申请控制权并等待各次确认；未订阅返回 ATT 0x81，过程未完成返回 ATT 0x80，未获权结果为 0x05，断开/复位/响应失败清理状态。当前未强制 Encryption，配对策略是明确未完成的规范项。
+Fitness Machine Status 和 Control Point 使用独立编号；Reset/Started 为 1 字节，Stopped/Paused 为 2 字节。FTMS 写入先保留响应位置，再把命令及票据交给单槽 mailbox；未接受返回 Operation Failed，满槽不覆盖旧命令。主循环实际应用后才返回 Success。过期票据、断连和退订不完成旧命令；退订释放未发送的 indication 预留，已发出的 ATT 保留至确认或失败，不允许同特征新过程越过在途确认；同一特征等待 indication 确认期间拒绝新过程。Reset 成功后目标指令必须重新 Request Control。
 
-应用层注册的 `g_erg_cb` 实际是 `app_main.c` 里的 `on_erg_target()`。
-它不直接写引擎，而是投递 `APP_EVT_ERG_TARGET`，由主循环串行消费。
+RSC `SC Control Point=0x2A55` 使用 Write + Indicate，支持 Set Cumulative Value（opcode 1、uint32 dm）及 Response Code 0x10；已知请求截断、未知操作码、未订阅、进行中和 mailbox 忙均有独立错误路径。累计设置仅作用于本次运行会话，不写 NVS；长度、订阅和全 uint32 范围回归不替代实物 GATT 验收。
+
+运动及遥测通知在分配 mbuf 前检查当前连接的逐特征 Notify CCCD 状态；断连、host reset、GATT 重建清空订阅。FTMS CP 强制加密，实际系统配对、旧缓存和目标 App 互操作尚未执行。
 
 ### 4.5 BikePower Config Service
 
@@ -381,14 +383,14 @@ Fitness Machine Status 和 Control Point 使用独立编号；Reset/Started 为 
 
 保存流程如下：
 
-1. 页面按 Meta 的 group mask 读取配置并记录当前 revision；当前固件暴露八组，旧固件可只暴露五组或六组。
+1. 页面读取 Meta，按 group mask 读取全部可用组后再读取 Meta；版本、mask 或 revision 变化则拒绝混合快照并保留上次完整值；当前固件暴露八组，旧固件可只暴露五组或六组。
 2. 页面向 Control 写 `BEGIN(protocol, transaction_id, revision)`；设备拒绝旧 revision、零事务号或并发事务。
 3. 页面写入设备支持的完整配置组；每组先解码到事务 staging，不改正式引擎，也不写 NVS。
 4. 页面写 `COMMIT(transaction_id, required_mask)`；缺组、事务号不一致或 revision 变化都会失败。
 5. NimBLE host 回调只把 staging 复制到应用 mailbox。主循环先再次确认 base revision 未变化，再做 schema/范围校验，在临时引擎上应用并调用 `nvs_store_save()`。
 6. 只有 NVS commit 成功后才替换 `s_engine`、更新配置快照和 revision，并通过 Control indication 返回成功；失败保留旧引擎和旧 revision。
 
-客户端可在 COMMIT 前发送 CANCEL。客户端断连时活动但尚未提交的事务自动取消。若 Profile 或广播掩码变化，成功响应带 `BLE_CONFIG_RESTART_GATT`，主循环等待客户端断开后重启 BLE 并重建服务表；仅设备名变化带 `BLE_CONFIG_RESTART_NAME`，当前连接保持在线并刷新 GAP 名称。
+客户端可在 COMMIT 前发送 CANCEL。客户端断连时活动但尚未提交的事务自动取消。若 Profile、广播掩码或桥接来源配置变化，成功响应带 `BLE_CONFIG_RESTART_GATT`，主循环等待客户端断开后重启 BLE 并重建服务表；仅设备名变化带 `BLE_CONFIG_RESTART_NAME`，当前连接保持在线并刷新 GAP 名称。
 
 ## 第五章：状态机
 
@@ -886,7 +888,7 @@ namespace 固定为：
 
 v13→v14 把原单设备绑定迁移到固定三设备表的槽位 0，其他槽位保持为空；NVS `bridge` 升为最长 125 字节的 wire v2，并继续兼容读取最长 47 字节的 wire v1。`brrecent` 只保存最近成功设备的地址类型和地址，作为下次定向连接排序提示，不复制名称或校正参数。v12→v13 仍负责补充默认桥接配置，v11→v12 的历史 ±5W→±50W 迁移继续逐级执行。持久化禁止直接写入 C 结构体。
 
-桥接领域模块 `cps_input_codec` 完整跳过 CPS 可选字段后读取功率及曲柄事件；`power_bridge` 要求两份有效样本，3 秒过期、断线立即失效。校正支持 ±200W 偏移或 50.0–150.0% 比例，输出夹紧到 0–2000W，原始功率 ≤0 时保持 0W。曲柄计数和时间差采用 16 位回绕，非法差值或曲柄停更不会输出旧踏频。桥接无曲柄 CPS 为 4 字节，有曲柄为 8 字节；桥接 FTMS 使用 More Data 位省略速度，仅编码真实踏频、校正功率及可选模拟心率。
+桥接领域模块 `cps_input_codec` 完整跳过 CPS 可选字段后读取功率及曲柄事件；`power_bridge` 要求两份有效样本，3 秒过期、断线立即失效。校正支持 ±200W 偏移或 50.0–300.0% 总倍率（页面显示相对 −50.0% 至 +200.0%，+200% 即原值 × 3；旧固件仍只接受最高 150.0% 总倍率），输出夹紧到 0–2000W，原始功率 ≤0 时保持 0W。曲柄计数和时间差采用 16 位回绕，非法差值或曲柄停更不会输出旧踏频。桥接无曲柄 CPS 为 4 字节，有曲柄为 8 字节；桥接 FTMS 使用 More Data 位省略速度，仅编码真实踏频、校正功率及可选模拟心率。
 
 `config_store_migrate()` 负责把旧 `schema_ver` 升级到当前版本。当前策略是：
 
