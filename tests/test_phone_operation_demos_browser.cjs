@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const os = require('node:os');
 const { PNG } = require('./web-flash/node_modules/pngjs');
 const { chromium } = require('./web-flash/node_modules/playwright');
 const root = path.join(__dirname, '..');
@@ -48,8 +49,8 @@ const reference = production('index.html').replace('<!-- INLINE_CSS -->', '<styl
     const box = await iframe.boundingBox();
     const actualPixels = await page.screenshot({ clip: box, animations: 'disabled', caret: 'hide' });
     const referencePixels = await original.screenshot({ animations: 'disabled', caret: 'hide' });
-    fs.writeFileSync('/private/tmp/bikepower-phone-actual.png', actualPixels);
-    fs.writeFileSync('/private/tmp/bikepower-phone-reference.png', referencePixels);
+    fs.writeFileSync(path.join(os.tmpdir(), 'bikepower-phone-actual.png'), actualPixels);
+    fs.writeFileSync(path.join(os.tmpdir(), 'bikepower-phone-reference.png'), referencePixels);
     const actualImage = PNG.sync.read(actualPixels), referenceImage = PNG.sync.read(referencePixels);
     assert.equal(actualImage.width, referenceImage.width);
     assert.equal(actualImage.height, referenceImage.height);
