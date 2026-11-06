@@ -11,8 +11,10 @@
  *   FTMS ControlPoint: ERG OpCode 状态机
  */
 #include <stdatomic.h>
+#include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -631,6 +633,23 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
 
 // ============================ DIS 读取（支持身份覆盖） ============================
 
+static char s_default_serial[DEVICE_IDENTITY_TEXT_MAX];
+
+static esp_err_t prepare_default_serial(void)
+{
+    if (s_default_serial[0]) return ESP_OK;
+    uint8_t mac[DEVICE_SERIAL_MAC_LEN];
+    esp_err_t err = esp_efuse_mac_get_default(mac);
+    if (err != ESP_OK) return err;
+    int length = snprintf(s_default_serial, sizeof(s_default_serial), DEVICE_SERIAL_FORMAT,
+                          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    if (length <= 0 || (size_t)length >= sizeof(s_default_serial)) {
+        s_default_serial[0] = '\0';
+        return ESP_ERR_INVALID_SIZE;
+    }
+    return ESP_OK;
+}
+
 /**
  * 以「覆盖值优先、否则内置值」返回某个 DIS 字符串字段。
  * ctxt：GATT 访问上下文。
@@ -679,11 +698,11 @@ static int dis_fw_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt
     return dis_read_field(ctxt, DEVICE_IDENTITY_FIRMWARE, fw_name);
 }
 
-/* DIS 序列号（0x2A25）：覆盖值或空串。 */
+/* DIS 序列号（0x2A25）：覆盖值或芯片出厂标识生成的稳定非空值。 */
 static int dis_serial_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ch; (void)ah; (void)arg;
-    return dis_read_field(ctxt, DEVICE_IDENTITY_SERIAL, "");
+    return dis_read_field(ctxt, DEVICE_IDENTITY_SERIAL, s_default_serial);
 }
 
 /* DIS 硬件版本（0x2A27）：覆盖值或板型名称。 */
@@ -1752,6 +1771,11 @@ esp_err_t ble_bikepower_start(void)
 {
     g_stopping = false;
     g_start_failed = false;
+    esp_err_t err = prepare_default_serial();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "初始化默认序列号失败 err=%d", err);
+        return err;
+    }
     ble_config_service_reset(indication_reserve, indicate_one, config_dis_profile_access_cb);
     if (!g_notify_lock) {
         g_notify_lock = xSemaphoreCreateMutex();
@@ -1760,7 +1784,7 @@ esp_err_t ble_bikepower_start(void)
             return ESP_ERR_NO_MEM;
         }
     }
-    esp_err_t err = nimble_port_init();
+    err = nimble_port_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "nimble_port_init 失败 err=%d", err);
         return err;

@@ -311,6 +311,7 @@ DIS 读取内容来自编译期常量：
 - `FIRMWARE_FIX_VERSION = "4.3.0"`
 - `BIKEPOWER_GIT_SHA` 由 `main/CMakeLists.txt` 在构建时注入最后一次 Git 短提交 ID
 - DIS 固件字段与门户固件名使用 `board_firmware_name()` 生成，格式为 `板型-v版本`，例如 `generic-c3-v4.3.0`；Git ID 和构建时间单独保留。
+- DIS 序列号 `2A25` 的默认值在 NimBLE 启动前由出厂 eFuse 标识生成，格式 `BP-` + 12 位大写十六进制；静态缓存，重启保持稳定，不新增 NVS 键。已有非空身份覆盖优先，清空覆盖回退到该默认值。详见 [序列号修复与刷写验证](43-qidou-serial-fix.md)。
 
 测试脚本 `tests/ble_selftest.py` 也会校验这三项。
 
