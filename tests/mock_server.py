@@ -54,7 +54,7 @@ LIMITS = {
     "run_speed_x100": (300, 2500), "run_pace_float_sec": (0, 60),
     "run_cadence": (120, 220), "run_cadence_float": (0, 20),
     "run_pace_low_sec": (144, 1200), "run_pace_high_sec": (144, 1200),
-    "bridge_watts": (-200, 200), "bridge_percent_x10": (500, 1500),
+    "bridge_watts": (-200, 200), "bridge_percent_x10": (500, 3000),
     "mode": (0, 1), "run_mode": (0, 1), "sport_profile": (0, 1), "ride_type": (0, 5),
     "run_pacer_type": (0, 4), "bridge_calibration": (0, 2), "cycling_source": (0, 1),
     "bridge_bound": (0, 1), "bridge_addr_type": (0, 1), "has_user_hr": (0, 1),

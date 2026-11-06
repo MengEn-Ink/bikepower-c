@@ -20,6 +20,16 @@ static int clamp_int(int value, int lo, int hi)
     return value;
 }
 
+static uint32_t saturate_u32(uint64_t value)
+{
+    return value > UINT32_MAX ? UINT32_MAX : (uint32_t)value;
+}
+
+static uint64_t saturating_add(uint64_t value, uint64_t delta)
+{
+    return delta > UINT64_MAX - value ? UINT64_MAX : value + delta;
+}
+
 static void running_walk_reset(running_walk_t *w)
 {
     w->value = 0.0f;
@@ -99,15 +109,16 @@ running_snapshot_t running_engine_snapshot(running_engine_t *e, uint32_t dt_ms)
     if (!e->running) {
         e->snapshot.speed_x100_kmh = 0;
         e->snapshot.cadence_spm = 0;
-        e->snapshot.total_distance_m = e->distance_x1000_m / 1000u;
-        e->snapshot.elapsed_time_s = e->elapsed_ms / 1000u;
+        e->snapshot.total_distance_m = saturate_u32(e->distance_x1000_m / 1000u);
+        e->snapshot.total_distance_dm = saturate_u32(e->distance_x1000_m / 100u);
+        e->snapshot.elapsed_time_s = saturate_u32(e->elapsed_ms / 1000u);
         e->snapshot.rsc_speed_1_256_mps = 0;
         e->snapshot.stride_cm = 0;
         e->snapshot.running = false;
         return e->snapshot;
     }
 
-    e->elapsed_ms += dt_ms;
+    e->elapsed_ms = saturating_add(e->elapsed_ms, dt_ms);
     int pace_sec;
     if (e->mode == RUN_MODE_PACER) {
         int lo = clamp_int(e->pace_low_sec, RUN_PACE_SEC_MIN, RUN_PACE_SEC_MAX);
@@ -127,19 +138,20 @@ running_snapshot_t running_engine_snapshot(running_engine_t *e, uint32_t dt_ms)
     int output_cadence_spm = clamp_int(e->cadence_spm + running_walk_step(&e->cadence_walk, e->cadence_float_spm),
                                        RUN_CADENCE_MIN, RUN_CADENCE_MAX);
 
-    uint32_t delta_x1000_m = (uint32_t)(((uint64_t)output_speed_x100 * 10000u * dt_ms) / 3600000u);
-    e->distance_x1000_m += delta_x1000_m;
+    uint64_t delta_x1000_m = ((uint64_t)output_speed_x100 * 10000u * dt_ms) / 3600000u;
+    e->distance_x1000_m = saturating_add(e->distance_x1000_m, delta_x1000_m);
 
     uint16_t rsc_speed = (uint16_t)(((uint32_t)output_speed_x100 * 256u + 180u) / 360u);
     uint16_t stride_cm = 0;
     if (output_cadence_spm > 0) {
-        stride_cm = (uint16_t)(((uint32_t)output_speed_x100 * 100u + (uint32_t)output_cadence_spm * 3u) / ((uint32_t)output_cadence_spm * 6u));
+        stride_cm = (uint16_t)(((uint32_t)output_speed_x100 * 100u + (uint32_t)output_cadence_spm * 3u / 2u) / ((uint32_t)output_cadence_spm * 3u));
     }
 
     e->snapshot.speed_x100_kmh = output_speed_x100;
     e->snapshot.cadence_spm = output_cadence_spm;
-    e->snapshot.total_distance_m = e->distance_x1000_m / 1000u;
-    e->snapshot.elapsed_time_s = e->elapsed_ms / 1000u;
+    e->snapshot.total_distance_m = saturate_u32(e->distance_x1000_m / 1000u);
+    e->snapshot.total_distance_dm = saturate_u32(e->distance_x1000_m / 100u);
+    e->snapshot.elapsed_time_s = saturate_u32(e->elapsed_ms / 1000u);
     e->snapshot.rsc_speed_1_256_mps = rsc_speed;
     e->snapshot.stride_cm = stride_cm;
     e->snapshot.running = true;
@@ -280,5 +292,6 @@ void running_engine_reset_session(running_engine_t *e)
     e->elapsed_ms = 0;
     e->distance_x1000_m = 0;
     e->snapshot.total_distance_m = 0;
+    e->snapshot.total_distance_dm = 0;
     e->snapshot.elapsed_time_s = 0;
 }

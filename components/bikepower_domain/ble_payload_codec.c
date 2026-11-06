@@ -2,7 +2,6 @@
 
 #define CPS_FLAG_CRANK_REVOLUTION_DATA 0x0020u
 #define CSC_FLAG_CRANK_REVOLUTION_DATA 0x02u
-#define FTMS_BIKE_FLAG_MORE_DATA        0x0001u
 #define FTMS_BIKE_FLAG_CADENCE          0x0004u
 #define FTMS_BIKE_FLAG_POWER            0x0040u
 #define FTMS_TREADMILL_FLAGS             0x0504u
@@ -66,33 +65,6 @@ size_t ble_payload_encode_cps_bridge(uint8_t *out, size_t capacity, bool has_cra
     return 4;
 }
 
-size_t ble_payload_encode_ftms_bridge(uint8_t *out, size_t capacity,
-                                      bool cadence, bool power, bool heartrate,
-                                      uint16_t cadence_half_rpm, int16_t power_w, uint8_t bpm)
-{
-    if (!out || (!cadence && !power && !heartrate)) return 0;
-    size_t required = 2 + (cadence ? 2 : 0) + (power ? 2 : 0) + (heartrate ? 1 : 0);
-    if (capacity < required) return 0;
-    uint16_t flags = FTMS_BIKE_FLAG_MORE_DATA;
-    size_t offset = 2;
-    if (cadence) {
-        flags |= FTMS_BIKE_FLAG_CADENCE;
-        put_u16_le(out + offset, cadence_half_rpm);
-        offset += 2;
-    }
-    if (power) {
-        flags |= FTMS_BIKE_FLAG_POWER;
-        put_u16_le(out + offset, (uint16_t)power_w);
-        offset += 2;
-    }
-    if (heartrate) {
-        flags |= 0x0200;
-        out[offset++] = bpm;
-    }
-    put_u16_le(out, flags);
-    return offset;
-}
-
 size_t ble_payload_encode_hrs(uint8_t *out, size_t capacity, uint8_t heart_rate_bpm)
 {
     if (!out || capacity < BLE_PAYLOAD_HRS_LEN) return 0;
@@ -109,15 +81,14 @@ size_t ble_payload_encode_ftms_bike(uint8_t *out, size_t capacity,
                                     int16_t power_w)
 {
     if (!out || (!include_cadence && !include_power)) return 0;
-    size_t required = 2u + (include_cadence ? 4u : 0u) + (include_power ? 2u : 0u);
+    size_t required = 4u + (include_cadence ? 2u : 0u) + (include_power ? 2u : 0u);
     if (capacity < required) return 0;
 
-    uint16_t flags = include_cadence ? 0u : FTMS_BIKE_FLAG_MORE_DATA;
-    size_t offset = 2;
+    uint16_t flags = 0u;
+    put_u16_le(out + 2, speed_x100_kmh);
+    size_t offset = 4;
     if (include_cadence) {
         flags |= FTMS_BIKE_FLAG_CADENCE;
-        put_u16_le(out + offset, speed_x100_kmh);
-        offset += 2;
         put_u16_le(out + offset, cadence_half_rpm);
         offset += 2;
     }
@@ -136,10 +107,8 @@ size_t ble_payload_encode_ftms_treadmill(uint8_t *out, size_t capacity,
                                          uint8_t heart_rate_bpm,
                                          uint16_t elapsed_time_s)
 {
-    if (!out || capacity < BLE_PAYLOAD_FTMS_TREADMILL_LEN
-            || total_distance_m > FTMS_DISTANCE_MAX) {
-        return 0;
-    }
+    if (!out || capacity < BLE_PAYLOAD_FTMS_TREADMILL_LEN) return 0;
+    if (total_distance_m > FTMS_DISTANCE_MAX) total_distance_m = FTMS_DISTANCE_MAX;
     put_u16_le(out, FTMS_TREADMILL_FLAGS);
     put_u16_le(out + 2, speed_x100_kmh);
     put_u24_le(out + 4, total_distance_m);

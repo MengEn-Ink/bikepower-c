@@ -24,6 +24,7 @@
 #include "domain_rng.h"
 #include "power_engine.h"
 #include "nvs_store.h"
+#include "persistent_store.h"
 #include "app_events.h"
 #include "app_state.h"
 #include "button.h"
@@ -41,12 +42,6 @@ static power_engine_t s_engine;
 // 主任务发布来源，host 控制点只读原子副本，不直接访问正在更新的引擎。
 static atomic_bool s_real_power_source;
 static QueueHandle_t s_app_queue;
-// ERG 控制点队列满时的兜底缓存：正常路径使用 app_queue 保序，避免 Stop/Pause 被旧目标覆盖。
-// mailbox 全部读写均在单核 C3 的关中断临界区；volatile 不承担同步职责。
-static int s_pending_erg_target = 0;
-static bool s_has_pending_erg = false;
-static int s_pending_erg_clear_reason = 0;
-static bool s_has_pending_erg_clear = false;
 // WiFi 完成事件队列满时的单比特保底；事件幂等，无需计数。
 static bool s_pending_wifi_done = false;
 static config_data_t s_pending_ble_config;
@@ -118,71 +113,73 @@ static void process_pending_identity(void)
     portENABLE_INTERRUPTS();
 }
 
-/**
- * 处理 FTMS 控制点下发的 ERG 目标功率。
- * 先做范围校验，缓存最新目标由主循环串行处理，不进事件队列。
- * target_power：目标功率，单位瓦特（signed 16-bit）。
- * 返回值：true 表示参数合法已接收，false 表示范围无效。
- * 特殊行为：运行在 NimBLE host 任务上下文，只做轻量校验和缓存，不直接改引擎状态；永远使用最新目标，旧目标自动覆盖。
- */
-static bool on_erg_target(int target_power)
+/** 控制点有界 mailbox：host 只接收，主循环按票据应用后确认；满槽拒绝不覆盖。 */
+typedef struct {
+    bool pending, rsc;
+    uint32_t ticket, distance_dm;
+    app_evt_t event;
+} control_mailbox_t;
+static control_mailbox_t s_control_mailbox;
+
+static bool queue_control(app_evt_t event, bool rsc, uint32_t distance_dm)
 {
-    if (s_real_power_source) return false;
-    // 范围校验：与领域层 POWER_MIN/POWER_MAX 一致
-    if (target_power < POWER_MIN || target_power > POWER_MAX) return false;
-    app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = target_power };
-    if (s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE) {
-        return true;
-    }
-    // 队列满时保留最新目标，避免训练 App 高频下发时因瞬时队列压力误报 Invalid Param。
     portDISABLE_INTERRUPTS();
-    s_pending_erg_target = target_power;
-    s_has_pending_erg = true;
+    bool accepted = !s_control_mailbox.pending;
+    if (accepted) s_control_mailbox = (control_mailbox_t){
+        .pending = true, .rsc = rsc, .distance_dm = distance_dm,
+        .ticket = ble_bikepower_control_ticket(rsc), .event = event,
+    };
     portENABLE_INTERRUPTS();
-    return true;
+    return accepted;
 }
 
-/**
- * 处理 FTMS 训练停止/复位等 ERG 退出信号。
- * 优先投递到主循环队列以保持与控制点命令顺序一致；队列满时缓存一次待清理原因。
- * reason：退出原因，通常为 FTMS 操作码。
- * 返回值：无。
- * 特殊行为：运行在 NimBLE host 任务上下文，不直接修改功率引擎。
- */
-static void on_erg_clear(int reason)
+static bool on_erg_target(int target_power)
 {
-    app_evt_t e = { .type = APP_EVT_ERG_CLEAR, .data = reason };
-    if (s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE) {
-        return;
-    }
-    portDISABLE_INTERRUPTS();
-    s_pending_erg_clear_reason = reason;
-    s_has_pending_erg_clear = true;
-    portENABLE_INTERRUPTS();
+    if (s_real_power_source || target_power < POWER_MIN || target_power > POWER_MAX) return false;
+    return queue_control((app_evt_t){ .type = APP_EVT_ERG_TARGET, .data = target_power }, false, 0);
+}
+
+static bool on_erg_clear(int reason)
+{
+    return queue_control((app_evt_t){ .type = APP_EVT_ERG_CLEAR, .data = reason }, false, 0);
 }
 
 static bool on_run_control(ble_run_control_type_t type, int value)
 {
-    app_evt_t e = { 0 };
+    app_evt_t event = {0};
     switch (type) {
     case BLE_RUN_CTRL_SPEED:
         if (value < RUN_SPEED_X100_MIN || value > RUN_SPEED_X100_MAX) return false;
-        e.type = APP_EVT_RUN_TARGET_SPEED;
-        e.data = value;
-        break;
-    case BLE_RUN_CTRL_START:
-        e.type = APP_EVT_RUN_START;
-        break;
-    case BLE_RUN_CTRL_STOP:
-        e.type = APP_EVT_RUN_STOP;
-        break;
-    case BLE_RUN_CTRL_RESET:
-        e.type = APP_EVT_RUN_RESET;
-        break;
-    default:
-        return false;
+        event.type = APP_EVT_RUN_TARGET_SPEED; event.data = value; break;
+    case BLE_RUN_CTRL_START: event.type = APP_EVT_RUN_START; break;
+    case BLE_RUN_CTRL_STOP: event.type = APP_EVT_RUN_STOP; break;
+    case BLE_RUN_CTRL_RESET: event.type = APP_EVT_RUN_RESET; break;
+    default: return false;
     }
-    return s_app_queue && xQueueSend(s_app_queue, &e, 0) == pdTRUE;
+    return queue_control(event, false, 0);
+}
+
+static bool on_rsc_distance(uint32_t distance_dm)
+{
+    return queue_control((app_evt_t){0}, true, distance_dm);
+}
+
+static void process_control_mailbox(void)
+{
+    portDISABLE_INTERRUPTS();
+    control_mailbox_t command = s_control_mailbox;
+    s_control_mailbox.pending = false;
+    portENABLE_INTERRUPTS();
+    if (!command.pending || !ble_bikepower_control_current(command.ticket, command.rsc)) return;
+    if (command.rsc) {
+        s_engine.running.distance_x1000_m = (uint64_t)command.distance_dm * 100u;
+        s_engine.running.snapshot.total_distance_m = command.distance_dm / 10u;
+        s_engine.running.snapshot.total_distance_dm = command.distance_dm;
+    } else {
+        app_state_handle_event(&command.event);
+        if (command.event.type == APP_EVT_RUN_RESET) power_engine_set_run_speed(&s_engine, RUN_SPEED_X100_DEFAULT);
+    }
+    ble_bikepower_control_complete(command.ticket, command.rsc, true);
 }
 
 static bool on_ble_config_commit(const config_data_t *config,
@@ -306,7 +303,8 @@ static void process_pending_ble_config(void)
     config_store_from_engine(&next, &applied);
     uint8_t restart_flags = 0;
     if (previous.sport_profile != applied.sport_profile
-            || previous.broadcast_mask != applied.broadcast_mask) {
+            || previous.broadcast_mask != applied.broadcast_mask
+            || previous.bridge.source != applied.bridge.source) {
         restart_flags |= BLE_CONFIG_RESTART_GATT;
     }
     if (strncmp(previous.device_name, applied.device_name, DEVICE_NAME_MAX) != 0) {
@@ -388,17 +386,18 @@ void app_main(void)
     ESP_LOGI(TAG, "BikePower C 启动 v%s (target=esp32c3, idf=v5.5.4)", FIRMWARE_VERSION);
 
     esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
+    bool storage_ready = ret == ESP_OK;
+    if (!storage_ready) {
+        ESP_LOGE(TAG, "NVS 初始化失败 ret=%d，保留分区，使用只读默认配置", ret);
+        persistent_store_readonly_defaults();
+    } else {
+        ESP_LOGI(TAG, "NVS 初始化完成");
     }
-    ESP_ERROR_CHECK(ret);
-    ESP_LOGI(TAG, "NVS 初始化完成");
 
     power_engine_init(&s_engine);
-    nvs_store_load(&s_engine);
+    if (storage_ready) nvs_store_load(&s_engine);
     static bridge_device_t bridge_recent;
-    bool have_bridge_recent = nvs_store_load_bridge_recent(&bridge_recent);
+    bool have_bridge_recent = storage_ready && nvs_store_load_bridge_recent(&bridge_recent);
     power_engine_clear_dirty(&s_engine);
     ESP_LOGI(TAG, "功率引擎初始化 p=%dW c=%dRPM hr=%d mode=%d",
              s_engine.base_power, s_engine.cadence_base,
@@ -441,6 +440,7 @@ void app_main(void)
     s_real_power_source = s_engine.bridge.source == BRIDGE_SOURCE_REAL;
     ble_bikepower_set_erg_clear_callback(on_erg_clear);
     ble_bikepower_set_run_control_callback(on_run_control);
+    ble_bikepower_enable_async_control(on_rsc_distance);
     ble_bikepower_set_config_commit_callback(on_ble_config_commit);
     ble_bikepower_set_identity_write_callback(on_ble_identity_write);
     {
@@ -449,6 +449,7 @@ void app_main(void)
         ble_bikepower_set_identity(&identity);
     }
     ble_bikepower_set_profile(s_engine.sport_profile);
+    ble_bikepower_set_bridge_mode(s_engine.bridge.source == BRIDGE_SOURCE_REAL);
     ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
     ble_bikepower_set_device_name(s_engine.device_name);
     ble_bikepower_set_config_snapshot(&s_engine);
@@ -496,39 +497,13 @@ void app_main(void)
             app_evt_t wifi_done = { .type = APP_EVT_WIFI_DONE, .data = 0 };
             app_state_handle_event(&wifi_done);
         }
-        // 处理待处理的ERG目标：关中断原子复制目标+清标志，避免竞态丢新目标（单核C3足够）
-        int erg_target = 0;
-        bool has_erg = false;
-        portDISABLE_INTERRUPTS();
-        if (s_has_pending_erg) {
-            erg_target = s_pending_erg_target;
-            has_erg = true;
-            s_has_pending_erg = false;
-        }
-        portENABLE_INTERRUPTS();
-        if (has_erg) {
-            app_evt_t e = { .type = APP_EVT_ERG_TARGET, .data = erg_target };
-            app_state_handle_event(&e);
-        }
-        int erg_clear_reason = 0;
-        bool has_erg_clear = false;
-        portDISABLE_INTERRUPTS();
-        if (s_has_pending_erg_clear) {
-            erg_clear_reason = s_pending_erg_clear_reason;
-            has_erg_clear = true;
-            s_has_pending_erg_clear = false;
-        }
-        portENABLE_INTERRUPTS();
-        if (has_erg_clear) {
-            app_evt_t e = { .type = APP_EVT_ERG_CLEAR, .data = erg_clear_reason };
-            app_state_handle_event(&e);
-        }
         ble_bikepower_set_config_snapshot(&s_engine);
         device_telemetry_sample((uint8_t)app_state_get(), (uint8_t)s_engine.sport_profile);
         wifi_portal_sync(&s_engine);
         process_pending_ble_config();
         ble_bikepower_set_config_snapshot(&s_engine);
         process_pending_identity();
+        process_control_mailbox();
 
         // WiFi 配网模式（共存）：BLE 保持在线继续通知，主循环继续生成快照推 BLE；
         // APP_EVT_WIFI_DONE 已在上方队列或 pending latch 消费中处理。
@@ -599,6 +574,7 @@ void app_main(void)
                 if (ble_bikepower_stop()) {
                     vTaskDelay(pdMS_TO_TICKS(RADIO_BLE_RELEASE_WAIT_MS));
                     ble_bikepower_set_profile(s_engine.sport_profile);
+                    ble_bikepower_set_bridge_mode(s_engine.bridge.source == BRIDGE_SOURCE_REAL);
                     ble_bikepower_set_broadcast_mask(s_engine.broadcast_mask);
                     ble_bikepower_set_device_name(s_engine.device_name);
                     esp_err_t r = ble_bikepower_start();

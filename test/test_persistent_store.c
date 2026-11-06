@@ -369,10 +369,31 @@ static void bootstrap_faults(void)
     }
 }
 
+static void percent_persistence(void)
+{
+    s_count = 0;
+    no_fault();
+    power_engine_t engine;
+    power_engine_init(&engine);
+    nvs_store_load(&engine);
+    config_data_t config, restored;
+    config_store_from_engine(&engine, &config);
+    config.bridge.calibration_mode = BRIDGE_CALIBRATION_PERCENT;
+    config.bridge.percent_x10 = 3000;
+    CHECK(config_store_apply_to_engine(&config, &engine));
+    CHECK(nvs_store_save(&engine));
+    power_engine_init(&engine);
+    nvs_store_load(&engine);
+    config_store_from_engine(&engine, &restored);
+    CHECK(restored.bridge.percent_x10 == 3000);
+    CHECK(power_bridge_correct(&restored.bridge, 100) == 300);
+    CHECK(power_bridge_correct(&restored.bridge, 0) == 0);
+}
+
 int main(int argc, char **argv)
 {
     if (argc > 1 && !strcmp(argv[1], "--legacy-red")) old_code_failure();
-    else { snapshot_codec(); transaction_faults(); migration_and_integration(); corruption_and_wrap(); bootstrap_faults(); }
+    else { snapshot_codec(); transaction_faults(); migration_and_integration(); corruption_and_wrap(); bootstrap_faults(); percent_persistence(); }
     printf("NVS 稳定性回归：%d 断言通过\n", s_assertions);
     return 0;
 }

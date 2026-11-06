@@ -54,7 +54,7 @@
 #define BRIDGE_OFFSET_MIN             -200
 #define BRIDGE_OFFSET_MAX              200
 #define BRIDGE_PERCENT_MIN             500
-#define BRIDGE_PERCENT_MAX             1500
+#define BRIDGE_PERCENT_MAX             3000  /* 总倍率 300.0%，相对原值增加 200%。 */
 #define BRIDGE_PERCENT_DEFAULT         1000
 #define BRIDGE_STALE_MS                3000u
 #define BRIDGE_VALID_SAMPLE_COUNT      2

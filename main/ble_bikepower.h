@@ -18,19 +18,25 @@
  * ERG 目标功率回调类型。
  * 当 FTMS 控制点收到 Set Target Power 指令时，用于把目标功率回传给应用层。
  * target_power：App 下发的目标功率，单位瓦特（signed 16-bit）。
- * 返回值：true 表示目标功率已被接受并生效，false 表示被拒绝（范围无效或资源不足）。
+ * 返回值：true 表示目标功率已被可靠接受，异步模式由主循环应用后完成票据，false 表示被拒绝（范围无效或资源不足）。
  * 特殊行为：回调运行在 NimBLE host 任务上下文，不应执行阻塞操作。
  */
 typedef bool (*ble_erg_cb_t)(int target_power);
+/* 启动前启用主循环异步完成模式；RSC距离单位为dm，票据仅在当前连接有效。 */
+typedef bool (*ble_rsc_distance_cb_t)(uint32_t distance_dm);
+void ble_bikepower_enable_async_control(ble_rsc_distance_cb_t cb);
+uint32_t ble_bikepower_control_ticket(bool rsc);
+bool ble_bikepower_control_current(uint32_t ticket, bool rsc);
+void ble_bikepower_control_complete(uint32_t ticket, bool rsc, bool success);
 
 /**
  * ERG 清除回调类型。
  * 当 FTMS 控制点收到 Stop/Pause、Reset 等退出训练指令时，用于通知应用层清除 ERG 状态。
  * reason：退出原因码，通常为 FTMS 操作码。
- * 返回值：无。
+ * 返回值：true 表示清除命令已被可靠接受，false 表示资源不足。
  * 特殊行为：回调运行在 NimBLE host 任务上下文，不应执行阻塞操作。
  */
-typedef void (*ble_erg_clear_cb_t)(int reason);
+typedef bool (*ble_erg_clear_cb_t)(int reason);
 
 typedef enum {
     BLE_RUN_CTRL_SPEED,
@@ -119,6 +125,8 @@ void ble_bikepower_set_broadcast_mask(int mask);
  * 特殊行为：建议在 ble_bikepower_start() 前调用；运行中修改需重启 BLE 才能重建 GATT 表。
  */
 void ble_bikepower_set_profile(sport_profile_t profile);
+/* 按配置来源选择固定GATT布局，真实桥接不声明FTMS；变更后需重建。 */
+void ble_bikepower_set_bridge_mode(bool real);
 
 /**
  * 更新跑步 profile 下一轮 BLE 通知数据。

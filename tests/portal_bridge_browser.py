@@ -89,6 +89,26 @@ def main():
                 assert saved["identity"]["model"] == "P505"
                 expect(page.locator("#heroMetricValue")).to_have_text("250")
                 expect(page.locator("#heartLiveValue")).to_have_text("—")
+                page.locator("[data-calibration=percent]").click()
+                expect(page.locator("#calibrationValue")).to_have_attribute("max", "200")
+                expect(page.locator("#calibrationRange")).to_have_attribute("max", "200")
+                page.locator("#calibrationValue").fill("200")
+                expect(page.locator("#calibrationPreview")).to_have_text("238 W → 714 W")
+                page.locator("#saveBtn").click()
+                expect(page.locator("#heroMetricValue")).to_have_text("714")
+                assert page.request.get(url + "/api/state").json()["config"]["bridge_percent_x10"] == 3000
+                page.reload()
+                expect(page.locator("#calibrationValue")).to_have_value("200")
+                expect(page.locator("#actualCalibration")).to_have_text("+200%")
+                page.locator("#calibrationValue").fill("200.1")
+                expect(page.locator("#calibrationValue")).to_have_value("200")
+                page.request.post(url + "/api/mock/fault", data={"fault": "zero"})
+                expect(page.locator("#heroMetricValue")).to_have_text("0")
+                page.request.post(url + "/api/mock/fault", data={})
+                expect(page.locator("#heroMetricValue")).to_have_text("714")
+                page.locator("[data-calibration=watts]").click()
+                page.locator("#saveBtn").click()
+                expect(page.locator("#heroMetricValue")).to_have_text("250")
                 if screenshots:
                     page.screenshot(path=str(screenshots / f"core-bridge-{width}.png"), full_page=True)
                 for scan_index, expected_count in ((1, 2), (2, 3)):

@@ -37,14 +37,21 @@ def main():
 #include <stdio.h>
 #include "ble_service_stubs.h"
 #include "bikepower_config.h"
+#define BLE_GATT_CHR_F_WRITE_ENC 32
 #define BLE_GATT_CHR_F_NOTIFY 8
 #define BLE_GATT_CHR_F_WRITE_NO_RSP 16
 typedef struct { ble_uuid_t u; uint16_t value; } test_uuid_t;
 #define BLE_UUID16_DECLARE(n) ((const ble_uuid_t *)&(const test_uuid_t){.value=(n)})
 static uint16_t g_cps_val_handle, g_hr_val_handle, g_csc_val_handle;
 static uint16_t g_ftms_bike_handle, g_ftms_cp_handle, g_ftms_status_handle;
-static uint16_t g_rsc_val_handle, g_ftms_treadmill_handle;
+static uint16_t g_rsc_val_handle, g_ftms_treadmill_handle, g_rsc_cp_handle;
 static const struct ble_gatt_svc_def *table_under_test;
+static int g_profile;
+static uint8_t g_broadcast_mask;
+static bool g_bridge_mode;
+static struct ble_gatt_svc_def g_active_svcs[7];
+static const struct ble_gatt_svc_def *ble_config_service_definition(void)
+{ static const struct ble_gatt_svc_def svc={0}; return &svc; }
 static int chr_read_buf(struct ble_gatt_access_ctxt *ctxt, const uint8_t *buf, size_t len)
 { return os_mbuf_append(ctxt->om, buf, len); }
 static uint16_t uuid16(const ble_uuid_t *uuid) { return ((const test_uuid_t *)uuid)->value; }
@@ -81,15 +88,22 @@ int main(void)
     assert(find(0x180d, 0x2a37)->flags == BLE_GATT_CHR_F_NOTIFY);
     assert(find(0x1826, 0x2ad2)->flags == BLE_GATT_CHR_F_NOTIFY);
     assert(find(0x1826, 0x2ada)->flags == BLE_GATT_CHR_F_NOTIFY);
-    assert(find(0x1826, 0x2ad9)->flags == (BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE));
+    assert(find(0x1826, 0x2ad9)->flags == (BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE | BLE_GATT_CHR_F_WRITE_ENC));
     assert(find(0x1826, 0x2ad8) && find(0x1826, 0x2ad8)->flags == BLE_GATT_CHR_F_READ);
     table_under_test = running_gatt_svcs;
     assert(find(0x1814, 0x2a53)->flags == BLE_GATT_CHR_F_NOTIFY);
+    assert(find(0x1814, 0x2a55)->flags == (BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE));
     assert(find(0x180d, 0x2a37)->flags == BLE_GATT_CHR_F_NOTIFY);
     assert(find(0x1826, 0x2acd)->flags == BLE_GATT_CHR_F_NOTIFY);
     assert(find(0x1826, 0x2ada)->flags == BLE_GATT_CHR_F_NOTIFY);
-    assert(find(0x1826, 0x2ad9)->flags == (BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE));
+    assert(find(0x1826, 0x2ad9)->flags == (BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE | BLE_GATT_CHR_F_WRITE_ENC));
     assert(find(0x1826, 0x2ad4) && find(0x1826, 0x2ad4)->flags == BLE_GATT_CHR_F_READ);
+    for(int profile=0;profile<2;++profile)for(int real=0;real<2;++real)for(int mask=1;mask<=7;++mask){
+        g_profile=profile;g_bridge_mode=real;g_broadcast_mask=mask;build_active_gatt_svcs();
+        table_under_test=g_active_svcs;
+        assert((find(0x1826,profile?0x2acd:0x2ad2)!=NULL)==((mask&3)&& (profile||!real)));
+        if(!profile){assert((find(0x1818,0x2a63)!=NULL)==!!(mask&1));assert((find(0x1816,0x2a5b)!=NULL)==!!(mask&2));}
+    }
     puts("骑行标准服务：Feature / Sensor Location 字节、只读与 Notify 属性通过");
     return 0;
 }
@@ -98,7 +112,7 @@ int main(void)
         folder = Path(temp)
         generated = folder / "gatt.c"
         generated.write_text(preamble + "\n" + "\n".join(buffers + callbacks)
-                             + "\n" + stubs + "\n" + table + "\n" + checks)
+                             + "\n" + stubs + "\n" + table + "\nstatic void " + extract_function(source, "build_active_gatt_svcs") + "\n" + checks)
         subprocess.run([
             "cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
             "-fsanitize=address,undefined", "-I", str(ROOT / "test"),

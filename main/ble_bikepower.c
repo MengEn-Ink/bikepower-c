@@ -48,6 +48,13 @@ static uint16_t g_ftms_bike_handle;
 static uint16_t g_ftms_treadmill_handle;
 static uint16_t g_ftms_cp_handle;
 static uint16_t g_ftms_status_handle;
+static uint16_t g_rsc_cp_handle;
+static atomic_bool g_rsc_subscribed, g_rsc_pending;
+static atomic_uint_least32_t g_rsc_response_token;
+static ble_rsc_distance_cb_t g_rsc_distance_cb;
+static atomic_bool g_control_async;
+static atomic_uchar g_control_op, g_control_parameter;
+static atomic_uint_least16_t g_notify_subscriptions[BLE_NOTIFY_SUBSCRIPTION_MAX];
 
 // 当前通知数据（由领域层写入，notify_tick 读取）
 typedef struct {
@@ -65,6 +72,7 @@ static ble_output_snapshot_t s_output = {
     .running = { .cadence_spm = RUN_CADENCE_DEFAULT, .running = true },
 };
 static atomic_uchar g_broadcast_mask = BROADCAST_FIELD_ALL;
+static atomic_bool g_bridge_mode;
 
 // 曲柄累计（CPS/CSC 共用）
 static uint16_t g_crank_rev = 0;
@@ -164,7 +172,35 @@ static bool indicate_try(uint16_t handle, const uint8_t *buf, size_t len);
 static uint32_t indication_reserve(uint16_t connection, uint16_t handle);
 static void indication_reset(void);
 static void indication_complete(uint16_t connection, uint16_t handle, int status);
+static void indication_subscription_revoked(uint16_t handle);
 static void indication_pump_nolock(void);
+static bool indication_submit(uint32_t token, const uint8_t *buf, size_t len);
+
+static void subscriptions_reset(void)
+{
+    for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i) g_notify_subscriptions[i] = 0;
+}
+
+static void subscription_update(uint16_t handle, bool enabled)
+{
+    if (!handle) return;
+    for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i) {
+        if (g_notify_subscriptions[i] == handle) {
+            if (!enabled) g_notify_subscriptions[i] = 0;
+            return;
+        }
+    }
+    if (enabled) for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i) {
+        if (!g_notify_subscriptions[i]) { g_notify_subscriptions[i] = handle; return; }
+    }
+}
+
+static bool notification_subscribed(uint16_t handle)
+{
+    for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i)
+        if (g_notify_subscriptions[i] == handle && handle) return true;
+    return false;
+}
 
 // ============================ GATT 访问回调 ============================
 
@@ -416,6 +452,43 @@ static void ftms_send_status(uint8_t status, uint8_t parameter)
  * 返回值：0 表示已处理，否则返回 ATT 错误码。
  * 特殊行为：仅支持写操作；未知操作码会返回 Not Supported。
  */
+static void ftms_operation_accepted(uint8_t op, uint8_t parameter)
+{
+    if (g_control_async) return;
+    if (op == FTMS_OP_RESET) { g_ftms_control = false; ftms_send_status(FTMS_STATUS_RESET, 0); }
+    else if (op == FTMS_OP_START_RESUME) ftms_send_status(FTMS_STATUS_STARTED_RESUMED_BY_USER, 0);
+    else if (op == FTMS_OP_STOP_PAUSE) ftms_send_status(FTMS_STATUS_STOPPED_PAUSED_BY_USER, parameter);
+    ftms_send_response(op, FTMS_RESULT_SUCCESS);
+}
+
+static int rsc_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)ah; (void)arg;
+    if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR || ch != g_conn_handle || !g_ready || g_stopping)
+        return BLE_ATT_ERR_UNLIKELY;
+    if (!g_rsc_subscribed) return RSC_ATT_ERR_CCCD_IMPROPERLY_CONFIGURED;
+    if (g_rsc_pending) return RSC_ATT_ERR_PROCEDURE_IN_PROGRESS;
+    uint8_t bytes[RSC_CP_REQUEST_MAX]; uint16_t len = 0;
+    if (ble_hs_mbuf_to_flat(ctxt->om, bytes, sizeof(bytes), &len) || !len)
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+    uint32_t token = indication_reserve(ch, g_rsc_cp_handle);
+    if (!token) return BLE_ATT_ERR_INSUFFICIENT_RES;
+    g_rsc_pending = true; g_rsc_response_token = token;
+    uint8_t result = RSC_RESULT_NOT_SUPPORTED;
+    if (bytes[0] == RSC_OP_SET_CUMULATIVE_VALUE) {
+        result = RSC_RESULT_INVALID_PARAM;
+        if (len == RSC_CP_REQUEST_MAX) {
+            uint32_t dm = (uint32_t)bytes[1] | ((uint32_t)bytes[2] << 8)
+                | ((uint32_t)bytes[3] << 16) | ((uint32_t)bytes[4] << 24);
+            if (g_rsc_distance_cb && g_rsc_distance_cb(dm)) return 0;
+            result = RSC_RESULT_OPERATION_FAILED;
+        }
+    }
+    uint8_t response[] = { RSC_OP_RESPONSE_CODE, bytes[0], result };
+    if (!indication_submit(token, response, sizeof(response))) return BLE_ATT_ERR_INSUFFICIENT_RES;
+    return 0;
+}
+
 static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ah; (void)arg;
@@ -433,6 +506,8 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
     g_ftms_response_token = indication_reserve(ch, g_ftms_cp_handle);
     if (!g_ftms_response_token) return BLE_ATT_ERR_INSUFFICIENT_RES;
     g_ftms_pending = true;
+    g_control_op = op;
+    g_control_parameter = op == FTMS_OP_STOP_PAUSE && len >= 2 ? buf[1] : 0;
     if (op != FTMS_OP_REQUEST_CONTROL && !g_ftms_control) {
         ftms_send_response(op, FTMS_RESULT_CONTROL_NOT_PERMITTED);
         return g_ftms_pending ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
@@ -487,7 +562,7 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
             } else if (!g_erg_cb || !g_erg_cb(target)) {
                 ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
             } else {
-                ftms_send_response(op, FTMS_RESULT_SUCCESS);
+                ftms_operation_accepted(op, 0);
             }
         }
         break;
@@ -508,7 +583,7 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
                        || !g_run_control_cb(BLE_RUN_CTRL_SPEED, (int)target_speed)) {
                 ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
             } else {
-                ftms_send_response(op, FTMS_RESULT_SUCCESS);
+                ftms_operation_accepted(op, 0);
             }
         }
         break;
@@ -518,8 +593,8 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
             ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
             break;
         }
-        ftms_send_status(FTMS_STATUS_STARTED_RESUMED_BY_USER, 0);
-        ftms_send_response(FTMS_OP_START_RESUME, FTMS_RESULT_SUCCESS);
+        if (g_profile == SPORT_PROFILE_RUNNING) ftms_operation_accepted(FTMS_OP_START_RESUME, 0);
+        else { ftms_send_status(FTMS_STATUS_STARTED_RESUMED_BY_USER, 0); ftms_send_response(op, FTMS_RESULT_SUCCESS); }
         break;
     case FTMS_OP_STOP_PAUSE:
         if (g_profile == SPORT_PROFILE_RUNNING
@@ -527,11 +602,12 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
             ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
             break;
         }
-        if (g_profile != SPORT_PROFILE_RUNNING && g_erg_clear_cb) {
-            g_erg_clear_cb(FTMS_OP_STOP_PAUSE);
+        if (g_profile != SPORT_PROFILE_RUNNING
+                && (!g_erg_clear_cb || !g_erg_clear_cb(FTMS_OP_STOP_PAUSE))) {
+            ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
+            break;
         }
-        ftms_send_status(FTMS_STATUS_STOPPED_PAUSED_BY_USER, buf[1]);
-        ftms_send_response(FTMS_OP_STOP_PAUSE, FTMS_RESULT_SUCCESS);
+        ftms_operation_accepted(FTMS_OP_STOP_PAUSE, buf[1]);
         break;
     case FTMS_OP_RESET:
         if (g_profile == SPORT_PROFILE_RUNNING
@@ -539,11 +615,12 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
             ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
             break;
         }
-        if (g_profile != SPORT_PROFILE_RUNNING && g_erg_clear_cb) {
-            g_erg_clear_cb(FTMS_OP_RESET);
+        if (g_profile != SPORT_PROFILE_RUNNING
+                && (!g_erg_clear_cb || !g_erg_clear_cb(FTMS_OP_RESET))) {
+            ftms_send_response(op, FTMS_RESULT_OPERATION_FAILED);
+            break;
         }
-        ftms_send_status(FTMS_STATUS_RESET, 0);
-        ftms_send_response(FTMS_OP_RESET, FTMS_RESULT_SUCCESS);
+        ftms_operation_accepted(FTMS_OP_RESET, 0);
         break;
     default:
         ftms_send_response(op, FTMS_RESULT_NOT_SUPPORTED);
@@ -722,7 +799,7 @@ static const struct ble_gatt_svc_def cycling_gatt_svcs[] = {
               .val_handle = &g_ftms_bike_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_CONTROL_POINT_CHAR_UUID),
               .access_cb = ftms_cp_cb,
-              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE,
+              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE | BLE_GATT_CHR_F_WRITE_ENC,
               .val_handle = &g_ftms_cp_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_STATUS_CHAR_UUID),
               .access_cb = ftms_status_cb,
@@ -768,6 +845,12 @@ static const struct ble_gatt_svc_def running_gatt_svcs[] = {
             { .uuid = BLE_UUID16_DECLARE(SENSOR_LOCATION_CHAR_UUID),
               .access_cb = sensor_location_cb,
               .flags = BLE_GATT_CHR_F_READ },
+            {
+                .uuid = BLE_UUID16_DECLARE(RSC_CONTROL_POINT_CHAR_UUID),
+                .access_cb = rsc_cp_cb,
+                .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE,
+                .val_handle = &g_rsc_cp_handle,
+            },
             { 0 }
         }
     },
@@ -798,7 +881,7 @@ static const struct ble_gatt_svc_def running_gatt_svcs[] = {
               .val_handle = &g_ftms_treadmill_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_CONTROL_POINT_CHAR_UUID),
               .access_cb = ftms_cp_cb,
-              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE,
+              .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE | BLE_GATT_CHR_F_WRITE_ENC,
               .val_handle = &g_ftms_cp_handle },
             { .uuid = BLE_UUID16_DECLARE(FTMS_STATUS_CHAR_UUID),
               .access_cb = ftms_status_cb,
@@ -850,7 +933,7 @@ static void build_active_gatt_svcs(void)
         if (power_on)               g_active_svcs[idx++] = cycling_gatt_svcs[0]; // CPS
         if (hr_on)                  g_active_svcs[idx++] = cycling_gatt_svcs[1]; // HRS
         if (cadence_on)             g_active_svcs[idx++] = cycling_gatt_svcs[2]; // CSC
-        if (power_on || cadence_on) g_active_svcs[idx++] = cycling_gatt_svcs[3]; // FTMS
+        if ((power_on || cadence_on) && !g_bridge_mode) g_active_svcs[idx++] = cycling_gatt_svcs[3]; // FTMS
         g_active_svcs[idx++] = cycling_gatt_svcs[4]; // DIS（始终）
     }
     g_active_svcs[idx++] = *ble_config_service_definition();
@@ -872,6 +955,7 @@ static void reset_svc_handles(void)
     g_ftms_treadmill_handle = 0;
     g_ftms_cp_handle = 0;
     g_ftms_status_handle = 0;
+    g_rsc_cp_handle = 0;
 }
 
 // ============================ 数据打包 ============================
@@ -904,11 +988,7 @@ static void pack_all(const ble_output_snapshot_t *data)
         ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), data->heartrate);
         ble_payload_encode_csc(g_csc_buf, sizeof(g_csc_buf),
             sample.crank_revolutions, sample.crank_event_time_1024);
-        g_ftms_bike_len = ble_payload_encode_ftms_bridge(g_ftms_bike_buf, sizeof(g_ftms_bike_buf),
-            sample.valid && sample.cadence_valid && (data->mask & BROADCAST_FIELD_CADENCE),
-            (data->mask & BROADCAST_FIELD_POWER) != 0,
-            (data->mask & BROADCAST_FIELD_HEARTRATE) != 0,
-            sample.cadence_half_rpm, (int16_t)sample.power_w, data->heartrate);
+        g_ftms_bike_len = 0;
         return;
     }
     g_cps_len = BLE_PAYLOAD_CPS_LEN;
@@ -952,9 +1032,9 @@ static void pack_running(const ble_output_snapshot_t *data)
     bool running = data->running.running;
 
     (void)ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), data->heartrate);
-    uint32_t distance_dm = distance > UINT32_MAX / 10u ? UINT32_MAX : distance * 10u;
+    uint32_t distance_dm = data->running.total_distance_dm;
     (void)ble_payload_encode_rsc(g_rsc_buf, sizeof(g_rsc_buf), running,
-                                 speed, (uint8_t)data->running.cadence_spm, stride, distance_dm);
+                                 speed, (uint8_t)((data->running.cadence_spm + 1) / 2), stride, distance_dm);
 
     uint16_t ftms_speed = (uint16_t)(((uint32_t)speed * 360u + 128u) / 256u);
     uint16_t elapsed16 = elapsed > 0xFFFFu ? 0xFFFFu : (uint16_t)elapsed;
@@ -977,7 +1057,7 @@ static void notify_one_nolock(uint16_t handle, const uint8_t *buf, size_t len)
     uint16_t connection = g_conn_handle;
     if (g_stopping || !g_ready || connection == BLE_HS_CONN_HANDLE_NONE) return;
     // 未注册服务的句柄为 0，跳过通知避免向不存在的特征发通知。
-    if (handle == 0) return;
+    if (!handle || !len || !notification_subscribed(handle)) return;
     struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
     if (om) ble_telemetry_service_tx(ble_gatts_notify_custom(connection, handle, om), false);
     else ble_telemetry_service_tx(0, true);
@@ -1006,6 +1086,9 @@ static void indication_reset(void)
     s_indication_head = s_indication_count = 0;
     s_indication_active = s_indication_failed = false;
     g_ftms_response_token = 0;
+    g_rsc_response_token = 0;
+    g_rsc_pending = g_rsc_subscribed = false;
+    subscriptions_reset();
     portEXIT_CRITICAL(&s_indication_lock);
 }
 
@@ -1027,6 +1110,31 @@ static uint32_t indication_reserve(uint16_t connection, uint16_t handle)
     return token;
 }
 
+/* 退订使未应用票据失效；尚未发出的队列项释放，在途ATT保留至确认或失败。 */
+static void indication_subscription_revoked(uint16_t handle)
+{
+    portENTER_CRITICAL(&s_indication_lock);
+    bool in_flight = s_indication_active && s_indication_count
+        && s_indications[s_indication_head].handle == handle;
+    if (handle == g_ftms_cp_handle) {
+        g_ftms_response_token = 0;
+        g_ftms_pending = in_flight;
+        g_ftms_control = false;
+    } else if (handle == g_rsc_cp_handle) {
+        g_rsc_response_token = 0;
+        g_rsc_pending = in_flight;
+    }
+    uint8_t kept = 0;
+    for (uint8_t i = 0; i < s_indication_count; ++i) {
+        uint8_t index = (s_indication_head + i) % BLE_INDICATION_QUEUE_SIZE;
+        if (s_indications[index].handle == handle && !(i == 0 && s_indication_active)) continue;
+        uint8_t target = (s_indication_head + kept++) % BLE_INDICATION_QUEUE_SIZE;
+        s_indications[target] = s_indications[index];
+    }
+    s_indication_count = kept;
+    portEXIT_CRITICAL(&s_indication_lock);
+}
+
 static void indication_complete(uint16_t connection, uint16_t handle, int status)
 {
     portENTER_CRITICAL(&s_indication_lock);
@@ -1037,6 +1145,7 @@ static void indication_complete(uint16_t connection, uint16_t handle, int status
             g_ftms_pending = false;
             if (status != BLE_HS_EDONE) g_ftms_control = false;
         }
+        if (handle == g_rsc_cp_handle) g_rsc_pending = false;
         if (status == BLE_HS_EDONE) {
             s_indication_head = (s_indication_head + 1) % BLE_INDICATION_QUEUE_SIZE;
             --s_indication_count;
@@ -1228,12 +1337,17 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         return 0;
     case BLE_GAP_EVENT_SUBSCRIBE:
         if (event->subscribe.conn_handle == g_conn_handle) {
+            subscription_update(event->subscribe.attr_handle, event->subscribe.cur_notify != 0);
             ble_telemetry_service_subscribe(event->subscribe.attr_handle, event->subscribe.cur_notify != 0);
+            if (event->subscribe.attr_handle == g_rsc_cp_handle) {
+                g_rsc_subscribed = event->subscribe.cur_indicate != 0;
+                if (!g_rsc_subscribed) indication_subscription_revoked(g_rsc_cp_handle);
+            }
         }
         if (event->subscribe.conn_handle == g_conn_handle
                 && event->subscribe.attr_handle == g_ftms_cp_handle) {
             g_ftms_subscribed = event->subscribe.cur_indicate != 0;
-            if (!g_ftms_subscribed) g_ftms_control = false;
+            if (!g_ftms_subscribed) indication_subscription_revoked(g_ftms_cp_handle);
         }
         return 0;
     case BLE_GAP_EVENT_NOTIFY_TX:
@@ -1283,7 +1397,7 @@ static int start_advertising(void)
     } else {
         if (power_on)               adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(POWER_SERVICE_UUID);
         if (cadence_on)             adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(CSC_SERVICE_UUID);
-        if (power_on || cadence_on) adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(FTMS_SERVICE_UUID);
+        if ((power_on || cadence_on) && !g_bridge_mode) adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(FTMS_SERVICE_UUID);
     }
     static ble_uuid16_t scan_rsp_uuids[] = {
         BLE_UUID16_INIT(HR_SERVICE_UUID),
@@ -1293,7 +1407,7 @@ static int start_advertising(void)
     fields.num_uuids16 = adv_uuid_count;
     fields.uuids16_is_complete = 0;
     uint8_t ftms_service_data[5] = { 0x26, 0x18, 0x01, 0x00, 0x00 };
-    if (power_on || cadence_on) {
+    if ((power_on || cadence_on) && (g_profile == SPORT_PROFILE_RUNNING || !g_bridge_mode)) {
         ftms_service_data[3] = g_profile == SPORT_PROFILE_RUNNING ? 0x01 : 0x20;
         fields.svc_data_uuid16 = ftms_service_data;
         fields.svc_data_uuid16_len = sizeof(ftms_service_data);
@@ -1373,7 +1487,7 @@ static void on_sync(void)
     ble_telemetry_service_sync();
     g_start_failed = false;
     ESP_LOGI(TAG, "BLE 就绪，profile=%s",
-             g_profile == SPORT_PROFILE_RUNNING ? "RSC+HRS+FTMS+DIS" : "CPS+HRS+CSC+FTMS+DIS");
+             g_profile == SPORT_PROFILE_RUNNING ? "RSC+HRS+FTMS+DIS" : g_bridge_mode ? "CPS+HRS+CSC+DIS" : "CPS+HRS+CSC+FTMS+DIS");
 }
 
 /**
@@ -1451,6 +1565,11 @@ void ble_bikepower_set_broadcast_mask(int mask)
     g_broadcast_mask = (uint8_t)normalized;
 }
 
+void ble_bikepower_set_bridge_mode(bool real)
+{
+    g_bridge_mode = real;
+}
+
 void ble_bikepower_set_profile(sport_profile_t profile)
 {
     if (profile < 0 || profile >= SPORT_PROFILE_COUNT) return;
@@ -1472,6 +1591,41 @@ void ble_bikepower_set_running_data(running_snapshot_t snapshot, uint8_t heartra
  * 返回值：无。
  * 特殊行为：新的回调会直接替换旧回调。
  */
+void ble_bikepower_enable_async_control(ble_rsc_distance_cb_t cb)
+{
+    g_control_async = true;
+    g_rsc_distance_cb = cb;
+}
+
+uint32_t ble_bikepower_control_ticket(bool rsc)
+{
+    return rsc ? g_rsc_response_token : g_ftms_response_token;
+}
+
+bool ble_bikepower_control_current(uint32_t ticket, bool rsc)
+{
+    return ticket && ticket == ble_bikepower_control_ticket(rsc) && g_ready && !g_stopping
+        && g_conn_handle != BLE_HS_CONN_HANDLE_NONE
+        && (rsc ? (g_rsc_pending && g_rsc_subscribed) : (g_ftms_pending && g_ftms_subscribed));
+}
+
+void ble_bikepower_control_complete(uint32_t ticket, bool rsc, bool success)
+{
+    if (!ble_bikepower_control_current(ticket, rsc)) return;
+    if (rsc) {
+        uint8_t response[] = {RSC_OP_RESPONSE_CODE, RSC_OP_SET_CUMULATIVE_VALUE,
+            success ? RSC_RESULT_SUCCESS : RSC_RESULT_OPERATION_FAILED};
+        (void)indication_submit(ticket, response, sizeof(response));
+    } else {
+        if (success) {
+            if (g_control_op == FTMS_OP_RESET) { g_ftms_control = false; ftms_send_status(FTMS_STATUS_RESET, 0); }
+            else if (g_control_op == FTMS_OP_START_RESUME) ftms_send_status(FTMS_STATUS_STARTED_RESUMED_BY_USER, 0);
+            else if (g_control_op == FTMS_OP_STOP_PAUSE) ftms_send_status(FTMS_STATUS_STOPPED_PAUSED_BY_USER, g_control_parameter);
+            ftms_send_response(g_control_op, FTMS_RESULT_SUCCESS);
+        } else ftms_send_response(g_control_op, FTMS_RESULT_OPERATION_FAILED);
+    }
+}
+
 void ble_bikepower_set_erg_callback(ble_erg_cb_t cb)
 {
     g_erg_cb = cb;
@@ -1614,6 +1768,10 @@ esp_err_t ble_bikepower_start(void)
 
     ble_hs_cfg.sync_cb = on_sync;
     ble_hs_cfg.reset_cb = on_reset;
+    ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
+    ble_hs_cfg.sm_sc = 1;
+    ble_hs_cfg.sm_bonding = 0;
+    ble_hs_cfg.sm_mitm = 0;
 
     ble_svc_gap_init();
     ble_svc_gatt_init();

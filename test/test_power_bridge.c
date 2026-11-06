@@ -144,13 +144,7 @@ static void output_cases(void)
     assert(ble_payload_encode_cps_bridge(out, sizeof(out), true, 250, 12, 4660) == 8);
     const uint8_t with_crank[] = {0x20, 0, 0xfa, 0, 12, 0, 0x34, 0x12};
     assert(memcmp(out, with_crank, sizeof(with_crank)) == 0);
-    assert(ble_payload_encode_ftms_bridge(out, sizeof(out), true, true, true, 180, 250, 150) == 7);
-    const uint8_t all[] = {0x45, 0x02, 0xb4, 0, 0xfa, 0, 150};
-    assert(memcmp(out, all, sizeof(all)) == 0);
-    assert(ble_payload_encode_ftms_bridge(out, sizeof(out), false, true, false, 0, 0, 0) == 4);
-    const uint8_t stale[] = {0x41, 0, 0, 0};
-    assert(memcmp(out, stale, sizeof(stale)) == 0);
-    assert(ble_payload_encode_ftms_bridge(out, 6, true, true, true, 180, 250, 150) == 0);
+
 }
 
 static void codec_cases(void)
@@ -178,7 +172,10 @@ static void codec_cases(void)
     assert(cps_input_decode(all, sizeof(all), &input));
     for (size_t n = 4; n < sizeof(all); n++) assert(!cps_input_decode(all, n, &input));
     all[1] |= 0x80;
-    assert(!cps_input_decode(all, sizeof(all), &input));
+    assert(cps_input_decode(all, sizeof(all), &input));
+    const uint8_t extension[] = {0, 0, 100, 0, 99};
+    assert(cps_input_decode(extension, sizeof(extension), &input));
+    assert(input.power_w == 100);
     assert(!cps_input_decode(NULL, 4, &input));
 }
 
@@ -310,8 +307,56 @@ static void config_cases(void)
     assert(c.bridge.source == BRIDGE_SOURCE_SIMULATED);
 }
 
+static void percent_upper_bound_cases(void)
+{
+    config_data_t config, restored;
+    config_store_defaults(&config);
+    config.bridge.calibration_mode = BRIDGE_CALIBRATION_PERCENT;
+    config.bridge.percent_x10 = 3000; /* +200% = 原功率的 300.0%。 */
+    assert(!config_store_validate(&config));
+    assert(power_bridge_correct(&config.bridge, 100) == 300);
+    assert(power_bridge_correct(&config.bridge, 0) == 0);
+    assert(power_bridge_correct(&config.bridge, -1) == 0);
+    assert(power_bridge_correct(&config.bridge, 667) == POWER_MAX);
+    config.bridge.percent_x10 = 2999;
+    assert(power_bridge_correct(&config.bridge, 101) == 303);
+    config.bridge.percent_x10 = 3000;
+
+    uint8_t wire[BRIDGE_WIRE_MAX_LEN];
+    size_t length = power_bridge_config_encode(&config.bridge, wire, sizeof(wire));
+    bridge_config_t decoded;
+    assert(length > 0 && power_bridge_config_decode(wire, length, &decoded));
+    assert(decoded.percent_x10 == 3000);
+    length = ble_config_encode_group(BLE_CONFIG_GROUP_BRIDGE, &config, wire, sizeof(wire));
+    assert(length > 0 && wire[13] == 0xb8 && wire[14] == 0x0b);
+    config_store_defaults(&restored);
+    assert(ble_config_decode_group(BLE_CONFIG_GROUP_BRIDGE, wire, length, &restored));
+    assert(restored.bridge.percent_x10 == 3000);
+    config_data_t guard = restored;
+    wire[13] = 0xb9; /* 300.1% 必须拒绝，不能悄悄夹紧后成功。 */
+    assert(!ble_config_decode_group(BLE_CONFIG_GROUP_BRIDGE, wire, length, &restored));
+    assert(memcmp(&guard, &restored, sizeof(guard)) == 0);
+    config.bridge.percent_x10 = 3001;
+    assert(!ble_config_encode_group(BLE_CONFIG_GROUP_BRIDGE, &config, wire, sizeof(wire)));
+    assert(config_store_validate(&config) && config.bridge.percent_x10 == 3000);
+
+    char json[CONFIG_JSON_MAX_LEN];
+    assert(config_store_serialize(&config, json, sizeof(json)) > 0);
+    assert(config_store_deserialize(json, &restored) && restored.bridge.percent_x10 == 3000);
+    power_engine_t engine;
+    power_engine_init(&engine);
+    assert(config_store_apply_to_engine(&config, &engine));
+    config_store_from_engine(&engine, &restored);
+    assert(restored.bridge.percent_x10 == 3000);
+    config.bridge.percent_x10 = 500;
+    assert(!config_store_validate(&config) && power_bridge_correct(&config.bridge, 100) == 50);
+    config.bridge.percent_x10 = 1500; /* 旧保存值仍然是 +50%，不改变解释。 */
+    assert(power_bridge_correct(&config.bridge, 100) == 150);
+}
+
 int main(void)
 {
+    percent_upper_bound_cases();
     multi_device_config_cases();
     legacy_wire_migration_cases();
     ble_config_group_cases();

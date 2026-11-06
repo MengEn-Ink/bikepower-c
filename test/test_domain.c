@@ -1970,7 +1970,7 @@ static void test_running_engine_defaults(void)
     CHECK(first.speed_x100_kmh == RUN_SPEED_X100_DEFAULT, "默认跑步速度=10.0km/h");
     CHECK(first.cadence_spm == RUN_CADENCE_DEFAULT, "默认跑步步频=170spm");
     CHECK(first.rsc_speed_1_256_mps == 711, "RSC速度单位=1/256m/s");
-    CHECK(first.stride_cm == 98, "默认步幅约98cm");
+    CHECK(first.stride_cm == 196, "同一脚两次落地步幅约196cm");
     CHECK(first.total_distance_m == 2, "1秒后累计距离整数米=2");
 
     running_snapshot_t second = running_engine_snapshot(&e, 1000);

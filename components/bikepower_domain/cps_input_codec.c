@@ -9,7 +9,6 @@ bool cps_input_decode(const uint8_t *data, size_t length, cps_input_t *out)
 {
     if (!data || !out || length < 4) return false;
     uint16_t flags = get_u16(data);
-    if (flags & 0xe000) return false;
     cps_input_t next = { .power_w = (int16_t)get_u16(data + 2) };
     size_t offset = 4;
     static const uint8_t field_lengths[12] = {1, 0, 2, 0, 6, 4, 4, 4, 3, 2, 2, 2};
@@ -24,7 +23,7 @@ bool cps_input_decode(const uint8_t *data, size_t length, cps_input_t *out)
         }
         offset += size;
     }
-    if (offset != length) return false;
+    /* CPP要求忽略RFU和未来新增octets；上方仍逐个校验已知字段。 */
     *out = next;
     return true;
 }

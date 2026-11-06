@@ -487,7 +487,7 @@
     var value = calibration.mode === "percent" ? calibration.percent : calibration.watts;
     var unit = calibration.mode === "percent" ? "%" : "W";
     var min = calibration.mode === "percent" ? -50 : -200;
-    var max = calibration.mode === "percent" ? 50 : 200;
+    var max = 200;
     var step = calibration.mode === "percent" ? .1 : 1;
     $("calibrationLabel").textContent = calibration.mode === "percent" ? "调整比例" : "调整瓦数";
     $("calibrationUnit").textContent = unit;
@@ -562,7 +562,7 @@
   function setCalibrationValue(value) {
     var calibration = state.draft.calibration;
     var min = calibration.mode === "percent" ? -50 : -200;
-    var max = calibration.mode === "percent" ? 50 : 200;
+    var max = 200;
     var parsed = Number(value);
     if (!Number.isFinite(parsed)) return;
     parsed = Math.min(max, Math.max(min, parsed));

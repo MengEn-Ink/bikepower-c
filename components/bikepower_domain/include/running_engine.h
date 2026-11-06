@@ -13,6 +13,7 @@ typedef struct {
     int speed_x100_kmh;
     int cadence_spm;
     uint32_t total_distance_m;
+    uint32_t total_distance_dm;
     uint32_t elapsed_time_s;
     uint16_t rsc_speed_1_256_mps;
     uint16_t stride_cm;
@@ -39,8 +40,8 @@ typedef struct {
     running_walk_t pace_walk;
     running_walk_t cadence_walk;
     running_walk_t pacer_pace_walk;
-    uint32_t elapsed_ms;
-    uint32_t distance_x1000_m;
+    uint64_t elapsed_ms;
+    uint64_t distance_x1000_m;
     bool running;
     running_snapshot_t snapshot;
 } running_engine_t;

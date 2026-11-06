@@ -55,6 +55,7 @@ int g_profile;
 static bool g_stopping, g_ready;
 static uint16_t g_conn_handle;
 static uint8_t g_broadcast_mask;
+static bool g_bridge_mode __attribute__((unused));
 static portMUX_TYPE s_data_lock;
 static struct { bool real; } s_output;
 static int chr_read_buf(struct ble_gatt_access_ctxt *c, const uint8_t *b, size_t n)
@@ -99,6 +100,8 @@ int main(void)
 CP_STUBS = r"""
 #define BLE_ATT_ERR_CCCD_IMPROPERLY_CONFIGURED FTMS_ATT_ERR_CCCD_IMPROPERLY_CONFIGURED
 #define BLE_ATT_ERR_PROCEDURE_ALREADY_IN_PROGRESS FTMS_ATT_ERR_PROCEDURE_IN_PROGRESS
+static atomic_bool g_control_async;
+static atomic_uchar g_control_op, g_control_parameter;
 static atomic_bool g_ftms_subscribed, g_ftms_control, g_ftms_pending;
 static uint16_t g_ftms_cp_handle=9, g_ftms_status_handle=10;
 static uint8_t g_ftms_resp_buf[3], g_ftms_status_buf[2];
@@ -120,7 +123,7 @@ static bool indicate_try(uint16_t h,const uint8_t *b,size_t n)
 static void notify_one(uint16_t h,const uint8_t *b,size_t n)
 { assert(h==10 && n==(b[0]==2?2u:1u)); statuses++; }
 static bool erg(int v) { calls++; value=v; return accepted; }
-static void clear(int op) { calls++; value=op; }
+static bool clear(int op) { calls++; value=op; return accepted; }
 static bool run_control(ble_run_control_type_t t,int v)
 { calls++; value=v; control_type=t; return accepted; }
 static void reset(void)
@@ -247,7 +250,7 @@ static int fields_check(const struct ble_hs_adv_fields *f,bool rsp)
         assert(f->num_uuids16==((g_broadcast_mask&4)?1:0));
     } else {
         primary_count++;
-        bool ftms=(g_broadcast_mask&3)!=0;
+        bool ftms=(g_broadcast_mask&3)!=0 && (g_profile==SPORT_PROFILE_RUNNING || !g_bridge_mode);
         assert((f->svc_data_uuid16_len==5)==ftms);
         if(ftms) {
             assert(f->svc_data_uuid16[0]==0x26 && f->svc_data_uuid16[1]==0x18);
@@ -280,6 +283,11 @@ int main(void)
     for(int i=1;i<=3;i++) {step=0;fail_at=i;assert(start_advertising()==7);}
     step=0;g_stopping=true;assert(start_advertising()==0 && step==0);
     assert(primary_count==42+2 && response_count==42+1 && s_lock_depth==0);
+    primary_count=response_count=0;g_bridge_mode=true;g_stopping=false;fail_at=0;
+    for(int p=0;p<2;p++)for(int m=1;m<=7;m++){
+        g_profile=p;g_broadcast_mask=m;step=0;assert(start_advertising()==0);
+    }
+    assert(primary_count==14&&response_count==14);
     puts("广播：双模式×7 掩码×3 名称、31 字节预算、UTF-8、错误返回与停止守卫通过");
 }
 """
@@ -308,7 +316,11 @@ static void ble_telemetry_service_disconnect(void) {}
 static void ble_telemetry_service_subscribe(uint16_t handle,bool notify) {(void)handle;(void)notify;}
 static void mark_start_failed(const char *reason,int rc) {(void)reason;(void)rc;assert(false);}
 static void ble_power_bridge_host_reset(void) {}
+static void subscription_update(uint16_t h,bool e) {(void)h;(void)e;}
+static uint16_t g_rsc_cp_handle=11;
+static bool g_rsc_subscribed;
 static void indication_reset(void) {}
+static void indication_subscription_revoked(uint16_t h) {if(h==9) g_ftms_control=false;}
 static void indication_complete(uint16_t connection,uint16_t handle,int status)
 {
     if(connection==g_conn_handle && handle==g_ftms_cp_handle && status) {
@@ -354,8 +366,10 @@ TX_STUBS = r"""
 static int g_notify_lock=1;
 static bool lock_ok=true,alloc_ok=true;
 static int send_rc,freed,sends,terminated;
-static uint16_t g_ftms_cp_handle=9;
-static atomic_bool g_ftms_pending,g_ftms_control;
+static uint16_t g_ftms_cp_handle=9,g_rsc_cp_handle=11;
+static atomic_bool g_ftms_pending,g_ftms_control,g_rsc_pending,g_rsc_subscribed;
+static uint32_t g_rsc_response_token;
+static void subscriptions_reset(void) {}
 #define BLE_HS_EDONE 14
 #define BLE_HS_ENOMEM 6
 #define BLE_ERR_REM_USER_CONN_TERM 19
@@ -441,7 +455,31 @@ int main(void)
     indication_reset();send_rc=0;synchronous_ack=true;
     token=indication_reserve(1,9);assert(indication_submit(token,b,3));
     assert(!s_indication_active && s_indication_count==0 && s_lock_depth==0);
-    puts("Indication：跨特征 FIFO、复制、容量、异步预留、确认、失败断连与代次隔离通过");
+    synchronous_ack=false;indication_reset();
+    g_ftms_pending=g_ftms_control=true;
+    g_ftms_response_token=indication_reserve(1,9);
+    third=indication_reserve(1,10);
+    assert(indication_submit(third,b,3));
+    int before=sends;
+    indication_subscription_revoked(9);
+    assert(!g_ftms_pending && !g_ftms_control && !g_ftms_response_token && s_indication_count==1);
+    assert(!indication_submit(token,b,3));
+    indication_pump_nolock();assert(sends==before+1 && last_handle==10);
+    indication_complete(1,10,BLE_HS_EDONE);
+    for(int i=0;i<32;i++) {
+        g_rsc_pending=true;g_rsc_response_token=indication_reserve(1,11);
+        assert(g_rsc_response_token);
+        indication_subscription_revoked(11);
+        assert(!g_rsc_pending && !g_rsc_response_token && s_indication_count==0);
+    }
+    g_ftms_pending=g_ftms_control=true;
+    g_ftms_response_token=indication_reserve(1,9);
+    assert(indication_submit(g_ftms_response_token,b,3));
+    indication_subscription_revoked(9);
+    assert(g_ftms_pending && !g_ftms_control && !g_ftms_response_token && s_indication_active);
+    indication_complete(1,9,BLE_HS_EDONE);
+    assert(!g_ftms_pending && !s_indication_active && s_indication_count==0);
+    puts("Indication：跨特征 FIFO、复制、容量、异步预留、确认、失败断连、退订释放及代次隔离通过");
 }
 """
 
@@ -509,7 +547,7 @@ def main():
         run(PREAMBLE + "\n".join(buffers) + callbacks + FEATURE_CHECKS)
     if mode in ("all", "control"):
         callbacks = functions(source, [("ftms_send_response", "static void"),
-                                       ("ftms_send_status", "static void"), ("ftms_cp_cb", "static int")])
+                                       ("ftms_send_status", "static void"), ("ftms_operation_accepted", "static void"), ("ftms_cp_cb", "static int")])
         run(PREAMBLE + CP_STUBS.replace("static int write_bytes", "static int ftms_cp_cb(uint16_t, uint16_t, struct ble_gatt_access_ctxt *, void *);\nstatic int write_bytes")
             + callbacks + CP_CHECKS)
     if mode in ("all", "advertising"):
@@ -521,7 +559,7 @@ def main():
     if mode in ("all", "transmission"):
         state=source.split("// BEGIN_INDICATION_STATE")[1].split("// END_INDICATION_STATE")[0]
         callbacks = functions(source, [("indication_reset","static void"),
-            ("indication_reserve","static uint32_t"),("indication_complete","static void"),
+            ("indication_reserve","static uint32_t"),("indication_subscription_revoked","static void"),("indication_complete","static void"),
             ("indication_pump_nolock","static void"),("indication_submit","static bool"),
             ("indicate_try","static bool"),("indicate_one","static void")])
         run(PREAMBLE + '#include "ble_config_codec.h"\n' + TX_STUBS + state + callbacks + TX_CHECKS)

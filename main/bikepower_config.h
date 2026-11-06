@@ -113,6 +113,16 @@ typedef enum {
 #define CSC_FEATURE_CHAR_UUID      0x2A5C
 #define RSC_MEASUREMENT_CHAR_UUID  0x2A53
 #define RSC_FEATURE_CHAR_UUID      0x2A54
+#define RSC_CONTROL_POINT_CHAR_UUID 0x2A55
+#define RSC_OP_SET_CUMULATIVE_VALUE 1u
+#define RSC_OP_RESPONSE_CODE 0x10u
+#define RSC_RESULT_SUCCESS 1u
+#define RSC_RESULT_NOT_SUPPORTED 2u
+#define RSC_RESULT_INVALID_PARAM 3u
+#define RSC_RESULT_OPERATION_FAILED 4u
+#define RSC_ATT_ERR_PROCEDURE_IN_PROGRESS 0x80
+#define RSC_ATT_ERR_CCCD_IMPROPERLY_CONFIGURED 0x81
+#define RSC_CP_REQUEST_MAX 5u
 #define SENSOR_LOCATION_CHAR_UUID  0x2A5D
 #define FTMS_FEATURE_CHAR_UUID     0x2ACC
 #define FTMS_CONTROL_POINT_CHAR_UUID 0x2AD9
@@ -190,6 +200,7 @@ typedef enum {
 #define BLE_RETRY_TICKS              100    // BLE 启动失败重试节拍数（每拍50ms → 5s）
 #define BLE_NOTIFY_LOCK_WAIT_MS      10     // 通知互斥锁短等待上限：锁持有为微秒级，避免阻塞 NimBLE 任务
 #define BLE_INDICATION_QUEUE_SIZE    8
+#define BLE_NOTIFY_SUBSCRIPTION_MAX   12
 #define BLE_SCAN_DEFAULT_MS          8000   // 模板库扫描附近 BLE 设备的默认时长
 #define BLE_SCAN_MAX_RESULTS         12     // 扫描结果缓存上限，避免配网态占用过多内存
 #define BLE_BRIDGE_TEST_MS           30000u

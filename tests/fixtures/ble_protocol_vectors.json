@@ -4,23 +4,19 @@
     {
       "name": "桥接无曲柄仅功率",
       "protocol": "cps_bridge",
-      "input": {"has_crank": false, "power_w": 250, "crank_revolutions": 12, "crank_event_time_1024": 4660},
+      "input": {
+        "has_crank": false,
+        "power_w": 250,
+        "crank_revolutions": 12,
+        "crank_event_time_1024": 4660
+      },
       "expected_hex": "0000fa00",
-      "expected_fields": {"flags": 0, "power_w": 250, "crank_revolutions": null, "crank_event_time_1024": null}
-    },
-    {
-      "name": "桥接真实踏频功率和可选心率无模拟速度",
-      "protocol": "ftms_bridge",
-      "input": {"include_cadence": true, "include_power": true, "include_heartrate": true, "cadence_half_rpm": 180, "power_w": 250, "heart_rate_bpm": 150},
-      "expected_hex": "4502b400fa0096",
-      "expected_fields": {"flags": 581, "speed_x100_kmh": null, "cadence_half_rpm": 180, "power_w": 250, "heart_rate_bpm": 150}
-    },
-    {
-      "name": "桥接失效零功率无踏频心率",
-      "protocol": "ftms_bridge",
-      "input": {"include_cadence": false, "include_power": true, "include_heartrate": false, "cadence_half_rpm": 0, "power_w": 0, "heart_rate_bpm": 0},
-      "expected_hex": "41000000",
-      "expected_fields": {"flags": 65, "speed_x100_kmh": null, "cadence_half_rpm": null, "power_w": 0, "heart_rate_bpm": null}
+      "expected_fields": {
+        "flags": 0,
+        "power_w": 250,
+        "crank_revolutions": null,
+        "crank_event_time_1024": null
+      }
     },
     {
       "name": "cps_positive_power",
@@ -128,10 +124,10 @@
         "cadence_half_rpm": 180,
         "power_w": 250
       },
-      "expected_hex": "4100fa00",
+      "expected_hex": "4000b80bfa00",
       "expected_fields": {
-        "flags": 65,
-        "speed_x100_kmh": null,
+        "flags": 64,
+        "speed_x100_kmh": 3000,
         "cadence_half_rpm": null,
         "cadence_rpm": null,
         "power_w": 250

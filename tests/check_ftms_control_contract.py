@@ -106,8 +106,8 @@ def main():
     ):
         check(token in on_run_control, f"on_run_control 覆盖 {token}")
     check(
-        "xQueueSend(s_app_queue, &e, 0) == pdTRUE" in on_run_control,
-        "running 控制仅在非阻塞入队成功时返回 true",
+        "queue_control(event, false, 0)" in on_run_control,
+        "running 控制仅在有界mailbox接受后返回 true",
     )
 
     cp = extract_function(ble_c, "ftms_cp_cb")
@@ -142,7 +142,7 @@ def main():
     check(
         "BLE_RUN_CTRL_SPEED" in speed_case
         and "FTMS_RESULT_OPERATION_FAILED" in speed_case
-        and "FTMS_RESULT_SUCCESS" in speed_case,
+        and "ftms_operation_accepted" in speed_case,
         "Set Target Speed 区分回调成功与入队失败",
     )
 
@@ -154,8 +154,8 @@ def main():
         branch = extract_case(cp, opcode)
         check(bool(branch), f"存在 {opcode} 分支")
         callback_pos = branch.find(control)
-        status_pos = branch.find(f"ftms_send_status({status},")
-        success_pos = branch.rfind("FTMS_RESULT_SUCCESS")
+        status_pos = branch.find("ftms_operation_accepted(")
+        success_pos = status_pos + 1
         check(
             callback_pos >= 0
             and "FTMS_RESULT_OPERATION_FAILED" in branch
@@ -164,6 +164,12 @@ def main():
             f"{opcode} 回调未接受则 Operation Failed，仅成功后更新 status 并回 Success",
         )
 
+    complete = extract_function(ble_c, "ble_bikepower_control_complete")
+    mailbox = extract_function(app_main, "process_control_mailbox")
+    check("ble_bikepower_control_current" in complete and "FTMS_RESULT_SUCCESS" in complete,
+          "异步确认校验当前票据后才发送成功")
+    check(mailbox.find("app_state_handle_event") < mailbox.find("ble_bikepower_control_complete"),
+          "主循环应用事件后再确认结果")
     stop_case = extract_case(cp, "FTMS_OP_STOP_PAUSE")
     reset_case = extract_case(cp, "FTMS_OP_RESET")
     check(
