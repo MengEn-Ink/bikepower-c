@@ -75,7 +75,7 @@ def main():
         ('id="ch16"', "手册新增设备比对与模板写入章节"),
         ("applyRoute();", "启动时按地址路由，默认进入使用手册"),
         ("routeFromHash", "工具页支持 #/monitor 等独立链接"),
-        ('id="connect-gate"', "进站先弹出蓝牙连接门（类钱包连接）"),
+        ('id="connect-gate"', "连接操作提供蓝牙连接门，首次手册优先阅读"),
         ("initLinkUi();", "启动时决定是否弹出蓝牙连接门"),
         ('id="link-capsule"', "右上角常驻蓝牙连接状态胶囊"),
         ("gateSuccess", "连接成功后关闭连接门并默认打开使用手册"),

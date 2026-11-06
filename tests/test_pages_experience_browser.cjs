@@ -19,10 +19,11 @@ const root = path.join(__dirname, '../tools/web');
           });
           if (url.pathname.endsWith('.json')) return route.fulfill({ json: { available: false } });
           const file = url.pathname === '/' ? 'ble-monitor.html' : path.basename(url.pathname);
-          if (!['ble-monitor.html', 'pages-experience.js', 'pages-experience.css', 'flash-session.js'].includes(file)) return route.fulfill({ status: 404 });
+          if (!['ble-monitor.html', 'operation-demos.js', 'operation-demos.css', 'phone-operation-demos.js', 'phone-operation-demos.css', 'phone-portal-source.js', 'pages-experience.js', 'pages-experience.css', 'flash-session.js'].includes(file)) return route.fulfill({ status: 404 });
           return route.fulfill({ path: path.join(root, file), contentType: file.endsWith('.css') ? 'text/css' : file.endsWith('.js') ? 'text/javascript' : 'text/html' });
         });
         await page.addInitScript(theme => {
+          if (window !== window.top) return;
           localStorage.setItem('bikepower.theme.v1', theme);
           sessionStorage.setItem('bikepower.linkgate.skip.v1', '1');
         }, theme);
@@ -32,7 +33,7 @@ const root = path.join(__dirname, '../tools/web');
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), '页面不得横向溢出 ' + width);
         if (width < 900) {
           await page.getByRole('link', { name: '按钮演示', exact: true }).click();
-          const demo = page.locator('[data-button-demo]');
+          const demo = page.locator('.mobile-guide [data-button-demo]');
           await demo.getByRole('button', { name: '下一步', exact: true }).click();
           assert.equal(await demo.locator('[data-demo-time]').textContent(), '0.5 s');
           await demo.getByRole('button', { name: '下一步', exact: true }).click();
@@ -61,8 +62,8 @@ const root = path.join(__dirname, '../tools/web');
           await checkbox.check();
           assert.equal(await checkbox.isChecked(), true);
           await page.getByRole('link', { name: '遇到问题', exact: true }).click();
-          await page.getByText('长按了，为什么没有 WiFi', { exact: true }).click();
-          assert.equal(await page.locator('.guide-faq').nth(2).getAttribute('open'), '');
+          assert.match(await page.locator('#mg-faq-title').textContent(), /注意事项/);
+          assert.ok(await page.getByText('配网要先松开，再在 3 秒内按一次。', { exact: true }).isVisible());
           if (width === 390) {
             await page.getByRole('link', { name: '按钮演示', exact: true }).click();
             await page.screenshot({ path: '/tmp/bikepower-pages-mobile-' + theme + '.png', animations: 'disabled' });
