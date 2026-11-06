@@ -9,6 +9,7 @@
 
 /* 读取已保存的身份覆盖；不存在或损坏时输出全空（全部回退内置值）。 */
 void device_identity_store_load(device_identity_t *id);
+bool device_identity_store_load_legacy(device_identity_t *id);
 
-/* 保存身份覆盖；全部字段为空时删除键以恢复出厂。返回是否成功提交。 */
+/* 保存身份覆盖到完整双槽快照；全空表示恢复内置，不删除旧迁移键。 */
 bool device_identity_store_save(const device_identity_t *id);

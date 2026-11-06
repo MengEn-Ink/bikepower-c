@@ -12,6 +12,7 @@ idf_component_register(
          "led.c"
          "board_detect.c"
          "nvs_store.c"
+         "persistent_store.c"
          "device_identity_store.c"
          "radio_ctrl.c"
          "wifi_portal.c"

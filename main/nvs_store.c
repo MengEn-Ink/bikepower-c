@@ -1,30 +1,138 @@
-/**
- * NVS 配置桥接实现 — 见 nvs_store.h
- */
-#include "nvs_store.h"
-#include "config_store.h"
-#include "bikepower_config.h"
-#include "nvs.h"
-#include "esp_log.h"
+#include <stddef.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
-#include <string.h>
+#include "nvs.h"
+#include "esp_log.h"
+#include "bikepower_config.h"
+#include "nvs_store.h"
+#include "persistent_store.h"
+#include "device_identity_store.h"
 
 static const char *TAG = "NVS";
+static StaticSemaphore_t s_recent_mutex_buffer;
+static SemaphoreHandle_t s_recent_mutex;
 
-// NVS 写入互斥锁：app_main 主循环（按钮调功 dirty 落盘）与 httpd 任务（网页保存）
-// 可能并发调用 nvs_store_save，加锁避免两个 nvs_open 同 namespace 并发写造成数据竞争。
-static SemaphoreHandle_t s_save_mutex = NULL;
-static StaticSemaphore_t s_save_mutex_buf;
+#define FIELD(key, name) {key, offsetof(config_data_t, name)}
+static const struct { const char *key; size_t offset; } s_legacy_fields[] = {
+    FIELD(NVS_KEY_SCHEMA_VER, schema_ver), FIELD(NVS_KEY_POWER, power),
+    FIELD(NVS_KEY_CADENCE, cadence), FIELD(NVS_KEY_MODE, mode),
+    FIELD(NVS_KEY_HEARTRATE, heartrate), FIELD(NVS_KEY_HAS_USER_HR, has_user_hr),
+    FIELD(NVS_KEY_POWER_FLOAT, power_float), FIELD(NVS_KEY_CADENCE_FLOAT, cadence_float),
+    FIELD(NVS_KEY_HR_FLOAT, hr_float), FIELD(NVS_KEY_POWER_STEP, power_step),
+    FIELD(NVS_KEY_WEIGHT, weight), FIELD(NVS_KEY_FTP, ftp), FIELD(NVS_KEY_THR_HR, thr_hr),
+    FIELD(NVS_KEY_RIDE_TYPE, ride_type), FIELD(NVS_KEY_CUSTOM_WKG_LO, custom_wkg_low),
+    FIELD(NVS_KEY_CUSTOM_WKG_HI, custom_wkg_high), FIELD(NVS_KEY_SPORT_PROFILE, sport_profile),
+    FIELD(NVS_KEY_BROADCAST_MASK, broadcast_mask), FIELD(NVS_KEY_RUN_SPEED, run_speed_x100),
+    FIELD(NVS_KEY_RUN_PACE_FLOAT, run_pace_float_sec), FIELD(NVS_KEY_RUN_CADENCE, run_cadence),
+    FIELD(NVS_KEY_RUN_CAD_FLOAT, run_cadence_float), FIELD(NVS_KEY_RUN_MODE, run_mode),
+    FIELD(NVS_KEY_RUN_PACER, run_pacer_type), FIELD(NVS_KEY_RUN_PACE_LO, run_pace_low_sec),
+    FIELD(NVS_KEY_RUN_PACE_HI, run_pace_high_sec),
+};
+#undef FIELD
 
-#define BRIDGE_RECENT_WIRE_VERSION 1u
-#define BRIDGE_RECENT_WIRE_LEN     8u
+static const char *s_led_keys[] = {
+    NVS_KEY_LED_SILENT, NVS_KEY_LED_WAIT_MODE, NVS_KEY_LED_WAIT_COLOR,
+    NVS_KEY_LED_CONN_MODE, NVS_KEY_LED_CONN_COLOR, NVS_KEY_LED_WIFI_MODE,
+    NVS_KEY_LED_WIFI_COLOR, NVS_KEY_LED_CONFIRM_MODE, NVS_KEY_LED_CONFIRM_COLOR,
+    NVS_KEY_LED_ERROR_MODE, NVS_KEY_LED_ERROR_COLOR,
+};
 
-static void ensure_save_mutex(void)
+static bool read_legacy(config_data_t *config)
 {
-    if (s_save_mutex == NULL) {
-        s_save_mutex = xSemaphoreCreateMutexStatic(&s_save_mutex_buf);
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle);
+    if (err == ESP_ERR_NVS_NOT_FOUND) return true;
+    if (err != ESP_OK) return false;
+    bool ok = true;
+    for (size_t i = 0; i < sizeof(s_legacy_fields) / sizeof(s_legacy_fields[0]); i++) {
+        int32_t value;
+        err = nvs_get_i32(handle, s_legacy_fields[i].key, &value);
+        if (err == ESP_OK) *(int *)((uint8_t *)config + s_legacy_fields[i].offset) = (int)value;
+        else if (err != ESP_ERR_NVS_NOT_FOUND) ok = false;
     }
+    uint8_t *led_fields[1 + LED_SCENE_COUNT * 2];
+    led_fields[0] = &config->led.silent;
+    for (unsigned i = 0; i < LED_SCENE_COUNT; i++) {
+        led_fields[1 + i * 2] = &config->led.scenes[i].mode;
+        led_fields[2 + i * 2] = &config->led.scenes[i].color;
+    }
+    for (size_t i = 0; i < sizeof(s_led_keys) / sizeof(s_led_keys[0]); i++) {
+        int32_t value;
+        err = nvs_get_i32(handle, s_led_keys[i], &value);
+        if (err == ESP_OK) *led_fields[i] = value < 0 || value > UINT8_MAX ? UINT8_MAX : (uint8_t)value;
+        else if (err != ESP_ERR_NVS_NOT_FOUND) ok = false;
+    }
+    const char *keys[] = {NVS_KEY_CUSTOM_NAME, NVS_KEY_RUN_CUSTOM_NAME, NVS_KEY_DEVICE_NAME};
+    char *strings[] = {config->custom_pacer_name, config->run_custom_name, config->device_name};
+    size_t capacities[] = {sizeof(config->custom_pacer_name), sizeof(config->run_custom_name), sizeof(config->device_name)};
+    for (unsigned i = 0; i < 3; i++) {
+        size_t length = capacities[i];
+        err = nvs_get_str(handle, keys[i], strings[i], &length);
+        if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) ok = false;
+    }
+    uint8_t bridge[BRIDGE_WIRE_MAX_LEN];
+    size_t length = sizeof(bridge);
+    err = nvs_get_blob(handle, NVS_KEY_BRIDGE, bridge, &length);
+    if (err == ESP_OK) {
+        if (!power_bridge_config_decode(bridge, length, &config->bridge)) ok = false;
+    } else if (err != ESP_ERR_NVS_NOT_FOUND) ok = false;
+    nvs_close(handle);
+    config_store_migrate(config);
+    config_store_validate(config);
+    return ok;
+}
+
+void nvs_store_load(power_engine_t *engine)
+{
+    if (!engine) return;
+    static config_data_t config;
+    static device_identity_t identity;
+    config_store_defaults(&config);
+    device_identity_defaults(&identity);
+    persistent_store_result_t result = persistent_store_load(&config, &identity);
+    if (result == PERSISTENT_STORE_OK) {
+        config_store_apply_to_engine(&config, engine);
+        return;
+    }
+    if (result != PERSISTENT_STORE_ABSENT && result != PERSISTENT_STORE_MIGRATION_INCOMPLETE) {
+        persistent_store_readonly_defaults();
+        ESP_LOGE(TAG, "快照不可读取，使用安全默认值并禁止覆盖存储");
+        config_store_apply_to_engine(&config, engine);
+        return;
+    }
+    bool ok = read_legacy(&config);
+    if (!device_identity_store_load_legacy(&identity)) ok = false;
+    config_store_apply_to_engine(&config, engine);
+    if (!ok) {
+        persistent_store_readonly_defaults();
+        config_store_defaults(&config);
+        config_store_apply_to_engine(&config, engine);
+        ESP_LOGE(TAG, "旧配置读取失败，禁止将不完整旧值迁移写回");
+        return;
+    }
+    if (result == PERSISTENT_STORE_MIGRATION_INCOMPLETE) {
+        persistent_store_readonly(&config, &identity);
+        ESP_LOGE(TAG, "首次提交标记不完整，使用原旧配置并禁止继续写入");
+        return;
+    }
+    persistent_store_seed(&config, &identity);
+    if (!persistent_store_save(&config, &identity)) {
+        ESP_LOGW(TAG, "旧配置快照迁移未完成，保留旧键并在下次启动重试");
+    }
+}
+
+bool nvs_store_save_with_identity(power_engine_t *engine, const device_identity_t *identity)
+{
+    if (!engine) return false;
+    config_data_t config;
+    config_store_from_engine(engine, &config);
+    return persistent_store_save(&config, identity);
+}
+
+bool nvs_store_save(power_engine_t *engine)
+{
+    return nvs_store_save_with_identity(engine, NULL);
 }
 
 static bool bridge_recent_valid(const bridge_device_t *device)
@@ -35,295 +143,22 @@ static bool bridge_recent_valid(const bridge_device_t *device)
     checked.source = BRIDGE_SOURCE_REAL;
     checked.device_count = 1;
     checked.devices[0] = *device;
-    checked.devices[0].name[0] = '\0';
+    checked.devices[0].name[0] = 0;
     return !power_bridge_config_validate(&checked);
-}
-
-// 读单个 i32，缺失时保留默认值
-/**
- * 从 NVS 读取一个 32 位整数键。
- * 若键存在则写入输出变量，否则保持调用方当前默认值不变。
- * h：已打开的 NVS 句柄。
- * key：键名。
- * out：输出整数地址。
- * 返回值：无。
- * 特殊行为：键不存在不视为错误，方便以 defaults 结构为底逐项覆盖。
- */
-static void get_i32(nvs_handle_t h, const char *key, int *out)
-{
-    int32_t v;
-    if (nvs_get_i32(h, key, &v) == ESP_OK) {
-        *out = (int)v;
-    }
-}
-
-/**
- * 从 NVS 加载配置。
- * 读取 namespace `bikepower` 下的键值，对版本迁移和越界修正后写回引擎。
- * e：待接收配置的功率引擎实例。
- * 返回值：无。
- * 特殊行为：无配置时会回写默认值；发生迁移或夹紧时也会重新保存修正后的结果。
- */
-void nvs_store_load(power_engine_t *e)
-{
-    // 启动时单线程初始化互斥锁（load 先于任何 save 调用，保证 mutex 在 save 之前就绪）
-    ensure_save_mutex();
-
-    config_data_t c;
-    config_store_defaults(&c);
-
-    nvs_handle_t h;
-    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &h);
-    if (err == ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGI(TAG, "无配置，使用默认值并回写");
-        config_store_apply_to_engine(&c, e);
-        if (!nvs_store_save(e)) ESP_LOGW(TAG, "默认值回写 NVS 失败，下次启动将重试");
-        return;
-    }
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "打开 NVS 失败(%s)，使用默认值", esp_err_to_name(err));
-        config_store_apply_to_engine(&c, e);
-        return;
-    }
-
-    get_i32(h, NVS_KEY_SCHEMA_VER, &c.schema_ver);
-    uint8_t bridge_wire[BRIDGE_WIRE_MAX_LEN];
-    size_t bridge_length = sizeof(bridge_wire);
-    esp_err_t bridge_err = nvs_get_blob(h, NVS_KEY_BRIDGE, bridge_wire, &bridge_length);
-    if (bridge_err == ESP_OK) {
-        if (!power_bridge_config_decode(bridge_wire, bridge_length, &c.bridge)) {
-            ESP_LOGW(TAG, "桥接配置编码无效，恢复模拟来源");
-        }
-    } else if (bridge_err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "读取桥接配置失败(%s)，恢复模拟来源", esp_err_to_name(bridge_err));
-    }
-    get_i32(h, NVS_KEY_POWER, &c.power);
-    get_i32(h, NVS_KEY_CADENCE, &c.cadence);
-    get_i32(h, NVS_KEY_MODE, &c.mode);
-    get_i32(h, NVS_KEY_HEARTRATE, &c.heartrate);
-    get_i32(h, NVS_KEY_HAS_USER_HR, &c.has_user_hr);
-    get_i32(h, NVS_KEY_POWER_FLOAT, &c.power_float);
-    get_i32(h, NVS_KEY_CADENCE_FLOAT, &c.cadence_float);
-    get_i32(h, NVS_KEY_HR_FLOAT, &c.hr_float);
-    get_i32(h, NVS_KEY_POWER_STEP, &c.power_step);
-    get_i32(h, NVS_KEY_WEIGHT, &c.weight);
-    get_i32(h, NVS_KEY_FTP, &c.ftp);
-    get_i32(h, NVS_KEY_THR_HR, &c.thr_hr);
-    get_i32(h, NVS_KEY_RIDE_TYPE, &c.ride_type);
-    get_i32(h, NVS_KEY_CUSTOM_WKG_LO, &c.custom_wkg_low);
-    get_i32(h, NVS_KEY_CUSTOM_WKG_HI, &c.custom_wkg_high);
-    get_i32(h, NVS_KEY_SPORT_PROFILE, &c.sport_profile);
-    get_i32(h, NVS_KEY_BROADCAST_MASK, &c.broadcast_mask);
-    get_i32(h, NVS_KEY_RUN_SPEED, &c.run_speed_x100);
-    get_i32(h, NVS_KEY_RUN_PACE_FLOAT, &c.run_pace_float_sec);
-    get_i32(h, NVS_KEY_RUN_CADENCE, &c.run_cadence);
-    get_i32(h, NVS_KEY_RUN_CAD_FLOAT, &c.run_cadence_float);
-    get_i32(h, NVS_KEY_RUN_MODE, &c.run_mode);
-    get_i32(h, NVS_KEY_RUN_PACER, &c.run_pacer_type);
-    get_i32(h, NVS_KEY_RUN_PACE_LO, &c.run_pace_low_sec);
-    get_i32(h, NVS_KEY_RUN_PACE_HI, &c.run_pace_high_sec);
-    size_t cn_len = sizeof(c.custom_pacer_name);
-    esp_err_t cn_err = nvs_get_str(h, NVS_KEY_CUSTOM_NAME, c.custom_pacer_name, &cn_len);
-    if (cn_err != ESP_OK && cn_err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "读取自定义配速昵称失败(%s)，保留默认昵称", esp_err_to_name(cn_err));
-    }
-    size_t rcn_len = sizeof(c.run_custom_name);
-    esp_err_t rcn_err = nvs_get_str(h, NVS_KEY_RUN_CUSTOM_NAME, c.run_custom_name, &rcn_len);
-    if (rcn_err != ESP_OK && rcn_err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "读取自定义跑步档名称失败(%s)，保留默认名称", esp_err_to_name(rcn_err));
-    }
-    int led_tmp;
-    led_tmp = c.led.silent; get_i32(h, NVS_KEY_LED_SILENT, &led_tmp); c.led.silent = (uint8_t)led_tmp;
-    led_tmp = c.led.scenes[LED_SCENE_WAIT_CONN].mode; get_i32(h, NVS_KEY_LED_WAIT_MODE, &led_tmp); c.led.scenes[LED_SCENE_WAIT_CONN].mode = (uint8_t)led_tmp;
-    led_tmp = c.led.scenes[LED_SCENE_WAIT_CONN].color; get_i32(h, NVS_KEY_LED_WAIT_COLOR, &led_tmp); c.led.scenes[LED_SCENE_WAIT_CONN].color = (uint8_t)led_tmp;
-    led_tmp = c.led.scenes[LED_SCENE_CONNECTED].mode; get_i32(h, NVS_KEY_LED_CONN_MODE, &led_tmp); c.led.scenes[LED_SCENE_CONNECTED].mode = (uint8_t)led_tmp;
-    led_tmp = c.led.scenes[LED_SCENE_CONNECTED].color; get_i32(h, NVS_KEY_LED_CONN_COLOR, &led_tmp); c.led.scenes[LED_SCENE_CONNECTED].color = (uint8_t)led_tmp;
-    led_tmp = c.led.scenes[LED_SCENE_WIFI_CONFIG].mode; get_i32(h, NVS_KEY_LED_WIFI_MODE, &led_tmp); c.led.scenes[LED_SCENE_WIFI_CONFIG].mode = (uint8_t)led_tmp;
-    led_tmp = c.led.scenes[LED_SCENE_WIFI_CONFIG].color; get_i32(h, NVS_KEY_LED_WIFI_COLOR, &led_tmp); c.led.scenes[LED_SCENE_WIFI_CONFIG].color = (uint8_t)led_tmp;
-    led_tmp = c.led.scenes[LED_SCENE_WIFI_CONFIRM].mode; get_i32(h, NVS_KEY_LED_CONFIRM_MODE, &led_tmp); c.led.scenes[LED_SCENE_WIFI_CONFIRM].mode = (uint8_t)led_tmp;
-    led_tmp = c.led.scenes[LED_SCENE_WIFI_CONFIRM].color; get_i32(h, NVS_KEY_LED_CONFIRM_COLOR, &led_tmp); c.led.scenes[LED_SCENE_WIFI_CONFIRM].color = (uint8_t)led_tmp;
-    led_tmp = c.led.scenes[LED_SCENE_ERROR].mode; get_i32(h, NVS_KEY_LED_ERROR_MODE, &led_tmp); c.led.scenes[LED_SCENE_ERROR].mode = (uint8_t)led_tmp;
-    led_tmp = c.led.scenes[LED_SCENE_ERROR].color; get_i32(h, NVS_KEY_LED_ERROR_COLOR, &led_tmp); c.led.scenes[LED_SCENE_ERROR].color = (uint8_t)led_tmp;
-    size_t dn_len = sizeof(c.device_name);
-    esp_err_t dn_err = nvs_get_str(h, NVS_KEY_DEVICE_NAME, c.device_name, &dn_len);
-    if (dn_err != ESP_OK && dn_err != ESP_ERR_NVS_NOT_FOUND) {
-        // 读取失败（如存储项损坏/超长）时保留 defaults 的设备名，并记录原因便于排查。
-        ESP_LOGW(TAG, "读取设备名失败(%s)，保留默认设备名", esp_err_to_name(dn_err));
-    }
-    nvs_close(h);
-
-    bool migrated = config_store_migrate(&c);
-    bool fixed = config_store_validate(&c);
-    config_store_apply_to_engine(&c, e);
-
-    ESP_LOGI(TAG, "配置加载完成 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d kg ftp=%dW thr=%dBPM ride=%d custom=%s pf=%d cf=%d hf=%d step=%d sport=%d bmask=%d run=%d/%d/%d/%d rmode=%d rpacer=%d rpace=%d-%d dn=%s%s%s",
-             c.power, c.cadence, c.mode, c.heartrate, c.has_user_hr,
-             c.weight, c.ftp, c.thr_hr, c.ride_type,
-             c.custom_pacer_name,
-             c.power_float, c.cadence_float, c.hr_float, c.power_step,
-             c.sport_profile, c.broadcast_mask, c.run_speed_x100, c.run_pace_float_sec, c.run_cadence, c.run_cadence_float,
-             c.run_mode, c.run_pacer_type, c.run_pace_low_sec, c.run_pace_high_sec,
-             c.device_name,
-             migrated ? " [migrated]" : "", fixed ? " [clamped]" : "");
-
-    if (migrated || fixed) {
-        if (!nvs_store_save(e)) ESP_LOGW(TAG, "迁移/夹紧后回写 NVS 失败，下次启动将重试");
-    }
-}
-
-/**
- * 把当前配置保存到 NVS。
- * 将引擎状态转换为 config_data_t 后逐键写入 namespace 并提交。
- * 任一键写入失败或 commit 失败都返回 false，保留 dirty 由调用方重试。
- * e：待保存的功率引擎实例。
- * 返回值：`true` 表示保存成功，`false` 表示失败。
- * 特殊行为：失败时记录具体出错的键名，便于诊断。
- */
-bool nvs_store_save(power_engine_t *e)
-{
-    // 防御性 lazy init：load 异常时 mutex 仍可能在 save 首次调用时为 NULL
-    ensure_save_mutex();
-    // 互斥保护整段 nvs_open→set→commit 流程，避免并发写造成 commit 丢失或脏写。
-    // 等待 100ms 让另一侧先写完；超时则放弃本次保存（dirty 保留，下次心跳重试）。
-    if (xSemaphoreTake(s_save_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-        ESP_LOGW(TAG, "NVS 保存互斥锁等待超时，跳过本次保存");
-        return false;
-    }
-
-    config_data_t c;
-    config_store_from_engine(e, &c);
-
-    nvs_handle_t h;
-    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "保存打开 NVS 失败(%s)", esp_err_to_name(err));
-        xSemaphoreGive(s_save_mutex);
-        return false;
-    }
-
-    bool ok = true;
-    uint8_t bridge_wire[BRIDGE_WIRE_MAX_LEN];
-    size_t bridge_length = power_bridge_config_encode(&c.bridge, bridge_wire, sizeof(bridge_wire));
-    if (!bridge_length) {
-        ESP_LOGW(TAG, "桥接配置校验失败，取消保存");
-        ok = false;
-    } else {
-        err = nvs_set_blob(h, NVS_KEY_BRIDGE, bridge_wire, bridge_length);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "保存桥接配置失败(%s)", esp_err_to_name(err));
-            ok = false;
-        }
-    }
-#define SET_I32(k, v) do { \
-        esp_err_t _e = nvs_set_i32(h, (k), (v)); \
-        if (_e != ESP_OK) { \
-            ESP_LOGW(TAG, "nvs_set_i32 %s 失败(%s)", (k), esp_err_to_name(_e)); \
-            ok = false; \
-        } \
-    } while (0)
-
-    SET_I32(NVS_KEY_SCHEMA_VER, c.schema_ver);
-    SET_I32(NVS_KEY_POWER, c.power);
-    SET_I32(NVS_KEY_CADENCE, c.cadence);
-    SET_I32(NVS_KEY_MODE, c.mode);
-    SET_I32(NVS_KEY_HEARTRATE, c.heartrate);
-    SET_I32(NVS_KEY_HAS_USER_HR, c.has_user_hr);
-    SET_I32(NVS_KEY_POWER_FLOAT, c.power_float);
-    SET_I32(NVS_KEY_CADENCE_FLOAT, c.cadence_float);
-    SET_I32(NVS_KEY_HR_FLOAT, c.hr_float);
-    SET_I32(NVS_KEY_POWER_STEP, c.power_step);
-    SET_I32(NVS_KEY_WEIGHT, c.weight);
-    SET_I32(NVS_KEY_FTP, c.ftp);
-    SET_I32(NVS_KEY_THR_HR, c.thr_hr);
-    SET_I32(NVS_KEY_RIDE_TYPE, c.ride_type);
-    SET_I32(NVS_KEY_CUSTOM_WKG_LO, c.custom_wkg_low);
-    SET_I32(NVS_KEY_CUSTOM_WKG_HI, c.custom_wkg_high);
-    SET_I32(NVS_KEY_SPORT_PROFILE, c.sport_profile);
-    SET_I32(NVS_KEY_BROADCAST_MASK, c.broadcast_mask);
-    SET_I32(NVS_KEY_RUN_SPEED, c.run_speed_x100);
-    SET_I32(NVS_KEY_RUN_PACE_FLOAT, c.run_pace_float_sec);
-    SET_I32(NVS_KEY_RUN_CADENCE, c.run_cadence);
-    SET_I32(NVS_KEY_RUN_CAD_FLOAT, c.run_cadence_float);
-    SET_I32(NVS_KEY_RUN_MODE, c.run_mode);
-    SET_I32(NVS_KEY_RUN_PACER, c.run_pacer_type);
-    SET_I32(NVS_KEY_RUN_PACE_LO, c.run_pace_low_sec);
-    SET_I32(NVS_KEY_RUN_PACE_HI, c.run_pace_high_sec);
-    SET_I32(NVS_KEY_LED_SILENT, c.led.silent);
-    SET_I32(NVS_KEY_LED_WAIT_MODE, c.led.scenes[LED_SCENE_WAIT_CONN].mode);
-    SET_I32(NVS_KEY_LED_WAIT_COLOR, c.led.scenes[LED_SCENE_WAIT_CONN].color);
-    SET_I32(NVS_KEY_LED_CONN_MODE, c.led.scenes[LED_SCENE_CONNECTED].mode);
-    SET_I32(NVS_KEY_LED_CONN_COLOR, c.led.scenes[LED_SCENE_CONNECTED].color);
-    SET_I32(NVS_KEY_LED_WIFI_MODE, c.led.scenes[LED_SCENE_WIFI_CONFIG].mode);
-    SET_I32(NVS_KEY_LED_WIFI_COLOR, c.led.scenes[LED_SCENE_WIFI_CONFIG].color);
-    SET_I32(NVS_KEY_LED_CONFIRM_MODE, c.led.scenes[LED_SCENE_WIFI_CONFIRM].mode);
-    SET_I32(NVS_KEY_LED_CONFIRM_COLOR, c.led.scenes[LED_SCENE_WIFI_CONFIRM].color);
-    SET_I32(NVS_KEY_LED_ERROR_MODE, c.led.scenes[LED_SCENE_ERROR].mode);
-    SET_I32(NVS_KEY_LED_ERROR_COLOR, c.led.scenes[LED_SCENE_ERROR].color);
-#undef SET_I32
-
-    err = nvs_set_str(h, NVS_KEY_CUSTOM_NAME, c.custom_pacer_name);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "nvs_set_str %s 失败(%s)", NVS_KEY_CUSTOM_NAME, esp_err_to_name(err));
-        ok = false;
-    }
-
-    err = nvs_set_str(h, NVS_KEY_RUN_CUSTOM_NAME, c.run_custom_name);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "nvs_set_str %s 失败(%s)", NVS_KEY_RUN_CUSTOM_NAME, esp_err_to_name(err));
-        ok = false;
-    }
-
-    err = nvs_set_str(h, NVS_KEY_DEVICE_NAME, c.device_name);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "nvs_set_str %s 失败(%s)", NVS_KEY_DEVICE_NAME, esp_err_to_name(err));
-        ok = false;
-    }
-
-    if (ok) {
-        err = nvs_commit(h);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "NVS commit 失败(%s)", esp_err_to_name(err));
-            ok = false;
-        }
-    }
-    nvs_close(h);
-
-    xSemaphoreGive(s_save_mutex);
-
-    if (ok) {
-        ESP_LOGI(TAG, "配置已保存 p=%dW c=%dRPM mode=%d hr=%d(user=%d) w=%d ftp=%d thr=%d ride=%d custom=%s pf=%d cf=%d hf=%d step=%d sport=%d bmask=%d run=%d/%d/%d/%d rmode=%d rpacer=%d rpace=%d-%d dn=%s",
-                 c.power, c.cadence, c.mode, c.heartrate, c.has_user_hr,
-                 c.weight, c.ftp, c.thr_hr, c.ride_type,
-                 c.custom_pacer_name,
-                 c.power_float, c.cadence_float, c.hr_float, c.power_step,
-                 c.sport_profile, c.broadcast_mask, c.run_speed_x100, c.run_pace_float_sec, c.run_cadence, c.run_cadence_float,
-                 c.run_mode, c.run_pacer_type, c.run_pace_low_sec, c.run_pace_high_sec,
-                 c.device_name);
-    }
-    return ok;
 }
 
 bool nvs_store_load_bridge_recent(bridge_device_t *device)
 {
     if (!device) return false;
     *device = (bridge_device_t){0};
-    nvs_handle_t h;
-    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &h);
-    if (err != ESP_OK) return false;
-
+    nvs_handle_t handle;
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) return false;
     uint8_t wire[BRIDGE_RECENT_WIRE_LEN];
     size_t length = sizeof(wire);
-    err = nvs_get_blob(h, NVS_KEY_BRIDGE_RECENT, wire, &length);
-    nvs_close(h);
-    if (err != ESP_OK || length != sizeof(wire)
-        || wire[0] != BRIDGE_RECENT_WIRE_VERSION || wire[1] > 1) {
-        return false;
-    }
-
-    bridge_device_t loaded = {
-        .bound = 1,
-        .addr_type = wire[1],
-    };
+    esp_err_t err = nvs_get_blob(handle, NVS_KEY_BRIDGE_RECENT, wire, &length);
+    nvs_close(handle);
+    if (err != ESP_OK || length != sizeof(wire) || wire[0] != BRIDGE_RECENT_WIRE_VERSION || wire[1] > 1) return false;
+    bridge_device_t loaded = {.bound = 1, .addr_type = wire[1]};
     memcpy(loaded.addr, wire + 2, sizeof(loaded.addr));
     if (!bridge_recent_valid(&loaded)) return false;
     *device = loaded;
@@ -333,28 +168,17 @@ bool nvs_store_load_bridge_recent(bridge_device_t *device)
 bool nvs_store_save_bridge_recent(const bridge_device_t *device)
 {
     if (!bridge_recent_valid(device)) return false;
-    ensure_save_mutex();
-    if (xSemaphoreTake(s_save_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-        ESP_LOGW(TAG, "最近成功设备保存互斥锁等待超时");
-        return false;
-    }
-
-    uint8_t wire[BRIDGE_RECENT_WIRE_LEN] = {
-        BRIDGE_RECENT_WIRE_VERSION,
-        (uint8_t)device->addr_type,
-    };
+    if (!s_recent_mutex) s_recent_mutex = xSemaphoreCreateMutexStatic(&s_recent_mutex_buffer);
+    if (!s_recent_mutex || xSemaphoreTake(s_recent_mutex, pdMS_TO_TICKS(NVS_SAVE_LOCK_MS)) != pdTRUE) return false;
+    uint8_t wire[BRIDGE_RECENT_WIRE_LEN] = {BRIDGE_RECENT_WIRE_VERSION, (uint8_t)device->addr_type};
     memcpy(wire + 2, device->addr, sizeof(device->addr));
-    nvs_handle_t h;
-    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
     if (err == ESP_OK) {
-        err = nvs_set_blob(h, NVS_KEY_BRIDGE_RECENT, wire, sizeof(wire));
-        if (err == ESP_OK) err = nvs_commit(h);
-        nvs_close(h);
+        err = nvs_set_blob(handle, NVS_KEY_BRIDGE_RECENT, wire, sizeof(wire));
+        if (err == ESP_OK) err = nvs_commit(handle);
+        nvs_close(handle);
     }
-    xSemaphoreGive(s_save_mutex);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "保存最近成功设备失败(%s)", esp_err_to_name(err));
-        return false;
-    }
-    return true;
+    xSemaphoreGive(s_recent_mutex);
+    return err == ESP_OK;
 }

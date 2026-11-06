@@ -1,11 +1,13 @@
 /**
  * NVS 配置桥接（ESP-IDF 专用）
  * 把领域层 config_data_t 与 power_engine/profile 状态在 NVS（namespace "bikepower"）间读写。
- * schema 校验/迁移/默认值由领域层 config_store 负责，本模块只做 NVS I/O 与字段搬运。
+ * 配置与 DIS 身份经 persistent_store 双槽快照联合保存；旧逐键布局只用于迁移读取。
+ * schema 校验/迁移/默认值由领域层 config_store 负责，本模块处理旧键兼容和引擎搬运。
  */
 #pragma once
 
 #include "power_engine.h"
+#include "device_identity.h"
 #include <stddef.h>
 #include <stdbool.h>
 
@@ -26,6 +28,7 @@ void nvs_store_load(power_engine_t *e);
  * 特殊行为：只负责当前快照写入，不主动清除领域层 dirty 标记。
  */
 bool nvs_store_save(power_engine_t *e);
+bool nvs_store_save_with_identity(power_engine_t *e, const device_identity_t *identity);
 
 /* 最近成功设备仅用于下次启动排序，不属于配置 schema。 */
 bool nvs_store_load_bridge_recent(bridge_device_t *device);

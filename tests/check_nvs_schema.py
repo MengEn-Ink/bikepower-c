@@ -2,7 +2,7 @@
 """
 TC-3e NVS schema 静态一致性检查（无需设备）
 
-校验 main/nvs_store.c 使用的 NVS key 与 main/bikepower_config.h 中
+校验 main/nvs_store.c 与 main/persistent_store.c 使用的 NVS key 与 main/bikepower_config.h 中
 #define NVS_KEY_* 的定义保持一致，防止 key 漂移导致读写不匹配。
 
 校验项：
@@ -50,6 +50,7 @@ def main():
 
     config_src = CONFIG_H.read_text(encoding="utf-8")
     nvs_src = NVS_C.read_text(encoding="utf-8")
+    nvs_src += (ROOT / "main/persistent_store.c").read_text(encoding="utf-8")
 
     # 1. 提取 config 头文件中所有 NVS_KEY_* 和 NVS_NAMESPACE* 定义
     key_defs = {}  # macro_name -> string_value

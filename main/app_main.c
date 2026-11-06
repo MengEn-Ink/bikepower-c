@@ -106,7 +106,7 @@ static void process_pending_identity(void)
     portENABLE_INTERRUPTS();
     if (!pending) return;
 
-    if (device_identity_store_save(&requested)) {
+    if (nvs_store_save_with_identity(&s_engine, &requested)) {
         ble_bikepower_set_identity(&requested);
         ESP_LOGI(TAG, "DIS 身份覆盖已保存（%s）",
                  device_identity_has_override(&requested) ? "自定义" : "恢复内置");
@@ -295,15 +295,8 @@ static void process_pending_ble_config(void)
                 memcpy(identity.fields[i], old_identity.fields[i], DEVICE_IDENTITY_TEXT_MAX);
             }
         }
-        if (!device_identity_store_save(&identity)) {
-            config_commit_result(transaction_id, BLE_CONFIG_RESULT_SAVE_FAILED, 0, NULL);
-            return;
-        }
     }
-    if (!nvs_store_save(&next)) {
-        if (copy_identity && !device_identity_store_save(&old_identity)) {
-            ESP_LOGE(TAG, "配置失败后身份回滚失败，需要重新保存身份");
-        }
+    if (!nvs_store_save_with_identity(&next, copy_identity ? &identity : NULL)) {
         ESP_LOGW(TAG, "BLE 配置事务 id=%lu 写入 NVS 失败", (unsigned long)transaction_id);
         config_commit_result(transaction_id, BLE_CONFIG_RESULT_SAVE_FAILED,
                                            0, NULL);

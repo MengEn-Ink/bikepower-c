@@ -130,6 +130,13 @@ typedef enum {
 
 // ===== NVS 持久化 =====
 #define NVS_NAMESPACE          "bikepower"
+#define NVS_KEY_SNAPSHOT_0     "snapshot0"
+#define NVS_KEY_SNAPSHOT_1     "snapshot1"
+#define NVS_KEY_COMMIT_0       "commit0"
+#define NVS_KEY_COMMIT_1       "commit1"
+#define NVS_SAVE_LOCK_MS       100
+#define BRIDGE_RECENT_WIRE_VERSION 1u
+#define BRIDGE_RECENT_WIRE_LEN     8u
 #define NVS_KEY_SCHEMA_VER     "sv"
 #define NVS_KEY_BRIDGE         "bridge"
 #define NVS_KEY_BRIDGE_RECENT  "brrecent"
