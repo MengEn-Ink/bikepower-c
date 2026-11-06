@@ -329,6 +329,7 @@ const fixture = {
   ],
 };
 const merged = {schema_ver: fixture.schema_ver};
+fixture.bridge_backup_1_wire=[1,0,0,0,0,0,0,0,0,0];fixture.bridge_backup_2_wire=[1,0,0,0,0,0,0,0,0,0];
 const lengths = [];
 for (const group of CONFIG_GROUPS) {
   const bytes = encodeConfigGroup(group.key, fixture);
@@ -342,7 +343,7 @@ const actualCore = Array.from(encodeConfigGroup("core", fixture));
 const begin = Array.from(makeConfigBegin(0x01020304, 0x11223344));
 const commit = Array.from(makeConfigCommit(0x01020304));
 if (!configsEqual(fixture, merged)
-    || JSON.stringify(lengths) !== JSON.stringify([15, 22, 24, 12, 14, 16])
+    || JSON.stringify(lengths) !== JSON.stringify([15, 22, 24, 12, 14, 16, 10, 10])
     || JSON.stringify(actualCore) !== JSON.stringify(expectedCore)
     || JSON.stringify(begin) !== JSON.stringify([1, 1, 4, 3, 2, 1, 68, 51, 34, 17])
     || JSON.stringify(commit) !== JSON.stringify([2, 4, 3, 2, 1, 31])) {
@@ -365,9 +366,22 @@ if(editedBytes[1]!==0||editedBytes[10]!==2||dv(editedBytes).getInt16(11,true)!==
   throw new Error("Pages 校正草稿必须编码且保留绑定");
 }
 if(!validateConfig({...fixture,...bridgeBack,bridge_bound:0}).some(e=>e.id==="cfg-cycling-source")
-    ||!validateConfig({...editedBridge,bridge_percent_x10:1501}).some(e=>e.id==="cfg-bridge-percent")
+    ||!validateConfig({...editedBridge,bridge_percent_x10:3001}).some(e=>e.id==="cfg-bridge-percent")
+    ||validateConfig({...editedBridge,bridge_percent_x10:3000}).some(e=>e.id==="cfg-bridge-percent")
+    ||!validateConfig({...editedBridge,bridge_percent_x10:499}).some(e=>e.id==="cfg-bridge-percent")
     ||!validateConfig({...editedBridge,bridge_watts:-201}).some(e=>e.id==="cfg-bridge-watts")){
   throw new Error("Pages 未绑定及校正边界校验缺失");
+}
+const upperBridge={...editedBridge,bridge_percent_x10:3000};
+const upperBytes=encodeConfigGroup("bridge",upperBridge);
+if(upperBytes[13]!==0xb8||upperBytes[14]!==0x0b
+    ||parseConfigGroup("bridge",dv(upperBytes)).bridge_percent_x10!==3000){
+  throw new Error("+200% 偏移必须保持 3000 的协议倍率往返");
+}
+const upperEditor=renderBridgeConfig(upperBridge);
+if(!upperEditor.includes('value="200.0"')||!upperEditor.includes('max="200"')
+    ||!upperEditor.includes('min="-50"')){
+  throw new Error("Pages 百分比输入必须显示相对 -50% 到 +200%");
 }
 const bridgeEditor=renderConfigEditor({configState:{supported:true,current:{...fixture,...bridgeBack},meta:{protocol:1,schema:13,revision:1}}});
 const legacyEditor=renderConfigEditor({configState:{supported:true,current:fixture,meta:{protocol:1,schema:12,revision:1}}});

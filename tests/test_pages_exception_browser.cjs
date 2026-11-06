@@ -9,6 +9,8 @@ const fixture = vm.runInNewContext(
   '(' + fs.readFileSync(path.join(__dirname, 'test_pages_bridge_browser.cjs'), 'utf8')
     .match(/const fixture = ([\s\S]*?);\n\(async/)[1] + ')');
 
+const currentBridgePercent = c => new DataView(new Uint8Array(c.bridge_wire).buffer).getInt16(13, true);
+
 (async () => {
   const browser = await chromium.launch({ headless: true });
   try {
@@ -76,7 +78,7 @@ const fixture = vm.runInNewContext(
         }
         const characters = Object.fromEntries([...CONFIG_GROUPS.map(g => g.key), 'control'].map(key => [key, new Characteristic(key)]));
         singleDevice = { device, server: { connected: true }, configState: {
-          supported: true, saving: false, current, meta: { protocol: 1, schema: 13, revision: 1 }, characters,
+          supported: true, saving: false, current, meta: { protocol: 1, schema: 14, revision: 1 }, characters,
         } };
         window.recover = () => { scenario = 'success'; singleDevice.server.connected = true; setConfigBusy(false); };
         const host = document.createElement('div');
@@ -84,6 +86,7 @@ const fixture = vm.runInNewContext(
         bindConfigForm(singleDevice);
       }, { fixture, scenario });
       await page.fill('#cfg-power', '275');
+      await page.fill('#cfg-bridge-percent', '200');
       await page.click('#config-save');
       await page.waitForFunction(() => !singleDevice.configState.saving
         && (writes.length > 0 || document.getElementById('config-status').textContent.includes('订阅失败')));
@@ -92,12 +95,18 @@ const fixture = vm.runInNewContext(
         writes, revision: singleDevice.configState.meta.revision, power: singleDevice.configState.current.power,
         listeners: singleDevice.configState.characters.control.listeners.size,
         status: document.getElementById('config-status').textContent,
+        percent: singleDevice.configState.current.bridge_percent_x10,
+        percentDraft: document.getElementById('cfg-bridge-percent').value,
         draft: document.getElementById('cfg-power').value,
       }));
       const success = ['success', 'wrong-response'].includes(scenario);
       assert.equal(result.revision, success ? 2 : 1, scenario);
       assert.equal(result.power, success ? 275 : 260, scenario);
       assert.equal(result.draft, '275');
+      assert.equal(result.percentDraft, '200');
+      assert.equal(result.percent, success ? 3000 : currentBridgePercent(fixture));
+      const groupWrite = result.writes.find(w => w.key === 'bridge');
+      if (groupWrite) assert.equal(new DataView(new Uint8Array(groupWrite.bytes).buffer).getInt16(13, true), 3000);
       assert.equal(result.listeners, 0, `${scenario} 响应监听器未释放`);
       if (['begin-timeout', 'group-write', 'cancel-write', 'commit-write'].includes(scenario))
         assert.ok(result.writes.some(w => w.key === 'control' && w.bytes[0] === 3), scenario);
@@ -109,6 +118,7 @@ const fixture = vm.runInNewContext(
         await page.click('#config-save');
         await page.waitForFunction(() => singleDevice.configState.meta.revision === 2);
         assert.equal(await page.evaluate(() => singleDevice.configState.current.power), 275);
+        assert.equal(await page.evaluate(() => singleDevice.configState.current.bridge_percent_x10), 3000);
         assert.equal(await page.evaluate(() => singleDevice.configState.characters.control.listeners.size), 0);
         assert.deepEqual(errors, [], `${scenario} 重试未处理异常`);
       }

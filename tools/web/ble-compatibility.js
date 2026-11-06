@@ -198,7 +198,7 @@
     }else{
       return {raw:canonicalHex(raw),supported:false};
     }
-    if(offset!==bytes.length)throw new Error("通知长度与 flags 不一致");
+    if(offset!==bytes.length&&!["2a63","2a5b","2a53","2ad2","2acd"].includes(short))throw new Error("通知长度与 flags 不一致");
     return result;
   }
   function featureSummary(uuid,raw){

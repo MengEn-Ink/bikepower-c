@@ -4,7 +4,7 @@ const path = require('node:path');
 const { chromium } = require('./web-flash/node_modules/playwright');
 const root = path.join(__dirname, '..');
 const fixture = {
-  schema_ver: 13, device_name: 'BikePower-C3', sport_profile: 0, mode: 1,
+  schema_ver: 14, device_name: 'BikePower-C3', sport_profile: 0, mode: 1,
   power: 260, cadence: 85, has_user_hr: 0, heartrate: 145, power_step: 20,
   power_float: 50, cadence_float: 8, hr_float: 7, broadcast_mask: 7,
   weight: 70, ftp: 250, thr_hr: 175, ride_type: 2,
@@ -17,6 +17,8 @@ const fixture = {
     { mode: 3, color: 3 }, { mode: 4, color: 0 },
   ],
   bridge_wire: [1, 0, 1, 1, 1, 2, 3, 4, 5, 6, 1, 12, 0, 232, 3, 2, 80, 77],
+  bridge_backup_1_wire: [1,1,1,7,8,9,10,11,12,2,66,49],
+  bridge_backup_2_wire: [1,0,0,0,0,0,0,0,0,0],
 };
 (async () => {
   const browser = await chromium.launch({ headless: true });
@@ -28,7 +30,7 @@ const fixture = {
       await page.route('**/*', route => {
         const url = new URL(route.request().url());
         if (url.hostname !== 'example.test') return route.abort();
-        if (url.pathname.endsWith('pages-experience.js') || url.pathname.endsWith('pages-experience.css')) {
+        if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
           return route.fulfill({ path: path.join(root, 'tools/web', path.basename(url.pathname)),
             contentType: url.pathname.endsWith('.css') ? 'text/css' : 'text/javascript' });
         }
@@ -51,7 +53,7 @@ const fixture = {
           device: { name: 'BikePower-C3', id: 'fixture' }, server: { connected: true },
           configState: {
             supported: true, saving: false, current,
-            meta: { protocol: 1, schema: 13, revision: 1 },
+            meta: { protocol: 1, schema: 14, revision: 1 },
             characters: Object.fromEntries(CONFIG_GROUPS.map(g => [g.key, { key: g.key }])),
           },
         };
@@ -83,9 +85,11 @@ const fixture = {
       assert.equal(wire[1], 1);
       assert.equal(wire[10], 2);
       assert.equal(Buffer.from(wire).readInt16LE(11), -25);
-      assert.equal(Buffer.from(wire).readInt16LE(13), 1123);
-      assert.equal(saved.writes.at(-1).bytes[5], 63);
+      assert.equal(Buffer.from(wire).readInt16LE(13), 2123);
+      assert.equal(saved.writes.at(-1).bytes[5], 255);
       assert.equal(await page.locator('#config-dirty').textContent(), '未修改');
+      assert.deepEqual(saved.writes.find(w => w.key === "bridge_backup_1").bytes, fixture.bridge_backup_1_wire);
+      assert.deepEqual(saved.writes.find(w => w.key === "bridge_backup_2").bytes, fixture.bridge_backup_2_wire);
       await page.evaluate(() => restoreDeviceConfig());
       assert.equal(await page.inputValue('#cfg-bridge-percent'), '112.3');
       const hintContrast = await page.locator('#cfg-bridge-percent-hint').evaluate(el => {
@@ -102,7 +106,7 @@ const fixture = {
       });
       assert.ok(hintContrast >= 4.5, `${theme} 桥接提示对比度 ${hintContrast}`);
       await page.locator('#pages-test-host').screenshot({ path: path.join(root, 'tests/reports/pages-bridge-' + theme + '.png') });
-      await page.fill('#cfg-bridge-percent', '150.1');
+      await page.fill('#cfg-bridge-percent', '200.1');
       await page.click('#config-save');
       assert.equal(await page.locator('#cfg-bridge-percent').getAttribute('aria-invalid'), 'true');
       assert.equal(await page.locator('#config-error-summary').isVisible(), true);
@@ -130,7 +134,7 @@ const fixture = {
       await page.evaluate(() => {
         const c = singleDevice.configState.current;
         for (const key of Object.keys(c)) if (key.startsWith('bridge_') || key === 'cycling_source') delete c[key];
-        delete singleDevice.configState.characters.bridge;
+        for (const key of ["bridge","bridge_backup_1","bridge_backup_2"])delete singleDevice.configState.characters[key];
         singleDevice.configState.meta.schema = 12;
         refreshConfigEditor(singleDevice);
       });
@@ -144,7 +148,7 @@ const fixture = {
       assert.equal(await page.locator('#mobile-guide').isVisible(), true);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
       assert.deepEqual(errors, []);
-      console.log(`[pages-bridge-browser] PASS ${theme} 编辑/六组保存/绑定保留/旧固件/移动引导/焦点`);
+      console.log(`[pages-bridge-browser] PASS ${theme} 编辑/八组保存/绑定保留/旧固件/移动引导/焦点`);
       await page.close();
     }
   } finally {

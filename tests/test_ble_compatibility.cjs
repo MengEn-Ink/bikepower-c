@@ -62,10 +62,11 @@ test('读取失败保留为未采集，不误报为空能力', () => {
   assert.ok(result.findings.some(f => f.code === 'value-2a65' && f.kind === 'unknown'));
   assert.ok(!result.findings.some(f => f.code === 'feature-length-2a65'));
 });
-test('CPS 可选字段按 flags 解析，截断与多余字节不能假绿', () => {
+test('CPS 已知字段截断拒绝，RFU与未来octets容忍', () => {
   assert.equal(api.decodePacket(uuid('2a63'), '00 00 fa 00').powerW, 250);
   assert.throws(() => api.decodePacket(uuid('2a63'), '20 00 fa 00'), /长度/);
-  assert.throws(() => api.decodePacket(uuid('2a63'), '00 00 fa 00 01'), /长度/);
+  assert.equal(api.decodePacket(uuid('2a63'), '00 00 fa 00 01').powerW, 250);
+  assert.equal(api.decodePacket(uuid('2a63'), '00 e0 fa 00 01').powerW, 250);
   assert.equal(api.decodePacket(uuid('2a53'), '07 00 02 b4 78 00 e8 03 00 00').distanceM, 100);
 });
 test('FTMS 变长包与 HRS 16-bit 心率单位正确', () => {

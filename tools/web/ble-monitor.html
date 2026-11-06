@@ -2972,6 +2972,8 @@ const CONFIG_GROUPS = [
   {key:"led",uuid:UUIDS.configLed,bit:8},
   {key:"identity",uuid:UUIDS.configIdentity,bit:16},
   {key:"bridge",uuid:"7a5a0009-4c7a-4f2a-9b3e-6d1f4a8c0b21",bit:32,optional:true},
+  {key:"bridge_backup_1",uuid:"7a5a000a-4c7a-4f2a-9b3e-6d1f4a8c0b21",bit:64,optional:true},
+  {key:"bridge_backup_2",uuid:"7a5a000b-4c7a-4f2a-9b3e-6d1f4a8c0b21",bit:128,optional:true},
 ];
 const CONFIG_RESULTS = {
   0:"成功",1:"数据长度不正确",2:"协议版本不匹配",3:"设备正忙",4:"配置已被其他操作更新",
@@ -3190,7 +3192,9 @@ function markNotify(rec,serviceKey){
 }
 function parseCyclingPower(view){
   if(view.byteLength<4)throw new Error("CPS 长度不足");
-  return {flags:view.getUint16(0,true),power:view.getInt16(2,true)};
+  let offset=4;const flags=view.getUint16(0,true);
+  for(const [bit,n] of [[0,1],[2,2],[4,6],[5,4],[6,4],[7,4],[8,3],[9,2],[10,2],[11,2]])if(flags&(1<<bit)){if(view.byteLength<offset+n)throw new Error("CPS 声明字段截断");offset+=n;}
+  return {flags,power:view.getInt16(2,true)};
 }
 function parseHeartRate(view){
   if(view.byteLength<2)throw new Error("HRS 长度不足");
@@ -3199,10 +3203,13 @@ function parseHeartRate(view){
   return view.getUint8(1);
 }
 function parseCsc(rec,view){
-  if(view.byteLength<5)throw new Error("CSC 长度不足");
+  if(view.byteLength<1)throw new Error("CSC 长度不足");
   const flags=view.getUint8(0);
+  let offset=1;
+  if(flags&1){if(view.byteLength<offset+6)throw new Error("CSC 轮数据截断");offset+=6;}
   if(!(flags&0x02))return null;
-  const revs=view.getUint16(1,true);const time=view.getUint16(3,true);
+  if(view.byteLength<offset+4)throw new Error("CSC 曲柄数据截断");
+  const revs=view.getUint16(offset,true);const time=view.getUint16(offset+2,true);
   if(!rec.cscPrev){rec.cscPrev={revs,time};return null;}
   const revDelta=(revs-rec.cscPrev.revs+65536)%65536;
   const timeDeltaRaw=(time-rec.cscPrev.time+65536)%65536;
@@ -3215,7 +3222,7 @@ function parseIndoorBike(view){
   const flags=view.getUint16(0,true);
   const result={flags,speed:null,avgSpeed:null,cadence:null,avgCadence:null,distance:null,resistance:null,power:null,avgPower:null,energyTotal:null,energyPerHour:null,energyPerMin:null,hr:null,met:null,elapsed:null,remaining:null};
   let offset=2;
-  const has=n=>view.byteLength>=offset+n;
+  const has=n=>{if(view.byteLength<offset+n)throw new Error("FTMS 声明字段截断");return true;};
   // FTMS Indoor Bike Data 按 flags 顺序变长排列；bit0=More Data 为 0 时才带瞬时速度
   if(!(flags&0x0001)&&has(2)){result.speed=view.getUint16(offset,true)/100;offset+=2;}
   if((flags&0x0002)&&has(2)){result.avgSpeed=view.getUint16(offset,true)/100;offset+=2;}
@@ -3239,13 +3246,12 @@ function parseRsc(view){
   const speed=view.getUint16(1,true)*3.6/256;
   const cadence=view.getUint8(3);
   let stride=null,distanceDm=null;
-  if(flags&0x01&&view.byteLength>=offset+2){stride=view.getUint16(offset,true);offset+=2;}
-  if(flags&0x02&&view.byteLength>=offset+4)distanceDm=view.getUint32(offset,true);
+  if(flags&0x01){if(view.byteLength<offset+2)throw new Error("RSC 步幅截断");stride=view.getUint16(offset,true);offset+=2;}
+  if(flags&0x02){if(view.byteLength<offset+4)throw new Error("RSC 距离截断");distanceDm=view.getUint32(offset,true);}
   return {speed,cadence,stride,distanceDm,distanceM:distanceDm===null?null:distanceDm / 10,running:!!(flags&0x04)};
 }
 function handleNotify(rec,serviceKey,event){
   try{
-    markNotify(rec,serviceKey);
     const view=event.target.value;
     const uuid=event.target.uuid||({cps:UUIDS.cpsMeasurement,hr:UUIDS.hrMeasurement,csc:UUIDS.cscMeasurement,rsc:UUIDS.rscMeasurement,ftms:UUIDS.ftmsIndoorBike,treadmill:UUIDS.ftmsTreadmill})[serviceKey];
     if(uuid&&view){
@@ -3257,7 +3263,7 @@ function handleNotify(rec,serviceKey,event){
     if(serviceKey==="cps"){const p=parseCyclingPower(view);latest.power=p.power;if(p.power<0||p.power>ANOMALY_LIMITS.powerMax)recordAnomaly("power",p.power+" W");}
     else if(serviceKey==="hr"){const hr=parseHeartRate(view);latest.hr=hr;if(hr<ANOMALY_LIMITS.hrMin||hr>ANOMALY_LIMITS.hrMax)recordAnomaly("heartrate",hr+" BPM");}
     else if(serviceKey==="csc"){const c=parseCsc(rec,view);if(c!==null){latest.cadence=c;if(c>ANOMALY_LIMITS.cadenceMax)recordAnomaly("cadence",c+" RPM");}}
-    else if(serviceKey==="ftms"){const d=parseIndoorBike(view);if(d.speed!==null&&latest.speed===null)latest.speed=d.speed;if(d.cadence!==null&&latest.cadence===null)latest.cadence=Math.round(d.cadence);if(d.power!==null){latest.ftmsPower=d.power;if(d.power<0||d.power>ANOMALY_LIMITS.powerMax)recordAnomaly("power",d.power+" W(FTMS)");}}
+    else if(serviceKey==="ftms"){const d=parseIndoorBike(view);if(d.speed!==null&&!(rec.notifyTimes?.rsc&&Date.now()-rec.notifyTimes.rsc<=ANOMALY_LIMITS.staleMs))latest.speed=d.speed;if(d.cadence!==null&&!["csc","rsc"].some(key=>rec.notifyTimes?.[key]&&Date.now()-rec.notifyTimes[key]<=ANOMALY_LIMITS.staleMs))latest.cadence=Math.round(d.cadence);if(d.power!==null){latest.ftmsPower=d.power;if(d.power<0||d.power>ANOMALY_LIMITS.powerMax)recordAnomaly("power",d.power+" W(FTMS)");}}
     else if(serviceKey==="rsc"){const d=parseRsc(view);latest.speed=d.speed;latest.cadence=d.cadence;latest.distance=d.distanceM;if(d.speed>ANOMALY_LIMITS.speedMaxKmh)recordAnomaly("speed",d.speed.toFixed(2)+" km/h");}
     else if(serviceKey==="treadmill"&&window.BikePowerCompatibility){
       const d=window.BikePowerCompatibility.decodePacket(uuid,hexDump(new Uint8Array(view.buffer,view.byteOffset,view.byteLength)));
@@ -3265,6 +3271,7 @@ function handleNotify(rec,serviceKey,event){
       if(d.distanceM!==undefined)latest.distance=d.distanceM;
       if(d.heartRateBpm!==undefined)latest.hr=d.heartRateBpm;
     }
+    markNotify(rec,serviceKey);
     appendSignalHistory(rec);
     renderRealtime(rec);
     gattLiveUpdate(rec,event.target);
@@ -3603,6 +3610,14 @@ function parseConfigMeta(value){
 function parseConfigGroup(key,value){
   const bytes=configBytes(value);const view=configDataView(bytes);
   if(!bytes.length||bytes[0]!==CONFIG_PROTOCOL_VERSION)throw new Error(key+" 配置协议版本不匹配");
+  if(key==="bridge_backup_1"||key==="bridge_backup_2"){
+    if(bytes.length<10||bytes.length!==10+bytes[9]||bytes[9]>31||bytes[1]>1)throw new Error("备选功率计配置长度无效");
+    if(!bytes[1]&&(bytes[2]||bytes.slice(3,9).some(v=>v)||bytes[9]))throw new Error("空备选槽数据无效");
+    if(bytes[1]&&(bytes[2]>3||!bytes.slice(3,9).some(v=>v)))throw new Error("备选功率计地址无效");
+    const name=new TextDecoder("utf-8",{fatal:true}).decode(bytes.slice(10));
+    if(name.includes("\0"))throw new Error("备选名称包含NUL");
+    return {[key+"_wire"]:Array.from(bytes),[key+"_name"]:name,[key+"_bound"]:bytes[1]};
+  }
   if(key==="bridge"){
     if(bytes.length<16||bytes.length!==16+bytes[15]||bytes[15]>31)throw new Error("Bridge 配置长度不正确");
     return {bridge_wire:Array.from(bytes),cycling_source:bytes[1],bridge_bound:bytes[2],
@@ -3638,6 +3653,11 @@ function encodeConfigString(prefix,value,maxBytes){
   const out=new Uint8Array(prefix.length+1+encoded.length);out.set(prefix);out[prefix.length]=encoded.length;out.set(encoded,prefix.length+1);return out;
 }
 function encodeConfigGroup(key,c){
+  if(key==="bridge_backup_1"||key==="bridge_backup_2"){
+    if(!c[key+"_wire"])throw new Error("未读取备选槽，不允许覆盖");
+    const out=new Uint8Array(c[key+"_wire"]);
+    parseConfigGroup(key,configDataView(out));return out;
+  }
   if(key==="bridge"){
     const out=new Uint8Array(c.bridge_wire||[1,0,0,0,0,0,0,0,0,0,0,0,0,232,3,0]),view=configDataView(out);
     if(c.cycling_source!==undefined)out[1]=c.cycling_source;
@@ -3706,12 +3726,14 @@ async function readDeviceConfig(rec,announce=false){
       const characteristic=await service.getCharacteristic(group.uuid);characters[group.key]=characteristic;
       Object.assign(current,parseConfigGroup(group.key,await characteristic.readValue()));
     }
+    const finalMeta=parseConfigMeta(await metaChar.readValue());
+    if(finalMeta.revision!==meta.revision||finalMeta.schema!==meta.schema||finalMeta.groupMask!==meta.groupMask||finalMeta.protocol!==meta.protocol)throw new Error("读取期间配置已变化，请重新读取，未使用混合快照");
     characters.control=await service.getCharacteristic(UUIDS.configControl);
     rec.configState={supported:true,error:null,meta,current,service,characters,saving:false,statusText:announce?"已从开发板重新读取全部 NVS 配置。":(previous.statusText||"已读取开发板当前 NVS 配置，可修改后显式保存。"),statusKind:announce?"ok":(previous.statusKind||"")};
     if(announce)log("已重新读取 BikePower 全部 NVS 配置（revision "+meta.revision+")","data");
   }catch(err){
-    rec.configState={supported:false,error:err.message||String(err),meta:null,current:null,saving:false,statusText:"当前固件未提供可读写配置服务。",statusKind:"warn"};
-    if(announce)log("配置读取失败: "+rec.configState.error,"warn");
+    rec.configState=previous.supported?{...previous,saving:false,statusKind:"warn",statusText:"重新读取失败，保留上次完整快照："+(err.message||String(err))}:{supported:false,error:err.message||String(err),meta:null,current:null,saving:false,statusText:"当前配置无法完整读取。",statusKind:"warn"};
+    if(announce)log("配置读取失败: "+(err.message||String(err)),"warn");
   }
   if(rec===singleDevice&&$("config-editor-shell"))refreshConfigEditor(rec);
   return rec.configState;
@@ -3742,13 +3764,14 @@ function renderBridgeConfig(c){
   if(!c.bridge_wire)return "";
   const peer=c.bridge_bound?(c.bridge_name||"无名称功率计"):"尚未绑定功率计";
   const address=c.bridge_bound?Array.from(c.bridge_wire.slice(4,10)).reverse().map(v=>v.toString(16).padStart(2,"0")).join(":").toUpperCase():"";
+  const backups=["bridge_backup_1","bridge_backup_2"].filter(key=>c[key+"_wire"]).map((key,index)=>'<div class="form-field"><span class="field-label">备选 '+(index+1)+'</span><strong>'+escapeHtml(c[key+"_bound"]?(c[key+"_name"]||"无名称功率计"):"空槽")+'</strong><span class="field-hint">完整读取并保留；绑定或更换请在设备配网页完成。</span></div>').join("");
   return '<details class="config-group bridge-config" open><summary>骑行输出来源与功率校正</summary><div class="config-fields">'+
     configSelect("cfg-cycling-source","骑行输出来源",c.cycling_source,[[0,"模拟"],[1,"真实功率计"]],"首次扫描、测试及绑定请在设备配网页完成。")+
     '<div class="form-field"><span class="field-label">已绑定功率计</span><strong>'+escapeHtml(peer)+'</strong><span class="field-hint">'+escapeHtml(address)+' · Pages 保留当前绑定，不更换功率计。</span></div>'+
-    configSelect("cfg-bridge-calibration","功率校正",c.bridge_calibration,[[0,"原始功率"],[1,"固定瓦数偏移"],[2,"百分比比例"]],"停踩 0W 保持为 0；最终输出限制为 0–2000W。")+
+    backups+configSelect("cfg-bridge-calibration","功率校正",c.bridge_calibration,[[0,"原始功率"],[1,"固定瓦数偏移"],[2,"百分比比例"]],"停踩 0W 保持为 0；最终输出限制为 0–2000W。")+
     configField("cfg-bridge-watts","瓦数偏移",c.bridge_watts,-200,200,1,"单位 W；仅固定偏移时生效。")+
-    configField("cfg-bridge-percent","功率比例",(c.bridge_percent_x10/10).toFixed(1),50,150,.1,"单位 %；仅百分比时生效。")+
-    '<div class="field-hint span-all">真实来源仅影响骑行功率和同源踏频。首次切到真实来源时默认关闭模拟心率，可在广播数据项中手动开启。保存后才切换设备输出。</div></div></details>';
+    configField("cfg-bridge-percent","百分比偏移",(c.bridge_percent_x10/10-100).toFixed(1),-50,200,.1,"相对原功率增减；+200% 表示输入 × 3。旧固件最多支持 +50%，超出会拒绝保存。")+
+    '<div class="field-hint span-all">真实桥接提供 CPS/CSC，不提供 FTMS 或模拟速度。来源切换保存后需断开并重建服务。首次切到真实来源时默认关闭模拟心率，可在广播数据项中手动开启。保存后才切换设备输出。</div></div></details>';
 }
 function renderConfigEditor(rec){
   const state=rec.configState;
@@ -3776,8 +3799,9 @@ function collectConfigForm(){
   const current=singleDevice.configState.current;
   const bridge=current.bridge_wire?{...parseConfigGroup("bridge",configDataView(new Uint8Array(current.bridge_wire))),
     cycling_source:configNumber("cfg-cycling-source"),bridge_calibration:configNumber("cfg-bridge-calibration"),
-    bridge_watts:configNumber("cfg-bridge-watts"),bridge_percent_x10:Math.round(configNumber("cfg-bridge-percent")*10)}:{};
-  return {...bridge,schema_ver:singleDevice.configState.meta.schema,device_name:$("cfg-device-name").value.trim(),sport_profile:configNumber("cfg-sport-profile"),mode:configNumber("cfg-mode"),power:configNumber("cfg-power"),cadence:configNumber("cfg-cadence"),has_user_hr:$("cfg-hr-lock").checked?1:0,heartrate:configNumber("cfg-heartrate"),power_step:configNumber("cfg-power-step"),power_float:configNumber("cfg-power-float"),cadence_float:configNumber("cfg-cadence-float"),hr_float:configNumber("cfg-hr-float"),broadcast_mask:($("cfg-broadcast-power").checked?1:0)|($("cfg-broadcast-cadence").checked?2:0)|($("cfg-broadcast-hr").checked?4:0),weight:configNumber("cfg-weight"),ftp:configNumber("cfg-ftp"),thr_hr:configNumber("cfg-thr-hr"),ride_type:configNumber("cfg-ride-type"),custom_wkg_low:Math.round(configNumber("cfg-custom-wkg-low")*10),custom_wkg_high:Math.round(configNumber("cfg-custom-wkg-high")*10),custom_pacer_name:$("cfg-custom-pacer-name").value.trim(),run_speed_x100:Math.round(configNumber("cfg-run-speed")*100),run_pace_float_sec:configNumber("cfg-run-pace-float"),run_cadence:configNumber("cfg-run-cadence"),run_cadence_float:configNumber("cfg-run-cadence-float"),run_mode:configNumber("cfg-run-mode"),run_pacer_type:configNumber("cfg-run-pacer-type"),run_pace_low_sec:configNumber("cfg-run-pace-low"),run_pace_high_sec:configNumber("cfg-run-pace-high"),run_custom_name:$("cfg-run-custom-name").value.trim(),led_silent:$("cfg-led-silent").checked?1:0,led_scenes:scenes};
+    bridge_watts:configNumber("cfg-bridge-watts"),bridge_percent_x10:Math.round((100+configNumber("cfg-bridge-percent"))*10)}:{};
+  const backups={};for(const key of ["bridge_backup_1","bridge_backup_2"])if(current[key+"_wire"])Object.assign(backups,parseConfigGroup(key,configDataView(new Uint8Array(current[key+"_wire"]))));
+  return {...backups,...bridge,schema_ver:singleDevice.configState.meta.schema,device_name:$("cfg-device-name").value.trim(),sport_profile:configNumber("cfg-sport-profile"),mode:configNumber("cfg-mode"),power:configNumber("cfg-power"),cadence:configNumber("cfg-cadence"),has_user_hr:$("cfg-hr-lock").checked?1:0,heartrate:configNumber("cfg-heartrate"),power_step:configNumber("cfg-power-step"),power_float:configNumber("cfg-power-float"),cadence_float:configNumber("cfg-cadence-float"),hr_float:configNumber("cfg-hr-float"),broadcast_mask:($("cfg-broadcast-power").checked?1:0)|($("cfg-broadcast-cadence").checked?2:0)|($("cfg-broadcast-hr").checked?4:0),weight:configNumber("cfg-weight"),ftp:configNumber("cfg-ftp"),thr_hr:configNumber("cfg-thr-hr"),ride_type:configNumber("cfg-ride-type"),custom_wkg_low:Math.round(configNumber("cfg-custom-wkg-low")*10),custom_wkg_high:Math.round(configNumber("cfg-custom-wkg-high")*10),custom_pacer_name:$("cfg-custom-pacer-name").value.trim(),run_speed_x100:Math.round(configNumber("cfg-run-speed")*100),run_pace_float_sec:configNumber("cfg-run-pace-float"),run_cadence:configNumber("cfg-run-cadence"),run_cadence_float:configNumber("cfg-run-cadence-float"),run_mode:configNumber("cfg-run-mode"),run_pacer_type:configNumber("cfg-run-pacer-type"),run_pace_low_sec:configNumber("cfg-run-pace-low"),run_pace_high_sec:configNumber("cfg-run-pace-high"),run_custom_name:$("cfg-run-custom-name").value.trim(),led_silent:$("cfg-led-silent").checked?1:0,led_scenes:scenes};
 }
 function validateConfig(config){
   const errors=[];const add=(id,message)=>errors.push({id,message});
@@ -3786,7 +3810,7 @@ function validateConfig(config){
     if(![0,1].includes(config.cycling_source)||config.cycling_source===1&&!config.bridge_bound)add("cfg-cycling-source","请先在设备配网页扫描、测试并绑定真实功率计");
     if(![0,1,2].includes(config.bridge_calibration))add("cfg-bridge-calibration","功率校正方式无效");
     integer("cfg-bridge-watts",config.bridge_watts,[-200,200],"瓦数偏移");
-    integer("cfg-bridge-percent",config.bridge_percent_x10,[500,1500],"功率比例（0.1%）");
+    integer("cfg-bridge-percent",config.bridge_percent_x10,[500,3000],"功率总倍率（0.1%；偏移范围 -50% 至 +200%）");
   }
   integer("cfg-power",config.power,CONFIG_LIMITS.power,"基础功率");integer("cfg-cadence",config.cadence,CONFIG_LIMITS.cadence,"基础踏频");integer("cfg-heartrate",config.heartrate,CONFIG_LIMITS.heartrate,"固定心率");integer("cfg-power-step",config.power_step,CONFIG_LIMITS.power_step,"按钮步进");integer("cfg-power-float",config.power_float,CONFIG_LIMITS.power_float,"功率浮动");integer("cfg-cadence-float",config.cadence_float,CONFIG_LIMITS.cadence_float,"踏频浮动");integer("cfg-hr-float",config.hr_float,CONFIG_LIMITS.hr_float,"心率浮动");
   if(![0,1].includes(config.sport_profile))add("cfg-sport-profile","运动 Profile 无效");if(![0,1].includes(config.mode))add("cfg-mode","骑行模式无效");if(!config.broadcast_mask)add("cfg-broadcast-power","广播数据项至少选择一项");
@@ -3871,8 +3895,12 @@ async function runConfigTransaction(rec,config,onStatus=()=>{}){
       if(!config.bridge_wire)Object.assign(config,parseConfigGroup("bridge",configDataView(new Uint8Array(state.current.bridge_wire))));
       config.bridge_wire=Array.from(encodeConfigGroup("bridge",config));
     }
-    let written=0;for(const group of CONFIG_GROUPS){if(group.optional&&!state.characters[group.key])continue;onStatus("正在写入配置组 "+(++written)+" / "+CONFIG_GROUPS.length+"…");await writeConfigValue(state.characters[group.key],encodeConfigGroup(group.key,config));}
-    onStatus("设备正在校验并写入 NVS…");commitAttempted=true;response=await exchange(0x02,makeConfigCommit(transactionId,CONFIG_GROUP_MASK_ALL|(state.characters.bridge?32:0)));committed=true;if(response.result!==0)throw configResultError(response);
+    const groups=CONFIG_GROUPS.filter(group=>!group.optional||state.characters[group.key]);
+    let written=0,mask=0;for(const group of groups){
+      if(group.key.startsWith("bridge_backup_")&&!config[group.key+"_wire"])config[group.key+"_wire"]=Array.from(state.current[group.key+"_wire"]);
+      onStatus("正在写入配置组 "+(++written)+" / "+groups.length+"…");await writeConfigValue(state.characters[group.key],encodeConfigGroup(group.key,config));mask|=group.bit;
+    }
+    onStatus("设备正在校验并写入 NVS…");commitAttempted=true;response=await exchange(0x02,makeConfigCommit(transactionId,mask));committed=true;if(response.result!==0)throw configResultError(response);
     state.meta.revision=response.revision;state.current=JSON.parse(JSON.stringify(config));
     return response;
   }catch(err){
