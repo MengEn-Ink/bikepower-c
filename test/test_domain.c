@@ -2392,6 +2392,68 @@ static void test_config_apply_to_engine(void)
     config.power = POWER_MAX + 1;
     CHECK(!config_store_apply_to_engine(&config, &engine), "越界完整配置被拒绝");
     CHECK(memcmp(&unchanged, &engine, sizeof(engine)) == 0, "应用失败不污染运行时引擎");
+
+    for (int mode = 0; mode < RUN_MODE_COUNT; mode++) {
+        for (int pacer = 0; pacer < RUN_PACER_PRESET_COUNT; pacer++) {
+            power_engine_init(&engine);
+            config_store_defaults(&config);
+            config.sport_profile = SPORT_PROFILE_RUNNING;
+            config.run_mode = mode;
+            config.run_pacer_type = pacer;
+            config.run_cadence = 191;
+            CHECK(config_store_apply_to_engine(&config, &engine), "预设档完整配置应用成功");
+            config_data_t applied;
+            config_store_from_engine(&engine, &applied);
+            CHECK(applied.run_cadence == 191, "保存预设档时保留用户步频，不被预设覆盖");
+            CHECK(applied.run_mode == mode && applied.run_pacer_type == pacer,
+                  "保存步频时保留跑步模式和预设选择");
+        }
+    }
+}
+
+static void test_config_string_validation(void)
+{
+    printf("[test] 配置字符串错误拒绝与 Unicode 往返\n");
+    const char *bad_values[] = {
+        "\"unterminated", "\"bad\\q\"", "\"bad\\u12\"", "\"bad\\uZZZZ\"",
+        "\"bad\\u0000tail\"", "\"bad\\uD800\"", "\"bad\\uDC00\"",
+        "\"bad\\uD800\\u0041\"", "\"raw\ncontrol\"",
+        "\"1234567890123456789012345678901234567890\"",
+    };
+    const char *keys[] = {"device_name", "custom_pacer_name", "run_custom_name"};
+    config_data_t guard;
+    config_store_defaults(&guard);
+    guard.power = 321;
+    config_data_t previous = guard;
+    char json[CONFIG_JSON_MAX_LEN];
+    for (size_t k = 0; k < sizeof(keys) / sizeof(keys[0]); k++) {
+        for (size_t i = 0; i < sizeof(bad_values) / sizeof(bad_values[0]); i++) {
+            snprintf(json, sizeof(json),
+                     "{\"schema_ver\":14,\"bridge_devices\":[],\"%s\":%s}", keys[k], bad_values[i]);
+            size_t length = strlen(json) + 1;
+            char *input = malloc(length);
+            CHECK(input != NULL, "精确长度字符串回归分配成功");
+            if (input) {
+                memcpy(input, json, length);
+                CHECK(!config_store_deserialize(input, &guard), "非法配置字符串必须返回失败");
+                free(input);
+            }
+            CHECK(memcmp(&guard, &previous, sizeof(guard)) == 0,
+                  "字符串解析失败不污染配置输出");
+            guard = previous;
+        }
+    }
+    CHECK(config_store_deserialize(
+        "{\"schema_ver\":14,\"bridge_devices\":[],"
+        "\"device_name\":\"\\u9a91\\u884c\\uD83D\\uDEB4\"}", &guard),
+        "支持中文和合法代理对 Unicode 转义");
+    CHECK(strcmp(guard.device_name, "骑行\xf0\x9f\x9a\xb4") == 0, "Unicode 转义完整还原 UTF-8");
+    CHECK(config_store_deserialize(
+        "{\"schema_ver\":14,\"bridge_devices\":[{\"addr_type\":0,"
+        "\"address\":\"000000000011\",\"name\":\"\\u529f\\u7387\\u8ba1\"}]}", &guard),
+        "功率计名称支持 Unicode 转义");
+    CHECK(strcmp(guard.bridge.devices[0].name, "功率计") == 0,
+          "功率计名称 Unicode 完整还原");
 }
 
 int main(void)
@@ -2439,6 +2501,7 @@ int main(void)
     test_ble_config_codec();
     test_device_identity_codec();
     test_config_apply_to_engine();
+    test_config_string_validation();
     printf("\n结果: %d 通过, %d 失败\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

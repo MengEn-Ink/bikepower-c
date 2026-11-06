@@ -138,7 +138,6 @@ bool config_store_apply_to_engine(const config_data_t *c, power_engine_t *e)
     power_engine_set_broadcast_mask(&next, checked.broadcast_mask);
     power_engine_set_run_speed(&next, checked.run_speed_x100);
     power_engine_set_run_pace_float(&next, checked.run_pace_float_sec);
-    power_engine_set_run_cadence(&next, checked.run_cadence);
     power_engine_set_run_cadence_float(&next, checked.run_cadence_float);
     if (checked.run_pacer_type == RUN_PACER_CUSTOM) {
         power_engine_set_run_custom_pacer(&next, checked.run_custom_name,
@@ -151,6 +150,7 @@ bool config_store_apply_to_engine(const config_data_t *c, power_engine_t *e)
                                         checked.run_pace_high_sec);
     }
     power_engine_set_run_mode(&next, (run_mode_t)checked.run_mode);
+    power_engine_set_run_cadence(&next, checked.run_cadence);
     power_engine_set_device_name(&next, checked.device_name);
     power_engine_set_mode(&next, (ride_mode_t)checked.mode);
     next.bridge = checked.bridge;
@@ -346,49 +346,96 @@ static size_t json_escape(const char *src, char *dst, size_t dst_sz)
 
 /* 把 JSON 字符串值反转义到 dst。src 指向值首字符（引号之后），
  * 解析到未转义的 '"' 结束。返回 true 表示成功。 */
+static bool json_hex4(const char **cursor, uint32_t *value)
+{
+    const char *p = *cursor;
+    uint32_t result = 0;
+    for (unsigned i = 0; i < 4; i++) {
+        unsigned char ch = (unsigned char)*p;
+        unsigned digit;
+        if (ch >= '0' && ch <= '9') digit = ch - '0';
+        else if (ch >= 'a' && ch <= 'f') digit = ch - 'a' + 10;
+        else if (ch >= 'A' && ch <= 'F') digit = ch - 'A' + 10;
+        else return false;
+        result = (result << 4) | digit;
+        p++;
+    }
+    *cursor = p;
+    *value = result;
+    return true;
+}
+
 static bool json_unescape(const char *src, char *dst, size_t dst_sz)
 {
     if (!src || !dst || dst_sz == 0) return false;
     size_t n = 0;
     const char *p = src;
-    for (; *p && *p != '"'; p++) {
-        char out;
-        if (*p == '\\') {
+    while (*p && *p != '"') {
+        unsigned char bytes[4];
+        size_t length = 1;
+        unsigned char ch = (unsigned char)*p++;
+        if (ch < 0x20) goto invalid;
+        if (ch == '\\') {
+            ch = (unsigned char)*p;
+            if (!ch) goto invalid;
             p++;
-            switch (*p) {
-            case '"':  out = '"';  break;
-            case '\\': out = '\\'; break;
-            case '/':  out = '/';  break;
-            case 'b':  out = '\b'; break;
-            case 'f':  out = '\f'; break;
-            case 'n':  out = '\n'; break;
-            case 'r':  out = '\r'; break;
-            case 't':  out = '\t'; break;
+            switch (ch) {
+            case '"': case '\\': case '/': bytes[0] = ch; break;
+            case 'b': bytes[0] = '\b'; break;
+            case 'f': bytes[0] = '\f'; break;
+            case 'n': bytes[0] = '\n'; break;
+            case 'r': bytes[0] = '\r'; break;
+            case 't': bytes[0] = '\t'; break;
             case 'u': {
-                /* \uXXXX：仅支持 00-FF 范围（设备名为 ASCII），高字节忽略 */
-                char hex[5] = {0};
-                for (int i = 0; i < 4 && p[1]; i++) hex[i] = *(++p);
-                out = (char)(strtol(hex, NULL, 16) & 0xFF);
+                uint32_t value;
+                if (!json_hex4(&p, &value)) goto invalid;
+                if (value >= 0xd800 && value <= 0xdbff) {
+                    if (*p != '\\') goto invalid;
+                    p++;
+                    if (*p != 'u') goto invalid;
+                    p++;
+                    uint32_t low;
+                    if (!json_hex4(&p, &low) || low < 0xdc00 || low > 0xdfff) goto invalid;
+                    value = 0x10000 + ((value - 0xd800) << 10) + low - 0xdc00;
+                } else if (value >= 0xdc00 && value <= 0xdfff) {
+                    goto invalid;
+                }
+                if (!value) goto invalid;
+                if (value < 0x80) {
+                    bytes[0] = (unsigned char)value;
+                } else if (value < 0x800) {
+                    length = 2;
+                    bytes[0] = (unsigned char)(0xc0 | (value >> 6));
+                    bytes[1] = (unsigned char)(0x80 | (value & 0x3f));
+                } else if (value < 0x10000) {
+                    length = 3;
+                    bytes[0] = (unsigned char)(0xe0 | (value >> 12));
+                    bytes[1] = (unsigned char)(0x80 | ((value >> 6) & 0x3f));
+                    bytes[2] = (unsigned char)(0x80 | (value & 0x3f));
+                } else {
+                    length = 4;
+                    bytes[0] = (unsigned char)(0xf0 | (value >> 18));
+                    bytes[1] = (unsigned char)(0x80 | ((value >> 12) & 0x3f));
+                    bytes[2] = (unsigned char)(0x80 | ((value >> 6) & 0x3f));
+                    bytes[3] = (unsigned char)(0x80 | (value & 0x3f));
+                }
                 break;
             }
-            case '\0': return false;  /* 反斜杠后截断 */
-            default:   out = *p;      break;
+            default: goto invalid;
             }
         } else {
-            out = *p;
+            bytes[0] = ch;
         }
-        if (n + 1 >= dst_sz) {
-            dst[0] = '\0';
-            return false;
-        }
-        dst[n++] = out;
+        if (length >= dst_sz - n) goto invalid;
+        memcpy(dst + n, bytes, length);
+        n += length;
     }
-    if (*p != '"') {
-        dst[0] = '\0';
-        return false;
-    }
+    if (*p != '"') goto invalid;
     dst[n] = '\0';
     return true;
+invalid:
+    dst[0] = '\0';
+    return false;
 }
 
 static bool append_format(char *buf, size_t size, size_t *offset,
@@ -673,19 +720,19 @@ bool config_store_deserialize(const char *json, config_data_t *c)
     const char *cp = strstr(json, "\"custom_pacer_name\":\"");
     if (cp) {
         cp += strlen("\"custom_pacer_name\":\"");
-        json_unescape(cp, tmp.custom_pacer_name, CUSTOM_PACER_NAME_MAX);
+        if (!json_unescape(cp, tmp.custom_pacer_name, CUSTOM_PACER_NAME_MAX)) return false;
     }
     const char *rp = strstr(json, "\"run_custom_name\":\"");
     if (rp) {
         rp += strlen("\"run_custom_name\":\"");
-        json_unescape(rp, tmp.run_custom_name, RUN_CUSTOM_NAME_MAX);
+        if (!json_unescape(rp, tmp.run_custom_name, RUN_CUSTOM_NAME_MAX)) return false;
     }
 
     /* device_name：定位值起点后做反转义（json_get_str 不处理转义） */
     const char *dp = strstr(json, "\"device_name\":\"");
     if (dp) {
         dp += strlen("\"device_name\":\"");
-        json_unescape(dp, tmp.device_name, DEVICE_NAME_MAX);
+        if (!json_unescape(dp, tmp.device_name, DEVICE_NAME_MAX)) return false;
     }
 
     if (tmp.schema_ver == CONFIG_VERSION) {
