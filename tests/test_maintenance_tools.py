@@ -31,6 +31,8 @@ class MaintenanceToolsTest(unittest.TestCase):
         self.assertFalse(parse([]).no_build)
         self.assertTrue(parse(["--no-build"]).no_build)
         self.assertEqual(parse(["--level", "docs"]).level, "docs")
+        self.assertFalse(parse([]).strict)
+        self.assertTrue(parse(["--strict"]).strict)
         with self.assertRaises(SystemExit):
             parse(["--level", "unknown"])
 

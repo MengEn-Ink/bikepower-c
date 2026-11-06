@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import math
+import signal
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -416,6 +417,16 @@ def main():
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
     server = ThreadingHTTPServer((args.bind, args.port), Handler)
+    stopping = threading.Event()
+
+    def stop_server(signum, frame):
+        if not stopping.is_set():
+            stopping.set()
+            threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, stop_server)
+    if hasattr(signal, "pthread_sigmask"):
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM})
     print(f"Mock server: http://{args.bind}:{args.port}（300 秒，显式续期）", flush=True)
     try:
         server.serve_forever()

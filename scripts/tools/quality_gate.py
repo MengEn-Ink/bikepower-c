@@ -197,6 +197,8 @@ def parse_options(argv=None):
                         help="跳过 ESP-IDF 构建，仍运行 host 和全部专项门禁")
     parser.add_argument("--level", choices=("full", "docs"), default="full",
                         help="full 为默认完整门禁；docs 只运行资产、Git、配置与文档校验")
+    parser.add_argument("--strict", action="store_true",
+                        help="依赖缺失、无 host 工具或专项跳过均判失败；工作区 WARN 不影响")
     return parser.parse_args(argv)
 
 
@@ -226,7 +228,7 @@ gcc_cmd = shutil.which("gcc") or shutil.which("clang")
 if options.level == "docs":
     print("  跳过 host 单测（文档门禁）")
 elif not make_cmd or not gcc_cmd:
-    warn("无 host 编译工具链（make/gcc），跳过单测")
+    (fail if options.strict else warn)("无 host 编译工具链（make/gcc），跳过单测")
 else:
     test_dir = os.path.join(PROJECT, "test")
     run_cmd([make_cmd, "-C", "test", "clean"], cwd=PROJECT)
@@ -239,7 +241,7 @@ else:
         m = re.search(r'(\d+) 通过.*?(\d+) 失败', out)
         if m:
             npass, nfail = int(m.group(1)), int(m.group(2))
-            if nfail == 0:
+            if nfail == 0 and rc == 0:
                 ok(f"单测通过 ({npass} 断言)")
             else:
                 fail(f"单测有失败: {npass} 通过, {nfail} 失败")
@@ -389,6 +391,8 @@ print("\n=== 6. 静态门禁聚合 ===")
 # (脚本相对路径, 人类可读名称)
 STATIC_CHECKS = [
     ("tests/test_maintenance_tools.py", "维护工具功能回归"),
+    ("tests/test_persistent_store.py", "生产 NVS 双槽原子提交与故障恢复 ASan/UBSan"),
+    ("tests/test_mock_server_shutdown.py", "mock 服务终止信号与清理回归"),
     ("tests/test_ble_config_service.py", "生产 BLE 配置 GATT 回调 ASan/UBSan"),
     ("tests/test_ble_runtime.py", "生产 BLE 同轮通知快照 ASan/UBSan"),
     ("tests/test_ble_compatibility.py", "BLE 标准特征与 Pages 兼容诊断回归"),
@@ -457,13 +461,13 @@ for rel_path, name in STATIC_CHECKS:
     run_args = [python_exe, full]
     if rel_path == "scripts/tools/sync_user_docs.py":
         run_args.append("--check")
-    out, rc = run_cmd(run_args, cwd=PROJECT)
+    out, rc = run_cmd(run_args, cwd=PROJECT, timeout=180)
     if rc == 0:
         ok(f"{name} 通过")
     elif any(marker in out for marker in ENV_MISSING_MARKERS):
         # 环境缺失（如未装 node）：降级 warn 并说明原因，不掩盖真实失败
         reason = next(m for m in ENV_MISSING_MARKERS if m in out)
-        warn(f"{name} 因环境缺失跳过（命中标志：{reason}）")
+        (fail if options.strict else warn)(f"{name} 因环境缺失跳过（命中标志：{reason}）")
     else:
         fail(f"{name} 检查失败: {out.strip().splitlines()[-1] if out.strip() else f'rc={rc}'}")
 
