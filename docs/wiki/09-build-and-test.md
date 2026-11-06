@@ -259,6 +259,12 @@ BikePower C 采用多层测试策略：
 | 真机验收 | `tests/test_device_acceptance.py` | 端到端功能验收，生成 evidence JSON | 需要设备+人工 |
 | 压力测试 | `tests/run_stress.sh` | 长时间运行稳定性 | 需要设备 |
 
+### 持久化故障与严格门禁
+
+`python3 tests/test_persistent_store.py` 编译生产 NVS/快照模块执行 ASan/UBSan；六阶段写入失败、回读损坏、截断和模拟中断覆盖提交前/后、旧配置迁移、代次回绕、最大容量与重复保存重载。不代替实际断电和 NVS 满分区验收。
+
+`python3 scripts/tools/quality_gate.py --no-build --strict` 不允许依赖缺失或专项跳过被记为通过；每个专项限时 180 秒。host Makefile 对所有领域头建立依赖，改头文件会重编全部测试目标。详细边界见 [稳定性加固](../dev/38-persistence-stability-hardening.md)。
+
 ### Host 单元测试
 
 [test/Makefile](../../test/Makefile) 使用 clang 直接编译领域层（纯 C，无 ESP-IDF 依赖）：

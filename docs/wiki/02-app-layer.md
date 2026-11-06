@@ -338,35 +338,24 @@ radio_ctrl_enter_wifi(engine)
 
 ### Namespace 与键
 
-- Namespace：`NVS_NAMESPACE = "bikepower"`
-- 键定义在 [bikepower_config.h](../../main/bikepower_config.h)，约 40 个键（功率、模式、体重、FTP、LED、跑步参数等）
+- `bikepower` 的 `snapshot0/1` 和 `commit0/1` 保存完整 config/DIS 双槽快照；键集中于 [bikepower_config.h](../../main/bikepower_config.h)。
+- 旧功率、模式、体重、FTP、LED、跑步键和 `bp_ident/dis` 只读迁移，不删除、不镜像新值。
 
-### 加载流程
+### 加载与保存流程
 
-```
-nvs_store_load(engine)
-    ├─ nvs_open("bikepower", NVS_READWRITE)
-    ├─ 读取 schema version ("sv")
-    ├─ 若 namespace 不存在：
-    │     ├─ config_store_defaults(&c)
-    │     ├─ config_store_apply_to_engine(&c, engine)
-    │     └─ nvs_store_save(engine)（回写默认值）
-    ├─ 若存在旧值：
-    │     ├─ 读取所有键值
-    │     ├─ config_store_migrate(&c)（schema 升级）
-    │     ├─ config_store_validate(&c)（范围夹紧）
-    │     ├─ config_store_apply_to_engine(&c, engine)
-    │     └─ 若发生 migration/clamp，再保存一次修正值
-    └─ nvs_close()
-```
+启动先验证双槽提交标记、代次、长度和 CRC，选择最新完整槽。无标记才读取旧键并迁移；所有槽损坏或 I/O 失败使用安全默认并禁止覆盖。首次提交标记不完整时只读恢复旧键。
+
+保存由 [persistent_store.c](../../main/persistent_store.c) 写非活动槽、commit、回读，再写提交标记并回读。候选阶段失败可重试；标记结果不确定闭锁后续写入，需重启核对。配置与 DIS 同槽保存，不再分步回滚。
 
 ### 关键函数
 
 | 函数 | 说明 |
 |------|------|
-| `nvs_store_load(engine)` | 从 NVS 加载配置到引擎（含 defaults/migrate/validate） |
-| `nvs_store_save(engine)` | 从引擎保存配置到 NVS |
-| `nvs_factory_reset()` | 擦除整个 "bikepower" namespace（未在主流程使用） |
+| `nvs_store_load(engine)` | 双槽/旧键迁移读取与引擎应用 |
+| `nvs_store_save(engine)` | 保存当前配置并保留当前 DIS |
+| `nvs_store_save_with_identity(engine, identity)` | 配置和 DIS 联合保存 |
+
+协议、故障矩阵与旧固件降级限制见 [稳定性加固](../dev/38-persistence-stability-hardening.md)。
 
 ---
 

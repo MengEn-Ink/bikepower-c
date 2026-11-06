@@ -32,6 +32,8 @@
 | [BLE 能力复核](dev/34-ble-compatibility-recheck.md) | 当前 USB 连接证据、标准功率计差异与真机验收边界 |
 | [设备遥测实施](dev/35-device-telemetry-plan.md) | 内存/CPU/BLE 快照、协议、Pages 与验证计划 |
 | [设备遥测协议与验证](dev/36-device-telemetry-verification.md) | 20 字节记录、CPU 口径、浏览器回归与实测边界 |
+| [项目审查与优化](dev/37-project-review-and-optimization.md) | 配置保存修复、字符串与测试退出回归、残余风险和证据 |
+| [持久化稳定性加固](dev/38-persistence-stability-hardening.md) | 双槽快照、联合提交、迁移与故障恢复、严格门禁 |
 
 ## Code Wiki
 

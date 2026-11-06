@@ -30,7 +30,8 @@
 - `ble_power_bridge.c`：单台已知 CPS 设备的定向连接、订阅、DIS 与样本快照
 - `radio_ctrl.c`：WiFi/BLE 射频共用唯一入口
 - `wifi_portal.c`：`esp_http_server` 配网页面（SoftAP 由 `radio_ctrl.c` 启动）
-- `nvs_store.c`：NVS 与领域层配置对象桥接
+- `nvs_store.c`：旧 NVS 键迁移与领域层配置对象桥接
+- `persistent_store.c`：完整配置/DIS 双槽快照、回读校验与提交标记
 - `bikepower_config.h`：应用层常量中心
 
 应用层的特点是“状态协调”而不是“算法本体”。
@@ -304,9 +305,9 @@ DIS 读取内容来自编译期常量：
 
 - `DEVICE_MANUFACTURER = "BikePower"`
 - `DEVICE_MODEL = "ESP32-C3"`
-- `FIRMWARE_VERSION = "4.2.0"`
+- `FIRMWARE_VERSION = "4.3.0"`
 - `FIRMWARE_STABLE_VERSION = "4.0.0"`
-- `FIRMWARE_FIX_VERSION = "4.2.0"`
+- `FIRMWARE_FIX_VERSION = "4.3.0"`
 - `BIKEPOWER_GIT_SHA` 由 `main/CMakeLists.txt` 在构建时注入最后一次 Git 短提交 ID
 - DIS 固件字段与门户固件名使用 `board_firmware_name()` 生成，格式为 `板型-v版本`，例如 `generic-c3-v4.3.0`；Git ID 和构建时间单独保留。
 
@@ -374,7 +375,7 @@ Fitness Machine Status 和 Control Point 使用独立编号；Reset/Started 为 
 | Bridge Backup 1 | `7a5a000a-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 第一台备选设备身份 |
 | Bridge Backup 2 | `7a5a000b-4c7a-4f2a-9b3e-6d1f4a8c0b21` | Read/Write | 第二台备选设备身份 |
 
-**DIS 身份覆盖（`7a5a0008`）**：线格式 `[version=1][count=6]` 后接 6 个 `[len][UTF-8]` 字段，顺序为厂商 `2A29`、型号 `2A24`、序列号 `2A25`、硬件版本 `2A27`、固件版本 `2A26`、软件版本 `2A28`；每字段最多 31 字节，拒绝控制字符与截断 UTF-8。空字段表示该项回退为固件内置值，全空写入会清除 NVS 中的覆盖（namespace `bp_ident` / key `dis`）。它独立于八组配置事务与 schema 迁移：NimBLE host 回调只做解码并投递到应用 mailbox（上一笔未落盘时拒绝写入），主循环写 NVS 成功后才刷新 DIS 读值。部分手机系统会缓存 DIS，写入后需在 App 中删除设备重新搜索。实现：`components/bikepower_domain/device_identity.c`、`main/device_identity_store.c`。
+**DIS 身份覆盖（`7a5a0008`）**：线格式 `[version=1][count=6]` 后接 6 个 `[len][UTF-8]` 字段，顺序为厂商 `2A29`、型号 `2A24`、序列号 `2A25`、硬件版本 `2A27`、固件版本 `2A26`、软件版本 `2A28`；每字段最多 31 字节，拒绝控制字符与截断 UTF-8。空字段表示该项回退为固件内置值，全空写入会清除当前快照中的覆盖（历史 namespace `bp_ident` / key `dis` 只读迁移）。它独立于八组 BLE 配置事务与 schema 迁移，但持久化和配置共享完整双槽快照：NimBLE host 回调只做解码并投递到应用 mailbox（上一笔未落盘时拒绝写入），主循环联合保存当前配置和身份成功后才刷新 DIS 读值。部分手机系统会缓存 DIS，写入后需在 App 中删除设备重新搜索。实现：`components/bikepower_domain/device_identity.c`、`main/device_identity_store.c`。
 
 协议版本当前为 `1`，所有多字节整数显式使用小端编码，不把 C struct 直接放上线传输。配置按八组拆分，单组上限 48 字节，适配当前 NimBLE MTU 64。字符串不携带结尾 `\0`，而是使用单字节 UTF-8 长度前缀；设备名最多 23 字节，自定义骑行/跑步名称最多 31 字节。`0009` 保留原主设备布局并携带来源与共享校正，`000a/000b` 各携带一个备选身份；Core/Profile/Running/LED/Identity 的既有线格式不变。
 
@@ -875,7 +876,7 @@ namespace 固定为：
 - `NVS_KEY_RUN_CUSTOM_NAME = "rcname"`
 
 设备门户已删除模板存储服务与 handler。历史 `ble_tpl` namespace 不再读写，
-升级不主动擦除旧槽位；当前配置和 DIS 覆盖分别走 `bikepower` 与 `bp_ident`。
+升级不主动擦除旧槽位。当前配置与 DIS 统一存入 `bikepower` 的双槽快照（`snapshot0/1` + `commit0/1`）；上文逐键列表与 `bp_ident/dis` 仅保留只读迁移，迁移后不镜像写回旧键。旧固件降级只能看到迁移时旧值，不承诺读取之后新保存配置。
 
 ### 9.2 schema 版本
 
@@ -918,14 +919,14 @@ v13→v14 把原单设备绑定迁移到固定三设备表的槽位 0，其他�
 
 ### 9.4 配置 JSON 序列化
 
-领域层提供 `config_store_serialize()` 和 `config_store_deserialize()`，用于配置导出/导入、备份/恢复和 host 单测。序列化覆盖 `config_data_t` 的全部持久字段，包括基础功率/踏频/心率、个人参数、骑行与跑步模式、广播掩码、LED 场景和设备名；字符串按 JSON 规则转义双引号、反斜杠和控制字符。反序列化要求 JSON 至少包含 `schema_ver`，缺失字段先保留默认值，最后复用 `config_store_validate()` 做范围夹紧。
+领域层提供 `config_store_serialize()` 和 `config_store_deserialize()`，用于配置导出/导入、备份/恢复和 host 单测。序列化覆盖 `config_data_t` 的全部持久字段，包括基础功率/踏频/心率、个人参数、骑行与跑步模式、广播掩码、LED 场景和设备名；字符串按 JSON 规则转义双引号、反斜杠和控制字符。反序列化要求 JSON 至少包含 `schema_ver`，缺失字段先保留默认值，最后复用 `config_store_validate()` 做范围夹紧。名称字段支持合法 Unicode 转义及代理对到 UTF-8 的转换；截断、非法转义、孤立代理、内嵌 NUL 或超过目标容量时返回失败，保持调用方配置不变。完整配置应用时在选择跑步预设后恢复用户步频，避免预设默认值覆盖已保存的步频。当前轻量解析器仍只承诺工具生成的紧凑格式，不等同于完整 JSON 语法验证器。
 
 ### 9.5 脏标记落盘策略
 
 落盘触发来源有三类：
 
 1. 主循环每 10 秒心跳时，若 `power_engine_is_dirty()` 为真，则自动保存
-2. WiFi 配网页面点击保存后，`h_config()` 直接 `nvs_store_save()`
+2. WiFi 配网页面点击保存后，`h_config()` 投递配置事务，由主任务调用 `nvs_store_save()`
 3. BLE 配置事务 COMMIT 后，主循环在临时引擎上校验并立即保存；只有 NVS commit 成功才替换正式引擎并向客户端返回成功
 
 成功保存后会调用：
@@ -933,6 +934,8 @@ v13→v14 把原单设备绑定迁移到固定三设备表的槽位 0，其他�
 `power_engine_clear_dirty(&s_engine)`
 
 这套策略兼顾了：
+
+注意：当前配置/DIS 使用显式二进制编码、CRC32、双槽与代次提交标记；先写非活动槽并回读核验，再切换其提交标记。启动只选择标记与快照一致且校验通过的最近代次，不使用无标记候选。提交标记写入/回读结果不确定时保留旧运行态并禁止继续保存，必须重启核对；重启可能采用完整旧值或完整新值，不承诺失败一定未落盘。首次迁移标记损坏时只读恢复旧键，保留证据不自动擦除。详见 [稳定性加固](38-persistence-stability-hardening.md)。
 
 - 按钮调功后的断电恢复
 - 配网页面提交时的即时生效

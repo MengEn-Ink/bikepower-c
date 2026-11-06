@@ -2,6 +2,29 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
+## [Unreleased]
+
+### 审查修复提交前复验（2026-11-06）
+- 用户授权测试通过后提交；`05a8627` 配置、`2c4b0fc` 存储、`ebc26a7` 测试工具已分批推送，文档批同步记录。
+- 当前源码复验：严格离线门禁 117 PASS / 2 工作区 WARN / 0 FAIL，无依赖跳过；NVS sanitizer 3584 断言、Host/严格 sanitizer 6233/0，ESP-IDF 编译 app `0x115320`、factory 72%；mock 15 轮/180.9 秒正常退出。
+- 没有烧录、tag 或固件发布；下方修复轮未提交描述仅保留当时历史，真实 flash/无线/第三方 App 验收仍未执行。
+
+### 持久化稳定性加固（2026-11-06）
+- 新增 config_snapshot/persistent_store：完整配置与 DIS 双槽显式编码、CRC32、代次和提交标记；候选回读后提交，失败/损坏整体回退，提交不确定闭锁保存。
+- nvs_store 旧多键布局改为只读迁移，旧 DIS blob 保留；门户和单独身份修改均与当前配置联合保存，不删除旧键、不镜像后续新值。
+- 新增生产存储 ASan/UBSan 故障回归，覆盖六阶段失败/截断/模拟断电、首次迁移、腐败/回绕、容量与 1000 次保存重载；没有真实 flash 掉电证据。
+- 本轮最终：NVS sanitizer 3584 断言、host/严格 sanitizer 6233/0、严格质量门禁 117 PASS / 2 工作区 WARN / 0 FAIL，编译 app `0x115320`、factory 余量 72%；mock 耐久 15 轮/181.1 秒。
+- host 头文件依赖、严格门禁与超时治理；最终结果见 [稳定性报告](docs/dev/38-persistence-stability-hardening.md)。本轮未烧录、提交或发布。
+
+### 项目审查与局部优化（2026-11-06）
+- `config_store.c`：完整配置应用在跑步预设后恢复用户步频；名称解析失败不吞掉，严格 Unicode 转义和代理对编码，非法字符串不污染输出。
+- `test/test_domain.c`：补四种预设 × 两模式、三类名称十种非法输入及精确长度边界；host/严格 ASan/UBSan 6233/0。
+- `tests/mock_server.py`、退出回归及质量门禁：处理继承 SIGTERM 忽略/屏蔽，异步 shutdown 可靠收尾；退出样例通过。独立 review 构建目录加入忽略规则。
+- ESP-IDF 独立编译通过，app `0x1157d0`、factory 余量 72%；Node 36/0 与工具台/设备状态双主题浏览器通过。全量门禁、耐久最终结果见 [审查报告](docs/dev/37-project-review-and-optimization.md)。
+- 最终全量离线质量门禁 116 PASS / 2 工作区 WARN / 0 FAIL，原五项依赖跳过补跑通过；文档事实/63 份链接及 diff 格式通过。
+- 三分钟耐久最终复跑 15 轮、180.1 秒、exit 0，报告正常落盘；首轮业务通过但收尾失败保留为失败证据。
+- 高优先级残余：多键 NVS 写入没有跨键事务回滚，需独立存储迁移和掉电回归；本轮不宣称持久化原子性。未烧录、未提交推送、未发布，不能沿用历史实物 PASS。
+
 ## [4.3.0] - 2026-11-06
 
 ### 设备状态与真实遥测（2026-11-05）

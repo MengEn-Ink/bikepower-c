@@ -1,5 +1,18 @@
 # 测试脚本使用说明
 
+## 持久化稳定性加固
+
+- `python3 tests/test_persistent_store.py`：ASan/UBSan 编译生产快照/NVS/身份模块；immediate-write 替身覆盖失败、截断、回读损坏、模拟掉电、重启、旧键迁移、代次回绕和 1000 次保存重载。
+- `python3 scripts/tools/quality_gate.py --no-build --strict`：完整离线门禁，依赖缺失与专项跳过计失败；每个专项有 180 秒超时。ESP-IDF 构建需另外执行或去掉 `--no-build`。
+- host Makefile 将领域头文件加入所有目标依赖，避免仅改头文件后增量测试沿用旧二进制。
+- 当前修改未烧录；仿真故障不替代实际 flash 断电与长时间 WiFi/BLE 共存验收，详见 [持久化加固](../docs/dev/38-persistence-stability-hardening.md)。
+
+## 本轮审查新增回归
+
+- `make -C test run`：补充四种预设 × 两种跑步模式保存后用户步频保持、三种名称字段非法输入不污染输出，以及 Unicode/代理对还原。
+- `python3 tests/test_mock_server_shutdown.py`：验证继承 SIGTERM 忽略状态及屏蔽掩码时仍可正常退出；mock 显式注册 SIGTERM，并在 POSIX 恢复信号掩码，异步 shutdown 避免主线程死锁。已接入总质量门禁。
+- 离线回归不证明真实 flash 多键原子性；残余风险和当前验证见 [项目审查](../docs/dev/37-project-review-and-optimization.md)。
+
 ## 设备状态遥测
 
 离线回归：`python3 tests/test_device_telemetry.py` 和 `node tests/test_device_telemetry.cjs`；浏览器回归 `node tests/test_device_status_browser.cjs` 使用受控协议输入，不构成实物验收。实际设备刷入候选后执行 `python3 tests/ble_telemetry_e2e.py --seconds 30 --report tests/reports/telemetry-device.json`，验证四组通知、CPU、RSSI、堆门限、退订与两次连接；测试前释放网页和 App。协议与验收边界见 [遥测验证](../docs/dev/36-device-telemetry-verification.md)。

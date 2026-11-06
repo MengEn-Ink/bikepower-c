@@ -162,8 +162,9 @@ app_main.c
 | [radio_ctrl.c/h](../../main/radio_ctrl.c) | 射频共存唯一入口与失败兜底 |
 | [wifi_portal.c/h](../../main/wifi_portal.c) | HTTP JSON、配置事务、超时与静态页面 |
 | [captive_portal.c/h](../../main/captive_portal.c) | DNS 与门户探测 |
-| [nvs_store.c/h](../../main/nvs_store.c) | NVS 配置迁移和持久化 |
-| [device_identity_store.c/h](../../main/device_identity_store.c) | DIS 覆盖持久化 |
+| [nvs_store.c/h](../../main/nvs_store.c) | 旧键只读迁移与引擎配置搬运 |
+| [persistent_store.c/h](../../main/persistent_store.c) | config/DIS 双槽、CRC、提交标记与故障闭锁 |
+| [device_identity_store.c/h](../../main/device_identity_store.c) | DIS 旧键读取与联合快照接口 |
 | [bikepower_config.h](../../main/bikepower_config.h) | 板级常量 |
 | `web/` | 编译时内联 HTML/CSS/JS |
 
@@ -178,6 +179,7 @@ app_main.c
 | [power_bridge.c](../../components/bikepower_domain/power_bridge.c) | 三设备配置、wire v1/v2、校正、0W 保护与同源踏频 |
 | [bridge_failover.c](../../components/bikepower_domain/bridge_failover.c) | 最近成功优先、两轮快速恢复、模拟降级和低频轮转纯状态机 |
 | [config_store.c](../../components/bikepower_domain/config_store.c) | schema/defaults/校验/迁移/序列化；版本以源码事实摘要为准 |
+| [config_snapshot.c](../../components/bikepower_domain/config_snapshot.c) | config/DIS 显式编码、头字段与负载 CRC、代次标记 |
 | [json_miniparse.c](../../components/bikepower_domain/json_miniparse.c) | 轻量 JSON 字段提取器（无动态分配，用于 HTTP 请求解析） |
 | [button_logic.c](../../components/bikepower_domain/button_logic.c) | 按钮按压语义纯逻辑（短按/长按/自动重复/确认窗口） |
 | [button_debounce.c](../../components/bikepower_domain/button_debounce.c) | 去抖与长按节拍纯逻辑 |

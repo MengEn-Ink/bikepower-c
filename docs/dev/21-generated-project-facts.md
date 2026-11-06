@@ -7,8 +7,8 @@
 - 配网超时：300 秒，仅显式续期
 - BLE 通知周期：1000 毫秒
 - 已注册 HTTP 路由：23 个（按 method + URI 计数）
-- 板级生产模块：17 个
-- 领域生产模块：18 个
+- 板级生产模块：18 个
+- 领域生产模块：19 个
 
 ## HTTP 路由
 
@@ -51,6 +51,7 @@
 - `main/led.c`
 - `main/board_detect.c`
 - `main/nvs_store.c`
+- `main/persistent_store.c`
 - `main/device_identity_store.c`
 - `main/radio_ctrl.c`
 - `main/wifi_portal.c`
@@ -60,6 +61,7 @@
 - `components/bikepower_domain/bridge_failover.c`
 - `components/bikepower_domain/button_debounce.c`
 - `components/bikepower_domain/button_logic.c`
+- `components/bikepower_domain/config_snapshot.c`
 - `components/bikepower_domain/config_store.c`
 - `components/bikepower_domain/cps_input_codec.c`
 - `components/bikepower_domain/device_analysis.c`
