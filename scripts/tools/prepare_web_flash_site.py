@@ -388,6 +388,9 @@ def initialize_site(source_dir, site_dir):
     if site_dir.exists():
         raise RuntimeError("站点输出目录已存在，拒绝递归覆盖")
     shutil.copytree(source_dir, site_dir)
+    if (site_dir / "phone-operation-demos.js").is_file():
+        from build_phone_demo import render as render_phone
+        (site_dir / "phone-portal-source.js").write_text(render_phone(), encoding="utf-8")
     monitor = site_dir / "ble-monitor.html"
     if not monitor.is_file():
         raise RuntimeError("站点源目录缺少 ble-monitor.html")

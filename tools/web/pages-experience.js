@@ -15,28 +15,31 @@
     const pressed = t < release || scene === "wifi" && t >= 3300 && t < 3500;
     let power = 200, state = "ble", text = "按下设备操作键，开始计时。";
     if (scene === "short") {
-      if (t >= release) { power = 180; text = "0.3 秒松开：短于 0.5 秒，减小一个步进（示例 20 W）。"; }
+      if (t >= release) { power = 180; text = "轻按松开，目标减少 20 W。"; }
     } else {
       const hold = Math.min(t, release, 1999);
       if (hold >= 500) power += (Math.floor((hold - 500) / 200) + 1) * 20;
-      if (t >= 500) text = "超过 0.5 秒：按住期间约每 0.2 秒增加一个步进。";
-      if (scene === "adjust" && t >= release) text = "1.5 秒松开：保留调功结果，不进入配网确认。";
-      if (scene !== "adjust" && t >= 2000) text = "已达到 2 秒：松开后才进入确认窗口。";
+      if (t >= 500) text = "继续按住，目标逐步增加。";
+      if (scene === "adjust" && t >= release) text = "不到 2 秒松开，保留调节结果。";
+      if (scene !== "adjust" && t >= 2000) text = "满 2 秒了，现在松开。";
       if (scene !== "adjust" && t >= release) {
         power = 200;
         state = "confirm";
-        text = "松开：本次临时调功回滚，LED 快闪；请在 3 秒内再按一次。";
+        text = "灯快闪了，3 秒内再按一次。目标恢复原值。";
       }
       if (scene === "wifi" && t >= 3300) {
         state = "wifi";
-        text = "二次按下：打开 WiFi 热点。正常配网期间 BLE 继续工作。";
+        text = "热点已开启。去手机 WiFi 连接 BikePower-XXXXXX。";
       }
       if (scene === "cancel" && t >= 5300) {
         state = "ble";
-        text = "3 秒内未确认：取消配网，恢复蓝牙工作；功率保持按下前的值。";
+        text = "没有再次确认，自动取消；目标保持原值。";
       }
     }
-    return { power, state, pressed, text, elapsed: t, progress: t / config.duration };
+    const countdown = state === "confirm" ? Math.max(0, (5300 - t) / 1000) : null;
+    const phase = t < release ? "hold" : state === "confirm" ? "release" : "confirm";
+    const ledOn = state === "confirm" ? Math.floor(t / 200) % 2 === 0 : Math.floor(t / 1000) % 2 === 0;
+    return { power, state, pressed, text, elapsed: t, progress: t / config.duration, countdown, phase, ledOn };
   }
   function releaseLabel(info) {
     if (!info) return "本地预览 · 未发布";
@@ -48,7 +51,9 @@
     return "页面更新发布时间 " + date + "（北京时间 · 页面构建） · " +
       info.commit.slice(0, 7) + (info.dirty ? " · 本地未提交预览" : "");
   }
-  if (typeof module !== "undefined") module.exports = { buttonFrame, releaseLabel, scenes };
+  const api = { buttonFrame, releaseLabel, scenes };
+  if (typeof module !== "undefined") module.exports = api;
+  if (typeof window !== "undefined") window.BikePowerExperience = api;
   if (typeof document === "undefined") return;
 
   function initDemo(host) {
@@ -62,6 +67,7 @@
       host.dataset.state = frame.state;
       host.dataset.pressed = String(frame.pressed);
       host.dataset.playing = String(running);
+      host.dataset.ledOn = String(frame.ledOn);
       host.querySelector("[data-demo-power]").textContent = frame.power;
       host.querySelector("[data-demo-time]").textContent = (frame.elapsed / 1000).toFixed(1) + " s";
       host.querySelector("[data-demo-fill]").style.transform = "scaleX(" + frame.progress + ")";
@@ -69,7 +75,18 @@
         ble: "蓝牙工作", confirm: "等待二次确认", wifi: "WiFi 配网"
       }[frame.state];
       host.querySelector("[data-demo-text]").textContent = frame.text;
+      const ledLabel = host.querySelector("[data-demo-led-label]");
+      if (ledLabel) ledLabel.textContent = frame.state === "confirm" ? "指示灯 · 快闪确认" : frame.state === "wifi" ? "指示灯 · 配网节奏" : "指示灯 · 慢闪";
       host.querySelector("[data-demo-key]").textContent = frame.pressed ? "按住" : "松开";
+      const countdown = host.querySelector("[data-demo-countdown]");
+      if (countdown) countdown.textContent = frame.countdown !== null ? "确认剩余 " + frame.countdown.toFixed(1) + " s" :
+        frame.state === "wifi" ? "到手机 WiFi 设置连接热点" :
+        scene === "short" || scene === "adjust" ? "0.5 秒起每 0.2 秒加一步" :
+        frame.elapsed >= 5300 ? "确认超时，热点未开启" : "满 2 秒后松开";
+      host.querySelectorAll("[data-demo-phase]").forEach(item => {
+        item.dataset.active = String(item.dataset.demoPhase === frame.phase);
+        item.parentElement.classList.toggle("hidden", scene === "short" || scene === "adjust");
+      });
       play.textContent = motion.matches ? "逐步演示" : running ? "暂停" : elapsed >= scenes[scene].duration ? "重播" : "播放演示";
       play.setAttribute("aria-pressed", String(running));
       if (announce) caption.textContent = frame.text;
@@ -118,6 +135,8 @@
       });
     });
     document.addEventListener("visibilitychange", () => { if (document.hidden) pause(false); });
+    host.closest("[data-operation-demos]")?.addEventListener("demo:pause", () => pause(false));
+    window.addEventListener("blur", () => pause(false));
     motion.addEventListener("change", () => pause(false));
     if ("IntersectionObserver" in window) {
       new IntersectionObserver(entries => { if (!entries[0].isIntersecting) pause(false); }).observe(host);
@@ -126,6 +145,10 @@
   }
   async function init() {
     document.querySelectorAll("[data-button-demo]").forEach(initDemo);
+    if (location.protocol === "file:") {
+      document.querySelectorAll("[data-page-release]").forEach(el => el.textContent = "本地预览 · 未发布");
+      return;
+    }
     try {
       const response = await fetch("./site-info.json", { cache: "no-cache" });
       const info = response.ok ? await response.json() : null;

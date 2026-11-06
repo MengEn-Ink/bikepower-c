@@ -1437,6 +1437,11 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
 <script src="./flash-session.js"></script>
 <link rel="stylesheet" href="./pages-experience.css">
+<link rel="stylesheet" href="./operation-demos.css">
+<link rel="stylesheet" href="./phone-operation-demos.css">
+<script defer src="./phone-portal-source.js"></script>
+<script defer src="./phone-operation-demos.js"></script>
+<script defer src="./operation-demos.js"></script>
 <script defer src="./pages-experience.js"></script>
 <link rel="stylesheet" href="./device-status.css">
 <script defer src="./device-telemetry.js"></script>
@@ -1454,20 +1459,17 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
   </header>
 
   <section class="mg-hero">
-    <span class="mg-eyebrow">ESP32-C3 · BLE 骑行信号源</span>
-    <h1>把一块开发板，<br>变成你的<em>功率计</em>。</h1>
-    <p>电脑完成首次安装，手机修改设备配置。按下面的步骤开始使用，按钮操作可以先看演示。</p>
-    <div class="mg-channels" aria-label="设备广播的数据">
-      <div class="mg-ch" style="--c:var(--sig-power)"><span>功率</span><b>W</b><i aria-hidden="true"><s></s><s></s><s></s><s></s><s></s><s></s><s></s></i><small>CPS 0x1818</small></div>
-      <div class="mg-ch" style="--c:var(--sig-cadence)"><span>踏频</span><b>rpm</b><i aria-hidden="true"><s></s><s></s><s></s><s></s><s></s><s></s><s></s></i><small>CSC 0x1816</small></div>
-      <div class="mg-ch" style="--c:var(--sig-hr)"><span>心率</span><b>bpm</b><i aria-hidden="true"><s></s><s></s><s></s><s></s><s></s><s></s><s></s></i><small>HRS 0x180D</small></div>
-      <div class="mg-ch" style="--c:var(--sig-speed)"><span>骑行台</span><b>ERG</b><i aria-hidden="true"><s></s><s></s><s></s><s></s><s></s><s></s><s></s></i><small>FTMS 0x1826</small></div>
-    </div>
+    <h1>看一遍，<br>就会<em>操作</em>。</h1>
+    <p>先播放演示，再到设备上动手。</p>
   </section>
 
   <nav class="guide-index" aria-label="使用手册目录">
     <a href="#mg-steps-title">快速上手</a><a href="#mg-button-title">按钮演示</a><a href="#mg-wifi-title">手机配网</a><a href="#mg-bridge-title">真实桥接</a><a href="#mg-run-title">跑步模式</a><a href="#mg-check-title">实物验收</a><a href="#mg-faq-title">遇到问题</a><a href="https://mengen-ink.github.io/bikepower-c/#/device-status">设备状态</a>
   </nav>
+  <section class="mg-sec" aria-labelledby="mg-button-title">
+    <h2 class="mg-h" id="mg-button-title">设备按键，手机操作</h2>
+    <div class="operation-demos" data-operation-demos><p>正在准备操作演示…</p></div>
+  </section>
   <section class="mg-desk" aria-labelledby="mg-desk-title">
     <div class="mg-desk-head"><span class="mg-num">→</span><div><h2 id="mg-desk-title">请在电脑上打开本页</h2><p>桌面版 Chrome 或 Edge，HTTPS 访问</p></div></div>
     <code class="mg-url" id="mg-url">https://mengen-ink.github.io/bikepower-c/</code>
@@ -1479,110 +1481,55 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
   </section>
 
   <section class="mg-sec" aria-labelledby="mg-steps-title">
-    <h2 class="mg-h" id="mg-steps-title"><span>01</span>四步上手</h2>
-    <ol class="mg-steps">
-      <li><b>烧录固件 <em>电脑</em></b><p>用能传数据的 USB 线连接开发板，在电脑上打开本页 →「固件刷写」→ 选择板型 → 连接串口并刷写。</p></li>
-      <li><b>连接骑行 App <em>手机 / 平板</em></b><p>上电后 LED 慢闪即开始广播。在骑行 App 里按功率计、心率计、踏频传感器或智能训练台搜索 <code>BikePower</code>。</p></li>
-      <li><b>日常操作 <em>设备</em></b><p>用操作键调整目标值；按压时长和反馈见下方<a href="#mg-button-title">按键操作示范</a>。</p></li>
-      <li><b>修改配置 <em>手机即可</em></b><p>需要调整模式或接入真实功率计时，按<a href="#mg-wifi-title">手机配网步骤</a>进入配置页。</p></li>
-    </ol>
-  </section>
-
-  <section class="mg-sec" aria-labelledby="mg-button-title">
-    <h2 class="mg-h" id="mg-button-title"><span>02</span>先练一次按钮操作</h2>
-    <p class="guide-intro">通用板使用 BOOT 操作键，M5Stamp C3 使用用户按钮，RST 是复位键。下面以<strong>模拟固定骑行、200 W、20 W 步进</strong>演示。数值与灯色均为教学示意，不控制设备。</p>
-    <div class="button-demo" data-button-demo data-state="ble" data-pressed="true" data-playing="false">
-      <div class="demo-scenes" role="group" aria-label="选择按钮操作演示">
-        <button type="button" data-demo-scene="short" aria-pressed="false">短按减功率</button>
-        <button type="button" data-demo-scene="adjust" aria-pressed="false">按住持续调功</button>
-        <button type="button" data-demo-scene="wifi" aria-pressed="true">长按 + 二次确认</button>
-        <button type="button" data-demo-scene="cancel" aria-pressed="false">不确认，自动取消</button>
-      </div>
-      <div class="demo-head"><b data-demo-title>长按 + 二次确认</b><time data-demo-time>0.0 s</time></div>
-      <div class="demo-stage">
-        <div class="demo-board" aria-hidden="true"><i class="demo-usb"></i><i class="demo-led"></i><span class="demo-key" data-demo-key>按住</span><small>BUTTON / LED</small></div>
-        <div class="demo-metric">示例目标功率<strong><span data-demo-power>200</span><small>W</small></strong><span class="demo-state" data-demo-state>蓝牙工作</span></div>
-      </div>
-      <div class="demo-track" aria-hidden="true"><i data-demo-fill></i></div>
-      <p class="demo-text" data-demo-text>按下设备操作键，开始计时。满 2 秒松开后，在 3 秒内再按一次。</p>
-      <div class="demo-controls"><button type="button" class="btn primary" data-demo-play aria-pressed="false">播放演示</button><button type="button" class="btn" data-demo-step>下一步</button><button type="button" class="btn ghost" data-demo-reset>重置</button></div>
-      <span class="demo-caption" data-demo-caption role="status" aria-live="polite"></span>
-    </div>
-    <div class="demo-legend"><span>蓝牙工作</span><span>等待确认</span><span>WiFi 配网</span></div>
-    <div class="guide-note"><strong>先松开，再确认。</strong>一直按住不会直接打开热点。满 2 秒松开后，本次临时调功会回滚，并进入 3 秒确认窗口。开启 ERG、配速机器人或真实桥接后，按钮目标与此示例可能不同，请以实际模式为准。</div>
+    <h2 class="mg-h" id="mg-steps-title">第一次使用</h2>
+    <p class="guide-intro">已预装的设备，直接看“连接 App”。</p>
+    <details class="guide-faq"><summary>电脑安装 · 播放步骤</summary><div data-operation-guide="install"></div></details>
+    <div data-operation-guide="connect"></div>
   </section>
 
   <section class="mg-sec" aria-labelledby="mg-wifi-title">
-    <h2 class="mg-h" id="mg-wifi-title"><span>03</span>用手机修改设备配置</h2>
-    <p class="guide-intro">Pages 是手册与电脑工具台。设备配置页在开发板自己的热点里，需要先连接热点。</p>
-    <div class="guide-note"><strong>版本说明：</strong>网页烧录提供正式 Release。下文新版门户与三设备主备桥接对应当前源码候选，仍待实物验收；页面更新不代表这些功能已经发布。请先核对设备固件版本。</div>
-    <ol class="guide-list">
-      <li><b>进入配网：</b>操作键长按至少 2 秒，松开；看到确认快闪后，在 3 秒内再按一次。</li>
-      <li><b>连接热点：</b>手机 WiFi 设置选择 <code>BikePower-XXXXXX</code>，密码 <code>12345678</code>。“无互联网”属于正常现象，请选择保持连接。</li>
-      <li><b>使用自动弹窗：</b>连接热点后，手机会自动弹出配置窗口，直接按页面提示操作。若没有弹出，再打开 Safari 或 Chrome，手动输入 <code>http://192.168.4.1</code>；弹窗无法正常操作时，也可用完整浏览器打开。</li>
-      <li><b>选择运动和输出：</b>切换骑行 / 跑步，填写必要参数。骑行可选模拟固定模式、配速机器人或真实来源；自定义档用于设置强度范围。</li>
-      <li><b>保存并核对：</b>点击页面保存按钮，等待成功提示，再核对回显和 App 数据。失败时保留页面，检查输入后重试。</li>
-      <li><b>结束配网：</b>默认开放 5 分钟。需要更多时间时主动续期，并以实际倒计时为准；先保存成功，再点击“关闭 WiFi”并确认，或等待超时关闭。</li>
-    </ol>
-    <div class="guide-note">普通配网期间 BLE 继续工作。修改运动类型或广播服务，保存可能引起短暂断连，需要重新配对。热点关闭后，设备页暂时无法访问属于正常现象。</div>
+    <h2 class="mg-h" id="mg-wifi-title">手机修改配置</h2>
+    <div data-operation-guide="hotspot"></div>
+    <details class="guide-faq"><summary>设置骑行 · 播放步骤</summary><div data-operation-guide="cycling"></div></details>
+    <details class="guide-faq"><summary>保存与退出 · 播放步骤</summary><div data-operation-guide="exit"></div></details>
   </section>
 
   <section class="mg-sec" aria-labelledby="mg-bridge-title">
-    <h2 class="mg-h" id="mg-bridge-title"><span>04</span>接入真实功率计</h2>
-    <div class="guide-flow" aria-label="功率桥接流程"><span>真实功率计</span><b>→</b><span>盒子校正</span><b>→</b><span>骑行 App</span></div>
-    <ol class="guide-list">
-      <li><b>唤醒功率计：</b>转动曲柄让它广播；若被其他 App 占用，先断开。</li>
-      <li><b>选择真实来源：</b>在设备配网页主动扫描，选择支持 CPS 的功率计；无名称设备也可使用。点击测试，等待两份合法功率样本确认来源。</li>
-      <li><b>设置校正：</b>固定偏移：200 W + 10 W = 210 W；比例：200 W × 105% = 210 W。两种方式择一，也可不校正。</li>
-      <li><b>核对身份与心率：</b>按需复制已读取的设备信息或自定义盒子名称。真实来源默认关闭心率广播；手动开启后，心率仍来自模拟。</li>
-      <li><b>保存主备：</b>最多保存三台设备，可设首选、删除或替换。校正由三台共享；测试成功不等于正式切换，保存后核对原始值、校正值和连接状态，再让骑行 App 连接盒子的广播名称。</li>
-    </ol>
-    <div class="guide-note"><strong>停踩与断线保护：</strong>真实输入 0 W 时保持 0 W，固定偏移和比例均不作用于 0 W；旧样本超过 3 秒会清除。重启或断开后，按最近成功设备优先定向恢复，60 秒内最多两轮；失败后改为完整模拟输出，并每 60 秒轮转探测一台已保存设备。持久配置仍保留真实来源。仅桥接功率和同源踏频，恢复及 WiFi 共存需要实物确认。</div>
+    <h2 class="mg-h" id="mg-bridge-title">接入真实功率计</h2>
+    <div data-operation-guide="upstream"></div>
   </section>
 
   <section class="mg-sec" aria-labelledby="mg-run-title">
-    <h2 class="mg-h" id="mg-run-title"><span>05</span>切换跑步模式</h2>
-    <p class="guide-intro">设备配网页选择跑步，设置速度或配速模板、步频与心率，保存后重新搜索设备。跑步和骑行使用不同服务，旧配对可能需要重新建立。</p>
-    <ol class="guide-list">
-      <li><b>固定与配速：</b>固定模式设速度；配速模式选模板或自定义范围。配速数值越小，速度越快。</li>
-      <li><b>开始与暂停：</b>支持的 App 可通过 FTMS 开始 / 恢复或停止 / 暂停。暂停后速度、步频与步幅归零，距离和用时冻结。</li>
-      <li><b>重置：</b>清空累计距离和用时，保持此前的运行 / 暂停状态。暂停后重置仍需恢复才继续累计。</li>
-    </ol>
-    <div class="guide-note">App 对 RSC 与 FTMS 的支持不同。若只有心率被识别，先确认 App 是否支持跑步传感器，再核对运动类型和广播项。</div>
+    <h2 class="mg-h" id="mg-run-title">切换跑步</h2>
+    <div data-operation-guide="running"></div>
   </section>
   <section class="mg-sec" aria-labelledby="mg-compat-title">
-    <h2 class="mg-h" id="mg-compat-title">连接兼容性诊断</h2>
-    <p class="guide-intro">骑鬥或码表搜不到、连不上、连接后无数据时，先确认支持 BLE、搜索角色与当前运动模式。开发板只允许一个下游连接，先关闭占用它的网页或 App。</p>
-    <ol class="guide-list">
-      <li>电脑 Chrome / Edge 打开本站「设备比对」，填写目标、版本、系统和失败阶段，添加开发板与同一目标下正常的参考设备。</li>
-      <li>等待通知后冻结快照、分析服务与能力差异。读取失败和未授权会显示为未知；名称复制不会复制 GATT 或私有握手。</li>
-      <li>点击「释放连接并开始实测」，本站所有标签页暂停连接，刷新仍暂停。到目标端验证，再记录并导出诊断 JSON。</li>
-      <li>建议连续连接 5 次、稳定收数 30 分钟；关闭目标端连接后，结束实测并手动重新连接网页。</li>
-    </ol>
+    <h2 class="mg-h" id="mg-compat-title">连不上，先这样试</h2>
+    <div data-operation-guide="troubleshoot"></div>
+    <details class="guide-faq"><summary>电脑比对与诊断 · 播放步骤</summary><div data-operation-guide="compare"></div></details>
   </section>
 
   <section class="mg-sec" aria-labelledby="mg-check-title">
-    <h2 class="mg-h" id="mg-check-title"><span>06</span>拿起实物，逐项验收</h2>
-    <p class="guide-intro">在实物上操作后手动勾选。这里只记录本页自查，刷新后清除，不生成固件通过报告。</p>
+    <h2 class="mg-h" id="mg-check-title">动手确认一下</h2>
+    <details class="guide-faq"><summary>看懂指示灯 · 播放演示</summary><div data-operation-guide="lights"></div></details>
     <div class="guide-checks">
-      <label><input type="checkbox"><span><b>上电与连接：</b>广播时 LED 慢闪，App 连接后切换连接灯效。先确认未开启静默或自定义灯效。</span></label>
-      <label><input type="checkbox"><span><b>短按与调功：</b>模拟固定骑行模式核对目标值减一步；按住 0.5–2 秒松开核对目标值增加。瞬时输出可能包含浮动。</span></label>
-      <label><input type="checkbox"><span><b>确认与取消：</b>长按满 2 秒松开看到快闪，核对临时调功回滚；不再按，3 秒后恢复蓝牙，热点不应开启。</span></label>
-      <label><input type="checkbox"><span><b>二次确认：</b>重做长按，确认窗口内再按一次，手机可见热点并能访问 192.168.4.1，检查 App 数据是否继续。</span></label>
-      <label><input type="checkbox"><span><b>保存与持久化：</b>修改一个参数，保存成功后核对回显；重新上电再读配置，确认保留。</span></label>
-      <label><input type="checkbox"><span><b>桥接（使用时）：</b>核对校正、停踩 0 W、断开保护和重连；手机配网页与下游 App 同时在线观察。</span></label>
+      <label><input type="checkbox"><span>App 能连接，读数持续更新。</span></label>
+      <label><input type="checkbox"><span>长按松开，再按后能连接热点。</span></label>
+      <label><input type="checkbox"><span>保存成功，重新接电后设置仍在。</span></label>
+      <label><input type="checkbox"><span>使用真实功率计时，停踩回到 0 W。</span></label>
     </div>
-    <div class="guide-note">M5Stamp C3 默认：广播蓝色慢闪、连接绿色常亮、确认黄色快闪、配网青色慢闪。通用板仅用单色灯表示节奏。自定义灯效或静默时，以实际配置为准。</div>
+    <p class="guide-intro">动画是模拟教学，实际状态请在设备与 App 上确认。</p>
   </section>
 
   <section class="mg-sec" aria-labelledby="mg-faq-title">
-    <h2 class="mg-h" id="mg-faq-title"><span>07</span>遇到问题，从这里排查</h2>
-    <details class="guide-faq"><summary>找不到设备，或 App 连不上</summary><p>重新上电唤醒广播，确认没有被另一个 App 或电脑工具台占用下游连接。关闭其他连接再扫描。改过运动类型、广播项或名称后，在 App 里删除旧配对再搜索。</p></details>
-    <details class="guide-faq"><summary>连接热点后，没有自动弹出配置窗口</summary><p>确认 WiFi 已连接 BikePower 热点，并选择保持无互联网连接。没有自动弹窗时，打开 Safari 或 Chrome 手动访问 http://192.168.4.1；仍打不开再检查影响本地访问的 VPN 或代理。热点超时关闭后，需要重新长按并确认。</p></details>
-    <details class="guide-faq"><summary>长按了，为什么没有 WiFi</summary><p>满 2 秒先松开，等待确认提示，再在 3 秒内按一次。一直按住无法二次确认。不要把 RST 当成操作键；静默灯效时结合计时与热点判断。</p></details>
-    <details class="guide-faq"><summary>真实功率为 0，或扫描不到功率计</summary><p>转动曲柄唤醒，确认支持标准 Cycling Power Service。解除其他 App 占用，重新扫描并测试。核对上游连接与样本状态；无新样本时的 0 W 是保护输出，不能证明功率计正常。</p></details>
-    <details class="guide-faq"><summary>怎么升级，会不会清掉配置</summary><p>电脑 Chrome / Edge 配合数据 USB 线，选择正确板型并核对版本。擦除会丢失配置，按弹窗提示决定并先备份。这里刷写正式 Release 固件，页面更新不代表新固件已发布。</p></details>
-    <details class="guide-faq"><summary>演示能播放，就算验收通过吗</summary><p>不能。动画只解释默认操作。按钮、灯色、手机 Safari、训练 App 兼容性，以及真实功率计与 WiFi 共存都需要实物验证，请逐项确认上方清单。</p></details>
+    <h2 class="mg-h" id="mg-faq-title">注意事项</h2>
+    <div class="important-notes"><ul>
+      <li>配网要先松开，再在 3 秒内按一次。</li>
+      <li>热点“无互联网”正常，保持连接。</li>
+      <li>保存成功后再退出；关闭页面不会保存。</li>
+      <li>App 配对前，释放网页连接。</li>
+      <li>页面更新不会升级设备，界面以安装版本为准。</li>
+    </ul></div>
   </section>
 
   <section class="mg-sec" aria-labelledby="mg-facts-title">
@@ -1591,11 +1538,10 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
       <div><dt>最新正式固件</dt><dd id="mg-fw">正在读取 Release</dd></div>
       <div><dt>默认蓝牙名</dt><dd>BikePower</dd></div>
       <div><dt>配网地址</dt><dd>192.168.4.1</dd></div>
-      <div><dt>支持板型</dt><dd>通用 ESP32-C3 · M5Stamp C3</dd></div>
     </dl>
   </section>
 
-  <footer class="mg-foot"><a href="https://github.com/MengEn-Ink/bikepower-c" rel="noopener">GitHub · MengEn-Ink/bikepower-c</a><span>Web Bluetooth / Web Serial 仅桌面端</span><span data-page-release>本地预览 · 未发布</span></footer>
+  <footer class="mg-foot"><a href="https://github.com/MengEn-Ink/bikepower-c" rel="noopener">项目主页</a><span>安装与电脑工具请使用桌面 Chrome / Edge</span><span data-page-release>本地预览 · 未发布</span></footer>
 </div>
 <div class="wrap">
   <header class="masthead">
@@ -1699,7 +1645,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           <span class="gate-env-item" id="gate-env-serial"><i>…</i>Web Serial</span>
           <span class="gate-env-item" id="gate-env-https"><i>…</i>HTTPS</span>
         </div>
-        <p class="gate-env-note" id="gate-env-note">Safari、Firefox 和手机浏览器不支持蓝牙与串口，只能阅读手册。</p>
+        <p class="gate-env-note" id="gate-env-note">网页蓝牙与刷写能力分别检测。手机可连接开发板热点修改配置；手册和演示不需要设备授权。</p>
         <div class="gate-actions">
           <button class="btn primary big" id="gate-connect" type="button" onclick="gateConnectPicker()">连接蓝牙设备</button>
           <button class="btn ghost hidden" id="gate-repick" type="button" onclick="setGate('choose')">改为选择其他设备</button>
@@ -2073,7 +2019,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <ol class="toc-list" id="toc-list"></ol>
         <div class="toc-foot">
           <b>基础信息</b>
-          默认 BLE：BikePower<br>
+          蓝牙名称：BikePower<br>
           WiFi 热点：BikePower-XXXXXX<br>
           密码：12345678<br>
           配网地址：192.168.4.1
@@ -2083,16 +2029,27 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
       <!-- 中：正文 -->
       <article class="manual-content" id="manual-content">
         <section class="manual-hero">
-          <div class="eye"><i></i><span>BIKEPOWER · USER MANUAL</span></div>
-          <h1>像读<em>一本小书</em>，<br>熟悉这台骑行伙伴。</h1>
-          <p class="lead">这份手册面向第一次使用 BikePower 的普通骑行用户。按节顺序读下来大约 10 分钟，覆盖烧录、蓝牙连接、按钮操作、WiFi 配网、骑行与跑步模式、全部设置项与常见故障。遇到问题随时跳到对应章节即可。</p>
+          <h1>先看一次，<br>再<em>亲手操作</em>。</h1>
+          <p class="lead">播放短演示，跟着做。已预装的设备可直接连接 App。</p>
+          <section class="task-start" aria-label="选择使用任务">
+            <h2>今天想完成哪一步？</h2>
+            <div class="task-options">
+              <a href="#ch01"><span>第一次安装</span></a>
+              <a href="#operations"><span>连接 App、修改配置</span></a>
+              <a href="#ch11"><span>接入真实功率计</span></a>
+              <a href="#ch14"><span>搜不到 / 连不上</span></a>
+            </div>
+          </section>
+          <details class="platform-guide"><summary>我的手机或浏览器可以做什么？</summary>
+            <p><b>安装与电脑工具：</b>用电脑 Chrome / Edge。</p>
+            <p><b>手机配置：</b>连接设备热点，用 Safari / Chrome 打开 192.168.4.1。</p>
+          </details>
           <div class="manual-meta">
             <div><span>手册源码版本</span><b>v4.3.0</b></div>
-            <div><span>默认 BLE 名</span><b>BikePower</b></div>
+            <div><span>蓝牙名称</span><b>BikePower</b></div>
             <div><span>配网地址</span><b>http://192.168.4.1</b></div>
-            <div><span>章节</span><b>16 节 · 12 分钟</b></div>
           </div>
-          <div class="m-callout">网页刷写提供正式 Release。下文新版门户和三设备主备对应当前源码候选，仍待实物验收；页面更新不代表固件已发布。先核对设备版本，旧版本界面可能不同。</div>
+          <p class="operation-caution"><b>版本</b>页面更新不会升级设备，功能以已安装版本为准。</p>
 
           <!-- 蓝牙连接状态条：未连接时提示连接；连接后按设备角色推荐下一步 -->
           <div class="linkbar" id="manual-linkbar">
@@ -2159,6 +2116,11 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         </section>
 
         <!-- 01 -->
+        <section class="operation-heading" id="operations" aria-labelledby="operations-title">
+          <h2 id="operations-title">设备看动作，手机跟着点。</h2>
+          <div class="operation-demos" data-operation-demos><p>正在准备操作演示…</p></div>
+          <div class="important-notes"><h3>特别注意</h3><ul><li>配网：先松开，再在 3 秒内按一次。</li><li>热点“无互联网”正常，保持连接。</li><li>保存成功后再退出；App 配对前释放网页连接。</li></ul></div>
+        </section>
         <section class="ch" id="ch01">
           <header class="ch-head">
             <div class="ch-num">01</div>
@@ -3934,12 +3896,16 @@ const MODE_TITLE={manual:"使用手册",flash:"固件刷写",connect:"实时监�
 function routeFromHash(hash){
   const raw=String(hash||"").replace(/^#\/?/,"").trim().toLowerCase();
   if(/^ch\d{2}$/.test(raw))return {mode:"manual",chapter:raw};
+  if(raw==="operations")return {mode:"manual",chapter:"operations"};
   return {mode:MODE_ROUTES[raw]||"manual",chapter:null};
 }
 function applyRoute(){
   const route=routeFromHash(location.hash);
   if(route.mode!==currentMode)switchMode(route.mode,{fromRoute:true});
-  if(route.chapter)setTimeout(()=>scrollToChapter(route.chapter),60);
+  if(route.chapter)setTimeout(()=>{
+    if(route.chapter==="operations")(window.innerWidth<900?$("mg-button-title"):$("operations")).scrollIntoView({block:"start"});
+    else scrollToChapter(route.chapter);
+  },60);
 }
 function refreshLaunchpad(){
   const set=(key,on,text)=>{const el=document.querySelector('.launch-live[data-live="'+key+'"]');if(!el)return;el.classList.toggle("on",!!on);el.lastElementChild.textContent=text;};
@@ -4735,6 +4701,7 @@ function initManualOnce(){
 function scrollToChapter(id){
   const node=document.getElementById(id);
   if(!node)return;
+  if(node.tagName==="DETAILS")node.open=true;
   const top=node.getBoundingClientRect().top+window.scrollY-72;
   window.scrollTo({top,behavior:"smooth"});
 }
@@ -6079,12 +6046,12 @@ async function initLinkUi(){
   let skipped=false;try{skipped=sessionStorage.getItem(GATE_SKIP_KEY)==="1";}catch(e){}
   if(skipped)return;                                   // 本次会话已选择「稍后连接」
   gateReturnMode=route.mode!=="manual"?route.mode:null; // 深链进来的，连接后回到原工具页
-  if(!navigator.bluetooth){openGate({state:"unsupported"});return;}
+  if(!navigator.bluetooth){if(route.mode!=="manual")openGate({state:"unsupported"});return;}
   const known=await orderedAuthorizedDevices();
   if(compatibilityHandoffActive())return;
   if(isSingleConnected()||mirrorState)return;
   if(known.length&&autoLinkEnabled){const last=lastDevice();openGate({state:"auto",name:(last&&last.name)||known[0].name||"上次的设备"});}
-  else openGate({state:"choose"});
+  else if(route.mode!=="manual")openGate({state:"choose"});
 }
 
 /* ==================== 模板写入开发板 ==================== */
@@ -6509,7 +6476,7 @@ function renderGateEnv(){
   ];
   checks.forEach(([id,ok])=>{const el=$(id);if(el){el.classList.toggle("ok",!!ok);el.classList.toggle("bad",!ok);const i=el.querySelector("i");if(i)i.textContent=ok?"✓":"✕";}});
   const note=$("gate-env-note");
-  if(note)note.textContent=navigator.bluetooth?"环境检测通过。Safari、Firefox 和手机浏览器不支持蓝牙与串口，只能阅读手册。":"当前浏览器不支持蓝牙与串口：你仍可阅读手册；刷写和连接请改用桌面版 Chrome / Edge（HTTPS 页面）。";
+  if(note)note.textContent="网页蓝牙："+(navigator.bluetooth?"API 可用，连接需主动授权":"当前浏览器不支持")+"；网页刷写："+("serial" in navigator?"Web Serial 可用，推荐桌面 Chrome / Edge":"当前浏览器不支持 Web Serial")+"。手机配置请连接开发板热点，使用 192.168.4.1；手册和演示可直接查看。";
 }
 
 /* ---- 6 步聚光灯导览 ---- */
