@@ -265,8 +265,10 @@ async def run_protocol(args, folder, record, record_not_obtained):
         if args.security:
             # 重建后已加密重连，验证SC indication被发送（bonded peer）
             require(firmware_controller.encryption_checks>=1,'重建后未加密重连')
-            # 等待SC indication（GATT重建触发Service Changed）
-            # sc_indication_data 已在前面 subscribe 时初始化
+            # 等待SC indication（GATT重建触发Service Changed），给协议栈发送留出窗口
+            deadline=time.monotonic()+5.0
+            while not sc_indication_data and time.monotonic()<deadline:
+                await asyncio.sleep(0.1)
             sc_found = len(sc_indication_data) > 0
             if sc_found:
                 record('sc_indication_after_rebuild', {'received': sc_found, 'count': len(sc_indication_data)})

@@ -315,7 +315,8 @@ class DeviceSession:
         self.notify_started = False
 
     async def connect(self):
-        await self.connect_uncached(False)
+        # 配置端E2E始终禁用Windows BLE服务缓存，避免旧GATT被误读为设备状态
+        await self.connect_uncached(True)
         service_uuids = {service.uuid.lower() for service in self.client.services}
         require(CONFIG_SERVICE_UUID in service_uuids, "未发现 BikePower Config Service")
 
