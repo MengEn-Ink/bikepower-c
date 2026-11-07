@@ -58,8 +58,10 @@ def reader():
         stream.close()
 
 
-async def scan_device(scanner=BleakScanner, name=DEVICE_NAME, timeout=10.0):
-    """执行一次全新的设备扫描，不缓存上一轮结果。"""
+async def scan_device(scanner=BleakScanner, name=DEVICE_NAME, timeout=10.0, address=""):
+    """执行一次全新的设备扫描；显式地址不回退到同名设备。"""
+    if address:
+        return await scanner.find_device_by_address(address, timeout=timeout)
     device = await scanner.find_device_by_name(name, timeout=timeout)
     if device:
         return device
@@ -80,6 +82,8 @@ async def connect_cycle(device, client_factory=BleakClient, hold_seconds=5.0, sl
         if not connected:
             raise RuntimeError("连接调用完成但 is_connected=false")
         await sleep_fn(hold_seconds)
+        if not client.is_connected:
+            raise RuntimeError("保持窗口内连接已意外断开")
     finally:
         if client.is_connected:
             await client.disconnect()
@@ -97,6 +101,7 @@ async def run_reconnect_harness(
     hold_seconds=5.0,
     readvertise_wait=3.0,
     sleep_fn=asyncio.sleep,
+    address="",
 ):
     """执行两轮独立 scan/connect/disconnect，返回可供 fake harness 断言的结果。"""
     results = []
@@ -104,7 +109,7 @@ async def run_reconnect_harness(
     expected_address = None
     for cycle in (1, 2):
         print(f"第 {cycle} 次扫描设备...")
-        device = await scan_device(scanner=scanner, name=name, timeout=scan_timeout)
+        device = await scan_device(scanner=scanner, name=name, timeout=scan_timeout, address=address)
         if not device:
             raise RuntimeError(f"第 {cycle} 次扫描未发现设备")
         address = str(device.address)
@@ -138,8 +143,10 @@ async def main():
     parser.add_argument("--scan-timeout", type=float, default=10.0)
     parser.add_argument("--hold-sec", type=float, default=5.0)
     parser.add_argument("--readvertise-wait", type=float, default=3.0)
+    parser.add_argument("--address", default="", help="精确BLE目标，不回退同名设备")
+    parser.add_argument("--no-serial", action="store_true", help="只验证BLE链路，不打开串口")
     args = parser.parse_args()
-    port = args.port or detect_port()
+    port = None if args.no_serial else args.port or detect_port()
     print(f"串口: {port or '未找到（仅验证 BLE 链路）'}")
 
     stop.clear()
@@ -153,6 +160,8 @@ async def main():
             scan_timeout=args.scan_timeout,
             hold_seconds=args.hold_sec,
             readvertise_wait=args.readvertise_wait,
+            address=args.address,
+            client_factory=lambda device: BleakClient(device, winrt={"use_cached_services": False}),
         )
     except Exception as exc:
         print(f"重连门禁失败: {type(exc).__name__}: {exc}")

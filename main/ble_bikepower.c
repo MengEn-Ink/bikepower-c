@@ -942,6 +942,9 @@ static void build_active_gatt_svcs(void)
     const bool power_on = (g_broadcast_mask & BROADCAST_FIELD_POWER) != 0;
     const bool cadence_on = (g_broadcast_mask & BROADCAST_FIELD_CADENCE) != 0;
     const bool hr_on = (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) != 0;
+    // 兼容模式：踏频由 CPS 曲柄字段承载，不注册独立 CSC，避免码表按 CSC 优先分类。
+    const bool csc_on = cadence_on
+        && !(power_on && (g_broadcast_mask & BROADCAST_FIELD_CADENCE_WITH_POWER));
 
     if (g_profile == SPORT_PROFILE_RUNNING) {
         if (power_on || cadence_on) g_active_svcs[idx++] = running_gatt_svcs[0]; // RSC
@@ -951,7 +954,7 @@ static void build_active_gatt_svcs(void)
     } else {
         if (power_on)               g_active_svcs[idx++] = cycling_gatt_svcs[0]; // CPS
         if (hr_on)                  g_active_svcs[idx++] = cycling_gatt_svcs[1]; // HRS
-        if (cadence_on)             g_active_svcs[idx++] = cycling_gatt_svcs[2]; // CSC
+        if (csc_on)                 g_active_svcs[idx++] = cycling_gatt_svcs[2]; // CSC
         if ((power_on || cadence_on) && !g_bridge_mode) g_active_svcs[idx++] = cycling_gatt_svcs[3]; // FTMS
         g_active_svcs[idx++] = cycling_gatt_svcs[4]; // DIS（始终）
     }
@@ -1311,6 +1314,28 @@ static void mark_start_failed(const char *reason, int rc)
 }
 
 /**
+ * 在 Host 确认真实外设连接后发布应用连接状态。
+ * 重复确认不清空已登记的订阅和控制事务。
+ */
+static bool connection_accept(uint16_t connection)
+{
+    if (g_stopping || !g_ready || connection == BLE_HS_CONN_HANDLE_NONE) return false;
+    uint16_t current = g_conn_handle;
+    if (current != BLE_HS_CONN_HANDLE_NONE && current != connection) return false;
+    struct ble_gap_conn_desc desc;
+    if (ble_gap_conn_find(connection, &desc) != 0 || desc.role != BLE_GAP_ROLE_SLAVE) return false;
+    if (current == connection) return true;
+    indication_reset();
+    g_ftms_subscribed = false;
+    g_ftms_control = false;
+    g_ftms_pending = false;
+    g_conn_handle = connection;
+    ble_telemetry_service_connect(connection);
+    ESP_LOGI(TAG, "设备已连接 handle=%u", connection);
+    return true;
+}
+
+/**
  * 处理 GAP 连接与广播事件。
  * 维护当前连接句柄，并在连接失败、断开或广播结束时重新启动广播。
  * event：GAP 事件对象。
@@ -1323,22 +1348,22 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
     (void)arg;
     int rc;
     switch (event->type) {
-    case BLE_GAP_EVENT_CONNECT:
-        if (event->connect.status == 0) {
-            indication_reset();
-            g_ftms_subscribed = false;
-            g_ftms_control = false;
-            g_ftms_pending = false;
-            g_conn_handle = event->connect.conn_handle;
-            ble_telemetry_service_connect(event->connect.conn_handle);
-            ESP_LOGI(TAG, "设备已连接 handle=%d", g_conn_handle);
-        } else {
-            ESP_LOGW(TAG, "连接失败 status=%d，重新广播", event->connect.status);
+    case BLE_GAP_EVENT_CONNECT: {
+        uint16_t connection = event->connect.conn_handle;
+        int status = event->connect.status;
+        bool recoverable = status == 0 || status == BLE_ERR_UNSUPP_REM_FEATURE;
+        if (recoverable && connection_accept(connection)) {
+            if (status != 0) ESP_LOGW(TAG, "远端特征状态=%d，Host连接仍有效 handle=%u", status, connection);
+        } else if (g_conn_handle == BLE_HS_CONN_HANDLE_NONE && !g_stopping) {
+            ESP_LOGW(TAG, "连接未建立 status=%d，重新广播", status);
             rc = start_advertising();
-            if (rc != 0 && !g_stopping) mark_start_failed("连接失败后重广播失败", rc);
+            if (rc != 0) mark_start_failed("连接失败后重广播失败", rc);
         }
         return 0;
+    }
     case BLE_GAP_EVENT_DISCONNECT:
+        if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE
+                && event->disconnect.conn.conn_handle != g_conn_handle) return 0;
         ESP_LOGI(TAG, "设备已断开 reason=%d", event->disconnect.reason);
         g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
         indication_reset();
@@ -1351,10 +1376,16 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         if (rc != 0 && !g_stopping) mark_start_failed("断开后重广播失败", rc);
         return 0;
     case BLE_GAP_EVENT_ADV_COMPLETE:
+        if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE) return 0;
         rc = start_advertising();
         if (rc != 0 && !g_stopping) mark_start_failed("广播完成后重广播失败", rc);
         return 0;
     case BLE_GAP_EVENT_SUBSCRIBE:
+        if (g_conn_handle == BLE_HS_CONN_HANDLE_NONE
+                && (event->subscribe.cur_notify || event->subscribe.cur_indicate)) {
+            (void)connection_accept(event->subscribe.conn_handle);
+        }
+        if (g_stopping || !g_ready || g_conn_handle == BLE_HS_CONN_HANDLE_NONE) return 0;
         if (event->subscribe.conn_handle == g_conn_handle) {
             subscription_update(event->subscribe.attr_handle, event->subscribe.cur_notify != 0);
             ble_telemetry_service_subscribe(event->subscribe.attr_handle, event->subscribe.cur_notify != 0);
@@ -1408,14 +1439,17 @@ static int start_advertising(void)
     const bool power_on = (g_broadcast_mask & BROADCAST_FIELD_POWER) != 0;
     const bool cadence_on = (g_broadcast_mask & BROADCAST_FIELD_CADENCE) != 0;
     const bool hr_on = (g_broadcast_mask & BROADCAST_FIELD_HEARTRATE) != 0;
+    // 与 GATT 注册保持一致：兼容模式下 CSC 不出现，踏频仍随 CPS/FTMS 数据输出。
     ble_uuid16_t adv_uuids[3];
+    const bool csc_on = cadence_on
+        && !(power_on && (g_broadcast_mask & BROADCAST_FIELD_CADENCE_WITH_POWER));
     int adv_uuid_count = 0;
     if (g_profile == SPORT_PROFILE_RUNNING) {
         if (power_on || cadence_on) adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(RSC_SERVICE_UUID);
         if (power_on || cadence_on) adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(FTMS_SERVICE_UUID);
     } else {
         if (power_on)               adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(POWER_SERVICE_UUID);
-        if (cadence_on)             adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(CSC_SERVICE_UUID);
+        if (csc_on)                 adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(CSC_SERVICE_UUID);
         if ((power_on || cadence_on) && !g_bridge_mode) adv_uuids[adv_uuid_count++] = (ble_uuid16_t)BLE_UUID16_INIT(FTMS_SERVICE_UUID);
     }
     static ble_uuid16_t scan_rsp_uuids[] = {
@@ -1579,8 +1613,8 @@ void ble_bikepower_set_bridge_data(const bridge_snapshot_t *snapshot, uint8_t he
 
 void ble_bikepower_set_broadcast_mask(int mask)
 {
-    int normalized = mask & BROADCAST_FIELD_ALL;
-    if (normalized == 0) normalized = BROADCAST_FIELD_ALL;
+    int normalized = mask & BROADCAST_FIELD_VALID;
+    if ((normalized & BROADCAST_FIELD_ALL) == 0) normalized = BROADCAST_FIELD_ALL;
     g_broadcast_mask = (uint8_t)normalized;
 }
 

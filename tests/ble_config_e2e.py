@@ -11,6 +11,7 @@ import re
 import secrets
 import struct
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -248,7 +249,15 @@ def expected_firmware_name(board):
     )
 
 
-def reset_device(port):
+def reset_device(port, method="serial"):
+    if method == "rom":
+        result = subprocess.run(
+            [sys.executable, "-m", "esptool", "--chip", "esp32c3", "--port", port, "run"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=45,
+        )
+        require(result.returncode == 0, "ROM复位失败: " + result.stdout + result.stderr)
+        return
+    require(method == "serial", "不支持的复位方式")
     import serial
 
     serial_port = serial.Serial(port, 115200, timeout=1)
@@ -263,10 +272,11 @@ def reset_device(port):
 
 
 class DeviceSession:
-    def __init__(self, device_name, scan_timeout):
+    def __init__(self, device_name, scan_timeout, address="", reset_method="serial"):
         self.device_name = device_name
         self.scan_timeout = scan_timeout
-        self.address = ""
+        self.address = address
+        self.reset_method = reset_method
         self.client = None
         self.responses = asyncio.Queue()
         self.notify_started = False
@@ -279,8 +289,8 @@ class DeviceSession:
                 lambda candidate, _adv: candidate.address == self.address,
                 timeout=self.scan_timeout,
             )
-            if device:
-                return device
+            require(device is not None, "指定BLE地址未广播，不回退到其他同名设备")
+            return device
         device = await BleakScanner.find_device_by_filter(
             lambda candidate, adv: (adv.local_name or candidate.name or "") == self.device_name,
             timeout=self.scan_timeout,
@@ -295,7 +305,9 @@ class DeviceSession:
             return
         device = await self._find_device()
         self.address = device.address
-        self.client = BleakClient(device)
+        self.client = BleakClient(device, timeout=max(20.0, self.scan_timeout),
+                                  winrt={"use_cached_services": False})
+        print("[ble-config-e2e] 正在建立精确目标连接", flush=True)
         await self.client.connect()
         self.responses = asyncio.Queue()
         self.notify_started = False
@@ -337,11 +349,14 @@ class DeviceSession:
         return await self.wait_response(request, transaction_id)
 
     async def read_snapshot(self):
-        meta = parse_meta(await self.client.read_gatt_char(CONFIG_META_UUID))
+        raw_meta = bytes(await self.client.read_gatt_char(CONFIG_META_UUID))
+        meta = parse_meta(raw_meta)
         groups = {
             key: bytes(await self.client.read_gatt_char(uuid))
             for key, uuid in CONFIG_GROUP_UUIDS.items()
         }
+        require(raw_meta == bytes(await self.client.read_gatt_char(CONFIG_META_UUID)),
+                "八组读取期间Meta改变，拒绝混合快照")
         validate_groups(groups)
         return meta, groups
 
@@ -381,7 +396,7 @@ async def verify_firmware(session, expected):
 
 async def verify_snapshot(session, expected, label):
     meta, actual = await session.read_snapshot()
-    require(actual == expected, f"{label} 六组配置与期望不一致")
+    require(actual == expected, f"{label} 八组配置与期望不一致")
     print(f"[ble-config-e2e] PASS {label}（revision {meta['revision']}）")
     return meta
 
@@ -397,7 +412,7 @@ async def restore_original(session, original, port, settle_seconds):
             await reconnect(session, settle_seconds)
     await verify_snapshot(session, original, "恢复后读取")
     await session.disconnect()
-    await asyncio.to_thread(reset_device, port)
+    await asyncio.to_thread(reset_device, port, session.reset_method)
     await asyncio.sleep(settle_seconds)
     await session.connect()
     await verify_snapshot(session, original, "恢复后重启持久化")
@@ -405,7 +420,8 @@ async def restore_original(session, original, port, settle_seconds):
 
 
 async def run_e2e(args):
-    session = DeviceSession(args.device_name, args.scan_timeout)
+    session = DeviceSession(args.device_name, args.scan_timeout,
+                            getattr(args, "address", ""), getattr(args, "reset_method", "serial"))
     original = None
     primary_error = None
     cleanup_error = None
@@ -414,7 +430,7 @@ async def run_e2e(args):
         await verify_firmware(session, expected_firmware_name(args.board))
         meta, original = await session.read_snapshot()
         print(
-            "[ble-config-e2e] PASS 六组配置全量读取 "
+            "[ble-config-e2e] PASS 八组配置全量读取 "
             f"schema={meta['schema']} revision={meta['revision']}"
         )
         base_revision = meta["revision"]
@@ -462,16 +478,16 @@ async def run_e2e(args):
 
         modified = make_modified_groups(original)
         response = await session.commit_all(modified, base_revision)
-        require(response["result"] == RESULT_SUCCESS, f"六组修改提交失败: {response}")
+        require(response["result"] == RESULT_SUCCESS, f"八组修改提交失败: {response}")
         require(response["revision"] != base_revision, "成功提交未推进 revision")
         require(response["restart_flags"] & RESTART_NAME, "设备名修改未返回刷新提示")
-        require(not response["restart_flags"] & RESTART_GATT, "普通六组修改意外触发 GATT 重建")
-        await verify_snapshot(session, modified, "六组修改后读取")
+        require(not response["restart_flags"] & RESTART_GATT, "普通八组修改意外触发 GATT 重建")
+        await verify_snapshot(session, modified, "八组修改后读取")
 
         await reconnect(session, args.settle_seconds)
         await verify_snapshot(session, modified, "重新连接后读取")
         await session.disconnect()
-        await asyncio.to_thread(reset_device, args.port)
+        await asyncio.to_thread(reset_device, args.port, session.reset_method)
         await asyncio.sleep(args.settle_seconds)
         await session.connect()
         meta_persisted = await verify_snapshot(session, modified, "设备重启后 NVS 读取")
@@ -488,13 +504,13 @@ async def run_e2e(args):
             "GATT 重建后的 HRS 注册状态与 broadcast_mask 不一致",
         )
         print("[ble-config-e2e] PASS 广播掩码触发断连、重广播与服务表重建")
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         primary_error = exc
     finally:
         if original is not None:
             try:
                 await restore_original(session, original, args.port, args.settle_seconds)
-            except Exception as exc:
+            except (Exception, asyncio.CancelledError) as exc:
                 cleanup_error = exc
         await session.disconnect()
 
@@ -519,6 +535,9 @@ def parse_args():
     parser.add_argument("--port", required=True, help="用于重启并验证 NVS 的开发板串口")
     parser.add_argument("--board", choices=("generic-c3", "m5stamp-c3"), default="")
     parser.add_argument("--device-name", default="BikePower")
+    parser.add_argument("--address", default="", help="精确BLE目标，首次及后续连接不回退同名设备")
+    parser.add_argument("--reset-method", choices=("serial", "rom"), default="serial",
+                        help="复位方式；USB Serial/JTAG可选esptool ROM run，不烧录")
     parser.add_argument("--scan-timeout", type=float, default=20.0)
     parser.add_argument("--settle-seconds", type=float, default=4.0)
     return parser.parse_args()
