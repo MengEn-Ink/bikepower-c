@@ -98,6 +98,16 @@ def main():
         assert populated_modified[key][1:9] == bound_modified[key][1:9]
         assert populated_modified[key][10:] != bound_modified[key][10:]
 
+    for percent in (500, 1500, 1877, 3000):
+        boundary = fixture_groups()
+        bridge = bytearray(boundary["bridge"])
+        struct.pack_into("<H", bridge, 13, percent)
+        boundary["bridge"] = bytes(bridge)
+        updated = make_modified_groups(boundary)
+        assert 500 <= struct.unpack_from("<H", updated["bridge"], 13)[0] <= 3000
+        assert updated["bridge"][13:15] != boundary["bridge"][13:15]
+        assert updated["bridge"][10:13] == boundary["bridge"][10:13]
+
     invalid = make_invalid_groups(original)
     assert struct.unpack_from("<H", invalid["core"], 1)[0] == 0xFFFF
     assert invalid["profile"] == original["profile"]

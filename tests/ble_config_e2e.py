@@ -183,7 +183,7 @@ def make_modified_groups(original):
     current_name = decode_counted_string(bytes(modified["identity"]), 1, 23)
     e2e_name = "BikePower-E2E" if current_name != "BikePower-E2E" else "BikePower-E2F"
     modified["identity"] = bytearray(encode_identity(e2e_name))
-    _toggle_u16(modified["bridge"], 13, 500, 1500)
+    _toggle_u16(modified["bridge"], 13, 500, 3000)
     primary = modified["bridge"]
     if not primary[2]:
         name = b"E2E-Primary"
