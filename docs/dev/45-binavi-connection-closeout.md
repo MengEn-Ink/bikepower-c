@@ -2,7 +2,7 @@
 
 更新日期：2026-11-07
 结项版本：v4.3.2 预发布（tag `v4.3.2` → `5fed5c3`）
-相关记录：[连接状态修复过程](44-binavi-connection-fix.md)、[发版记录](../../tests/reports/binavi-release-prep-20261107/v4.3.2-release.md)
+相关记录：[连接状态修复过程](44-binavi-connection-fix.md)、[发版记录](https://github.com/MengEn-Ink/bikepower-c/releases/tag/v4.3.2)
 
 ## 结论
 
