@@ -195,6 +195,8 @@ echo "=== 构建前测试门禁：host / mock / static ==="
 make -C test run
 python3 tests/test_device_telemetry.py
 python3 tests/test_bridge_session.py
+python3 tests/test_ble_connection_recovery.py
+python3 tests/test_ble_standard_contract.py
 python3 tests/check_portal_render.py
 python3 tests/test_portal_config_save.py
 python3 tests/test_core_flow_endurance.py \
@@ -209,6 +211,7 @@ python3 tests/check_board_desc.py
 python3 tests/check_ble_advertising_fields.py
 python3 tests/test_ble_protocol_vectors.py
 python3 tests/test_ble_config_e2e.py
+python3 tests/test_ble_e2e_transport.py
 python3 tests/test_ble_reconnect_harness.py
 python3 tests/test_ble_running_harness.py
 python3 tests/test_device_profile_harness.py

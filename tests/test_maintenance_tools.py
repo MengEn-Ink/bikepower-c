@@ -38,6 +38,25 @@ class MaintenanceToolsTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             parse(["--level", "unknown"])
 
+    def test_connection_recovery_has_formal_gate_entries(self):
+        script = "tests/test_ble_connection_recovery.py"
+        quality = ast.parse((ROOT / "scripts/tools/quality_gate.py").read_text())
+        lists = {target.id: ast.literal_eval(node.value) for node in quality.body
+                 if isinstance(node, ast.Assign) and isinstance(node.value, ast.List)
+                 for target in node.targets if isinstance(target, ast.Name)
+                 and target.id in {"STATIC_CHECKS"}}
+        self.assertIn(script, [row[0] for row in lists["STATIC_CHECKS"]])
+        operation = ast.parse((ROOT / "tests/operation_gate.py").read_text())
+        quick = next(node for node in operation.body
+                     if isinstance(node, ast.FunctionDef) and node.name == "quick_steps")
+        commands = [node.args[2].value for node in ast.walk(quick)
+                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id == "run_step" and len(node.args) > 2
+                    and isinstance(node.args[2], ast.Constant)]
+        self.assertIn("python3 " + script, commands)
+        self.assertIn("python3 " + script, (ROOT / "scripts/build_all.sh").read_text())
+        self.assertIn("tests/operation_gate.py", (ROOT / ".github/workflows/ci.yml").read_text())
+
     def test_markdown_links_check_fragments_and_ignore_code(self):
         tool = load("check_markdown_links")
         with tempfile.TemporaryDirectory() as temp:

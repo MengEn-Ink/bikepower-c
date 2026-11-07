@@ -133,7 +133,10 @@ def main():
             skip_git_check=True,
         )
         assert len(artifacts) == 10
-        print(f"{TAG} PASS 标准 release 样例通过")
+        assert (release_dir / "images/web-flash-serial-port.jpg").is_file()
+        with zipfile.ZipFile(release_dir / f"bikepower-c-v{VERSION}.zip") as archive:
+            assert "images/web-flash-serial-port.jpg" in archive.namelist()
+        print(f"{TAG} PASS 标准release样例与跨平台POSIX图像路径通过")
 
         tampered = release_dir / f"generic-c3-v{VERSION}.bin"
         tampered.write_bytes(b"tampered")

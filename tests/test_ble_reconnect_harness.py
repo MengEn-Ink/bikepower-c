@@ -30,6 +30,11 @@ class FakeScanner:
         return device
 
     @classmethod
+    async def find_device_by_address(cls, address, timeout):
+        assert address == "fake-device"
+        return await cls.find_device_by_name("BikePower", timeout)
+
+    @classmethod
     async def discover(cls, timeout):
         del timeout
         raise AssertionError("精确扫描已成功，不应进入 fallback discover")

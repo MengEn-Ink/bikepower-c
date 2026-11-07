@@ -1,5 +1,13 @@
 # 测试脚本使用说明
 
+## BINAVI连接修复与上线前验证
+
+- `python3 tests/test_ble_connection_recovery.py`：生产函数Host确认、状态26、真实失败、早到订阅、幂等确认及异句柄隔离；已接入quick/full、质量门禁和双板构建前测试。
+- `python3 tests/ble_config_e2e.py --port <串口> --board generic-c3 --address <目标BLE地址> --reset-method rom`：禁缓存八组事务、Meta前后稳定核验、重启持久化和原配置恢复；ROM方式用当前解释器调用esptool，不烧录。取消异常也必须完成原配置恢复；WinRT重连建议`--scan-timeout 30 --settle-seconds 8`，失败仍保留而非自动假绿。
+- `python3 tests/stage3_conn_test.py --address <目标BLE地址> --no-serial --hold-sec 8`：两次独立精确扫描、连接、断开；无串口参数时不得冒充串口状态验证。
+- `python3 tests/test_ble_e2e_transport.py`：离线验证精确目标不回退、缓存参数、复位及Meta fence；真实BLE端到端仍须另跑。
+- 正式发布仍需最终提交/版本绑定、双板固件及全部P0证据；当前准备不自动提交/发布，不把BINAVI首次分类、多角色、详情/校准列为已解决。
+
 ## 骑行端适配采集回归
 
 - `node tests/test_pages_capture_browser.cjs`：实际Pages两侧只读采集、默认逐台、双连失败保留、稳定标识、刷新、单側导入导出与差异展示，外部BLE为替身，采样等待加速；已接入浏览器入口。

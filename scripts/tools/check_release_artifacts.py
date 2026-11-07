@@ -219,7 +219,7 @@ def validate_release_artifacts(
 
     manifest = parse_manifest(release_dir / "manifest.txt")
     manifest_required = [name for name in expected if name != "manifest.txt"]
-    image_rel_names = [str(path.relative_to(release_dir)) for path in iter_image_files(release_dir)]
+    image_rel_names = [path.relative_to(release_dir).as_posix() for path in iter_image_files(release_dir)]
     for rel_name in manifest_required + image_rel_names + evidence_rel_names:
         if rel_name not in manifest:
             raise ReleaseGateError(f"manifest.txt 缺少记录: {rel_name}")
