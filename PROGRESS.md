@@ -1,9 +1,36 @@
 # BikePower C — 项目进度
 
 > 当前行为：[技术参考](docs/dev/01-technical-reference.md)；早期重写背景见 [归档](docs/archive/01-cidf-nimble-rewrite.md)
-> 当前固件版本：v4.3.2（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v4.3.3（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
+
+## 2026-11-07 v4.3.3 持久绑定续接（执行中）
+
+- [x] pair-only受控测试全程不写配置、不重建GATT；Windows首次加密成功，第二次建链后尝试恢复加密，HCI Encryption Change返回0x06/enabled0，随后Windows主动拆链。采集无事件丢失；StartEncryption及Pair参数被提供程序裁剪，不从短载荷推断密钥/EDIV/Rand。
+- [x] 用户授权受控持久绑定修复与测试，覆盖此前无NVS绑定限制；仅清本次诊断新建Windows配对，手机与用户配置不改。最新4MiB Flash私有备份已保存校验。
+- [x] 生产候选接标准NimBLE独立绑定namespace，容量4、ENC/ID分发、SC Just Works和FTMS WRITE_ENC保持；本机广播仍public，不启用本机RPA。满容量拒绝新增、不自动删除旧绑定；启动逐记录恢复校验、同身份更新落盘回读、写入失败保护已接线。
+- [x] 新专项生产函数ASan/UBSan和实际IDF容量/重复配对前置分支通过；不代表完整无线或故障注入真机验收。
+- [x] 最新独立候选4.3.3/e3c0551 dirty构建完成，app1151328字节、125个bt编译单元不再带BONDING0，WARN/自动WiFi OFF、分区保持；首构建环境warning已补进程路径后消除，旧日志保留。
+- [x] 第一持久绑定候选44145c…已刷，首次/独立复连/重启后三次HCI加密status0/enabled1、每次CPS8帧、原八组保持；服务表重建后的WinRT全量发现异常仍FAIL。第一次配置E2E测试上界错误1877修正至生产范围500–3000；原失败保存。
+- [x] Service Changed新候选41209d…已刷，完整配置E2E（写入/错误路径/重启/GATT重建/恢复）通过，但运行时电脑无配对，不代表绑定跨表变化通过。恢复前的失败中只清测试电脑记录；经Flash确认仅本轮新增一个测试peer，用私有定向收尾镜像清该peer并保留本机IRK。回刷增量构建曾因复制时间戳复用收尾镜像，hash核查抓到，强制重编译后41209d…逐字节回读，主生产无清理逻辑，原日志保留。
+- [x] 新源码离线full43/0、Host6237/0、mock48轮600.0秒通过；首full因子进程解释器缺serial/bleak及cJSON路径5FAIL保留，修正进程PATH/IDF_PATH后原断言通过。浏览器仍1.52环境，锁定1.64.1未完成。
+- [x] 新Service Changed候选正常pair后五轮四路通知总计300.031秒、各路每轮60–61帧，全部控制响应正确、功率318–324W、空闲堆最小153116字节、发送/分配失败0；原八组恢复并重启回读，独立postsoak再次一致，不在轮间清绑定。首漏pair失败ATT0x05原件保留，未降认证。
+- [x] 已绑定状态完整八组E2E（错误路径/修改/复连/重启/GATT重建/服务重新发现/原配置恢复）全部通过，未清配对；独立postbondede2e回读一致。WARN候选ROM启动标志完整、20秒未发现panic/WDT/Backtrace。
+- [x] 用户收到当前持久绑定候选自动验证结果后明确回复“继续发布，继续发版”。鬥骑复测仍跳过，不记新手机PASS。
+- [ ] 最终已提交镜像构建与完整P0、tag/Release/下载/Pages仍待执行。
+- 鬥骑本新候选按用户要求跳过复测；旧手机通过仅作历史。后续未完成项按本节新事实更新，不用下面旧构建/无绑定回归替代。
+
+## 2026-11-07 v4.3.3 本轮正式发版门禁（历史准备轮）
+
+- [x] 用户指定通用C3、v4.3.3正式版；跳过鬥骑新版本复测，不沿用旧镜像PASS。
+- [x] 现场Windows目标仍为已配对；用户授权仅清该旧配对，完整八组/DIS/默认序列号快照立即恢复读取，未写配置，手机未改。
+- [x] 本轮4MiB完整Flash私有备份读取成功、大小与SHA256已核验。
+- [x] 4.3.3/e3c0551 dirty独立候选构建完成、125个bt单元安全定义核验，正式WARN日志/禁止自动WiFi保持；295/0一致性通过，首次三处文档漂移失败保留。
+- [x] 留板4.3.2/669127d受控复核：普通双次新连接通过；首次SC控制Request/Start/320W/Stop通过（323W），断开前原配置恢复提交已确认；第二次新连接GATT Unreachable失败。清理测试新建Windows配对后原八组/DIS/串号独立回读一致、连接释放。
+- [x] 离线full最终43项通过/0失败，Host6237/0；10分钟mock48轮600.2秒、序列号/真实NimBLE安全分支通过。9组浏览器原断言使用playwright1.52.0与预装Chromium通过；锁定1.64.1缺Chromium的安装等待被中止，锁文件未改，该依赖版本浏览器运行未完成。
+- [ ] 正式发布暂停：候选4.3.3尚未刷写、未形成本轮完整P0。加密后重复连接缺陷不能靠每轮unpair放行；当前commit/tag/Release/Pages均未执行。
+- 无实物m5stamp不参与本轮正式发行；人工按钮/LED/热点/跑步App等不得沿用历史通过。
 
 ## 2026-11-07 鬥骑会话加密修复与用户验收
 

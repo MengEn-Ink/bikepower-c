@@ -238,9 +238,11 @@ check("for cycle in (1, 2)" in stage3_conn_src
       and "client.is_connected" in stage3_conn_src
       and "无串口时不阻断" in stage3_conn_src,
       "stage3_conn_test.py 必须执行两次独立扫描/连接/断开，串口日志仅作为增强证据")
-check("CONFIG_BT_NIMBLE_NVS_PERSIST=n" in sdkconfig_defaults_src
-      and "CONFIG_BT_NIMBLE_HS_PVCY=n" in sdkconfig_defaults_src,
-      "sdkconfig.defaults 必须关闭 NimBLE privacy/RPA，避免关闭 NVS 持久化时 IRK 写入 warning 影响广播")
+check("CONFIG_BT_NIMBLE_NVS_PERSIST=y" in sdkconfig_defaults_src
+      and "CONFIG_BT_NIMBLE_MAX_BONDS=4" in sdkconfig_defaults_src
+      and "CONFIG_BT_NIMBLE_HS_PVCY=y" in sdkconfig_defaults_src
+      and "CONFIG_BT_NIMBLE_HANDLE_REPEAT_PAIRING_DELETION=n" in sdkconfig_defaults_src,
+      "sdkconfig.defaults 必须启用有界绑定/身份密钥恢复，禁止自动删除已有绑定")
 check('#include "esp_random.h"' in app_main_src
       and '#include "domain_rng.h"' in app_main_src
       and "domain_rng_seed(esp_random())" in app_main_src,

@@ -11,8 +11,3 @@ endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(bikepower-c)
-
-# 配对只建立会话加密，不保存绑定；与 MAX_BONDS=0 和 sm_bonding=0 保持一致。
-# 仅作用于本项目 NimBLE 组件，避免上游容量检查拒绝无绑定配对。
-idf_component_get_property(bikepower_bt_lib bt COMPONENT_LIB)
-target_compile_definitions(${bikepower_bt_lib} PRIVATE MYNEWT_VAL_BLE_SM_BONDING=0)

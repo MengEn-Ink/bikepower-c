@@ -16,12 +16,14 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_timer.h"
+#include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
 #include "host/util/util.h"
+#include "store/config/ble_store_config.h"
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 
@@ -38,31 +40,261 @@
 
 static const char *TAG = "BLE";
 
-static int session_security_store_read(int obj_type, const union ble_store_key *key,
-                                       union ble_store_value *value)
+void ble_store_config_init(void);
+static atomic_bool s_security_store_failed;
+static esp_err_t security_store_sync_value(int obj_type, const union ble_store_value *value);
+
+static int security_store_read(int obj_type, const union ble_store_key *key,
+                               union ble_store_value *value)
 {
     if (!key || !value) return BLE_HS_EINVAL;
-    switch (obj_type) {
-    case BLE_STORE_OBJ_TYPE_OUR_SEC:
-    case BLE_STORE_OBJ_TYPE_PEER_SEC:
-    case BLE_STORE_OBJ_TYPE_CCCD:
-    case BLE_STORE_OBJ_TYPE_PEER_DEV_REC:
-    case BLE_STORE_OBJ_TYPE_PEER_ADDR:
-    case BLE_STORE_OBJ_TYPE_LOCAL_IRK:
-    case BLE_STORE_OBJ_TYPE_CSFC:
-        return BLE_HS_ENOENT;
-    default:
-        return BLE_HS_ENOTSUP;
-    }
+    if (s_security_store_failed) return BLE_HS_ESTORE_FAIL;
+    return ble_store_config_read(obj_type, key, value);
 }
 
-static void configure_session_security(void)
+static int security_store_write(int obj_type, const union ble_store_value *value)
 {
+    if (!value) return BLE_HS_EINVAL;
+    if (s_security_store_failed) return BLE_HS_ESTORE_FAIL;
+    int rc = ble_store_config_write(obj_type, value);
+    if (rc == 0 && security_store_sync_value(obj_type, value) != ESP_OK) {
+        rc = BLE_HS_ESTORE_FAIL;
+    }
+    if (rc != 0 && rc != BLE_HS_ESTORE_CAP && rc != BLE_HS_ENOTSUP) {
+        s_security_store_failed = true;
+        ESP_LOGE(TAG, "绑定存储写入失败 type=%d rc=%d，拒绝后续加密恢复", obj_type, rc);
+    }
+    return rc;
+}
+
+static int security_store_delete(int obj_type, const union ble_store_key *key)
+{
+    if (!key) return BLE_HS_EINVAL;
+    if (s_security_store_failed) return BLE_HS_ESTORE_FAIL;
+    int rc = ble_store_config_delete(obj_type, key);
+    if (rc != 0 && rc != BLE_HS_ENOENT && rc != BLE_HS_ENOTSUP) {
+        s_security_store_failed = true;
+        ESP_LOGE(TAG, "绑定存储删除失败 type=%d rc=%d", obj_type, rc);
+    }
+    return rc;
+}
+
+static int security_store_status(struct ble_store_status_event *event, void *arg)
+{
+    (void)arg;
+    if (!event) return BLE_HS_EINVAL;
+    if (event->event_code == BLE_STORE_EVENT_FULL
+            || event->event_code == BLE_STORE_EVENT_OVERFLOW) {
+        return BLE_HS_ESTORE_CAP;
+    }
+    return BLE_HS_ENOTSUP;
+}
+
+/* 标准初始化吞掉恢复错误，因此逐记录核验格式及恢复后的 RAM 内容。 */
+static esp_err_t security_store_validate(void)
+{
+    static const struct {
+        const char *prefix;
+        int type;
+        size_t size;
+        unsigned capacity;
+    } records[] = {
+        { BLE_BOND_NVS_OUR_SEC_PREFIX, BLE_STORE_OBJ_TYPE_OUR_SEC,
+          sizeof(struct ble_store_value_sec), CONFIG_BT_NIMBLE_MAX_BONDS },
+        { BLE_BOND_NVS_PEER_SEC_PREFIX, BLE_STORE_OBJ_TYPE_PEER_SEC,
+          sizeof(struct ble_store_value_sec), CONFIG_BT_NIMBLE_MAX_BONDS },
+        { BLE_BOND_NVS_CCCD_PREFIX, BLE_STORE_OBJ_TYPE_CCCD,
+          sizeof(struct ble_store_value_cccd), CONFIG_BT_NIMBLE_MAX_CCCDS },
+        { BLE_BOND_NVS_CSFC_PREFIX, BLE_STORE_OBJ_TYPE_CSFC,
+          sizeof(struct ble_store_value_csfc), MYNEWT_VAL(BLE_STORE_MAX_CSFCS) },
+        { BLE_BOND_NVS_IRK_PREFIX, BLE_STORE_OBJ_TYPE_LOCAL_IRK,
+          sizeof(struct ble_store_value_local_irk), CONFIG_BT_NIMBLE_MAX_BONDS },
+        { BLE_BOND_NVS_RPA_PREFIX, BLE_STORE_OBJ_TYPE_PEER_ADDR,
+          sizeof(struct ble_store_value_rpa_rec), CONFIG_BT_NIMBLE_MAX_BONDS },
+    };
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(BLE_BOND_NVS_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) return err;
+    nvs_iterator_t it = NULL;
+    err = nvs_entry_find_in_handle(handle, NVS_TYPE_ANY, &it);
+    while (err == ESP_OK) {
+        nvs_entry_info_t info;
+        err = nvs_entry_info(it, &info);
+        if (err != ESP_OK) break;
+        size_t record = sizeof(records) / sizeof(records[0]);
+        for (size_t i = 0; i < sizeof(records) / sizeof(records[0]); ++i) {
+            size_t prefix_len = strlen(records[i].prefix);
+            if (strncmp(info.key, records[i].prefix, prefix_len) != 0) continue;
+            unsigned index = 0;
+            const char *digit = info.key + prefix_len;
+            if (!*digit) break;
+            for (; *digit >= '0' && *digit <= '9'; ++digit) {
+                index = index * 10 + (unsigned)(*digit - '0');
+                if (index > records[i].capacity) break;
+            }
+            if (*digit || index == 0 || index > records[i].capacity) break;
+            record = i;
+            break;
+        }
+        if (record == sizeof(records) / sizeof(records[0]) || info.type != NVS_TYPE_BLOB) {
+            err = ESP_ERR_INVALID_STATE;
+            break;
+        }
+        union ble_store_value stored = {0};
+        size_t size = sizeof(stored);
+        err = nvs_get_blob(handle, info.key, &stored, &size);
+        if (err != ESP_OK) break;
+        if (size != records[record].size) {
+            err = ESP_ERR_INVALID_SIZE;
+            break;
+        }
+        bool found = false;
+        for (unsigned index = 0; index < records[record].capacity; ++index) {
+            union ble_store_key key = {0};
+            union ble_store_value restored = {0};
+            switch (records[record].type) {
+            case BLE_STORE_OBJ_TYPE_OUR_SEC:
+            case BLE_STORE_OBJ_TYPE_PEER_SEC:
+                key.sec.peer_addr = *BLE_ADDR_ANY;
+                key.sec.idx = index;
+                break;
+            case BLE_STORE_OBJ_TYPE_CCCD:
+                key.cccd.peer_addr = *BLE_ADDR_ANY;
+                key.cccd.idx = index;
+                break;
+            case BLE_STORE_OBJ_TYPE_CSFC:
+                key.csfc.peer_addr = *BLE_ADDR_ANY;
+                key.csfc.idx = index;
+                break;
+            case BLE_STORE_OBJ_TYPE_LOCAL_IRK:
+                key.local_irk.addr = *BLE_ADDR_ANY;
+                key.local_irk.idx = index;
+                break;
+            case BLE_STORE_OBJ_TYPE_PEER_ADDR:
+                key.rpa_rec.peer_rpa_addr = stored.rpa_rec.peer_rpa_addr;
+                break;
+            }
+            if (ble_store_config_read(records[record].type, &key, &restored) == 0
+                    && memcmp(&stored, &restored, size) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            err = ESP_ERR_INVALID_STATE;
+            break;
+        }
+        err = nvs_entry_next(&it);
+    }
+    nvs_release_iterator(it);
+    nvs_close(handle);
+    return err == ESP_ERR_NVS_NOT_FOUND ? ESP_OK : err;
+}
+
+/* 上游按记录数量持久化，数量不变的同身份更新需要补充实际落盘与回读。 */
+static esp_err_t security_store_sync_value(int obj_type, const union ble_store_value *value)
+{
+    const char *prefix;
+    size_t size;
+    unsigned capacity;
+    switch (obj_type) {
+    case BLE_STORE_OBJ_TYPE_OUR_SEC:
+        prefix = BLE_BOND_NVS_OUR_SEC_PREFIX;
+        size = sizeof(value->sec);
+        capacity = CONFIG_BT_NIMBLE_MAX_BONDS;
+        break;
+    case BLE_STORE_OBJ_TYPE_PEER_SEC:
+        prefix = BLE_BOND_NVS_PEER_SEC_PREFIX;
+        size = sizeof(value->sec);
+        capacity = CONFIG_BT_NIMBLE_MAX_BONDS;
+        break;
+    case BLE_STORE_OBJ_TYPE_CCCD:
+        prefix = BLE_BOND_NVS_CCCD_PREFIX;
+        size = sizeof(value->cccd);
+        capacity = CONFIG_BT_NIMBLE_MAX_CCCDS;
+        break;
+    case BLE_STORE_OBJ_TYPE_CSFC:
+        prefix = BLE_BOND_NVS_CSFC_PREFIX;
+        size = sizeof(value->csfc);
+        capacity = MYNEWT_VAL(BLE_STORE_MAX_CSFCS);
+        break;
+    case BLE_STORE_OBJ_TYPE_LOCAL_IRK:
+        prefix = BLE_BOND_NVS_IRK_PREFIX;
+        size = sizeof(value->local_irk);
+        capacity = CONFIG_BT_NIMBLE_MAX_BONDS;
+        break;
+    case BLE_STORE_OBJ_TYPE_PEER_ADDR:
+        prefix = BLE_BOND_NVS_RPA_PREFIX;
+        size = sizeof(value->rpa_rec);
+        capacity = CONFIG_BT_NIMBLE_MAX_BONDS;
+        break;
+    default:
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(BLE_BOND_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) return err;
+    union ble_store_key key = {0};
+    union ble_store_value expected = {0};
+    ble_store_key_from_value(obj_type, &key, value);
+    if (ble_store_config_read(obj_type, &key, &expected) != 0) {
+        nvs_close(handle);
+        return ESP_ERR_INVALID_STATE;
+    }
+    char name[NVS_KEY_NAME_MAX_SIZE];
+    bool found = false;
+    for (unsigned index = 1; index <= capacity; ++index) {
+        snprintf(name, sizeof(name), "%s%u", prefix, index);
+        union ble_store_value stored = {0};
+        size_t length = sizeof(stored);
+        err = nvs_get_blob(handle, name, &stored, &length);
+        if (err == ESP_ERR_NVS_NOT_FOUND) continue;
+        if (err != ESP_OK || length != size) {
+            if (err == ESP_OK) err = ESP_ERR_INVALID_SIZE;
+            break;
+        }
+        union ble_store_key stored_key = {0};
+        ble_store_key_from_value(obj_type, &stored_key, &stored);
+        if (memcmp(&key, &stored_key, sizeof(key)) != 0) continue;
+        found = true;
+        if (memcmp(&stored, &expected, size) == 0) break;
+        err = nvs_set_blob(handle, name, &expected, size);
+        if (err == ESP_OK) err = nvs_commit(handle);
+        if (err == ESP_OK) {
+            length = sizeof(stored);
+            err = nvs_get_blob(handle, name, &stored, &length);
+            if (err == ESP_OK && (length != size || memcmp(&stored, &expected, size) != 0)) {
+                err = ESP_ERR_INVALID_STATE;
+            }
+        }
+        break;
+    }
+    nvs_close(handle);
+    if (!found && (err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND)) return ESP_ERR_INVALID_STATE;
+    return err;
+}
+
+static esp_err_t configure_session_security(void)
+{
+    s_security_store_failed = false;
+    ble_store_config_init();
+    esp_err_t err = security_store_validate();
+    if (err != ESP_OK) {
+        s_security_store_failed = true;
+        ESP_LOGE(TAG, "绑定存储恢复校验失败 err=%d，不擦除记录", err);
+        return err;
+    }
     ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
     ble_hs_cfg.sm_sc = 1;
-    ble_hs_cfg.sm_bonding = 0;
+    ble_hs_cfg.sm_bonding = 1;
     ble_hs_cfg.sm_mitm = 0;
-    ble_hs_cfg.store_read_cb = session_security_store_read;
+    ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+    ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+    ble_hs_cfg.store_read_cb = security_store_read;
+    ble_hs_cfg.store_write_cb = security_store_write;
+    ble_hs_cfg.store_delete_cb = security_store_delete;
+    ble_hs_cfg.store_status_cb = security_store_status;
+    return ESP_OK;
 }
 
 static uint8_t  g_own_addr_type;
@@ -522,7 +754,7 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
 {
     (void)ah; (void)arg;
     if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
-    if (ch != g_conn_handle || g_stopping || !g_ready) return BLE_ATT_ERR_UNLIKELY;
+    if (ch != g_conn_handle || g_stopping || !g_ready || s_security_store_failed) return BLE_ATT_ERR_UNLIKELY;
     if (!g_ftms_subscribed) return FTMS_ATT_ERR_CCCD_IMPROPERLY_CONFIGURED;
     if (g_ftms_pending) return FTMS_ATT_ERR_PROCEDURE_IN_PROGRESS;
 
@@ -1557,6 +1789,8 @@ static void on_sync(void)
         mark_start_failed("infer addr type 失败", rc);
         return;
     }
+    /* 服务表可随配置重建；将变化留给已绑定客户端在下次加密连接重新发现。 */
+    ble_svc_gatt_changed(BLE_GATT_CHANGED_START_HANDLE, BLE_GATT_CHANGED_END_HANDLE);
     rc = start_advertising();
     if (rc != 0) {
         mark_start_failed("启动广播失败", rc);
@@ -1853,7 +2087,11 @@ esp_err_t ble_bikepower_start(void)
 
     ble_hs_cfg.sync_cb = on_sync;
     ble_hs_cfg.reset_cb = on_reset;
-    configure_session_security();
+    err = configure_session_security();
+    if (err != ESP_OK) {
+        nimble_port_deinit();
+        return err;
+    }
 
     ble_svc_gap_init();
     ble_svc_gatt_init();

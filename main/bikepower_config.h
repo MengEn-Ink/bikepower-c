@@ -10,6 +10,18 @@
     0x2a, 0x4f, 0x7a, 0x4c, (id), 0x10, 0x5a, 0x7a
 #define BLE_TELEMETRY_INTERVAL_MS 1000
 
+/* 与 ESP-IDF 标准绑定存储保持一致；仅校验，不迁移或擦除用户配置。 */
+#define BLE_BOND_NVS_PARTITION "nvs"
+#define BLE_BOND_NVS_NAMESPACE "nimble_bond"
+#define BLE_BOND_NVS_OUR_SEC_PREFIX "our_sec_"
+#define BLE_BOND_NVS_PEER_SEC_PREFIX "peer_sec_"
+#define BLE_BOND_NVS_CCCD_PREFIX "cccd_sec_"
+#define BLE_BOND_NVS_CSFC_PREFIX "csfc_sec_"
+#define BLE_BOND_NVS_IRK_PREFIX "local_irk_"
+#define BLE_BOND_NVS_RPA_PREFIX "rpa_rec_"
+#define BLE_GATT_CHANGED_START_HANDLE 1
+#define BLE_GATT_CHANGED_END_HANDLE UINT16_MAX
+
 // ===== 板型枚举 =====
 // 新增板型：在此追加枚举值（保持 BOARD_TYPE_COUNT 末位），
 // 并在 board_detect.c 的 s_board_desc[] 表里补一行即可，无需改动 led/button 等模块。
@@ -316,9 +328,9 @@ typedef enum {
 #define DEVICE_SERIAL_PREFIX "BP-"
 #define DEVICE_SERIAL_MAC_LEN 6
 #define DEVICE_SERIAL_FORMAT DEVICE_SERIAL_PREFIX "%02X%02X%02X%02X%02X%02X"
-#define FIRMWARE_VERSION     "4.3.2"
+#define FIRMWARE_VERSION     "4.3.3"
 #define FIRMWARE_STABLE_VERSION "4.0.0"
-#define FIRMWARE_FIX_VERSION    "4.3.2"
+#define FIRMWARE_FIX_VERSION    "4.3.3"
 
 #ifndef BIKEPOWER_GIT_SHA
 #define BIKEPOWER_GIT_SHA "nogit"

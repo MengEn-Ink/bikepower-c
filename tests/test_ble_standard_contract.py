@@ -53,6 +53,7 @@ static inline __attribute__((unused)) void test_log(const char *tag,const char *
 #define ESP_LOGD(...) ((void)0)
 int g_profile;
 static bool g_stopping, g_ready;
+static atomic_bool s_security_store_failed __attribute__((unused));
 static uint16_t g_conn_handle;
 static uint8_t g_broadcast_mask;
 static bool g_bridge_mode __attribute__((unused));
