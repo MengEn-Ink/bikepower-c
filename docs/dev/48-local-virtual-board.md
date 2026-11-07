@@ -69,6 +69,20 @@ Bumble 默认 LocalLink 的 encryption 路径不请求 peripheral LTK。本项�
 
 以下仍需真机：Windows/手机 GATT 缓存、跨表已绑定客户端的 Service Changed 订阅落盘/发送/确认、真实射频加密、WiFi/BLE 共存、真实功率桥接、实体断电/电气/按钮/灯效、目标骑跑 App、长时控制耐久。原 v4.3.3 发行阻断保持；不创建 tag/Release，不因本地仿真通过放行。
 
+## 统一入口与本地门禁
+
+Windows 侧统一走 `scripts/dev.ps1`，不再直接拼底层脚本参数：
+
+| 命令 | 作用 |
+| --- | --- |
+| `.\scripts\dev.ps1 sim` | 默认完整虚拟回归（等价 sim-test） |
+| `.\scripts\dev.ps1 sim-doctor` | 校验模拟器与依赖版本 |
+| `.\scripts\dev.ps1 sim-build` / `sim-debug` | 独立构建目录构建 / GDB 调试 |
+| `.\scripts\dev.ps1 sim-stats` | 历史会话耗时基线（中位、最快、最慢） |
+| `.\scripts\dev.ps1 accept -Port COMx` | 真机验收批处理，报告写入 tests/reports |
+
+推送前可跑秒级本地门禁：`python scripts/tools/pre_push_gate.py run`；`install` 写入 `.git/hooks/pre-push`，解释器不可用时明确跳过而不阻塞推送。`workspace_audit.py` 只读分类未提交改动，`report_maintenance.py` 只清理最近会话之外、可由源码重建的固件镜像，报告与日志不入选。
+
 ## 提效方式
 
 开发循环为离线单测 → 隔离增量构建 → 本地完整虚拟回归 → 必要真机专项。模拟器可创建独立 Flash/NVS 客户端状态，不占用唯一开发板；报告和失败退出适合自动回归。已测约 50 秒的是单次热环境回归，不含冷安装、固件构建或 CI 排队，未做真机对照测速，不宣称固定倍数/百分比提速。

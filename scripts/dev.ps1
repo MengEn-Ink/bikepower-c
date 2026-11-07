@@ -24,7 +24,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("build", "flash", "monitor", "test", "check", "clean", "reconfigure", "erase", "stats", "sim", "sim-setup", "sim-doctor", "sim-build", "sim-test", "sim-debug", "sim-stats", "help", "")]
+    [ValidateSet("build", "flash", "monitor", "test", "check", "clean", "reconfigure", "erase", "stats", "accept", "sim", "sim-setup", "sim-doctor", "sim-build", "sim-test", "sim-debug", "sim-stats", "help", "")]
     [string]$Action = "help",
 
     [ValidateSet("generic", "m5stamp")]
@@ -40,6 +40,8 @@ param(
     [switch]$Security,
 
     [switch]$Running,
+
+    [switch]$DryRun,
 
     [string]$Gdb = "gdb-multiarch",
 
@@ -75,6 +77,7 @@ function Show-Help {
     Write-Host "  reconfigure  重新生成 CMake 配置"
     Write-Host "  erase        擦除整片 flash"
     Write-Host "  stats        显示 ccache 缓存统计"
+    Write-Host "  accept       真机验收批处理（串口→设备级门禁→报告），-DryRun 只打印命令"
     Write-Host "  sim          本地虚拟板（Windows + WSL2，不接真实设备）"
     Write-Host "               可用: sim / sim-setup / sim-doctor / sim-build / sim-test / sim-debug / sim-stats"
     Write-Host "               sim 默认执行 test，sim-stats 输出历史耗时基线"
@@ -286,6 +289,28 @@ function Do-Check {
 }
 
 # 清理构建
+# 真机验收批处理：一条命令跑完设备级门禁并落报告
+function Do-Accept {
+    param([switch]$DryRun)
+    if (-not $Port) {
+        $Port = Detect-SerialPort
+        if (-not $Port) {
+            Die "找不到串口设备，请用 -Port 指定"
+        }
+    }
+    $boardId = if ($Board -eq "m5stamp") { "m5stamp-c3" } else { "generic-c3" }
+    $report = Join-Path $ProjectDir ("tests\reports\operation_gate_device_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".md")
+    $gate = Join-Path $ProjectDir "tests\operation_gate.py"
+    $gateArgs = @("--level", "device", "--port", $Port, "--board", $boardId, "--report", $report)
+    if ($DryRun) {
+        Write-Host ("待执行: python " + $gate + " " + ($gateArgs -join " ")) -ForegroundColor Gray
+        Write-Host ("报告将写入: " + $report) -ForegroundColor Gray
+        return
+    }
+    Invoke-PythonScript -ScriptPath $gate -ScriptArgs $gateArgs
+    Write-Success ("真机验收报告: " + $report)
+}
+
 function Do-Clean {
     Write-Log "清理构建目录（idf.py fullclean）"
     Invoke-IdfCommand -IdfPath $IdfPath -IdfArgs @("fullclean")
@@ -373,6 +398,12 @@ if ($Action -eq "stats") {
     exit 0
 }
 
+# accept 的 DryRun 只打印命令，不需要 ESP-IDF
+if ($Action -eq "accept" -and $DryRun) {
+    Do-Accept -DryRun
+    exit 0
+}
+
 # build/flash/monitor/clean/reconfigure/erase 需要 ESP-IDF 环境
 $IdfPath = Find-EspIdf -UserSpecified $IdfPath
 if ($null -eq $IdfPath) {
@@ -386,6 +417,7 @@ switch ($Action) {
         if (-not $NoChecks) { Do-Check }
         Do-Build
     }
+    "accept" { Do-Accept -DryRun:$DryRun }
     "flash" {
         if (-not $NoChecks) { Do-Check }
         Do-Flash
