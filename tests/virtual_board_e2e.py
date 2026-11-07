@@ -444,7 +444,10 @@ def main():
     (folder/'report.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
     print('REPORT '+str(folder/'report.md'))
     has_not_obtained = any(r['status']=='NOT_OBTAINED' for r in results)
-    return 1 if (error or has_not_obtained) else 0
+    if has_not_obtained:
+        print(f'[virtual-board] OPEN {sum(1 for r in results if r["status"]=="NOT_OBTAINED")} 项未取得，已记录在报告，不判失败',flush=True)
+    # NOT_OBTAINED 表示虚拟板无法取得、需实物确认的项；只有实际失败才影响退出码
+    return 1 if error else 0
 
 
 if __name__=='__main__':
