@@ -24,7 +24,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("build", "flash", "monitor", "test", "check", "clean", "reconfigure", "erase", "stats", "sim", "sim-setup", "sim-doctor", "sim-build", "sim-test", "sim-debug", "help", "")]
+    [ValidateSet("build", "flash", "monitor", "test", "check", "clean", "reconfigure", "erase", "stats", "sim", "sim-setup", "sim-doctor", "sim-build", "sim-test", "sim-debug", "sim-stats", "help", "")]
     [string]$Action = "help",
 
     [ValidateSet("generic", "m5stamp")]
@@ -76,8 +76,8 @@ function Show-Help {
     Write-Host "  erase        擦除整片 flash"
     Write-Host "  stats        显示 ccache 缓存统计"
     Write-Host "  sim          本地虚拟板（Windows + WSL2，不接真实设备）"
-    Write-Host "               可用: sim / sim-setup / sim-doctor / sim-build / sim-test / sim-debug"
-    Write-Host "               sim 默认执行 test"
+    Write-Host "               可用: sim / sim-setup / sim-doctor / sim-build / sim-test / sim-debug / sim-stats"
+    Write-Host "               sim 默认执行 test，sim-stats 输出历史耗时基线"
     Write-Host "  help         显示此帮助"
     Write-Host ""
     Write-Host "Options:"
@@ -329,6 +329,12 @@ if ($Port) { Write-Host ("串口: " + $Port) }
 Write-Host ""
 
 # 本地虚拟板：Windows 侧不激活 ESP-IDF，由 virtual_board.ps1 自行解析构建环境
+if ($Action -eq "sim-stats") {
+    $rootLinux = (& wsl -d $WslDistribution --exec wslpath -a $ProjectDir | Select-Object -Last 1).Trim()
+    & wsl -d $WslDistribution --exec "$rootLinux/build/virtual-board-tools/venv/bin/python" "$rootLinux/scripts/tools/timing_summary.py"
+    exit $LASTEXITCODE
+}
+
 if ($Action -like "sim*") {
     $step = if ($Action -eq "sim") { "test" } else { $Action.Substring(4) }
     $runner = Join-Path $ScriptDir "virtual_board.ps1"
