@@ -43,7 +43,7 @@
       simulation:{mode:c.mode === 1 ? "pacer":"fixed",power:c.power,cadence:c.cadence,weight:c.weight,
         preset:c.ride_type === 5 ? "custom":String(c.ride_type),wkgMin:c.custom_wkg_low / 10,
         wkgMax:c.custom_wkg_high / 10,customName:c.custom_pacer_name,powerFloat:c.power_float,cadenceFloat:c.cadence_float},
-      broadcast:{power:!!(c.broadcast_mask & 1),cadence:!!(c.broadcast_mask & 2),heart:!!(c.broadcast_mask & 4)},
+      broadcast:{power:!!(c.broadcast_mask & 1),cadence:!!(c.broadcast_mask & 2),heart:!!(c.broadcast_mask & 4),cadenceWithPower:!!(c.broadcast_mask & 8)},
       heart:{enabled:!!(c.broadcast_mask & 4),mode:c.has_user_hr ? "fixed":"linked",ftp:c.ftp,
         threshold:c.thr_hr,fixed:c.heartrate,float:c.hr_float},
       running:{mode:c.run_mode ? "pacer":"fixed",preset:c.run_pacer_type === 4 ? "custom":String(c.run_pacer_type),
@@ -70,7 +70,7 @@
       custom_wkg_high:Math.round(s.wkgMax * 10),custom_pacer_name:s.customName,
       power_float:s.powerFloat,cadence_float:s.cadenceFloat,has_user_hr:h.mode === "fixed" ? 1:0,
       heartrate:h.fixed,ftp:h.ftp,thr_hr:h.threshold,hr_float:h.float,
-      broadcast_mask:(config.broadcast.power ? 1:0) | (config.broadcast.cadence ? 2:0) | (h.enabled ? 4:0),
+      broadcast_mask:(config.broadcast.power ? 1:0) | (config.broadcast.cadence ? 2:0) | (h.enabled ? 4:0) | (config.broadcast.cadenceWithPower ? 8:0),
       run_speed_x100:Math.round(360000 / (r.paceMinutes * 60 + r.paceSeconds)),
       run_mode:r.mode === "fixed" ? 0:1,run_pacer_type:r.preset === "custom" ? 4:Number(r.preset),
       run_pace_low_sec:r.low,run_pace_high_sec:r.high,run_custom_name:r.customName,
@@ -103,6 +103,8 @@
     if (!state.draft) return false;
     var c = pendingConfig(), s = c.simulation, h = c.heart, r = c.running;
     var range = function(v,min,max) { return Number.isInteger(v) && v >= min && v <= max; };
+    var bw = state.draft.broadcast;
+    if (bw.cadenceWithPower && !(bw.power && bw.cadence)) return false;
     return validSimulation() && range(s.cadence,20,120) && range(s.powerFloat,0,100)
       && range(s.cadenceFloat,0,20) && range(h.ftp,50,500) && range(h.threshold,100,220)
       && range(h.fixed,60,200) && range(h.float,0,20) && range(c.powerStep,5,50)
@@ -348,6 +350,11 @@
     document.querySelectorAll("[data-broadcast]").forEach(function (input) {
       input.checked = state.draft.broadcast[input.dataset.broadcast];
     });
+    var bundleCheck = document.querySelector("[data-cadence-bundle]");
+    if (bundleCheck) {
+      bundleCheck.checked = !!state.draft.broadcast.cadenceWithPower;
+      bundleCheck.disabled = state.draft.sport === "running";
+    }
     renderBridgeDevices();
     renderBridgeRuntime();
   }
@@ -602,11 +609,27 @@
       renderAll(); edited();
     });
   });
+  document.querySelectorAll("[data-cadence-bundle]").forEach(function(input) {
+    input.addEventListener("change", function() {
+      state.draft.broadcast.cadenceWithPower = this.checked;
+      if (this.checked && !state.draft.broadcast.cadence) {
+        state.draft.broadcast.cadence = true;
+        var cadenceCheck = document.querySelector('[data-broadcast="cadence"]');
+        if (cadenceCheck) cadenceCheck.checked = true;
+      }
+      edited();
+    });
+  });
   document.querySelectorAll("[data-broadcast]").forEach(function(input) {
     input.addEventListener("change",function() {
       state.draft.broadcast[this.dataset.broadcast] = this.checked;
       if (this.dataset.broadcast === "heart") state.draft.heart.enabled = this.checked;
-      if (!Object.values(state.draft.broadcast).some(Boolean)) {
+      if (!(state.draft.broadcast.power && state.draft.broadcast.cadence)) {
+        state.draft.broadcast.cadenceWithPower = false;
+        var bundleBox = document.querySelector("[data-cadence-bundle]");
+        if (bundleBox) bundleBox.checked = false;
+      }
+      if (!(state.draft.broadcast.power || state.draft.broadcast.cadence || state.draft.broadcast.heart)) {
         this.checked = true; state.draft.broadcast[this.dataset.broadcast] = true;
         if (this.dataset.broadcast === "heart") state.draft.heart.enabled = true;
         showToast("至少保留一项广播数据");
@@ -617,7 +640,7 @@
   $("heartToggle").addEventListener("click",function() {
     state.draft.heart.enabled = !state.draft.heart.enabled;
     state.draft.broadcast.heart = state.draft.heart.enabled;
-    if (!Object.values(state.draft.broadcast).some(Boolean)) state.draft.broadcast.power = true;
+    if (!(state.draft.broadcast.power || state.draft.broadcast.cadence || state.draft.broadcast.heart)) state.draft.broadcast.power = true;
     state.bridgeHeartInitialized = true; renderSource(); renderHeart(); edited();
   });
   $("copyIdentity").addEventListener("change",function() { state.copyIdentity = this.checked; renderIdentity(); edited(); });

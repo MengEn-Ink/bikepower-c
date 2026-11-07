@@ -389,6 +389,18 @@ if(!bridgeEditor.includes('id="cfg-cycling-source"')||!bridgeEditor.includes('id
     ||!bridgeEditor.includes("PM")||legacyEditor.includes('id="cfg-cycling-source"')){
   throw new Error("Pages 桥接表单及旧固件降级失败");
 }
+const compatCore = Array.from(encodeConfigGroup("core", {...fixture, broadcast_mask: 15}));
+if (compatCore.length !== 15 || compatCore[14] !== 15 || compatCore[13] !== 0
+    || configsEqual({...fixture, broadcast_mask: 15}, {...fixture})
+    || !configsEqual({...fixture, broadcast_mask: 15}, {...fixture, broadcast_mask: 15})) {
+  throw new Error("兼容位 0x08 必须随 broadcast_mask 原样编码并参与脏状态比较");
+}
+if (!validateConfig({...fixture, cadenceWithPower: true, broadcast_mask: 1}).some(e => e.id === "cfg-broadcast-cadence-bundle")
+    || !validateConfig({...fixture, cadenceWithPower: true, broadcast_mask: 2}).some(e => e.id === "cfg-broadcast-cadence-bundle")
+    || validateConfig({...fixture, cadenceWithPower: true, broadcast_mask: 11}).some(e => e.id === "cfg-broadcast-cadence-bundle")
+    || validateConfig({...fixture, cadenceWithPower: false, broadcast_mask: 7}).some(e => e.id === "cfg-broadcast-cadence-bundle")) {
+  throw new Error("Pages 兼容位校验必须要求功率+踏频同时启用");
+}
 const identity = {manufacturer: "萌恩", model: "BP-C3", serial: "", hardware: "v2", firmware: "1.4.0", software: ""};
 const idBytes = encodeIdentityProfile(identity);
 const idBack = decodeIdentityProfile(new DataView(idBytes.buffer, idBytes.byteOffset, idBytes.byteLength));

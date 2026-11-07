@@ -65,7 +65,9 @@ def main():
     args = parser.parse_args()
     expected = render()
     if args.check:
-        if not TARGET.is_file() or TARGET.read_text(encoding="utf-8") != expected:
+        current = TARGET.read_text(encoding="utf-8") if TARGET.is_file() else None
+        # Git 在 Windows 工作区检出为 CRLF，产物按 LF 生成；只比较内容，不把行尾当漂移。
+        if current is None or current.replace("\r\n", "\n") != expected:
             print("离线手册已漂移：运行 python3 scripts/tools/sync_user_docs.py")
             return 1
         print("离线手册与 Pages 来源一致")
