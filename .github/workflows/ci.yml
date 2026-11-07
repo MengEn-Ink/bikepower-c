@@ -14,9 +14,30 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Markdown links
+        run: python3 scripts/tools/check_markdown_links.py
+      - name: Docs quality gate
+        run: python3 scripts/tools/quality_gate.py --level docs
+
   virtual-board:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
     steps:
       - name: Checkout exact source
         uses: actions/checkout@v7
@@ -26,6 +47,18 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+      - name: Cache ESP-IDF toolchains
+        uses: actions/cache@v5
+        with:
+          path: ~/.espressif
+          key: idf-v5.5.4-${{ runner.os }}-${{ runner.arch }}
+          restore-keys: idf-v5.5.4-${{ runner.os }}-
+      - name: Cache virtual runtime
+        uses: actions/cache@v5
+        with:
+          path: build/virtual-board-tools/venv
+          key: virtual-venv-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('requirements-virtual-board.txt') }}
+          restore-keys: virtual-venv-${{ runner.os }}-${{ runner.arch }}-
       - name: Install locked emulator and harness
         run: sh scripts/virtual_board.sh setup
       - name: Controller refusal regression
@@ -33,22 +66,28 @@ jobs:
       - name: Build actual ESP32-C3 firmware
         shell: bash
         run: |
-          git clone --branch v5.5.4 --depth 1 --recursive --shallow-submodules https://github.com/espressif/esp-idf.git "$RUNNER_TEMP/esp-idf"
-          "$RUNNER_TEMP/esp-idf/install.sh" esp32c3
-          . "$RUNNER_TEMP/esp-idf/export.sh"
+          IDF_DIR="$HOME/esp-idf-v5.5.4"
+          if [ ! -d "$IDF_DIR/.git" ]; then
+            git clone --branch v5.5.4 --depth 1 --recursive --shallow-submodules https://github.com/espressif/esp-idf.git "$IDF_DIR"
+          fi
+          "$IDF_DIR/install.sh" esp32c3
+          . "$IDF_DIR/export.sh"
+          GDB=$(command -v riscv32-esp-elf-gdb || true)
+          if [ -z "$GDB" ]; then GDB=$(command -v gdb-multiarch || true); fi
+          test -n "$GDB"
           sh scripts/virtual_board.sh build
           sh scripts/virtual_board.sh test build/virtual-board-build --security --running
-          sh scripts/virtual_board.sh debug build/virtual-board-build
+          sh scripts/virtual_board.sh debug build/virtual-board-build --gdb "$GDB"
       - name: Upload public evidence only
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: virtual-board-${{ github.run_id }}
+          name: virtual-board-${{ matrix.os }}-${{ github.run_id }}
           path: |
             tests/reports/virtual-board/**/report.json
             tests/reports/virtual-board/**/report.md
             tests/reports/virtual-board/**/gdb.log
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
   quick-harness:

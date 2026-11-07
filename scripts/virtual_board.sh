@@ -24,7 +24,11 @@ case "$ACTION" in
     mkdir -p "$BUILD"
     python3 -c 'import pathlib,sys; root=pathlib.Path(sys.argv[1]); out=pathlib.Path(sys.argv[2]); out.write_text((root/"sdkconfig.defaults").read_text(encoding="utf-8")+"\nCONFIG_BOARD_GENERIC_C3=y\n",encoding="utf-8")' "$ROOT" "$BUILD/sdkconfig.defaults"
     cd "$ROOT"
-    idf.py --ccache -B "$BUILD" -D "SDKCONFIG=$BUILD/sdkconfig" -D "SDKCONFIG_DEFAULTS=$BUILD/sdkconfig.defaults" -D PORTAL_TEST_AUTO_CONFIG=OFF reconfigure build
+    if command -v ccache >/dev/null 2>&1; then
+      idf.py --ccache -B "$BUILD" -D "SDKCONFIG=$BUILD/sdkconfig" -D "SDKCONFIG_DEFAULTS=$BUILD/sdkconfig.defaults" -D PORTAL_TEST_AUTO_CONFIG=OFF reconfigure build
+    else
+      idf.py -B "$BUILD" -D "SDKCONFIG=$BUILD/sdkconfig" -D "SDKCONFIG_DEFAULTS=$BUILD/sdkconfig.defaults" -D PORTAL_TEST_AUTO_CONFIG=OFF reconfigure build
+    fi
     ;;
   test|debug)
     BUILD=${1:-build/virtual-board-build}
