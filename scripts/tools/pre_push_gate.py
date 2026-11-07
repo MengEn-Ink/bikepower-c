@@ -16,14 +16,15 @@ HOOK_MARKER = '# bikepower-pre-push-gate'
 HOOK_BODY = """#!/bin/sh
 {marker}
 cd "$(git rev-parse --show-toplevel)" || exit 1
-if command -v python3 >/dev/null 2>&1; then
-  exec python3 scripts/tools/pre_push_gate.py run
-elif command -v python >/dev/null 2>&1; then
-  exec python scripts/tools/pre_push_gate.py run
-else
-  echo "[pre-push] 未找到python，跳过本地门禁" >&2
-  exit 0
-fi
+for candidate in python3 python "py -3"; do
+  probe=${{candidate%% *}}
+  command -v "$probe" >/dev/null 2>&1 || continue
+  if $candidate -c "import sys" >/dev/null 2>&1; then
+    exec $candidate scripts/tools/pre_push_gate.py run
+  fi
+done
+echo "[pre-push] 未找到可用python，跳过本地门禁" >&2
+exit 0
 """.format(marker=HOOK_MARKER)
 
 
