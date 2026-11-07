@@ -37,6 +37,7 @@
 #include "ble_bikepower.h"
 #include "board_detect.h"
 #include "ble_power_bridge.h"
+#include "ble_bond_cache.h"
 
 static const char *TAG = "BLE";
 
@@ -49,7 +50,11 @@ static int security_store_read(int obj_type, const union ble_store_key *key,
 {
     if (!key || !value) return BLE_HS_EINVAL;
     if (s_security_store_failed) return BLE_HS_ESTORE_FAIL;
-    return ble_store_config_read(obj_type, key, value);
+    int rc = ble_store_config_read(obj_type, key, value);
+#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
+    ESP_LOGW(TAG, "DIAG: store_read type=%d rc=%d", obj_type, rc);
+#endif
+    return rc;
 }
 
 static int security_store_write(int obj_type, const union ble_store_value *value)
@@ -57,6 +62,9 @@ static int security_store_write(int obj_type, const union ble_store_value *value
     if (!value) return BLE_HS_EINVAL;
     if (s_security_store_failed) return BLE_HS_ESTORE_FAIL;
     int rc = ble_store_config_write(obj_type, value);
+#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
+    ESP_LOGW(TAG, "DIAG: store_write type=%d rc=%d", obj_type, rc);
+#endif
     if (rc == 0 && security_store_sync_value(obj_type, value) != ESP_OK) {
         rc = BLE_HS_ESTORE_FAIL;
     }
@@ -272,6 +280,21 @@ static esp_err_t security_store_sync_value(int obj_type, const union ble_store_v
     nvs_close(handle);
     if (!found && (err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND)) return ESP_ERR_INVALID_STATE;
     return err;
+}
+
+static esp_err_t security_store_activate(void)
+{
+    if (s_security_store_failed) return ESP_ERR_INVALID_STATE;
+    esp_err_t err = security_store_validate();
+    if (err != ESP_OK) {
+        s_security_store_failed = true;
+        return err;
+    }
+    ble_hs_cfg.store_read_cb = security_store_read;
+    ble_hs_cfg.store_write_cb = security_store_write;
+    ble_hs_cfg.store_delete_cb = security_store_delete;
+    ble_hs_cfg.store_status_cb = security_store_status;
+    return ESP_OK;
 }
 
 static esp_err_t configure_session_security(void)
@@ -1640,6 +1663,11 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         if (rc != 0 && !g_stopping) mark_start_failed("广播完成后重广播失败", rc);
         return 0;
     case BLE_GAP_EVENT_SUBSCRIBE:
+#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
+        ESP_LOGW(TAG, "DIAG: subscribe handle=%u cur_notify=%u cur_indicate=%u reason=%u",
+                 event->subscribe.attr_handle, event->subscribe.cur_notify,
+                 event->subscribe.cur_indicate, event->subscribe.reason);
+#endif
         if (g_conn_handle == BLE_HS_CONN_HANDLE_NONE
                 && (event->subscribe.cur_notify || event->subscribe.cur_indicate)) {
             (void)connection_accept(event->subscribe.conn_handle);
@@ -1660,10 +1688,30 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         }
         return 0;
     case BLE_GAP_EVENT_NOTIFY_TX:
+#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
+        /* 诊断：打印所有 indication TX/ACK 状态（不硬编码 SC 句柄） */
+        if (event->notify_tx.indication) {
+            ESP_LOGW(TAG, "DIAG: notify_tx handle=%u indication=%u status=%d",
+                     event->notify_tx.attr_handle, event->notify_tx.indication,
+                     event->notify_tx.status);
+        }
+#endif
         if (event->notify_tx.conn_handle == g_conn_handle && event->notify_tx.indication) {
             indication_complete(event->notify_tx.conn_handle,
                                 event->notify_tx.attr_handle, event->notify_tx.status);
         }
+        return 0;
+    case BLE_GAP_EVENT_ENC_CHANGE:
+#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
+        {
+            /* NimBLE enc_change 事件只有 status/conn_handle，encrypted 需查连接 */
+            struct ble_gap_conn_desc desc;
+            int enc_rc = ble_gap_conn_find(event->enc_change.conn_handle, &desc);
+            uint8_t encrypted = (enc_rc == 0) ? desc.sec_state.encrypted : 0;
+            ESP_LOGW(TAG, "DIAG: enc_change conn=%u status=%d encrypted=%d",
+                     event->enc_change.conn_handle, event->enc_change.status, encrypted);
+        }
+#endif
         return 0;
     default:
         return 0;
@@ -1789,8 +1837,30 @@ static void on_sync(void)
         mark_start_failed("infer addr type 失败", rc);
         return;
     }
-    /* 服务表可随配置重建；将变化留给已绑定客户端在下次加密连接重新发现。 */
-    ble_svc_gatt_changed(BLE_GATT_CHANGED_START_HANDLE, BLE_GATT_CHANGED_END_HANDLE);
+    esp_err_t store_err = security_store_activate();
+    if (store_err != ESP_OK) {
+        mark_start_failed("同步后绑定存储激活失败", store_err);
+        return;
+    }
+#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
+    ESP_LOGW(TAG, "DIAG: store_activate err=%d", store_err);
+#endif
+    bool layout_changed = false;
+    esp_err_t cache_err = ble_bond_cache_sync(&layout_changed);
+    if (cache_err != ESP_OK) {
+        s_security_store_failed = true;
+        mark_start_failed("订阅缓存布局同步失败", cache_err);
+        return;
+    }
+#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
+    ESP_LOGW(TAG, "DIAG: bond_cache_sync err=%d layout_changed=%d", cache_err, layout_changed);
+#endif
+    if (layout_changed) {
+#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
+        ESP_LOGW(TAG, "DIAG: 触发 ble_svc_gatt_changed SC indication");
+#endif
+        ble_svc_gatt_changed(BLE_GATT_CHANGED_START_HANDLE, BLE_GATT_CHANGED_END_HANDLE);
+    }
     rc = start_advertising();
     if (rc != 0) {
         mark_start_failed("启动广播失败", rc);
@@ -2085,6 +2155,8 @@ esp_err_t ble_bikepower_start(void)
         return err;
     }
 
+    ble_bond_cache_begin();
+    ble_hs_cfg.gatts_register_cb = ble_bond_cache_register;
     ble_hs_cfg.sync_cb = on_sync;
     ble_hs_cfg.reset_cb = on_reset;
     err = configure_session_security();

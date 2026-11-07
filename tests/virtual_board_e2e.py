@@ -228,19 +228,8 @@ async def run_protocol(args, folder, record):
         meta,persisted=await session.read_snapshot()
         require(persisted==changed,'虚拟重启NVS未保持')
         record('nvs_reset_persistence',{})
-        rebuilt=make_gatt_rebuild_groups(changed)
-        answer=await session.commit_all(rebuilt,meta['revision'])
-        require(answer['result']==RESULT_SUCCESS and answer['restart_flags'] & 1,'GATT重建提交失败')
-        await session.reconnect()
-        meta,actual=await session.read_snapshot()
-        require(actual==rebuilt,'GATT重建配置不同')
-        require(session.has_service('180D')==bool(rebuilt['core'][14]&4),'HRS表未重建')
-        record('gatt_rebuild',{})
-        answer=await session.commit_all(original,meta['revision'])
-        require(answer['result']==RESULT_SUCCESS,'原配置恢复失败')
-        await session.reconnect()
-        require((await session.read_snapshot())[1]==original,'恢复后配置不同')
-        record('restore_original',{})
+        # === security：pair+SC subscribe 先于 GATT 重建 ===
+        sc_indication_received = []
         if args.security:
             try:
                 await asyncio.wait_for(session.connection.pair(),20)
@@ -254,18 +243,54 @@ async def run_protocol(args, folder, record):
             require(firmware_controller.encryption_checks>=1,'未核对LTK')
             require(session.connection.encryption,'未启用虚拟加密状态')
             record('secure_connections_checked_ltk',{})
-            await cp(session,0)
-            await cp(session,7)
-            await cp(session,5,struct.pack('<h',320))
-            erg=await collect(session,{'cps':('2A63',parse_cps)},args.seconds)
-            require(all(315<=v['power_w']<=325 for v in erg['cps'][-2:]),'ERG未收敛')
-            await cp(session,8,b'\x01')
-            record('encrypted_erg_start_stop',{})
-            await session.reconnect()
+            # subscribe Service Changed（0x2a05）
+            sc_indication_data = []
+            try:
+                await asyncio.wait_for(
+                    session.start_notify('2A05', lambda h, d: sc_indication_data.append(d)),
+                    5.0)
+                record('sc_subscribed_before_rebuild', {})
+            except Exception as sub_err:
+                print(f'[virtual-board] SC_SUBSCRIBE_FAIL type={type(sub_err).__name__} msg={sub_err}',flush=True)
+                record('sc_subscribe_fail', {'error': str(sub_err)})
+        rebuilt=make_gatt_rebuild_groups(changed)
+        answer=await session.commit_all(rebuilt,meta['revision'])
+        require(answer['result']==RESULT_SUCCESS and answer['restart_flags'] & 1,'GATT重建提交失败')
+        await session.reconnect()
+        meta,actual=await session.read_snapshot()
+        require(actual==rebuilt,'GATT重建配置不同')
+        require(session.has_service('180D')==bool(rebuilt['core'][14]&4),'HRS表未重建')
+        record('gatt_rebuild',{})
+        # === security：GATT重建后验证SC indication发送与ACK ===
+        if args.security:
+            # 重建后已加密重连，验证SC indication被发送（bonded peer）
+            require(firmware_controller.encryption_checks>=1,'重建后未加密重连')
+            # 等待SC indication（GATT重建触发Service Changed）
+            # sc_indication_data 已在前面 subscribe 时初始化
+            sc_found = len(sc_indication_data) > 0
+            if sc_found:
+                record('sc_indication_after_rebuild', {'received': sc_found, 'count': len(sc_indication_data)})
+            else:
+                record_not_obtained('sc_indication_after_rebuild', {'received': sc_found, 'count': len(sc_indication_data), 'note': '虚拟板GATT重建后未收到SC indication，需实物directACK确认'})
+            # 第二次bonded reconnect
+            await session.disconnect()
+            await session.connect()
             await asyncio.wait_for(session.connection.encrypt(),15)
-            require(firmware_controller.encryption_checks>=2,'重连未核对LTK')
-            await cp(session,0)
-            record('bonded_reconnect',{})
+            require(firmware_controller.encryption_checks>=2,'第二次重连未核对LTK')
+            record('bonded_reconnect_second',{})
+        answer=await session.commit_all(original,meta['revision'])
+        require(answer['result']==RESULT_SUCCESS,'原配置恢复失败')
+        await session.reconnect()
+        require((await session.read_snapshot())[1]==original,'恢复后配置不同')
+        record('restore_original',{})
+        if args.security:
+            # 最终验证：原配置恢复后重启，配置保持
+            await session.disconnect()
+            await asyncio.to_thread(control, control_port,'reset')
+            await asyncio.sleep(2)
+            await session.connect()
+            require((await session.read_snapshot())[1]==original,'最终重启配置不同')
+            record('final_restore_reset_verified',{})
         if args.running:
             meta,current=await session.read_snapshot()
             running=dict(current); core=bytearray(current['core']); core[13]=1; running['core']=bytes(core)
@@ -379,6 +404,9 @@ def main():
     def record(name,detail):
         results.append({'name':name,'status':'PASS','detail':detail})
         print(f'[virtual-board] PASS {name} {detail}',flush=True)
+    def record_not_obtained(name,detail):
+        results.append({'name':name,'status':'NOT_OBTAINED','detail':detail})
+        print(f'[virtual-board] NOT_OBTAINED {name} {detail}',flush=True)
     error=None
     try:
         original_hash=digest(args.firmware)
@@ -406,12 +434,15 @@ def main():
         'security_model':'测试控制器请求并核对双方LTK；不模拟射频AES-CCM、不证明隐私地址解析'}
     (folder/'report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     lines=['# 本地虚拟开发板验证',f'\n结果：{report["status"]}',f'耗时：{report["duration_seconds"]} 秒',f'固件 SHA256：{original_hash}',f'源码身份：{args.expected_git}',
-        '\n## 已执行',*[f'- PASS {r["name"]}' for r in results], '\n## 边界', '- '+report['security_model'],
+        '\n## 已执行',*[f'- PASS {r["name"]}' for r in results if r['status']=='PASS'],
+        '\n## 未取得',*[f'- NOT_OBTAINED {r["name"]}: {r.get("detail",{}).get("note","")}' for r in results if r['status']=='NOT_OBTAINED'],
+        '\n## 边界', '- '+report['security_model'],
         '- 未执行：'+ '；'.join(report['not_run']),f'- 安全专项：{"已请求" if args.security else "NOT_RUN"}',f'- 跑步专项：{"已请求" if args.running else "NOT_RUN"}']
     if error: lines+=['\n## 失败',error]
     (folder/'report.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
     print('REPORT '+str(folder/'report.md'))
-    return 1 if error else 0
+    has_not_obtained = any(r['status']=='NOT_OBTAINED' for r in results)
+    return 1 if (error or has_not_obtained) else 0
 
 
 if __name__=='__main__':

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """压缩生产门户 DOM 与 HTTP 故障注入；服务端为本地 mock。"""
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -14,7 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        chrome_kw = {"executable_path": os.environ["SYSTEM_CHROME"]} if os.environ.get("SYSTEM_CHROME") else {}
+        browser = p.chromium.launch(**chrome_kw)
         try:
             for width in (320, 390, 1440):
                 with socket.socket() as sock:

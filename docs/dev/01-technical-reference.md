@@ -11,7 +11,11 @@
 
 ## BLE持久绑定安全策略（4.3.3）
 
-NimBLE启用最多4个绑定记录，标准独立`nimble_bond` namespace存储安全密钥/CCCD/客户端能力；用户配置namespace与schema不变。使用SC Just Works、ENC/ID分发和public本机广播，保持FTMS骑行/跑步WRITE_ENC。容量满拒绝新增，不使用轮转删除；已有绑定重复配对不自动替换。启动逐记录核验实际NVS格式及RAM恢复，写入后补同身份更新落盘和回读，失败阻止密钥恢复及FTMS控制，不擦除记录。服务表可因配置变化重建，重新同步时通过Service Changed告知已绑定客户端。该候选五轮加密控制/四路300秒通知、已绑定时八组配置/GATT重建/重启与原配置恢复通过；当前容量和存储故障仅host专项，未做多客户端满容量或真机写失败注入。若系统单侧忘记绑定，板端会拒绝覆盖；当前没有用户清绑定入口，需定向维护。最终发行门禁以PROGRESS.md为准；旧[会话修复报告](46-qidou-session-security-fix.md)仅记录先前无绑定手机验收，不代表当前候选通过。
+NimBLE启用最多4个绑定记录，标准独立`nimble_bond` namespace存储安全密钥/CCCD/客户端能力；用户配置namespace与schema不变。使用SC Just Works、ENC/ID分发和public本机广播，保持FTMS骑行/跑步WRITE_ENC。容量满拒绝新增，不使用轮转删除；已有绑定重复配对不自动替换。启动逐记录核验实际NVS格式及RAM恢复，写入后补同身份更新落盘和回读，失败阻止密钥恢复及FTMS控制，不擦除记录。服务表可因配置变化重建，重新同步时通过Service Changed告知已绑定客户端。该早期候选五轮加密控制/四路300秒通知、已绑定时八组配置/GATT重建/重启与原配置恢复通过，但最终4ecf069镜像实物第二轮重连失败，正式发行阻断；持久CCCD存在跨服务表句柄失配线索，尚未修复。当前容量和存储故障仅host专项，未做多客户端满容量或真机写失败注入。若系统单侧忘记绑定，板端会拒绝覆盖；当前没有用户清绑定入口，需定向维护。最终发行门禁以PROGRESS.md为准；旧[会话修复报告](46-qidou-session-security-fix.md)仅记录先前无绑定手机验收，不代表当前候选通过。
+
+## 未提交的订阅布局缓存候选（仍阻断发行）
+
+新增 `ble_bond_cache` 按GATT注册布局SHA256区分旧订阅，独立namespace `ble_gatt_cache`、key `layout_sha`。布局变化先清旧CCCD，保留已有Service Changed订阅并置value_changed，核验NVS后才提交/回读布局；相同布局及同Host重复sync不重复清理。密钥和用户配置不清，失败阻止广播。当前caf973be候选真实普通复连与重启配置保持通过，但服务表重建后WinRT发现仍失败，不能作为已修复规格或正式固件。采集时CCCD为0，不证明重建前状态或唯一根因；原八组/DIS已独立恢复。完整结果见 [绑定发行核验](47-bonding-release-verification.md)。标准Database Hash/Robust Caching尚未启用。
 
 ## BLE外设连接状态确认
 

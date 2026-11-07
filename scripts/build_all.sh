@@ -198,6 +198,7 @@ python3 tests/test_bridge_session.py
 python3 tests/test_ble_connection_recovery.py
 python3 tests/test_ble_standard_contract.py
 python3 tests/test_ble_session_security.py
+python3 tests/test_ble_bond_cache.py
 python3 tests/check_portal_render.py
 python3 tests/test_portal_config_save.py
 python3 tests/test_core_flow_endurance.py \

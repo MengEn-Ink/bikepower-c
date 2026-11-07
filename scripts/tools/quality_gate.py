@@ -401,6 +401,7 @@ STATIC_CHECKS = [
     ("tests/test_ble_standard_contract.py", "生产 FTMS 标准与广播事务 ASan/UBSan"),
     ("tests/test_ble_connection_recovery.py", "Host连接恢复与订阅交接生产回归 ASan/UBSan"),
     ("tests/test_ble_session_security.py", "会话加密初始化与安全存储契约 ASan/UBSan"),
+    ("tests/test_ble_bond_cache.py", "GATT布局变化与绑定订阅失效 ASan/UBSan"),
     ("tests/test_ble_serial_identity.py", "默认序列号与身份覆盖生产回归 ASan/UBSan"),
     ("tests/test_device_telemetry.py", "设备遥测人工协议真值与 CPU 窗口"),
     ("tests/test_portal_runtime.py", "生产门户容量与超时 ASan/UBSan"),

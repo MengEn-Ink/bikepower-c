@@ -168,6 +168,17 @@ int main(void) {
  assert(ble_hs_cfg.sm_io_cap==3&&ble_hs_cfg.sm_our_key_dist==3&&ble_hs_cfg.sm_their_key_dist==3);
  assert(ble_hs_cfg.store_read_cb==security_store_read&&ble_hs_cfg.store_write_cb==security_store_write);
  assert(ble_hs_cfg.store_delete_cb==security_store_delete&&ble_hs_cfg.store_status_cb==security_store_status);
+ ble_hs_cfg.store_read_cb=ble_store_config_read;
+ ble_hs_cfg.store_write_cb=ble_store_config_write;
+ ble_hs_cfg.store_delete_cb=ble_store_config_delete;
+ unsigned initializations=init_calls;
+ assert(security_store_activate()==0 && init_calls==initializations);
+ assert(ble_hs_cfg.store_read_cb==security_store_read&&ble_hs_cfg.store_write_cb==security_store_write&&ble_hs_cfg.store_delete_cb==security_store_delete);
+ s_security_store_failed=true;
+ ble_hs_cfg.store_read_cb=ble_store_config_read;
+ assert(security_store_activate()==ESP_ERR_INVALID_STATE && s_security_store_failed && ble_hs_cfg.store_read_cb==ble_store_config_read);
+ fixture();open_rc=42;assert(security_store_activate()==42 && s_security_store_failed && init_calls==0);
+ fixture();assert(configure_session_security()==0);
  union ble_store_key key={0};union ble_store_value value={0};
  assert(security_store_read(1,NULL,&value)==BLE_HS_EINVAL);
  assert(security_store_write(1,NULL)==BLE_HS_EINVAL);
@@ -222,9 +233,13 @@ def main():
     assert 's_security_store_failed' in extract_function(source, 'ftms_cp_cb')
     assert 'ble_hs_id_infer_auto(0,' in extract_function(source, 'on_sync'), '不切换本机RPA广播'
     assert 'ble_svc_gatt_changed(' in extract_function(source, 'on_sync'), '绑定客户端必须获知服务表变化'
+    sync = extract_function(source, 'on_sync')
+    assert sync.index('security_store_activate()') < sync.index('ble_bond_cache_sync(')
+    assert sync.index('security_store_activate()') < sync.index('start_advertising()')
+    assert 'ble_store_config_init(' not in extract_function(source, 'security_store_activate')
     assert 'ble_store_util_status_rr' not in source
     sigs = [(name, 'static int') for name in ('security_store_read','security_store_write','security_store_delete','security_store_status')]
-    sigs += [(name,'static esp_err_t') for name in ('security_store_validate','security_store_sync_value','configure_session_security')]
+    sigs += [(name,'static esp_err_t') for name in ('security_store_validate','security_store_sync_value','security_store_activate','configure_session_security')]
     production = functions(source, sigs)
     compiler = os.environ.get('CC') or shutil.which('cc') or shutil.which('gcc')
     assert compiler, '需要host C编译器，不允许跳过'
@@ -265,6 +280,52 @@ puts("实际IDF容量与重复配对前置分支通过；不自动删除旧绑�
 }
 '''
             run('upstream',PREAMBLE+production+helpers+code+checks)
+            store_path = upstream/'ble_store_config.c'
+            if not store_path.exists():
+                store_path = upstream.parent/'store/config/src/ble_store_config.c'
+            store_source = store_path.read_text(encoding='utf-8')
+            privacy_source = (upstream/'ble_hs_pvcy.c').read_text(encoding='utf-8')
+            host_source = (upstream/'ble_hs.c').read_text(encoding='utf-8')
+            assert 'ble_store_config_init();' in extract_function(privacy_source, 'ble_hs_pvcy_set_default_irk')
+            host_sync = extract_function(host_source, 'ble_hs_sync')
+            assert host_sync.index('ble_hs_startup_go()') < host_sync.index('ble_hs_cfg.sync_cb()')
+            actual_init = functions(store_source, [('ble_store_config_init', 'void')])
+            sequence_helpers = r'''
+#define MYNEWT_VAL_BLE_STATIC_TO_DYNAMIC 0
+#define MYNEWT_VAL_ENC_ADV_DATA 0
+#define SYSINIT_ASSERT_ACTIVE() ((void)0)
+static int ble_store_config_num_our_secs,ble_store_config_num_peer_secs,ble_store_config_num_cccds,ble_store_config_num_csfcs,ble_store_config_num_rpa_recs,ble_store_config_num_local_irks;
+static void ble_store_config_conf_init(void) {init_calls++;}
+static unsigned cache_calls,advertise_calls,failure_calls,telemetry_calls;
+static int security_store_read(int,const union ble_store_key*,union ble_store_value*);
+static int security_store_write(int,const union ble_store_value*);
+static int security_store_delete(int,const union ble_store_key*);
+static bool g_ready,g_start_failed;
+static unsigned char g_own_addr_type;
+#define BLE_GATT_CHANGED_START_HANDLE 1
+#define BLE_GATT_CHANGED_END_HANDLE 65535
+static int ble_hs_util_ensure_addr(int n) {(void)n;return 0;}
+static int ble_hs_id_infer_auto(int n,unsigned char *t) {(void)n;*t=0;return 0;}
+static void mark_start_failed(const char *m,int n) {(void)m;(void)n;failure_calls++;g_start_failed=true;g_ready=false;}
+static int ble_bond_cache_sync(bool *changed) {cache_calls++;*changed=false;assert(ble_hs_cfg.store_read_cb==security_store_read);assert(ble_hs_cfg.store_write_cb==security_store_write);assert(ble_hs_cfg.store_delete_cb==security_store_delete);return 0;}
+static void ble_svc_gatt_changed(unsigned a,unsigned b) {(void)a;(void)b;}
+static int start_advertising(void) {advertise_calls++;assert(ble_hs_cfg.store_read_cb==security_store_read);return 0;}
+static void ble_telemetry_service_sync(void) {telemetry_calls++;}
+#define ESP_LOGI(...) ((void)0)
+'''
+            sequence_checks = r'''
+int main(void) {
+fixture();assert(configure_session_security()==0);assert(init_calls==1);
+ble_store_config_init();assert(init_calls==2);
+assert(ble_hs_cfg.store_read_cb==ble_store_config_read && ble_hs_cfg.store_write_cb==ble_store_config_write && ble_hs_cfg.store_delete_cb==ble_store_config_delete);
+on_sync();assert(init_calls==2 && cache_calls==1 && advertise_calls==1 && telemetry_calls==1 && g_ready && !failure_calls);
+ble_store_config_init();s_security_store_failed=true;on_sync();assert(init_calls==3 && failure_calls==1 && cache_calls==1 && advertise_calls==1 && s_security_store_failed && !g_ready);
+s_security_store_failed=false;open_rc=42;on_sync();assert(failure_calls==2 && cache_calls==1 && advertise_calls==1 && s_security_store_failed && !g_ready);
+puts("真实IDF存储初始化覆盖→生产on_sync重新安装→缓存/广播次序及失败锁存阻断通过（host替身）");return 0;
+}
+'''
+            preamble = PREAMBLE.replace('static void ble_store_config_init(void) { init_calls++; }', 'void ble_store_config_init(void);')
+            run('startup_sequence', preamble+sequence_helpers+actual_init+production+'static void '+extract_function(source, 'on_sync')+sequence_checks)
 
 if __name__ == '__main__':
     main()

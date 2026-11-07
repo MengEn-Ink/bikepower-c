@@ -21,6 +21,17 @@
 #define BLE_BOND_NVS_RPA_PREFIX "rpa_rec_"
 #define BLE_GATT_CHANGED_START_HANDLE 1
 #define BLE_GATT_CHANGED_END_HANDLE UINT16_MAX
+#define BLE_BOND_CACHE_NAMESPACE "ble_gatt_cache"
+#define BLE_BOND_CACHE_LAYOUT_KEY "layout_sha"
+#define BLE_BOND_CACHE_FORMAT_VERSION 1
+#define BLE_BOND_CACHE_DIGEST_SIZE 32
+
+/* 诊断日志开关：默认 off，prod 编译无任何额外日志；
+ * diag sdkconfig 中 CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS=y 开启。
+ * 开启后输出 SC TX/ACK、订阅 restore、加密状态等诊断信息。 */
+#ifndef CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
+#define CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS 0
+#endif
 
 // ===== 板型枚举 =====
 // 新增板型：在此追加枚举值（保持 BOARD_TYPE_COUNT 末位），

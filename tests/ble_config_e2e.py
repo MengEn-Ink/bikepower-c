@@ -298,19 +298,24 @@ class DeviceSession:
         require(device is not None, f"未发现 BLE 设备 {self.device_name}")
         return device
 
-    async def connect(self):
+    async def connect_uncached(self, uncached=False):
         from bleak import BleakClient
 
         if self.client and self.client.is_connected:
             return
         device = await self._find_device()
         self.address = device.address
+        winrt = {"use_cached_services": False} if uncached else None
         self.client = BleakClient(device, timeout=max(20.0, self.scan_timeout),
-                                  winrt={"use_cached_services": False})
-        print("[ble-config-e2e] 正在建立精确目标连接", flush=True)
+                                  winrt=winrt) if winrt else BleakClient(
+            device, timeout=max(20.0, self.scan_timeout))
+        print(f"[ble-config-e2e] 正在建立精确目标连接 uncached={uncached}", flush=True)
         await self.client.connect()
         self.responses = asyncio.Queue()
         self.notify_started = False
+
+    async def connect(self):
+        await self.connect_uncached(False)
         service_uuids = {service.uuid.lower() for service in self.client.services}
         require(CONFIG_SERVICE_UUID in service_uuids, "未发现 BikePower Config Service")
 

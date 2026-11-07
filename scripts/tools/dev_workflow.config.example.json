@@ -1,0 +1,15 @@
+{
+  "$comment": "示例配置。复制到 %USERPROFILE%\\.bikepower\\dev_workflow.json（Linux/macOS 为 ~/.bikepower/dev_workflow.json）后按本机路径修改。本文件不含任何真实机器路径，可安全提交；机器本地配置绝不提交。",
+  "idf_path": "C:/Espressif/frameworks/esp-idf-v5.5.4",
+  "idf_python": "C:/Espressif/python_env/idf5.5_py3.11_env/Scripts/python.exe",
+  "tools_root": "C:/Espressif/tools",
+  "target": "esp32c3",
+  "board": "generic",
+  "cache_root": null,
+  "timeouts": {
+    "doctor": 90,
+    "build": 2400,
+    "test": 1200,
+    "lock_wait": 60
+  }
+}

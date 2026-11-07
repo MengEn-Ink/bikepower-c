@@ -188,6 +188,7 @@ def quick_steps(gate):
     run_step(gate, "Host连接恢复与订阅交接 ASan/UBSan", "python3 tests/test_ble_connection_recovery.py", 60)
     run_step(gate, "BLE 标准与广播事务 ASan/UBSan", "python3 tests/test_ble_standard_contract.py", 60)
     run_step(gate, "会话加密初始化与安全存储 ASan/UBSan", "python3 tests/test_ble_session_security.py", 60)
+    run_step(gate, "GATT布局变化与绑定订阅失效 ASan/UBSan", "python3 tests/test_ble_bond_cache.py", 60)
     run_step(gate, "BLE 协议 golden vectors", "python3 tests/test_ble_protocol_vectors.py", 60)
     run_step(gate, "BLE 配置 E2E 离线协议回归", "python3 tests/test_ble_config_e2e.py", 30)
     run_step(gate, "BLE E2E传输与目标隔离回归", "python3 tests/test_ble_e2e_transport.py", 30)

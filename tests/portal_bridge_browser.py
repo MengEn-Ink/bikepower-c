@@ -2,6 +2,7 @@
 """使用生产页面和 mock 接口验证手机/桌面桥接与保存失败路径。"""
 import json
 import argparse
+import os
 import socket
 import subprocess
 import sys
@@ -22,7 +23,8 @@ def main():
         screenshots.mkdir(parents=True, exist_ok=True)
     rows = []
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        chrome_kw = {"executable_path": os.environ["SYSTEM_CHROME"]} if os.environ.get("SYSTEM_CHROME") else {}
+        browser = p.chromium.launch(**chrome_kw)
         for width in (320, 390, 1440):
             with socket.socket() as sock:
                 sock.bind(("127.0.0.1", 0))

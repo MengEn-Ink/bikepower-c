@@ -4,14 +4,40 @@
 
 ## [未发布]
 
+### 离线 full 门禁第二轮闭合 + 真实浏览器回归（2026-11-08，独立QC）
+- Host 领域 6237/0；BLE E2E 传输在 Windows IDF Python 3.11.15 下 8/8 OK（证 py3.9 asyncio 无事件环为纯环境）；门户 JS、监控页内联 JS、web-flash node 单元 46/46（含跨标签 Web Lock）在 Windows node v22.23.2 下 PASS。
+- 会话安全 ASan、门户 runtime/faults 从独立冻结快照 `release-snapshot-4ecf069-020141`（排除 build/.git/node_modules）确定性重跑 rc=0 PASS，非"瞬态"推断；快照内 ble_bikepower.c sha256 `db7afdbe…` 与跑前不同，证实源被并发改写。
+- 真实浏览器 E2E 全绿：锁版本 chromium v1248 (CfT 156.0.8078.4) 本机下载被网络阻断，**未用旧 chromium-1194 冒充**；按授权改用系统已装 Google Chrome 156.0.8078.80，经单写预加载 `tests/_syschrome_preload.cjs`（node）与隔离 venv `build/test-venv`（python playwright 1.64.1，`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`，`SYSTEM_CHROME` 指同一 Chrome），9 个 node 浏览器用例 + 2 个 python 门户用例（bridge/exception，320/390/1440 三宽）全 PASS，断言零改动。
+- 核心流程耐久 mock 真实 600.4 秒 / 48 cycle PASS（非 15 cycle 替代），为 mock HTTP+host 算法，不代表真机无线/按键耐久。
+- 硬A侧（执行方上报，非本QC独立验证）：新生产 CCFD 完整 E2E 恢复 + 独立 restart PASS；SC 直连诊断子项已 PASS（state 0→14、两次 NimBLE 头、14 EDONE + gap 960 = ACK，已 QC），不等于生产最终门禁；设备五轮控制（5×60）正在修当前 UUID/旧 test 期待，尚未闭合。#14 生产最终门禁、#16 干净构建精确 flash 读回、CI、新鬥骑人工结果仍待，不旧 PASS 迁移。
+
 ### 本地虚拟开发板工具链
 - 新增Windows原生构建+WSL2仿真与Apple Silicon/Linux入口，固定ESP Emulator0.51.0、Bumble0.0.219、esptool4.11.0和运行依赖；Mac未实机验证。
 - 实际C3固件NimBLE、八组配置事务/重启/GATT重建/恢复、SC checked LTK/ERG/绑定复连/跑步回归通过；dirty候选和4ecf069已提交基线分别验证，不转移PASS。UART精确写读仅4 KiB，GDB断点/栈/单步已验证。
 - 九项辅助安全单测通过；修改后异常和取消保持FAIL/非零，恢复原八组并reset回读通过。新增独立虚拟CI和公开报告筛选，提交级远端结果待核验；不操作真机、不提交旧生产修复、不放行发行。
 
-## [4.3.3] - 2026-11-07
+### 启动保护回调最小修复验收（#13完成，仍不发行）
+- 新生产安全/订阅缓存ASan/UBSan专项通过；新增实际IDF存储初始化覆盖与生产on_sync重安装顺序回归，覆盖缓存/广播前安装、失败锁存及NVS异常拒绝启动。
+- 补齐进程IDF_PYTHON_ENV_PATH构建通过，生产e84a3dcf…e006eb7保持，app1153296字节。仅日志隔离镜像两次实物启动确认同步前包装读写删除不在位、同步后四回调全在位且failed=0；诊断已撤回，无诊断生产候选已刷入并esptool verify_flash摘要匹配，本轮全字节应用读取未完成。
+- 原八组/DIS/序列号复位后独立最终回读一致，NVS刷前两次独立读取及刷后24576字节逐字节相同、10条受保护有效blob CRC通过；本轮未删配对/密钥、不写用户配置。stub完整/分块短包与单包停滞失败保留，已停止恢复设备运行；ROM NVS/分区只读备份不冒称全Flash。
+- 已绑定跨服务表、Service Changed订阅持久化/发送/确认、五轮控制耐久和完整新最终镜像门禁仍未完成。电脑is_paired=false、板有测试密钥，当前保持密钥条件下未擅自初始化；新鬥骑复测恢复待验，main仍4ecf069，无本轮提交或发布。
 
-### 正式发行范围
+### 最小订阅缓存候选（未提交，仍未通过正式门禁）
+- 保留密钥、用户配置与按配置裁剪服务，仅用注册布局SHA256区分跨表旧CCCD；保留已有Service Changed订阅并置变更标志，相同布局/Host重复同步不重复清理，删除/落盘/回读失败阻止广播。
+- 通用C3候选app1153152字节、SHA caf973be…0bf2472构建0error、应用区精确刷读，原配置保持；真实Git副本生产缓存、原安全和标准专项通过。完整新聚合未执行，host替身不代替无线。
+- 正常pair后的完整配置E2E：读取/错误拒绝/修改/普通复连/重启持久化通过，服务表重建后WinRT灾难性故障、自动恢复Unreachable，轮内未清配对；新候选耐久未执行。不能将旧镜像五轮PASS转移。
+- 失败现场有效NVS读取：布局32字节CRC有效、安全记录2条、CCCD为0；不证明重建前订阅状态或全部异常唯一根因。完整Flash读取因传输损坏失败，部分原件保留不当有效备份。
+- 保留绑定复位和定向发现仍不能恢复，仅为收尾清本轮电脑pair；随后原八组恢复提交/回读/重启回读与独立DIS/串号核验通过，手机及板密钥不清。WARN启动20秒无致命标志。
+- 新修复未提交、无v4.3.3 tag/Release。Service Changed订阅与客户端缓存刷新链路仍待核对；未擅自启用引入动态服务行为的标准Database Hash/Robust Caching。
+
+### v4.3.3 正式发行被真机门禁阻断
+- 修复与文档已分批提交推送，生产修复a274bfe、最终构建源4ecf069；对应CI完整通过，包括锁定依赖浏览器回归。尚无v4.3.3 tag或Release。
+- 最终4ecf069镜像1151584字节、应用SHA5a6bb6bc…138c961精确刷写回读。原BLE自测通过（四路各17通知，320W实测321W，Stop回179W）；五轮耐久在完成第一轮60秒后第二轮GATT Unreachable失败，自动恢复报WinRT灾难性故障。旧候选41209d的五轮PASS不能代替最终镜像。
+- 普通复位和定向发现恢复失败，缓存发现返回Meta长度19而非12；仅为恢复现场清本轮电脑测试配对后独立原八组/DIS/序列号读取一致、重启保持。该清理不记正式重连PASS，板端测试绑定仍保留，未降低FTMS认证。
+- 记录级核对：当前服务表与若干持久CCCD句柄不匹配，含通知标志映射到只读DIS字段；支持跨服务表订阅缓存失配线索，但尚未证明它是全部WinRT失败唯一根因。服务表版本/订阅恢复策略需继续修复并重新验证。
+- 最终P0：serial_boot与ble_cycling PASS，ble_config_rw NOT_RUN、ble_reconnect与soak_5min FAIL；正式发行禁止放行，完整证据见本轮本地报告。
+
+### 计划发行范围
 - 通用 ESP32-C3 单板发行，保留稳定基线4.0.0；M5Stamp C3没有本轮实物证据，不提供未经验证的对应固件。
 - 修复Windows首次加密成功但复连缺密钥问题，启用标准持久绑定、存储校验和Service Changed；保留FTMS加密，不使用逐轮删除配对的测试捷径。
 - 原配置schema/分区、public本机身份、WARN日志、禁止开机自动WiFi保持。首次训练控制由系统配对；最多四个客户端，不自动淘汰或覆盖旧绑定。单侧忘记设备后需要定向维护，当前无用户清绑定入口。

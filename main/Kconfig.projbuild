@@ -17,4 +17,11 @@ menu "BikePower 板型配置"
             bool "M5Stamp C3（GPIO2 SK6812 RGB LED + GPIO3 按钮）"
     endchoice
 
+    config BIKEPOWER_DIAGNOSTIC_LOGS
+        bool "诊断日志（SC TX/ACK/订阅恢复/加密状态）"
+        default n
+        help
+            开启后输出 SC indication TX/ACK、订阅 restore、加密状态等诊断日志。
+            仅用于诊断镜像，prod 编译保持 off。
+
 endmenu
