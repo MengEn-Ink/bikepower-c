@@ -150,7 +150,7 @@ async def cp(session, opcode, payload=b''):
     require(response == bytes([0x80,opcode,1]), f'FTMS响应错误: {response.hex()}')
 
 
-async def run_protocol(args, folder, record):
+async def run_protocol(args, folder, record, record_not_obtained):
     from bumble import hci
     from bumble.device import Device
     from bumble.host import Host
@@ -417,7 +417,7 @@ def main():
             require(importlib.metadata.version(package)==LOCK[package],f'{package}版本不匹配')
         check_dependencies()
         run_flash(args,folder,record)
-        asyncio.run(asyncio.wait_for(run_protocol(args,folder,record),220))
+        asyncio.run(asyncio.wait_for(run_protocol(args,folder,record,record_not_obtained),220))
     except (Exception,KeyboardInterrupt,asyncio.CancelledError) as exc:
         error=f'{type(exc).__name__}: {exc}'
         print('[virtual-board] FAIL '+error,flush=True)
