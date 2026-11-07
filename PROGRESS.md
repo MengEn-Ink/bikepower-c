@@ -5,6 +5,16 @@
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
+## 2026-11-07 鬥骑会话加密修复与用户验收
+
+- [x] 修复前手机20轮证据为FTMS认证触发SMP失败后手机主动拆链；不是采集窗内App进程反复崩溃，序列号15字节已正常。
+- [x] 最小会话加密修复：本项目bt编译期无绑定、host启动前ENOENT读取回调；保留SC Just Works/FTMS加密、不持久化bond，不改通知或用户配置。
+- [x] 通用C3候选4.3.2/669127d dirty已刷，app d501cc24…逐字节回读匹配；原八组/DIS/序列号保持。Flash差异仅phy/cal_data有效记录更新，用户记录CRC保持，原始失败保留。
+- [x] 构建0error、Host6237/0与生产专项/静态、mock15轮180.5秒通过；Windows首次正常配对后控制/ERG/Stop通过，320W最后324W、四路各12帧、空闲堆155460字节。
+- [x] 用户本轮确认鬥骑正常连接；手机SC加密成功、1次连接/0次断开、24次控制Status0，Request/Start正确，FTMS去重340通知/356.973秒、无SMP失败/当前退出。0x11正常Not Supported未拆链，不等于新增控制支持或页面全部数值验收。
+- [x] 新安全回归接质量、quick/full、双板构建前门禁；完整[验收与边界](docs/dev/46-qidou-session-security-fix.md)已记录。
+- [ ] 独立保留：Windows后续GATT Unreachable（配置E2E首次读取前失败，无写入）、双次重连未跑；跑步加密/m5stamp实物/实体按钮/长时跨App/完整发行门禁未闭合。本轮只提交修复，不升版本、不创建新发行、不干扰手机连接。
+
 ## 2026-11-07 v4.3.2 预发布与 BINAVI 连接结项
 
 - [x] 版本号 4.3.2 落地（`bikepower_config.h` 三处版本常量 → `4.3.2`，`FIRMWARE_STABLE_VERSION` 保持 `4.0.0`），文档事实与四处一致性文档同步；一致性 295 通过 0 失败、docs 门禁 79 通过 2 警告 0 失败。

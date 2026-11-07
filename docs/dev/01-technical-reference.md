@@ -306,7 +306,7 @@ GAP 事件回调为 `gap_event_cb()`：
 
 CPS/CSC Measurement 仅使用 Notify。CPS Feature 固定四字节 `08 00 10 00`（曲柄转数、非分布式总功率），CPS Sensor Location 复用 `SENSOR_LOCATION_CHAR_UUID=0x2A5D`，值 `05`（左曲柄）；CSC Feature 固定两字节 `02 00`（曲柄转数）。不声明未实现的轮速、校准或控制能力。`test_ble_cycling_services.py` 验证双 profile GATT 与读取回调，真机脚本 `ble_selftest.py` 验证实际读值和属性。服务变化后需清除客户端旧缓存，第三方 App/码表仍需实测。
 
-FTMS 跑步 Feature 为 `0414000001000000`，对应距离、心率、用时与目标速度；目标速度范围 `2AD4` 为 3–25km/h、增量 0.01km/h，目标功率范围 `2AD8` 为 0–2000W、增量 1W。HRS/RSC/FTMS 数据及状态使用 Notify，FTMS 控制点使用 Write + Indicate + Write Encryption；采用无输入输出、非 bonding 的 Secure Connections Just Works，真实配对尚待验收。主广播使用部分 UUID 列表，FTMS Service Data 声明可用状态与骑行/跑步机类型，名字最多 11 字节且按 UTF-8 截断。详见 [补测记录](33-ble-standard-test-plan.md)。
+FTMS 跑步 Feature 为 `0414000001000000`，对应距离、心率、用时与目标速度；目标速度范围 `2AD4` 为 3–25km/h、增量 0.01km/h，目标功率范围 `2AD8` 为 0–2000W、增量 1W。HRS/RSC/FTMS 数据及状态使用 Notify，FTMS 控制点使用 Write + Indicate + Write Encryption；采用无输入输出、非 bonding 的 Secure Connections Just Works；本项目bt编译期关闭持久绑定分支，host启动前安全存储读取回调对支持对象返回ENOENT，不写持久密钥。华为鬥骑当前候选已通过SC加密与Request/Start，Windows首次配对后ERG/Stop通过；Windows后续GATT重连及完整跨客户端验收仍开放，见[修复验收](46-qidou-session-security-fix.md)。主广播使用部分 UUID 列表，FTMS Service Data 声明可用状态与骑行/跑步机类型，名字最多 11 字节且按 UTF-8 截断。详见 [补测记录](33-ble-standard-test-plan.md)。
 
 模拟骑行 FTMS Feature 固定为 `0244000008000000`；真实桥接按用户选择不提供 FTMS。来源配置改变时等待断连后重建 GATT；上游掉线和模拟降级不触发服务重建。FTMS/配置 indication 共享 8 条静态预留队列，操作前预留、确认后推进，失败终止连接，旧 token 不跨连接复用。跑步 RSC 在功率位或踏频位任一启用时发送完整必需字段，与服务注册一致。专项证据见 [兼容复核](34-ble-compatibility-recheck.md)。
 
@@ -367,7 +367,7 @@ Fitness Machine Status 和 Control Point 使用独立编号；Reset/Started 为 
 
 RSC `SC Control Point=0x2A55` 使用 Write + Indicate，支持 Set Cumulative Value（opcode 1、uint32 dm）及 Response Code 0x10；已知请求截断、未知操作码、未订阅、进行中和 mailbox 忙均有独立错误路径。累计设置仅作用于本次运行会话，不写 NVS；长度、订阅和全 uint32 范围回归不替代实物 GATT 验收。
 
-运动及遥测通知在分配 mbuf 前检查当前连接的逐特征 Notify CCCD 状态；断连、host reset、GATT 重建清空订阅。FTMS CP 强制加密，实际系统配对、旧缓存和目标 App 互操作尚未执行。
+运动及遥测通知在分配 mbuf 前检查当前连接的逐特征 Notify CCCD 状态；断连、host reset、GATT 重建清空订阅。FTMS CP 强制加密；鬥骑本次SC会话加密与控制成功，后续旧缓存、Windows重复连接及完整跨App互操作未闭合，不沿用为全场景PASS。
 
 ### 4.5 BikePower Config Service
 

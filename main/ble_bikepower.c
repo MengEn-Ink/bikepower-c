@@ -38,6 +38,33 @@
 
 static const char *TAG = "BLE";
 
+static int session_security_store_read(int obj_type, const union ble_store_key *key,
+                                       union ble_store_value *value)
+{
+    if (!key || !value) return BLE_HS_EINVAL;
+    switch (obj_type) {
+    case BLE_STORE_OBJ_TYPE_OUR_SEC:
+    case BLE_STORE_OBJ_TYPE_PEER_SEC:
+    case BLE_STORE_OBJ_TYPE_CCCD:
+    case BLE_STORE_OBJ_TYPE_PEER_DEV_REC:
+    case BLE_STORE_OBJ_TYPE_PEER_ADDR:
+    case BLE_STORE_OBJ_TYPE_LOCAL_IRK:
+    case BLE_STORE_OBJ_TYPE_CSFC:
+        return BLE_HS_ENOENT;
+    default:
+        return BLE_HS_ENOTSUP;
+    }
+}
+
+static void configure_session_security(void)
+{
+    ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
+    ble_hs_cfg.sm_sc = 1;
+    ble_hs_cfg.sm_bonding = 0;
+    ble_hs_cfg.sm_mitm = 0;
+    ble_hs_cfg.store_read_cb = session_security_store_read;
+}
+
 static uint8_t  g_own_addr_type;
 // host 发布句柄，主任务与通知任务读取；单值状态使用 C11 原子。
 static atomic_uint_least16_t g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
@@ -1826,10 +1853,7 @@ esp_err_t ble_bikepower_start(void)
 
     ble_hs_cfg.sync_cb = on_sync;
     ble_hs_cfg.reset_cb = on_reset;
-    ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
-    ble_hs_cfg.sm_sc = 1;
-    ble_hs_cfg.sm_bonding = 0;
-    ble_hs_cfg.sm_mitm = 0;
+    configure_session_security();
 
     ble_svc_gap_init();
     ble_svc_gatt_init();

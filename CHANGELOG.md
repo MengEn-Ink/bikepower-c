@@ -4,7 +4,10 @@
 
 ## [Unreleased]
 
-（暂无）
+### 修复
+- 鬥骑FTMS配对循环：本项目bt组件编译期关闭持久绑定分支，接会话安全存储ENOENT回调；保留SC Just Works与两种Profile的Write Encryption，不新增NVS绑定或降低认证。
+- 华为手机实测：1次连接/0次断开，SC加密开启；控制写入24次Status0、Request/Start响应正确，FTMS通知去重340条/356.973秒，无配对失败、无新增退出；用户确认正常连接。后续0x11请求正常返回Not Supported，App读数及其他场景不扩大验收。
+- 构建、Host6237/0、生产专项和15轮/180.5秒mock通过；Windows首次配对/ERG320W实测324W/Stop通过，后续GATT Unreachable与配置E2E未执行写入的失败保留。专项接质量/quick/full/双板构建；本轮不升版本或发布，详见[会话加密修复验收](docs/dev/46-qidou-session-security-fix.md)。
 
 ## [4.3.2] - 2026-11-07
 
