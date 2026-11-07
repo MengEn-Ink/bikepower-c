@@ -7,7 +7,7 @@
 - **名称**：BikePower C — ESP32-C3 蓝牙功率计模拟器（C 重写版）
 - **运行环境**：ESP-IDF v5.5.4 + NimBLE + FreeRTOS（非 MicroPython）
 - **硬件平台**：合宙 ESP32-C3（RISC-V 单核 160MHz, 400KB SRAM, WiFi+BLE5.0）
-- **当前版本**：v4.3.1；本轮审查修复仍需新的构建与实物验收证据，不能沿用历史正式版本的 PASS。
+- **当前版本**：以 `main/bikepower_config.h` 为准；发布进度及当前候选验收见 `PROGRESS.md`，不得沿用历史版本的 PASS。
 - **主仓库**：git@github.com:MengEn-Ink/bikepower-c.git
 - **构建/烧录**：`idf.py build` / `idf.py -p <port> flash monitor`
 
