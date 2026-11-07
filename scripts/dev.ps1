@@ -24,7 +24,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("build", "flash", "monitor", "test", "check", "clean", "reconfigure", "erase", "stats", "help", "")]
+    [ValidateSet("build", "flash", "monitor", "test", "check", "clean", "reconfigure", "erase", "stats", "sim", "sim-setup", "sim-doctor", "sim-build", "sim-test", "sim-debug", "help", "")]
     [string]$Action = "help",
 
     [ValidateSet("generic", "m5stamp")]
@@ -36,6 +36,16 @@ param(
     [switch]$NoChecks,
     [switch]$Erase,
     [switch]$SkipHostTest,
+
+    [switch]$Security,
+
+    [switch]$Running,
+
+    [string]$Gdb = "gdb-multiarch",
+
+    [string]$BuildDir = "build/virtual-board-build",
+
+    [string]$WslDistribution = "Ubuntu-20.04",
 
     [string]$IdfPath = ""
 )
@@ -65,6 +75,9 @@ function Show-Help {
     Write-Host "  reconfigure  重新生成 CMake 配置"
     Write-Host "  erase        擦除整片 flash"
     Write-Host "  stats        显示 ccache 缓存统计"
+    Write-Host "  sim          本地虚拟板（Windows + WSL2，不接真实设备）"
+    Write-Host "               可用: sim / sim-setup / sim-doctor / sim-build / sim-test / sim-debug"
+    Write-Host "               sim 默认执行 test"
     Write-Host "  help         显示此帮助"
     Write-Host ""
     Write-Host "Options:"
@@ -73,6 +86,10 @@ function Show-Help {
     Write-Host "  -NoBuild                   跳过编译（仅 flash 时有效）"
     Write-Host "  -NoChecks                  跳过静态门禁"
     Write-Host "  -SkipHostTest              跳过 host 单测"
+    Write-Host "  -Security / -Running       sim test 时启用安全配对与跑步通知用例"
+    Write-Host "  -Gdb [path]                sim debug 使用的 GDB（默认 gdb-multiarch）"
+    Write-Host "  -BuildDir [path]           sim 使用的独立构建目录"
+    Write-Host "  -WslDistribution [name]    sim 使用的 WSL 分发版（默认 Ubuntu-20.04）"
     Write-Host "  -IdfPath [path]            指定 ESP-IDF 安装路径"
     Write-Host ""
     Write-Host "示例:"
@@ -310,6 +327,23 @@ Write-Host ("动作: " + $Action)
 if ($Board -ne "generic") { Write-Host ("板型: " + $Board) }
 if ($Port) { Write-Host ("串口: " + $Port) }
 Write-Host ""
+
+# 本地虚拟板：Windows 侧不激活 ESP-IDF，由 virtual_board.ps1 自行解析构建环境
+if ($Action -like "sim*") {
+    $step = if ($Action -eq "sim") { "test" } else { $Action.Substring(4) }
+    $runner = Join-Path $ScriptDir "virtual_board.ps1"
+    $simParams = @{
+        Action       = $step
+        BuildDir     = $BuildDir
+        Gdb          = $Gdb
+        Distribution = $WslDistribution
+        Security     = [bool]$Security
+        Running      = [bool]$Running
+    }
+    if ($IdfPath) { $simParams['IdfPath'] = $IdfPath }
+    & $runner @simParams
+    exit $LASTEXITCODE
+}
 
 # check 和 test 只需要 Python，不需要 ESP-IDF
 if ($Action -eq "check") {

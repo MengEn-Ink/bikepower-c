@@ -1,4 +1,4 @@
-# 本地虚拟板运行器，不访问串口或真实蓝牙。
+﻿# 本地虚拟板运行器，不访问串口或真实蓝牙。
 [CmdletBinding()]
 param(
     [ValidateSet('setup','doctor','build','test','debug')][string]$Action='doctor',

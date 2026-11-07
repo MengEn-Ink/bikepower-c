@@ -47,3 +47,19 @@ test/test_power_bridge
 test/test_power_bridge.exe
 test/test_bridge_failover
 test/test_bridge_failover.exe
+
+# 工作区残渣（scripts/tools/workspace_audit.py 归类为 scratch）
+=0.22,
+*.tmp
+*.bak
+final-status.md
+
+# 本机 agent / 技能配置，不入库
+.agents/
+.claude/
+agent/
+skills-lock.json
+
+# 网页草稿与内嵌演示副本
+tools/web/_drafts/
+tools/web/design-demos/
