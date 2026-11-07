@@ -43,6 +43,7 @@
 | [鬥骑序列号修复](dev/43-qidou-serial-fix.md) | USB证据、非空默认序列号、配置保留刷写与待App复测 |
 | [鬥骑会话加密修复](dev/46-qidou-session-security-fix.md) | 无绑定安全存储、手机配对/控制成功与未闭合边界 |
 | [持久绑定与发行核验](dev/47-bonding-release-verification.md) | v4.3.3加密恢复、已绑定GATT重建、真实耐久与发行边界 |
+| [本地虚拟开发板](dev/48-local-virtual-board.md) | Windows/WSL本机入口、Apple Silicon待验、虚拟刷写/BLE/GDB/CI与真机边界 |
 
 ## Code Wiki
 

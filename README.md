@@ -51,6 +51,8 @@ Pages 手册分为设备按键与手机操作：手机机身内复用实际配�
 
 ## 开发与验证
 
+无硬件优先验证使用[本地虚拟开发板](docs/dev/48-local-virtual-board.md)：Windows 原生构建 + 同机 WSL2 模拟器已跑通，macOS Apple Silicon 入口待实机验证。统一入口 `scripts/virtual_board.ps1` / `scripts/virtual_board.sh` 提供 setup、doctor、build、test 和 GDB debug；虚拟测试不替代真实射频、系统 GATT 缓存和发行门禁。
+
 应用层位于 `main/`；纯 C 领域算法位于 `components/bikepower_domain/`，可在宿主机测试。BLE 配置、上游桥接与 RF 生命周期分别由专属模块维护。
 
 | 目录 | 用途 |

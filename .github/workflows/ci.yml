@@ -14,6 +14,43 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  virtual-board:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Setup virtual runtime
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install locked emulator and harness
+        run: sh scripts/virtual_board.sh setup
+      - name: Controller refusal regression
+        run: build/virtual-board-tools/venv/bin/python tests/test_virtual_board.py
+      - name: Build actual ESP32-C3 firmware
+        shell: bash
+        run: |
+          git clone --branch v5.5.4 --depth 1 --recursive --shallow-submodules https://github.com/espressif/esp-idf.git "$RUNNER_TEMP/esp-idf"
+          "$RUNNER_TEMP/esp-idf/install.sh" esp32c3
+          . "$RUNNER_TEMP/esp-idf/export.sh"
+          sh scripts/virtual_board.sh build
+          sh scripts/virtual_board.sh test build/virtual-board-build --security --running
+          sh scripts/virtual_board.sh debug build/virtual-board-build
+      - name: Upload public evidence only
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: virtual-board-${{ github.run_id }}
+          path: |
+            tests/reports/virtual-board/**/report.json
+            tests/reports/virtual-board/**/report.md
+            tests/reports/virtual-board/**/gdb.log
+          if-no-files-found: error
+          retention-days: 14
+
   quick-harness:
     runs-on: ubuntu-latest
     timeout-minutes: 15

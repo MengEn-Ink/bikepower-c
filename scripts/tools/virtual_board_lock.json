@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "esp_idf": "5.5.4",
+  "esp_emulator": "0.51.0",
+  "bumble": "0.0.219",
+  "esptool": "4.11.0",
+  "archives": {
+    "x86_64-unknown-linux-gnu": "2b9e157470edb8b03167996550292c6df8cc6716025ebad8927db950d7931417",
+    "aarch64-unknown-linux-gnu": "3fca854df8d1fc2fc73e37f3a4e9db214166d0e07dfdbd4702019fd9dcc3146f",
+    "aarch64-apple-darwin": "ab02524bd286ce84577639731d0e48d623ce9be65e45d9e1246dd220c1476102"
+  }
+}

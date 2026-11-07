@@ -5,6 +5,14 @@
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
+## 本地虚拟开发板验证（独立于真机发行）
+
+- [x] Windows 原生 IDF5.5.4 + 同机 WSL2 ESP Emulator0.51.0/Bumble0.0.219 跑通，无真实串口或蓝牙适配器。九项辅助控制器拒绝单测通过，GDB app_main断点/栈/PC-SP/单步通过。
+- [x] dirty候选完整安全+跑步虚拟回归通过（一次50.062秒）；已提交4ecf069基线独立完整回归通过。后续收尾加固复跑含原配置reset回读通过；异常/取消注入均整体FAIL且恢复与reset回读PASS，失败原报告保留。
+- [x] setup/doctor/build/test/debug入口、完整Python版本锁、archive SHA和独立报告已实现。UART精确刷写回读只覆盖0x10000起4 KiB，完整4 MiB镜像用于运行，不冒称全Flash重刷。
+- [ ] 新工具提交级构建、远端CI待完成；macOS Apple Silicon未实机验证，Intel Mac无固定原生包。运行边界见[本地虚拟开发板](docs/dev/48-local-virtual-board.md)。
+- [ ] 虚拟Host/HCI模型不证明AES-CCM射频、隐私解析、Windows/手机缓存、跨表SC落盘/发送/确认、实体掉电、电气灯效、WiFi共存或目标App；下列真机发行阻断保持。本轮不操作真实设备，不提交旧生产修复，不tag/Release。
+
 ## 2026-11-07 v4.3.3 持久绑定续接（执行中）
 
 - [x] pair-only受控测试全程不写配置、不重建GATT；Windows首次加密成功，第二次建链后尝试恢复加密，HCI Encryption Change返回0x06/enabled0，随后Windows主动拆链。采集无事件丢失；StartEncryption及Pair参数被提供程序裁剪，不从短载荷推断密钥/EDIV/Rand。

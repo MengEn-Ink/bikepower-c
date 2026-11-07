@@ -1,5 +1,13 @@
 # 测试脚本使用说明
 
+## 本地虚拟开发板
+
+- Windows：`./scripts/virtual_board.ps1 setup`、`doctor`、`build`、`test -Security -Running`、`debug`；构建在 Windows，仿真在同机 WSL2，不访问真实串口/蓝牙。
+- macOS Apple Silicon/Linux：`sh scripts/virtual_board.sh setup|doctor|build`，`test build/virtual-board-build --security --running`，`debug build/virtual-board-build --gdb riscv32-esp-elf-gdb`。macOS 未实机验证，Intel 无固定版原生包。
+- `tests/test_virtual_board.py` 验证 LTK/未知命令拒绝；`virtual_board_e2e.py` 跑实际 NimBLE/配置/通知/重启/恢复；`virtual_board_gdb.py` 验证符号断点、栈与单步。
+- `--inject-failure after-config|cancel-after-config` 仅针对私有虚拟镜像，预期整体 FAIL/非零且原配置恢复与 reset 回读通过，不是正常 E2E PASS。
+- CI 运行独立 `virtual-board` job，只上传公开报告/GDB日志，不上传 keys/Flash 私有副本。虚拟刷写目前精确覆盖4 KiB，真实缓存/射频/发行门禁保持，详见[运行与边界](../docs/dev/48-local-virtual-board.md)。
+
 ## BINAVI连接修复与上线前验证
 
 - `python3 tests/test_ble_connection_recovery.py`：生产函数Host确认、状态26、真实失败、早到订阅、幂等确认及异句柄隔离；已接入quick/full、质量门禁和双板构建前测试。

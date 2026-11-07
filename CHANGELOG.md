@@ -2,6 +2,13 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。版本号格式 `vMAJOR.MINOR.PATCH`。
 
+## [未发布]
+
+### 本地虚拟开发板工具链
+- 新增Windows原生构建+WSL2仿真与Apple Silicon/Linux入口，固定ESP Emulator0.51.0、Bumble0.0.219、esptool4.11.0和运行依赖；Mac未实机验证。
+- 实际C3固件NimBLE、八组配置事务/重启/GATT重建/恢复、SC checked LTK/ERG/绑定复连/跑步回归通过；dirty候选和4ecf069已提交基线分别验证，不转移PASS。UART精确写读仅4 KiB，GDB断点/栈/单步已验证。
+- 九项辅助安全单测通过；修改后异常和取消保持FAIL/非零，恢复原八组并reset回读通过。新增独立虚拟CI和公开报告筛选，提交级远端结果待核验；不操作真机、不提交旧生产修复、不放行发行。
+
 ## [4.3.3] - 2026-11-07
 
 ### 正式发行范围
