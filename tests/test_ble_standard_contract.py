@@ -299,10 +299,15 @@ GAP_STUBS = r"""
 #define BLE_GAP_EVENT_SUBSCRIBE 4
 #define BLE_GAP_EVENT_NOTIFY_TX 5
 #define BLE_HS_EDONE 14
+#define BLE_ERR_UNSUPP_REM_FEATURE 26
+#define BLE_GAP_ROLE_SLAVE 1
+struct ble_gap_conn_desc {uint16_t conn_handle;uint8_t role;};
+static int ble_gap_conn_find(uint16_t h,struct ble_gap_conn_desc *d)
+{if(h!=1)return 7;d->conn_handle=h;d->role=BLE_GAP_ROLE_SLAVE;return 0;}
 struct ble_gap_event {
     int type;
     struct {int status;uint16_t conn_handle;} connect;
-    struct {int reason;} disconnect;
+    struct {int reason;struct ble_gap_conn_desc conn;} disconnect;
     struct {uint16_t conn_handle,attr_handle;bool cur_indicate,cur_notify;} subscribe;
     struct {uint16_t conn_handle,attr_handle;bool indication;int status;} notify_tx;
 };
@@ -334,6 +339,7 @@ GAP_CHECKS = r"""
 int main(void)
 {
     (void)chr_read_buf;(void)g_ready;(void)g_broadcast_mask;(void)s_data_lock;(void)s_output;
+    g_ready=true;g_conn_handle=BLE_HS_CONN_HANDLE_NONE;
     struct ble_gap_event e={.type=BLE_GAP_EVENT_CONNECT,.connect={.status=0,.conn_handle=1}};
     g_ftms_pending=g_ftms_control=g_ftms_subscribed=true;gap_event_cb(&e,NULL);
     assert(g_conn_handle==1 && !g_ftms_pending && !g_ftms_control && !g_ftms_subscribed);
@@ -352,7 +358,8 @@ int main(void)
     assert(!g_ftms_pending && !g_ftms_control);
     e.type=BLE_GAP_EVENT_SUBSCRIBE;e.subscribe.conn_handle=1;e.subscribe.attr_handle=9;
     g_ftms_control=true;gap_event_cb(&e,NULL);assert(!g_ftms_subscribed && !g_ftms_control);
-    e.type=BLE_GAP_EVENT_DISCONNECT;g_ftms_pending=g_ftms_control=g_ftms_subscribed=true;
+    e.type=BLE_GAP_EVENT_DISCONNECT;e.disconnect.conn.conn_handle=1;
+    g_ftms_pending=g_ftms_control=g_ftms_subscribed=true;
     gap_event_cb(&e,NULL);
     assert(g_conn_handle==0xffff && !g_ftms_pending && !g_ftms_control && !g_ftms_subscribed);
     assert(ads==1 && closed==1);
@@ -554,7 +561,8 @@ def main():
         callbacks = functions(source, [("start_advertising", "static int")])
         run(PREAMBLE + ADV_STUBS + callbacks + ADV_CHECKS)
     if mode in ("all", "lifecycle"):
-        callbacks = functions(source, [("gap_event_cb", "static int"), ("on_reset", "static void")])
+        callbacks = functions(source, [("connection_accept", "static bool"),
+                                       ("gap_event_cb", "static int"), ("on_reset", "static void")])
         run(PREAMBLE + GAP_STUBS + callbacks + GAP_CHECKS)
     if mode in ("all", "transmission"):
         state=source.split("// BEGIN_INDICATION_STATE")[1].split("// END_INDICATION_STATE")[0]

@@ -84,9 +84,13 @@ typedef enum {
     BROADCAST_FIELD_POWER     = 1 << 0,
     BROADCAST_FIELD_CADENCE   = 1 << 1,
     BROADCAST_FIELD_HEARTRATE = 1 << 2,
+    /* 兼容选项：踏频随 CPS 曲柄字段输出，不再单独暴露 CSC 服务，
+       让只按设备类型过滤的码表优先把本机识别为功率计。 */
+    BROADCAST_FIELD_CADENCE_WITH_POWER = 1 << 3,
 } broadcast_field_t;
 
 #define BROADCAST_FIELD_ALL (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_HEARTRATE)
+#define BROADCAST_FIELD_VALID (BROADCAST_FIELD_ALL | BROADCAST_FIELD_CADENCE_WITH_POWER)
 
 // ===== 跑步输出模式 =====
 typedef enum {

@@ -432,6 +432,29 @@ for legacy_ver in sorted({int(v) for v in re.findall(r'c->schema_ver == (\d+)', 
 check("未知旧版本" in tech_ref_src and "默认配置" in tech_ref_src,
       "技术参考记录未知旧 schema 的默认回退策略")
 
+# 踏频随功率兼容位（0x08）必须在设备门户与 Pages 都被编码并保留
+check("BROADCAST_FIELD_CADENCE_WITH_POWER = 1 << 3" in domain_src,
+      "domain_config.h 定义 CADENCE_WITH_POWER = 1<<3")
+check((1 << 3) <= 0xFF and "broadcast_mask &= BROADCAST_FIELD_VALID" in config_store_src,
+      "config_store.c 按 BROADCAST_FIELD_VALID 归一化广播位")
+check("data-cadence-bundle" in app_js_src and "cadenceWithPower" in app_js_src,
+      "设备门户 app.js 必须保留兼容位草稿与编码")
+pages_src = read(ROOT / "tools" / "web" / "ble-monitor.html")
+check("cfg-broadcast-cadence-bundle" in pages_src,
+      "Pages 配置表单必须提供踏频随功率复选框")
+check("cadenceWithPower:cadenceBundle" in pages_src
+      and "((cadenceBundle&&broadcastPower&&broadcastCadence)?8:0)" in pages_src,
+      "Pages collectConfigForm 必须把兼容位并入 broadcast_mask，不能只重组 bit0-2")
+check("踏频随功率需要同时启用功率和踏频" in pages_src,
+      "Pages 校验必须拒绝孤立兼容位，避免勾选后被静默丢弃")
+check("bw.cadenceWithPower && !(bw.power && bw.cadence)" in app_js_src,
+      "设备门户保存前必须拒绝孤立兼容位")
+check("state.draft.broadcast.cadenceWithPower = false" in app_js_src
+      and 'querySelector("[data-cadence-bundle]")' in app_js_src,
+      "设备门户取消功率或踏频时必须同步清除兼容位勾选")
+check("state.draft.broadcast.power || state.draft.broadcast.cadence || state.draft.broadcast.heart" in app_js_src,
+      "设备门户“至少一项广播”必须只统计真实数据位，不含兼容位")
+
 
 # ============================ 4. WiFi AP 凭证一致性 ============================
 print(f"\n{TAG} [S4] WiFi AP 凭证一致性")

@@ -98,11 +98,16 @@ int main(void)
     assert(find(0x1826, 0x2ada)->flags == BLE_GATT_CHR_F_NOTIFY);
     assert(find(0x1826, 0x2ad9)->flags == (BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE | BLE_GATT_CHR_F_WRITE_ENC));
     assert(find(0x1826, 0x2ad4) && find(0x1826, 0x2ad4)->flags == BLE_GATT_CHR_F_READ);
-    for(int profile=0;profile<2;++profile)for(int real=0;real<2;++real)for(int mask=1;mask<=7;++mask){
+    for(int profile=0;profile<2;++profile)for(int real=0;real<2;++real)for(int mask=1;mask<16;++mask){
+        if(!(mask&7)) continue;
         g_profile=profile;g_bridge_mode=real;g_broadcast_mask=mask;build_active_gatt_svcs();
         table_under_test=g_active_svcs;
         assert((find(0x1826,profile?0x2acd:0x2ad2)!=NULL)==((mask&3)&& (profile||!real)));
-        if(!profile){assert((find(0x1818,0x2a63)!=NULL)==!!(mask&1));assert((find(0x1816,0x2a5b)!=NULL)==!!(mask&2));}
+        if(!profile){
+            assert((find(0x1818,0x2a63)!=NULL)==!!(mask&1));
+            /* 兼容位只在功率同时开启时移除独立 CSC，踏频仍通过 CPS 曲柄字段提供。 */
+            assert((find(0x1816,0x2a5b)!=NULL)==((mask&2) && !((mask&1)&&(mask&8))));
+        }
     }
     puts("骑行标准服务：Feature / Sensor Location 字节、只读与 Notify 属性通过");
     return 0;

@@ -539,6 +539,14 @@ static void test_broadcast_fields_and_button_target(void)
     power_engine_set_sport_profile(&e, SPORT_PROFILE_CYCLING);
     CHECK(power_engine_set_broadcast_mask(&e, BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_HEARTRATE), "骑行踏频+心率 mask 生效");
     CHECK(power_engine_button_target(&e) == CONTROL_TARGET_CADENCE, "骑行功率关闭时按钮目标为踏频");
+    CHECK(power_engine_set_broadcast_mask(&e,
+              BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_CADENCE_WITH_POWER),
+          "可启用踏频随功率兼容位");
+    CHECK(e.broadcast_mask == (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE | BROADCAST_FIELD_CADENCE_WITH_POWER),
+          "兼容位随 mask 保留");
+    CHECK(power_engine_button_target(&e) == CONTROL_TARGET_POWER, "兼容位不改变按钮目标");
+    CHECK(!power_engine_set_broadcast_mask(&e, BROADCAST_FIELD_CADENCE_WITH_POWER),
+          "仅兼容位无数据项时拒绝");
     CHECK(power_engine_set_broadcast_mask(&e, BROADCAST_FIELD_POWER | BROADCAST_FIELD_HEARTRATE), "骑行功率+心率 mask 生效");
     CHECK(power_engine_button_target(&e) == CONTROL_TARGET_POWER, "骑行多项时优先功率");
 }

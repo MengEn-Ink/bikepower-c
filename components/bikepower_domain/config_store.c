@@ -199,7 +199,7 @@ bool config_store_validate(config_data_t *c)
     }
     led_config_validate(&c->led);
     if (c->sport_profile < 0 || c->sport_profile >= SPORT_PROFILE_COUNT) c->sport_profile = DEFAULT_SPORT_PROFILE;
-    c->broadcast_mask &= BROADCAST_FIELD_ALL;
+    c->broadcast_mask &= BROADCAST_FIELD_VALID;
     if (c->broadcast_mask == 0) c->broadcast_mask = BROADCAST_FIELD_ALL;
     c->run_speed_x100 = clamp_int(c->run_speed_x100, RUN_SPEED_X100_MIN, RUN_SPEED_X100_MAX);
     c->run_pace_float_sec = clamp_int(c->run_pace_float_sec, RUN_PACE_FLOAT_SEC_MIN, RUN_PACE_FLOAT_SEC_MAX);

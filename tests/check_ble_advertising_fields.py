@@ -58,6 +58,8 @@ check("BLE_UUID16_INIT(CSC_SERVICE_UUID)" in cycling_branch,
       "骑行主广播包含 Cycling Speed and Cadence Service")
 check("BLE_UUID16_INIT(FTMS_SERVICE_UUID)" in cycling_branch,
       "骑行主广播包含 Fitness Machine Service")
+check("csc_on" in adv_block and "BROADCAST_FIELD_CADENCE_WITH_POWER" in adv_block,
+      "兼容模式下 CSC 广告随内容开关一起关闭，踏频仍由 CPS 输出")
 
 print(f"\n{TAG} [S2] 跑步主广播服务发现")
 check("BLE_UUID16_INIT(RSC_SERVICE_UUID)" in running_branch,

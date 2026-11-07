@@ -624,8 +624,8 @@ snapshot_t power_engine_bridge_snapshot(power_engine_t *e, const bridge_snapshot
 
 bool power_engine_set_broadcast_mask(power_engine_t *e, int mask)
 {
-    int normalized = mask & BROADCAST_FIELD_ALL;
-    if (normalized == 0) return false;
+    int normalized = mask & BROADCAST_FIELD_VALID;
+    if ((normalized & BROADCAST_FIELD_ALL) == 0) return false;
     if (e->broadcast_mask == normalized) return false;
     e->broadcast_mask = normalized;
     e->dirty = true;
