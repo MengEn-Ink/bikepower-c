@@ -4,10 +4,14 @@
 内容基于当前仓库实现撰写，重点对应 `main/`、`components/bikepower_domain/`、`tests/` 和 `docs/images/`。
 阅读顺序建议配合 [架构](../images/architecture.svg)、[主循环](../images/main-loop-flow.svg)、[按钮状态](../images/button-led-state.svg) 和 [WiFi 共存](../images/rf-wifi-flow.svg) 一起看。
 
-当前固件版本为 `v4.3.1`。
+当前固件版本为 `v4.3.2`。
 运行环境为 `ESP-IDF v5.5.4 + NimBLE + FreeRTOS`，目标芯片为 `ESP32-C3`。
 
 当前源码另提供独立只读遥测服务 `7a5a1000`：每秒统一发布内存、CPU 窗口、连接参数和发送计数，四组记录均不超过 20 字节。主任务采样，RSSI 由 NimBLE host 缓存；GATT 不同步查询 HCI。CPU 使用 FreeRTOS esp_timer 运行统计，Pages 状态页与常驻指标/窗口共用既有连接。详细布局、百分比口径和实物边界见 [设备遥测协议](36-device-telemetry-verification.md)。此功能尚未发布正式固件。
+
+## BLE外设连接状态确认
+
+当前本地候选将CONNECT状态0或已观察到的远端特征错误26经`ble_gap_conn_find`确认，只有Host仍存在真实外设连接才发布应用句柄；开启SUBSCRIBE早于CONNECT确认时走相同验证。同句柄重复确认不重置订阅/控制，异句柄断开不清空当前连接，通知仍要求正确应用句柄和逐特征订阅。候选实物结果与未执行项见 [BINAVI连接修复](44-binavi-connection-fix.md)，不以构建通过代替码表验收。
 
 ## Pages 骑行端适配排查
 
@@ -224,13 +228,15 @@ ready/stopping/failed/profile/mask/连接句柄使用 C11 原子；释放 NimBLE
 
 - `Cycling Power Service`，UUID `0x1818`（骑行，POWER 位）
 - `Heart Rate Service`，UUID `0x180D`（HEARTRATE 位）
-- `Cycling Speed and Cadence Service`，UUID `0x1816`（骑行，CADENCE 位）
+- `Cycling Speed and Cadence Service`，UUID `0x1816`（骑行，CADENCE 位；同时启用 POWER 和 CADENCE_WITH_POWER 时不注册）
 - `Running Speed and Cadence Service`，UUID `0x1814`（跑步，POWER 或 CADENCE 位）
 - `Fitness Machine Service`，UUID `0x1826`（POWER 或 CADENCE 位）
 - `Device Information Service`，UUID `0x180A`（始终）
 - `BikePower Config Service`，UUID `7a5a0000-4c7a-4f2a-9b3e-6d1f4a8c0b21`（始终）
 
 运行时修改 `broadcast_mask` 会触发 BLE 重启以重建 GATT 表，未启用的服务从 GATT 中移除。
+
+本地候选增加 `CADENCE_WITH_POWER=0x08`（“踏频随功率”）选项，默认关闭，`BROADCAST_FIELD_ALL`仍为7、有效位集合为15；Core长度和schema14不变。骑行启用功率、踏频及该位时，从GATT和广播同时去掉独立CSC；CPS累计曲柄转数及事件时间仍可承载踏频，HRS按原开关保留，跑步RSC分支不受影响。这是候选发现呈现选项，不是保证BINAVI首次发现、同地址多角色或页面读数成功的已验收功能；真实桥接没有有效曲柄数据时不能虚构踏频。旧固件/旧客户端可能不识别或保留新位，发布前仍需兼容回归。最新证据见 [BINAVI核对](44-binavi-connection-fix.md)。
 
 ### 4.1 广播与 GAP 行为
 
@@ -310,11 +316,11 @@ DIS 读取内容来自编译期常量：
 
 - `DEVICE_MANUFACTURER = "BikePower"`
 - `DEVICE_MODEL = "ESP32-C3"`
-- `FIRMWARE_VERSION = "4.3.1"`
+- `FIRMWARE_VERSION = "4.3.2"`
 - `FIRMWARE_STABLE_VERSION = "4.0.0"`
-- `FIRMWARE_FIX_VERSION = "4.3.1"`
+- `FIRMWARE_FIX_VERSION = "4.3.2"`
 - `BIKEPOWER_GIT_SHA` 由 `main/CMakeLists.txt` 在构建时注入最后一次 Git 短提交 ID
-- DIS 固件字段与门户固件名使用 `board_firmware_name()` 生成，格式为 `板型-v版本`，例如 `generic-c3-v4.3.1`；Git ID 和构建时间单独保留。
+- DIS 固件字段与门户固件名使用 `board_firmware_name()` 生成，格式为 `板型-v版本`，例如 `generic-c3-v4.3.2`；Git ID 和构建时间单独保留。
 - DIS 序列号 `2A25` 的默认值在 NimBLE 启动前由出厂 eFuse 标识生成，格式 `BP-` + 12 位大写十六进制；静态缓存，重启保持稳定，不新增 NVS 键。已有非空身份覆盖优先，清空覆盖回退到该默认值。详见 [序列号修复与刷写验证](43-qidou-serial-fix.md)。
 
 测试脚本 `tests/ble_selftest.py` 也会校验这三项。
