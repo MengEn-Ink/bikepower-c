@@ -39,6 +39,7 @@
 | [Pages 全站布局更新](dev/41-pages-layout-refresh.md) | 轻导航、演示主导首页、工具页排版与回归边界 |
 | [骑行端适配差异采集](dev/42-cycling-compatibility-capture.md) | 两侧独立保存、顺序/双连、差异解析与补齐方向 |
 | [BINAVI连接状态修复](dev/44-binavi-connection-fix.md) | Host活跃连接确认、订阅交接、最小候选及实物验收 |
+| [BINAVI连接问题结项](dev/45-binavi-connection-closeout.md) | 根因、修复与码表实测结论，心率项按用户决定结项 |
 | [鬥骑序列号修复](dev/43-qidou-serial-fix.md) | USB证据、非空默认序列号、配置保留刷写与待App复测 |
 
 ## Code Wiki

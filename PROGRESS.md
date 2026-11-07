@@ -4,6 +4,21 @@
 > 当前固件版本：v4.3.2（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
+
+## 2026-11-07 v4.3.2 预发布与 BINAVI 连接结项
+
+- [x] 版本号 4.3.2 落地（`bikepower_config.h` 三处版本常量 → `4.3.2`，`FIRMWARE_STABLE_VERSION` 保持 `4.0.0`），文档事实与四处一致性文档同步；一致性 295 通过 0 失败、docs 门禁 79 通过 2 警告 0 失败。
+- [x] 7 个主题提交推送到 `main`，HEAD `5fed5c3`；tag `v4.3.2`（annotated）指向同一提交。
+- [x] CI 首跑抓出门户内嵌生产 JS 漂移（`tools/web/phone-portal-source.js` 未随 `main/web/app.js` 同步，断言"屏幕必须使用当前生产 JS"失败），按生成器重跑后转绿；push 与 release 触发的 Pages 部署均 success。
+- [x] 双板正式产物：merged 各 1204368 字节、app 各 1138832 字节；generic-c3 `fe2f9d20…`、m5stamp-c3 `6205fd93…`、总包 `272b81fc…`；release 门禁 10 附件/双板/zip 16 条目通过，上传后下载回读哈希一致。
+- [x] GitHub 预发布已建（`isPrerelease: true`，不占 latest）：<https://github.com/MengEn-Ink/bikepower-c/releases/tag/v4.3.2>。
+- [x] 真机 P0：`serial_boot`/`ble_config_rw`/`ble_reconnect`/`soak_5min` PASS，`ble_cycling` FAIL（FTMS 未配对 ATT 0x05，ERG 未验，未放宽认证）。
+- [x] **BINAVI 码表实测通过**：可连接，功率与踏频稳定连续。板端 45 秒采样 CPS/CSC/HRS 各 34 帧，功率 278 W、曲柄累计 1064、心率 161 bpm；默认 mask `07` 已满足"功率里带踏频"，兼容位 bit3 无需启用。
+- [x] 心率一项码表侧未显示，板端 HRS 正常；用户确认不再追究，按码表不取该路结项，不列为固件缺陷。结项说明见 [docs/dev/45-binavi-connection-closeout.md](docs/dev/45-binavi-connection-closeout.md)。
+- [ ] 仍开放：m5stamp-c3 实物 P0（无实物）、FTMS 配对后 ERG、兼容位 mask15 窗口内 300 秒与复连 60 秒、按钮/LED/手机 Captive Portal/Zwift 等人工项。
+
+---
+
 ## 2026-11-07 端到端复跑与发版准备（本地候选，仍未通过码表数值验收）
 
 - [x] 浏览器回归首次可执行即抓出真实缺陷：`tools/web/ble-monitor.html` 的“踏频随功率”复选框把判断表达式当字符串传给 `configCheck`，非空字符串恒真，mask7 设备上页面初始即勾选 bit3（立刻置脏，保存会静默把 bit3 写进设备）。改为布尔表达式 `!!(c.broadcast_mask&8)` 后 light/dark 全部通过。
