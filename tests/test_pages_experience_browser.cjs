@@ -19,7 +19,7 @@ const root = path.join(__dirname, '../tools/web');
           });
           if (url.pathname.endsWith('.json')) return route.fulfill({ json: { available: false } });
           const file = url.pathname === '/' ? 'ble-monitor.html' : path.basename(url.pathname);
-          if (!['ble-monitor.html', 'operation-demos.js', 'operation-demos.css', 'phone-operation-demos.js', 'phone-operation-demos.css', 'phone-portal-source.js', 'pages-experience.js', 'pages-experience.css', 'flash-session.js'].includes(file)) return route.fulfill({ status: 404 });
+          if (!['ble-monitor.html', 'operation-demos.js', 'operation-demos.css', 'phone-operation-demos.js', 'phone-operation-demos.css', 'phone-portal-source.js', 'pages-experience.js', 'pages-experience.css', 'flash-session.js', 'flash-dialog.js'].includes(file)) return route.fulfill({ status: 404 });
           return route.fulfill({ path: path.join(root, file), contentType: file.endsWith('.css') ? 'text/css' : file.endsWith('.js') ? 'text/javascript' : 'text/html' });
         });
         await page.addInitScript(theme => {

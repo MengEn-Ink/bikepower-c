@@ -76,6 +76,7 @@
       session.cleaning = true;
       session.controller.abort();
       clearTimeout(session.timer);
+      if (session.adapter) session.adapter.stop();
       if (session.disconnect) navigator.serial.removeEventListener('disconnect', session.disconnect);
       try {
         if (session.opened && (session.port.readable || session.port.writable)) await session.port.close();
@@ -83,7 +84,9 @@
         if (session.release) session.release();
         active = null;
         options.busy(false);
-        notify('串口会话已关闭。以安装弹窗的最终结果为准；失败后请排障，再主动点击重试。');
+        notify(session.result === 'success' ? '刷写完成，串口已释放。请等待设备启动，再点击连接蓝牙。' : session.result === 'failed' ? '刷写失败，串口已释放。请检查数据线、BOOT 和串口占用后主动重试。' : '安装弹窗已关闭，串口已释放；未确认刷写成功。需要时重新点击刷写。');
+        if (session.dialog && options.onDialogClose) options.onDialogClose({ outcome: session.result || 'unknown', version: session.version });
+        return true;
       } catch (error) {
         session.cleaning = false;
         notify('串口资源尚未释放，已禁止重复刷写。请关闭占用终端/其他标签页，关闭本页后重新打开；不要继续点击安装。');
@@ -93,7 +96,7 @@
       if (active) { notify('已有串口/安装/日志会话，请先返回并关闭安装弹窗。'); return; }
       if (!global.isSecureContext || !navigator.serial) { notify('刷写需要安全上下文和 Web Serial，请使用支持该 API 的桌面浏览器访问 HTTPS 页面。'); return; }
       if (!item) { notify('没有可刷写固件'); return; }
-      const session = { controller: new AbortController(), urls: [], opened: false, cleaning: false };
+      const session = { controller: new AbortController(), urls: [], opened: false, cleaning: false, version };
       active = session;
       options.busy(true);
       notify('请选择开发板串口；授权后先下载并校验固件，尚未写入。');
@@ -130,10 +133,11 @@
         const dialog = document.createElement('ewt-install-dialog');
         dialog.port = session.port;
         dialog.manifestPath = manifest;
-        dialog.addEventListener('closed', () => {
-          void cleanup(session);
-          if (options.onDialogClose) options.onDialogClose();
-        }, { once: true });
+        dialog.addEventListener('closed', () => { void cleanup(session); }, { once: true });
+        if (global.BikePowerFlashDialog) session.adapter = global.BikePowerFlashDialog.attach(dialog, {
+          message: notify,
+          result: outcome => { session.result = outcome; },
+        });
         session.dialog = dialog;
         options.beforeInstall();
         document.body.appendChild(dialog);

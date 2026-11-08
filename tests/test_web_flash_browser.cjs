@@ -26,6 +26,7 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
         return route.fulfill({ path: path.join(root, 'tools/web', path.basename(url.pathname)),
           contentType: url.pathname.endsWith('.css') ? 'text/css' : 'text/javascript' });
       }
+      if (url.pathname.endsWith('/flash-dialog.js')) return route.fulfill({ path: path.join(root, 'tools/web/flash-dialog.js'), contentType: 'text/javascript' });
       if (url.pathname.endsWith('/flash-session.js')) return route.fulfill({ path: path.join(root, 'tools/web/flash-session.js'), contentType: 'text/javascript' });
       if (url.pathname.endsWith('/manifest.json')) return route.fulfill({ json: manifest });
       if (url.pathname.endsWith('/bike.bin')) return route.fulfill({ body: bytes });
@@ -73,21 +74,25 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
     // Actual page + real upstream dashboard/erase/confirmation; no device writes before confirmation.
     await page.evaluate(() => { window.cancelChooser = false; window.failInitialize = true; document.getElementById('flash-activate').click(); });
     const dialog = page.locator('ewt-install-dialog');
-    await dialog.getByText('Install BikePower', { exact: true }).click();
-    await dialog.getByText('Next', { exact: true }).click();
-    await dialog.getByText('Confirm Installation', { exact: true }).waitFor();
+    await dialog.getByText('安装 BikePower 固件', { exact: true }).click();
+    await dialog.getByText('下一步', { exact: true }).click();
+    await dialog.locator('div[slot="headline"]').filter({ hasText: /^确认刷写$/ }).waitFor();
     assert.equal(await page.evaluate(() => serialCounts.writes), 0);
     assert.equal(await page.evaluate(() => serialCounts.picks), 2); // no upstream duplicate chooser
-    await dialog.locator('ew-text-button').filter({ hasText: /^\s*Install\s*$/ }).click();
-    await dialog.getByText('Installation failed', { exact: true }).waitFor();
-    assert.match(await dialog.locator('ewt-page-message').evaluate(el => String(el.label)), /Failed to initialize/);
+    await dialog.locator('ew-text-button').filter({ hasText: /^\s*确认刷写\s*$/ }).click();
+    await dialog.getByText('刷写失败', { exact: true }).waitFor();
+    assert.match(await dialog.locator('ewt-page-message').evaluate(el => String(el.label)), /无法连接芯片/);
     assert.equal(await dialog.getAttribute('state'), 'INSTALL');
     assert.equal(await dialog.getByText('正在把 BikePower 固件写入开发板', { exact: true }).count(), 0);
     await dialog.getByText('安装结果以弹窗上方状态为准', { exact: true }).waitFor();
-    assert.equal(await dialog.locator('ew-text-button').filter({ hasText: /^\s*Install\s*$/ }).count(), 0); // no automatic retry on ERROR
+    assert.equal(await dialog.locator('ew-text-button').filter({ hasText: /^\s*确认刷写\s*$/ }).count(), 0); // no automatic retry on ERROR
     assert.equal(await page.evaluate(() => flashSession.isBusy()), true);
     assert.equal(await page.evaluate(() => serialCounts.writes), 0);
     assert.equal(await page.locator('#flash-activate').isEnabled(), false);
+    await dialog.getByText('关闭并排障', { exact: true }).click();
+    await page.waitForFunction(() => !flashSession.isBusy());
+    assert.equal(await page.locator('#ob-success').count(), 0, 'failed session cannot report success on close');
+    assert.match(await page.locator('#flash-message').textContent(), /刷写失败.*串口已释放/);
     assert.deepEqual(errors, []);
     // Recovery fallback: leaving this page destroys the owner; reload must not auto-select/reflash.
     await page.reload();

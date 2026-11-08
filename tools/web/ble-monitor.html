@@ -1436,6 +1436,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 </style>
 <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
 <script src="./flash-session.js"></script>
+<script src="./flash-dialog.js"></script>
 <link rel="stylesheet" href="./operation-demos.css">
 <link rel="stylesheet" href="./phone-operation-demos.css">
 <script defer src="./phone-portal-source.js"></script>
@@ -1753,6 +1754,8 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           <button class="btn ghost" onclick="openDockPane('templates')">打开模板库</button>
         </div>
         <div id="connect-empty" class="monitor-note">首次连接会打开浏览器设备选择器，只显示广播了骑行功率、心率、骑行速度/踏频或智能骑行台服务的设备。网页不能静默获取附近设备。</div>
+        <div id="ble-pause-notice" class="monitor-note hidden" role="status"><p>网页蓝牙已暂停，让其他 App 使用设备。完成 App 实测后，可在这里恢复；不会自动抢占设备。</p><button class="btn alt" type="button" onclick="resumePageBluetooth()">结束实测，恢复网页连接</button></div>
+        <p id="ble-connect-feedback" class="monitor-note" role="status" aria-live="polite"></p>
         <div class="rail-identity" id="single-device-card" aria-live="polite"></div>
         <div class="autolink" aria-label="自动连接与跨标签页关联">
           <label class="autolink-toggle" for="autolink-enabled"><input type="checkbox" id="autolink-enabled" checked onchange="setAutoLinkEnabled(this.checked)">自动连接 · 断线重连 · 多标签页同步</label>
@@ -3010,6 +3013,8 @@ function themeEspWebToolsDialog(host){
     .bikepower-flash-helper{display:block;margin:18px 0 0;padding:14px 15px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font-size:14px;line-height:1.6;text-align:left}
     .bikepower-flash-helper b{display:block;margin-bottom:4px;color:var(--strong)}
     .bikepower-flash-helper span{display:block;color:var(--muted)}
+    p.bikepower-auto-close{color:var(--muted);font-size:14px;line-height:1.6}
+    button.bikepower-auto-close{border:1px solid var(--line);border-radius:8px;background:var(--accent-fill);color:var(--on-accent);padding:10px 18px;font:inherit;cursor:pointer}
   `);
   if(!themedDialogObservers.has(root)){
     const observer=new MutationObserver(()=>{
@@ -4103,10 +4108,27 @@ function prepareForFlash(){
 }
 
 /* ==================== 通用：连接任意 BLE 设备 ==================== */
+let blePickerBusy=false;
+function renderBlePauseNotice(){const notice=$("ble-pause-notice");if(notice)notice.classList.toggle("hidden",!compatibilityHandoffActive());}
+function resumePageBluetooth(){
+  setCompatibilityHandoff(false);
+  renderBlePauseNotice();
+  if(gateOpen)setGate("choose");
+  setText("ble-connect-feedback","网页蓝牙已恢复。请先断开其他 App，再点击扫描并连接设备。");
+}
+function showBleConnectFeedback(message,kind="warn"){
+  renderBlePauseNotice();
+  const feedback=$("ble-connect-feedback");if(feedback){feedback.textContent=message;feedback.dataset.kind=kind;}
+  if(gateOpen&&kind!=="pending")setGate("error",{message});
+  log(message,kind==="error"?"error":kind==="pending"?"info":"warn");
+}
 async function requestDevice(){
-  if(compatibilityHandoffActive()){log("目标端实测期间网页连接已暂停，请先结束实测。","warn");return null;}
-  if(flashSession&&flashSession.isBusy()){log("请先关闭串口安装/日志会话再连接蓝牙","warn");return null;}
-  if(!checkSupport())return null;
+  if(blePickerBusy)return null;
+  if(compatibilityHandoffActive()){showBleConnectFeedback("目标端实测期间网页蓝牙已暂停。请点击「结束实测，恢复网页连接」，再手动连接。");return null;}
+  if(flashSession&&flashSession.isBusy()){showBleConnectFeedback("串口刷写或日志会话尚未关闭，请先关闭安装弹窗，再连接蓝牙。");return null;}
+  if(!checkSupport()||!window.isSecureContext){showBleConnectFeedback("当前环境不支持网页蓝牙，请在电脑 Chrome / Edge 中通过 HTTPS 打开此页。","error");return null;}
+  blePickerBusy=true;
+  showBleConnectFeedback("正在打开蓝牙设备选择器，请选择已上电并正在广播的设备；若列表为空，先断开其他 App 的连接。","pending");
   try{
     const epoch=bleConnectionEpoch;
     const extra=currentMode==="compare"&&window.BikePowerCompatibilityUI?window.BikePowerCompatibilityUI.privateServices():[];
@@ -4118,12 +4140,15 @@ async function requestDevice(){
     assertBleConnection(device,epoch);
     pageGattPermissions.set(device,optionalServices);
     allowManualPageConnection();
+    setText("ble-connect-feedback","已选择设备，正在连接并读取蓝牙服务…");
     return device;
   }catch(err){
-    if(err.name==="NotFoundError"){log("用户取消了设备选择","warn");}
-    else{log("设备选择失败: "+err.message,"error");}
+    const message=err.name==="NotFoundError"?"已取消蓝牙设备选择，尚未连接。需要时再次点击；若列表为空，请确认设备在广播且未被其他 App 占用。":
+      err.name==="SecurityError"||err.name==="NotAllowedError"?"浏览器未允许蓝牙访问。请检查地址栏的网站蓝牙权限，并在电脑 Chrome / Edge 中重新点击连接。":
+      "蓝牙设备选择失败："+err.message+"。请检查电脑蓝牙是否开启，然后主动重试。";
+    showBleConnectFeedback(message,err.name==="NotFoundError"?"warn":"error");
     return null;
-  }
+  }finally{blePickerBusy=false;}
 }
 
 async function readStringValue(service,uuid){
@@ -4258,18 +4283,20 @@ async function subscribeNotifications(rec){
 }
 
 async function connectAuthorized(){
+  if(compatibilityHandoffActive()){showBleConnectFeedback("网页蓝牙已暂停，请先结束实测并恢复网页连接。");return;}
+  if(flashSession&&flashSession.isBusy()){showBleConnectFeedback("请先关闭串口安装弹窗，再连接蓝牙。");return;}
   if(!checkSupport())return;
-  if(!navigator.bluetooth.getDevices){log("当前浏览器不支持 getDevices，需点击扫描并连接设备重新授权","warn");return;}
+  if(!navigator.bluetooth.getDevices){showBleConnectFeedback("当前浏览器不支持已授权设备列表，请点击扫描并连接设备重新授权。");return;}
   if(currentMode==="compare"){
     const devices=await orderedAuthorizedDevices();
     const candidate=devices[0];
-    if(!candidate){log("没有已授权的设备，请先点击扫描并连接设备","warn");return;}
+    if(!candidate){showBleConnectFeedback("没有已授权设备，请先点击扫描并连接设备。");return;}
     addCompareDeviceFromExisting(candidate);
     return;
   }
   allowManualPageConnection();
   const ok=await autoConnect("manual");
-  if(!ok)log("没有可连接的已授权设备，请先点击扫描并连接设备","warn");
+  if(!ok)showBleConnectFeedback("没有可连接的已授权设备，请先点击扫描并连接设备。");
 }
 
 /* ==================== 模式二：单设备连接 ==================== */
@@ -4301,11 +4328,14 @@ async function connectSingleWith(device,source="picker",timeoutMs=20000){
     const rec=await Promise.race([connectAndCollect(device),timeout]).finally(()=>clearTimeout(timer));
     singleDevice=rec;
     renderSingleDevice(rec);
+    setText("ble-connect-feedback","蓝牙已连接，已读取服务；实时数据由设备通知更新。");
     onSingleDeviceConnected(rec,source);
     if(window.BikePowerStatus)window.BikePowerStatus.attach(rec);
     return rec;
   }catch(err){
     $("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+escapeHtml(err.message)+'</div>';
+    showBleConnectFeedback("蓝牙连接失败："+err.message+"。请确认设备上电且未被其他 App 占用。","error");
+    setLinkState("idle");
     resetMonitorSignals();
     throw err;
   }
@@ -5533,6 +5563,7 @@ function setCompatibilityHandoff(active,publish=true){
     tabBusPost({type:"compatibility-handoff",active:!!active});
   }
   if(window.BikePowerCompatibilityUI)window.BikePowerCompatibilityUI.renderHandoff();
+  renderBlePauseNotice();
 }
 function setAutoLinkStatus(text,kind=""){const el=$("autolink-status");if(el){el.textContent=text;el.className="autolink-status"+(kind?" "+kind:"");}}
 function setAutoLinkEnabled(on){
@@ -5892,6 +5923,7 @@ async function openGate(opts){
   renderGateEnv();
   await renderGateKnown();
   setGate(state,opts);
+  if(compatibilityHandoffActive())setGate("error",{message:"网页蓝牙已暂停，请在实时监控页点击「结束实测，恢复网页连接」。"});
   setTimeout(()=>{const b=$("gate-connect");if(gateOpen&&b&&!b.disabled)b.focus();},40);
 }
 function closeGate(reason){
@@ -6008,7 +6040,7 @@ async function initLinkUi(){
     if(gateOpen&&!gateBusy&&$("confirm-mask").classList.contains("hidden")){e.preventDefault();closeGate("skip");}
     else closeCapPanel();
   });
-  renderLinkCapsule();renderManualLinkbar();
+  renderLinkCapsule();renderManualLinkbar();renderBlePauseNotice();
   if(compatibilityHandoffActive())return;
   const route=routeFromHash(location.hash);
   if(route.mode==="flash"||route.mode==="compare")return;
@@ -6702,14 +6734,14 @@ function fgActivate(){
 }
 function fgConnectBle(){closeFlashGuide(true);obStartHandoff();openGate({force:true});}
 
-/* ESP Web Tools v10.4.0 无安装状态事件；结果只以其安装窗口为准。 */
+/* 只有真实组件成功终态且串口释放后才显示完成引导。 */
 /* ---- 刷写成功窗（5 秒倒计时自动关闭）→ 重启 → 蓝牙衔接聚光灯 ---- */
 function showFlashSuccess(){
   const ver=selectedFirmwareLabel();
   let left=5,hold=false;
   const html='<div class="ob-card2 ok" role="alertdialog" aria-modal="true" aria-labelledby="ob-fs-title">'
     +'<div class="ob-count"><i id="ob-fs-bar"></i></div><div class="ob-m-body">'
-    +'<div class="ob-m-kicker ok">INSTALLATION COMPLETE · 校验通过</div>'
+    +'<div class="ob-m-kicker ok">刷写完成 · 串口已释放</div>'
     +'<h3 class="ob-m-title" id="ob-fs-title">刷写完成，'+(ver?"v"+escapeHtml(ver)+" ":"")+'已写入</h3>'
     +'<div class="ob-reboot"><span class="chip">C3<i></i></span><div><b>设备正在重启…</b><p>约 3 秒后 LED 慢闪，表示开始蓝牙广播。数据线可继续插着供电。</p></div></div>'
     +'</div><div class="ob-m-actions"><span class="spacer" id="ob-fs-left">5 秒后自动关闭，并引导你连接蓝牙</span>'
@@ -6824,9 +6856,10 @@ function initOnboarding(){
       },
       beforeInstall:prepareForFlash,
       loadDialog:window.BikePowerFlash.loadDialog,
-      onDialogClose:()=>{
+      onDialogClose:result=>{
+        if(result.outcome!=="success"){fgFlashed=false;if(fgOpen){fgPhase=null;fgGo(3);}return;}
         fgFlashed=true;
-        if(fgOpen){fgPhase=null;fgGo(5);}
+        closeFlashGuide(true);
         showFlashSuccess();
       },
     });

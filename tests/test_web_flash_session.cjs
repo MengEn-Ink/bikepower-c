@@ -231,6 +231,22 @@ test('selected-device disconnect warns but never auto-closes active write; unrel
   h.dispose();
 });
 
+test('closed outcome is reported only after successful resource release', async () => {
+  const h = harness();
+  const results = [];
+  h.options.onDialogClose = result => { assert.equal(h.session.isBusy(), false); results.push(result); };
+  await h.session.start(item, '4.2.1');
+  await h.close();
+  assert.equal(results.length, 1);
+  assert.equal(results[0].outcome, 'unknown');
+  assert.equal(results[0].version, '4.2.1');
+  await h.session.start(item, '4.2.1');
+  h.port.locked = true;
+  await h.close();
+  assert.equal(results.length, 1, 'failed release must not notify completion');
+  h.dispose();
+});
+
 test('cross-tab Web Lock excludes other sessions and releases only after closed', async () => {
   const h = harness();
   let held = false;

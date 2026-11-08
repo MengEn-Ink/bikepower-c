@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "node ../test_web_flash_dom.cjs && node --test ../test_web_flash_session.cjs ../test_pages_experience.cjs ../test_pages_operation_demos.cjs && node ../test_device_telemetry.cjs",
-    "browser": "node ../test_pages_capture_browser.cjs && node ../test_pages_layout_browser.cjs && node ../test_web_flash_browser.cjs && node ../test_pages_experience_browser.cjs && node ../test_pages_operation_demos_browser.cjs && node ../test_phone_operation_demos_browser.cjs && node ../test_device_status_browser.cjs && node ../test_pages_bridge_browser.cjs && node ../test_pages_audit_browser.cjs"
+    "browser": "node ../test_pages_capture_browser.cjs && node ../test_pages_layout_browser.cjs && node ../test_pages_connection_flow_browser.cjs && node ../test_web_flash_browser.cjs && node ../test_pages_experience_browser.cjs && node ../test_pages_operation_demos_browser.cjs && node ../test_phone_operation_demos_browser.cjs && node ../test_device_status_browser.cjs && node ../test_pages_bridge_browser.cjs && node ../test_pages_audit_browser.cjs"
   },
   "devDependencies": {
     "esp-web-tools": "10.4.0",

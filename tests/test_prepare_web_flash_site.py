@@ -4,6 +4,7 @@
 import hashlib
 import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -31,6 +32,12 @@ class WebFlashSiteTest(unittest.TestCase):
 
     def tearDown(self):
         self.temp_dir.cleanup()
+
+    def test_production_site_includes_dialog_adapter(self):
+        with patch.object(sys, 'path', [str(ROOT / 'scripts/tools'), *sys.path]):
+            site = web_flash.initialize_site(ROOT / "tools/web", self.base / "site")
+        self.assertEqual((site / "flash-dialog.js").read_bytes(), (ROOT / "tools/web/flash-dialog.js").read_bytes())
+        self.assertIn('<script src="./flash-dialog.js"></script>', (site / "index.html").read_text(encoding="utf-8"))
 
     def test_site_materializes_referenced_canonical_manual_image(self):
         (self.source / "ble-monitor.html").write_text(
