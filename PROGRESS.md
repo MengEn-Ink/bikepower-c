@@ -1,9 +1,46 @@
 # BikePower C — 项目进度
 
 > 当前行为：[技术参考](docs/dev/01-technical-reference.md)；早期重写背景见 [归档](docs/archive/01-cidf-nimble-rewrite.md)
-> 当前固件版本：v4.3.3（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v4.4.0（C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
+
+## v4.4.0 发版收尾（仅 generic-c3，执行中，尚未发布）
+
+- 用户已批准三组小修及正式发行，明确 v4.4.0 / 仅通用ESP32-C3；不覆盖v4.3.3，不发布M5Stamp，不新增上游控制。
+- R1停止先取通知生命周期锁，超时完整保持原运行态；Host stop失败锁存未就绪，app_main清理失败不重新初始化。生产函数ASan/UBSan异常专项通过。
+- R2 ZIP内部size/SHA256/CRC、重复条目及内部manifest精确前置映射已修；四新负例和原发行样例通过。
+- R3正式兼容性23 Node及浏览器通过；配置单轮及同进程两轮通过。十分钟同进程耐久600.6秒/47轮及3次周期host通过，末尾关闭配网后保存/续期拒绝通过；只证明mock HTTP+host。
+- 完整55次专项首轮53 PASS/2 FAIL：版本文档未同步的常量检查修正后299/0；门户续期toast断言首跑FAIL，原断言三宽复跑通过，首失败保留，稳定性仍需对照。
+- 新候选真实NimBLE三链路9项通过（两下游各53帧、上游掉线恢复、原八组恢复/reset），不代替射频/WiFi验收。
+- 新独立候选Windows IDF5.5.4构建成功，应用1165856字节；候选SHA256 `b30c06371ebd403c2a7f500cf02ac8aaad8ab5b6c5c008e567c904f66adbfbeb`（精确值由构建产物核对）。版本/用户手册已同步。仍非最终提交发行镜像；COM205已仅刷此候选应用，独立verify digest matched、20秒ROM启动无致命异常通过。
+- COM205刷前及新候选WinRT uncached整表发现均报E_UNEXPECTED，ROM复位仍未恢复，定向发现Unreachable；没有有效八组/持续通知验收，不清配对。ROM NVS刷前/刷后各双读24KiB一致，65有效记录CRC通过、受保护配置/身份/原密钥保持。严格P0未通过前不创建Release。
+- Pages47项Node、DOM/遥测及11入口浏览器全PASS；门户独立闲置三宽PASS；严格docs79PASS/2工作区WARN/0FAIL。原安全/跑步虚拟PASS/OPEN1，SC仍NOT_OBTAINED。
+- 下一步按白名单提交/推送并从隔离clean源生成候选；仍不tag/Release，不把旧P0或用户一般反馈写为新版本P0。当前刷前与刷后NVS的65条有效记录无变化，双读字节一致。
+- 构建依赖IDF显示dirty，已核对大部分为可执行模式变化；剩余文本改动在未参与本构建的示例/RIOT路径。不会清理共享IDF，最终报告保留依赖状态，不声称官方完全clean工具链。
+- 以下旧阶段保留各自镜像/时间的结果；不把其未发布、未修或PASS状态当成本次最终结论。
+
+## 发版前复核（历史审查：只验证，未修改生产代码或发布）
+
+- 用户最新确认桥接正常；仅记录当前场景的用户反馈，不扩展成全部设备矩阵/时长/WiFi验收。
+- 独立Windows IDF5.5.4构建通过（app1165744字节）；完整专项首轮50/54通过，门户两项IDF路径补齐后通过，兼容性两个旧夹具原入口仍FAIL，内存补齐真实连接前置后验证通过。正式full/strict整条尚不能宣称全绿。
+- Pages47项Node及11入口浏览器全PASS；新独立镜像实际NimBLE三链路9项PASS、原安全/跑步PASS/OPEN1，SC仍NOT_OBTAINED。docs strict79/2WARN/0FAIL、版本6文件0不一致。
+- 新生产失败注入复现BLE停止锁超时：返回false却ready仍true，通知定时器已删除、上游先停止，待修。发布ZIP故障注入复现包内固件不同而门禁放行，需内容/重复项/CRC核验。
+- 10分钟mock耐久尝试在14.3秒/1循环后因重复使用fresh-default前置失败，closing亦未重置；不算耐久PASS。仅提出修复建议，原脚本未改。
+- 建议先修stop回滚、ZIP内容门禁和测试前置，再按确定板型/版本提交、干净构建及精确证据收尾。服务拆分/新控制功能延后，无本轮刷机/commit/push/tag/Release。
+- [完整问题清单与证据](docs/dev/51-pre-release-project-review.md)。
+
+## BLE三链路候选（已实现，实体完整验收待补，未发布）
+
+- 用户批准2个下游+1个上游；COM206不在线，经确认改用COM205。基线92e2ffd，现有配置/绑定保留，不新增上游控制。
+- 固定双客户端槽、独立订阅/响应FIFO/代次、FTMS单控制者、配置事务所有者和布局保存冻结已实现；总连接3/活动6/绑定4/持久CCCD48。
+- 数据与响应发送改为Host队列串行，检查真实每连接indication在途状态，避免与系统Service Changed竞争；固定IDF5.5.4私有头耦合，升级需复核。同步busy不误标失败，控制响应不增加运动通知频率。
+- Windows IDF5.5.4最终构建通过，app1165744字节，SHA256 `070cf289b758ecc013bbbdb5758411a814d8998c923024e68d75861121538e7a`；相关离线13入口全通过，领域6246/0、常量299/0，双连接遥测和系统indication竞争host增强通过。
+- 最终实际NimBLE虚拟三链路9项通过：两下游各53帧、双在线布局保存拒绝、两下游在线时上游掉线恢复及251W转发、原配置恢复/reset。原安全/八组/跑步回归通过，SC indication仍NOT_OBTAINED，不算PASS；虚拟PrivacyMode/RSSI/IRK限制保留。
+- 首轮重建后未sync调用Host崩溃已修复，失败证据保留；虚拟写负例收紧ATT错误码，清理错误分开记录。测试夹具/Werror/镜像生成时序失败均修正后复跑，不放宽生产断言。
+- COM205最终候选仅刷应用区并独立verify digest matched；启动20秒无致命异常，CPS/内存遥测各60帧，单下游最低堆151948字节，八组/身份保持且第一连接仍广播。最终NVS双读/CRC通过，配置/身份/原密钥保持，仅CPS及遥测CCCD更新；没有全Flash备份。Windows文档门禁79/2WARN/0FAIL。
+- 实体两个独立下游+真实功率计、目标手机/BINAVI、WiFi共存峰值与长时耐久未验，不能用一个Windows中心端或虚拟PASS替代。本轮不commit/push/tag/Release，源码原地保留。
+- [实现、精确证据与未验边界](docs/dev/50-ble-multi-client.md)。
 
 ## 配网页闲置续期与结束页（2026-11-08，仅本地）
 

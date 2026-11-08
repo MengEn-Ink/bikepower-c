@@ -4,7 +4,7 @@
 内容基于当前仓库实现撰写，重点对应 `main/`、`components/bikepower_domain/`、`tests/` 和 `docs/images/`。
 阅读顺序建议配合 [架构](../images/architecture.svg)、[主循环](../images/main-loop-flow.svg)、[按钮状态](../images/button-led-state.svg) 和 [WiFi 共存](../images/rf-wifi-flow.svg) 一起看。
 
-当前固件版本为 `v4.3.3`。
+当前固件版本为 `v4.4.0`。
 运行环境为 `ESP-IDF v5.5.4 + NimBLE + FreeRTOS`，目标芯片为 `ESP32-C3`。
 
 当前源码另提供独立只读遥测服务 `7a5a1000`：每秒统一发布内存、CPU 窗口、连接参数和发送计数，四组记录均不超过 20 字节。主任务采样，RSSI 由 NimBLE host 缓存；GATT 不同步查询 HCI。CPU 使用 FreeRTOS esp_timer 运行统计，Pages 状态页与常驻指标/窗口共用既有连接。详细布局、百分比口径和实物边界见 [设备遥测协议](36-device-telemetry-verification.md)。此功能尚未发布正式固件。
@@ -266,12 +266,12 @@ ready/stopping/failed/profile/mask/连接句柄使用 C11 原子；释放 NimBLE
 
 GAP 事件回调为 `gap_event_cb()`：
 
-- `BLE_GAP_EVENT_CONNECT`：成功则记录 `g_conn_handle`
-- 连接失败则重启广播
-- `BLE_GAP_EVENT_DISCONNECT`：清空连接句柄并重启广播
-- `BLE_GAP_EVENT_ADV_COMPLETE`：重启广播
+- `BLE_GAP_EVENT_CONNECT`：Host确认外设角色后登记固定客户端槽，下游不足2台时继续广播
+- 连接失败则重新尝试广播；不得为广播恢复失败清掉其他健康连接
+- `BLE_GAP_EVENT_DISCONNECT`：只清理该连接订阅、响应和事务归属，释放名额
+- `BLE_GAP_EVENT_ADV_COMPLETE`：有下游名额且不处于服务表重建冻结时重启广播
 
-当前实现明确是单连接模型，`ble_bikepower_conn_count()` 只返回 `0` 或 `1`。
+当前候选支持2个下游客户端和1个上游功率计；`ble_bikepower_conn_count()` 返回0、1或2，不含上游。NimBLE总容量3，控制器活动容量6，绑定容量4，持久CCCD容量48。逐连接订阅、indication队列及代次隔离；同一运动快照分发给两台。模拟FTMS仅一个控制者，真实桥接保持不注册FTMS。配置全局单写事务绑定发起连接；BLE服务表变更要求其他下游断开，HTTP服务表变更要求全部下游断开，保存前冻结新连接，失败解除冻结。实现与验证边界见 [三链路验证](50-ble-multi-client.md)。
 
 ### 4.2 动态通知特征
 

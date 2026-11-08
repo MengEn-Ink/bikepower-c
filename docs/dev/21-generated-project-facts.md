@@ -2,7 +2,7 @@
 
 > 由 `python3 scripts/tools/doc_facts.py --write` 生成；请修改源码后重新生成，不手工编辑。
 
-- 固件版本：v4.3.3
+- 固件版本：v4.4.0
 - 配置 schema：14
 - 配网超时：300 秒，仅显式续期
 - BLE 通知周期：1000 毫秒

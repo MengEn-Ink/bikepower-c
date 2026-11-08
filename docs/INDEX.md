@@ -44,6 +44,8 @@
 | [鬥骑会话加密修复](dev/46-qidou-session-security-fix.md) | 无绑定安全存储、手机配对/控制成功与未闭合边界 |
 | [持久绑定与发行核验](dev/47-bonding-release-verification.md) | v4.3.3加密恢复、已绑定GATT重建、真实耐久与发行边界 |
 | [本地虚拟开发板](dev/48-local-virtual-board.md) | Windows/WSL本机入口、Apple Silicon待验、虚拟刷写/BLE/GDB/CI与真机边界 |
+| [三链路实现与验证](dev/50-ble-multi-client.md) | 两下游+单上游、逐连接隔离、虚拟与实物验收边界 |
+| [发版前项目复核](dev/51-pre-release-project-review.md) | 新失败注入、发布ZIP内容门禁、完整专项结果与待修/可延后项 |
 
 ## Code Wiki
 
