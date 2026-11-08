@@ -5,6 +5,14 @@
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
+## Pages 蓝牙与刷机弹窗修复（2026-11-08）
+
+- [x] 真实Chrome复现实测暂停状态导致连接被静默拦截；监控页可见说明与显式恢复入口，取消/权限拒绝/连接失败直接反馈，保留跨标签暂停与手动重连规则。
+- [x] 真实ESP Web Tools10.4.0中文DOM适配，成功终态后自动关闭，串口释放后才完成引导；关闭/错误/写入100%/收尾中不冒充成功。双主题新专项、原失败与取消专项、47项单元与15项站点打包通过。
+- [x] 实际原生Chrome蓝牙选择器可打开并发现BikePower；取消授权，无设备配置/绑定/固件写入。
+- [x] 完整Pages10个浏览器入口全PASS，双主题/多宽度/手机原严格触屏与0像素差异均通过，最后观察器清理改动专项复验通过。
+- 用户已批准提交与部署；Pages源码与回归已提交 `f491262` 并推送，当前远端CI/Pages待本次结果核验。真实GATT通知/USB完整烧录/Mac/Safari未在本轮验收，模拟通知不代替实物。
+
 ## 本地虚拟开发板验证（独立于真机发行）
 
 - [x] Windows 原生 IDF5.5.4 + 同机 WSL2 ESP Emulator0.51.0/Bumble0.0.219 跑通，无真实串口或蓝牙适配器。九项辅助控制器拒绝单测通过，GDB app_main断点/栈/PC-SP/单步通过。
