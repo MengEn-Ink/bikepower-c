@@ -24,6 +24,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -55,13 +56,30 @@ def idf_python() -> Path:
     return py
 
 
+def ensure_bleak() -> None:
+    """BLE 读取依赖 bleak；当前解释器缺依赖时自动用 IDF Python 重执行。"""
+    try:
+        import bleak  # noqa: F401
+        return
+    except ImportError:
+        pass
+    if os.environ.get("BW_REFRESH_IDF_PY") == "1":
+        raise SystemExit("[refresh] 已切换到 IDF Python 但仍缺 bleak，请检查环境")
+    py = idf_python()
+    env = dict(os.environ, BW_REFRESH_IDF_PY="1")
+    print(f"[refresh] 当前解释器缺 bleak，切换到 IDF Python: {py}")
+    raise SystemExit(subprocess.call([str(py), str(Path(__file__).resolve())] + sys.argv[1:],
+                                      env=env))
+
+
 def rom_reset(port: str) -> None:
     py = idf_python()
-    argv = [str(py), "-m", "esptool", "--chip", "esp32c3", "--port", port,
-            "--before", "default_reset", "--after", "hard_reset", "run"]
-    proc = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", timeout=180)
+    argv = [str(py), "-m", "esptool", "--chip", "esp32c3", "--port", port, "run"]
+    proc = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", timeout=180)
     if proc.returncode != 0:
-        raise SystemExit(f"[refresh] ROM 复位失败: {proc.stderr.strip()[-300:]}")
+        detail = (proc.stdout or "").strip() + (proc.stderr or "").strip()
+        raise SystemExit(f"[refresh] ROM 复位失败: {detail[-400:]}")
     print(f"[refresh] ROM 复位完成 port={port}")
 
 
@@ -137,6 +155,7 @@ def main(argv=None) -> int:
     p.add_argument("--no-reset", action="store_true", help="跳过 ROM 复位，只做回读")
     p.add_argument("--out", default=str(ROOT / "tests" / "reports" / "device-refresh.json"))
     args = p.parse_args(argv)
+    ensure_bleak()
 
     if not args.no_reset:
         rom_reset(args.port)

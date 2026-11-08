@@ -95,14 +95,18 @@ class FakeSession:
     async def commit_all(self, groups, revision):
         self.commits += 1
         for key, value in groups.items():
+            # ignore_bridge：模拟提交成功但桥接位未生效（前置条件错误场景）
+            if key == 'bridge' and state.get('ignore_bridge'):
+                continue
             if key in self.cfg:
                 self.cfg[key] = bytearray(value)
         return {'result': 0, 'revision': revision + 1, 'restart_flags': 1}
 
 
-def run_scenario(scenario, rounds=2, min_frames=1, boom=False):
+def run_scenario(scenario, rounds=2, min_frames=1, boom=False, ignore_bridge=False):
     state.clear()
-    state.update({'scenario': scenario, 'boom': boom, 'tasks': []})
+    state.update({'scenario': scenario, 'boom': boom, 'tasks': [],
+                  'ignore_bridge': ignore_bridge})
     FakeSession.instances = []
     mod = importlib.import_module('ble_release_control_soak')
     importlib.reload(mod)
@@ -166,6 +170,12 @@ def main_checks():
     assert ses.commits >= 2, f'fullmask+恢复两次提交都应发生, 实际{ses.commits}'
     assert rc == 1
     print('PASS 已读backup+已commit后main失败仍真实恢复')
+
+    # 7) 前置不成立：提交成功但桥接位没生效 → 判 precondition(rc=2)，不跑主测试、不计 FAIL
+    rc, sessions = run_scenario('good', ignore_bridge=True)
+    assert rc == 2, f'前置不成立应返回2而非FAIL(1): rc={rc}'
+    assert sessions[0].client.handlers == {}, '前置不成立时不应订阅任何特征（不该跑主测试）'
+    print('PASS 前置不成立→precondition(rc=2)且不跑主测试')
 
 
 if __name__ == '__main__':
