@@ -98,6 +98,13 @@ int main(void)
     assert(find(0x1826, 0x2ada)->flags == BLE_GATT_CHR_F_NOTIFY);
     assert(find(0x1826, 0x2ad9)->flags == (BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE | BLE_GATT_CHR_F_WRITE_ENC));
     assert(find(0x1826, 0x2ad4) && find(0x1826, 0x2ad4)->flags == BLE_GATT_CHR_F_READ);
+    g_profile=SPORT_PROFILE_CYCLING;g_bridge_mode=false;g_broadcast_mask=BROADCAST_MASK_DEFAULT;
+    assert(g_broadcast_mask == (BROADCAST_FIELD_ALL | BROADCAST_FIELD_CADENCE_WITH_POWER));
+    build_active_gatt_svcs();table_under_test=g_active_svcs;
+    assert(find(POWER_SERVICE_UUID,POWER_CHAR_UUID));
+    assert(!find(CSC_SERVICE_UUID,CSC_CHAR_UUID));
+    assert(find(HR_SERVICE_UUID,HR_CHAR_UUID));
+    assert(find(FTMS_SERVICE_UUID,FTMS_POWER_CHAR_UUID));
     for(int profile=0;profile<2;++profile)for(int real=0;real<2;++real)for(int mask=1;mask<16;++mask){
         if(!(mask&7)) continue;
         g_profile=profile;g_bridge_mode=real;g_broadcast_mask=mask;build_active_gatt_svcs();

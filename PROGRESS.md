@@ -5,6 +5,31 @@
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
+## 配网页闲置续期与结束页（2026-11-08，仅本地）
+
+- [x] 复用原renew：可信点击/编辑/触摸/滚动/键盘操作重置300秒，连续约每秒合并并保留尾部；轮询/动画/程序滚动/空闲鼠标/visibility恢复不续期。最后30秒固定提醒，草稿不自动提交且不阻止关闭。
+- [x] 设备到期锁内冻结续期，留5秒结束提示窗口再走原done/radio_ctrl；配置接收期间过期则不提交。统一全屏结束页，已确认结束与断网待确认分开，停止续期/轮询并禁用编辑。
+- [x] 生产portal runtime/faults+cJSON ASan/UBSan通过；真实Chrome三宽闲置专项含旧轮询/后台/键盘触摸/断网重查通过；原异常/桥接及HTTP回归通过。配置一致性299/0，文档79通过/2工作区警告/0失败。
+- [x] Windows原生IDF5.5.4最终generic构建通过，app1161456字节、内联94460字节；WARN/原4MB分区保持。此前默认踏频随功率修改保留，schema与版本不变；生成演示与离线手册同步。
+- [ ] 手机热点/WebView、实物WiFi退出与BLE连续性、长时耐久、Safari及完整Pages动画矩阵未验。本轮未提交/烧录/发布，不把mock或前轮码表PASS当新镜像实物验收。
+- 结果及精确边界：`tests/reports/portal-idle-20261108/result.md`。独立cadence-default-firmware目录已增量更新为本次候选，不再对应前轮镜像哈希；历史报告保留。
+
+## 踏频随功率默认开启（2026-11-08，本地源码）
+
+- 用户要求设为默认值，新增领域常量 `BROADCAST_MASK_DEFAULT=15`，新建配置、引擎与BLE初始化、空掩码回退统一使用；`BROADCAST_FIELD_ALL=7` 数据位语义与schema14保持。
+- 已保存mask7/手动关闭兼容位、已知旧schema迁移保留原值，不强制迁移已有设备。新建及缺省掩码JSON采用15；历史v8补默认仍为7。功率/踏频数据和心率开关保留，默认骑行不注册独立CSC，用户可关闭选项恢复CSC，跑步RSC不受影响。
+- [x] 原默认回归RED四项失败保留；最终领域6246/0，桥接/主备/遥测通过，生产默认服务与通知ASan/UBSan、标准协议、HTTP默认15及手动7/15保存通过，常量一致性299/0。
+- [x] Windows原生ESP-IDF5.5.4独立generic-c3构建通过，app1153312字节，WARN与原分区保持。本轮不烧录、不清配对、不改版本、不发布；现场已手动启用的设备无需再次写配置。
+- 手册和技术参考同步，手机演示/离线手册由生成器更新默认fixture；首次文档门禁发现该fixture漂移保留，最终文档79通过/2工作区警告/0失败。完整虚拟板、实物刷写、码表新镜像、双板发行和远端CI未执行；报告 `tests/reports/cadence-default-20261108/result.md`。
+
+## BINAVI 功率优先配置结项（2026-11-08）
+
+- 最新码表日志目标先以 `cbsc` 建链、完成 CSC 发现后转 `cad`，之后才进入功率搜索；本次无目标 `pwr` 建链。固件 CPS 已排在主广播 UUID 第一位，不能靠排序保证第三方码表角色优先级。
+- 用户明确不需要独立踏频连接，选择功率连接同时带踏频；通过手机配网页开启现有 bit3“踏频随功率”。独立重启回读只见 Core[14] `07→0f` 一字节变化，其余八组字节保持；CPS/HRS/FTMS 保留，独立 CSC 从 GATT 与广播移除。
+- [x] 电脑 CPS 20 秒/20 帧功率 245–263 W、曲柄解码踏频 84.05–93.02 rpm；采样前后配置保持，连接释放，复位后抓到 20 条功率广播且无 CSC。
+- [x] 用户码表功率最终反馈“可以了，功率正常了”；码表踏频连续显示及长时稳定未单独确认，不迁移电脑结果。
+- Windows 配置 Control CCCD 拒绝 ATT0x1B、部分 GATT Unreachable 原失败保留；独立回读确认失败没有改配置，未清配对或蓝牙设置放行。未刷固件、改默认值、提交或发布；证据和边界见 `tests/reports/binavi-power-discovery-20261108/result.md`（本地忽略目录）。
+
 ## Pages 连接失败根因与 COM205 实连验收（2026-11-08 晚）
 
 - 根因闭合：板端 NVS 只读解析显示 `nimble_bond` 仅有 `local_irk_1`、无 `peer_sec_`/`our_sec_`，而电脑侧 `is_paired=true`，即**单边绑定**；电脑拿旧密钥发起加密恢复，板端无记录回 0x06，Windows 随即 HCI Disconnect。

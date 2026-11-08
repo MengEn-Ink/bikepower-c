@@ -437,6 +437,16 @@ check("未知旧版本" in tech_ref_src and "默认配置" in tech_ref_src,
 # 踏频随功率兼容位（0x08）必须在设备门户与 Pages 都被编码并保留
 check("BROADCAST_FIELD_CADENCE_WITH_POWER = 1 << 3" in domain_src,
       "domain_config.h 定义 CADENCE_WITH_POWER = 1<<3")
+check("#define BROADCAST_MASK_DEFAULT (BROADCAST_FIELD_ALL | BROADCAST_FIELD_CADENCE_WITH_POWER)" in domain_src,
+      "默认广播掩码开启踏频随功率且不改变数据位集合")
+check("c->broadcast_mask = BROADCAST_MASK_DEFAULT;" in config_store_src
+      and "e->broadcast_mask = BROADCAST_MASK_DEFAULT;" in read(ROOT / "components/bikepower_domain/power_engine.c")
+      and "g_broadcast_mask = BROADCAST_MASK_DEFAULT;" in ble_bikepower_src,
+      "配置、引擎与BLE初始默认广播使用同一常量")
+check('"broadcast_mask": 15' in mock_src and extract_mock_limit(mock_src, "broadcast_mask") == (1, 15),
+      "mock初始掩码及保存范围包含兼容位")
+check("BROADCAST_MASK_DEFAULT=15" in tech_ref_src and "默认开启“踏频随功率”" in user_manual_src,
+      "技术参考与手册记录新配置默认开启踏频随功率")
 check((1 << 3) <= 0xFF and "broadcast_mask &= BROADCAST_FIELD_VALID" in config_store_src,
       "config_store.c 按 BROADCAST_FIELD_VALID 归一化广播位")
 check("data-cadence-bundle" in app_js_src and "cadenceWithPower" in app_js_src,

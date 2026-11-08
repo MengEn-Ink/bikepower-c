@@ -43,6 +43,18 @@ def exercise(base):
     state = request_json(base + "/api/state")
     assert state["config"]["schema_ver"] == 14
     assert state["config"]["bridge_devices"] == []
+    assert state["config"]["broadcast_mask"] == 15
+    assert not request_json(base + "/api/config", {
+        "revision": state["revision"], "broadcast_mask": 8,
+    })["ok"]
+    for mask in (7, 15):
+        state = request_json(base + "/api/state")
+        saved = complete(base, request_json(base + "/api/config", {
+            "revision": state["revision"], "broadcast_mask": mask,
+        }))
+        assert saved["result"] == 0
+        state = request_json(base + "/api/state")
+        assert state["config"]["broadcast_mask"] == mask
     revision = state["revision"]
     payload = dict(state["config"], revision=revision, power=345, device_name="配置测试")
     runtime = complete(base, request_json(base + "/api/config", payload))
@@ -155,6 +167,12 @@ def exercise(base):
     assert after <= before
     request_json(base + "/api/renew", {})
     assert request_json(base + "/api/state")["remaining_sec"] >= 299
+    state = request_json(base + "/api/state")
+    assert state["idle_timeout_sec"] == 300
+    closed = complete(base, request_json(base + "/api/close-wifi", {"revision": state["revision"]}))
+    assert closed["closing"] and 0 < closed["remaining_sec"] <= 5
+    assert request_json(base + "/api/renew", {})["closing"]
+    assert not request_json(base + "/api/config", {"revision": state["revision"]})["ok"]
 
 
 def main():

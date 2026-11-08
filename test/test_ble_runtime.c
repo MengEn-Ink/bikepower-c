@@ -8,6 +8,7 @@ int64_t esp_timer_get_time(void) { return s_now; }
 
 int main(void)
 {
+    assert(output_snapshot().mask == BROADCAST_MASK_DEFAULT);
     ble_bikepower_set_broadcast_mask(BROADCAST_FIELD_ALL);
     ble_bikepower_set_data(222, 111, 88);
     ble_output_snapshot_t first = output_snapshot();
@@ -45,7 +46,7 @@ int main(void)
         assert(g_rsc_buf[6]==255 && g_rsc_buf[9]==255);
     }
     ble_bikepower_set_broadcast_mask(0);
-    assert(output_snapshot().mask == BROADCAST_FIELD_ALL);
+    assert(output_snapshot().mask == BROADCAST_MASK_DEFAULT);
     puts("BLE 通知快照：模拟/桥接/跑步均保持同轮字段与掩码一致");
     return 0;
 }

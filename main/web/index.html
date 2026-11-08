@@ -24,8 +24,8 @@
         <span id="headerFirmware">正在读取固件…</span>
       </div>
       <div class="session-clock">
-        <span>配网剩余</span>
-        <b id="wifiTimer" aria-label="配网剩余时间">05:00</b>
+        <span>闲置关闭</span>
+        <b id="wifiTimer" aria-label="无操作后关闭倒计时">05:00</b>
         <button class="icon-btn" id="renewBtn" type="button" title="续期配网" aria-label="续期配网">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>
         </button>
@@ -34,6 +34,12 @@
   </header>
 
   <main class="page">
+    <div class="session-warning" id="sessionWarning" role="status" hidden>
+      <div><b>即将关闭配网</b><p>继续无操作，<strong id="warningSeconds">30</strong> 秒后关闭 WiFi。操作页面可续期至 5 分钟。</p>
+      <p id="warningDirty" hidden>未保存修改不会自动提交，请及时保存。</p></div>
+      <button class="secondary-btn" id="warningRenewBtn" type="button">继续配置</button>
+    </div>
+    <p class="session-renew-error" id="sessionRenewError" role="status" hidden></p>
     <nav class="sport-switch" aria-label="运动类型">
       <button class="is-active" type="button" data-sport="cycling" aria-pressed="true">骑行</button>
       <button type="button" data-sport="running" aria-pressed="false">跑步</button>
@@ -426,12 +432,13 @@
     </section>
   </div>
 
-  <div class="wifi-closed" id="wifiClosed" hidden>
+  <div class="wifi-closed" id="wifiClosed" tabindex="-1" role="region" aria-labelledby="wifiClosedTitle" hidden>
     <div>
-      <span>WiFi 已关闭</span>
-      <h2>BikePower 继续广播</h2>
-      <p>真实功率桥接保持运行，设备门户已结束。</p>
-      <p>再次访问请按设备按钮重新开启配网。</p>
+      <span id="wifiClosedState">本次配网已结束</span>
+      <h2 id="wifiClosedTitle">配网页已关闭</h2>
+      <p id="wifiClosedText">已应用的运动输出继续运行，WiFi 配网正在退出。</p>
+      <p>未保存修改不会自动提交。再次配置请长按设备按钮满 2 秒后松开，再短按一次开启热点。</p>
+      <button class="secondary-btn" id="sessionRetryBtn" type="button" hidden>重新检查设备状态</button>
     </div>
   </div>
 

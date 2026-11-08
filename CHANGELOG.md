@@ -4,6 +4,24 @@
 
 ## [未发布]
 
+### 配网页闲置续期与结束页（2026-11-08，仅本地）
+- 复用300秒deadline和renew接口；可信用户操作自动续期，连续活动合并，后台轮询/动画/程序滚动/空闲鼠标/切回页面不续期。最后30秒固定提醒，未保存修改不自动提交、不阻止闲置结束。
+- 到期冻结续期并保留5秒提示窗口；配置接收期间过期拒绝提交。统一结束页区分已确认结束与网络不可达待确认，停止后台周期任务并禁用编辑，不冒充物理WiFi已关闭。
+- 生产portal+cJSON ASan/UBSan、三宽Chrome闲置/旧响应/键盘触摸/后台恢复/断网重查、原异常/桥接与HTTP回归通过，常量299/0、文档79通过/2WARN/0FAIL。演示及离线手册由生成器同步。
+- Windows IDF5.5.4 generic最终构建app1161456字节、页面94460字节，SHA256 `64d9998bfae174d5ebabfd04da8066bbfdb7daafa0eb0fe3f16ad67b09dcd6ec`；原WARN/分区、schema14和前轮默认15保持。未提交/烧录/发布，实物手机热点、WiFi退出/BLE共存及长时耐久未验。报告 `tests/reports/portal-idle-20261108/result.md`。
+
+### 踏频随功率默认开启（2026-11-08）
+- 新增 `BROADCAST_MASK_DEFAULT=15`，配置/引擎/BLE初始化和空掩码回退使用同一常量。保留数据位ALL=7、schema14及历史已保存掩码，不强制开启旧设备兼容位；用户可关闭恢复独立CSC。
+- mock默认15、保存范围支持兼容位，拒绝只剩兼容位；增加默认值、旧schema保留、JSON缺省/显式7、生产服务/快照和HTTP7/15往返回归。手册、技术参考与生成演示来源同步。
+- 最终领域6246/0，桥接/主备/遥测、生产服务/快照ASan/UBSan、标准协议、HTTP事务和常量299/0通过，文档门禁79通过/2工作区警告/0失败。原RED四项、JSON夹具缺bridge_devices、测试宏名错误及文档fixture漂移失败保留，修正测试输入/宏后原断言通过。
+- ESP-IDF5.5.4独立generic构建通过：app1153312字节、SHA256 `5b5c2301f5c3890e426f0053f96a2246e91ec037e6b6e213a4c2a2669c28ff60`。本地修改，未刷真机、提交、发布或升级版本，不将旧码表验收转移到新构建；报告 `tests/reports/cadence-default-20261108/result.md`。
+
+### BINAVI 功率优先配置验收（2026-11-08，无源码变更）
+- 最新 USB 日志目标 `cbsc→cad`，功率页在踏频建链后才打开；CPS UUID 原已排第一。用户选择不再提供独立踏频连接，使用现有“踏频随功率”。
+- 手机配网页保存 mask `07→0f`；重启后八组回读仅 Core[14] 一字节差异，CPS/HRS/FTMS 保留、CSC 从 GATT/广播关闭，不改变其他配置或默认值。
+- 电脑同一 CPS 连接 20 秒/20 帧：245–263 W、曲柄解码 84.05–93.02 rpm；采样前后配置一致，释放连接后复位恢复功率广播。用户反馈“可以了，功率正常了”；码表踏频连续显示和长时耐久未单独确认。
+- Windows Control CCCD ATT0x1B 与 GATT Unreachable 原失败保留，独立回读确认原配置未变，不清配对放行。未刷固件、改代码、提交或创建发行；本地证据 `tests/reports/binavi-power-discovery-20261108/result.md`。
+
 ### COM205 单边绑定修复与页面实连验收（2026-11-08）
 - 根因：板端 NVS 只读解析显示 `nimble_bond` 仅有 `local_irk_1`、无 `peer_sec_`/`our_sec_`，而电脑侧 `is_paired=true`，构成单边绑定；电脑用旧密钥发起加密恢复，板端回 0x06（PIN/Key Missing），Windows 随即 HCI Disconnect。
 - 修复（仅该设备）：`_bt_unpair.ps1` 定向解除电脑侧记录 → 系统 `PairAsync` Default/None 两次 Failed → 改用仓库 `_bt_pair_custom.py`（ConfirmOnly + ProtectionLevel NONE）配对成功 `status=0 protection=1`。

@@ -244,7 +244,7 @@ ready/stopping/failed/profile/mask/连接句柄使用 C11 原子；释放 NimBLE
 
 运行时修改 `broadcast_mask` 会触发 BLE 重启以重建 GATT 表，未启用的服务从 GATT 中移除。
 
-本地候选增加 `CADENCE_WITH_POWER=0x08`（“踏频随功率”）选项，默认关闭，`BROADCAST_FIELD_ALL`仍为7、有效位集合为15；Core长度和schema14不变。骑行启用功率、踏频及该位时，从GATT和广播同时去掉独立CSC；CPS累计曲柄转数及事件时间仍可承载踏频，HRS按原开关保留，跑步RSC分支不受影响。这是候选发现呈现选项，不是保证BINAVI首次发现、同地址多角色或页面读数成功的已验收功能；真实桥接没有有效曲柄数据时不能虚构踏频。旧固件/旧客户端可能不识别或保留新位，发布前仍需兼容回归。最新证据见 [BINAVI核对](44-binavi-connection-fix.md)。
+当前源码保留 `CADENCE_WITH_POWER=0x08`（“踏频随功率”）选项，并将新建配置默认值设为 `BROADCAST_MASK_DEFAULT=15`；`BROADCAST_FIELD_ALL`仍为7、有效位集合为15，Core长度和schema14不变。骑行启用功率、踏频及该位时，从GATT和广播同时去掉独立CSC；CPS累计曲柄转数及事件时间承载踏频，HRS按原开关保留，跑步RSC分支不受影响。已有持久配置及已知schema迁移保留用户掩码，不强制开启；历史v8迁移仍补原来的7。新建配置、JSON缺省字段、未知schema重置及空掩码回退采用15，用户可手动关闭兼容位恢复独立CSC。真实桥接没有有效曲柄数据时不虚构踏频。BINAVI本次开启选项后用户确认功率正常，电脑已验证同一CPS连接功率与踏频；不代表所有码表或长时耐久均通过。默认值改动尚未发布或烧录，不回写已发布v4.3.3的行为；最新配置验收见 PROGRESS.md。
 
 ### 4.1 广播与 GAP 行为
 
@@ -747,7 +747,7 @@ SoftAP 由 `radio_ctrl_start_wifi_ap()` 启动，HTTP 门户由 `wifi_portal_sta
 - `WIFI_PASSWORD = "12345678"`
 - `WIFI_AP_CHANNEL = 1`
 - `WIFI_PORT = 80`
-- `WIFI_SHUTDOWN_MS = 300000`，显式续期重新设置 300 秒截止时间
+- `WIFI_SHUTDOWN_MS = 300000`，网页可信用户操作合并调用原续期接口，重新设置 300 秒闲置截止时间
 
 `start_softap()` 中的运行时配置还包括：
 
@@ -777,7 +777,7 @@ v3.2.0 起配网门户前后端分离：
 - `GET /api/state`（配置 `config`、有效 DIS `identity`、revision、桥接状态、固件信息、预设与配网剩余时间）
 - `GET /api/runtime`（实际输出、保存事务结果、桥接原始值、有效性和跑步累计）
 - `GET /api/time`（纯数字剩余秒数）
-- `POST /api/renew`（续期，返回新的剩余秒数）
+- `POST /api/renew`（未关闭且未过期时续期，成功保持纯文本剩余秒数；已过期/关闭则返回 `ok=false, closing=true` JSON）
 - `GET /api/mem_stats`（`{"free":..,"min_free":..}`）
 - `POST /api/config`（提交带 revision 的配置，返回 transaction；轮询 runtime 确认落盘结果）
 - `POST /api/close-wifi`（提交带 revision 的关闭事务，持久化当前已应用配置后进入 5 秒收尾窗口；不提交网页草稿）
@@ -797,7 +797,7 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 - `/api/bridge/*`：仅手动扫描 CPS；测试期间保持原输出，收到两份合法通知（包括 0W）后才允许保存新增设备。复制有效 DIS 字段到 `bp_ident`，缺失字段保留原值。
 - schema v14：桥接 blob 使用最多三台设备的 wire v2 显式小端编码，并兼容读取 wire v1；v13 单设备绑定迁移到设备表槽位 0。设备身份由“地址类型 + 地址”组成，满三台后新增设备必须显式提交 `replace_slot`。
 - `/api/runtime.bridge_runtime`：分别返回持久配置来源和运行时实际来源，以及主备状态、活动槽位、候选槽位和下次尝试倒计时；HTTP 任务只读主循环同步的快照并通过 mailbox 投递命令。
-- 配网默认 300 秒，读取、扫描和临时测试不自动续期。
+- 配网默认连续无操作 300 秒；state/runtime 返回 `idle_timeout_sec=300`。读取、轮询、动画、临时测试的后台进展不续期；用户点击扫描/测试等操作由网页统一事件监听调用 renew。
 
 桥接自动恢复不使用扫描。冷启动按“最近成功设备 → 后续已保存设备”的顺序定向连接，异常断连时优先从断连设备开始；60 秒快速窗口最多轮询两轮。全部失败后仅把运行时实际来源切换为完整模拟数据，持久配置仍保持真实来源；此后每 60 秒定向探测一台已保存设备，成功后自动恢复真实输出并更新最近成功提示。运行状态由纯 C `bridge_failover` 决策，`bridge_runtime` 负责调用单设备会话和最近成功 NVS。
 
@@ -817,7 +817,7 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Locati
 
 1. `arm_deadline()` 设定截止时间
 2. `esp_timer_start_periodic(..., 1000000)` 每秒检查一次
-3. `shutdown_check_cb()` 判断是否超时
+3. `shutdown_check_cb()` 到期锁内进入 closing，先留 5 秒页面通知窗口；此后不再接受续期
 4. 超时或关闭事务成功后的收尾窗口结束时调用 `portal_done()`
 5. `portal_done()` 通过返回 `bool` 的 done 回调投递 `APP_EVT_WIFI_DONE`
 6. 队列满时 `on_wifi_done()` 设置 `s_pending_wifi_done`，由主循环在任何 BLE-not-ready 提前返回前消费
@@ -832,7 +832,7 @@ deadline、closing、done 与重启请求都在 `s_lock` 下读写；done 回调
 
 运动草稿与已应用 profile 不同时，整个旧实时区隐藏，编辑区单栏展示待切换提示；保存成功才恢复新 profile 实时输出，失败或结果未知继续保留草稿。切回已应用模式立即恢复实时区。跑步使用速度、步频、RSC/HRS/FTMS 与本机模拟术语，运动按钮同步 `aria-pressed`。保存按钮为“保存并应用”、切换运动或启用桥接时相应变化；“关闭 WiFi”单独确认，不提交未保存草稿。
 
-核心门户采用单页明亮高密度布局，固定模式与配速机器人共用区域，自定义收敛到机器人档位。模板库和 LED 编辑移到电脑工具。真实来源按“选择→扫描→两样本临时测试→配置→保存应用”渐进披露，测试不提前改变实际输出；首次默认关闭心率。页面可管理最多三台设备，支持设为首选、删除和满容量替换，并分别展示配置来源、实际来源、恢复状态、倒计时和立即重试。共享校正明确作用于全部已保存设备。支持 DIS 有效字段复制、功率计/开发板/自定义名称、原始与校正值预览。前端区分草稿、已应用配置和实际输出，保存携带 revision，轮询 transaction 确认 NVS 结果，失败保留草稿。默认配网 300 秒，仅显式续期延长。内联资源上限 110 KiB，按钮居中，动画遵循 reduced-motion。详细接口与验证见 `docs/wiki/08-wifi-portal.md`。
+核心门户采用单页明亮高密度布局，固定模式与配速机器人共用区域，自定义收敛到机器人档位。模板库和 LED 编辑移到电脑工具。真实来源按“选择→扫描→两样本临时测试→配置→保存应用”渐进披露，测试不提前改变实际输出；首次默认关闭心率。页面可管理最多三台设备，支持设为首选、删除和满容量替换，并分别展示配置来源、实际来源、恢复状态、倒计时和立即重试。共享校正明确作用于全部已保存设备。支持 DIS 有效字段复制、功率计/开发板/自定义名称、原始与校正值预览。前端区分草稿、已应用配置和实际输出，保存携带 revision，轮询 transaction 确认 NVS 结果，失败保留草稿。默认连续无操作 300 秒关闭：可信点击、输入、选择、触摸、滚轮、键盘阅读及按下指针的拖动算操作，空闲鼠标移动、合成事件、程序滚动和 visibility 恢复不续期。首操作即时调用原 renew，连续操作最多约每秒一次并保留尾部操作；仅收到设备成功响应才延长，失败保持原倒计时。单调时钟以请求开始时间保守换算，leaseVersion 隔离旧轮询覆盖新续期。最后 30 秒固定可见提醒，未保存草稿明确提醒且不阻止关闭/不自动提交。自动结束、手动关闭和 closing 响应共用结束页，停止后台任务、禁用编辑并说明已应用输出继续；断网只显示状态待确认和检查入口，不冒充物理 WiFi 已关闭。内联资源上限 110 KiB，按钮居中，动画遵循 reduced-motion。详细接口与验证见 `docs/wiki/08-wifi-portal.md`。
 
 `wifi_portal.c` 用 cJSON 构造和转义 JSON，HTTP 服务任务独占 8192 字节共享输出区，
 state/runtime/scan 容量分别由 `WIFI_JSON_STATE_CAPACITY=8192`、

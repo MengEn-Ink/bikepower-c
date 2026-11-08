@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""核心门户接口替身；配置事务、桥接临时测试及显式 300 秒续期。"""
+"""核心门户接口替身；配置事务、桥接临时测试及300秒闲置续期/5秒结束窗口。"""
 import argparse
 import copy
 import json
@@ -18,7 +18,7 @@ CONFIG = {
     "heartrate": 145, "has_user_hr": 0, "power_float": 50, "cadence_float": 8,
     "hr_float": 2, "power_step": 20, "weight": 70, "ftp": 300, "thr_hr": 190,
     "ride_type": 0, "custom_wkg_low": 25, "custom_wkg_high": 30,
-    "custom_pacer_name": "自定义", "sport_profile": 0, "broadcast_mask": 7,
+    "custom_pacer_name": "自定义", "sport_profile": 0, "broadcast_mask": 15,
     "run_speed_x100": 1000, "run_pace_float_sec": 10, "run_cadence": 170,
     "run_cadence_float": 4, "run_mode": 0, "run_pacer_type": 0,
     "run_pace_low_sec": 390, "run_pace_high_sec": 450, "run_custom_name": "自定义",
@@ -58,7 +58,7 @@ LIMITS = {
     "mode": (0, 1), "run_mode": (0, 1), "sport_profile": (0, 1), "ride_type": (0, 5),
     "run_pacer_type": (0, 4), "bridge_calibration": (0, 2), "cycling_source": (0, 1),
     "bridge_bound": (0, 1), "bridge_addr_type": (0, 1), "has_user_hr": (0, 1),
-    "broadcast_mask": (1, 7),
+    "broadcast_mask": (1, 15),
 }
 STATE = {"revision": 1, "deadline": time.monotonic() + 300, "closing": False,
          "transaction": 0, "pending": False, "result": 0, "restart": 0,
@@ -218,9 +218,11 @@ def tick():
                 STATE["runtime_override"] = ""
             if STATE["close_after"]:
                 STATE["closing"] = True
+                STATE["deadline"] = time.monotonic() + 5
         STATE["fail_save"] = False
-    if remaining() == 0:
+    if remaining() == 0 and not STATE["closing"]:
         STATE["closing"] = True
+        STATE["deadline"] = time.monotonic() + 5
 
 
 def runtime():
@@ -237,7 +239,7 @@ def runtime():
     return {k: STATE[k] for k in ("revision", "transaction", "pending", "result", "restart")} | {
         "source": c["cycling_source"], "power": power, "cadence": cadence,
         "heartrate": c["heartrate"] if c["broadcast_mask"] & 4 else 0,
-        "connections": 1, "remaining_sec": remaining(), "closing": STATE["closing"],
+        "connections": 1, "remaining_sec": remaining(), "closing": STATE["closing"], "idle_timeout_sec": 300,
         "bridge": b, "bridge_runtime": bridge_state,
         "run_speed_x100": c["run_speed_x100"], "run_distance_m": 123, "run_elapsed_sec": 60}
 
@@ -248,7 +250,7 @@ def state():
             "identity": copy.deepcopy(BOARD_IDENTITY),
             "firmware_version": "4.3.1", "firmware_name": "generic-c3-v4.3.1",
             "board": "generic-c3", "git_sha": "mock", "build_time": "mock",
-            "remaining_sec": remaining(), "closing": STATE["closing"],
+            "remaining_sec": remaining(), "closing": STATE["closing"], "idle_timeout_sec": 300,
             "pacers": [{"id": i, "low": lo, "high": hi, "name": name} for i, (lo, hi, name) in enumerate(PACERS)],
             "run_pacers": [{"id": i, "low": lo, "high": hi, "cadence": cadence, "name": name}
                            for i, (lo, hi, cadence, name) in enumerate(RUN_PACERS)]}
@@ -270,6 +272,8 @@ def submit(body, close):
         elif isinstance(CONFIG[key], int):
             if type(value) is not int:
                 return {"ok": False, "error": "参数类型无效"}
+            if key == "broadcast_mask" and (value < 1 or value > 15 or not (value & 7)):
+                return {"ok": False, "error": "至少启用一项广播数据"}
             lo, hi = LIMITS.get(key, (0, 13))
             requested[key] = min(hi, max(lo, value))
         elif not isinstance(value, str) or len(value.encode()) > (23 if key == "device_name" else 31):
@@ -377,6 +381,9 @@ class Handler(BaseHTTPRequestHandler):
                     STATE["runtime_override"] = "live"
                 return self.send({"ok": True})
             if path == "/api/renew":
+                tick()
+                if STATE["closing"]:
+                    return self.send({"ok": False,"closing": True,"error": "配网已结束"})
                 STATE["deadline"] = time.monotonic() + 300
                 return self.send(300, "text/plain")
             if path in ("/api/config", "/api/close-wifi"):

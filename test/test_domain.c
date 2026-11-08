@@ -516,14 +516,14 @@ static void test_broadcast_fields_and_button_target(void)
     printf("[test] 广播数据项开关与按钮目标选择\n");
     power_engine_t e;
     power_engine_init(&e);
-    CHECK(e.broadcast_mask == BROADCAST_FIELD_ALL, "默认广播功率/踏频/心率全开");
+    CHECK(e.broadcast_mask == (BROADCAST_FIELD_ALL | BROADCAST_FIELD_CADENCE_WITH_POWER), "默认开启全部数据项与踏频随功率");
     CHECK(power_engine_broadcast_enabled(&e, BROADCAST_FIELD_POWER), "默认功率广播开启");
     CHECK(power_engine_broadcast_enabled(&e, BROADCAST_FIELD_CADENCE), "默认踏频广播开启");
     CHECK(power_engine_broadcast_enabled(&e, BROADCAST_FIELD_HEARTRATE), "默认心率广播开启");
 
     power_engine_clear_dirty(&e);
     CHECK(!power_engine_set_broadcast_mask(&e, 0), "拒绝关闭全部广播项");
-    CHECK(e.broadcast_mask == BROADCAST_FIELD_ALL, "全关被拒绝后保留原 mask");
+    CHECK(e.broadcast_mask == (BROADCAST_FIELD_ALL | BROADCAST_FIELD_CADENCE_WITH_POWER), "全关被拒绝后保留原 mask");
     CHECK(!power_engine_is_dirty(&e), "全关被拒绝不置 dirty");
 
     CHECK(power_engine_set_broadcast_mask(&e, BROADCAST_FIELD_HEARTRATE), "可只保留心率广播");
@@ -1464,7 +1464,21 @@ static void test_config_store(void)
     CHECK(c.led.silent == 0, "默认 LED 非静默");
     CHECK(c.run_pace_float_sec == RUN_PACE_FLOAT_SEC_DEFAULT, "默认跑步配速浮动秒数");
     CHECK(c.run_cadence_float == RUN_CADENCE_FLOAT_DEFAULT, "默认跑步步频浮动");
-    CHECK(c.broadcast_mask == BROADCAST_FIELD_ALL, "默认广播项全开");
+    CHECK(c.broadcast_mask == (BROADCAST_FIELD_ALL | BROADCAST_FIELD_CADENCE_WITH_POWER), "默认数据项全开且踏频随功率");
+
+    config_data_t saved = c;
+    saved.broadcast_mask = BROADCAST_FIELD_ALL;
+    CHECK(!config_store_validate(&saved), "已保存关闭兼容位的配置不强制开启");
+    CHECK(!config_store_migrate(&saved), "当前schema不迁移用户兼容位");
+    CHECK(saved.broadcast_mask == BROADCAST_FIELD_ALL, "用户选择独立踏频保持");
+    saved.schema_ver = 13;
+    CHECK(config_store_migrate(&saved), "已知旧schema正常迁移");
+    CHECK(saved.broadcast_mask == BROADCAST_FIELD_ALL, "旧schema已有广播掩码保持");
+    config_data_t imported;
+    CHECK(config_store_deserialize("{\"schema_ver\":14,\"bridge_devices\":[]}", &imported), "缺少掩码的配置使用默认值");
+    CHECK(imported.broadcast_mask == (BROADCAST_FIELD_ALL | BROADCAST_FIELD_CADENCE_WITH_POWER), "缺省JSON开启踏频随功率");
+    CHECK(config_store_deserialize("{\"schema_ver\":14,\"broadcast_mask\":7,\"bridge_devices\":[]}", &imported), "显式掩码JSON可读取");
+    CHECK(imported.broadcast_mask == BROADCAST_FIELD_ALL, "显式独立踏频JSON不覆盖");
 
     // 合法数据不修正
     CHECK(!config_store_validate(&c), "默认值无需校验修正");
@@ -1515,7 +1529,7 @@ static void test_config_store(void)
     CHECK(b.ride_type == PACER_INDEX_DEFAULT, "非法配速机器人回默认");
     CHECK(b.run_pace_float_sec == RUN_PACE_FLOAT_SEC_MAX, "跑步配速浮动夹到上限");
     CHECK(b.run_cadence_float == RUN_CADENCE_FLOAT_MAX, "跑步步频浮动夹到上限");
-    CHECK(b.broadcast_mask == BROADCAST_FIELD_ALL, "广播项全关回默认全开");
+    CHECK(b.broadcast_mask == (BROADCAST_FIELD_ALL | BROADCAST_FIELD_CADENCE_WITH_POWER), "广播项全关回默认踏频随功率");
     CHECK(b.led.scenes[LED_SCENE_WAIT_CONN].mode == LED_MODE_SLOW, "非法 LED 模式回默认慢闪");
     CHECK(b.led.scenes[LED_SCENE_CONNECTED].color == LED_COLOR_BLUE, "非法 LED 颜色回默认蓝色");
     CHECK(b.led.silent == 1, "LED 静默规范化为1");

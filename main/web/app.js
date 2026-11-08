@@ -8,7 +8,12 @@
     bridgeStage:"idle", bridgeHeartInitialized:false, copyIdentity:false,
     nameSource:"board", customName:"", toastTimer:0, pacers:[], runPacers:[],
     bridge:null, bridgeRuntime:null, output:null, testCandidate:null,
-    pendingReplacementKey:null, replaceSlot:null, polling:false, closed:false};
+    pendingReplacementKey:null, replaceSlot:null, polling:false, closed:false,
+    closeRequested:false, closeConfirmed:false, leaseVersion:0, idleSeconds:300,
+    renewing:false, activityTimer:0, activityPending:false, lastRenewAt:0,
+    pointerActive:false};
+  var ACTIVITY_MERGE_MS = 1000, CLOSE_WARNING_SEC = 30;
+  var pollTimer = 0, memoryTimer = 0;
   var emptyIdentity = {manufacturer:"",model:"",serial:"",hardware:"",firmware:"",software:""};
   function deviceKey(address, type) { return address + ":" + type; }
   function rememberDevice(item, info) {
@@ -123,7 +128,13 @@
         cache:"no-store",headers:body === undefined ? {}:{"Content-Type":"application/json"},
         body:body === undefined ? undefined:JSON.stringify(body),signal:controller.signal});
       if (!response.ok) throw new Error("设备请求失败：" + response.status);
-      var data = path === "renew" ? {remaining_sec:Number(await response.text())}:await response.json();
+      var data;
+      if (path === "renew") {
+        var text = await response.text();
+        data = text.trim().charAt(0) === "{" ? JSON.parse(text):{remaining_sec:Number(text)};
+        if (data.closing) endSession(true,data.remaining_sec || 0);
+        if (data.ok !== false && (!Number.isFinite(data.remaining_sec) || data.remaining_sec <= 0)) throw new Error("续期响应无效");
+      } else data = await response.json();
       if (data.ok === false) throw new Error(data.error || "设备拒绝操作");
       return data;
     } catch (e) {
@@ -137,7 +148,77 @@
     $("closeWifiBtn").disabled = value;
     if (state.loaded) updateDirty();
   }
-  function countdown(seconds) { state.wifiDeadline = Date.now() + Math.max(0,seconds) * 1000; renderTimer(); }
+  function countdown(seconds, version, startedAt) {
+    if (state.closed || (version !== undefined && version !== state.leaseVersion)) return;
+    if (!Number.isFinite(seconds) || seconds < 0) return;
+    state.wifiDeadline = (startedAt === undefined ? performance.now():startedAt) + seconds * 1000;
+    renderTimer();
+  }
+  function endSession(confirmed, seconds) {
+    if (state.closeConfirmed && !confirmed) return;
+    state.closed = true; state.closeConfirmed = confirmed;
+    state.wifiDeadline = performance.now() + Math.max(0,seconds || 0) * 1000;
+    clearTimeout(state.activityTimer); state.activityTimer = 0; state.activityPending = false;
+    clearInterval(pollTimer); clearInterval(memoryTimer);
+    ["scanModal","closeModal"].forEach(function(id) { $(id).hidden = true; });
+    document.querySelector(".page").inert = true;
+    document.querySelector(".action-bar").inert = true;
+    $("renewBtn").disabled = true;
+    $("sessionWarning").hidden = true;
+    $("wifiClosed").hidden = false;
+    $("wifiClosed").dataset.confirmed = String(confirmed);
+    $("wifiClosedTitle").textContent = confirmed ? "本次配网已结束":"配网时间已到";
+    $("wifiClosedState").textContent = confirmed ? "正在关闭 WiFi":"设备状态待确认";
+    $("wifiClosedText").textContent = confirmed
+      ? "设备已接受关闭，WiFi 正在退出；已应用的运动输出继续运行。"
+      : "当前无法确认设备是否已关闭。请检查热点连接；不要把网络中断当成保存成功。";
+    $("sessionRetryBtn").hidden = confirmed;
+    $("wifiClosed").focus();
+  }
+  async function renewSession(manual) {
+    if (!state.loaded || state.closed || state.closeRequested || state.renewing) return;
+    state.renewing = true; state.activityPending = false;
+    state.lastRenewAt = performance.now();
+    $("renewBtn").disabled = true;
+    try {
+      var data = await api("renew",{});
+      if (state.closed || state.closeRequested) return;
+      state.leaseVersion++;
+      countdown(Math.max(0,data.remaining_sec - (performance.now() - state.lastRenewAt) / 1000));
+      $("sessionRenewError").hidden = true;
+      if (manual) showToast("已续期，闲置 5 分钟后关闭");
+    } catch(e) {
+      if (!state.closed) {
+        $("sessionRenewError").hidden = false;
+        $("sessionRenewError").textContent = "续期未确认，请检查热点连接；倒计时未延长。";
+        if (manual) showToast(e.message);
+      }
+    } finally {
+      state.renewing = false;
+      $("renewBtn").disabled = state.closed || state.closeRequested;
+      if (state.activityPending && !state.closed && !state.closeRequested) {
+        clearTimeout(state.activityTimer);
+        state.activityTimer = setTimeout(function() { state.activityTimer = 0; renewSession(false); },ACTIVITY_MERGE_MS);
+      }
+    }
+  }
+  function userActivity(event) {
+    if (!event.isTrusted || document.hidden || !state.loaded || state.closed || state.closeRequested) return;
+    if (event.target.closest && event.target.closest("#renewBtn,#warningRenewBtn,#confirmCloseBtn,#wifiClosed")) return;
+    if (event.type === "pointermove" && (!state.pointerActive || !event.buttons)) return;
+    state.activityPending = true;
+    if (state.renewing || state.activityTimer) return;
+    var delay = Math.max(0,ACTIVITY_MERGE_MS - (performance.now() - state.lastRenewAt));
+    if (!delay) renewSession(false);
+    else state.activityTimer = setTimeout(function() { state.activityTimer = 0; renewSession(false); },delay);
+  }
+  document.addEventListener("pointerdown",function(e) { if (e.isTrusted) state.pointerActive = true; },true);
+  ["pointerup","pointercancel"].forEach(function(type) {
+    document.addEventListener(type,function() { state.pointerActive = false; },true);
+  });
+  ["pointerdown","pointermove","click","input","change","keydown","wheel","touchmove"].forEach(function(type) {
+    document.addEventListener(type,userActivity,{capture:true,passive:true});
+  });
   function fillPresets() {
     [["robotPreset",state.pacers,5],["runPreset",state.runPacers,4]].forEach(function(entry) {
       var select = $(entry[0]); select.replaceChildren();
@@ -149,8 +230,10 @@
       custom.textContent = "自定义"; select.appendChild(custom);
     });
   }
-  async function load(preserve) {
-    var data = await api("state");
+  async function load(preserve, snapshot) {
+    var version = state.leaseVersion, startedAt = performance.now();
+    var data = snapshot || await api("state");
+    if (state.closed) return data;
     state.wire = clone(data.config); state.revision = data.revision;
     state.pacers = data.pacers; state.runPacers = data.run_pacers; state.bridge = data.bridge;
     rememberBridge(data.bridge);
@@ -161,7 +244,10 @@
       state.bridgeHeartInitialized = state.applied.devices.length > 0;
       state.replaceSlot = null; state.pendingReplacementKey = null;
     }
-    state.loaded = true; state.message = ""; countdown(data.remaining_sec);
+    state.loaded = true; state.message = "";
+    state.idleSeconds = data.idle_timeout_sec || state.idleSeconds;
+    if (data.closing) { endSession(true,data.remaining_sec); return data; }
+    countdown(data.remaining_sec,version,startedAt);
     fillPresets();
     [["firmwareVersion",data.firmware_version],["boardType",data.board],
       ["gitSha",data.git_sha],["buildTime",data.build_time]].forEach(function(x) { $(x[0]).textContent = x[1]; });
@@ -742,7 +828,11 @@
     });
   }
   async function save(close) {
-    if (!state.loaded || state.busy) return;
+    if (!state.loaded || state.busy || state.closed || state.closeRequested) return;
+    if (close) {
+      state.closeRequested = true;
+      clearTimeout(state.activityTimer); state.activityTimer = 0; state.activityPending = false;
+    }
     if (!close && (!validFields() || (state.draft.source === "bridge" && !bridgeReady()))) return;
     setBusy(true); state.message = "";
     var transaction = 0, confirmedFailure = false;
@@ -759,8 +849,8 @@
             confirmedFailure = true;
             throw new Error("配置未保存（错误 " + runtime.result + "），草稿已保留");
           }
-          if (close) { state.closed = true; $("wifiClosed").hidden = false; closeModal("closeModal"); }
-          else { await load(false); showToast("配置已保存并应用"); }
+          if (close) { endSession(true,runtime.remaining_sec); }
+          else { await load(false); if (!state.closed) showToast("配置已保存并应用"); }
           return;
         }
         await new Promise(function(resolve) { setTimeout(resolve,250); });
@@ -772,7 +862,14 @@
       showToast(message);
       try { await load(true); } catch (_) {}
       state.message = message; updateDirty();
-    } finally { setBusy(false); }
+    } finally {
+      if (!state.closed) state.closeRequested = false;
+      setBusy(false);
+      if (!state.closed && state.activityPending && !state.activityTimer && !state.renewing) {
+        state.activityTimer = setTimeout(function() { state.activityTimer = 0; renewSession(false); },ACTIVITY_MERGE_MS);
+      }
+      renderTimer();
+    }
   }
   $("saveBtn").addEventListener("click",function() { save(false); });
   $("closeWifiBtn").addEventListener("click",function() { if (state.loaded) openModal("closeModal"); });
@@ -807,17 +904,49 @@
     renderAll(); edited();
     showToast("替换已加入草稿，保存后生效");
   });
-  $("renewBtn").addEventListener("click",async function() {
-    this.disabled = true;
-    try { var data = await api("renew",{}); countdown(data.remaining_sec); showToast("配网时间已续期至 5 分钟"); }
-    catch(e) { showToast(e.message); } finally { this.disabled = false; }
-  });
+  $("renewBtn").addEventListener("click",function() { renewSession(true); });
+  $("warningRenewBtn").addEventListener("click",function() { renewSession(true); });
+  async function checkSession() {
+    if (state.closeConfirmed) return;
+    $("sessionRetryBtn").disabled = true;
+    try {
+      var data = await api("state");
+      if (data.closing) { endSession(true,data.remaining_sec); return; }
+      if (data.remaining_sec > 0) {
+        state.closed = false; state.closeRequested = false;
+        $("wifiClosed").hidden = true;
+        document.querySelector(".page").inert = false;
+        document.querySelector(".action-bar").inert = false;
+        await load(true,data);
+        if (state.closed) return;
+        $("renewBtn").disabled = false;
+        clearInterval(pollTimer); clearInterval(memoryTimer);
+        pollTimer = setInterval(poll,1000); memoryTimer = setInterval(refreshMemory,10000);
+        poll();
+      }
+    } catch(e) {
+      $("wifiClosedText").textContent = "设备暂时无法连接，关闭状态未确认。本页不会自动提交草稿；已发出的保存请求结果请重新连接后核对。";
+    } finally { $("sessionRetryBtn").disabled = false; }
+  }
+  $("sessionRetryBtn").addEventListener("click",checkSession);
   function renderTimer() {
-    var seconds = Math.max(0,Math.ceil((state.wifiDeadline - Date.now()) / 1000));
+    if (!state.loaded || !state.wifiDeadline) return;
+    var seconds = Math.max(0,Math.ceil((state.wifiDeadline - performance.now()) / 1000));
+    if (state.closed) {
+      if (state.closeConfirmed && seconds === 0) $("wifiClosedState").textContent = "WiFi 关闭流程已启动";
+      return;
+    }
     $("wifiTimer").textContent = String(Math.floor(seconds / 60)).padStart(2,"0") + ":" + String(seconds % 60).padStart(2,"0");
-    $("wifiTimer").classList.toggle("is-low",seconds <= 60);
+    $("wifiTimer").classList.toggle("is-low",seconds <= CLOSE_WARNING_SEC);
+    $("sessionWarning").hidden = seconds > CLOSE_WARNING_SEC || state.closeRequested;
+    $("warningSeconds").textContent = String(seconds);
+    $("warningDirty").hidden = !isDirty();
+    if (seconds === 0 && !state.renewing && !state.closeRequested) {
+      endSession(false,0); checkSession();
+    }
   }
   async function refreshMemory() {
+    if (state.closed) return;
     try {
       var memory = await api("mem_stats");
       $("heapValue").textContent = "当前 " + (memory.free / 1024).toFixed(1)
@@ -829,14 +958,18 @@
   async function poll() {
     if (state.polling || state.closed || !state.loaded) return;
     state.polling = true;
+    var version = state.leaseVersion, startedAt = performance.now();
     try {
       var o = await api("runtime");
+      if (o.closing) { endSession(true,o.remaining_sec); return; }
+      if (state.closed) return;
       state.output = o; state.bridge = o.bridge; state.bridgeRuntime = o.bridge_runtime;
       state.rawPower = o.bridge.raw_power;
       $("meterConnection").textContent = o.bridge.valid ? "数据有效":o.bridge.connected ? "等待数据":"未连接";
       state.runtime = o.bridge_runtime && o.bridge_runtime.actual_source === "simulation"
         ? "fallback":o.bridge.valid ? "normal":"stale";
-      countdown(o.remaining_sec);
+      countdown(o.remaining_sec,version,startedAt);
+      if (state.closed) return;
       var key = rememberBridge(o.bridge);
       if (state.testCandidate && key === deviceKey(state.testCandidate.address,state.testCandidate.type)) {
         if (o.bridge.tested && o.bridge.valid) {
@@ -878,8 +1011,9 @@
       if (document.activeElement !== $("calibrationValue") && document.activeElement !== $("calibrationRange")) renderCalibration();
       updateDirty();
       if (!$("scanModal").hidden && state.testCandidate === null) renderScan(await api("bridge/scan"));
-      if (o.closing) { state.closed = true; $("wifiClosed").hidden = false; }
+      if (o.closing) endSession(true,o.remaining_sec);
     } catch(e) {
+      if (state.closed) return;
       $("liveSubtitle").textContent = "设备暂时不可达，最后数据已停止更新";
       $("heroMetricValue").textContent = "—"; $("metricTwoValue").textContent = "—"; $("heartLiveValue").textContent = "—";
       state.message = e.message; updateDirty();
@@ -889,8 +1023,8 @@
   load(false).then(function() { setBusy(false); refreshMemory(); poll(); }).catch(function(e) {
     $("saveState").textContent = e.message + "；请刷新页面重试";
   });
-  setInterval(poll,1000);
+  pollTimer = setInterval(poll,1000);
   setInterval(renderTimer,1000);
-  setInterval(refreshMemory,10000);
-  document.addEventListener("visibilitychange",function() { if (!document.hidden) poll(); });
+  memoryTimer = setInterval(refreshMemory,10000);
+  document.addEventListener("visibilitychange",function() { if (!document.hidden) { renderTimer(); poll(); } });
 }());

@@ -46,6 +46,7 @@ static bool next_generation(void)
     s_closing = false;
     s_done_called = false;
     s_done_inflight = false;
+    s_deadline_sec = 0;
     portEXIT_CRITICAL(&s_lock);
     return true;
 }
@@ -123,11 +124,24 @@ int main(void)
     assert(remaining_seconds() == 200);
     arm_deadline();
     assert(remaining_seconds() == 300);
+    s_now += 270000000;
+    h_api_renew(&req);
+    assert(remaining_seconds() == 300 && !strcmp(s_body,"300"));
+    s_now += 300000000;
+    assert(!arm_deadline());
+    assert(s_closing && remaining_seconds() == WIFI_PORTAL_REBOOT_DELAY_SEC);
+    s_closing = false; s_deadline_sec = 0;
+    assert(arm_deadline());
     s_now += 300000000;
     shutdown_check_cb(NULL);
-    assert(s_done_attempts == 1 && s_closing && !s_done_called);
-    arm_deadline();
-    assert(remaining_seconds() == 0);
+    assert(s_done_attempts == 0 && s_closing && !s_done_called);
+    assert(remaining_seconds() == WIFI_PORTAL_REBOOT_DELAY_SEC);
+    assert(!arm_deadline());
+    h_api_renew(&req);
+    assert(strstr(s_body,"配网已结束"));
+    s_now += WIFI_PORTAL_REBOOT_DELAY_SEC * 1000000LL;
+    shutdown_check_cb(NULL);
+    assert(s_done_attempts == 1 && !s_done_called);
     shutdown_check_cb(NULL);
     assert(s_done_attempts == 2 && s_done_called);
     shutdown_check_cb(NULL);

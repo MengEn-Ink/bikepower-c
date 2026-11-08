@@ -146,7 +146,7 @@ void power_engine_init(power_engine_t *e)
     led_config_defaults(&e->led);
     hr_model_init(&e->hr, DEFAULT_HEARTRATE);
     e->sport_profile = DEFAULT_SPORT_PROFILE;
-    e->broadcast_mask = BROADCAST_FIELD_ALL;
+    e->broadcast_mask = BROADCAST_MASK_DEFAULT;
     running_engine_init(&e->running);
     power_bridge_config_defaults(&e->bridge);
     e->snapshot.power = DEFAULT_POWER;

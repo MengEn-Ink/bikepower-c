@@ -5,7 +5,13 @@
   let config = structuredClone(fixture.state.config), revision = 1, transaction = 0;
   let result = 0, closing = false, failNext = false, peer = null, tested = false, temporary = false, raw = 200;
   let token = "", suspended = false;
-  let runtimeReads = 0;
+  let runtimeReads = 0, deadline = performance.now() + 300000;
+  function remaining() {
+    if (!closing && performance.now() >= deadline) {
+      closing = true; deadline = performance.now() + 5000;
+    }
+    return Math.max(0,Math.ceil((deadline - performance.now()) / 1000));
+  }
   const interval = window.setInterval.bind(window), clear = window.clearInterval.bind(window);
   const intervals = new Map();
   window.setInterval = (fn, ms) => {
@@ -40,7 +46,7 @@
     return { revision, transaction, pending: false, result, restart: 0, source: config.cycling_source,
       power: real ? b.power : config.power, cadence: real ? b.cadence : config.cadence,
       heartrate: config.broadcast_mask & 4 ? config.heartrate : 0,
-      connections: 0, remaining_sec: 300, closing, bridge: b,
+      connections: 0, remaining_sec: remaining(), idle_timeout_sec: 300, closing, bridge: b,
       bridge_runtime: { state: real ? "live" : "disabled", configured_real: !!config.cycling_source,
         actual_source: real ? "real" : "simulation", active_slot: real ? 0 : -1,
         candidate_slot: -1, next_attempt_ms: 0 },
@@ -50,10 +56,15 @@
     if (typeof url !== "string" || !url.startsWith("/api/")) throw Error("演示禁止外部请求");
     const path = url.slice(5), body = options.body ? JSON.parse(options.body) : undefined;
     let data;
-    if (path === "state") data = { ...fixture.state, config: structuredClone(config), revision, bridge: bridge(), closing, remaining_sec: 300 };
+    const seconds = remaining();
+    if (path === "state") data = { ...fixture.state, config: structuredClone(config), revision, bridge: bridge(), remaining_sec: seconds, idle_timeout_sec: 300, closing };
     else if (path === "runtime") { runtimeReads++; data = runtime(); }
     else if (path === "mem_stats") data = { free_heap: 140000, min_free_heap: 130000, largest_free_block: 100000 };
-    else if (path === "renew") return new Response("300");
+    else if (path === "renew") {
+      if (closing) return Response.json({ok:false,closing:true,error:"配网已结束"});
+      deadline = performance.now() + 300000;
+      return new Response("300");
+    }
     else if (path === "bridge/scan") data = { scanning: !body?.stop, generation: 1, devices: fixture.devices };
     else if (path === "bridge/control") {
       if (body.action === "test") {
@@ -62,13 +73,13 @@
       } else if (body.action === "stop") { temporary = false; peer = null; tested = false; }
       data = { ok: true };
     } else if (path === "config" || path === "close-wifi") {
-      if (body.revision !== revision) data = { ok: false, error: "配置已变化，请重试" };
+      if (closing || body.revision !== revision) data = { ok: false, error: "配网结束或配置已变化，请重试" };
       else {
         transaction++;
         result = failNext ? 5 : 0;
         failNext = false;
         if (!result) {
-          if (path === "close-wifi") closing = true;
+          if (path === "close-wifi") { closing = true; deadline = performance.now() + 5000; }
           else {
             const next = structuredClone(config);
             Object.keys(config).forEach(key => { if (key in body) next[key] = body[key]; });

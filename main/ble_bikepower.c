@@ -355,7 +355,7 @@ static ble_output_snapshot_t s_output = {
     .power = DEFAULT_POWER, .heartrate = DEFAULT_HEARTRATE, .cadence = DEFAULT_CADENCE,
     .running = { .cadence_spm = RUN_CADENCE_DEFAULT, .running = true },
 };
-static atomic_uchar g_broadcast_mask = BROADCAST_FIELD_ALL;
+static atomic_uchar g_broadcast_mask = BROADCAST_MASK_DEFAULT;
 static atomic_bool g_bridge_mode;
 
 // 曲柄累计（CPS/CSC 共用）
@@ -1945,7 +1945,7 @@ void ble_bikepower_set_bridge_data(const bridge_snapshot_t *snapshot, uint8_t he
 void ble_bikepower_set_broadcast_mask(int mask)
 {
     int normalized = mask & BROADCAST_FIELD_VALID;
-    if ((normalized & BROADCAST_FIELD_ALL) == 0) normalized = BROADCAST_FIELD_ALL;
+    if ((normalized & BROADCAST_FIELD_ALL) == 0) normalized = BROADCAST_MASK_DEFAULT;
     g_broadcast_mask = (uint8_t)normalized;
 }
 

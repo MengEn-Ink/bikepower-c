@@ -23,13 +23,15 @@ static bridge_runtime_command_t s_bridge_command;
 static bridge_device_t s_bridge_device;
 static unsigned s_bridge_calls;
 static bridge_runtime_snapshot_t s_bridge_snapshot;
+static int64_t s_now = 1000000;
+static bool s_expire_on_receive;
 
 static void *request_malloc(size_t size)
 {
     return s_fail_request_alloc ? NULL : malloc(size);
 }
 
-int64_t esp_timer_get_time(void) { return 1000000; }
+int64_t esp_timer_get_time(void) { return s_now; }
 esp_err_t httpd_resp_set_hdr(httpd_req_t *req, const char *key, const char *value)
 { (void)req; (void)key; (void)value; assert(!s_lock_depth); return 0; }
 esp_err_t httpd_resp_set_type(httpd_req_t *req, const char *type)
@@ -40,6 +42,7 @@ int httpd_req_recv(httpd_req_t *req, char *buffer, size_t length)
 {
     (void)req;
     assert(!s_lock_depth);
+    if (s_expire_on_receive) s_now = (int64_t)s_deadline_sec * 1000000;
     if (s_timeouts) { s_timeouts--; return HTTPD_SOCK_ERR_TIMEOUT; }
     size_t left = strlen(s_input) - s_offset;
     size_t count = left < length ? left : length;
@@ -105,6 +108,9 @@ static void reset(void)
     memset(&s_transaction, 0, sizeof(s_transaction));
     s_revision = 1;
     s_closing = false;
+    s_deadline_sec = 0;
+    s_now = 1000000;
+    s_expire_on_receive = false;
     s_calls = 0;
     s_timeouts = 0;
     s_accept = true;
@@ -192,6 +198,10 @@ int main(void)
         assert(!submit(invalid[i], false, 0));
         assert(!s_calls && !s_transaction.pending && s_revision == 1);
     }
+    reset();
+    s_expire_on_receive = true;
+    assert(!submit("{\"revision\":1,\"power\":300}", false, 0));
+    assert(!s_calls && !s_transaction.pending && s_config.power != 300);
     reset();
     s_fail_request_alloc = true;
     assert(!submit("{\"revision\":1}", false, 0));

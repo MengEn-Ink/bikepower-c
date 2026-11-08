@@ -80,12 +80,19 @@ static bool portal_closing(void)
     return closing;
 }
 
-static void arm_deadline(void)
+static bool arm_deadline(void)
 {
-    uint32_t deadline = now_sec() + WIFI_SHUTDOWN_MS / 1000;
+    uint32_t now = now_sec();
     portENTER_CRITICAL(&s_lock);
-    if (!s_closing) s_deadline_sec = deadline;
+    bool expired = s_deadline_sec && (int32_t)(s_deadline_sec - now) <= 0;
+    bool accepted = !s_closing && !expired;
+    if (accepted) s_deadline_sec = now + WIFI_SHUTDOWN_MS / 1000;
+    else if (!s_closing) {
+        s_closing = true;
+        s_deadline_sec = now + WIFI_PORTAL_REBOOT_DELAY_SEC;
+    }
     portEXIT_CRITICAL(&s_lock);
+    return accepted;
 }
 
 static void portal_done(void)
@@ -120,7 +127,16 @@ static void portal_done(void)
 static void shutdown_check_cb(void *arg)
 {
     (void)arg;
-    if (!remaining_seconds()) portal_done();
+    uint32_t now = now_sec();
+    portENTER_CRITICAL(&s_lock);
+    bool expired = (int32_t)(s_deadline_sec - now) <= 0;
+    bool finish = expired && s_closing;
+    if (expired && !s_closing) {
+        s_closing = true;
+        s_deadline_sec = now + WIFI_PORTAL_REBOOT_DELAY_SEC;
+    }
+    portEXIT_CRITICAL(&s_lock);
+    if (finish) portal_done();
 }
 
 static esp_err_t send_json(httpd_req_t *req, const char *body)
@@ -335,6 +351,7 @@ static esp_err_t h_api_state(httpd_req_t *req)
     }
     cJSON_AddNumberToObject(object, "remaining_sec", remaining_seconds());
     cJSON_AddBoolToObject(object, "closing", portal_closing());
+    cJSON_AddNumberToObject(object, "idle_timeout_sec", WIFI_SHUTDOWN_MS / 1000);
     cJSON *pacers = cJSON_AddArrayToObject(object, "pacers");
     for (int i = 0; i < PACER_COUNT; i++) {
         cJSON *pacer = cJSON_CreateObject();
@@ -388,6 +405,7 @@ static esp_err_t h_api_runtime(httpd_req_t *req)
     cJSON_AddNumberToObject(object, "connections", ble_bikepower_conn_count());
     cJSON_AddNumberToObject(object, "remaining_sec", remaining_seconds());
     cJSON_AddBoolToObject(object, "closing", portal_closing());
+    cJSON_AddNumberToObject(object, "idle_timeout_sec", WIFI_SHUTDOWN_MS / 1000);
     cJSON_AddItemToObject(object, "bridge", bridge_object(&bridge.session));
     cJSON_AddItemToObject(object, "bridge_runtime",
                           bridge_runtime_object(&bridge));
@@ -504,7 +522,13 @@ static esp_err_t submit_config(httpd_req_t *req, bool close_wifi)
     if (!ok || !s_config_cb) {
         return send_json(req, "{\"ok\":false,\"error\":\"配置已变化、参数无效或功率计尚未通过测试\"}");
     }
+    uint32_t now = now_sec();
     portENTER_CRITICAL(&s_lock);
+    bool ended = s_closing || (int32_t)(s_deadline_sec - now) <= 0;
+    if (ended) {
+        portEXIT_CRITICAL(&s_lock);
+        return send_json(req, "{\"ok\":false,\"closing\":true,\"error\":\"配网已结束\"}");
+    }
     uint32_t transaction = ++s_next_transaction;
     if (!transaction) transaction = ++s_next_transaction;
     s_transaction.id = transaction;
@@ -587,7 +611,11 @@ static esp_err_t h_api_time(httpd_req_t *req)
     return httpd_resp_sendstr(req, text);
 }
 
-static esp_err_t h_api_renew(httpd_req_t *req) { arm_deadline(); return h_api_time(req); }
+static esp_err_t h_api_renew(httpd_req_t *req)
+{
+    if (!arm_deadline()) return send_json(req, "{\"ok\":false,\"closing\":true,\"error\":\"配网已结束\"}");
+    return h_api_time(req);
+}
 
 static esp_err_t h_api_mem_stats(httpd_req_t *req)
 {
@@ -616,6 +644,7 @@ esp_err_t wifi_portal_start(power_engine_t *engine)
     portENTER_CRITICAL(&s_lock);
     s_generation++;
     s_closing = s_done_called = s_done_retry_logged = s_done_inflight = false;
+    s_deadline_sec = 0;
     portEXIT_CRITICAL(&s_lock);
     arm_deadline();
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -673,6 +702,7 @@ void wifi_portal_stop(void)
     portENTER_CRITICAL(&s_lock);
     s_generation++;
     s_closing = s_done_called = s_done_retry_logged = s_done_inflight = false;
+    s_deadline_sec = 0;
     portEXIT_CRITICAL(&s_lock);
 }
 

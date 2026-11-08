@@ -7,9 +7,9 @@
 deadline/closing/done/restart 由 `s_lock` 保护；done 锁外调用，inflight 防重入，
 generation 隔离旧会话回写，拒收时下一节拍重试。重启请求锁内取清。
 
-WiFi 启停统一经过 `radio_ctrl`，普通配网保持 BLE peripheral 在线。默认 300 秒，仅用户点击续期调用 `/api/renew` 重置截止时间；读状态、保存、扫描和测试都不延长。
+WiFi 启停统一经过 `radio_ctrl`，普通配网保持 BLE peripheral 在线。连续无操作 300 秒进入关闭；可信点击、输入、选择、触摸、键盘阅读和滚动操作经网页合并调用 `/api/renew` 重置截止时间（首个即时、连续约每秒一次及尾部补发）。后台读状态、轮询、动画、程序滚动和单纯切回页面不续期。最后 30 秒固定提醒，草稿不自动保存，也不阻止闲置关闭。
 
-保存并关闭在事务成功后进入 5 秒收尾窗口，done 回调投递 `APP_EVT_WIFI_DONE`，主循环关闭 HTTP、DNS 和 SoftAP。普通共存模式不重启；异常初始化降级遵循 radio_ctrl 原有恢复流程。
+手动关闭事务成功或闲置到期后进入 5 秒提示窗口，到期后的 renew 不会复活会话。窗口结束调用 done 回调投递 `APP_EVT_WIFI_DONE`，主循环关闭 HTTP、DNS 和 SoftAP；done 拒收重试与代次隔离保持。前端统一结束页：设备已确认显示配网结束/正在退出 WiFi；网络不可达仅显示状态待确认和重新检查，不声称物理 WiFi 已关闭。普通共存模式不重启；异常初始化降级遵循 radio_ctrl 原有恢复流程。
 
 ## HTTP 接口
 
@@ -23,7 +23,7 @@ WiFi 启停统一经过 `radio_ctrl`，普通配网保持 BLE peripheral 在线�
 | GET | `/api/state` | config、有效 identity、revision、预设、固件详情与桥接状态 |
 | GET | `/api/runtime` | 实际输出、桥接状态、保存事务结果、跑步累计 |
 | GET | `/api/time` | 剩余秒数纯文本 |
-| POST | `/api/renew` | 显式续期，返回剩余秒数纯文本 |
+| POST | `/api/renew` | 用户操作续期；成功纯文本秒数，过期/关闭返回拒绝 JSON |
 | GET | `/api/mem_stats` | 当前和历史最小空闲堆 |
 | POST | `/api/config` | 提交配置事务 |
 | POST | `/api/close-wifi` | 提交保存及关闭请求 |
@@ -63,7 +63,7 @@ BLE 配置事务共八组：既有五组布局不变，`0009` 保留主设备与
 
 HTTP 服务任务独占 8192 字节 JSON 共享区；state/runtime/scan 命名容量分别为
 8192/4096/3072。配置序列化复用同一区。容量不足返回合法错误 JSON。
-生产 cJSON 容量与超时回归入口为 `python3 tests/test_portal_runtime.py`。
+生产 cJSON 容量与超时回归入口为 `python3 tests/test_portal_runtime.py`。state/runtime 同步提供 `idle_timeout_sec=300`；前端单调时钟以请求开始时间保守估算，续期版本隔离旧轮询。`tests/portal_idle_browser.py` 在真实 Chrome 中用虚拟时钟覆盖闲置、30 秒提醒、滚动合并、未保存草稿、续期失败、旧响应、后台恢复与结束页重查。
 
 草稿、已应用配置和实际输出分别管理。三设备列表支持设为首选、删除和满容量替换，共享校正提示不会随设备切换改变。轮询不抢输入焦点；按钮居中、输入字号适配手机、弹窗支持键盘焦点和 Escape，动画遵循 reduced-motion。
 
