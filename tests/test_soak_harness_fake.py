@@ -74,6 +74,9 @@ class FakeSession:
     def __init__(self, name, timeout, address='', reset_method='rom'):
         self.connects = 0
         self.commits = 0
+        self.cfg = {'core': bytearray(15), 'bridge': bytearray(16)}
+        self.cfg['core'][14] = 3          # 初始：完整掩码未开
+        self.cfg['bridge'][1] = 1         # 初始：真实桥接（FTMS 按设计不注册）
         self.client = FakeClient(state['scenario'], state)
         FakeSession.instances.append(self)
 
@@ -86,13 +89,14 @@ class FakeSession:
         pass
 
     async def read_snapshot(self):
-        core = bytearray(15)
-        core[14] = 3
         return {'protocol': 1, 'schema': 14, 'revision': 1, 'group_mask': 255,
-                'capabilities': 15}, {'core': bytes(core)}
+                'capabilities': 15}, {k: bytes(v) for k, v in self.cfg.items()}
 
     async def commit_all(self, groups, revision):
         self.commits += 1
+        for key, value in groups.items():
+            if key in self.cfg:
+                self.cfg[key] = bytearray(value)
         return {'result': 0, 'revision': revision + 1, 'restart_flags': 1}
 
 

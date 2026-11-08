@@ -53,7 +53,15 @@ def parse_args():
     p.add_argument('--rounds', type=int, default=5)
     p.add_argument('--min-frames', type=int, default=60)
     p.add_argument('--out', default='')
+    p.add_argument('--preflight', action='store_true',
+                   help='只做前置自检（连接/快照/串号/期望配置），不写设备')
+    p.add_argument('--expect-core14', type=int, default=None)
+    p.add_argument('--expect-bridge', type=int, default=None)
     return p.parse_args()
+
+
+class PreconditionAbort(RuntimeError):
+    """前置条件不成立：中止测试但不算固件 FAIL。"""
 
 
 class SoakRun:
@@ -62,7 +70,7 @@ class SoakRun:
     def __init__(self, args):
         self.args = args
         self.result = {'address': args.address, 'main_failures': [], 'restore_failures': [],
-                       'rounds': [], 'cp_responses_hex': []}
+                       'precondition_failures': [], 'rounds': [], 'cp_responses_hex': []}
         self.backup = None
         self.mask_before = None
 
@@ -71,6 +79,10 @@ class SoakRun:
 
     def fail_restore(self, msg):
         self.result['restore_failures'].append(msg)
+
+    def fail_precondition(self, msg):
+        """前置条件错误：单独归类，绝不计入固件 FAIL。"""
+        self.result['precondition_failures'].append(msg)
 
 
 async def subscribe_all(s, run):
@@ -136,6 +148,41 @@ async def run_round(s, round_ctx, run, round_index):
 async def main():
     args = parse_args()
     run = SoakRun(args)
+
+    # --preflight：只读自检，不写设备、不跑主测试
+    if args.preflight:
+        info = {'address': args.address, 'precondition_failures': []}
+        s = DeviceSession('BikePower', 30, address=args.address, reset_method='none')
+        try:
+            await s.connect()
+            meta, cfg = await s.read_snapshot()
+            info['meta'] = meta
+            info['core14'] = cfg['core'][14]
+            info['bridge_source'] = cfg['bridge'][1]
+            serial = bytes(await s.client.read_gatt_char('00002a25-0000-1000-8000-00805f9b34fb'))
+            info['serial_length'] = len(serial)
+            if meta.get('schema') != 14 or meta.get('max_len') != 48:
+                info['precondition_failures'].append(f'配置协议异常: {meta}')
+            if args.expect_core14 is not None and cfg['core'][14] != args.expect_core14:
+                info['precondition_failures'].append(
+                    f"core14={cfg['core'][14]} != {args.expect_core14}")
+            if args.expect_bridge is not None and cfg['bridge'][1] != args.expect_bridge:
+                info['precondition_failures'].append(
+                    f"bridge_source={cfg['bridge'][1]} != {args.expect_bridge}")
+        except Exception as exc:  # noqa: BLE001
+            info['precondition_failures'].append(f'{type(exc).__name__}: {exc}')
+        finally:
+            try:
+                await s.disconnect()
+            except Exception:  # noqa: BLE001
+                pass
+            info['released'] = True
+        info['status'] = 'preflight-failed' if info['precondition_failures'] else 'preflight-ok'
+        out = Path(args.out) if args.out else Path(__file__).with_name('soak-preflight.json')
+        out.write_text(json.dumps(info, ensure_ascii=False, indent=2), encoding='utf-8', newline='\n')
+        print(json.dumps(info, ensure_ascii=False))
+        return 2 if info['precondition_failures'] else 0
+
     s = DeviceSession('BikePower', 30, address=args.address, reset_method='rom')
     try:
         await s.connect()
@@ -156,6 +203,25 @@ async def main():
         await asyncio.to_thread(reset_device, args.port, 'rom')
         await asyncio.sleep(8)
         await s.connect()
+        # 前置条件自检：FTMS 注册受「完整掩码 + 模拟桥接」共同门控，缺一即测试前置错误
+        meta_after, cfg_after = await s.read_snapshot()
+        pre = []
+        core_after = (cfg_after or {}).get('core')
+        bridge_after = (cfg_after or {}).get('bridge')
+        if not core_after or len(core_after) < 15:
+            pre.append('快照缺少 core 组，无法确认完整掩码前置')
+        elif core_after[14] != FULL_MASK:
+            pre.append(f"完整掩码未生效 core14={core_after[14]} != {FULL_MASK}")
+        if not bridge_after or len(bridge_after) < 2:
+            pre.append('快照缺少 bridge 组，无法确认桥接模式前置')
+        elif bridge_after[1] != 0:
+            pre.append(
+                f"桥接未切模拟 bridge_source={bridge_after[1]} != 0"
+                "（固件仅在非真实桥接下注册 FTMS）")
+        for item in pre:
+            run.fail_precondition(item)
+        if pre:
+            raise PreconditionAbort('前置条件不成立，中止主测试')
         round_ctx, ok = await subscribe_all(s, run)
         if not ok:
             raise RuntimeError('required特征缺失，中止主测试')
@@ -171,6 +237,8 @@ async def main():
             except Exception as exc:
                 run.fail_main(f'R{r + 1}独立连接失败: {type(exc).__name__}: {exc}')
                 break
+    except PreconditionAbort:
+        pass
     except Exception as exc:
         run.fail_main(f'{type(exc).__name__}: {exc}')
     finally:
@@ -205,15 +273,22 @@ async def main():
                 except Exception:
                     pass
         run.result['mask_after_restore'] = run.backup['core'][14] if run.backup else None
-        run.result['status'] = 'success' if not run.result['main_failures'] \
-            and not run.result['restore_failures'] else 'failed'
+        if run.result['precondition_failures']:
+            run.result['status'] = 'precondition'
+        elif run.result['main_failures'] or run.result['restore_failures']:
+            run.result['status'] = 'failed'
+        else:
+            run.result['status'] = 'success'
         run.result['released'] = True
         out = Path(args.out) if args.out else Path(__file__).with_suffix('.json')
         out.write_text(json.dumps(run.result, ensure_ascii=False, indent=2),
                        encoding='utf-8', newline='\n')
     print(json.dumps({'status': run.result['status'],
+                      'precondition_failures': run.result['precondition_failures'],
                       'main_failures': run.result['main_failures'],
                       'restore_failures': run.result['restore_failures']}, ensure_ascii=False))
+    if run.result['precondition_failures']:
+        return 2
     return 1 if (run.result['main_failures'] or run.result['restore_failures']) else 0
 
 
