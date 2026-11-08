@@ -50,13 +50,13 @@ jobs:
         with:
           python-version: "3.12"
       - name: Cache ESP-IDF toolchains
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.espressif
           key: idf-v5.5.4-${{ runner.os }}-${{ runner.arch }}
           restore-keys: idf-v5.5.4-${{ runner.os }}-
       - name: Cache virtual runtime
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: build/virtual-board-tools/venv
           key: virtual-venv-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('requirements-virtual-board.txt') }}
