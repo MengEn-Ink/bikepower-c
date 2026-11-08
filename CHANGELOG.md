@@ -8,7 +8,7 @@
 - 复用300秒deadline和renew接口；可信用户操作自动续期，连续活动合并，后台轮询/动画/程序滚动/空闲鼠标/切回页面不续期。最后30秒固定提醒，未保存修改不自动提交、不阻止闲置结束。
 - 到期冻结续期并保留5秒提示窗口；配置接收期间过期拒绝提交。统一结束页区分已确认结束与网络不可达待确认，停止后台周期任务并禁用编辑，不冒充物理WiFi已关闭。
 - 生产portal+cJSON ASan/UBSan、三宽Chrome闲置/旧响应/键盘触摸/后台恢复/断网重查、原异常/桥接与HTTP回归通过，常量299/0、文档79通过/2WARN/0FAIL。演示及离线手册由生成器同步。
-- Windows IDF5.5.4 generic最终构建app1161456字节、页面94460字节，SHA256 `64d9998bfae174d5ebabfd04da8066bbfdb7daafa0eb0fe3f16ad67b09dcd6ec`；原WARN/分区、schema14和前轮默认15保持。未提交/烧录/发布，实物手机热点、WiFi退出/BLE共存及长时耐久未验。报告 `tests/reports/portal-idle-20261108/result.md`。
+- Windows IDF5.5.4 generic最终构建app1161456字节、页面94460字节，SHA256 `64d9998bfae174d5ebabfd04da8066bbfdb7daafa0eb0fe3f16ad67b09dcd6ec`；原WARN/分区、schema14和前轮默认15保持。已提交 `b1a2337` 并推送，已烧录 COM205（哈希校验通过、启动无panic、只读扫描 CPS/HRS/FTMS 无 CSC）；实物手机热点、WiFi退出/BLE共存及长时耐久仍待验收。报告 `tests/reports/portal-idle-20261108/result.md`。
 
 ### 踏频随功率默认开启（2026-11-08）
 - 新增 `BROADCAST_MASK_DEFAULT=15`，配置/引擎/BLE初始化和空掩码回退使用同一常量。保留数据位ALL=7、schema14及历史已保存掩码，不强制开启旧设备兼容位；用户可关闭恢复独立CSC。

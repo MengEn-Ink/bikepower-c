@@ -11,7 +11,9 @@
 - [x] 设备到期锁内冻结续期，留5秒结束提示窗口再走原done/radio_ctrl；配置接收期间过期则不提交。统一全屏结束页，已确认结束与断网待确认分开，停止续期/轮询并禁用编辑。
 - [x] 生产portal runtime/faults+cJSON ASan/UBSan通过；真实Chrome三宽闲置专项含旧轮询/后台/键盘触摸/断网重查通过；原异常/桥接及HTTP回归通过。配置一致性299/0，文档79通过/2工作区警告/0失败。
 - [x] Windows原生IDF5.5.4最终generic构建通过，app1161456字节、内联94460字节；WARN/原4MB分区保持。此前默认踏频随功率修改保留，schema与版本不变；生成演示与离线手册同步。
-- [ ] 手机热点/WebView、实物WiFi退出与BLE连续性、长时耐久、Safari及完整Pages动画矩阵未验。本轮未提交/烧录/发布，不把mock或前轮码表PASS当新镜像实物验收。
+- [x] 已提交 `b1a2337` 并推送；门禁领域6246/0、门户C回归、常量299/0、文档79通过/2工作区警告/0失败。
+- [x] 已烧录 COM205（app 1161456 字节，哈希校验通过），启动无panic；只读扫描确认 `BikePower` 广播为 CPS/HRS/FTMS、无 CSC。
+- [ ] 手机热点/WebView、实物WiFi退出与BLE连续性、长时耐久、Safari及完整Pages动画矩阵未验，不把mock或前轮码表PASS当新镜像实物验收。
 - 结果及精确边界：`tests/reports/portal-idle-20261108/result.md`。独立cadence-default-firmware目录已增量更新为本次候选，不再对应前轮镜像哈希；历史报告保留。
 
 ## 踏频随功率默认开启（2026-11-08，本地源码）
