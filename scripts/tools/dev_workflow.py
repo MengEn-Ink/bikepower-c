@@ -1045,6 +1045,13 @@ def cmd_clean(ctx: Context, mode: Optional[str]) -> int:
     return EXIT_OK
 
 
+def cmd_release(argv: List[str]) -> int:
+    """委托给 release_build，保持发行流水线单一实现。"""
+    sys.path.insert(0, str(Path(__file__).parent))
+    import release_build  # noqa: PLC0415
+    return release_build.main(argv)
+
+
 # ---------------------------------------------------------------------------
 # 入口
 # ---------------------------------------------------------------------------
@@ -1074,6 +1081,18 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("clean", help="只清理 build/devcache 本工具缓存")
     sp.add_argument("--mode", choices=MODES)
 
+    sp = sub.add_parser("release", help="一条命令生成发行产物（不 tag / 不发布）")
+    sp.add_argument("--version", required=True, help="发行版本，如 4.3.3")
+    sp.add_argument("--board", default="generic", choices=BOARDS)
+    sp.add_argument("--release-root", help="产物根目录（默认 build/release）")
+    sp.add_argument("--evidence", help="真机验收证据 JSON 源路径")
+    sp.add_argument("--endurance", help="耐久报告 md 源路径")
+    sp.add_argument("--test-summary", help="测试摘要 md")
+    sp.add_argument("--notes", help="Release 说明 md")
+    sp.add_argument("--skip-build", action="store_true")
+    sp.add_argument("--allow-dirty-source", action="store_true")
+    sp.add_argument("--dry-run", action="store_true")
+
     sub.add_parser("version", help="打印版本")
     return p
 
@@ -1097,6 +1116,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return cmd_status(ctx)
     if args.cmd == "clean":
         return cmd_clean(ctx, args.mode)
+    if args.cmd == "release":
+        fwd = ["--version", args.version, "--board", args.board]
+        for flag, value in (("--release-root", args.release_root),
+                            ("--evidence", args.evidence),
+                            ("--endurance", args.endurance),
+                            ("--test-summary", args.test_summary),
+                            ("--notes", args.notes)):
+            if value:
+                fwd += [flag, value]
+        for flag, on in (("--skip-build", args.skip_build),
+                         ("--allow-dirty-source", args.allow_dirty_source),
+                         ("--dry-run", args.dry_run)):
+            if on:
+                fwd.append(flag)
+        return cmd_release(fwd)
     if args.cmd == "version":
         print(f"dev_workflow {TOOL_VERSION}")
         return EXIT_OK

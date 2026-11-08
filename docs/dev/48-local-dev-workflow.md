@@ -34,6 +34,46 @@
 .\scripts\dev_workflow.ps1 clean --mode diagnostic   # 只删 build/devcache/diagnostic
 ```
 
+## 发行流水线（release）
+
+```powershell
+# 一条命令生成发行产物（不 tag、不 push、不发布）
+.\scripts\dev_workflow.ps1 release --version 4.3.3 --board generic
+
+# 只看计划
+.\scripts\dev_workflow.ps1 release --version 4.3.3 --dry-run
+```
+
+产物按版本隔离到 `build/release/<version>/`：merged bin、`.sha256`、`manifest.txt`、
+`test-report.md`、`core-flow-endurance.md`、`user-manual.md`、`images/`、`evidence/`、
+`release-notes.md`、发行 zip 与 `release-state.json`（阶段状态）。
+
+脚本内强制的门禁：
+- `FIRMWARE_VERSION` 必须等于 `--version`；
+- 生产源码（main / components / CMakeLists / partitions / sdkconfig*）有未提交改动时拒绝（`--allow-dirty-source` 可显式承担风险）；
+- 真机证据必须存在、版本一致、P0 无 FAIL（`NOT_RUN` 会列出但不阻断）；
+- 耐久报告缺失直接失败。
+
+结束时只打印 `git tag` / `git push` / `gh release create` 命令，人工确认后执行，脚本不代替发布。
+
+## 版本一致性静态检查
+
+```powershell
+python scripts\tools\check_release_version_consistency.py
+```
+
+扫描 `tools/web/*.html`、`docs/user/*.md`、`README.md` 与当前版本 `manifest.txt`，
+要求所有 `v<X.Y.Z>` 等于 `FIRMWARE_VERSION`；CI 的 docs job 已接入。确实在讲旧版本的句子用 `--allow 4.3.0` 显式放行。
+
+## 设备刷新固定动作
+
+```powershell
+python scripts\tools\device_refresh.py --port COM205 --expect-version 4.3.3 --expect-core14 3 --expect-bridge 1
+```
+
+ROM 复位 → 等广播恢复 → 新进程严格回读（`stale_reasons` 为空、meta 48/14、DIS 版本、可选 core14 / bridge / 串号基线）。
+用于绕开 Windows 已绑定设备的 GATT 缓存残留；不要再反复试 radio 开关 / PnP / unpair。
+
 ## 设计要点
 
 - **进程环境**：IDF_PATH / IDF_PYTHON_ENV_PATH / 工具链只写进子进程 env dict，不改系统 PATH、不污染调用 shell。**工具链按 IDF `tools/tools.json` 的 `status=recommended` 版本精确选定**（target=esp32c3），不再整目录扫描新老版本混排；doctor 直接打印 build 实际使用的 riscv32-esp-elf-gcc 路径与 `--version`，与 PATH 前置段一一对应。

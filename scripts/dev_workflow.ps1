@@ -1,4 +1,4 @@
-# BikePower C - dev_workflow 薄包装（Windows / PowerShell）
+﻿# BikePower C - dev_workflow 薄包装（Windows / PowerShell）
 #
 # 作用：只负责找到一个 Python 解释器并调用 scripts/tools/dev_workflow.py。
 # 设计约束：
@@ -13,16 +13,13 @@
 #   .\scripts\dev_workflow.ps1 status
 #   .\scripts\dev_workflow.ps1 clean --mode diagnostic
 
-[CmdletBinding()]
-param(
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$ForwardArgs
-)
+
 
 $ErrorActionPreference = "Stop"
+$ForwardArgs = @($args)
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoDir = Split-Path -Parent $ScriptDir
-$Entry = Join-Path $ScriptDir "tools" "dev_workflow.py"
+$Entry = Join-Path (Join-Path $ScriptDir "tools") "dev_workflow.py"
 
 if (-not (Test-Path -LiteralPath $Entry)) {
     Write-Error "找不到 dev_workflow 入口: $Entry"
