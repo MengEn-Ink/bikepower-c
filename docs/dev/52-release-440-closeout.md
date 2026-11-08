@@ -60,3 +60,16 @@
 本包精确镜像实体 P0 `serial_boot / ble_config_rw / ble_cycling / ble_reconnect / soak_5min` 均未完成。一般性的用户正常反馈及旧镜像验收不能替代它。
 
 真实两个独立下游 + CPS 上游 / WiFi峰值、SC直接ACK、目标手机/BINAVI完整矩阵、物理按键/LED、M5Stamp 均无新精确镜像完整证据。后续必须在可验证的实际客户端完成当前构建 P0，再生成严格标准发行包、tag及Release。不得把此候选ZIP改名后当正式包上传。
+
+## 附录：Windows 缓存阻塞复诊（2026-11-08）
+
+**结论：阻塞在主机缓存层，不在固件。** 复诊脚本 `build/probe_com205_cache.py`、`build/probe_com205_winrt_variants.py`、`build/probe_com205_per_uuid.py`：
+
+- 广播正常（`BikePower`），`use_cached_services=true` 连接成功并读到配置元数据 → 链路与固件运行正常。
+- 缓存表仍含 `0x1816`（CSC），而当前固件默认踏频随 CPS 不注册 CSC → 缓存与固件真实布局不一致。
+- `GattCommunicationStatus` 在 uncached 整表与逐 UUID 定向（CPS/FTMS/DIS/config/CP）全部返回 `1 = Unreachable`；uncached 连接抛 `WinError -2147418113 (E_UNEXPECTED)`。
+- PnP 保留同一设备多代服务子节点（句柄组 001A/0020、0028/002E、0035/003B、004D/0053），属多次布局变更残留。
+
+**已执行**：`build/fix_com205_stale_bond.py` 通过 `DeviceInformationPairing.UnpairAsync` 移除本机侧过期配对（成功，`is_paired false → can_pair true`），设备侧绑定未改动。这是非管理员条件下清除 bond 级 GATT 缓存的唯一有效路径；删除缓存子节点或重启 bthserv 需管理员，未执行。
+
+**新阻断**：解绑后复配/验证未能进行，因为开发板已完全离线——`Get-PnpDevice -PresentOnly` 无任何 `VID_303A` 设备，COM205 消失，BLE 设备对象不存在。物理恢复（USB 数据线插回）后按“全新配对 → uncached 整表校验 → 烧精确 v4.4.0 应用区 → 完整 P0”顺序继续；若复配仍失败，再判定设备侧绑定槽满或 IRK 不匹配，凭既有 NVS 备份处理，不盲清。
