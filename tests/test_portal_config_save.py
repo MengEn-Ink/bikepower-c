@@ -39,11 +39,13 @@ def complete(base, result):
     raise RuntimeError("保存结果超时")
 
 
-def exercise(base):
+def exercise(base, *, fresh=True, close_wifi=True):
     state = request_json(base + "/api/state")
+    original = dict(state["config"])
     assert state["config"]["schema_ver"] == 14
     assert state["config"]["bridge_devices"] == []
-    assert state["config"]["broadcast_mask"] == 15
+    if fresh:
+        assert state["config"]["broadcast_mask"] == 15
     assert not request_json(base + "/api/config", {
         "revision": state["revision"], "broadcast_mask": 8,
     })["ok"]
@@ -167,6 +169,14 @@ def exercise(base):
     assert after <= before
     request_json(base + "/api/renew", {})
     assert request_json(base + "/api/state")["remaining_sec"] >= 299
+    state = request_json(base + "/api/state")
+    complete(base, request_json(base + "/api/config", dict(original, revision=state["revision"])))
+    assert request_json(base + "/api/state")["config"] == original
+    if close_wifi:
+        exercise_close(base)
+
+
+def exercise_close(base):
     state = request_json(base + "/api/state")
     assert state["idle_timeout_sec"] == 300
     closed = complete(base, request_json(base + "/api/close-wifi", {"revision": state["revision"]}))

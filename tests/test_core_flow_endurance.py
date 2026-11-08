@@ -8,7 +8,7 @@ import time
 import traceback
 from datetime import datetime
 from pathlib import Path
-from test_portal_config_save import exercise, wait_ready
+from test_portal_config_save import exercise, exercise_close, wait_ready
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -37,22 +37,37 @@ def main():
             if result.returncode:
                 raise RuntimeError(result.stdout[-2000:] + result.stderr[-2000:])
             rows.append("host 领域 gate 通过")
+        host_last = time.monotonic()
         while (cycles < args.cycles if args.cycles else time.monotonic() - started < args.minutes * 60):
-            exercise(f"http://127.0.0.1:{port}")
+            exercise(f"http://127.0.0.1:{port}", fresh=cycles == 0, close_wifi=False)
+            if not args.skip_host and time.monotonic() - host_last >= args.host_every_minutes * 60:
+                result = subprocess.run(["make", "-C", "test", "run"], cwd=ROOT, capture_output=True, text=True)
+                if result.returncode:
+                    raise RuntimeError(result.stdout[-2000:] + result.stderr[-2000:])
+                host_last = time.monotonic()
+                rows.append("周期 host 领域 gate 通过")
             cycles += 1
             rows.append(f"循环 {cycles}：保存、版本冲突、失败、临时测试、校正、零功率、过期、切回模拟、续期通过")
             print(f"[core-flow] PASS cycle={cycles}", flush=True)
             if args.cycles and cycles >= args.cycles:
                 break
             time.sleep(min(args.interval, 30, max(0, args.minutes * 60 - (time.monotonic() - started))))
+        exercise_close(f"http://127.0.0.1:{port}")
+        rows.append("同进程全部循环后关闭配网并拒绝保存/续期通过")
     except Exception as error:
         errors.append(
             f"{type(error).__name__}: {error!r}\n\n```text\n"
             f"{traceback.format_exc().rstrip()}\n```"
         )
     finally:
-        proc.terminate()
-        proc.wait(timeout=5)
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception as error:
+            errors.append("清理失败: " + repr(error))
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
     path = Path(args.report) if args.report else ROOT / "tests/reports" / f"core_flow_endurance_{datetime.now():%Y%m%d_%H%M%S}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("# 核心门户桥接耐久报告\n\n"

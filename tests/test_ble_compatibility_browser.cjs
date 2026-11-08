@@ -82,7 +82,7 @@ const root = path.join(__dirname, '..');
     await page.evaluate(async () => {
       const ch = { uuid: '00002a65-0000-1000-8000-00805f9b34fb', properties: { read: true },
         readValue: async () => { throw new Error('读取被拒绝'); } };
-      const services = await enumerateServices({ getPrimaryServices: async () => [
+      const services = await enumerateServices({ connected: true, getPrimaryServices: async () => [
         { uuid: UUIDS.cpsService, getCharacteristics: async () => [ch] },
         { uuid: UUIDS.cscService, getCharacteristics: async () => { throw new Error('没有授权'); } },
       ] });

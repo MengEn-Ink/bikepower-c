@@ -86,8 +86,12 @@ def parse_sha256_sidecar(path):
 
 
 def parse_manifest(path):
+    return parse_manifest_text(path.read_text(encoding="utf-8"))
+
+
+def parse_manifest_text(text):
     entries = {}
-    for raw in path.read_text(encoding="utf-8").splitlines():
+    for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
@@ -253,13 +257,42 @@ def validate_release_artifacts(
     expected_zip_entries.update(evidence_rel_names)
 
     with zipfile.ZipFile(zip_path) as archive:
-        entries = {name for name in archive.namelist() if not name.endswith("/")}
-    missing_zip = sorted(expected_zip_entries - entries)
-    extra_zip = sorted(entries - expected_zip_entries)
-    if missing_zip:
-        raise ReleaseGateError("release zip 缺少文件: " + ", ".join(missing_zip))
-    if extra_zip:
-        raise ReleaseGateError("release zip 存在非标准文件: " + ", ".join(extra_zip))
+        names = [info.filename for info in archive.infolist()]
+        if len(names) != len(set(names)):
+            raise ReleaseGateError("release zip 重复条目")
+        entries = {name for name in names if not name.endswith("/")}
+        missing_zip = sorted(expected_zip_entries - entries)
+        extra_zip = sorted(entries - expected_zip_entries)
+        if missing_zip:
+            raise ReleaseGateError("release zip 缺少文件: " + ", ".join(missing_zip))
+        if extra_zip:
+            raise ReleaseGateError("release zip 存在非标准文件: " + ", ".join(extra_zip))
+        for name in sorted(entries):
+            info = archive.getinfo(name)
+            if name == "manifest.txt":
+                if info.file_size > (release_dir / name).stat().st_size:
+                    raise ReleaseGateError("release zip manifest 大小不合理")
+                try:
+                    packed_manifest = parse_manifest_text(archive.read(name).decode("utf-8"))
+                except (UnicodeError, zipfile.BadZipFile) as exc:
+                    raise ReleaseGateError("release zip manifest 编码或 CRC 错误") from exc
+                required = entries - {"manifest.txt"}
+                if set(packed_manifest) != required or any(
+                        packed_manifest[key] != manifest[key] for key in required):
+                    raise ReleaseGateError("release zip manifest 与外部记录不一致")
+                continue
+            expected_size, expected_digest = manifest[name]
+            if info.file_size != expected_size:
+                raise ReleaseGateError("release zip 内容大小不一致: " + name)
+            digest = hashlib.sha256()
+            try:
+                with archive.open(info) as member:
+                    for chunk in iter(lambda: member.read(1024 * 1024), b""):
+                        digest.update(chunk)
+            except (zipfile.BadZipFile, RuntimeError, OSError) as exc:
+                raise ReleaseGateError("release zip CRC 或内容读取失败: " + name) from exc
+            if digest.hexdigest() != expected_digest:
+                raise ReleaseGateError("release zip 内容 SHA256 不匹配: " + name)
 
     upload_count = len(expected)
     expected_upload_count = 2 * len(boards) + len(FIXED_ATTACHMENTS)

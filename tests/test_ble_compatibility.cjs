@@ -185,15 +185,20 @@ test('跑步机采样入口订阅 Treadmill Data 原始通知', async () => {
   const source = html.slice(html.indexOf('async function subscribeNotifications('), html.indexOf('async function connectAuthorized('));
   let received = false;
   const ch = { async startNotifications() { received = true; }, addEventListener() {} };
-  const rec = { subscriptions: {}, server: { async getPrimaryService(service) {
+  const rec = { subscriptions: {}, server: { connected: true, async getPrimaryService(service) {
     if(service !== uuid('1826'))throw new Error('not found');
     return { async getCharacteristic(char) { if(char !== uuid('2acd'))throw new Error('not found');return ch; } };
   } } };
   const sandbox = vm.createContext({ rec, log() {}, handleNotify() {} });
-  vm.runInContext(dictionary + source, sandbox);
+  const lifecycle = html.slice(html.indexOf('function assertGattConnected('), html.indexOf('const DIS_CHARS ='));
+  vm.runInContext(dictionary + lifecycle + source, sandbox);
   await vm.runInContext('subscribeNotifications(rec)', sandbox);
   assert.equal(received, true);
   assert.equal(rec.subscriptions.treadmill, true);
+  rec.server.connected = false;
+  received = false;
+  await assert.rejects(vm.runInContext('subscribeNotifications(rec)', sandbox), /连接已断开/);
+  assert.equal(received, false);
 });
 test('身份差异只建议现有身份写入，不宣称完整克隆或目标兼容', () => {
   const reference = snapshot('reference');

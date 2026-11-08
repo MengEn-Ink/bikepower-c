@@ -123,7 +123,57 @@ def expect_error(message, fn):
     raise AssertionError(f"expected ReleaseGateError containing {message!r}")
 
 
+def refresh_package_manifest(release_dir):
+    package_name = f"bikepower-c-v{VERSION}.zip"
+    write_sidecar(release_dir, package_name)
+    manifest = release_dir / "manifest.txt"
+    lines = []
+    for raw in manifest.read_text(encoding="utf-8").splitlines():
+        if raw.startswith(package_name + "  ") or raw.startswith(package_name + ".sha256  "):
+            path = release_dir / raw.split()[0]
+            raw = f"{path.name}  {path.stat().st_size}  {sha256_file(path)}"
+        lines.append(raw)
+    manifest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def check_zip_failures():
+    for case, expected in (("payload", "内容 SHA256"), ("duplicate", "重复条目"),
+                           ("manifest", "manifest 与外部"), ("crc", "CRC")):
+        temp, folder = create_release_dir()
+        try:
+            package = folder / f"bikepower-c-v{VERSION}.zip"
+            with zipfile.ZipFile(package) as z:
+                data = {n: z.read(n) for n in z.namelist()}
+            name = f"generic-c3-v{VERSION}.bin"
+            if case == "payload":
+                data[name] = b"X" * len(data[name])
+            if case == "manifest":
+                data["manifest.txt"] = b"# empty\n"
+            with zipfile.ZipFile(package, "w", zipfile.ZIP_STORED) as z:
+                for n, value in data.items():
+                    z.writestr(n, value)
+                if case == "duplicate":
+                    import warnings
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", UserWarning)
+                        z.writestr(name, data[name])
+            if case == "crc":
+                import struct
+                with zipfile.ZipFile(package) as z:
+                    offset = z.getinfo(name).header_offset
+                binary = bytearray(package.read_bytes())
+                name_len, extra_len = struct.unpack_from("<HH", binary, offset + 26)
+                binary[offset + 30 + name_len + extra_len] ^= 1
+                package.write_bytes(binary)
+            refresh_package_manifest(folder)
+            expect_error(expected, lambda: validate_release_artifacts(
+                folder, VERSION, GIT_SHA, skip_git_check=True))
+        finally:
+            temp.cleanup()
+
+
 def main():
+    check_zip_failures()
     temp, release_dir = create_release_dir()
     try:
         artifacts, _ = validate_release_artifacts(

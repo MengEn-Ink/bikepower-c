@@ -393,6 +393,8 @@ STATIC_CHECKS = [
     ("tests/test_maintenance_tools.py", "维护工具功能回归"),
     ("tests/test_persistent_store.py", "生产 NVS 双槽原子提交与故障恢复 ASan/UBSan"),
     ("tests/test_mock_server_shutdown.py", "mock 服务终止信号与清理回归"),
+    ("tests/test_ble_stop_recovery.py", "BLE停止失败回滚 ASan/UBSan"),
+    ("tests/test_ble_multi_client.py", "双客户端容量/订阅/响应/配置隔离生产回归 ASan/UBSan"),
     ("tests/test_ble_config_service.py", "生产 BLE 配置 GATT 回调 ASan/UBSan"),
     ("tests/test_audit_regressions.py", "审查固定输入生产回归 ASan/UBSan"),
     ("tests/test_control_delivery.py", "控制确认与CCCD生产回归 ASan/UBSan"),
