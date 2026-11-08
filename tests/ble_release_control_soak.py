@@ -145,10 +145,17 @@ async def main():
         core = bytearray(run.backup['core'])
         core[14] = FULL_MASK
         full['core'] = bytes(core)
+        bridge = bytearray(run.backup['bridge'])
+        bridge[1] = 0  # BRIDGE_SOURCE_SIMULATED，禁真实桥接以注册 FTMS
+        full['bridge'] = bytes(bridge)
         resp = await s.commit_all(full, meta['revision'])
         if not (resp['result'] == 0 and resp['restart_flags'] & RESTART_GATT):
             run.fail_main(f'fullmask提交异常: {resp}')
-        await reconnect(s, 10)
+        # GATT 表重建后 Windows 缓存可能 stale，用一个跨平台设备重启代替重连
+        await s.disconnect()
+        await asyncio.to_thread(reset_device, args.port, 'rom')
+        await asyncio.sleep(8)
+        await s.connect()
         round_ctx, ok = await subscribe_all(s, run)
         if not ok:
             raise RuntimeError('required特征缺失，中止主测试')
@@ -172,8 +179,11 @@ async def main():
             await s.disconnect()
         except Exception:
             pass
-        if run.backup is not None and not run.result['main_failures'] is None:
+        if run.backup is not None:
             try:
+                # 服务表可能已被重建，先 ROM 重启让中心设备重新枚举再恢复
+                await asyncio.to_thread(reset_device, args.port, 'rom')
+                await asyncio.sleep(8)
                 await s.connect()
                 meta2, current = await s.read_snapshot()
                 if current != run.backup:
