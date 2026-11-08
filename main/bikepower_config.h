@@ -326,6 +326,7 @@ typedef enum {
 
 // ===== 射频软切换（radio_ctrl，毫秒） =====
 #define RADIO_BLE_RELEASE_WAIT_MS  200   // 停 BLE 后留给控制器释放射频的时间
+#define RADIO_BLE_REBUILD_GRACE_MS 1500  // 布局变更后等待对端自行断开的宽限，超时由设备主动断开
 #define RADIO_RESTART_DELAY_MS     1000  // 失败兜底 esp_restart 前的等待
 #define BLE_STOP_LOCK_WAIT_MS      100   // 停 BLE 等待通知回调退出的最大时间
 #define BLE_SCAN_LOCK_WAIT_MS      5     // BLE 扫描回调等待扫描结果锁的最大时间

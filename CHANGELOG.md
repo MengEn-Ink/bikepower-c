@@ -5,6 +5,7 @@
 ## [未发布]
 
 ### v4.4.0 发版候选（仅 generic-c3，尚未正式发布）
+- 修复布局变更后重建等待死锁：配置提交要求重建GATT时，若对端（Windows）保留ACL不主动断开，广播会长期停摆。主循环改为先给 `RADIO_BLE_REBUILD_GRACE_MS=1500` 宽限，超时由 `ble_bikepower_stop()` 主动终止下游链路再重建；实测配置端到端由卡死转为13项全PASS，三轮连接/断开均正常恢复广播。
 - 合并双下游+一上游CPS三链路、逐连接订阅/FIFO/代次与控制/配置所有者隔离；真实桥接不提供FTMS，schema14、配置与绑定保持。
 - 修复stop锁超时原运行态损坏及Host stop失败清理锁存；生产stop故障注入回归通过。
 - ZIP逐条目size/SHA256/CRC/重复项与内部manifest映射门禁；同大小篡改、重复条目、空manifest、CRC四负例及原样例通过。

@@ -55,6 +55,7 @@ static bool s_pending_config_identity;
 static device_identity_t s_config_identity;
 static bool s_processing_config_wifi;
 static bool s_ble_config_restart_pending = false;
+static uint32_t s_ble_rebuild_wait_ms = 0;  // 布局变更开始等待对端断开的时刻（0=未计时）
 // DIS 身份覆盖写入 mailbox：host 任务只复制，主循环负责 NVS 落盘后再让 DIS 读值生效。
 static device_identity_t s_pending_identity;
 static bool s_has_pending_identity = false;
@@ -588,7 +589,14 @@ void app_main(void)
 
         bool wifi_restart_requested = wifi_portal_ble_restart_requested();
         if (wifi_restart_requested || s_ble_config_restart_pending) {
-            if (conn == 0) {
+            // 布局变更：先给对端一小段自行断开的宽限，超时后由 stop 主动终止链路重建，
+            // 避免 Windows 等主机保留 ACL 时广播永久停摆。
+            uint32_t rebuild_now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+            if (s_ble_rebuild_wait_ms == 0) s_ble_rebuild_wait_ms = rebuild_now_ms ? rebuild_now_ms : 1;
+            bool grace_expired =
+                (uint32_t)(rebuild_now_ms - s_ble_rebuild_wait_ms) >= RADIO_BLE_REBUILD_GRACE_MS;
+            if (conn == 0 || grace_expired) {
+                if (conn != 0) ESP_LOGW(TAG, "等待对端断开超时，主动断开并重建 GATT 服务表 conn=%d", conn);
                 ESP_LOGI(TAG, "运动 profile 或服务开关已变化，重启 BLE 以重建 GATT 服务表");
                 if (ble_bikepower_stop()) {
                     vTaskDelay(pdMS_TO_TICKS(RADIO_BLE_RELEASE_WAIT_MS));
@@ -600,6 +608,7 @@ void app_main(void)
                     if (r == ESP_OK) {
                         if (wifi_restart_requested) wifi_portal_consume_ble_restart_requested();
                         s_ble_config_restart_pending = false;
+                        s_ble_rebuild_wait_ms = 0;
                         last_conn = 0;
                         app_state_clear_error();
                         bridge_runtime_request(BRIDGE_RUNTIME_RETRY_NOW, NULL);
@@ -614,6 +623,8 @@ void app_main(void)
             } else if (tick % 20 == 0) {
                 ESP_LOGW(TAG, "运动 profile 或服务开关已变化，等待 BLE 断开后重建 GATT 服务表 conn=%d", conn);
             }
+        } else {
+            s_ble_rebuild_wait_ms = 0;
         }
 
         app_state_tick();

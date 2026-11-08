@@ -73,3 +73,11 @@
 **已执行**：`build/fix_com205_stale_bond.py` 通过 `DeviceInformationPairing.UnpairAsync` 移除本机侧过期配对（成功，`is_paired false → can_pair true`），设备侧绑定未改动。这是非管理员条件下清除 bond 级 GATT 缓存的唯一有效路径；删除缓存子节点或重启 bthserv 需管理员，未执行。
 
 **新阻断**：解绑后复配/验证未能进行，因为开发板已完全离线——`Get-PnpDevice -PresentOnly` 无任何 `VID_303A` 设备，COM205 消失，BLE 设备对象不存在。物理恢复（USB 数据线插回）后按“全新配对 → uncached 整表校验 → 烧精确 v4.4.0 应用区 → 完整 P0”顺序继续；若复配仍失败，再判定设备侧绑定槽满或 IRK 不匹配，凭既有 NVS 备份处理，不盲清。
+
+## 附录B：布局变更重建死锁（实体复现与修复）
+
+- 现象：配置提交要求重建 GATT（改广播掩码）后，设备持续输出 `等待 BLE 断开后重建 GATT 服务表 conn=1`，广播不再出现；客户端进程全部退出后仍持续，只有复位能清除。
+- 定位：`start_advertising()` 在 `s_rebuild_pending` 期间静默返回（`ble_bikepower.c:1861`），而重建只在 `conn==0` 时触发（`app_main.c:591`）。Windows 主机在 GATT 会话关闭后仍保留 ACL，`conn` 长期为 1，形成死锁。干净连接/断开 20 秒内正常恢复广播，证明主机释放链路本身无问题，问题在“等待对端断开”这一策略。
+- 修复：`ble_bikepower_stop()` 本身会 `ble_gap_terminate` 全部下游链路，因此主循环改为宽限 `RADIO_BLE_REBUILD_GRACE_MS=1500ms` 后主动 stop 重建；成功路径与空闲路径清零计时。
+- 验证：`tests/ble_config_e2e.py` 由“13项中12项PASS、末尾失败”转为 **13项全PASS**（含广播掩码触发断连、重广播、服务表重建、配置恢复与重启持久化）；三轮 connect→断开 均正常恢复广播。
+- 本轮镜像：`build/release-4.4.0-candidate/bikepower-c.bin`，1166016 字节，SHA256 `2111963ba7e85832a2eb1e0235bf0912e3b0ee5cd9cf4ac73d142468be7696f4`，已写入 COM205 `0x10000` 并 verify 通过。
