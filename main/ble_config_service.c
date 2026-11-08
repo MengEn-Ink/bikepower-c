@@ -14,7 +14,8 @@ static config_data_t s_snapshot;
 static bool s_snapshot_valid;
 static uint32_t s_revision = BLE_CONFIG_INITIAL_REVISION;
 static uint16_t s_control_handle;
-static uint8_t s_response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
+static uint8_t s_responses[BLE_DOWNSTREAM_MAX][BLE_CONFIG_CONTROL_RESPONSE_LEN];
+static uint16_t s_connections[BLE_DOWNSTREAM_MAX] = {BLE_HS_CONN_HANDLE_NONE, BLE_HS_CONN_HANDLE_NONE};
 static ble_config_commit_cb_t s_commit_cb;
 static ble_config_indicate_cb_t s_indicate_cb;
 static ble_config_reserve_cb_t s_reserve_cb;
@@ -25,6 +26,7 @@ static struct {
     uint32_t id;
     uint32_t revision;
     uint32_t response_token;
+    uint16_t owner;
     uint8_t written;
     config_data_t staging;
 } s_transaction;
@@ -72,8 +74,11 @@ static void send_response(uint32_t token, uint8_t opcode, uint8_t result, uint8_
     uint8_t response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
     ble_config_encode_control_response(response, sizeof(response), opcode, result,
                                        restart, transaction, revision);
+    uint16_t connection = ble_bikepower_response_connection(token);
     portENTER_CRITICAL(&s_lock);
-    memcpy(s_response, response, sizeof(response));
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i)
+        if (s_connections[i] == connection && connection != BLE_HS_CONN_HANDLE_NONE)
+            memcpy(s_responses[i], response, sizeof(response));
     portEXIT_CRITICAL(&s_lock);
     if (s_indicate_cb) s_indicate_cb(token, response, sizeof(response));
 }
@@ -110,14 +115,14 @@ static int group_access(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *c
         return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
     }
     portENTER_CRITICAL(&s_lock);
-    bool writable = s_transaction.active && !s_transaction.committing;
+    bool writable = s_transaction.active && !s_transaction.committing && s_transaction.owner == ch;
     config = s_transaction.staging;
     uint32_t transaction = s_transaction.id;
     portEXIT_CRITICAL(&s_lock);
     if (!writable) return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
     if (!ble_config_decode_group(group, payload, length, &config)) return BLE_ATT_ERR_VALUE_NOT_ALLOWED;
     portENTER_CRITICAL(&s_lock);
-    if (!s_transaction.active || s_transaction.committing || s_transaction.id != transaction) {
+    if (!s_transaction.active || s_transaction.committing || s_transaction.id != transaction || s_transaction.owner != ch) {
         portEXIT_CRITICAL(&s_lock);
         return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
     }
@@ -131,9 +136,10 @@ static int control_access(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt 
 {
     (void)ah; (void)arg;
     if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
-        uint8_t response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
+        uint8_t response[BLE_CONFIG_CONTROL_RESPONSE_LEN] = {0};
         portENTER_CRITICAL(&s_lock);
-        memcpy(response, s_response, sizeof(response));
+        for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i)
+            if (s_connections[i] == ch) memcpy(response, s_responses[i], sizeof(response));
         portEXIT_CRITICAL(&s_lock);
         return read_buf(ctxt, response, sizeof(response));
     }
@@ -163,6 +169,7 @@ static int control_access(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt 
             else if (!transaction || expected != revision) result = BLE_CONFIG_RESULT_STALE_REVISION;
             else {
                 s_transaction.active = true;
+                s_transaction.owner = ch;
                 s_transaction.id = transaction;
                 s_transaction.revision = revision;
                 s_transaction.written = 0;
@@ -181,7 +188,7 @@ static int control_access(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt 
             portENTER_CRITICAL(&s_lock);
             revision = s_revision;
             if (!s_transaction.active) result = BLE_CONFIG_RESULT_NO_TRANSACTION;
-            else if (s_transaction.id != transaction) result = BLE_CONFIG_RESULT_TRANSACTION_MISMATCH;
+            else if (s_transaction.id != transaction || s_transaction.owner != ch) result = BLE_CONFIG_RESULT_TRANSACTION_MISMATCH;
             else if (s_transaction.revision != revision) {
                 result = BLE_CONFIG_RESULT_STALE_REVISION;
                 s_transaction.active = false;
@@ -213,7 +220,7 @@ static int control_access(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt 
             revision = s_revision;
             if (!s_transaction.active) result = s_transaction.committing
                 ? BLE_CONFIG_RESULT_BUSY : BLE_CONFIG_RESULT_NO_TRANSACTION;
-            else if (s_transaction.id != transaction) result = BLE_CONFIG_RESULT_TRANSACTION_MISMATCH;
+            else if (s_transaction.id != transaction || s_transaction.owner != ch) result = BLE_CONFIG_RESULT_TRANSACTION_MISMATCH;
             else {
                 s_transaction.active = false;
                 s_transaction.written = 0;
@@ -278,18 +285,61 @@ void ble_config_service_reset(ble_config_reserve_cb_t reserve,
     ble_config_encode_control_response(response, sizeof(response), BLE_CONFIG_OP_CANCEL,
                                        BLE_CONFIG_RESULT_SUCCESS, 0, 0, revision);
     portENTER_CRITICAL(&s_lock);
-    memcpy(s_response, response, sizeof(response));
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
+        s_connections[i] = BLE_HS_CONN_HANDLE_NONE;
+        memcpy(s_responses[i], response, sizeof(response));
+    }
+    s_transaction.owner = BLE_HS_CONN_HANDLE_NONE;
     portEXIT_CRITICAL(&s_lock);
 }
 
 const struct ble_gatt_svc_def *ble_config_service_definition(void) { return &s_service; }
 
-void ble_config_service_disconnect(void)
+void ble_config_service_connect(uint16_t connection)
 {
     portENTER_CRITICAL(&s_lock);
-    s_transaction.active = false;
-    s_transaction.written = 0;
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
+        if (s_connections[i] == connection) { portEXIT_CRITICAL(&s_lock); return; }
+    }
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
+        if (s_connections[i] == BLE_HS_CONN_HANDLE_NONE) {
+            s_connections[i] = connection;
+            ble_config_encode_control_response(s_responses[i], sizeof(s_responses[i]),
+                BLE_CONFIG_OP_CANCEL, BLE_CONFIG_RESULT_SUCCESS, 0, 0, s_revision);
+            break;
+        }
+    }
     portEXIT_CRITICAL(&s_lock);
+}
+
+void ble_config_service_disconnect(uint16_t connection)
+{
+    portENTER_CRITICAL(&s_lock);
+    if (s_transaction.owner == connection || connection == BLE_HS_CONN_HANDLE_NONE) {
+        s_transaction.active = false;
+        s_transaction.written = 0;
+    }
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i)
+        if (s_connections[i] == connection || connection == BLE_HS_CONN_HANDLE_NONE)
+            s_connections[i] = BLE_HS_CONN_HANDLE_NONE;
+    portEXIT_CRITICAL(&s_lock);
+}
+
+bool ble_config_service_busy(void)
+{
+    portENTER_CRITICAL(&s_lock);
+    bool busy = s_transaction.active || s_transaction.committing;
+    portEXIT_CRITICAL(&s_lock);
+    return busy;
+}
+
+uint16_t ble_config_service_owner(uint32_t transaction)
+{
+    portENTER_CRITICAL(&s_lock);
+    uint32_t token = s_transaction.committing && s_transaction.id == transaction
+        ? s_transaction.response_token : 0;
+    portEXIT_CRITICAL(&s_lock);
+    return token ? ble_bikepower_response_connection(token) : BLE_HS_CONN_HANDLE_NONE;
 }
 
 void ble_config_service_set_commit_callback(ble_config_commit_cb_t cb) { s_commit_cb = cb; }

@@ -24,6 +24,11 @@ idf_component_register(
              esp_driver_rmt json mbedtls
 )
 
+# 固定 IDF 5.5.4：读取真实每连接 indication 在途状态，避免与系统 Service Changed 冲突。
+idf_component_get_property(BT_COMPONENT_DIR bt COMPONENT_DIR)
+target_include_directories(${COMPONENT_LIB} PRIVATE
+    "${BT_COMPONENT_DIR}/host/nimble/nimble/nimble/host/src")
+
 # ===== web 静态资源内联（v3.2.0 前后端分离） =====
 # 把 main/web/{index.html,app.css,app.js} 合并为单一内联 HTML，输出 web_index_html.h
 # 由 scripts/inline_static.py 在编译时生成，wifi_portal.c 通过 #include 引用。

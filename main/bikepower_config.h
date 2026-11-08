@@ -218,6 +218,10 @@ typedef enum {
 #define NVS_TEMPLATE_KEY_PREFIX   "tpl"
 
 // ===== BLE 连接与广播 =====
+#define BLE_DOWNSTREAM_MAX          2
+#define BLE_UPSTREAM_MAX            1
+#define BLE_TOTAL_CONNECTIONS       (BLE_DOWNSTREAM_MAX + BLE_UPSTREAM_MAX)
+#define BLE_CCCDS_PER_BOND          12
 #define BLE_ADVERTISING_INTERVAL_MS  100    // 广播间隔
 #define BLE_NOTIFY_INTERVAL_MS       1000   // 通知间隔
 #define BLE_RETRY_TICKS              100    // BLE 启动失败重试节拍数（每拍50ms → 5s）
@@ -339,9 +343,9 @@ typedef enum {
 #define DEVICE_SERIAL_PREFIX "BP-"
 #define DEVICE_SERIAL_MAC_LEN 6
 #define DEVICE_SERIAL_FORMAT DEVICE_SERIAL_PREFIX "%02X%02X%02X%02X%02X%02X"
-#define FIRMWARE_VERSION     "4.3.3"
+#define FIRMWARE_VERSION     "4.4.0"
 #define FIRMWARE_STABLE_VERSION "4.0.0"
-#define FIRMWARE_FIX_VERSION    "4.3.3"
+#define FIRMWARE_FIX_VERSION    "4.4.0"
 
 #ifndef BIKEPOWER_GIT_SHA
 #define BIKEPOWER_GIT_SHA "nogit"

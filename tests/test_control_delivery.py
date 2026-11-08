@@ -13,9 +13,13 @@ def main():
         ("ble_bikepower_control_ticket","uint32_t"),("ble_bikepower_control_current","bool"),
         ("ble_bikepower_control_complete","void")])
     stubs=t.CP_STUBS.replace('static int write_bytes','static int ftms_cp_cb(uint16_t,uint16_t,struct ble_gatt_access_ctxt *,void *);\nstatic int write_bytes')
+    stubs=stubs.replace('static bool indication_submit(uint32_t token,const uint8_t *b,size_t n)\n{(void)token;return indicate_try(9,b,n);}', '')
+    stubs=stubs.replace('static bool client_indicates(uint16_t c,uint16_t h){(void)h;return c==g_conn_handle&&g_ftms_subscribed;}', '')
     extra=r'''
 static uint16_t g_rsc_cp_handle=11;
 static bool g_rsc_subscribed,g_rsc_pending;
+static uint16_t g_rsc_connection=65535;
+static bool client_indicates(uint16_t c,uint16_t h){return c==g_conn_handle&&(h==11?g_rsc_subscribed:g_ftms_subscribed);}
 static uint32_t g_rsc_response_token;
 static ble_rsc_distance_cb_t g_rsc_distance_cb;
 static bool indication_submit(uint32_t token,const uint8_t *b,size_t n)
@@ -72,10 +76,11 @@ int main(void)
 }
 '''
     t.run(t.PREAMBLE+stubs+extra+funcs+checks)
-    funcs=t.functions(source,[("subscriptions_reset","static void"),("subscription_update","static void"),
+    funcs=t.functions(source,[("client_find","static ble_client_t *"),("subscriptions_reset","static void"),("subscription_update","static void"),
         ("notification_subscribed","static bool"),("notify_one_nolock","static void")])
     stubs=r'''
-static atomic_uint_least16_t g_notify_subscriptions[BLE_NOTIFY_SUBSCRIPTION_MAX];
+typedef struct {uint16_t connection;atomic_uint_least16_t subscriptions[BLE_NOTIFY_SUBSCRIPTION_MAX];} ble_client_t;
+static ble_client_t s_clients[BLE_DOWNSTREAM_MAX]={{.connection=1},{.connection=BLE_HS_CONN_HANDLE_NONE}};
 static unsigned sends,allocations;
 static struct os_mbuf *ble_hs_mbuf_from_flat(const uint8_t *b,size_t n)
 {static struct os_mbuf om;memcpy(om.data,b,n);allocations++;return &om;}
@@ -85,14 +90,14 @@ static void ble_telemetry_service_tx(int rc,bool oom){assert(!rc&&!oom);}
 '''
     checks=r'''
 int main(void){
- (void)chr_read_buf;(void)g_broadcast_mask;(void)s_output;(void)s_data_lock;
- g_ready=true;g_conn_handle=1;uint8_t b[]={1,2};
+ (void)chr_read_buf;(void)g_broadcast_mask;(void)s_output;(void)s_data_lock;(void)g_conn_handle;
+ g_ready=true;uint8_t b[]={1,2};
  notify_one_nolock(5,b,2);assert(!sends&&!allocations);
- subscription_update(5,true);notify_one_nolock(5,b,2);assert(sends==1);
+ subscription_update(1,5,true);notify_one_nolock(5,b,2);assert(sends==1);
  notify_one_nolock(6,b,2);assert(sends==1);
- subscription_update(5,false);notify_one_nolock(5,b,2);assert(sends==1);
- subscription_update(5,true);subscriptions_reset();notify_one_nolock(5,b,2);assert(sends==1);
- subscription_update(5,true);g_stopping=true;notify_one_nolock(5,b,2);assert(sends==1);
+ subscription_update(1,5,false);notify_one_nolock(5,b,2);assert(sends==1);
+ subscription_update(1,5,true);subscriptions_reset();notify_one_nolock(5,b,2);assert(sends==1);
+ subscription_update(1,5,true);g_stopping=true;notify_one_nolock(5,b,2);assert(sends==1);
  puts("CCCD新增路径：未订阅/其他特征/退订/重连清理均不分配不发送通过");
 }
 '''

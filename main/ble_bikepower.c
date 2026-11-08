@@ -22,6 +22,7 @@
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
+#include "ble_hs_priv.h"
 #include "host/util/util.h"
 #include "store/config/ble_store_config.h"
 #include "services/gap/ble_svc_gap.h"
@@ -320,9 +321,11 @@ static esp_err_t configure_session_security(void)
     return ESP_OK;
 }
 
-static uint8_t  g_own_addr_type;
-// host 发布句柄，主任务与通知任务读取；单值状态使用 C11 原子。
-static atomic_uint_least16_t g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+static uint8_t g_own_addr_type;
+static atomic_bool s_rebuild_pending;
+static atomic_uint_least16_t g_ftms_owner = BLE_HS_CONN_HANDLE_NONE;
+static atomic_uint_least16_t g_ftms_connection = BLE_HS_CONN_HANDLE_NONE;
+static atomic_uint_least16_t g_rsc_connection = BLE_HS_CONN_HANDLE_NONE;
 
 static uint16_t g_cps_val_handle;
 static uint16_t g_hr_val_handle;
@@ -333,12 +336,11 @@ static uint16_t g_ftms_treadmill_handle;
 static uint16_t g_ftms_cp_handle;
 static uint16_t g_ftms_status_handle;
 static uint16_t g_rsc_cp_handle;
-static atomic_bool g_rsc_subscribed, g_rsc_pending;
+static atomic_bool g_rsc_pending;
 static atomic_uint_least32_t g_rsc_response_token;
 static ble_rsc_distance_cb_t g_rsc_distance_cb;
 static atomic_bool g_control_async;
 static atomic_uchar g_control_op, g_control_parameter;
-static atomic_uint_least16_t g_notify_subscriptions[BLE_NOTIFY_SUBSCRIPTION_MAX];
 
 // 当前通知数据（由领域层写入，notify_tick 读取）
 typedef struct {
@@ -397,7 +399,6 @@ static const uint8_t g_ftms_speed_range_buf[6] = {
     RUN_SPEED_X100_MIN & 0xff, (RUN_SPEED_X100_MIN >> 8) & 0xff,
     RUN_SPEED_X100_MAX & 0xff, (RUN_SPEED_X100_MAX >> 8) & 0xff, 1, 0,
 };
-static atomic_bool g_ftms_subscribed = false;
 static atomic_bool g_ftms_control = false;
 static atomic_bool g_ftms_pending = false;
 // Reset/Started 为单字节；Stopped/Paused 带一字节控制信息。
@@ -417,24 +418,55 @@ static atomic_bool g_start_failed = false;
 // 通知互斥锁：保证 notify_tick 回调与 ble_bikepower_stop 的 deinit 互斥，
 // stop 在释放 NimBLE 前必须先拿到锁，确保没有 notify 回调正在访问协议栈（消除 UAF 窗口）。
 static SemaphoreHandle_t g_notify_lock = NULL;
+static struct ble_npl_event s_notify_event;
+static atomic_bool s_data_notify_pending;
+static void host_notify_event(struct ble_npl_event *event);
+static void notify_schedule(void);
 
-// 单连接 indication 队列；预留条目也计入容量，异步 COMMIT 保留自己的响应位置。
+// 固定客户端槽；连接代次隔离断连后的异步响应。
 // BEGIN_INDICATION_STATE
 typedef struct {
     uint32_t token;
+    uint32_t generation;
     uint16_t connection;
     uint16_t handle;
     uint8_t length;
     bool ready;
     uint8_t payload[BLE_CONFIG_CONTROL_RESPONSE_LEN];
 } ble_indication_entry_t;
+typedef struct {
+    atomic_uint_least16_t connection;
+    uint32_t generation;
+    atomic_uint_least16_t subscriptions[BLE_NOTIFY_SUBSCRIPTION_MAX];
+    atomic_bool ftms_subscribed, rsc_subscribed;
+    ble_indication_entry_t indications[BLE_INDICATION_QUEUE_SIZE];
+    uint8_t head, count;
+    bool active, failed;
+} ble_client_t;
 static portMUX_TYPE s_indication_lock = portMUX_INITIALIZER_UNLOCKED;
-static ble_indication_entry_t s_indications[BLE_INDICATION_QUEUE_SIZE];
-static uint8_t s_indication_head, s_indication_count;
+static ble_client_t s_clients[BLE_DOWNSTREAM_MAX] = {
+    { .connection = BLE_HS_CONN_HANDLE_NONE },
+    { .connection = BLE_HS_CONN_HANDLE_NONE },
+};
 static uint32_t s_indication_sequence;
-static bool s_indication_active, s_indication_failed;
 static atomic_uint_least32_t g_ftms_response_token;
 // END_INDICATION_STATE
+
+static ble_client_t * client_find(uint16_t connection)
+{
+    if (connection == BLE_HS_CONN_HANDLE_NONE) return NULL;
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
+        if (s_clients[i].connection == connection) return &s_clients[i];
+    }
+    return NULL;
+}
+
+static bool client_indicates(uint16_t connection, uint16_t handle)
+{
+    ble_client_t *client = client_find(connection);
+    return client && ((handle == g_ftms_cp_handle && client->ftms_subscribed)
+        || (handle == g_rsc_cp_handle && client->rsc_subscribed));
+}
 
 // DIS 身份覆盖：由应用层落盘后通过 ble_bikepower_set_identity() 写入，host 任务只读。
 static portMUX_TYPE g_identity_lock = portMUX_INITIALIZER_UNLOCKED;
@@ -456,33 +488,38 @@ static bool indicate_try(uint16_t handle, const uint8_t *buf, size_t len);
 static uint32_t indication_reserve(uint16_t connection, uint16_t handle);
 static void indication_reset(void);
 static void indication_complete(uint16_t connection, uint16_t handle, int status);
-static void indication_subscription_revoked(uint16_t handle);
+static void indication_subscription_revoked(uint16_t connection, uint16_t handle);
 static void indication_pump_nolock(void);
 static bool indication_submit(uint32_t token, const uint8_t *buf, size_t len);
 
 static void subscriptions_reset(void)
 {
-    for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i) g_notify_subscriptions[i] = 0;
+    for (size_t c = 0; c < BLE_DOWNSTREAM_MAX; ++c) {
+        for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i) s_clients[c].subscriptions[i] = 0;
+    }
 }
 
-static void subscription_update(uint16_t handle, bool enabled)
+static void subscription_update(uint16_t connection, uint16_t handle, bool enabled)
 {
-    if (!handle) return;
+    ble_client_t *client = client_find(connection);
+    if (!client || !handle) return;
     for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i) {
-        if (g_notify_subscriptions[i] == handle) {
-            if (!enabled) g_notify_subscriptions[i] = 0;
+        if (client->subscriptions[i] == handle) {
+            if (!enabled) client->subscriptions[i] = 0;
             return;
         }
     }
     if (enabled) for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i) {
-        if (!g_notify_subscriptions[i]) { g_notify_subscriptions[i] = handle; return; }
+        if (!client->subscriptions[i]) { client->subscriptions[i] = handle; return; }
     }
 }
 
-static bool notification_subscribed(uint16_t handle)
+static bool notification_subscribed(uint16_t connection, uint16_t handle)
 {
+    ble_client_t *client = client_find(connection);
+    if (!client || !handle) return false;
     for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i)
-        if (g_notify_subscriptions[i] == handle && handle) return true;
+        if (client->subscriptions[i] == handle) return true;
     return false;
 }
 
@@ -705,6 +742,7 @@ static void ftms_send_response(uint8_t request_op, uint8_t result)
     if (!indicate_try(g_ftms_cp_handle, g_ftms_resp_buf, sizeof(g_ftms_resp_buf))) {
         g_ftms_pending = false;
         g_ftms_control = false;
+        if (g_ftms_owner == g_ftms_connection) g_ftms_owner = BLE_HS_CONN_HANDLE_NONE;
         ESP_LOGW(TAG, "FTMS 响应发送失败，控制权已释放");
     }
 }
@@ -739,7 +777,7 @@ static void ftms_send_status(uint8_t status, uint8_t parameter)
 static void ftms_operation_accepted(uint8_t op, uint8_t parameter)
 {
     if (g_control_async) return;
-    if (op == FTMS_OP_RESET) { g_ftms_control = false; ftms_send_status(FTMS_STATUS_RESET, 0); }
+    if (op == FTMS_OP_RESET) { g_ftms_control = false; g_ftms_owner = BLE_HS_CONN_HANDLE_NONE; ftms_send_status(FTMS_STATUS_RESET, 0); }
     else if (op == FTMS_OP_START_RESUME) ftms_send_status(FTMS_STATUS_STARTED_RESUMED_BY_USER, 0);
     else if (op == FTMS_OP_STOP_PAUSE) ftms_send_status(FTMS_STATUS_STOPPED_PAUSED_BY_USER, parameter);
     ftms_send_response(op, FTMS_RESULT_SUCCESS);
@@ -748,9 +786,9 @@ static void ftms_operation_accepted(uint8_t op, uint8_t parameter)
 static int rsc_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     (void)ah; (void)arg;
-    if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR || ch != g_conn_handle || !g_ready || g_stopping)
+    if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR || !client_find(ch) || !g_ready || g_stopping)
         return BLE_ATT_ERR_UNLIKELY;
-    if (!g_rsc_subscribed) return RSC_ATT_ERR_CCCD_IMPROPERLY_CONFIGURED;
+    if (!client_indicates(ch, g_rsc_cp_handle)) return RSC_ATT_ERR_CCCD_IMPROPERLY_CONFIGURED;
     if (g_rsc_pending) return RSC_ATT_ERR_PROCEDURE_IN_PROGRESS;
     uint8_t bytes[RSC_CP_REQUEST_MAX]; uint16_t len = 0;
     if (ble_hs_mbuf_to_flat(ctxt->om, bytes, sizeof(bytes), &len) || !len)
@@ -758,6 +796,7 @@ static int rsc_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctxt
     uint32_t token = indication_reserve(ch, g_rsc_cp_handle);
     if (!token) return BLE_ATT_ERR_INSUFFICIENT_RES;
     g_rsc_pending = true; g_rsc_response_token = token;
+    g_rsc_connection = ch;
     uint8_t result = RSC_RESULT_NOT_SUPPORTED;
     if (bytes[0] == RSC_OP_SET_CUMULATIVE_VALUE) {
         result = RSC_RESULT_INVALID_PARAM;
@@ -777,9 +816,8 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
 {
     (void)ah; (void)arg;
     if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
-    if (ch != g_conn_handle || g_stopping || !g_ready || s_security_store_failed) return BLE_ATT_ERR_UNLIKELY;
-    if (!g_ftms_subscribed) return FTMS_ATT_ERR_CCCD_IMPROPERLY_CONFIGURED;
-    if (g_ftms_pending) return FTMS_ATT_ERR_PROCEDURE_IN_PROGRESS;
+    if (!client_find(ch) || g_stopping || !g_ready || s_security_store_failed) return BLE_ATT_ERR_UNLIKELY;
+    if (!client_indicates(ch, g_ftms_cp_handle)) return FTMS_ATT_ERR_CCCD_IMPROPERLY_CONFIGURED;
 
     uint8_t buf[FTMS_CP_BUF_SIZE];
     uint16_t len = 0;
@@ -787,8 +825,15 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
     if (rc != 0 || len < 1) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
 
     uint8_t op = buf[0];
+    if (g_ftms_owner != BLE_HS_CONN_HANDLE_NONE && g_ftms_owner != ch) {
+        uint32_t denied = indication_reserve(ch, g_ftms_cp_handle);
+        uint8_t response[] = { FTMS_OP_RESPONSE_CODE, op, FTMS_RESULT_CONTROL_NOT_PERMITTED };
+        return denied && indication_submit(denied, response, sizeof(response)) ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    }
+    if (g_ftms_pending) return FTMS_ATT_ERR_PROCEDURE_IN_PROGRESS;
     g_ftms_response_token = indication_reserve(ch, g_ftms_cp_handle);
     if (!g_ftms_response_token) return BLE_ATT_ERR_INSUFFICIENT_RES;
+    g_ftms_connection = ch;
     g_ftms_pending = true;
     g_control_op = op;
     g_control_parameter = op == FTMS_OP_STOP_PAUSE && len >= 2 ? buf[1] : 0;
@@ -821,6 +866,7 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
     ESP_LOGD(TAG, "FTMS控制点写入 op=0x%02x len=%d", op, len);
     switch (op) {
     case FTMS_OP_REQUEST_CONTROL:
+        g_ftms_owner = ch;
         g_ftms_control = true;
         ftms_send_response(FTMS_OP_REQUEST_CONTROL, FTMS_RESULT_SUCCESS);
         break;
@@ -1024,6 +1070,7 @@ static int config_dis_profile_access_cb(uint16_t ch, uint16_t ah,
     }
     if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
 
+    if (!client_find(ch) || ble_config_service_busy()) return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
     uint8_t payload[DEVICE_IDENTITY_WIRE_MAX];
     uint16_t len = 0;
     int rc = ble_hs_mbuf_to_flat(ctxt->om, payload, sizeof(payload), &len);
@@ -1248,7 +1295,6 @@ static void build_active_gatt_svcs(void)
 static void reset_svc_handles(void)
 {
     indication_reset();
-    g_ftms_subscribed = false;
     g_ftms_control = false;
     g_ftms_pending = false;
     g_cps_val_handle = 0;
@@ -1356,15 +1402,24 @@ static void pack_running(const ble_output_snapshot_t *data)
  * 返回值：无。
  * 特殊行为：状态异常或mbuf分配失败则静默跳过。
  */
-static void notify_one_nolock(uint16_t handle, const uint8_t *buf, size_t len)
+static void notify_client_nolock(uint16_t connection, uint16_t handle, const uint8_t *buf, size_t len)
 {
-    uint16_t connection = g_conn_handle;
-    if (g_stopping || !g_ready || connection == BLE_HS_CONN_HANDLE_NONE) return;
-    // 未注册服务的句柄为 0，跳过通知避免向不存在的特征发通知。
-    if (!handle || !len || !notification_subscribed(handle)) return;
+    if (g_stopping || !g_ready || !handle || !len || !notification_subscribed(connection, handle)) return;
     struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
     if (om) ble_telemetry_service_tx(ble_gatts_notify_custom(connection, handle, om), false);
     else ble_telemetry_service_tx(0, true);
+}
+
+static void notify_one_nolock(uint16_t handle, const uint8_t *buf, size_t len)
+{
+    if (g_stopping || !g_ready || !handle || !len) return;
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
+        uint16_t connection = s_clients[i].connection;
+        if (!notification_subscribed(connection, handle)) continue;
+        struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
+        if (om) ble_telemetry_service_tx(ble_gatts_notify_custom(connection, handle, om), false);
+        else ble_telemetry_service_tx(0, true);
+    }
 }
 
 /**
@@ -1387,11 +1442,14 @@ static void notify_one(uint16_t handle, const uint8_t *buf, size_t len)
 static void indication_reset(void)
 {
     portENTER_CRITICAL(&s_indication_lock);
-    s_indication_head = s_indication_count = 0;
-    s_indication_active = s_indication_failed = false;
-    g_ftms_response_token = 0;
-    g_rsc_response_token = 0;
-    g_rsc_pending = g_rsc_subscribed = false;
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
+        s_clients[i].head = s_clients[i].count = 0;
+        s_clients[i].active = s_clients[i].failed = false;
+        s_clients[i].ftms_subscribed = s_clients[i].rsc_subscribed = false;
+    }
+    g_ftms_response_token = g_rsc_response_token = 0;
+    g_ftms_pending = g_rsc_pending = false;
+    g_ftms_owner = g_ftms_connection = g_rsc_connection = BLE_HS_CONN_HANDLE_NONE;
     subscriptions_reset();
     portEXIT_CRITICAL(&s_indication_lock);
 }
@@ -1400,102 +1458,133 @@ static uint32_t indication_reserve(uint16_t connection, uint16_t handle)
 {
     uint32_t token = 0;
     portENTER_CRITICAL(&s_indication_lock);
-    if (!g_stopping && g_ready && handle && connection == g_conn_handle
-            && connection != BLE_HS_CONN_HANDLE_NONE && !s_indication_failed
-            && s_indication_count < BLE_INDICATION_QUEUE_SIZE) {
+    ble_client_t *client = client_find(connection);
+    if (!g_stopping && g_ready && handle && client && !client->failed
+            && client->count < BLE_INDICATION_QUEUE_SIZE) {
         if (++s_indication_sequence == 0) ++s_indication_sequence;
         token = s_indication_sequence;
-        uint8_t tail = (s_indication_head + s_indication_count++) % BLE_INDICATION_QUEUE_SIZE;
-        s_indications[tail] = (ble_indication_entry_t){
-            .token = token, .connection = connection, .handle = handle,
+        uint8_t tail = (client->head + client->count++) % BLE_INDICATION_QUEUE_SIZE;
+        client->indications[tail] = (ble_indication_entry_t){
+            .token = token, .generation = client->generation,
+            .connection = connection, .handle = handle,
         };
     }
     portEXIT_CRITICAL(&s_indication_lock);
     return token;
 }
 
-/* 退订使未应用票据失效；尚未发出的队列项释放，在途ATT保留至确认或失败。 */
-static void indication_subscription_revoked(uint16_t handle)
+static void indication_subscription_revoked(uint16_t connection, uint16_t handle)
 {
     portENTER_CRITICAL(&s_indication_lock);
-    bool in_flight = s_indication_active && s_indication_count
-        && s_indications[s_indication_head].handle == handle;
+    ble_client_t *client = client_find(connection);
+    if (!client) { portEXIT_CRITICAL(&s_indication_lock); return; }
+    bool in_flight = client->active && client->count
+        && client->indications[client->head].handle == handle;
     if (handle == g_ftms_cp_handle) {
-        g_ftms_response_token = 0;
-        g_ftms_pending = in_flight;
-        g_ftms_control = false;
-    } else if (handle == g_rsc_cp_handle) {
+        if (g_ftms_owner == connection) g_ftms_owner = BLE_HS_CONN_HANDLE_NONE;
+        if (g_ftms_connection == connection) {
+            g_ftms_response_token = 0;
+            g_ftms_pending = in_flight;
+            g_ftms_control = false;
+        }
+    } else if (handle == g_rsc_cp_handle && g_rsc_connection == connection) {
         g_rsc_response_token = 0;
         g_rsc_pending = in_flight;
     }
     uint8_t kept = 0;
-    for (uint8_t i = 0; i < s_indication_count; ++i) {
-        uint8_t index = (s_indication_head + i) % BLE_INDICATION_QUEUE_SIZE;
-        if (s_indications[index].handle == handle && !(i == 0 && s_indication_active)) continue;
-        uint8_t target = (s_indication_head + kept++) % BLE_INDICATION_QUEUE_SIZE;
-        s_indications[target] = s_indications[index];
+    for (uint8_t i = 0; i < client->count; ++i) {
+        uint8_t index = (client->head + i) % BLE_INDICATION_QUEUE_SIZE;
+        if (client->indications[index].handle == handle && !(i == 0 && client->active)) continue;
+        uint8_t target = (client->head + kept++) % BLE_INDICATION_QUEUE_SIZE;
+        client->indications[target] = client->indications[index];
     }
-    s_indication_count = kept;
+    client->count = kept;
     portEXIT_CRITICAL(&s_indication_lock);
 }
 
 static void indication_complete(uint16_t connection, uint16_t handle, int status)
 {
     portENTER_CRITICAL(&s_indication_lock);
-    if (status && s_indication_active && s_indication_count
-            && s_indications[s_indication_head].connection == connection
-            && s_indications[s_indication_head].handle == handle) {
-        if (handle == g_ftms_cp_handle) {
+    ble_client_t *client = client_find(connection);
+    if (status && client && client->active && client->count
+            && client->indications[client->head].handle == handle) {
+        if (status == BLE_HS_EBUSY) {
+            client->active = false;
+            portEXIT_CRITICAL(&s_indication_lock);
+            return;
+        }
+        uint32_t token = client->indications[client->head].token;
+        if (handle == g_ftms_cp_handle && g_ftms_connection == connection
+                && (token == g_ftms_response_token || !g_ftms_response_token)) {
             g_ftms_pending = false;
-            if (status != BLE_HS_EDONE) g_ftms_control = false;
+            if (status != BLE_HS_EDONE) {
+                g_ftms_control = false;
+                if (g_ftms_owner == connection) g_ftms_owner = BLE_HS_CONN_HANDLE_NONE;
+            }
         }
-        if (handle == g_rsc_cp_handle) g_rsc_pending = false;
+        if (handle == g_rsc_cp_handle && g_rsc_connection == connection
+                && (token == g_rsc_response_token || !g_rsc_response_token)) g_rsc_pending = false;
         if (status == BLE_HS_EDONE) {
-            s_indication_head = (s_indication_head + 1) % BLE_INDICATION_QUEUE_SIZE;
-            --s_indication_count;
-            s_indication_active = false;
-        } else {
-            // 失败后不能假定 ATT 已空闲；终止连接，再由断连清理恢复。
-            s_indication_failed = true;
-        }
+            client->head = (client->head + 1) % BLE_INDICATION_QUEUE_SIZE;
+            --client->count;
+            client->active = false;
+        } else client->failed = true;
     }
     portEXIT_CRITICAL(&s_indication_lock);
 }
 
-// 调用者持通知互斥锁；标记在途后才能调用可能同步产生 NOTIFY_TX 的 NimBLE API。
 static void indication_pump_nolock(void)
 {
-    ble_indication_entry_t entry = {0};
-    bool failed;
-    portENTER_CRITICAL(&s_indication_lock);
-    failed = s_indication_failed;
-    if (!failed && !s_indication_active && s_indication_count
-            && s_indications[s_indication_head].ready && !g_stopping && g_ready
-            && s_indications[s_indication_head].connection == g_conn_handle) {
-        entry = s_indications[s_indication_head];
-        s_indication_active = true;
-    }
-    portEXIT_CRITICAL(&s_indication_lock);
-    if (failed) {
-        if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE && !g_stopping) {
-            ble_gap_terminate(g_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
-        }
-        return;
-    }
-    if (!entry.token) return;
-    struct os_mbuf *om = ble_hs_mbuf_from_flat(entry.payload, entry.length);
-    int rc = om ? ble_gatts_indicate_custom(entry.connection, entry.handle, om) : BLE_HS_ENOMEM;
-    if (rc) {
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
+        ble_indication_entry_t entry = {0};
+        bool failed;
+        uint16_t connection;
+        ble_client_t *client = &s_clients[i];
         portENTER_CRITICAL(&s_indication_lock);
-        if (s_indication_count && s_indication_active
-                && s_indications[s_indication_head].token == entry.token) {
-            s_indication_failed = true;
-            if (entry.handle == g_ftms_cp_handle) {
-                g_ftms_pending = false;
-                g_ftms_control = false;
-            }
+        connection = client->connection;
+        failed = client->failed;
+        if (!failed && !client->active && client->count
+                && client->indications[client->head].ready && !g_stopping && g_ready
+                && connection != BLE_HS_CONN_HANDLE_NONE
+                && client->indications[client->head].generation == client->generation) {
+            entry = client->indications[client->head];
         }
         portEXIT_CRITICAL(&s_indication_lock);
+        if (failed) {
+            if (connection != BLE_HS_CONN_HANDLE_NONE && !g_stopping)
+                ble_gap_terminate(connection, BLE_ERR_REM_USER_CONN_TERM);
+            continue;
+        }
+        if (!entry.token) continue;
+        ble_hs_lock();
+        struct ble_hs_conn *host_connection = ble_hs_conn_find(entry.connection);
+        bool busy = host_connection && host_connection->bhc_gatt_svr.indicate_val_handle != 0;
+        ble_hs_unlock();
+        if (!host_connection || busy) continue;
+        portENTER_CRITICAL(&s_indication_lock);
+        bool valid = client->connection == entry.connection && client->generation == entry.generation
+            && client->count && !client->active && !client->failed
+            && client->indications[client->head].token == entry.token;
+        if (valid) client->active = true;
+        portEXIT_CRITICAL(&s_indication_lock);
+        if (!valid) continue;
+        struct os_mbuf *om = ble_hs_mbuf_from_flat(entry.payload, entry.length);
+        int rc = om ? ble_gatts_indicate_custom(entry.connection, entry.handle, om) : BLE_HS_ENOMEM;
+        if (rc) {
+            portENTER_CRITICAL(&s_indication_lock);
+            if (client->count && client->active && client->connection == entry.connection
+                    && client->indications[client->head].token == entry.token) {
+                if (rc == BLE_HS_EBUSY) client->active = false;
+                else {
+                    client->failed = true;
+                    if (g_ftms_connection == entry.connection && entry.handle == g_ftms_cp_handle) {
+                        g_ftms_pending = g_ftms_control = false;
+                        if (g_ftms_owner == entry.connection) g_ftms_owner = BLE_HS_CONN_HANDLE_NONE;
+                    }
+                }
+            }
+            portEXIT_CRITICAL(&s_indication_lock);
+        }
     }
 }
 
@@ -1504,21 +1593,21 @@ static bool indication_submit(uint32_t token, const uint8_t *buf, size_t len)
     bool accepted = false;
     if (!token || !buf || !len || len > BLE_CONFIG_CONTROL_RESPONSE_LEN) return false;
     portENTER_CRITICAL(&s_indication_lock);
-    for (uint8_t i = 0; i < s_indication_count && !s_indication_failed; i++) {
-        ble_indication_entry_t *entry =
-            &s_indications[(s_indication_head + i) % BLE_INDICATION_QUEUE_SIZE];
-        if (entry->token == token && !entry->ready && entry->connection == g_conn_handle) {
-            memcpy(entry->payload, buf, len);
-            entry->length = (uint8_t)len;
-            entry->ready = accepted = true;
-            break;
+    for (size_t c = 0; c < BLE_DOWNSTREAM_MAX && !accepted; ++c) {
+        ble_client_t *client = &s_clients[c];
+        for (uint8_t i = 0; i < client->count && !client->failed; ++i) {
+            ble_indication_entry_t *entry = &client->indications[(client->head + i) % BLE_INDICATION_QUEUE_SIZE];
+            if (entry->token == token && !entry->ready && entry->connection == client->connection
+                    && entry->generation == client->generation) {
+                memcpy(entry->payload, buf, len);
+                entry->length = (uint8_t)len;
+                entry->ready = accepted = true;
+                break;
+            }
         }
     }
     portEXIT_CRITICAL(&s_indication_lock);
-    if (accepted && g_notify_lock && xSemaphoreTake(g_notify_lock, 0) == pdTRUE) {
-        indication_pump_nolock();
-        xSemaphoreGive(g_notify_lock);
-    }
+    if (accepted) notify_schedule();
     return accepted;
 }
 
@@ -1540,21 +1629,40 @@ static void indicate_one(uint32_t token, const uint8_t *buf, size_t len)
  * 返回值：无。
  * 特殊行为：无连接时直接返回，不做任何打包和发送。
  */
+static void notify_schedule(void)
+{
+    if (!g_notify_lock || xSemaphoreTake(g_notify_lock, 0) != pdTRUE) return;
+    if (g_ready && !g_stopping)
+        ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &s_notify_event);
+    xSemaphoreGive(g_notify_lock);
+}
+
 static void notify_tick(void *arg)
 {
     (void)arg;
+    s_data_notify_pending = true;
+    notify_schedule();
+}
+
+static void host_notify_event(struct ble_npl_event *event)
+{
+    (void)event;
     // 持锁后再检查标志并访问协议栈：stop 会先拿同一把锁才 deinit NimBLE，
     // 保证本回调要么完整在 deinit 前执行、要么 stop 等待本回调结束，消除 UAF 窗口。
     if (!g_notify_lock || xSemaphoreTake(g_notify_lock, 0) != pdTRUE) {
         ble_telemetry_service_lock_skipped();
         return;
     }
-    if (g_stopping || !g_ready || g_conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+    if (g_stopping || !g_ready || ble_bikepower_conn_count() == 0) {
+        xSemaphoreGive(g_notify_lock);
+        return;
+    }
+    indication_pump_nolock();
+    if (!atomic_exchange(&s_data_notify_pending, false)) {
         xSemaphoreGive(g_notify_lock);
         return;
     }
     ble_output_snapshot_t data = output_snapshot();
-    indication_pump_nolock();
     uint8_t mask = data.mask;
     portENTER_CRITICAL(&s_data_lock);
     if (g_profile == SPORT_PROFILE_RUNNING) pack_running(&data);
@@ -1574,7 +1682,7 @@ static void notify_tick(void *arg)
         if ((mask & BROADCAST_FIELD_CADENCE) && s_bridge_csc_valid) notify_one_nolock(g_csc_val_handle, g_csc_buf, sizeof(g_csc_buf));
         if (mask & (BROADCAST_FIELD_POWER | BROADCAST_FIELD_CADENCE)) notify_one_nolock(g_ftms_bike_handle, g_ftms_bike_buf, g_ftms_bike_len);
     }
-    ble_telemetry_service_notify(notify_one_nolock);
+    ble_telemetry_service_notify(notify_client_nolock);
     xSemaphoreGive(g_notify_lock);
 }
 
@@ -1602,19 +1710,51 @@ static void mark_start_failed(const char *reason, int rc)
 static bool connection_accept(uint16_t connection)
 {
     if (g_stopping || !g_ready || connection == BLE_HS_CONN_HANDLE_NONE) return false;
-    uint16_t current = g_conn_handle;
-    if (current != BLE_HS_CONN_HANDLE_NONE && current != connection) return false;
     struct ble_gap_conn_desc desc;
     if (ble_gap_conn_find(connection, &desc) != 0 || desc.role != BLE_GAP_ROLE_SLAVE) return false;
-    if (current == connection) return true;
-    indication_reset();
-    g_ftms_subscribed = false;
-    g_ftms_control = false;
-    g_ftms_pending = false;
-    g_conn_handle = connection;
+    if (client_find(connection)) return true;
+    if (s_rebuild_pending) return false;
+    portENTER_CRITICAL(&s_indication_lock);
+    ble_client_t *client = NULL;
+    if (!s_rebuild_pending) for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
+        if (s_clients[i].connection == BLE_HS_CONN_HANDLE_NONE) { client = &s_clients[i]; break; }
+    }
+    if (client) {
+        ++client->generation;
+        client->head = client->count = 0;
+        client->active = client->failed = false;
+        client->ftms_subscribed = client->rsc_subscribed = false;
+        for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i) client->subscriptions[i] = 0;
+        client->connection = connection;
+    }
+    portEXIT_CRITICAL(&s_indication_lock);
+    if (!client) return false;
+    ble_config_service_connect(connection);
     ble_telemetry_service_connect(connection);
-    ESP_LOGI(TAG, "设备已连接 handle=%u", connection);
+    ESP_LOGI(TAG, "下游已连接 handle=%u count=%d", connection, ble_bikepower_conn_count());
     return true;
+}
+
+static void connection_remove(uint16_t connection)
+{
+    portENTER_CRITICAL(&s_indication_lock);
+    ble_client_t *client = client_find(connection);
+    if (client) {
+        client->connection = BLE_HS_CONN_HANDLE_NONE;
+        ++client->generation;
+        client->head = client->count = 0;
+        client->active = client->failed = false;
+        client->ftms_subscribed = client->rsc_subscribed = false;
+        for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i) client->subscriptions[i] = 0;
+        if (g_ftms_owner == connection) { g_ftms_owner = BLE_HS_CONN_HANDLE_NONE; g_ftms_control = false; }
+        if (g_ftms_connection == connection) { g_ftms_response_token = 0; g_ftms_pending = false; }
+        if (g_rsc_connection == connection) { g_rsc_response_token = 0; g_rsc_pending = false; }
+    }
+    portEXIT_CRITICAL(&s_indication_lock);
+    if (client) {
+        ble_config_service_disconnect(connection);
+        ble_telemetry_service_disconnect(connection);
+    }
 }
 
 /**
@@ -1636,31 +1776,23 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         bool recoverable = status == 0 || status == BLE_ERR_UNSUPP_REM_FEATURE;
         if (recoverable && connection_accept(connection)) {
             if (status != 0) ESP_LOGW(TAG, "远端特征状态=%d，Host连接仍有效 handle=%u", status, connection);
-        } else if (g_conn_handle == BLE_HS_CONN_HANDLE_NONE && !g_stopping) {
-            ESP_LOGW(TAG, "连接未建立 status=%d，重新广播", status);
+        } else if (recoverable && connection != BLE_HS_CONN_HANDLE_NONE) {
+            ble_gap_terminate(connection, BLE_ERR_REM_USER_CONN_TERM);
+        }
+        if (!g_stopping) {
             rc = start_advertising();
-            if (rc != 0) mark_start_failed("连接失败后重广播失败", rc);
+            if (rc != 0) ESP_LOGW(TAG, "连接事件后广播暂未恢复 rc=%d", rc);
         }
         return 0;
     }
     case BLE_GAP_EVENT_DISCONNECT:
-        if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE
-                && event->disconnect.conn.conn_handle != g_conn_handle) return 0;
-        ESP_LOGI(TAG, "设备已断开 reason=%d", event->disconnect.reason);
-        g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
-        indication_reset();
-        g_ftms_subscribed = false;
-        g_ftms_control = false;
-        g_ftms_pending = false;
-        ble_config_service_disconnect();
-        ble_telemetry_service_disconnect();
+        connection_remove(event->disconnect.conn.conn_handle);
         rc = start_advertising();
-        if (rc != 0 && !g_stopping) mark_start_failed("断开后重广播失败", rc);
+        if (rc != 0 && !g_stopping) ESP_LOGW(TAG, "断开后广播暂未恢复 rc=%d", rc);
         return 0;
     case BLE_GAP_EVENT_ADV_COMPLETE:
-        if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE) return 0;
         rc = start_advertising();
-        if (rc != 0 && !g_stopping) mark_start_failed("广播完成后重广播失败", rc);
+        if (rc != 0 && !g_stopping) ESP_LOGW(TAG, "广播完成后暂未恢复 rc=%d", rc);
         return 0;
     case BLE_GAP_EVENT_SUBSCRIBE:
 #if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
@@ -1668,23 +1800,22 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
                  event->subscribe.attr_handle, event->subscribe.cur_notify,
                  event->subscribe.cur_indicate, event->subscribe.reason);
 #endif
-        if (g_conn_handle == BLE_HS_CONN_HANDLE_NONE
+        if (!client_find(event->subscribe.conn_handle)
                 && (event->subscribe.cur_notify || event->subscribe.cur_indicate)) {
             (void)connection_accept(event->subscribe.conn_handle);
         }
-        if (g_stopping || !g_ready || g_conn_handle == BLE_HS_CONN_HANDLE_NONE) return 0;
-        if (event->subscribe.conn_handle == g_conn_handle) {
-            subscription_update(event->subscribe.attr_handle, event->subscribe.cur_notify != 0);
-            ble_telemetry_service_subscribe(event->subscribe.attr_handle, event->subscribe.cur_notify != 0);
-            if (event->subscribe.attr_handle == g_rsc_cp_handle) {
-                g_rsc_subscribed = event->subscribe.cur_indicate != 0;
-                if (!g_rsc_subscribed) indication_subscription_revoked(g_rsc_cp_handle);
-            }
+        if (g_stopping || !g_ready) return 0;
+        ble_client_t *sub_client = client_find(event->subscribe.conn_handle);
+        if (!sub_client) return 0;
+        subscription_update(event->subscribe.conn_handle, event->subscribe.attr_handle, event->subscribe.cur_notify != 0);
+        ble_telemetry_service_subscribe(event->subscribe.conn_handle, event->subscribe.attr_handle, event->subscribe.cur_notify != 0);
+        if (event->subscribe.attr_handle == g_rsc_cp_handle) {
+            sub_client->rsc_subscribed = event->subscribe.cur_indicate != 0;
+            if (!sub_client->rsc_subscribed) indication_subscription_revoked(event->subscribe.conn_handle, g_rsc_cp_handle);
         }
-        if (event->subscribe.conn_handle == g_conn_handle
-                && event->subscribe.attr_handle == g_ftms_cp_handle) {
-            g_ftms_subscribed = event->subscribe.cur_indicate != 0;
-            if (!g_ftms_subscribed) indication_subscription_revoked(g_ftms_cp_handle);
+        if (event->subscribe.attr_handle == g_ftms_cp_handle) {
+            sub_client->ftms_subscribed = event->subscribe.cur_indicate != 0;
+            if (!sub_client->ftms_subscribed) indication_subscription_revoked(event->subscribe.conn_handle, g_ftms_cp_handle);
         }
         return 0;
     case BLE_GAP_EVENT_NOTIFY_TX:
@@ -1696,7 +1827,7 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
                      event->notify_tx.status);
         }
 #endif
-        if (event->notify_tx.conn_handle == g_conn_handle && event->notify_tx.indication) {
+        if (client_find(event->notify_tx.conn_handle) && event->notify_tx.indication) {
             indication_complete(event->notify_tx.conn_handle,
                                 event->notify_tx.attr_handle, event->notify_tx.status);
         }
@@ -1727,10 +1858,8 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
  */
 static int start_advertising(void)
 {
-    if (g_stopping) {
-        ESP_LOGI(TAG, "停止过程中，跳过广播重启");
-        return 0;
-    }
+    if (g_stopping || s_rebuild_pending || ble_bikepower_conn_count() >= BLE_DOWNSTREAM_MAX) return 0;
+    if (ble_gap_adv_active()) return 0;
     struct ble_gap_adv_params adv_params;
     struct ble_hs_adv_fields fields;
     int rc;
@@ -1884,16 +2013,15 @@ static void on_sync(void)
  */
 static void on_reset(int reason)
 {
+    g_ready = false;
     ble_power_bridge_host_reset();
     ESP_LOGE(TAG, "BLE 协议栈复位 reason=%d", reason);
     // 复位后旧连接句柄已失效且不会有断开事件，清理以免 conn_count 误报已连接、
     // notify_tick 持续向失效句柄发通知。
-    g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
-    ble_telemetry_service_disconnect();
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) connection_remove(s_clients[i].connection);
+    ble_telemetry_service_disconnect(BLE_HS_CONN_HANDLE_NONE);
     indication_reset();
-    g_ftms_subscribed = false;
-    g_ftms_control = false;
-    g_ftms_pending = false;
+    s_rebuild_pending = false;
 }
 
 /**
@@ -1988,9 +2116,10 @@ uint32_t ble_bikepower_control_ticket(bool rsc)
 
 bool ble_bikepower_control_current(uint32_t ticket, bool rsc)
 {
+    uint16_t connection = rsc ? g_rsc_connection : g_ftms_connection;
     return ticket && ticket == ble_bikepower_control_ticket(rsc) && g_ready && !g_stopping
-        && g_conn_handle != BLE_HS_CONN_HANDLE_NONE
-        && (rsc ? (g_rsc_pending && g_rsc_subscribed) : (g_ftms_pending && g_ftms_subscribed));
+        && client_indicates(connection, rsc ? g_rsc_cp_handle : g_ftms_cp_handle)
+        && (rsc ? g_rsc_pending : g_ftms_pending);
 }
 
 void ble_bikepower_control_complete(uint32_t ticket, bool rsc, bool success)
@@ -2002,7 +2131,7 @@ void ble_bikepower_control_complete(uint32_t ticket, bool rsc, bool success)
         (void)indication_submit(ticket, response, sizeof(response));
     } else {
         if (success) {
-            if (g_control_op == FTMS_OP_RESET) { g_ftms_control = false; ftms_send_status(FTMS_STATUS_RESET, 0); }
+            if (g_control_op == FTMS_OP_RESET) { g_ftms_control = false; g_ftms_owner = BLE_HS_CONN_HANDLE_NONE; ftms_send_status(FTMS_STATUS_RESET, 0); }
             else if (g_control_op == FTMS_OP_START_RESUME) ftms_send_status(FTMS_STATUS_STARTED_RESUMED_BY_USER, 0);
             else if (g_control_op == FTMS_OP_STOP_PAUSE) ftms_send_status(FTMS_STATUS_STOPPED_PAUSED_BY_USER, g_control_parameter);
             ftms_send_response(g_control_op, FTMS_RESULT_SUCCESS);
@@ -2103,7 +2232,7 @@ void ble_bikepower_refresh_device_name(void)
     }
     // 已连接时不重启广播：避免 ble_gap_adv_stop 影响现有连接；
     // 连接内通过 GAP Device Name 服务读取即可拿到新名，断连回调会用新名重广播。
-    if (g_conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+    if (ble_bikepower_conn_count() < BLE_DOWNSTREAM_MAX && !s_rebuild_pending) {
         ble_gap_adv_stop();
         rc = start_advertising();
         if (rc != 0 && !g_stopping) {
@@ -2117,12 +2246,15 @@ void ble_bikepower_refresh_device_name(void)
  * 获取当前 BLE 连接数。
  * 根据连接句柄是否有效返回单连接状态。
  * 无参数。
- * 返回值：0 表示未连接，1 表示已连接。
- * 特殊行为：当前模块只支持单连接，因此不会返回更大的值。
+ * 返回值：当前下游连接数，范围0到BLE_DOWNSTREAM_MAX。
+ * 特殊行为：上游功率计不计入下游客户端数量。
  */
 int ble_bikepower_conn_count(void)
 {
-    return g_conn_handle == BLE_HS_CONN_HANDLE_NONE ? 0 : 1;
+    int count = 0;
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i)
+        if (s_clients[i].connection != BLE_HS_CONN_HANDLE_NONE) ++count;
+    return count;
 }
 
 /**
@@ -2132,8 +2264,46 @@ int ble_bikepower_conn_count(void)
  * 返回值：`ESP_OK` 表示启动成功，否则为对应错误码。
  * 特殊行为：任一步失败都会回滚已分配资源，保持模块可再次尝试启动。
  */
+bool ble_bikepower_begin_rebuild(uint16_t owner)
+{
+    portENTER_CRITICAL(&s_indication_lock);
+    bool allowed = !s_rebuild_pending;
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
+        uint16_t connection = s_clients[i].connection;
+        if (connection != BLE_HS_CONN_HANDLE_NONE && connection != owner) allowed = false;
+    }
+    if (allowed) s_rebuild_pending = true;
+    portEXIT_CRITICAL(&s_indication_lock);
+    if (allowed && g_ready) ble_gap_adv_stop();
+    return allowed;
+}
+
+void ble_bikepower_cancel_rebuild(void)
+{
+    s_rebuild_pending = false;
+    if (g_ready && !g_stopping) (void)start_advertising();
+}
+
+uint16_t ble_bikepower_response_connection(uint32_t token)
+{
+    uint16_t connection = BLE_HS_CONN_HANDLE_NONE;
+    portENTER_CRITICAL(&s_indication_lock);
+    for (size_t c = 0; c < BLE_DOWNSTREAM_MAX; ++c) {
+        ble_client_t *client = &s_clients[c];
+        for (uint8_t i = 0; i < client->count; ++i) {
+            ble_indication_entry_t *entry = &client->indications[(client->head + i) % BLE_INDICATION_QUEUE_SIZE];
+            if (entry->token == token && entry->generation == client->generation
+                    && entry->connection == client->connection) connection = entry->connection;
+        }
+    }
+    portEXIT_CRITICAL(&s_indication_lock);
+    return connection;
+}
+
 esp_err_t ble_bikepower_start(void)
 {
+    _Static_assert(CONFIG_BT_NIMBLE_MAX_CONNECTIONS >= BLE_TOTAL_CONNECTIONS, "BLE connection capacity");
+    _Static_assert(CONFIG_BT_NIMBLE_MAX_CCCDS >= CONFIG_BT_NIMBLE_MAX_BONDS * BLE_CCCDS_PER_BOND, "BLE CCCD capacity");
     g_stopping = false;
     g_start_failed = false;
     esp_err_t err = prepare_default_serial();
@@ -2155,6 +2325,8 @@ esp_err_t ble_bikepower_start(void)
         return err;
     }
 
+    s_data_notify_pending = false;
+    ble_npl_event_init(&s_notify_event, host_notify_event, NULL);
     ble_bond_cache_begin();
     ble_hs_cfg.gatts_register_cb = ble_bond_cache_register;
     ble_hs_cfg.sync_cb = on_sync;
@@ -2248,28 +2420,26 @@ bool ble_bikepower_start_failed(void)
  */
 bool ble_bikepower_stop(void)
 {
-    ble_power_bridge_radio_stop();
+    bool have_notify_lock = false;
+    if (g_notify_lock) {
+        if (xSemaphoreTake(g_notify_lock, pdMS_TO_TICKS(BLE_STOP_LOCK_WAIT_MS)) != pdTRUE) {
+            ESP_LOGE(TAG, "等待通知锁超时，保持原 BLE 运行态");
+            return false;
+        }
+        have_notify_lock = true;
+    }
     g_stopping = true;
+    ble_power_bridge_radio_stop();
     if (g_notify_timer) {
         esp_timer_stop(g_notify_timer);
         esp_timer_delete(g_notify_timer);
         g_notify_timer = NULL;
     }
-    // 拿锁等待可能正在执行的 notify_tick 回调结束（esp_timer_delete 不保证等待飞行中的回调），
-    // 之后再释放协议栈，确保回调不会访问已 deinit 的 NimBLE 资源。
-    bool have_notify_lock = false;
-    if (g_notify_lock) {
-        if (xSemaphoreTake(g_notify_lock, pdMS_TO_TICKS(BLE_STOP_LOCK_WAIT_MS)) != pdTRUE) {
-            ESP_LOGE(TAG, "等待通知锁超时，取消停用 BLE");
-            g_stopping = false;
-            return false;
-        }
-        have_notify_lock = true;
-    }
     ble_telemetry_service_stop();
 
-    if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
-        ble_gap_terminate(g_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
+        uint16_t connection = s_clients[i].connection;
+        if (connection != BLE_HS_CONN_HANDLE_NONE) ble_gap_terminate(connection, BLE_ERR_REM_USER_CONN_TERM);
     }
     ble_gap_adv_stop();
 
@@ -2282,10 +2452,11 @@ bool ble_bikepower_stop(void)
     } else {
         ESP_LOGE(TAG, "nimble_port_stop 失败 rc=%d 射频可能仍被占用", rc);
     }
-    g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+    for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) connection_remove(s_clients[i].connection);
     indication_reset();
+    s_rebuild_pending = false;
     g_ready = false;
-    g_start_failed = false;
+    g_start_failed = !released;
 
     if (have_notify_lock) xSemaphoreGive(g_notify_lock);
     return released;

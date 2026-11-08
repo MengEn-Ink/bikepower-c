@@ -59,7 +59,8 @@ class VirtualSession(DeviceSession):
         from bumble import hci
         found = asyncio.Queue()
         def advertisement(value):
-            if value.is_connectable:
+            target = getattr(self, 'target_address', None)
+            if value.is_connectable and (target is None or value.address == target):
                 found.put_nowait(value)
         self.phone.on('advertisement', advertisement)
         try:
@@ -192,6 +193,12 @@ async def run_protocol(args, folder, record, record_not_obtained):
         record('boot_identity', identity)
         meta, original = await session.read_snapshot()
         record('eight_groups_read', {'schema':meta['schema'], 'revision':meta['revision']})
+        fixture = dict(original)
+        core = bytearray(fixture['core']); core[14] = 7; fixture['core'] = bytes(core)
+        if fixture != original:
+            require((await session.commit_all(fixture,meta['revision']))['result'] == RESULT_SUCCESS,'全服务测试前置配置失败')
+            await session.reconnect()
+            meta,_ = await session.read_snapshot()
         specs = {'cps':('2A63',parse_cps),'csc':('2A5B',parse_csc),'hr':('2A37',parse_hr),'ftms':('2AD2',parse_ftms_indoor_bike)}
         data = await collect(session,specs,args.seconds)
         record('cycling_notifications',{k:len(v) for k,v in data.items()})
@@ -206,11 +213,11 @@ async def run_protocol(args, folder, record, record_not_obtained):
             answer=await session.control(payload,opcode,11 if name=='stale_revision' else 12)
             require(answer['result']==result,f'{name}未返回期望错误码')
             record(name,{})
-        answer=await session.commit_all(make_invalid_groups(original),meta['revision'])
+        answer=await session.commit_all(make_invalid_groups(fixture),meta['revision'])
         require(answer['result']==RESULT_INVALID_VALUE,'非法值未拒绝')
-        require((await session.read_snapshot())[1]==original,'非法值污染配置')
+        require((await session.read_snapshot())[1]==fixture,'非法值污染配置')
         record('invalid_value_unchanged',{})
-        changed=make_modified_groups(original)
+        changed=make_modified_groups(fixture)
         answer=await session.commit_all(changed,meta['revision'])
         require(answer['result']==RESULT_SUCCESS,'八组修改失败')
         require((await session.read_snapshot())[1]==changed,'八组修改回读不同')

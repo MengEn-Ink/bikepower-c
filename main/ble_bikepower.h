@@ -200,7 +200,10 @@ void ble_bikepower_refresh_device_name(void);
  * 查询当前 BLE 连接数。
  * 返回当前是否存在活动连接。
  * 无参数。
- * 返回值：`0` 表示未连接，`1` 表示已连接。
- * 特殊行为：当前实现只支持单连接，因此返回值只会是 0 或 1。
+ * 返回值：当前下游连接数，范围0到BLE_DOWNSTREAM_MAX。
+ * 特殊行为：不包含上游功率计连接。
  */
 int ble_bikepower_conn_count(void);
+bool ble_bikepower_begin_rebuild(uint16_t owner);
+void ble_bikepower_cancel_rebuild(void);
+uint16_t ble_bikepower_response_connection(uint32_t token);

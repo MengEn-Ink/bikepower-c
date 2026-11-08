@@ -20,6 +20,8 @@
 #include "bikepower_config.h"
 #include "ble_bikepower.h"
 #include "ble_config_codec.h"
+#include "ble_config_service.h"
+#include "host/ble_gap.h"
 #include "device_telemetry_runtime.h"
 #include "domain_rng.h"
 #include "power_engine.h"
@@ -76,7 +78,7 @@ static esp_err_t on_wifi_bridge_command(bridge_runtime_command_t command,
  */
 static bool on_ble_identity_write(const device_identity_t *identity)
 {
-    if (!identity) return false;
+    if (!identity || ble_config_service_busy()) return false;
     bool accepted = false;
     portDISABLE_INTERRUPTS();
     if (!s_has_pending_identity) {
@@ -207,7 +209,7 @@ static bool on_wifi_config_commit(const config_data_t *config, uint32_t transact
                                   const device_identity_t *identity)
 {
     (void)close_wifi;
-    if (!config || !transaction) return false;
+    if (!config || !transaction || ble_config_service_busy()) return false;
     portDISABLE_INTERRUPTS();
     bool accepted = !s_has_pending_ble_config;
     if (accepted) {
@@ -293,7 +295,19 @@ static void process_pending_ble_config(void)
             }
         }
     }
+    bool rebuild = previous.sport_profile != checked.sport_profile
+        || previous.broadcast_mask != checked.broadcast_mask
+        || previous.bridge.source != checked.bridge.source;
+    if (rebuild) {
+        uint16_t owner = s_processing_config_wifi ? BLE_HS_CONN_HANDLE_NONE
+            : ble_config_service_owner(transaction_id);
+        if (!ble_bikepower_begin_rebuild(owner)) {
+            config_commit_result(transaction_id, BLE_CONFIG_RESULT_BUSY, 0, NULL);
+            return;
+        }
+    }
     if (!nvs_store_save_with_identity(&next, copy_identity ? &identity : NULL)) {
+        if (rebuild) ble_bikepower_cancel_rebuild();
         ESP_LOGW(TAG, "BLE 配置事务 id=%lu 写入 NVS 失败", (unsigned long)transaction_id);
         config_commit_result(transaction_id, BLE_CONFIG_RESULT_SAVE_FAILED,
                                            0, NULL);
@@ -521,7 +535,12 @@ void app_main(void)
                 // 如果是启动过程中异步失败，先清理资源再重试
                 if (ble_bikepower_start_failed()) {
                     ESP_LOGW(TAG, "BLE 启动失败，清理资源后重试");
-                    ble_bikepower_stop();
+                    if (!ble_bikepower_stop()) {
+                        ESP_LOGE(TAG, "BLE 清理未完成，禁止重新初始化 Host");
+                        esp_task_wdt_reset();
+                        vTaskDelay(pdMS_TO_TICKS(HR_LOOP_INTERVAL_MS));
+                        continue;
+                    }
                 }
                 ESP_LOGW(TAG, "重试 BLE 启动...");
                 esp_err_t r = ble_bikepower_start();
@@ -598,6 +617,11 @@ void app_main(void)
         }
 
         app_state_tick();
+        if (!ble_bikepower_is_ready()) {
+            esp_task_wdt_reset();
+            vTaskDelay(pdMS_TO_TICKS(HR_LOOP_INTERVAL_MS));
+            continue;
+        }
 
         snapshot_t s = s_engine.snapshot;
         uint32_t bridge_now = (uint32_t)(esp_timer_get_time() / 1000);

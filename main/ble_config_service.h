@@ -16,7 +16,10 @@ void ble_config_service_reset(ble_config_reserve_cb_t reserve, ble_config_indica
 const struct ble_gatt_svc_def *ble_config_service_definition(void);
 
 /** 断连取消未提交事务；已提交的应用层落盘仍可完成。 */
-void ble_config_service_disconnect(void);
+void ble_config_service_connect(uint16_t connection);
+void ble_config_service_disconnect(uint16_t connection);
+bool ble_config_service_busy(void);
+uint16_t ble_config_service_owner(uint32_t transaction);
 
 /** 启动前注册 host 提交回调；只投递应用 mailbox，运行期间不更换。 */
 void ble_config_service_set_commit_callback(ble_config_commit_cb_t cb);

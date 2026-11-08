@@ -14,7 +14,7 @@ from check_wifi_done_contract import extract_function
 def functions(source, signatures):
     result = []
     for name, signature in signatures:
-        definition = re.search(r"^" + signature + r"\s+" + name + r"\([^;]*\)\s*\{",
+        definition = re.search(r"^" + re.escape(signature) + r"\s+" + name + r"\([^;]*\)\s*\{",
                                source, re.M)
         body = extract_function(source[definition.start():], name) if definition else ""
         assert body, f"缺少生产函数 {name}"
@@ -112,6 +112,10 @@ static ble_erg_clear_cb_t g_erg_clear_cb;
 static ble_run_control_cb_t g_run_control_cb;
 static unsigned calls, responses, statuses;
 static uint32_t g_ftms_response_token;
+static uint16_t g_ftms_owner=BLE_HS_CONN_HANDLE_NONE,g_ftms_connection=BLE_HS_CONN_HANDLE_NONE;
+static void *client_find(uint16_t c){return c==g_conn_handle?(void*)1:NULL;}
+static bool client_indicates(uint16_t c,uint16_t h){(void)h;return c==g_conn_handle&&g_ftms_subscribed;}
+static bool indication_submit(uint32_t token,const uint8_t *b,size_t n);
 static bool capacity=true;
 static uint32_t indication_reserve(uint16_t c,uint16_t h)
 {assert(c==1 && h==9);return capacity?1:0;}
@@ -120,6 +124,8 @@ static bool accepted=true, send_ok=true;
 static int value, control_type;
 static bool indicate_try(uint16_t h,const uint8_t *b,size_t n)
 { assert(h==9 && n==3); responses++; memcpy(response,b,n); return send_ok; }
+static bool indication_submit(uint32_t token,const uint8_t *b,size_t n)
+{(void)token;return indicate_try(9,b,n);}
 #define indicate_one(h,b,n) ((void)indicate_try(h,b,n))
 static void notify_one(uint16_t h,const uint8_t *b,size_t n)
 { assert(h==10 && n==(b[0]==2?2u:1u)); statuses++; }
@@ -130,6 +136,7 @@ static bool run_control(ble_run_control_type_t t,int v)
 static void reset(void)
 {
     g_ftms_subscribed=true; g_ftms_control=true; g_ftms_pending=false;
+    g_ftms_owner=BLE_HS_CONN_HANDLE_NONE;g_ftms_connection=1;
     g_profile=SPORT_PROFILE_CYCLING; g_conn_handle=1; g_ready=true; g_stopping=false;
     accepted=true; send_ok=true; capacity=true; calls=responses=statuses=0;
     g_erg_cb=erg; g_erg_clear_cb=clear; g_run_control_cb=run_control;
@@ -234,6 +241,9 @@ struct ble_hs_adv_fields {
     const uint8_t *svc_data_uuid16;
     size_t svc_data_uuid16_len;
 };
+int ble_bikepower_conn_count(void){return 0;}
+static bool ble_gap_adv_active(void){return false;}
+static bool s_rebuild_pending;
 static uint8_t g_own_addr_type;
 static char g_device_name[DEVICE_NAME_MAX];
 static int fail_at, step;
@@ -499,6 +509,8 @@ static bool lock_ok=true;
 static int xSemaphoreTake(int h,int t) {(void)h;(void)t;return lock_ok;}
 static void xSemaphoreGive(int h) {(void)h;}
 static void indication_pump_nolock(void) {}
+struct ble_npl_event {int unused;};
+static atomic_bool s_data_notify_pending=true;
 typedef struct {uint8_t mask;} ble_output_snapshot_t;
 static ble_output_snapshot_t output_snapshot(void)
 {return (ble_output_snapshot_t){g_broadcast_mask};}
@@ -513,7 +525,9 @@ static bool s_bridge_csc_valid=true;
 static unsigned counts[7];
 static void notify_one_nolock(uint16_t h,const uint8_t *b,size_t n)
 {(void)b;(void)n;if(h)counts[h]++;}
-static void ble_telemetry_service_notify(void (*send)(uint16_t,const uint8_t*,size_t)) {(void)send;}
+int ble_bikepower_conn_count(void){return g_conn_handle==BLE_HS_CONN_HANDLE_NONE?0:1;}
+static void notify_client_nolock(uint16_t c,uint16_t h,const uint8_t *b,size_t n){(void)c;(void)h;(void)b;(void)n;}
+static void ble_telemetry_service_notify(void (*send)(uint16_t,uint16_t,const uint8_t*,size_t)) {(void)send;}
 static void ble_telemetry_service_lock_skipped(void) {}
 """
 
@@ -526,7 +540,7 @@ int main(void)
         g_broadcast_mask=mask;memset(counts,0,sizeof(counts));
         g_rsc_val_handle=(mask&3)?1:0;
         g_ftms_treadmill_handle=(mask&3)?3:0;
-        notify_tick(NULL);notify_tick(NULL);
+        s_data_notify_pending=true;notify_tick(NULL);s_data_notify_pending=true;notify_tick(NULL);
         assert(counts[1]==((mask&3)?2u:0u));
         assert(counts[3]==((mask&3)?2u:0u));
         assert(counts[2]==((mask&4)?2u:0u));
@@ -562,19 +576,10 @@ def main():
     if mode in ("all", "advertising"):
         callbacks = functions(source, [("start_advertising", "static int")])
         run(PREAMBLE + ADV_STUBS + callbacks + ADV_CHECKS)
-    if mode in ("all", "lifecycle"):
-        callbacks = functions(source, [("connection_accept", "static bool"),
-                                       ("gap_event_cb", "static int"), ("on_reset", "static void")])
-        run(PREAMBLE + GAP_STUBS + callbacks + GAP_CHECKS)
-    if mode in ("all", "transmission"):
-        state=source.split("// BEGIN_INDICATION_STATE")[1].split("// END_INDICATION_STATE")[0]
-        callbacks = functions(source, [("indication_reset","static void"),
-            ("indication_reserve","static uint32_t"),("indication_subscription_revoked","static void"),("indication_complete","static void"),
-            ("indication_pump_nolock","static void"),("indication_submit","static bool"),
-            ("indicate_try","static bool"),("indicate_one","static void")])
-        run(PREAMBLE + '#include "ble_config_codec.h"\n' + TX_STUBS + state + callbacks + TX_CHECKS)
+    if mode in ("all", "lifecycle", "transmission"):
+        subprocess.run([sys.executable, str(ROOT / 'tests/test_ble_multi_client.py')], check=True)
     if mode in ("all", "notification"):
-        callbacks=functions(source,[("notify_tick","static void")])
+        callbacks=functions(source,[("host_notify_event","static void")]).replace('host_notify_event(struct ble_npl_event *event)', 'notify_tick(struct ble_npl_event *event)')
         run(PREAMBLE + TICK_STUBS + callbacks + TICK_CHECKS)
 
 

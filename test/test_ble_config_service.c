@@ -5,15 +5,16 @@
 
 unsigned s_lock_depth;
 static uint8_t s_response[BLE_CONFIG_CONTROL_RESPONSE_LEN];
-static unsigned s_responses;
+static unsigned response_count;
 static config_data_t s_submitted;
 static bool s_accept = true;
 
+uint16_t ble_bikepower_response_connection(uint32_t token){assert(token==1);return 1;}
 static bool s_capacity = true;
 static uint32_t reserve(uint16_t connection, uint16_t handle)
 {
     (void)handle;
-    assert(connection == 1 && s_lock_depth == 0);
+    assert((connection == 1 || connection == 2) && s_lock_depth == 0);
     return s_capacity ? 1 : 0;
 }
 
@@ -23,7 +24,7 @@ static void indicate(uint32_t token, const uint8_t *data, size_t length)
     assert(s_lock_depth == 0);
     assert(length == sizeof(s_response));
     memcpy(s_response, data, length);
-    s_responses++;
+    response_count++;
 }
 
 static bool commit(const config_data_t *config, uint32_t transaction, uint32_t revision)
@@ -50,6 +51,7 @@ int main(void)
     power_engine_init(&engine);
     ble_config_service_set_snapshot(&engine);
     ble_config_service_reset(reserve, indicate, NULL);
+    ble_config_service_connect(1);
     ble_config_service_set_commit_callback(commit);
     const struct ble_gatt_svc_def *svc = ble_config_service_definition();
     assert(svc->characteristics[8].arg == (void *)(uintptr_t)BLE_CONFIG_GROUP_BRIDGE);
@@ -69,6 +71,15 @@ int main(void)
     assert(s_response[2] == BLE_CONFIG_RESULT_BUSY);
     assert(control(finish, sizeof(finish)) == 0);
     assert(s_response[2] == BLE_CONFIG_RESULT_INCOMPLETE);
+    ble_config_service_connect(2);
+    ble_config_service_disconnect(2);
+    assert(s_transaction.active && s_transaction.owner == 1);
+    struct os_mbuf other = {.length = sizeof(finish)};
+    memcpy(other.data, finish, sizeof(finish));
+    struct ble_gatt_access_ctxt other_ctxt = {.op = BLE_GATT_ACCESS_OP_WRITE_CHR, .om = &other};
+    s_capacity = false;
+    assert(control_access(2,1,&other_ctxt,NULL) == BLE_ATT_ERR_INSUFFICIENT_RES);
+    s_capacity = true;
     uint8_t payload[BLE_CONFIG_GROUP_MAX_LEN];
     config_data_t config;
     config_store_defaults(&config);
@@ -77,6 +88,7 @@ int main(void)
     om.length = ble_config_encode_group(BLE_CONFIG_GROUP_CORE, &config, payload, sizeof(payload));
     memcpy(om.data, payload, om.length);
     struct ble_gatt_access_ctxt ctxt = { .op = BLE_GATT_ACCESS_OP_WRITE_CHR, .om = &om };
+    assert(svc->characteristics[1].access_cb(2, 1, &ctxt, svc->characteristics[1].arg) == BLE_ATT_ERR_WRITE_NOT_PERMITTED);
     assert(svc->characteristics[1].access_cb(1, 1, &ctxt, svc->characteristics[1].arg) == 0);
     s_accept = false;
     assert(control(finish, sizeof(finish)) == 0);
@@ -84,13 +96,15 @@ int main(void)
     assert(!s_transaction.active && !s_transaction.committing);
     assert(control(begin, sizeof(begin)) == 0);
     assert(s_response[2] == BLE_CONFIG_RESULT_SUCCESS);
+    assert(svc->characteristics[1].access_cb(2, 1, &ctxt, svc->characteristics[1].arg) == BLE_ATT_ERR_WRITE_NOT_PERMITTED);
     assert(svc->characteristics[1].access_cb(1, 1, &ctxt, svc->characteristics[1].arg) == 0);
     s_accept = true;
-    unsigned before = s_responses;
+    unsigned before = response_count;
     assert(control(finish, sizeof(finish)) == 0);
-    assert(s_responses == before);
+    assert(response_count == before);
     assert(s_submitted.power == 321);
-    ble_config_service_disconnect();
+    ble_config_service_disconnect(1);
+    ble_config_service_connect(1);
     ble_config_service_commit_result(7, BLE_CONFIG_RESULT_SUCCESS, 0, &s_submitted);
     assert(s_response[2] == BLE_CONFIG_RESULT_SUCCESS);
     assert(ble_config_service_revision_matches(2));
@@ -98,7 +112,8 @@ int main(void)
     assert(s_response[2] == BLE_CONFIG_RESULT_STALE_REVISION);
     begin[6] = 2;
     assert(control(begin, sizeof(begin)) == 0);
-    ble_config_service_disconnect();
+    ble_config_service_disconnect(1);
+    ble_config_service_connect(1);
     assert(control(finish, sizeof(finish)) == 0);
     assert(s_response[2] == BLE_CONFIG_RESULT_NO_TRANSACTION);
     uint8_t unknown[] = { 0xff };

@@ -12,6 +12,7 @@ extern unsigned s_lock_depth;
 #define portEXIT_CRITICAL(lock) ((void)(lock), --s_lock_depth)
 #define ESP_LOGW(...) ((void)0)
 #define ESP_LOGI(...) ((void)0)
+#define BLE_HS_CONN_HANDLE_NONE 0xffff
 #define BLE_ATT_ERR_INSUFFICIENT_RES 1
 #define BLE_ATT_ERR_UNLIKELY 2
 #define BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN 3

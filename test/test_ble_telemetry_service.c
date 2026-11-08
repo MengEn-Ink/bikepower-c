@@ -13,14 +13,28 @@ void device_telemetry_meta(uint8_t out[TELEMETRY_RECORD_LEN])
 static unsigned s_sent;
 static uint16_t s_expected_sequence = 1;
 static telemetry_snapshot_t s_new;
-static void send(uint16_t handle, const uint8_t *data, size_t length)
+static void send(uint16_t connection, uint16_t handle, const uint8_t *data, size_t length)
 {
+    assert(connection == 1);
     assert(!s_lock_depth);
     assert(handle >= 11 && handle <= 14 && length == 20);
     assert(data[2] == s_expected_sequence && data[3] == 0);
     if (++s_sent == 1) {
         s_new.sequence = 2;
         ble_telemetry_service_publish(&s_new);
+    }
+}
+
+static unsigned s_multi_sent[3];
+static void send_multi(uint16_t connection, uint16_t handle, const uint8_t *data, size_t length)
+{
+    assert(connection == 1 || connection == 2);
+    assert(!s_lock_depth && handle >= 11 && handle <= 14 && length == 20);
+    assert(data[2] == 1 && data[3] == 0);
+    ++s_multi_sent[connection];
+    if (connection == 1 && s_multi_sent[1] == 1) {
+        telemetry_snapshot_t next = {.sequence = 2};
+        ble_telemetry_service_publish(&next);
     }
 }
 
@@ -35,11 +49,11 @@ int main(void)
     ble_telemetry_service_sync();
     read_link(NULL);
     assert(s_queries == 1 && s_callout_resets == 2);
-    for(unsigned i=0;i<4;i++)ble_telemetry_service_subscribe(s_handles[i], true);
+    for(unsigned i=0;i<4;i++)ble_telemetry_service_subscribe(1, s_handles[i], true);
     ble_telemetry_service_publish(&s);
     ble_telemetry_service_notify(send);
     assert(s_sent==4);
-    for(unsigned i=0;i<4;i++)ble_telemetry_service_subscribe(s_handles[i], false);
+    for(unsigned i=0;i<4;i++)ble_telemetry_service_subscribe(1, s_handles[i], false);
     ble_telemetry_service_notify(send);
     assert(s_sent==4);
     struct os_mbuf om={0};
@@ -52,16 +66,31 @@ int main(void)
     s_test_rssi=127;
     read_link(NULL);
     ble_telemetry_service_publish(&s);
-    assert(!s.rssi_valid);
+    assert(!s_clients[0].link.rssi_valid);
     s_test_rssi=-65;s_test_rssi_error=1;
     read_link(NULL);ble_telemetry_service_publish(&s);
-    assert(!s.rssi_valid);
+    assert(!s_clients[0].link.rssi_valid);
     ble_telemetry_service_tx(0,false);ble_telemetry_service_tx(3,false);
     ble_telemetry_service_tx(0,true);ble_telemetry_service_lock_skipped();
     ble_telemetry_service_publish(&s);
     assert(s.submitted==1 && s.failed==1 && s.allocation_failed==1 && s.lock_skipped==1);
-    ble_telemetry_service_disconnect();ble_telemetry_service_publish(&s);
-    assert(!s.connected && !s.rssi_valid);
+    ble_telemetry_service_disconnect(1);ble_telemetry_service_publish(&s);
+    assert(!s_clients[0].link.connected && !s_clients[0].link.rssi_valid);
+    ble_telemetry_service_connect(1);ble_telemetry_service_connect(2);
+    s_test_rssi_error=0;read_link(NULL);
+    assert(s_clients[0].link.interval==24 && s_clients[1].link.interval==40);
+    for(unsigned i=0;i<4;i++) {
+        ble_telemetry_service_subscribe(1,s_handles[i],true);
+        ble_telemetry_service_subscribe(2,s_handles[i],true);
+    }
+    ble_telemetry_service_publish(&s);ble_telemetry_service_notify(send_multi);
+    assert(s_multi_sent[1]==4 && s_multi_sent[2]==4);
+    ble_telemetry_service_disconnect(1);ble_telemetry_service_publish(&s);
+    ble_telemetry_service_notify(send_multi);
+    assert(s_multi_sent[1]==4 && s_multi_sent[2]==8);
+    ble_telemetry_service_connect(1);ble_telemetry_service_publish(&s);
+    ble_telemetry_service_notify(send_multi);
+    assert(s_multi_sent[1]==4 && s_multi_sent[2]==12);
     ble_telemetry_service_stop();queries=s_queries;
     read_link(NULL);assert(s_queries==queries);
     ble_telemetry_service_deinit();assert(s_deinits==1 && !s_lock_depth);
