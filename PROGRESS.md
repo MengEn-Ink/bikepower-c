@@ -5,6 +5,17 @@
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
+## Pages 连接失败根因与 COM205 实连验收（2026-11-08 晚）
+
+- 根因闭合：板端 NVS 只读解析显示 `nimble_bond` 仅有 `local_irk_1`、无 `peer_sec_`/`our_sec_`，而电脑侧 `is_paired=true`，即**单边绑定**；电脑拿旧密钥发起加密恢复，板端无记录回 0x06，Windows 随即 HCI Disconnect。
+- 修复动作（仅针对该设备）：`_bt_unpair.ps1` 解除电脑侧记录（`Unpaired`）→ 系统 `PairAsync` Default/None 两次 Failed → 改用 `_bt_pair_custom.py`（ConfirmOnly + ProtectionLevel NONE）成功 `status=0 protection=1`。
+- 配对 HCI 对照：handle 3585，`Encryption Change status=0 enabled=1`，`EventsLost=0/BuffersLost=0`；摘要 `tests/reports/pages-pair-com205-safe.json`。
+- 板端持久化：配对后（经硬复位）回读 NVS，`nimble_bond` 由 2 条增至 12 条，新增 `our_sec_1`(88B)、`peer_sec_1`(88B)、`rpa_rec_1`、`csfc_sec_1`、`cccd_sec_1`，复位后仍在。
+- [x] 复位后免配对复连（WinRT/bleak）：9 个服务、DIS 序列号 `BP-1020BACC3AEC`、CPS 连续 10 帧通知。
+- [x] 正式页面验收：公网 `#/monitor` 选择器显示「BikePower · 已配对」，17:04:23 建链、17:04:26 枚举 7 服务、17:04:27 订阅 CPS/HR/CSC/FTMS，实时功率 282→244→245 W、样本 30→71、通知间隔 0.6 s；DIS 可选信息缺失如实提示，未冒充完整成功。截图 `tests/reports/pages-com205-live-20261108.png`。
+- [ ] 新边界（未修）：GATT 客户端断开后 Windows 仍保持链路（`connection_status=Connected`），板端不广播，选择器看不到设备；复位板子后才恢复。是否在页面/手册给出「断开后稍候或复位设备」提示待定，本轮未改代码。
+- 未刷固件、未写配置、未改系统蓝牙设置；原始 NVS 与 ETW 留私有诊断，不外发。
+
 ## Pages 后续连接失败调查（2026-11-08）
 
 - 用户确认独立Chrome、COM205、无其他连接；截图显示建链后立即断开，DIS/枚举异常不能证明缺少运动服务。

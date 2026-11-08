@@ -4,6 +4,14 @@
 
 ## [未发布]
 
+### COM205 单边绑定修复与页面实连验收（2026-11-08）
+- 根因：板端 NVS 只读解析显示 `nimble_bond` 仅有 `local_irk_1`、无 `peer_sec_`/`our_sec_`，而电脑侧 `is_paired=true`，构成单边绑定；电脑用旧密钥发起加密恢复，板端回 0x06（PIN/Key Missing），Windows 随即 HCI Disconnect。
+- 修复（仅该设备）：`_bt_unpair.ps1` 定向解除电脑侧记录 → 系统 `PairAsync` Default/None 两次 Failed → 改用仓库 `_bt_pair_custom.py`（ConfirmOnly + ProtectionLevel NONE）配对成功 `status=0 protection=1`。
+- 证据：配对 HCI 摘要 handle 3585、`Encryption Change status=0 enabled=1`、事件零丢失；配对后（硬复位后）回读 NVS，`nimble_bond` 由 2 条增至 12 条，含 `our_sec_1`(88B)、`peer_sec_1`(88B)、`rpa_rec_1`、`csfc_sec_1`、`cccd_sec_1`。
+- 验收：复位后免配对复连（WinRT/bleak）9 服务、DIS 序列号 `BP-1020BACC3AEC`、CPS 连续通知；公网 `#/monitor` 实连 BikePower，17:04:23 建链、枚举 7 服务、订阅 CPS/HR/CSC/FTMS，实时功率 282→244→245 W、样本 30→71、通知间隔 0.6 s，DIS 可选信息缺失如实提示。
+- 新边界（未修）：GATT 客户端断开后 Windows 仍保持链路，板端不广播、选择器看不到设备；复位板子后恢复。是否加页面/手册提示待定。
+- 边界：未刷固件、未写配置、未改系统蓝牙设置、未清除其他绑定；原始 NVS/ETW 留私有诊断不外发。报告改动见 PROGRESS.md（`tests/reports/` 被忽略，不入库）。
+
 ### Pages 断连误判与握手隔离（2026-11-08）
 - 修复 GATT 断开后 DIS/服务发现失败被空数组掩盖、误报设备缺少运动服务；各异步阶段核对实际连接与本次取消状态，可选DIS缺失不冒充完整读取成功。
 - 同设备在途握手共享、已连接对象复用；超时/取消保留底层在途互斥至收尾，迟到返回不能继续读取或发布成功，暂停/刷机交接隔离旧任务。失败/断连释放监听器，已知页面主动断开记录原因。
