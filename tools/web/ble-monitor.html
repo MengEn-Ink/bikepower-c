@@ -2861,13 +2861,18 @@ function assertBleConnection(device,epoch){
     throw new Error("目标端实测期间网页连接已暂停，请先结束实测。");
   }
 }
-async function connectPageGatt(device,epoch){
+async function connectPageGatt(device,epoch,check=()=>{}){
   assertBleConnection(device,epoch);
+  check();
   pageGattDevices.add(device);
   pageGattEpochs.set(device,epoch);
   const server=await device.gatt.connect();
   assertBleConnection(device,epoch);
+  check();
   return server;
+}
+function assertGattConnected(server,phase){
+  if(!server||!server.connected)throw new Error("蓝牙连接已断开（"+phase+"），无法继续读取；断开发起方尚未确认。");
 }
 const DIS_CHARS = [
   ["manufacturer","厂商","00002a29-0000-1000-8000-00805f9b34fb"],
@@ -3642,27 +3647,39 @@ function configResultError(response){
   const message=CONFIG_RESULTS[response.result]||("未知错误 "+response.result);
   const error=new Error(message);error.configResponse=response;return error;
 }
-async function readDeviceConfig(rec,announce=false){
+async function readDeviceConfig(rec,announce=false,guard=()=>{}){
   const previous=rec.configState||{};
   try{
+    guard();
     const service=await rec.server.getPrimaryService(UUIDS.configService);
+    guard();
     const characters={};
     const metaChar=await service.getCharacteristic(UUIDS.configMeta);
-    const meta=parseConfigMeta(await metaChar.readValue());
+    guard();
+    const metaValue=await metaChar.readValue();
+    guard();
+    const meta=parseConfigMeta(metaValue);
     if(meta.protocol!==CONFIG_PROTOCOL_VERSION)throw new Error("设备配置协议版本 "+meta.protocol+" 暂不支持");
     if((meta.groupMask&CONFIG_GROUP_MASK_ALL)!==CONFIG_GROUP_MASK_ALL)throw new Error("设备未提供全部配置组");
     const current={schema_ver:meta.schema};
     for(const group of CONFIG_GROUPS){
       if(group.optional&&!(meta.groupMask&group.bit))continue;
       const characteristic=await service.getCharacteristic(group.uuid);characters[group.key]=characteristic;
-      Object.assign(current,parseConfigGroup(group.key,await characteristic.readValue()));
+      guard();
+      const value=await characteristic.readValue();
+      guard();
+      Object.assign(current,parseConfigGroup(group.key,value));
     }
-    const finalMeta=parseConfigMeta(await metaChar.readValue());
+    const finalMetaValue=await metaChar.readValue();
+    guard();
+    const finalMeta=parseConfigMeta(finalMetaValue);
     if(finalMeta.revision!==meta.revision||finalMeta.schema!==meta.schema||finalMeta.groupMask!==meta.groupMask||finalMeta.protocol!==meta.protocol)throw new Error("读取期间配置已变化，请重新读取，未使用混合快照");
     characters.control=await service.getCharacteristic(UUIDS.configControl);
+    guard();
     rec.configState={supported:true,error:null,meta,current,service,characters,saving:false,statusText:announce?"已从开发板重新读取全部 NVS 配置。":(previous.statusText||"已读取开发板当前 NVS 配置，可修改后显式保存。"),statusKind:announce?"ok":(previous.statusKind||"")};
     if(announce)log("已重新读取 BikePower 全部 NVS 配置（revision "+meta.revision+")","data");
   }catch(err){
+    guard();
     rec.configState=previous.supported?{...previous,saving:false,statusKind:"warn",statusText:"重新读取失败，保留上次完整快照："+(err.message||String(err))}:{supported:false,error:err.message||String(err),meta:null,current:null,saving:false,statusText:"当前配置无法完整读取。",statusKind:"warn"};
     if(announce)log("配置读取失败: "+(err.message||String(err)),"warn");
   }
@@ -3853,7 +3870,7 @@ async function saveDeviceConfig(event){
     clearConfigErrors();setText("config-revision","revision "+response.revision);updateConfigDirty();
     const rebuild=!!(response.restartFlags&1);const renamed=!!(response.restartFlags&2);let message="保存成功：全部配置已写入开发板 NVS（revision "+response.revision+"）。";if(rebuild){message+=" 服务结构已变化，页面将断开连接，设备随后自动重新广播。";state.expectedDisconnectMessage="配置已保存成功（revision "+response.revision+"）。设备正在重建 GATT，请等待重新广播后重连。";}else if(renamed)message+=" 新设备名已同步，当前连接保持在线。";
     setConfigStatus(message,"ok");log(message,"data");
-    if(rebuild)setTimeout(()=>{if(rec.server&&rec.server.connected)rec.server.disconnect();},350);
+    if(rebuild)setTimeout(()=>{if(rec.server&&rec.server.connected){rec.disconnectReason="配置保存后重建 GATT";rec.server.disconnect();}},350);
   }catch(err){
     const stale=err.configResponse&&err.configResponse.result===4;const message=(stale?"设备配置已变化，请先重新读取。":"保存失败：")+(err.message||String(err));setConfigStatus(message,"err");log(message,"error");
   }finally{setConfigBusy(false);}
@@ -4104,8 +4121,10 @@ async function loadFirmwareCatalog(){
 }
 function prepareForFlash(){
   fgFlashed=false;clearInterval(fgSuccessTimer);clearInterval(fgHandoffTimer);
+  if(singleConnectionAttempt&&singleConnectionAttempt.cancel)singleConnectionAttempt.cancel("准备刷写，已取消网页蓝牙连接尝试。");
   if(singleDevice&&singleDevice.server&&singleDevice.server.connected){
     autoLinkUserDisconnected=true;clearTimeout(reconnectTimer);
+    singleDevice.disconnectReason="准备 USB 刷写";
     try{singleDevice.server.disconnect();}catch(e){}
     log("开始刷写前已断开当前 BLE 连接","warn");
   }
@@ -4128,6 +4147,7 @@ function showBleConnectFeedback(message,kind="warn"){
 }
 async function requestDevice(){
   if(blePickerBusy)return null;
+  if(singleConnectionAttempt){showBleConnectFeedback("上一连接仍在建立或收尾，请稍候；不会重复连接或抢占当前设备。","pending");return null;}
   if(compatibilityHandoffActive()){showBleConnectFeedback("目标端实测期间网页蓝牙已暂停。请点击「结束实测，恢复网页连接」，再手动连接。");return null;}
   if(flashSession&&flashSession.isBusy()){showBleConnectFeedback("串口刷写或日志会话尚未关闭，请先关闭安装弹窗，再连接蓝牙。");return null;}
   if(!checkSupport()||!window.isSecureContext){showBleConnectFeedback("当前环境不支持网页蓝牙，请在电脑 Chrome / Edge 中通过 HTTPS 打开此页。","error");return null;}
@@ -4155,49 +4175,67 @@ async function requestDevice(){
   }finally{blePickerBusy=false;}
 }
 
-async function readStringValue(service,uuid){
+async function readStringValue(service,uuid,check=()=>{}){
   try{
+    check();
     const char=await service.getCharacteristic(uuid);
+    check();
     const val=await char.readValue();
+    check();
     return new TextDecoder("utf-8").decode(val).replace(/\0/g,"").trim();
-  }catch(err){return null;}
+  }catch(err){check();return null;}
 }
 
-async function readDeviceInfo(server){
+async function readDeviceInfo(server,guard=()=>{}){
+  const check=()=>{guard();assertGattConnected(server,"读取设备信息");};
   const info={manufacturer:null,model:null,serial:null,hardware:null,firmware:null,software:null};
+  info.readStatus="complete";
   try{
+    check();
     const dis=await server.getPrimaryService(UUIDS.disService);
+    check();
     for(const [key,label,uuid] of DIS_CHARS){
-      info[key]=await readStringValue(dis,uuid);
+      info[key]=await readStringValue(dis,uuid,check);
+      check();
+      if(info[key]===null)info.readStatus="partial";
     }
   }catch(err){
-    log("DIS 读取失败: "+err.message,"warn");
+    check();
+    info.readStatus="unavailable";
+    log("DIS 读取未完成: "+err.message,"warn");
   }
   return info;
 }
 
-async function enumerateServices(server){
+async function enumerateServices(server,guard=()=>{}){
+  const check=()=>{guard();assertGattConnected(server,"发现蓝牙服务");};
   const services=[];
   services.coverage={scope:"authorized",enumeration:"complete",allowedServices:[]};
   let reads=0;
   try{
+    check();
     const svcs=await server.getPrimaryServices();
+    check();
     for(const svc of svcs){
+      check();
       const entry={uuid:svc.uuid,name:svcName(svc.uuid),isPrimary:true,enumeration:"complete",characteristics:[]};
       try{
         const chars=await svc.getCharacteristics();
+        check();
         for(const ch of chars){
+          check();
           const item={uuid:ch.uuid,name:charName(ch.uuid),properties:propFlags(ch),value:null,raw:null,
             readStatus:ch.properties.read?"skipped":"not-readable",readError:""};
           // 读取一次可读特征的当前值，用于 GATT 列表中文解析；限制次数避免拖慢连接
           if(ch.properties.read&&reads<48){
             reads++;
-            try{const v=await ch.readValue();item.raw=hexDump(new Uint8Array(v.buffer,v.byteOffset,v.byteLength));item.readStatus="ok";item.value=decodeGattValue(ch.uuid,v);}
-            catch(err){item.readStatus=item.raw===null?"failed":"ok";item.readError=err.message||err.name;item.value="读取/解析失败："+item.readError;}
+            try{const v=await ch.readValue();check();item.raw=hexDump(new Uint8Array(v.buffer,v.byteOffset,v.byteLength));item.readStatus="ok";item.value=decodeGattValue(ch.uuid,v);}
+            catch(err){check();item.readStatus=item.raw===null?"failed":"ok";item.readError=err.message||err.name;item.value="读取/解析失败："+item.readError;}
           }
           entry.characteristics.push(item);
         }
       }catch(err){
+        check();
         entry.enumeration="failed";
         services.coverage.enumeration="partial";
         entry.characteristics.push({uuid:"",name:"读取特征失败: "+err.message,properties:""});
@@ -4205,24 +4243,37 @@ async function enumerateServices(server){
       services.push(entry);
     }
   }catch(err){
+    check();
     services.coverage.enumeration="failed";
     log("GATT 服务枚举失败: "+err.message,"warn");
+    throw new Error("蓝牙服务发现失败："+(err.message||err.name)+"；未判定设备缺少运动服务。");
   }
   return services;
 }
 
-async function connectAndCollect(device){
+function releaseConnectionListeners(rec){
+  if(rec.onDisconnect){rec.device.removeEventListener("gattserverdisconnected",rec.onDisconnect);rec.onDisconnect=null;}
+  for(const [ch,fn] of rec.notificationListeners||[])ch.removeEventListener("characteristicvaluechanged",fn);
+  rec.notificationListeners=[];
+}
+async function connectAndCollect(device,attempt=null){
   const epoch=bleConnectionEpoch;
-  assertBleConnection(device,epoch);
+  const guard=()=>{
+    assertBleConnection(device,epoch);
+    if(attempt&&attempt.cancelled)throw new Error("蓝牙连接已取消或超时，旧会话不再继续读取。");
+  };
+  guard();
   if(flashSession&&flashSession.isBusy())throw new Error("串口会话期间禁止新建 BLE 会话");
   const rec={device,server:null,info:{},services:[],compatibilitySamples:[],connectedAt:new Date().toISOString(),
     latest:{power:null,hr:null,cadence:null,speed:null,ftmsPower:null,distance:null},
     lastNotifyAt:0,cscPrev:null,staleOpen:false,subscriptions:{},notifyTimes:{},history:[],lastHistoryAt:0,lastHistoryTrimAt:0,
     sessionStartedAt:Date.now(),sessionEndedAt:0,
     configState:{supported:false,error:null,meta:null,current:null,saving:false,statusText:"正在读取开发板配置…",statusKind:"warn"}};
-  device.addEventListener("gattserverdisconnected",()=>{
+  rec.notificationListeners=[];
+  rec.onDisconnect=()=>{
+    releaseConnectionListeners(rec);
     rec.sessionEndedAt=Date.now();
-    log("设备 '"+(device.name||"(无名)")+"' 已断开","warn");
+    log("设备 '"+(device.name||"(无名)")+"' 已断开"+(rec.disconnectReason?"（网页主动："+rec.disconnectReason+"）":"（未记录网页主动请求，外设/系统原因待确认）"),"warn");
     if(singleDevice===rec){
       if(window.BikePowerStatus)window.BikePowerStatus.detach();
       if(rec.configState&&rec.configState.expectedDisconnectMessage)log("配置保存后的预期断连：设备正在重建 GATT","data");
@@ -4233,29 +4284,33 @@ async function connectAndCollect(device){
       markConfigDisconnected(rec);renderSignalTrace(rec);updateMonitorEvidence(rec);
       onSingleDeviceDisconnected(rec);
     }
-  });
+  };
+  device.addEventListener("gattserverdisconnected",rec.onDisconnect);
+  if(attempt)attempt.rec=rec;
   try{
-    rec.server=await connectPageGatt(device,epoch);
+    rec.server=await connectPageGatt(device,epoch,guard);
+    guard();assertGattConnected(rec.server,"建立 GATT");
     log("GATT 已连接: "+(device.name||"(无名)"));
-    rec.info=await readDeviceInfo(rec.server);
-    assertBleConnection(device,epoch);
-    log("DIS 信息读取完成");
-    rec.services=await enumerateServices(rec.server);
-    assertBleConnection(device,epoch);
+    rec.info=await readDeviceInfo(rec.server,guard);
+    guard();assertGattConnected(rec.server,"读取设备信息");
+    log(rec.info.readStatus==="complete"?"DIS 信息读取完成":"DIS 可选信息缺失或读取不完整，继续检查运动服务",rec.info.readStatus==="complete"?"info":"warn");
+    rec.services=await enumerateServices(rec.server,guard);
+    guard();assertGattConnected(rec.server,"发现蓝牙服务");
     rec.gattCoverage={...rec.services.coverage,allowedServices:pageGattPermissions.get(device)||ALL_OPTIONAL_SERVICES,
       scope:pageGattPermissions.has(device)?"authorized":"unknown"};
     log("已枚举 "+rec.services.length+" 个 GATT 服务");
     if(!rec.services.some(service=>CYCLING_SERVICE_SET.has(service.uuid.toLowerCase())||(pageGattPermissions.get(device)||[]).includes(service.uuid.toLowerCase()))){
-      try{rec.server.disconnect();}catch(e){}
       throw new Error("该设备未提供运动服务或已明确授权的参考服务，已过滤");
     }
-    await readDeviceConfig(rec);
-    assertBleConnection(device,epoch);
-    await subscribeNotifications(rec);
-    assertBleConnection(device,epoch);
+    await readDeviceConfig(rec,false,()=>{guard();assertGattConnected(rec.server,"读取开发板配置");});
+    guard();assertGattConnected(rec.server,"读取开发板配置");
+    await subscribeNotifications(rec,guard);
+    guard();assertGattConnected(rec.server,"订阅运动通知");
     if(anomalyTimer)clearInterval(anomalyTimer);
     anomalyTimer=setInterval(checkAnomalies,1000);
   }catch(err){
+    releaseConnectionListeners(rec);
+    rec.disconnectReason="连接失败收尾";
     disconnectPageGatt(device,epoch);
     log("连接/读取失败: "+err.message,"error");
     throw err;
@@ -4263,7 +4318,8 @@ async function connectAndCollect(device){
   return rec;
 }
 
-async function subscribeNotifications(rec){
+async function subscribeNotifications(rec,guard=()=>{}){
+  const check=()=>{guard();assertGattConnected(rec.server,"订阅运动通知");};
   const map=[
     ["cps",UUIDS.cpsService,UUIDS.cpsMeasurement],
     ["hr",UUIDS.hrService,UUIDS.hrMeasurement],
@@ -4274,13 +4330,20 @@ async function subscribeNotifications(rec){
   ];
   for(const [key,svcUuid,charUuid] of map){
     try{
+      check();
       const svc=await rec.server.getPrimaryService(svcUuid);
+      check();
       const ch=await svc.getCharacteristic(charUuid);
+      check();
       await ch.startNotifications();
-      ch.addEventListener("characteristicvaluechanged",(ev)=>handleNotify(rec,key,ev));
+      check();
+      const onValue=ev=>handleNotify(rec,key,ev);
+      ch.addEventListener("characteristicvaluechanged",onValue);
+      (rec.notificationListeners||(rec.notificationListeners=[])).push([ch,onValue]);
       rec.subscriptions[key]=true;
       log("已订阅 "+key.toUpperCase()+" 通知","data");
     }catch(err){
+      check();
       if(!err.message.includes("not found"))log("未订阅 "+key+": "+err.message,"warn");
     }
   }
@@ -4312,11 +4375,26 @@ async function connectAnyDevice(){
 }
 
 /* 统一的单设备连接入口：手动选择、刷新自动连接、断线重连、跨标签页关联都走这里 */
-async function connectSingleWith(device,source="picker",timeoutMs=20000){
-  if(compatibilityHandoffActive())return false;
-  if(flashSession&&flashSession.isBusy())return false;
+let singleConnectionAttempt=null;
+function connectSingleWith(device,source="picker",timeoutMs=20000){
+  if(compatibilityHandoffActive())return Promise.resolve(false);
+  if(flashSession&&flashSession.isBusy())return Promise.resolve(false);
+  if(singleConnectionAttempt){
+    if(singleConnectionAttempt.device===device&&!singleConnectionAttempt.cancelled)return singleConnectionAttempt.promise;
+    const error=new Error("上一蓝牙连接仍在建立或收尾，请稍候后重试；未抢占该连接。");
+    showBleConnectFeedback(error.message,"pending");
+    return Promise.reject(error);
+  }
+  if(isSingleConnected()&&singleDevice.device===device)return Promise.resolve(singleDevice);
+  const attempt={device,epoch:bleConnectionEpoch,cancelled:false,rec:null,promise:null};
+  singleConnectionAttempt=attempt;
+  attempt.promise=runSingleConnection(attempt,source,timeoutMs);
+  return attempt.promise;
+}
+async function runSingleConnection(attempt,source,timeoutMs){
+  const device=attempt.device;
   if(window.BikePowerStatus)window.BikePowerStatus.detach();
-  if(singleDevice&&singleDevice.server){const previous=singleDevice;singleDevice=null;try{previous.server.disconnect();}catch(e){}}
+  if(singleDevice&&singleDevice.server){const previous=singleDevice;singleDevice=null;previous.disconnectReason="切换监控设备";try{previous.server.disconnect();}catch(e){}releaseConnectionListeners(previous);}
   mirrorState=null;
   anomalies={};resetTraceInteraction();
   $("connect-empty").classList.add("hidden");
@@ -4327,9 +4405,24 @@ async function connectSingleWith(device,source="picker",timeoutMs=20000){
   setLinkState("connecting",device);setText("monitor-device-name",device.name||"未命名设备");
   try{
     let timer=null;
-    const epoch=bleConnectionEpoch;
-    const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{disconnectPageGatt(device,epoch);reject(new Error("连接超时（"+Math.round(timeoutMs/1000)+" 秒），设备可能不在附近或未上电"));},timeoutMs);});
-    const rec=await Promise.race([connectAndCollect(device),timeout]).finally(()=>clearTimeout(timer));
+    const cancelled=new Promise((_,reject)=>{
+      attempt.cancel=message=>{
+        if(attempt.cancelled)return;
+        attempt.cancelled=true;
+        if(attempt.rec){attempt.rec.disconnectReason=message;releaseConnectionListeners(attempt.rec);}
+        log("网页主动结束连接尝试："+message,"warn");
+        disconnectPageGatt(device,attempt.epoch);
+        reject(new Error(message));
+      };
+      timer=setTimeout(()=>attempt.cancel("连接超时（"+Math.round(timeoutMs/1000)+" 秒），已停止本次读取；等待底层蓝牙操作收尾后才能重试。"),timeoutMs);
+    });
+    const operation=connectAndCollect(device,attempt);
+    const unlock=()=>{if(singleConnectionAttempt===attempt)singleConnectionAttempt=null;};
+    operation.then(unlock,unlock);
+    const rec=await Promise.race([operation,cancelled]).finally(()=>clearTimeout(timer));
+    assertBleConnection(device,attempt.epoch);
+    if(attempt.cancelled)throw new Error("旧蓝牙连接已取消，未发布为已连接。");
+    assertGattConnected(rec.server,"完成连接");
     singleDevice=rec;
     renderSingleDevice(rec);
     setText("ble-connect-feedback","蓝牙已连接，已读取服务；实时数据由设备通知更新。");
@@ -4338,7 +4431,7 @@ async function connectSingleWith(device,source="picker",timeoutMs=20000){
     return rec;
   }catch(err){
     $("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+escapeHtml(err.message)+'</div>';
-    showBleConnectFeedback("蓝牙连接失败："+err.message+"。请确认设备上电且未被其他 App 占用。","error");
+    showBleConnectFeedback("蓝牙连接失败："+err.message+" 请保留当前错误与事件日志，确认所选开发板和使用浏览器；仅在确有其他连接时先释放它。","error");
     setLinkState("idle");
     resetMonitorSignals();
     throw err;
@@ -4401,7 +4494,9 @@ function renderServiceList(services){
 
 function disconnectSingle(){
   autoLinkUserDisconnected=true;
+  if(singleConnectionAttempt&&singleConnectionAttempt.cancel)singleConnectionAttempt.cancel("用户已取消本次蓝牙连接，等待底层操作收尾。");
   if(singleDevice&&singleDevice.server){
+    singleDevice.disconnectReason="用户断开并保留历史";
     try{singleDevice.server.disconnect();}catch(e){}
   }
 }
@@ -5554,7 +5649,9 @@ function setCompatibilityHandoff(active,publish=true){
   clearTimeout(reconnectTimer);
   mirrorState=null;
   if(active){
+    if(singleConnectionAttempt&&singleConnectionAttempt.cancel)singleConnectionAttempt.cancel("目标端实测开始，网页蓝牙连接已暂停。");
     const records=[singleDevice,...compareDevices,inspectorState.rec];
+    records.filter(Boolean).forEach(rec=>{rec.disconnectReason="交接目标端实测";});
     const devices=new Set([...pageGattDevices,...records.filter(Boolean).map(r=>r.device),healthState.device].filter(Boolean));
     devices.forEach(device=>{try{device.gatt.disconnect();}catch(e){}});
     records.filter(Boolean).forEach(rec=>{try{if(rec.server)rec.server.disconnect();}catch(e){}});
@@ -5886,7 +5983,7 @@ function setGate(state,opts){
   const g=$("connect-gate");if(!g)return;
   g.dataset.gate=state;
   const c=GATE_COPY[state]||GATE_COPY.choose;
-  const fill=t=>t.replace("{name}",escapeHtml(opts.name||"设备")).replace("{role}",opts.role?escapeHtml(opts.role)+"。":"").replace("{next}",gateReturnMode&&MODE_TITLE[gateReturnMode]?"正在返回「"+MODE_TITLE[gateReturnMode]+"」…":"正在打开使用手册…").replace("{message}",escapeHtml(opts.message||"设备没有响应。")+" 请确认设备已上电、未被手机 App 占用（多数 BLE 外设同一时间只允许一个连接）。");
+  const fill=t=>t.replace("{name}",escapeHtml(opts.name||"设备")).replace("{role}",opts.role?escapeHtml(opts.role)+"。":"").replace("{next}",gateReturnMode&&MODE_TITLE[gateReturnMode]?"正在返回「"+MODE_TITLE[gateReturnMode]+"」…":"正在打开使用手册…").replace("{message}",escapeHtml(opts.message||"设备没有响应。")+" 请核对所选开发板并保留事件日志；若设备确有其他连接，先释放后再重试。断连不代表缺少运动服务。");
   setText("gate-step",c.step);setText("gate-tag",c.tag);
   $("gate-title").innerHTML=fill(c.title);
   setText("gate-desc",opts.note||fill(c.desc));

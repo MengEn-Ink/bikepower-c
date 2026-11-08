@@ -7,7 +7,7 @@ const { chromium } = require('./web-flash/node_modules/playwright');
 const root = path.join(__dirname, '..');
 const fixture = vm.runInNewContext(
   '(' + fs.readFileSync(path.join(__dirname, 'test_pages_bridge_browser.cjs'), 'utf8')
-    .match(/const fixture = ([\s\S]*?);\n\(async/)[1] + ')');
+    .match(/const fixture = ([\s\S]*?);\r?\n\(async/)[1] + ')');
 
 const currentBridgePercent = c => new DataView(new Uint8Array(c.bridge_wire).buffer).getInt16(13, true);
 
