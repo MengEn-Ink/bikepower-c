@@ -2419,7 +2419,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="ch-meta">
               <div class="ch-kicker">TROUBLESHOOT</div>
               <h2 class="ch-title">常见问题</h2>
-              <p class="ch-desc">7 个最常被问到的问题与解决方向。</p>
+              <p class="ch-desc">8 个最常被问到的问题与解决方向。</p>
             </div>
           </header>
           <div class="ch-body">
@@ -2451,6 +2451,10 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
               <details>
                 <summary><span class="q">Q07</span><span style="flex:1">如何更新固件</span><span class="plus"></span></summary>
                 <div class="a">打开项目 GitHub Pages，按第 1 节的网页烧录流程重新烧录；Pages 临时不可用时使用备用烧录入口。</div>
+              </details>
+              <details>
+                <summary><span class="q">Q08</span><span style="flex:1">重建服务表后为什么收不到 Service Changed</span><span class="plus"></span></summary>
+                <div class="a">这属于已知边界，不影响使用。切换运动类型或广播项会重建 GATT：手机端保存后<b>断开重连</b>即可看到新的服务表，不需要重新配对；电脑（Windows）端的蓝牙栈可能保留旧服务缓存，重连后仍显示旧列表，属于系统客户端行为，换手机或用页面工具复查即可。配置读写、参数持久化和已绑定免配对重连均正常。</div>
               </details>
             </div>
           </div>
@@ -4665,7 +4669,7 @@ const MANUAL_META = {
   "ch11":{num:11,title:"设备配网 · 真实功率主备",kicker:"POWER BRIDGE",points:["最多三台 CPS，无名称也可用","共享校正，真实 0 W 保持 0 W","60 秒恢复失败后模拟，低频定向探测"]},
   "ch12":{num:12,title:"设备配网 · 设备信息",kicker:"ABOUT",points:["展开设备区","记录板型、版本、Git ID 与构建时间","页面更新与固件发布分别核对"]},
   "ch13":{num:13,title:"保存和退出配网",kicker:"SAVE",points:["整份草稿保存，失败保留修改","默认 300 秒，仅主动续期延长","先保存，再关闭 WiFi 并确认"]},
-  "ch14":{num:14,title:"常见问题",kicker:"TROUBLESHOOT",points:["搜不到 BLE / 进不了配网 / 无互联网","保存后核对回显，服务变化重新配对","固件升级统一走网页烧录"]},
+  "ch14":{num:14,title:"常见问题",kicker:"TROUBLESHOOT",points:["搜不到 BLE / 进不了配网 / 无互联网","保存后核对回显，服务变化重新配对","重建服务表后重连即可看到新服务"]},
   "ch15":{num:15,title:"记住这 4 步",kicker:"TL;DR",points:["连接 → 进配网 → 保存 → 关闭 WiFi","适合贴在设备旁或打印","任何陌生场景都按这 4 步就对了"]},
   "ch16":{num:16,title:"设备比对与模板写入",kicker:"WEB TOOLS",points:["按 GATT 私有服务识别开发板，不看设备名","参考设备只读，只向开发板写入","写入后回读校验，可一键恢复内置值"]},
 };

@@ -5,6 +5,18 @@
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
+## 手机 BLE 中心端真机验收（2026-11-08，v4.3.3）
+
+- 场景纠正：COM205 的真实使用场景是**手机作为 BLE 中心设备**；Windows WinRT 栈的 GATT 缓存残留定性为验证环境客户端行为，不属用户场景，不作为发布门禁。发版已按此结论完成：tag `v4.3.3` → `118c726`，Release 四个资产齐全，Pages 已显示 v4.3.3。
+- [x] 手机端（华为 ABR-AL60 / Android 12）实测验收对象 **10:20:BA:CE:4F:6E**，DIS 串号 `BP-1020BACE4F6C`、固件 `generic-c3-v4.3.3`；Meta 12 字节 `010eff0f0100000030000000`（protocol=1 schema=14 mask=ff caps=0f max_len=48）。
+- [x] 免重配对直连 PASS：bondState 前后均 12，`connectGatt(autoConnect=false)` status=0 state=2，未 createBond、无配对弹窗。
+- [x] 八组读写 PASS：基线八组逐字节一致；改名事务 result=00 读回 `010a42696b65506f77657254`；恢复事务全量写回 result=00。
+- [x] 服务表重建后免配对重连 PASS：COMMIT `restart_flags=01`(RESTART_GATT)，断连重连 bondState 仍 12，重新发现 9 个服务 UUID 与重建前一致，配置可读写。
+- [ ] **SC indication 手机端未捕获（FAIL，如实保留）**：四次订阅窗口 CCCD 写 status=0，`onCharacteristicChanged(2a05)` 事件数 0。固件 `app_main.c:571` 只在 conn==0 重建服务表，NimBLE SC 自动指示窗口早于客户端写 CCCD，属指示通道时序问题；`restart_flags` 上报与重连服务发现均正常，不影响配置与免配对重连功能。后续版本可考虑断连前主动先发 SC。
+- [x] 原配置恢复与重启持久化 PASS：恢复事务八组 8/8 match，`esptool run` 仅硬复位后手机重连八组逐字节等于基线、9 服务、bondState=12。测试中曾因脚本 revision 偏移解析错误被设备以 STALE_REVISION=0x04 拒绝，反证 stale-revision 防护有效。
+- [ ] 10:20:BA:CC:3A:EE（COM205 板）本轮不在 USB 枚举、手机扫描未见广播，未纳入本轮手机验收；上表 COM205 真机条目依据发版期 Windows 侧证据，不迁移为手机端结论。
+- 证据：`tests/reports/release-4.3.3-phone/phone-ble-center-acceptance.{md,json}`、`gatt-result-raw.log`；独立产物审计 `tests/reports/release-audit/release-v4.3.3-audit.{md,json}`。
+
 ## Pages 蓝牙与刷机弹窗修复（2026-11-08）
 
 - [x] 真实Chrome复现实测暂停状态导致连接被静默拦截；监控页可见说明与显式恢复入口，取消/权限拒绝/连接失败直接反馈，保留跨标签暂停与手动重连规则。
