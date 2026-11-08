@@ -11,7 +11,7 @@
 - 正式兼容性连接前置夹具修正并补断连拒绝：23 Node及独立browser通过；耐久循环恢复原配置并在末尾独立关闭配网，两轮回归通过。
 - 新IDF5.5.4生产候选app1165856字节构建通过；十分钟600.6秒/47循环和3次周期host通过；完整55专项首轮53/2，常量同步后299/0、门户原断言三宽复跑通过，原失败保留。Pages47单元/11入口browser、独立闲置三宽、docs79/2WARN/0FAIL通过。
 - 实际NimBLE三链路9PASS，原安全/跑步PASS/OPEN1，SC仍NOT_OBTAINED。COM205仅刷候选应用并verify digest matched、ROM启动通过；刷前和刷后均WinRT枚举异常，当前版本BLE/P0无法取得，不清配对放行。NVS双读/CRC及受保护配置/身份/原密钥保持。
-- 仅完成代码及候选收尾，正式发行被当前精确版本P0阻断；不创建tag或Release，不沿用旧镜像PASS。
+- 已分批提交推送5bbb374/deca711/5b11f0f，最终CI四作业success；clean项目候选构建/三链路9PASS/原协议PASS OPEN1，正式P0未取得不tag/Release。COM205回退此前确认正常三链路app并verify/启动通过，NVS回退差异仅PHY校准。合并镜像从0x0会覆盖NVS，应用保持式候选仅写0x10000；详见[收尾报告](docs/dev/52-release-440-closeout.md)。
 
 ### 发版前复核（只验证，待修）
 - 用户确认桥接当前正常；未虚构设备矩阵或实测时长。生产代码/原测试与上次交付保持，未刷机/升版/提交/发布。

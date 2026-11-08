@@ -16,7 +16,10 @@
 - 新独立候选Windows IDF5.5.4构建成功，应用1165856字节；候选SHA256 `b30c06371ebd403c2a7f500cf02ac8aaad8ab5b6c5c008e567c904f66adbfbeb`（精确值由构建产物核对）。版本/用户手册已同步。仍非最终提交发行镜像；COM205已仅刷此候选应用，独立verify digest matched、20秒ROM启动无致命异常通过。
 - COM205刷前及新候选WinRT uncached整表发现均报E_UNEXPECTED，ROM复位仍未恢复，定向发现Unreachable；没有有效八组/持续通知验收，不清配对。ROM NVS刷前/刷后各双读24KiB一致，65有效记录CRC通过、受保护配置/身份/原密钥保持。严格P0未通过前不创建Release。
 - Pages47项Node、DOM/遥测及11入口浏览器全PASS；门户独立闲置三宽PASS；严格docs79PASS/2工作区WARN/0FAIL。原安全/跑步虚拟PASS/OPEN1，SC仍NOT_OBTAINED。
-- 下一步按白名单提交/推送并从隔离clean源生成候选；仍不tag/Release，不把旧P0或用户一般反馈写为新版本P0。当前刷前与刷后NVS的65条有效记录无变化，双读字节一致。
+- 代码已分三批提交推送：5bbb374（生产三链路/停止）、deca711（发布/测试）、5b11f0f（文档）。5b11f0f隔离clean项目构建1165856字节，app SHA256 `7d078fea51f03a30e4f3688cf20dabade5048dd8d679d334eb6f05e0e542510a`；精确镜像三链路9PASS、原安全/跑步PASS/OPEN1。
+- 最终5b11f0f远端CI success（docs/quick/Ubuntu与macOS虚拟板）；Pages部署skipped。候选包存在，正式实体P0仍缺，不tag/Release，v4.3.3保持。
+- COM205已回退此前确认正常的三链路app `070cf289…38e7a`，应用区verify digest matched、20秒ROM启动通过。回退后NVS双读一致，64有效记录CRC通过；仅PHY校准分块/索引变化，用户配置/身份/原密钥保持，不冒称全字节不变。
+- 合并固件从0x0写入会覆盖NVS填充区，即使不勾整片擦除亦不能保留配置。候选包含开发者应用区版本，必须确认原分区、备份，仅写0x10000并校验；普通用户暂不升级。[最终收尾报告](docs/dev/52-release-440-closeout.md)。
 - 构建依赖IDF显示dirty，已核对大部分为可执行模式变化；剩余文本改动在未参与本构建的示例/RIOT路径。不会清理共享IDF，最终报告保留依赖状态，不声称官方完全clean工具链。
 - 以下旧阶段保留各自镜像/时间的结果；不把其未发布、未修或PASS状态当成本次最终结论。
 

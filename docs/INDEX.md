@@ -45,6 +45,7 @@
 | [持久绑定与发行核验](dev/47-bonding-release-verification.md) | v4.3.3加密恢复、已绑定GATT重建、真实耐久与发行边界 |
 | [本地虚拟开发板](dev/48-local-virtual-board.md) | Windows/WSL本机入口、Apple Silicon待验、虚拟刷写/BLE/GDB/CI与真机边界 |
 | [三链路实现与验证](dev/50-ble-multi-client.md) | 两下游+单上游、逐连接隔离、虚拟与实物验收边界 |
+| [v4.4.0优化与发行收尾](dev/52-release-440-closeout.md) | 提交级候选、CI、COM205回退、NVS保持与正式P0阻断 |
 | [发版前项目复核](dev/51-pre-release-project-review.md) | 新失败注入、发布ZIP内容门禁、完整专项结果与待修/可延后项 |
 
 ## Code Wiki

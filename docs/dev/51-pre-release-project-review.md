@@ -11,7 +11,7 @@
 - 新候选app1165856字节、SHA256 `b30c06371ebd403c2a7f500cf02ac8aaad8ab5b6c5c008e567c904f66adbfbeb`；三链路实际NimBLE9PASS，原安全/跑步PASS/OPEN1，SC仍NOT_OBTAINED。
 - COM205刷前WinRT整表枚举E_UNEXPECTED，ROM复位仍失败，定向服务发现Unreachable；未清配对或修改系统蓝牙。ROM NVS双读24KiB一致、65有效记录CRC及分区布局一致。
 - 在保留NVS的前提下仅应用区新候选刷写、独立verify digest matched、20秒ROM启动无致命异常通过；当前版本BLE/P0完整证据仍待取得，不能发布。
-- 当前源码将在白名单分批提交后隔离构建；现有候选内嵌Git仍92e2ffd。当前版本BLE/P0无法取得，最终tag和Release不执行。刷后NVS双读一致，65有效记录与刷前无差异。
+- 已完成白名单三批提交并推送，5b11f0f隔离项目构建及精确三链路/原协议虚拟复验通过，CI success。当前版本实体P0无法取得，不tag/Release；COM205回退已确认候选，用户配置/身份/原密钥保持，PHY校准变化单列。完整当前结论见[最终收尾](52-release-440-closeout.md)。
 - 当前版本Pages47项Node和11个browser入口全通过，docs79/2WARN/0FAIL；依赖IDF的dirty标识保留，大部分文件模式变化，非参与构建示例/RIOT文本修改未清理。
 
 ## 历史审查结论
