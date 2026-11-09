@@ -93,7 +93,7 @@ bikepower-c/
 │   ├── flash_latest.sh       — 自动探测 ESP-IDF 路径与串口，编译并烧录最新正式固件
 │   ├── build_all.sh          — 双板型 release 产物构建（merged bin + manifest）
 │   ├── log_daemon.sh         — 串口日志守护包装脚本
-│   ├── tools/                — 质量门禁 / 设备监控工具
+│   ├── tools/                — 质量门禁 / 设备监控 / 离线演示生成（含 export_configuration_demo.py）
 │   └── platform/             — 平台相关构建入口
 ├── tools/web/
 │   ├── ble-monitor.html      — Pages 工具台与移动使用手册
@@ -114,6 +114,7 @@ bikepower-c/
 │   ├── stage5_portal_test.py — 配网门户 /api/xxx JSON 路由自测
 │   ├── check_portal_js.py    — TC-3a：对 main/web/app.js 跑 node --check
 │   ├── check_portal_structure.py — TC-3d：校验 index.html 结构 + 路由表一致性 + 前端 API 调用
+│   ├── test_portal_theme_browser.cjs — 双主题、浏览器持久化、对比度与布局回归
 │   ├── check_config_consistency.py — TC-3c：常量一致性校验
 │   ├── check_nvs_schema.py   — TC-3e：NVS key/schema 静态一致性
 │   ├── check_board_desc.py   — TC-3f：板型描述表静态一致性

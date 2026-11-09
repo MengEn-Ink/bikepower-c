@@ -87,4 +87,6 @@ python3 scripts/tools/serve_ble_monitor.py
 
 分别访问 `http://127.0.0.1:8080/` 和 `http://127.0.0.1:8766/`。Pages 预览不拉取发行固件，刷写入口显示不可用。
 
+新版配置页支持深浅主题与浏览器持久化，可打开 [离线交互模拟](design-demos/bikepower-ui/configuration-preview/configuration.html)。重新生成使用 `python3 scripts/tools/export_configuration_demo.py`，专项验证使用 `node tests/test_portal_theme_browser.cjs`；离线保存只修改演示数据，设备需安装包含新版页面的固件。
+
 文档改动运行 `python3 scripts/tools/quality_gate.py --level docs`；源码事实由 `doc_facts.py --write` 更新，手机离线手册由 `sync_user_docs.py` 同步。协作规则见 [AGENTS](AGENTS.md)，当前实现见 [技术参考](docs/dev/01-technical-reference.md)，历史变化见 [CHANGELOG](CHANGELOG.md)。
