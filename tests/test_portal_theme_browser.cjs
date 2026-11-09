@@ -94,14 +94,14 @@ const root = path.resolve(__dirname, '..');
           const luminance = value => value.match(/[\d.]+/g).slice(0,3).map(Number).map(n => {
             n /= 255; return n <= .04045 ? n / 12.92 : ((n + .055) / 1.055) ** 2.4;
           }).reduce((sum,n,i) => sum + n * [.2126,.7152,.0722][i],0);
-          const style = getComputedStyle(node), border = luminance(style.borderTopColor), back = luminance(style.backgroundColor);
+          const style = getComputedStyle(node.closest('.paired-input') || node), border = luminance(style.borderTopColor), back = luminance(style.backgroundColor);
           return (Math.max(border,back) + .05) / (Math.min(border,back) + .05) >= 3;
         }), `${theme} 输入框边界应可辨认`);
         if (width === 390) {
           await page.evaluate(() => scrollTo(0, 0));
           const input = await page.locator('#simPower').boundingBox();
           const footer = await page.locator('.action-bar').boundingBox();
-          assert(input.y + input.height <= footer.y, '390 首屏目标功率被保存栏遮挡');
+          assert(input.y + input.height <= footer.y, `390 首屏目标功率被保存栏遮挡：输入 ${input.y}–${input.y + input.height}，保存栏 ${footer.y}`);
         }
         if (directory) await page.screenshot({path:path.join(directory, `${theme}-${width}.png`), fullPage:true});
       }

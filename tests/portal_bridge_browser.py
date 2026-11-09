@@ -67,6 +67,7 @@ def main():
                 expect(page.locator("#heroMetricValue")).to_have_text("310")
                 page.locator("#saveBtn").click()
                 expect(page.locator("#heroMetricValue")).to_have_text("315")
+                page.locator("#sourceOptions summary").click()
                 page.locator("[data-source=bridge]").click()
                 expect(page.locator("#bridgeEditor")).to_be_hidden()
                 expect(page.locator("#saveBtn")).to_be_disabled()
