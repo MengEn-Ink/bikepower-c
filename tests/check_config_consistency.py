@@ -334,18 +334,26 @@ for key, expected in range_expectations.items():
     check(actual == expected, f"tests/mock_server.py LIMITS[{key}] == {expected} (实际={actual})")
 
 js_ranges = {
-    "s.powerFloat": "power_float",
-    "s.cadenceFloat": "cadence_float",
-    "h.float": "hr_float",
-    "r.paceFloat": "run_pace_float_sec",
-    "r.cadenceFloat": "run_cadence_float",
-    "c.powerStep": "power_step",
+    "powerFloat": "power_float",
+    "cadenceFloat": "cadence_float",
+    "hrFloat": "hr_float",
+    "runPaceFloat": "run_pace_float_sec",
+    "runCadenceFloat": "run_cadence_float",
+    "powerStepInput": "power_step",
 }
+groups_match = re.search(r"var floatGroups = (\[.*?\n  \]);", app_js_src, re.S)
+float_ranges = {row[1]: (0, row[6]) for row in json.loads(groups_match.group(1))} if groups_match else {}
+check("rules.push([g[1],0,g[6]" in app_js_src
+      and "Number.isInteger(v) && v >= g[1] && v <= g[2]" in app_js_src
+      and "!validationErrors().length" in app_js_src,
+      "共享浮动范围必须用于保存前整数及上下限校验")
 for js_key, domain_key in js_ranges.items():
-    match = re.search(rf"range\({re.escape(js_key)},\s*(-?\d+),\s*(-?\d+)\)", app_js_src)
-    actual = tuple(map(int, match.groups())) if match else None
+    actual = float_ranges.get(js_key)
+    if js_key == "powerStepInput":
+        match = re.search(r'check\("powerStepInput",Number.isInteger\(c.powerStep\) && c.powerStep >= (\d+) && c.powerStep <= (\d+)', app_js_src)
+        actual = tuple(map(int, match.groups())) if match else None
     expected = range_expectations[domain_key]
-    check(actual == expected, f"main/web/app.js range({js_key}) == {expected} (实际={actual})")
+    check(actual == expected, f"main/web/app.js 校验范围 {js_key} == {expected} (实际={actual})")
 
 power_float_default = extract_int(domain_src, "POWER_FLOAT_DEFAULT")
 cadence_float_default = extract_int(domain_src, "CADENCE_FLOAT_DEFAULT")
@@ -459,7 +467,7 @@ check("cadenceWithPower:cadenceBundle" in pages_src
       "Pages collectConfigForm 必须把兼容位并入 broadcast_mask，不能只重组 bit0-2")
 check("踏频随功率需要同时启用功率和踏频" in pages_src,
       "Pages 校验必须拒绝孤立兼容位，避免勾选后被静默丢弃")
-check("bw.cadenceWithPower && !(bw.power && bw.cadence)" in app_js_src,
+check('check("broadcastOptionsSummary",!c.broadcast.cadenceWithPower || (c.broadcast.power && c.broadcast.cadence)' in app_js_src,
       "设备门户保存前必须拒绝孤立兼容位")
 check("state.draft.broadcast.cadenceWithPower = false" in app_js_src
       and 'querySelector("[data-cadence-bundle]")' in app_js_src,

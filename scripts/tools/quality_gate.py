@@ -415,6 +415,7 @@ STATIC_CHECKS = [
     ("tests/test_portal_faults.py", "生产门户 HTTP 事务故障 ASan/UBSan"),
     ("tests/test_device_gate_commands.py", "设备门禁板型命令契约"),
     ("tests/portal_exception_browser.py", "门户 HTTP 异常与恢复 E2E"),
+    ("tests/test_portal_recovery_browser.cjs", "门户隐藏错误定位与草稿恢复"),
     ("tests/test_pages_exceptions.py", "Pages BLE 事务异常与重试 E2E"),
     ("tests/test_bridge_session.py", "上游桥接会话与扫描 ASan/UBSan"),
     ("tests/check_bridge_failover_contract.py", "桥接主备恢复静态契约"),
@@ -472,7 +473,7 @@ for rel_path, name in STATIC_CHECKS:
     if not os.path.exists(full):
         fail(f"{name}: 脚本缺失 {rel_path}")
         continue
-    run_args = [python_exe, full]
+    run_args = ["node" if rel_path.endswith(".cjs") else python_exe, full]
     if rel_path == "scripts/tools/sync_user_docs.py":
         run_args.append("--check")
     out, rc = run_cmd(run_args, cwd=PROJECT, timeout=180)

@@ -210,6 +210,7 @@ def quick_steps(gate):
     run_step(gate, "门户 JS", "python3 tests/check_portal_js.py", 60)
     run_step(gate, "压缩门户手机与桌面交互", "python3 tests/check_portal_render.py", 180)
     run_step(gate, "门户 HTTP 异常与恢复 E2E", "python3 tests/portal_exception_browser.py", 180)
+    run_step(gate, "门户隐藏错误定位与草稿恢复", "node tests/test_portal_recovery_browser.cjs", 180)
     run_step(gate, "Pages BLE 事务异常与重试 E2E", "python3 tests/test_pages_exceptions.py", 120)
     run_step(gate, "设备遥测协议与生命周期", "python3 tests/test_device_telemetry.py", 60)
 

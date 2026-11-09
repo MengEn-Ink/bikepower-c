@@ -142,6 +142,7 @@ window.testCloseRace = async function () {
                     assert len(posts) == count + 1, "等待异事务超时不得重复提交"
                     faults.clear()
                     expect(page.locator("#heroMetricValue")).to_have_text("325")
+                    page.locator("#sourceOptions summary").click()
                     page.locator("[data-source=bridge]").click()
                     faults["bridge/scan"] = "503"
                     page.locator("#bridgeStartScanBtn").click()
