@@ -278,6 +278,11 @@ async def run_protocol(args, folder, record, record_not_obtained):
                 await asyncio.sleep(0.1)
             sc_found = len(sc_indication_data) > 0
             if sc_found:
+                for payload in sc_indication_data:
+                    require(len(payload) == 4, 'SC indication 长度必须为四字节')
+                    require(int.from_bytes(payload[:2], 'little') == 1
+                            and int.from_bytes(payload[2:], 'little') == 65535,
+                            'SC indication 必须覆盖完整句柄范围，禁止零范围')
                 record('sc_indication_after_rebuild', {'received': sc_found, 'count': len(sc_indication_data)})
             else:
                 record_not_obtained('sc_indication_after_rebuild', {'received': sc_found, 'count': len(sc_indication_data), 'note': '虚拟板GATT重建后未收到SC indication，需实物directACK确认'})

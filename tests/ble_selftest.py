@@ -38,6 +38,7 @@ SENSOR_LOCATION_UUID = "00002a5d-0000-1000-8000-00805f9b34fb"
 DIS_MANUF_UUID = "00002a29-0000-1000-8000-00805f9b34fb"
 DIS_MODEL_UUID = "00002a24-0000-1000-8000-00805f9b34fb"
 DIS_FW_UUID = "00002a26-0000-1000-8000-00805f9b34fb"
+SERVICE_CHANGED_UUID = "00002a05-0000-1000-8000-00805f9b34fb"
 
 def get_expected_board_name(repo_root):
     env_board = os.environ.get("BIKEPOWER_EXPECT_BOARD", "")
@@ -563,6 +564,9 @@ async def main():
     async with BleakClient(dev) as client:
         print("已连接")
         found = {c.uuid for s in client.services for c in s.characteristics}
+        changed = client.services.get_characteristic(SERVICE_CHANGED_UUID)
+        assert changed and "indicate" in changed.properties, "缺少 Service Changed 指示特征"
+        print("Service Changed 特征存在；发送及确认仍需绑定后跨重启验收")
         if telemetry_uuid(1) in found:
             meta = telemetry_meta(bytes(await client.read_gatt_char(telemetry_uuid(1))))
             for group in range(4):
