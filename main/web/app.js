@@ -8,8 +8,9 @@
   function applyTheme() {
     var theme = themeChoice || (themeMedia.matches ? "dark":"light");
     document.documentElement.dataset.theme = theme;
-    $("themeToggle").textContent = theme === "dark" ? "浅色":"深色";
-    $("themeToggle").setAttribute("aria-label",theme === "dark" ? "切换为浅色主题":"切换为深色主题");
+    var label = theme === "dark" ? "切换为浅色主题":"切换为深色主题";
+    $("themeToggle").setAttribute("aria-label",label);
+    $("themeToggle").title = label;
     document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#14161a":"#f3f4f6";
   }
   $("themeToggle").addEventListener("click",function() {
@@ -164,7 +165,11 @@
   function setBusy(value) {
     state.busy = value;
     document.querySelector(".editor-pane").classList.toggle("is-busy",value);
+    document.querySelector(".editor-pane").setAttribute("aria-busy",String(value));
+    $("saveBtn").setAttribute("aria-busy",String(value));
     $("closeWifiBtn").disabled = value;
+    ["profileWeight","ftpValue","thresholdHeart"].forEach(function(id) { $(id).disabled = value || state.closed; });
+    if (state.loaded) renderFloatInputs();
     if (state.loaded) updateDirty();
   }
   function countdown(seconds, version, startedAt) {
@@ -182,6 +187,8 @@
     ["scanModal","closeModal"].forEach(function(id) { $(id).hidden = true; });
     document.querySelector(".page").inert = true;
     document.querySelector(".action-bar").inert = true;
+    $("profileBar").inert = true;
+    if (state.loaded) renderFloatInputs();
     $("renewBtn").disabled = true;
     $("sessionWarning").hidden = true;
     $("wifiClosed").hidden = false;
@@ -239,18 +246,28 @@
     document.addEventListener(type,userActivity,{capture:true,passive:true});
   });
   function fillPresets() {
-    [["robotPreset",state.pacers,5],["runPreset",state.runPacers,4]].forEach(function(entry) {
+    $("robotStops").replaceChildren();
+    state.pacers.concat({id:5,name:"自定义"}).forEach(function(p) {
+      var button = document.createElement("button");
+      button.type = "button"; button.dataset.ride = p.id === 5 ? "custom":String(p.id);
+      button.textContent = p.id === 5 ? "自定义":p.name;
+      button.addEventListener("click",function() { chooseRobot(this.dataset.ride); });
+      $("robotStops").appendChild(button);
+    });
+    [["runPreset",state.runPacers,4]].forEach(function(entry) {
       var select = $(entry[0]); select.replaceChildren();
       entry[1].filter(function(p) { return p.id !== entry[2]; }).forEach(function(p) {
         var option = document.createElement("option");
-        option.value = String(p.id); option.textContent = p.name; select.appendChild(option);
+        option.value = String(p.id);
+        option.textContent = p.name;
+        select.appendChild(option);
       });
       var custom = document.createElement("option"); custom.value = "custom";
       custom.textContent = "自定义"; select.appendChild(custom);
     });
   }
   async function load(preserve, snapshot) {
-    var version = state.leaseVersion, startedAt = performance.now();
+    var version = state.leaseVersion, startedAt = performance.now(), firstLoad = !state.loaded;
     var data = snapshot || await api("state");
     if (state.closed) return data;
     state.wire = clone(data.config); state.revision = data.revision;
@@ -273,6 +290,11 @@
     $("schemaVersion").textContent = "schema v" + data.config.schema_ver;
     $("headerFirmware").textContent = "固件 v" + data.firmware_version;
     if (!preserve) renderAll(); else updateDirty();
+    if (firstLoad) {
+      $("sourceOptions").open = state.draft.source === "bridge" || state.draft.simulation.mode === "pacer";
+      $("heartOptions").open = state.draft.heart.mode === "fixed";
+      $("broadcastOptions").open = (data.config.broadcast_mask & 7) !== 7;
+    }
     return data;
   }
   function renderLive() {
@@ -379,6 +401,7 @@
   }
 
   function updateDirty() {
+    renderDisclosure();
     var dirty = isDirty();
     var bridgePending = state.draft.sport === "cycling"
       && state.draft.source === "bridge"
@@ -404,12 +427,15 @@
       $("saveHint").textContent = state.busy ? "正在切换运动模式…":"保存后 BLE 服务将短暂重建";
     }
     if (!validSimulation()) $("saveHint").textContent = "请检查体重和强度范围";
+    if (!validFields() && validSimulation()) $("saveHint").textContent = "请检查填写值是否在允许范围内";
+    if (state.busy) $("saveBtn").textContent = state.closeRequested ? "正在关闭 WiFi…":"正在保存…";
   }
 
   function renderHeader() {
     $("headerDeviceName").textContent = state.applied.deviceName;
     $("deviceNameInput").value = state.draft.deviceName;
     $("powerStepInput").value = state.draft.powerStep;
+    ["profileWeight","ftpValue","thresholdHeart"].forEach(function(id) { $(id).disabled = state.busy || state.closed; });
   }
 
   function renderSport() {
@@ -549,39 +575,109 @@
     return presets[simulation.preset] || [simulation.wkgMin, simulation.wkgMax];
   }
 
+  function validWkg(value) {
+    return Number.isFinite(value) && value >= 1 && value <= 7
+      && Math.abs(value * 10 - Math.round(value * 10)) < .000001;
+  }
+  function validRobot(simulation) {
+    var range = robotRange(simulation);
+    return Number.isInteger(simulation.weight) && simulation.weight >= 40 && simulation.weight <= 150
+      && range.every(validWkg) && range[0] <= range[1];
+  }
   function validSimulation() {
     var simulation = state.draft.simulation;
     if (state.draft.sport !== "cycling" || state.draft.source !== "simulation") return true;
     if (simulation.mode === "fixed") return Number.isFinite(simulation.power) && simulation.power >= 0 && simulation.power <= 2000;
-    var range = robotRange(simulation);
-    return Number.isFinite(simulation.weight) && simulation.weight >= 40 && simulation.weight <= 150
-      && range.every(function (n) { return Number.isFinite(n) && n >= 1 && n <= 7; })
-      && range[0] <= range[1];
+    return validRobot(simulation);
   }
 
   function renderRobotPreview() {
     var simulation = state.draft.simulation;
-    var range = robotRange(simulation);
-    $("robotPowerRange").textContent = validSimulation()
-      ? Math.round(simulation.weight * range[0]) + "–" + Math.round(simulation.weight * range[1]) + " W" : "—";
-    $("robotRangeError").hidden = validSimulation();
-    $("robotRangeError").textContent = range[0] > range[1] ? "强度下限不能大于上限" : "体重需为 40–150 kg，强度需为 1–7 W/kg";
+    var range = robotRange(simulation), valid = validRobot(simulation), ftp = state.draft.heart.ftp;
+    var ftpValid = Number.isInteger(ftp) && ftp >= 50 && ftp <= 500;
+    var power = range.map(function(n) { return Math.floor(simulation.weight * Math.round(n * 10) / 10); });
+    var percent = power.map(function(n) { return n / ftp * 100; });
+    var preset = state.pacers.find(function(p) { return String(p.id) === (simulation.preset === "custom" ? "5":simulation.preset); });
+    var label = simulation.preset === "custom" ? "自定义":preset ? preset.name:"正在读取档位…";
+    if (range.every(validWkg) && range[0] <= range[1]) label += " · " + range[0].toFixed(1) + "–" + range[1].toFixed(1) + " W/kg";
+    $("robotPresetLabel").textContent = label;
+    $("robotPreset").setAttribute("aria-valuetext",label);
+    $("robotPowerRange").textContent = valid ? power[0] + "–" + power[1] + " W":"—";
+    $("robotFtpReference").textContent = ftpValid ? "参考 FTP：" + ftp + " W":"参考 FTP";
+    $("robotFtpRange").textContent = valid && ftpValid ? Math.round(percent[0]) + "–" + Math.round(percent[1]) + "% FTP":"—";
+    $("robotFtpTrack").toggleAttribute("hidden",!valid || !ftpValid);
+    $("robotFtpScale").hidden = !valid || !ftpValid;
+    $("robotFtpRelation").textContent = !valid ? "填写有效体重和强度后显示预览"
+      : !ftpValid ? "FTP 需为 50–500 W 的整数，请在顶部修改"
+      : (power[1] < ftp ? "低于 FTP":power[0] > ftp ? "高于 FTP":power[0] < ftp && power[1] > ftp ? "跨越 FTP":"达到 FTP")
+        + " · 仅作相对参考" + (percent[1] > 150 ? "；图示上限为 150%，数值完整显示":"");
+    if (valid && ftpValid) {
+      var start = Math.min(percent[0],149), end = Math.min(percent[1],150);
+      $("robotRangeBand").style.transform = "translateX(" + start + "px) scaleX(" + Math.max(1,end - start) / 150 + ")";
+    }
+    $("robotRangeError").hidden = valid;
+    $("robotRangeError").textContent = range[0] > range[1] ? "强度下限不能大于上限" : "体重需为 40–150 kg 整数；强度需为 1–7 W/kg，步进 0.1";
+    $("profileWeight").setAttribute("aria-invalid",String(!Number.isInteger(simulation.weight) || simulation.weight < 40 || simulation.weight > 150));
+    ["wkgMin","wkgMax"].forEach(function(id,i) {
+      $(id).setAttribute("aria-invalid",String(simulation.preset === "custom" && (!validWkg(range[i]) || range[0] > range[1])));
+    });
+    $("ftpValue").setAttribute("aria-invalid",String(!ftpValid));
+    var threshold = state.draft.heart.threshold;
+    $("thresholdHeart").setAttribute("aria-invalid",String(!Number.isInteger(threshold) || threshold < 100 || threshold > 220));
+  }
+
+  var floatGroups = [
+    ["simPower","powerFloat","powerInputHelp","目标功率",0,2000,100,"W"],
+    ["simCadence","cadenceFloat","cadenceInputHelp","踏频",20,120,20,"rpm"],
+    ["fixedHeart","hrFloat","hrFloatHelp","心率",60,200,20,"bpm"],
+    [null,"runPaceFloat","runPaceFloatHelp","配速",0,0,60,"秒/km"],
+    ["runCadence","runCadenceFloat","runCadenceFloatHelp","步频",120,220,20,"spm"]
+  ];
+  function renderFloatInputs() {
+    floatGroups.forEach(function(g) {
+      var errors = [], slider = $(g[1] + "Range");
+      [g[0],g[1]].forEach(function(id,i) {
+        if (!id) return;
+        var node = $(id), value = node.value === "" ? NaN:Number(node.value);
+        var min = i ? 0:g[4], max = i ? g[6]:g[5];
+        var invalid = !Number.isInteger(value) || value < min || value > max;
+        node.setAttribute("aria-invalid",String(invalid));
+        node.disabled = state.busy || state.closed;
+        if (invalid) errors.push((i ? g[3].replace("目标","") + "浮动":g[3]) + "需为 " + min + "–" + max + " " + g[7] + " 的整数");
+        if (i) {
+          if (!invalid) slider.value = value;
+          slider.disabled = invalid || state.busy || state.closed;
+          slider.setAttribute("aria-valuetext",invalid ? "请先修正浮动数值":"正负 " + value + " " + g[7]);
+        }
+      });
+      var robot = state.draft.simulation.mode === "pacer";
+      $(g[2]).textContent = errors.join("；") || (robot && g[0] === "simCadence"
+        ? "踏频 20–120 rpm，填写整数；机器人浮动由引擎控制。"
+        : (g[0] ? g[3] + " " + g[4] + "–" + g[5] + " " + g[7] + "；":"")
+          + "浮动 0–" + g[6] + " " + g[7] + "。滑杆只调浮动。");
+      $(g[2]).classList.toggle("field-error",errors.length > 0);
+      $(g[2]).hidden = errors.length === 0;
+      var pair = $(g[1]).closest(".paired-input");
+      if (pair) pair.classList.toggle("is-invalid",errors.length > 0);
+    });
+    renderPaceSpeed();
   }
 
   function renderSimulation() {
     var simulation = state.draft.simulation;
     var robot = simulation.mode === "pacer";
     setActive("[data-sim-mode]", simulation.mode, "simMode");
-    $("simulationModeSummary").textContent = robot ? "按强度平滑输出" : "按填写功率输出";
     $("robotFields").hidden = !robot;
     $("fixedPowerField").hidden = robot;
-    $("robotWeightField").hidden = !robot;
+    document.querySelectorAll("[data-fixed-float]").forEach(function(node) { node.hidden = robot; });
     $("customRobotFields").hidden = simulation.preset !== "custom";
-    $("robotPreset").value = simulation.preset;
+    $("robotPreset").value = simulation.preset === "custom" ? "5":simulation.preset;
+    setActive("[data-ride]",simulation.preset,"ride");
     $("simPower").value = simulation.power;
     $("simCadence").value = simulation.cadence;
     $("powerFloat").value = simulation.powerFloat;
     $("cadenceFloat").value = simulation.cadenceFloat;
+    renderFloatInputs();
     $("customPacerName").value = simulation.customName;
     $("customPacerName").parentElement.hidden = simulation.preset !== "custom";
     $("profileWeight").value = simulation.weight;
@@ -635,6 +731,7 @@
     $("thresholdHeart").value = heart.threshold;
     $("fixedHeart").value = heart.fixed;
     $("hrFloat").value = heart.float;
+    renderFloatInputs();
   }
 
   function renderRunning() {
@@ -643,6 +740,7 @@
     $("runModeSummary").textContent = run.mode === "fixed" ? "固定配速":"配速档";
     $("runRobotFields").hidden = run.mode === "fixed";
     $("fixedPaceFields").hidden = run.mode !== "fixed";
+    $("runPaceFloatField").hidden = run.mode !== "fixed";
     $("runCustomFields").hidden = run.preset !== "custom";
     $("runCustomName").parentElement.hidden = run.preset !== "custom";
     $("runPreset").value = run.preset;
@@ -651,11 +749,25 @@
     $("runCustomName").value = run.customName;
     $("runPaceFloat").value = run.paceFloat;
     $("paceMinutes").value = state.draft.running.paceMinutes;
-    $("paceSeconds").value = state.draft.running.paceSeconds;
+    $("paceSeconds").value = Number.isInteger(run.paceSeconds) ? String(run.paceSeconds).padStart(2,"0"):run.paceSeconds;
     $("runCadence").value = state.draft.running.cadence;
     $("runCadenceFloat").value = state.draft.running.cadenceFloat;
-    var total = Math.max(144, state.draft.running.paceMinutes * 60 + state.draft.running.paceSeconds);
-    $("paceSpeed").textContent = (3600 / total).toFixed(2) + " km/h";
+    renderFloatInputs();
+    renderPaceSpeed();
+  }
+
+  function renderPaceSpeed() {
+    var r = state.draft.running, total = r.paceMinutes * 60 + r.paceSeconds;
+    var valid = Number.isInteger(r.paceMinutes) && r.paceMinutes >= 2 && r.paceMinutes <= 20
+      && Number.isInteger(r.paceSeconds) && r.paceSeconds >= 0 && r.paceSeconds <= 59
+      && total >= 144 && total <= 1200;
+    [["paceMinutes",2,20],["paceSeconds",0,59]].forEach(function(g) {
+      var node = $(g[0]), value = node.value === "" ? NaN:Number(node.value);
+      node.disabled = state.busy || state.closed;
+      node.setAttribute("aria-invalid",String(!Number.isInteger(value) || value < g[1] || value > g[2] || total < 144 || total > 1200));
+    });
+    $("fixedPaceFields").classList.toggle("is-invalid",!valid || $("runPaceFloat").getAttribute("aria-invalid") === "true");
+    $("paceSpeed").textContent = valid ? (3600 / total).toFixed(2) + " km/h":"请填写 2:24–20:00 的有效配速";
   }
 
   function renderAll() {
@@ -685,7 +797,95 @@
   }
 
   $("sharedHeart").appendChild($("heartSection"));
-  function edited() { state.message = ""; updateDirty(); if (!validFields()) $("saveHint").textContent = "请检查输入范围、配速上下限和名称（最多 23 UTF-8 字节）"; }
+  document.querySelector(".diagnostics").appendChild(document.querySelector(".signal-chain"));
+  function disclose(id, title, nodes) {
+    var details = document.createElement("details"), summary = document.createElement("summary");
+    var heading = document.createElement("div"), label = document.createElement("span");
+    var value = document.createElement("b"), action = document.createElement("span");
+    details.id = id; details.className = "device-settings";
+    label.textContent = title; value.id = id + "Summary"; action.textContent = "展开";
+    heading.append(label,value); summary.append(heading,action); details.appendChild(summary);
+    nodes.forEach(function(node) { details.appendChild(node); });
+    details.addEventListener("toggle",function() { action.textContent = details.open ? "收起":"展开"; });
+    return details;
+  }
+  var sourceSection = document.querySelector("[data-source]").closest("section");
+  var simulationModes = document.createElement("div");
+  simulationModes.id = "simulationModes"; simulationModes.className = "editor-section";
+  var modeLabel = document.createElement("p"); modeLabel.className = "identity-note"; modeLabel.textContent = "模拟模式";
+  simulationModes.append(modeLabel,document.querySelector("[data-sim-mode]").parentElement);
+  var sourceOptions = disclose("sourceOptions","模式与来源",[sourceSection,simulationModes]);
+  $("sharedHeart").after(sourceOptions);
+  sourceOptions.after(disclose("broadcastOptions","广播与兼容",[document.querySelector("[data-broadcast]").closest("section")]));
+  var heartModes = document.querySelector("[data-heart-mode]").parentElement;
+  var heartOptions = disclose("heartOptions","心率模式",[heartModes]);
+  $("heartFields").prepend(heartOptions);
+  function renderDisclosure() {
+    var c = state.draft;
+    $("sourceOptions").hidden = $("broadcastOptions").hidden = c.sport === "running";
+    $("simulationModes").hidden = c.source === "bridge";
+    $("sourceOptionsSummary").textContent = c.source === "bridge" ? "真实功率计"
+      : "模拟输出 · " + (c.simulation.mode === "pacer" ? "配速机器人":"固定功率");
+    $("heartOptionsSummary").textContent = c.heart.mode === "fixed" ? "固定心率":"功率随动";
+    $("heartIndex").textContent = c.sport === "running" ? "02":c.source === "simulation" ? "01":"04";
+    $("broadcastOptionsSummary").textContent = ["power","cadence","heart"].map(function(key,i) {
+      return c.broadcast[key] ? ["功率","踏频","心率"][i]:"";
+    }).filter(Boolean).join(" · ");
+  }
+  floatGroups.slice(2).forEach(function(g) {
+    var input = $(g[1]), label = input.parentElement, field = document.createElement("div");
+    field.id = g[1] + "Field"; field.className = "simulation-fields"; field.style.marginTop = "16px";
+    label.before(field);
+    var heading, pair, left;
+    if (g[0]) {
+      var target = $(g[0]), targetLabel = target.parentElement;
+      targetLabel.parentElement.classList.remove("field-pair");
+      heading = document.createElement("label"); heading.htmlFor = g[0];
+      heading.textContent = targetLabel.firstChild.textContent;
+      pair = document.createElement("div"); pair.className = "paired-input";
+      left = document.createElement("div"); left.append(target,targetLabel.querySelector("span"));
+      pair.appendChild(left); targetLabel.remove();
+    } else {
+      pair = $("fixedPaceFields"); pair.className = "paired-input pace-input";
+      heading = pair.querySelector("label"); heading.htmlFor = "paceMinutes";
+      left = pair.querySelector("div");
+      left.querySelector("span").textContent = ":";
+      left.querySelector("span:last-child").textContent = "/km";
+      [["paceMinutes",2,20,"配速分钟"],["paceSeconds",0,59,"配速秒数"]].forEach(function(x) {
+        $(x[0]).min = x[1]; $(x[0]).max = x[2]; $(x[0]).step = 1; $(x[0]).inputMode = "numeric";
+        $(x[0]).setAttribute("aria-label",x[3]); $(x[0]).setAttribute("aria-describedby","paceSpeed " + g[2]);
+      });
+    }
+    field.append(heading,pair);
+    var right = document.createElement("div"), sign = document.createElement("span"), unit = document.createElement("span");
+    sign.textContent = "±"; unit.textContent = g[7]; right.append(sign,input,unit); pair.appendChild(right);
+    label.remove();
+    input.min = 0; input.max = g[6]; input.step = 1; input.inputMode = "numeric";
+    input.setAttribute("aria-label",g[3] + "浮动 " + g[7]);
+    input.setAttribute("aria-describedby",g[2]); input.disabled = true;
+    var slider = document.createElement("input");
+    slider.id = g[1] + "Range"; slider.type = "range"; slider.min = 0; slider.max = g[6]; slider.step = 1;
+    slider.disabled = true; slider.setAttribute("aria-label","调整" + g[3] + "浮动");
+    slider.setAttribute("aria-describedby",g[2]);
+    var help = document.createElement("p");
+    help.id = g[2]; help.className = "identity-note"; help.setAttribute("role","status");
+    field.append(slider,help);
+    if (!g[0]) { $("paceSpeed").className = "identity-note"; field.appendChild($("paceSpeed")); }
+    if (g[0]) {
+      $(g[0]).min = g[4]; $(g[0]).max = g[5]; $(g[0]).step = 1;
+      $(g[0]).inputMode = "numeric"; $(g[0]).setAttribute("aria-describedby",g[2]);
+    }
+  });
+  function profileError() {
+    var entries = [[state.draft.simulation.weight,40,150,"体重","kg"],[state.draft.heart.ftp,50,500,"FTP","W"],
+      [state.draft.heart.threshold,100,220,"阈值心率","bpm"]];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!Number.isInteger(e[0]) || e[0] < e[1] || e[0] > e[2]) return e[3] + "需为 " + e[1] + "–" + e[2] + " " + e[4] + " 的整数";
+    }
+    return "";
+  }
+  function edited() { state.message = profileError(); updateDirty(); if (!validFields()) $("saveHint").textContent = "请检查输入范围、配速上下限和名称（最多 23 UTF-8 字节）"; }
   ["sport","source","calibration","sim-mode","heart-mode","run-mode"].forEach(function(attr) {
     document.querySelectorAll("[data-" + attr + "]").forEach(function(button) {
       button.addEventListener("click",function() {
@@ -704,7 +904,13 @@
       });
     });
   });
-  [["robotPreset","simulation"],["runPreset","running"]].forEach(function(x) {
+  function chooseRobot(value) {
+    if (!state.loaded || state.busy || state.closed) return;
+    state.draft.simulation.preset = value;
+    renderAll(); edited();
+  }
+  $("robotPreset").addEventListener("input",function() { chooseRobot(this.value === "5" ? "custom":this.value); });
+  [["runPreset","running"]].forEach(function(x) {
     $(x[0]).addEventListener("change",function() {
       state.draft[x[1]].preset = this.value;
       if (x[1] === "running" && this.value !== "custom") {
@@ -760,15 +966,21 @@
     runPaceHigh:["running","high"],runCustomName:["running","customName"]};
   Object.keys(fields).forEach(function(id) {
     $(id).addEventListener("input",function() {
-      if (!state.loaded) return;
+      if (!state.loaded || state.busy || state.closed) return;
       var x = fields[id];
       state.draft[x[0]][x[1]] = /Name$/.test(id) ? this.value : this.value === "" ? NaN:Number(this.value);
-      if (["profileWeight","wkgMin","wkgMax"].includes(id)) renderRobotPreview();
-      if (id === "paceMinutes" || id === "paceSeconds") {
-        var r = state.draft.running;
-        $("paceSpeed").textContent = (3600 / (r.paceMinutes * 60 + r.paceSeconds)).toFixed(2) + " km/h";
-      }
+      if (["profileWeight","wkgMin","wkgMax","ftpValue","thresholdHeart"].includes(id)) renderRobotPreview();
+      if (floatGroups.some(function(g) { return g[0] === id || g[1] === id; })) renderFloatInputs();
+      if (id === "paceMinutes" || id === "paceSeconds") renderPaceSpeed();
       edited();
+    });
+  });
+  floatGroups.forEach(function(g) {
+    var id = g[1];
+    $(id + "Range").addEventListener("input",function() {
+      if (!state.loaded || state.busy || state.closed) return;
+      $(id).value = this.value;
+      $(id).dispatchEvent(new Event("input",{bubbles:true}));
     });
   });
   $("deviceNameInput").addEventListener("input",function() { state.draft.deviceName = this.value; edited(); });
@@ -803,7 +1015,10 @@
     if (!modal) return;
     if (e.key === "Escape") { closeModal(modal.id); if (modal.id === "scanModal") cancelTest(); }
     if (e.key === "Tab") {
-      var buttons = Array.from(modal.querySelectorAll("button:not(:disabled),input,select"));
+      var buttons = Array.from(modal.querySelectorAll("button,input,select")).filter(function(node) {
+        return !node.disabled && node.getClientRects().length && node.tabIndex >= 0;
+      });
+      if (!buttons.length) return;
       var first = buttons[0], last = buttons[buttons.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
@@ -937,6 +1152,7 @@
         $("wifiClosed").hidden = true;
         document.querySelector(".page").inert = false;
         document.querySelector(".action-bar").inert = false;
+        $("profileBar").inert = false;
         await load(true,data);
         if (state.closed) return;
         $("renewBtn").disabled = false;
