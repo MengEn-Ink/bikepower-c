@@ -21,6 +21,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from datetime import datetime
 from pathlib import Path
 
@@ -68,15 +69,27 @@ class FakeRunner:
         self.calls = []
         self.fail = fail
         self.last_env = None
+        self.config_before_call = []
 
     def __call__(self, argv, env, cwd, timeout_s, log_path):
         self.calls.append((list(argv), str(cwd), timeout_s))
         self.last_env = env
+        config = Path(cwd) / "sdkconfig"
+        self.config_before_call.append(config.read_text(encoding="utf-8")
+                                       if config.is_file() else None)
         (log_path).parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a", encoding="utf-8") as fh:
             fh.write("$ fake argv\n")
         if self.fail:
             return 3, 0.1, "boom"
+        if argv[-1] == "build":
+            mode_dir = Path(argv[argv.index("-B") + 1])
+            for rel in ("bikepower-c.bin", "bootloader/bootloader.bin",
+                        "partition_table/partition-table.bin"):
+                out = mode_dir / rel
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_bytes(rel.encode("utf-8"))
+            (Path(cwd) / "sdkconfig").write_text("固定夹具配置\n", encoding="utf-8")
         return 0, 0.1, "fake ok"
 
 
@@ -113,6 +126,38 @@ class DevWorkflowTestBase(unittest.TestCase):
 
 
 class TestEnvDetection(DevWorkflowTestBase):
+    @unittest.skipIf(os.name == "nt", "POSIX 虚拟环境软链接")
+    def test_posix_venv_and_explicit_env(self):
+        repo = make_fake_repo(self.tmp)
+        venv = self.tmp / "venv"
+        (venv / "bin").mkdir(parents=True)
+        py = venv / "bin" / "python"
+        py.symlink_to(sys.executable)
+        ctx = dw.Context(repo=repo, config={"idf_python": str(py)})
+        found, root = dw.detect_idf_python(ctx, None)
+        self.assertEqual(found, py)
+        self.assertEqual(root, venv)
+        env = dw.build_env(ctx, None, found, None)
+        self.assertEqual(env["IDF_PYTHON_ENV_PATH"], str(venv))
+        with patch.dict(os.environ, {"IDF_PYTHON_ENV_PATH": str(venv)}):
+            found, root = dw.detect_idf_python(dw.Context(repo=repo), None)
+        self.assertEqual((found, root), (py, venv))
+
+    def test_doctor_uses_build_path(self):
+        repo = make_fake_repo(self.tmp)
+        ctx = make_ctx(self.tmp, repo)
+        bins = self.tmp / "venv" / "bin"
+        bins.mkdir(parents=True)
+        py = bins / "python"
+        py.write_text("", encoding="utf-8")
+        ctx.config["idf_python"] = str(py)
+        for name in ("cmake", "ninja", "riscv32-esp-elf-gcc"):
+            exe = bins / name
+            exe.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            exe.chmod(0o755)
+        with patch.object(dw, "_run_version", return_value="fixture 1"):
+            self.assertEqual(dw.cmd_doctor(ctx, as_json=True), dw.EXIT_OK)
+
     def test_wrong_python_missing(self):
         repo = make_fake_repo(self.tmp)
         bad_py = self.tmp / "badpy.txt"
@@ -220,6 +265,48 @@ class TestModeIsolation(DevWorkflowTestBase):
 
 
 class TestLockAndTimeout(DevWorkflowTestBase):
+    def test_build_and_clean_do_not_write_before_lock(self):
+        repo = make_fake_repo(self.tmp)
+        ctx = make_ctx(self.tmp, repo)
+        ctx.config["timeouts"] = {"lock_wait": 0}
+        self.run_build(ctx)
+        before = {p.relative_to(ctx.mode_dir("production")): p.read_bytes()
+                  for p in ctx.mode_dir("production").rglob("*") if p.is_file()}
+        lock = dw.ModeLock(ctx.mode_dir("production") / "build.lock")
+        lock.acquire(0)
+        try:
+            with self.assertRaises(dw.LockBusy):
+                self.run_build(ctx, board="m5stamp")
+            with self.assertRaises(dw.LockBusy):
+                dw.cmd_clean(ctx, "production")
+        finally:
+            lock.release()
+        after = {p.relative_to(ctx.mode_dir("production")): p.read_bytes()
+                 for p in ctx.mode_dir("production").rglob("*") if p.is_file()}
+        self.assertEqual(before, after)
+
+    def test_continuous_output_timeout_isolated(self):
+        log = self.tmp / "stream.log"
+        argv = [sys.executable, "-c",
+                "import time\nend=time.monotonic()+2\n"
+                "while time.monotonic()<end: print('line', flush=True)"]
+        with patch.object(dw, "_kill_tree", side_effect=lambda p: p.kill()):
+            rc, duration, tail = dw.run_subprocess(
+                argv, dict(os.environ), self.tmp, 0.3, log, stream=False)
+        self.assertEqual((rc, tail), (-1, "TIMEOUT"))
+        self.assertLess(duration, 1.5)
+
+    @unittest.skipIf(os.name == "nt", "Unix 独立进程组")
+    def test_timeout_child_has_own_process_group(self):
+        log = self.tmp / "group.log"
+        argv = [sys.executable, "-c",
+                "import os,time; print(os.getpgrp(),flush=True); time.sleep(2)"]
+        with patch.object(dw, "_kill_tree", side_effect=lambda p: p.kill()):
+            dw.run_subprocess(argv, dict(os.environ), self.tmp, 0.3, log, stream=False)
+        group = next(int(line) for line in log.read_text().splitlines()
+                     if line.strip().isdigit())
+        self.assertNotEqual(group, os.getpgrp())
+
     def test_lock_contention(self):
         lock_path = self.tmp / "build.lock"
         lock1 = dw.ModeLock(lock_path)
@@ -277,7 +364,8 @@ class TestCleanBoundary(DevWorkflowTestBase):
         keep = repo / "build" / "old-build" / "keep.txt"
         self.assertTrue(keep.exists())
         dw.cmd_clean(ctx, "diagnostic")
-        self.assertFalse(ctx.mode_dir("diagnostic").exists())
+        self.assertEqual(list(ctx.mode_dir("diagnostic").iterdir()),
+                         [ctx.mode_dir("diagnostic") / "build.lock"])
         self.assertTrue(keep.exists())  # 绝不动用户/旧产物
 
 
@@ -290,7 +378,8 @@ class TestEnvIsolation(DevWorkflowTestBase):
         self.assertEqual(rc, 0)
         after = dict(os.environ)
         self.assertEqual(before, after)  # 调用进程环境不变
-        self.assertEqual(fake.last_env["IDF_PATH"], ctx.config["idf_path"])
+        self.assertEqual(Path(fake.last_env["IDF_PATH"]).resolve(),
+                         Path(ctx.config["idf_path"]).resolve())
 
 
 class TestFenceInputs(DevWorkflowTestBase):
@@ -316,6 +405,41 @@ class TestFenceInputs(DevWorkflowTestBase):
 
 
 class TestCacheWipe(DevWorkflowTestBase):
+    def test_bucket_change_discards_snapshot_sdkconfig(self):
+        repo = make_fake_repo(self.tmp)
+        ctx = make_ctx(self.tmp, repo)
+        self.run_build(ctx)
+        snap_config = ctx.mode_dir("production") / "source-snapshot" / "sdkconfig"
+        snap_config.write_text("CONFIG_BOARD_GENERIC_C3=y\n", encoding="utf-8")
+        _, runner = self.run_build(ctx, board="m5stamp")
+        self.assertIsNone(runner.config_before_call[0])
+        self.assertNotIn("CONFIG_BOARD_GENERIC_C3=y", snap_config.read_text(encoding="utf-8"))
+
+    def test_tampered_snapshot_is_repaired(self):
+        repo = make_fake_repo(self.tmp)
+        ctx = make_ctx(self.tmp, repo)
+        self.run_build(ctx)
+        dest = ctx.mode_dir("production") / "source-snapshot" / "main" / "main.c"
+        dest.write_text("篡改快照\n", encoding="utf-8")
+        self.run_build(ctx)
+        self.assertEqual(dest.read_bytes(), (repo / "main" / "main.c").read_bytes())
+
+    def test_git_identity_and_artifact_hashes(self):
+        repo = make_fake_repo(self.tmp)
+        ctx = make_ctx(self.tmp, repo)
+        for sha in ("a" * 40, "b" * 40):
+            with patch.object(dw, "git_identity", return_value={"head": sha, "dirty": "clean"}):
+                _, runner = self.run_build(ctx)
+            self.assertTrue(any(f"BIKEPOWER_SOURCE_GIT_SHA={sha}" in arg
+                                for call, _, _ in runner.calls for arg in call))
+            self.assertEqual(len(runner.calls), 2)
+            state = dw.read_state(ctx, "production")
+            self.assertEqual(state["source_fingerprint"], dw.source_fingerprint(ctx)[0])
+            self.assertEqual(set(state["artifact_hashes"]), {
+                "bikepower-c.bin", "bootloader/bootloader.bin",
+                "partition_table/partition-table.bin"})
+            for rel, digest in state["artifact_hashes"].items():
+                self.assertEqual(digest, dw._hash_file(ctx.mode_dir("production") / rel))
     def test_wipe_removes_objects_keeps_metadata(self):
         repo = make_fake_repo(self.tmp)
         ctx = make_ctx(self.tmp, repo)

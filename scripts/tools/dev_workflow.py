@@ -219,9 +219,9 @@ def detect_idf_python(ctx: Context, idf_path: Optional[Path]) -> Tuple[Optional[
     """返回 (python.exe, python_env 根目录)。"""
     override = ctx.config.get("idf_python")
     if override:
-        p = Path(override)
+        p = Path(override).expanduser().absolute()
         if p.is_file():
-            return p.resolve(), p.parent.parent if p.parent.name.lower() == "scripts" else None
+            return p, _python_env_root(p)
     env_override = os.environ.get("IDF_PYTHON_ENV_PATH")
     home = Path(os.path.expanduser("~"))
     roots = []
@@ -231,15 +231,22 @@ def detect_idf_python(ctx: Context, idf_path: Optional[Path]) -> Tuple[Optional[
     for root in roots:
         if not root.is_dir():
             continue
+        direct = root / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        if direct.is_file():
+            return direct.absolute(), root.absolute()
         for d in sorted(root.glob("idf*_env"), reverse=True):
             py = d / "Scripts" / "python.exe" if os.name == "nt" else d / "bin" / "python"
             if py.is_file():
-                return py.resolve(), d.resolve()
+                return py.absolute(), d.absolute()
     # 回退：PATH 中的 python（不校验 idf 包，doctor 会单独报告）
     found = shutil.which("python") or shutil.which("python3")
     if found:
         return Path(found), None
     return None, None
+
+
+def _python_env_root(p: Path) -> Optional[Path]:
+    return p.parent.parent if p.parent.name.lower() in ("scripts", "bin") else None
 
 
 def detect_tools_root(ctx: Context) -> Optional[Path]:
@@ -325,7 +332,7 @@ def build_env(ctx: Context, idf_path: Optional[Path], python_exe: Optional[Path]
     if idf_path:
         env["IDF_PATH"] = str(idf_path)
     if python_exe:
-        env_dir = python_exe.parent.parent if python_exe.parent.name.lower() == "scripts" else None
+        env_dir = _python_env_root(python_exe)
         if env_dir is not None:
             env["IDF_PYTHON_ENV_PATH"] = str(env_dir)
     prepend: List[str] = []
@@ -369,6 +376,7 @@ def run_subprocess(argv: Sequence[str], env: Dict[str, str], cwd: Path,
             cwd=str(cwd), env=env,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             bufsize=1, text=True, encoding="utf-8", errors="replace",
+            start_new_session=os.name != "nt",
         )
         assert popen.stdout is not None
         line_q: "queue.Queue[Optional[str]]" = queue.Queue()
@@ -385,6 +393,11 @@ def run_subprocess(argv: Sequence[str], env: Dict[str, str], cwd: Path,
         tail: List[str] = []
         timed_out = False
         while True:
+            if time.monotonic() - started >= timeout_s:
+                timed_out = True
+                _kill_tree(popen)
+                popen.wait(timeout=5)
+                break
             try:
                 line = line_q.get(timeout=0.2)
             except queue.Empty:
@@ -400,14 +413,6 @@ def run_subprocess(argv: Sequence[str], env: Dict[str, str], cwd: Path,
                 continue
             rc = popen.poll()
             if rc is not None:
-                break
-            if time.monotonic() - started > timeout_s:
-                timed_out = True
-                _kill_tree(popen)
-                try:
-                    popen.wait(timeout=5)
-                except Exception:  # noqa: BLE001
-                    pass
                 break
         if timed_out:
             elapsed = time.monotonic() - started
@@ -436,7 +441,7 @@ def _kill_tree(popen: subprocess.Popen) -> None:
                        capture_output=True)
     else:
         try:
-            os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
+            os.killpg(popen.pid, signal.SIGKILL)
         except Exception:  # noqa: BLE001
             popen.kill()
 
@@ -479,7 +484,7 @@ class ModeLock:
                 self._close()
                 raise LockBusy(
                     f"缓存锁被占用且等待 {timeout_s:.0f}s 仍未获得: {self.lock_path}\n"
-                    f"  另一个 dev_workflow 进程正在构建同一模式；请等待或确认无残留进程后删除该锁文件重试。"
+                    f"  另一个 dev_workflow 进程正在使用同一模式；请等待该进程完成，保留锁文件。"
                 )
             time.sleep(0.5)
 
@@ -593,7 +598,7 @@ def sync_source_snapshot(ctx: Context, mode: str, files: Dict[str, str]) -> Tupl
     changed: List[str] = []
     for rel, sha in files.items():
         dest = snap / rel
-        if manifest.get(rel) != sha or not dest.is_file():
+        if manifest.get(rel) != sha or not dest.is_file() or _hash_file(dest) != sha:
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ctx.repo / rel, dest)  # 内容拷贝，新 mtime
             changed.append(rel)
@@ -722,6 +727,7 @@ def cmd_doctor(ctx: Context, as_json: bool) -> int:
     tools_root = detect_tools_root(ctx)
     selected, toolchain_src = load_idf_toolchain(idf_path, tools_root,
                                                   ctx.config.get("target", "esp32c3"))
+    env = build_env(ctx, idf_path, py_exe, tools_root, selected)
     if tools_root:
         checks.append({
             "name": "tools_root",
@@ -732,29 +738,24 @@ def cmd_doctor(ctx: Context, as_json: bool) -> int:
             "status": "OK" if selected else "WARN",
             "detail": f"{toolchain_src}；选中 {len(selected)} 个 recommended 版本（不扫描混排）",
         })
-        cmake_bin = ninja_bin = gcc_used = None
-        if "cmake" in selected:
-            cmake_bin = Path(selected["cmake"]["bins"][0]) / ("cmake.exe" if os.name == "nt" else "cmake")
-        if "ninja" in selected:
-            ninja_bin = Path(selected["ninja"]["bins"][0]) / ("ninja.exe" if os.name == "nt" else "ninja")
-        if "riscv32-esp-elf" in selected:
-            gcc_used = Path(selected["riscv32-esp-elf"]["bins"][0]) / (
-                "riscv32-esp-elf-gcc.exe" if os.name == "nt" else "riscv32-esp-elf-gcc")
+        cmake_bin = shutil.which("cmake", path=env["PATH"])
+        ninja_bin = shutil.which("ninja", path=env["PATH"])
+        gcc_used = shutil.which("riscv32-esp-elf-gcc", path=env["PATH"])
         checks.append({
             "name": "cmake",
-            "status": "OK" if cmake_bin and cmake_bin.is_file() else "MISSING",
+            "status": "OK" if cmake_bin else "MISSING",
             "detail": f"{cmake_bin}  ({_run_version([str(cmake_bin), '--version'])})"
                       if cmake_bin else "tools.json 选定版本缺失",
         })
         checks.append({
             "name": "ninja",
-            "status": "OK" if ninja_bin and ninja_bin.is_file() else "MISSING",
+            "status": "OK" if ninja_bin else "MISSING",
             "detail": f"{ninja_bin}  ({_run_version([str(ninja_bin), '--version'])})"
                       if ninja_bin else "tools.json 选定版本缺失",
         })
         checks.append({
             "name": "riscv32-esp-elf gcc（build 实际使用）",
-            "status": "OK" if gcc_used and gcc_used.is_file() else "MISSING",
+            "status": "OK" if gcc_used else "MISSING",
             "detail": f"{gcc_used}  ({_run_version([str(gcc_used), '--version'])})"
                       if gcc_used else "tools.json 选定版本缺失",
         })
@@ -815,10 +816,11 @@ def _merged_defaults(ctx: Context, board: str) -> str:
     return base.rstrip("\r\n") + "\n" + BOARD_KCONFIG[board] + "\n"
 
 
-def _config_bucket(mode: str, board: str, merged: str, selected: Dict[str, dict]) -> str:
+def _config_bucket(mode: str, board: str, merged: str, selected: Dict[str, dict],
+                   target: str = "esp32c3") -> str:
     """配置桶：模式/板型/合并defaults/工具链版本/target 变化才全量 wipe。"""
     material = json.dumps({
-        "mode": mode, "board": board,
+        "mode": mode, "board": board, "target": target,
         "defaults_sha": hashlib.sha256(merged.encode("utf-8")).hexdigest(),
         "tools": {k: v["version"] for k, v in sorted(selected.items())},
         "tool_version": TOOL_VERSION,
@@ -827,6 +829,28 @@ def _config_bucket(mode: str, board: str, merged: str, selected: Dict[str, dict]
 
 
 def cmd_build(ctx: Context, mode: str, board: str, dry_run: bool) -> int:
+    if mode not in MODES or board not in BOARDS:
+        raise DevWorkflowError(f"未知模式或板型: {mode}/{board}")
+    lock = ModeLock(ctx.mode_dir(mode) / "build.lock")
+    lock.acquire(ctx.timeout("lock_wait"))
+    try:
+        return _cmd_build_locked(ctx, mode, board, dry_run)
+    finally:
+        lock.release()
+
+
+ARTIFACT_FILES = ("bikepower-c.bin", "bootloader/bootloader.bin",
+                  "partition_table/partition-table.bin")
+
+
+def artifact_hashes(cache_dir: Path) -> Dict[str, str]:
+    missing = [rel for rel in ARTIFACT_FILES if not (cache_dir / rel).is_file()]
+    if missing:
+        raise DevWorkflowError(f"构建缺少实际产物: {missing}", EXIT_BUILD_FAIL)
+    return {rel: _hash_file(cache_dir / rel) for rel in ARTIFACT_FILES}
+
+
+def _cmd_build_locked(ctx: Context, mode: str, board: str, dry_run: bool) -> int:
     if mode not in MODES:
         raise DevWorkflowError(f"未知模式 {mode}，可选: {MODES}")
     if board not in BOARDS:
@@ -869,13 +893,15 @@ def cmd_build(ctx: Context, mode: str, board: str, dry_run: bool) -> int:
                 f"诊断构建请显式使用 --mode diagnostic。")
 
     files = snapshot_files(ctx)
+    source_sha = source_fingerprint(ctx)[0]
     gi = git_identity(ctx)
-    bucket = _config_bucket(mode, board, merged, selected)
+    bucket = _config_bucket(mode, board, merged, selected, ctx.config.get("target", "esp32c3"))
     prev = read_state(ctx, mode) or {}
     prev_bucket = prev.get("config_bucket")
     has_build_state = (cache_dir / "build.ninja").is_file() or (cache_dir / "CMakeCache.txt").is_file()
     prev_failed = prev.get("status") in (None, "FAIL", "TIMEOUT", "ERROR")
     full_rebuild = (prev_bucket != bucket) or (not has_build_state) or prev_failed
+    reconfigure = full_rebuild or prev.get("git_head") != gi["head"]
 
     print(f"模式={mode} board={board} cache={cache_dir}")
     print(f"git head={gi['head']} tree={gi['dirty']} 源码输入文件数={len(files)}")
@@ -901,13 +927,12 @@ def cmd_build(ctx: Context, mode: str, board: str, dry_run: bool) -> int:
                 log_path=str(log_path), git_head=gi["head"],
                 toolchain=toolchain_src)
 
-    lock = ModeLock(cache_dir / "build.lock")
     try:
-        lock.acquire(ctx.timeout("lock_wait"))
-
         # 全量重编：清空旧 object/CMake 状态；source-snapshot 与 manifest 保留
         if full_rebuild:
             removed = wipe_cache_objects(cache_dir)
+            for rel in ("sdkconfig", "sdkconfig.old"):
+                (cache_dir / "source-snapshot" / rel).unlink(missing_ok=True)
             if removed:
                 shown = ", ".join(sorted(removed)[:8])
                 print(f"已清空 {len(removed)} 项旧产物 [{shown}{'...' if len(removed) > 8 else ''}]")
@@ -925,10 +950,12 @@ def cmd_build(ctx: Context, mode: str, board: str, dry_run: bool) -> int:
             "-B", str(cache_dir),
             "-C", str(snap),
             "-D", f"SDKCONFIG_DEFAULTS={defaults_file}",
+            "-D", f"IDF_TARGET={ctx.config.get('target', 'esp32c3')}",
+            "-D", f"BIKEPOWER_SOURCE_GIT_SHA={gi['head']}",
         ]
         env = build_env(ctx, idf_path, py_exe, tools_root, selected)
 
-        if full_rebuild:
+        if reconfigure:
             write_state(ctx, mode, stage="reconfigure", status="RUNNING")
             rc, dur, tail = run_subprocess(
                 base_argv + ["reconfigure"], env, snap, ctx.timeout("doctor") + 60, log_path)
@@ -954,14 +981,22 @@ def cmd_build(ctx: Context, mode: str, board: str, dry_run: bool) -> int:
                         duration_s=round(dur, 1))
             raise DevWorkflowError(f"build 失败 exit={rc}，日志: {log_path}\n{tail}", EXIT_BUILD_FAIL)
 
+        hashes = artifact_hashes(cache_dir)
+        config_hash = _hash_file(snap / "sdkconfig")
+        if source_fingerprint(ctx)[0] != source_sha or git_identity(ctx) != gi:
+            write_state(ctx, mode, stage="done", status="FAIL")
+            raise DevWorkflowError("构建期间源码或 Git 身份变化，拒绝记录通过", EXIT_BUILD_FAIL)
         write_state(ctx, mode, stage="done", status="PASS", exit_code=0,
                     duration_s=round(dur, 1), log_path=str(log_path),
-                    snapshot_changed=changed)
+                    snapshot_changed=changed,
+                    source_fingerprint=source_sha,
+                    artifact_hashes=hashes, sdkconfig_hash=config_hash)
         print(f"[OK] build 完成 {dur:.0f}s  日志: {log_path}")
         print("提示：这只是本工具的构建退出码记录，不等于项目门禁 PASS；正式门禁以 quality_gate/设备验收为准。")
         return EXIT_OK
-    finally:
-        lock.release()
+    except OSError as exc:
+        write_state(ctx, mode, status="ERROR")
+        raise DevWorkflowError(f"构建文件操作失败: {exc}", EXIT_BUILD_FAIL) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -1024,32 +1059,35 @@ def cmd_status(ctx: Context) -> int:
 
 
 def cmd_clean(ctx: Context, mode: Optional[str]) -> int:
-    """只删 build/devcache 内本工具自己管理的目录。"""
-    targets: List[Path] = []
-    if mode:
-        if mode not in MODES:
-            raise DevWorkflowError(f"未知模式 {mode}，可选: {MODES}")
-        targets.append(ctx.mode_dir(mode))
-    else:
-        targets.append(ctx.cache_root)
-    for t in targets:
-        t = t.resolve()
-        root = ctx.cache_root.resolve()
-        if t != root and root not in t.parents:
-            raise DevWorkflowError(f"拒绝清理不在 {root} 下的路径: {t}")
-        if t.exists():
-            shutil.rmtree(t)
-            print(f"已删除本工具缓存: {t}")
-        else:
-            print(f"缓存不存在，跳过: {t}")
-    return EXIT_OK
+    """同模式持锁清理产物，保留锁文件以防等待者锁到不同 inode。"""
+    if mode and mode not in MODES:
+        raise DevWorkflowError(f"未知模式 {mode}，可选: {MODES}")
+    locks = []
+    try:
+        for name in (mode,) if mode else MODES:
+            lock = ModeLock(ctx.mode_dir(name) / "build.lock")
+            lock.acquire(ctx.timeout("lock_wait"))
+            locks.append(lock)
+        for lock in locks:
+            for entry in lock.lock_path.parent.iterdir():
+                if entry == lock.lock_path:
+                    continue
+                if entry.is_dir() and not entry.is_symlink():
+                    shutil.rmtree(entry)
+                else:
+                    entry.unlink()
+            print(f"已清理本工具缓存，保留锁: {lock.lock_path.parent}")
+        return EXIT_OK
+    finally:
+        for lock in reversed(locks):
+            lock.release()
 
 
-def cmd_release(argv: List[str]) -> int:
+def cmd_release(ctx: Context, argv: List[str]) -> int:
     """委托给 release_build，保持发行流水线单一实现。"""
     sys.path.insert(0, str(Path(__file__).parent))
     import release_build  # noqa: PLC0415
-    return release_build.main(argv)
+    return release_build.main(argv, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -1091,6 +1129,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--notes", help="Release 说明 md")
     sp.add_argument("--skip-build", action="store_true")
     sp.add_argument("--allow-dirty-source", action="store_true")
+    sp.add_argument("--candidate", action="store_true")
     sp.add_argument("--dry-run", action="store_true")
 
     sub.add_parser("version", help="打印版本")
@@ -1127,10 +1166,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 fwd += [flag, value]
         for flag, on in (("--skip-build", args.skip_build),
                          ("--allow-dirty-source", args.allow_dirty_source),
+                         ("--candidate", args.candidate),
                          ("--dry-run", args.dry_run)):
             if on:
                 fwd.append(flag)
-        return cmd_release(fwd)
+        return cmd_release(ctx, fwd)
     if args.cmd == "version":
         print(f"dev_workflow {TOOL_VERSION}")
         return EXIT_OK
