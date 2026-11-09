@@ -14,4 +14,4 @@
 - [x] 同步手机演示和离线预览，验证页面对齐、触屏与无外部请求。
 - [x] 同步文档及变更记录，记录资源和验收边界。
 
-结果：[验证报告](../../tests/reports/portal-profile-slider-20261109/report.md)。内联 102,497 字节，原预算保持；浏览器与离线门禁通过，真机 NOT_RUN。本轮承接已有未提交 UI 改动，已有 BLE 规则与 AgentBuddy 文件保持；尚未提交或部署。
+阶段结果：内联 102,497 字节，原预算保持；浏览器与离线门禁通过，真机 NOT_RUN。当时尚未提交或部署；后续实现与验证见[渐进配置](62-portal-progressive-configuration.md)。截图报告保存在本地 `tests/reports/portal-profile-slider-20261109/report.md`，不作为仓库交付资产。

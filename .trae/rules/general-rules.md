@@ -117,6 +117,7 @@ bikepower-c/
 │   ├── test_portal_theme_browser.cjs — 双主题、浏览器持久化、对比度与布局回归
 │   ├── test_portal_intensity_browser.cjs — 档位/功率/FTP 草稿反馈、无效输入与保存事务浏览器回归
 │   ├── test_portal_inputs_browser.cjs — 渐进配置、已有配置恢复、组合数值与浮动滑杆浏览器回归
+│   ├── test_portal_recovery_browser.cjs — 隐藏错误定位、撤销草稿与临时功率计取消回归
 │   ├── check_config_consistency.py — TC-3c：常量一致性校验
 │   ├── check_nvs_schema.py   — TC-3e：NVS key/schema 静态一致性
 │   ├── check_board_desc.py   — TC-3f：板型描述表静态一致性

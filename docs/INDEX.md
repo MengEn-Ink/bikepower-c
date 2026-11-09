@@ -57,6 +57,7 @@
 | [组合输入实施与验证](dev/60-portal-composite-input-implementation.md) | 字段校验、滑杆同步、焦点修复、双主题与离线门禁 |
 | [模式对齐与浮动滑杆统一](dev/61-portal-alignment-float-sliders.md) | 模式等宽居中、五项同栏输入、隐藏保值、几何门禁与资源预算 |
 | [首次核心配置与渐进展开](dev/62-portal-progressive-configuration.md) | 默认固定模拟、随动心率、按需展开、已保存配置恢复与验证结果 |
+| [草稿恢复计划](dev/63-portal-draft-recovery-plan.md)、[验证报告](dev/64-portal-draft-recovery-validation.md) | 隐藏错误定位、撤销草稿、资源与门禁验证 |
 
 ## Code Wiki
 
