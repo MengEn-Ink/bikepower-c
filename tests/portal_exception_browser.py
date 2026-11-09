@@ -63,6 +63,27 @@ def main():
                             request.continue_()
 
                     page.route("**/api/**", route)
+                    def instrument_portal(request):
+                        response = request.fetch()
+                        hook = """
+window.testCloseRace = async function () {
+  var snapshot = await api("state"), original = api, release;
+  api = function () { return new Promise(function (resolve) { release = resolve; }); };
+  endSession(false,0);
+  var pending = checkSession();
+  api = original;
+  endSession(true,1);
+  release(snapshot);
+  await pending;
+  return {closed:state.closed,confirmed:state.closeConfirmed,
+    hidden:$("wifiClosed").hidden,inert:document.querySelector(".page").inert};
+};
+"""
+                        html = response.text()
+                        assert html.count("}());") == 1
+                        request.fulfill(response=response, body=html.replace("}());", hook + "}());"))
+
+                    page.route(url + "/", instrument_portal)
                     for fault in ("503", "json"):
                         faults["state"] = fault
                         page.goto(url)
@@ -136,6 +157,11 @@ def main():
                     expect(page.locator("#wifiClosed")).to_be_hidden()
                     expect(page.locator("#confirmCloseBtn")).to_be_enabled()
                     faults.clear()
+                    race = page.evaluate("testCloseRace()")
+                    assert race == {"closed": True, "confirmed": True, "hidden": False, "inert": True}, race
+                    page.reload()
+                    expect(page.locator("#heroMetricValue")).to_have_text("325")
+                    page.locator("#closeWifiBtn").click()
                     page.locator("#confirmCloseBtn").click()
                     expect(page.locator("#wifiClosed")).to_be_visible()
                     assert not errors, errors

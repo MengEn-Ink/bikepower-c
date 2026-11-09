@@ -137,6 +137,50 @@ const root = path.join(__dirname, '..', 'tools/web');
       assert.equal(handoff.discoveries, 0);
       assert.equal(handoff.unlocked, true);
       assert.equal(handoff.connected, false);
+      const inspector = await page.evaluate(async () => {
+        const t = makeTransport('discovery-error');
+        const picker = requestDevice;
+        requestDevice = async () => t.device;
+        try { await inspectorConnect(); }
+        finally { requestDevice = picker; }
+        return { connected: t.device.gatt.connected, listeners: t.listeners.size, disconnects: t.counters.disconnects };
+      });
+      assert.equal(inspector.connected, false, '枚举失败必须关闭 GATT');
+      assert.equal(inspector.listeners, 0, '枚举失败必须释放监听');
+      assert.equal(inspector.disconnects, 1);
+      const oldEpoch = await page.evaluate(async () => {
+        const t = makeTransport('discovery-error');
+        const picker = requestDevice, enumerate = enumerateServices;
+        let reject;
+        requestDevice = async () => t.device;
+        enumerateServices = () => new Promise((resolve, fail) => { reject = fail; });
+        try {
+          const pending = inspectorConnect();
+          while (!reject) await new Promise(resolve => setTimeout(resolve, 0));
+          bleConnectionEpoch++;
+          await connectPageGatt(t.device, bleConnectionEpoch);
+          reject(new Error('旧代次枚举失败'));
+          await pending;
+          return { connected: t.device.gatt.connected, disconnects: t.counters.disconnects };
+        } finally {
+          requestDevice = picker; enumerateServices = enumerate;
+          t.device.gatt.disconnect();
+        }
+      });
+      assert.equal(oldEpoch.connected, true, '旧代次失败不得断开新代次');
+      assert.equal(oldEpoch.disconnects, 0);
+      const health = await page.evaluate(async () => {
+        const t = makeTransport('normal'), picker = requestDevice;
+        requestDevice = async () => t.device;
+        try {
+          await runHealthCheck();
+          return { env: healthState.results.env, dis: healthState.results.dis, running: healthState.running, listeners: t.listeners.size };
+        } finally { requestDevice = picker; }
+      });
+      assert.equal(health.env.status, 'pass', '健康检查应使用浏览器 window');
+      assert.equal(health.dis.status, 'warn', 'readStatus 不是 DIS 字段');
+      assert.equal(health.running, false);
+      assert.equal(health.listeners, 0, '健康检查完成后释放断连监听');
       assert.deepEqual(errors, []);
       console.log(`PASS ${theme}: disconnect != unsupported, discovery error retained, listener cleanup, irrelevant-device filter, concurrent/same-device connection sharing; no hardware`);
       await page.close();

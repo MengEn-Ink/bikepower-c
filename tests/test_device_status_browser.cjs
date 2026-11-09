@@ -4,6 +4,8 @@ const fs=require("node:fs");
 const path=require("node:path");
 const {chromium}=require("./web-flash/node_modules/playwright");
 const root=path.join(__dirname,"../tools/web");
+const screenshots=path.join(__dirname,"reports/device-status");
+fs.mkdirSync(screenshots,{recursive:true});
 assert.ok(fs.existsSync(path.join(root,"device-status.js")),"缺少设备状态界面");
 (async()=>{
   const browser=await chromium.launch({headless:true});
@@ -93,7 +95,7 @@ assert.ok(fs.existsSync(path.join(root,"device-status.js")),"缺少设备状态�
       assert.equal(await page.locator("#telemetry-memory-value").textContent(),"112.0 KiB");
       assert.equal(await page.locator("#telemetry-memory-sub").textContent(),"35.0% 空闲");
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),"不得横向溢出");
-      await page.screenshot({path:`/tmp/bikepower-device-status-${width}-${theme}.png`,animations:"disabled"});
+      await page.screenshot({path:path.join(screenshots,`device-status-${width}-${theme}.png`),animations:"disabled"});
       await page.evaluate(()=>window.BikePowerStatus.detach());
       assert.equal(await page.locator("#telemetry-memory-value").textContent(),"—");
       assert.deepEqual(errors,[]);

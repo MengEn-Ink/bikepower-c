@@ -911,6 +911,7 @@
     $("sessionRetryBtn").disabled = true;
     try {
       var data = await api("state");
+      if (state.closeConfirmed) return;
       if (data.closing) { endSession(true,data.remaining_sec); return; }
       if (data.remaining_sec > 0) {
         state.closed = false; state.closeRequested = false;
@@ -925,6 +926,7 @@
         poll();
       }
     } catch(e) {
+      if (state.closeConfirmed) return;
       $("wifiClosedText").textContent = "设备暂时无法连接，关闭状态未确认。本页不会自动提交草稿；已发出的保存请求结果请重新连接后核对。";
     } finally { $("sessionRetryBtn").disabled = false; }
   }
