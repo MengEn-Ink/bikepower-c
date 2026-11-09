@@ -7,6 +7,19 @@ from pathlib import Path
 from bleak import BleakClient, BleakScanner
 from ble_telemetry import decode, decode_meta, uuid
 
+async def wait_link_ready(client, timeout=5.0):
+    """有界等待host低频链路缓存，正式样本仍严格验证MTU与通知。"""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while True:
+        link = decode(2, bytes(await client.read_gatt_char(uuid(4))))
+        if link["connected"] and link["mtu"] >= 23:
+            return link
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            raise TimeoutError("遥测连接缓存未在规定时间内就绪")
+        await asyncio.sleep(min(0.1, remaining))
+
 async def run(args):
     device = await BleakScanner.find_device_by_filter(
         lambda d, _: args.address == d.address if args.address else d.name == args.name,
@@ -21,6 +34,7 @@ async def run(args):
             if boot is not None and boot != meta["boot"]:
                 raise AssertionError("普通重连不应重启设备")
             boot = meta["boot"]
+            await wait_link_ready(client)
             pending, samples, errors = {}, [], []
             count = 0
             def handler(group):
