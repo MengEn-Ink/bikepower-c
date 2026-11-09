@@ -19,6 +19,11 @@ Pages 47 项单元及 11 个浏览器入口、双板生产构建通过。通用�
 不创建 tag/Release；M5 RMT 因无目标实物保留独立待验证工作区，
 不纳入本轮 main 合并。
 
+分支 CI 首轮 Linux/macOS 虚拟板与文档通过，Ubuntu 主机编译因
+strnlen 的 POSIX 声明缺失失败。已在测试 Makefile 统一 CPPFLAGS；
+严格声明下全套主机测试与协议向量通过，最终 Git 的 CI 与实物回归
+仍以本轮报告为准。
+
 - tag `v4.4.0` 与 GitHub Release 已创建；v4.3.3 保留不覆盖，M5Stamp C3 未发布。
 - 发行镜像：merged `generic-c3-v4.4.0.bin` 1231552 字节，SHA256 `0f325f0308810c441b0a8ba2d3a9ed31c46eff4cd8ca822b38888216a6aa8080`；应用区 1166016 字节，SHA256 `2111963ba7e85832a2eb1e0235bf0912e3b0ee5cd9cf4ac73d142468be7696f4`。
 - 发版前最后一项修复：布局变更重建死锁（宽限 1.5s 后主动断开），提交 `4d4935e`；收尾报告 `a13411c`。COM205 配置端到端 13 项全 PASS、三轮重连广播恢复、CPS 10 秒 10 帧。
