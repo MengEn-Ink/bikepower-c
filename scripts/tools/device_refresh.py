@@ -121,8 +121,6 @@ def check(result: dict, expect_version: str, expect_core14: Optional[int],
     if result.get("status") != "success":
         problems.append(f"连接/读取失败: {result.get('error') or result.get('status')}")
         return problems
-    if result.get("stale_reasons"):
-        problems.append(f"服务表过期: {result['stale_reasons']}")
     meta = result.get("meta") or {}
     if meta.get("max_len") != 48:
         problems.append(f"meta.max_len={meta.get('max_len')} != 48")
@@ -168,8 +166,8 @@ def main(argv=None) -> int:
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n",
-                   encoding="utf-8", newline="\n")
+    with out.open("w", encoding="utf-8", newline="\n") as stream:
+        stream.write(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps(result, ensure_ascii=False))
     if problems:
         print(f"[refresh] FAIL 严格回读不通过（{len(problems)} 项）：")

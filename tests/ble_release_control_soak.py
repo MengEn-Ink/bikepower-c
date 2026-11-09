@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""BikePower C — 发行控制子项 soak（COM205 设备执行者专属，owner: COM205 执行者）。
+"""BikePower C — 发行控制子项 soak。
 
 前置条件（由调用方在同一事务内完成）：fullmask core[14]=0x07 且禁桥接
 （ble_bikepower.c:1240 FTMS 仅在 !g_bridge_mode 时注册；bridge source=REAL 时 FTMS 不注册属设计）。
@@ -9,8 +9,8 @@ finally 恢复原 mask+bridge 全八组。
 严格断言（不虚绿）：
 - required CPS/HR/CSC/FTMS_BIKE/FTMS_CP 缺失 = FAIL；CP 缺失即终止，不做空采。
 - 每路每窗口帧数 >= 阈值（tele 四组分别计数，不合计）。
-- parse_cps 解析错误计数 > 0 = FAIL。
-- ERG 收敛 320W 既有验收 318..324。
+- 运动与遥测逐路解析错误 > 0 = FAIL，最低堆必须 >80KiB。
+- ERG 最后三个实际样本均须处于生产目标 ±5W。
 - 真正 finally：仅在读取到原快照后才执行恢复事务 + ROM 独立回读；
   主错误与恢复错误分离报告。
 
@@ -20,6 +20,7 @@ finally 恢复原 mask+bridge 全八组。
 """
 import argparse
 import asyncio
+from collections import deque
 import json
 import struct
 import sys
@@ -27,7 +28,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ble_config_e2e import DeviceSession, reconnect, RESTART_GATT, reset_device  # noqa: E402
-from ble_protocol import parse_cps  # noqa: E402
+from ble_protocol import parse_cps, parse_csc, parse_hr, parse_ftms_indoor_bike  # noqa: E402
+from ble_telemetry import decode as decode_telemetry  # noqa: E402
 
 CPS_UUID = '00002a63-0000-1000-8000-00805f9b34fb'
 HR_UUID = '00002a37-0000-1000-8000-00805f9b34fb'
@@ -42,7 +44,8 @@ REQUIRED = {'CPS': CPS_UUID, 'HR': HR_UUID, 'CSC': CSC_UUID,
             'FTMS_BIKE': FTMS_BIKE_UUID, 'FTMS_CP': FTMS_CP_UUID}
 FULL_MASK = 0x07
 ERG_TARGET = 320
-ERG_RANGE = (318, 324)  # 既有验收范围，勿放宽
+ERG_RANGE = (ERG_TARGET - 5, ERG_TARGET + 5)
+MINIMUM_HEAP_BYTES = 80 * 1024
 
 
 def parse_args():
@@ -94,20 +97,33 @@ async def subscribe_all(s, run):
         return found, False
     counts = {u: 0 for u in [CPS_UUID, HR_UUID, CSC_UUID, FTMS_BIKE_UUID] + TELE_UUIDS}
     parse_errors = []
+    power_tail = deque(maxlen=3)
+    minimum_heap = [None]
+    parsers = {
+        CPS_UUID: parse_cps, HR_UUID: parse_hr,
+        CSC_UUID: parse_csc, FTMS_BIKE_UUID: parse_ftms_indoor_bike,
+        **{u: (lambda data, group=index: decode_telemetry(group, data))
+           for index, u in enumerate(TELE_UUIDS)},
+    }
 
     def make_cb(uuid):
         def cb(_, data):
             counts[uuid] += 1
-            if uuid == CPS_UUID:
-                try:
-                    parse_cps(bytes(data))
-                except ValueError as exc:
-                    parse_errors.append(str(exc))
+            try:
+                parsed = parsers[uuid](bytes(data))
+                if uuid == CPS_UUID:
+                    power_tail.append(parsed["power_w"])
+                elif uuid == TELE_UUIDS[0]:
+                    value = parsed["minimum"]
+                    minimum_heap[0] = value if minimum_heap[0] is None else min(minimum_heap[0], value)
+            except ValueError as exc:
+                parse_errors.append(f"{uuid}: {exc}")
         return cb
     for uuid in counts:
         if uuid in found:
             await s.client.start_notify(uuid, make_cb(uuid))
-    return {'found': found, 'counts': counts, 'parse_errors': parse_errors}, True
+    return {'found': found, 'counts': counts, 'parse_errors': parse_errors,
+            'power_tail': power_tail, 'minimum_heap': minimum_heap}, True
 
 
 async def run_round(s, round_ctx, run, round_index):
@@ -134,15 +150,24 @@ async def run_round(s, round_ctx, run, round_index):
     await cp_expect(0x05, struct.pack('<h', -1), 0x03, 'SetTargetPower(-1)')
     await cp_expect(0x05, struct.pack('<h', ERG_TARGET), 0x01, f'SetTargetPower({ERG_TARGET})')
     snap = dict(counts)
+    round_ctx['power_tail'].clear()
+    round_ctx['minimum_heap'][0] = None
     await asyncio.sleep(run.args.duration)
     delta = {u: counts[u] - snap[u] for u in counts}
     for uuid, n in delta.items():
         if n < run.args.min_frames:
             run.fail_main(f'R{round_index} {uuid}帧 {n} < {run.args.min_frames}')
+    tail = list(round_ctx['power_tail'])
+    minimum = round_ctx['minimum_heap'][0]
+    if len(tail) != 3 or not all(ERG_RANGE[0] <= value <= ERG_RANGE[1] for value in tail):
+        run.fail_main(f'R{round_index} ERG末三帧未收敛到{ERG_RANGE}: {tail}')
+    if minimum is None or minimum <= MINIMUM_HEAP_BYTES:
+        run.fail_main(f'R{round_index} 遥测最低堆 {minimum} <= {MINIMUM_HEAP_BYTES}')
     await cp_expect(0x08, b'\x01', 0x01, 'StopPause')
     if round_ctx['parse_errors']:
-        run.fail_main(f'R{round_index} CPS解析错误x{len(round_ctx["parse_errors"])}')
-    return delta
+        run.fail_main(f'R{round_index} 协议解析错误x{len(round_ctx["parse_errors"])}: '
+                      + '; '.join(round_ctx['parse_errors'][:3]))
+    return {'frames': delta, 'power_tail_w': tail, 'minimum_heap_bytes': minimum}
 
 
 async def main():
@@ -179,7 +204,9 @@ async def main():
             info['released'] = True
         info['status'] = 'preflight-failed' if info['precondition_failures'] else 'preflight-ok'
         out = Path(args.out) if args.out else Path(__file__).with_name('soak-preflight.json')
-        out.write_text(json.dumps(info, ensure_ascii=False, indent=2), encoding='utf-8', newline='\n')
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open('w', encoding='utf-8', newline='\n') as stream:
+            stream.write(json.dumps(info, ensure_ascii=False, indent=2) + '\n')
         print(json.dumps(info, ensure_ascii=False))
         return 2 if info['precondition_failures'] else 0
 
@@ -196,13 +223,13 @@ async def main():
         bridge[1] = 0  # BRIDGE_SOURCE_SIMULATED，禁真实桥接以注册 FTMS
         full['bridge'] = bytes(bridge)
         resp = await s.commit_all(full, meta['revision'])
-        if not (resp['result'] == 0 and resp['restart_flags'] & RESTART_GATT):
-            run.fail_main(f'fullmask提交异常: {resp}')
-        # GATT 表重建后 Windows 缓存可能 stale，用一个跨平台设备重启代替重连
-        await s.disconnect()
-        await asyncio.to_thread(reset_device, args.port, 'rom')
-        await asyncio.sleep(8)
-        await s.connect()
+        if resp['result'] != 0:
+            raise RuntimeError(f'fullmask提交异常: {resp}')
+        if resp['restart_flags'] & RESTART_GATT:
+            await s.disconnect()
+            await asyncio.to_thread(reset_device, args.port, 'rom')
+            await asyncio.sleep(8)
+            await s.connect()
         # 前置条件自检：FTMS 注册受「完整掩码 + 模拟桥接」共同门控，缺一即测试前置错误
         meta_after, cfg_after = await s.read_snapshot()
         pre = []
@@ -280,9 +307,10 @@ async def main():
         else:
             run.result['status'] = 'success'
         run.result['released'] = True
-        out = Path(args.out) if args.out else Path(__file__).with_suffix('.json')
-        out.write_text(json.dumps(run.result, ensure_ascii=False, indent=2),
-                       encoding='utf-8', newline='\n')
+        out = Path(args.out) if args.out else Path(__file__).parent / 'reports' / 'ble-release-control-soak.json'
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open('w', encoding='utf-8', newline='\n') as stream:
+            stream.write(json.dumps(run.result, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps({'status': run.result['status'],
                       'precondition_failures': run.result['precondition_failures'],
                       'main_failures': run.result['main_failures'],

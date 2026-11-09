@@ -61,7 +61,8 @@ async def restore_original(session, original, settle_seconds):
 
 
 async def run_harness(args):
-    session = DeviceSession(args.device_name, args.scan_timeout)
+    session = DeviceSession(args.device_name, args.scan_timeout,
+                            address=getattr(args, "address", "") or os.environ.get("BIKEPOWER_BLE_ADDRESS", ""))
     original = None
     primary_error = None
     cleanup_error = None
@@ -78,6 +79,7 @@ async def run_harness(args):
 
         command = selftest_command(args.profile, args.duration, args.target_power)
         env = dict(os.environ)
+        env["BIKEPOWER_BLE_ADDRESS"] = session.address
         if args.board:
             env["BIKEPOWER_EXPECT_BOARD"] = args.board
         print("[device-profile-ble] 执行:", " ".join(command))
@@ -121,6 +123,7 @@ def parse_args():
     parser.add_argument("--profile", choices=tuple(SPORT_PROFILES), required=True)
     parser.add_argument("--board", choices=("generic-c3", "m5stamp-c3"), default="")
     parser.add_argument("--device-name", default="BikePower")
+    parser.add_argument("--address", default="", help="首次及后续连接固定设备地址，不回退到同名设备")
     parser.add_argument("--scan-timeout", type=float, default=20.0)
     parser.add_argument("--settle-seconds", type=float, default=4.0)
     parser.add_argument("--duration", type=int, default=12)

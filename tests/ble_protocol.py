@@ -130,6 +130,7 @@ def parse_rsc(data):
         "flags": flags,
         "speed_1_256_mps": speed,
         "speed_kmh": speed * 3.6 / 256.0,
+        "cadence_single_leg_spm": payload[3],
         "cadence_spm": payload[3],
         "stride_cm": struct.unpack_from("<H", payload, 4)[0],
         "total_distance_dm": distance_dm,

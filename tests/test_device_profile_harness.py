@@ -8,7 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tests"))
 
-from device_profile_harness import run_profile_harness  # noqa: E402
+from device_profile_harness import restore_config, run_profile_harness, set_profile  # noqa: E402
+from unittest.mock import patch
 
 
 class Completed:
@@ -22,7 +23,7 @@ def run_case(profile, selftest_rc=0, raise_selftest=False):
     def request_fn(base_url, path, payload=None):
         calls.append(("request", base_url, path, payload))
         if path == "/api/state":
-            return {
+            return {"revision": 31, "config": {
                 "sport_profile": "cycling",
                 "broadcast_mask": 5,
                 "run_speed_x100": 987,
@@ -34,7 +35,7 @@ def run_case(profile, selftest_rc=0, raise_selftest=False):
                 "run_pace_low_sec": 300,
                 "run_pace_high_sec": 360,
                 "run_custom_name": "原始跑步配置",
-            }
+            }}
         return {"ok": True}
 
     def set_profile_fn(base_url, next_profile, mask, request_fn):
@@ -86,8 +87,41 @@ def main():
     with redirect_stdout(StringIO()):
         run_case("running", selftest_rc=3)
         run_case("running", raise_selftest=True)
+    test_config_transactions()
     print("[device-profile-harness] PASS: full mask, argv and success/failure restoration")
     return 0
+
+
+def test_config_transactions():
+    for operation in ("set", "restore"):
+        for result in (0, 7, None):
+            calls = []
+            runtime_count = [0]
+
+            def request(base, path, payload=None):
+                calls.append((path, payload))
+                if path == "/api/state":
+                    return {"revision": 31}
+                if path == "/api/config":
+                    assert payload["revision"] == 31, "配置提交必须携带最新 revision"
+                    return {"ok": True, "transaction": 23}
+                assert path == "/api/runtime"
+                runtime_count[0] += 1
+                if runtime_count[0] == 1:
+                    return {"transaction": 22, "pending": False, "result": 0}
+                return {"transaction": 23, "pending": result is None, "result": result}
+
+            error = None
+            with patch("device_profile_harness.time.sleep", lambda _: None):
+                try:
+                    if operation == "set":
+                        set_profile("http://test", "running", 7, request_fn=request)
+                    else:
+                        restore_config("http://test", {"sport_profile": "cycling"}, request_fn=request)
+                except RuntimeError as exc:
+                    error = exc
+            assert (error is None) == (result == 0), (operation, result, error)
+            assert runtime_count[0] >= 2, "不得把旧事务或接收成功作为保存成功"
 
 
 if __name__ == "__main__":
