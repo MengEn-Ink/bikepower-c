@@ -40,6 +40,7 @@ AI 助手在执行任务前必须先回顾此文档，严格按照历史要求�
 6. **提交前 diff 自检**：链路完整、无残留调试、文档已同步。
 7. commit message 末尾附 `Co-authored-by: AI <ai@trae>` + `Model:`。
 8. **唯一仓库与发布链路**：GitHub `MengEn-Ink/bikepower-c`；本地 `origin`、Release、Actions 和 Pages 均只使用 GitHub，不保留其他远端或回退发布渠道。
+9. **合并后自动清理分支**：用户要求 PR 合并后自动删除已合并的本地、远程工作分支及关联 worktree，保持分支干净；执行 `.trae/rules/general-rules.md` 的「PR 合并后分支清理」，未合并或仍有有效改动的分支保留。
 
 ---
 

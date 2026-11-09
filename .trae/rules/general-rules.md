@@ -19,6 +19,7 @@
 5. **代码改动同步文档**：改代码必须同步 PROGRESS.md / 规则 / CHANGELOG。
 6. **按功能分批提交**：不相关变更不混进同一 commit。
 7. **commit 后立即 push**（最高优先级）。
+8. **PR 合并后自动清理分支**：按下文流程删除已合并的工作分支及关联 worktree，保持本地和远程分支整洁，清理结果必须纳入交付说明。
 
 ## 文档命名规范（强制）
 
@@ -207,3 +208,18 @@ bridge_failover → bridge_runtime → ble_power_bridge 定向会话
 - 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + 用户手动验证并明确批准 + 打 tag + DIS 固件版本同步。
 - **固件发行产物必须合并为单文件（强制）**：创建发行版时，必须用 `esptool.py merge_bin` 把 bootloader + partition-table + app 合并为单一 `.bin`，用户一次烧录即可，禁止分发分散的多个 bin 文件。
 - Commit message：`<type>(<scope>): <简体中文概述>` + 逐文件正文 + `Co-authored-by: AI <ai@trae>` + `Model:`。
+
+## PR 合并后分支清理（强制）
+
+本规则适用于本仓库 PR 合并后的交付收尾。用户已授权自动清理满足以下条件的已合并工作分支，无需再次询问删除确认。
+
+1. **先确认合并**：从 GitHub 核对 PR 状态为 `MERGED`，记录来源分支、来源提交、目标分支和合并提交。仅提交 PR、CI 通过或 PR 被关闭均不代表已合并。
+2. **远程自动删除**：仓库必须保持 `delete_branch_on_merge=true`，由 GitHub 在 PR 合并后自动删除来源分支。若来源分支仍存在，确认其 head 与 PR 合并时的来源提交一致，再用 `git push origin --delete <branch>` 清理；合并后新增提交的同名分支必须保留。
+3. **同步主分支**：执行 `git fetch --prune origin`，确认目标主分支包含合并提交。工作区干净时切回目标主分支并使用 `git merge --ff-only origin/<base>` 更新；已有未提交改动时不得覆盖、强制切换或自动丢弃。
+4. **清理本地与工作区**：先保存必要的测试报告、日志和交付产物；关联 worktree 必须无 tracked/untracked 改动，再用 `git worktree remove <path>` 删除临时工作区，最后用 `git branch -d <branch>` 删除本地来源分支。未提交的待验证修复不能随工作区删除。
+5. **收敛历史分支**：每次收尾同时检查本地和 origin 上遗留的已合并工作分支；核对其 PR、最新 head、有效差异与关联 worktree 后按同样流程清理，不为已交付任务长期保留临时备份分支。
+6. **保留有效分支**：`main`、默认分支、受保护分支、仍有 OPEN PR 的分支、存在未合并有效提交或未提交改动的分支不自动删除。其他人的活动分支和无法确认归属的共享分支不得清理。
+7. **删除失败必须如实记录**：权限或保护规则阻止删除，或 squash/rebase 合并后普通 `git branch -d` 拒绝删除时，保留分支并说明原因；不得擅自使用 `-D`、force push、reset/clean 等方式绕过检查。
+8. **最终核验**：再次检查本地分支、远程 heads、worktree 和主分支状态；交付说明列出已删除分支、仍保留分支及理由。只有清理或明确记录阻断后才完成收尾，不得把未完成的清理写成已删除。
+
+PR 合并不授权固件发版、打 tag 或删除 tag；仍遵循原有发布门禁。

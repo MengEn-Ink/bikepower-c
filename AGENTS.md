@@ -33,6 +33,7 @@
 - 禁止把不相关的代码、产物、治理文档混进同一个 commit。
 - 用户确认提交后立即 push。
 - 不重写已推送历史、不 amend，除非用户明确要求。
+- PR 合并后自动清理已合并的本地、远程工作分支及关联 worktree，执行 [.trae/rules/general-rules.md](.trae/rules/general-rules.md) 的「PR 合并后分支清理」；清理和核验完成才算交付收尾。
 
 ## Validation
 
