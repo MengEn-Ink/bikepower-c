@@ -5,6 +5,13 @@
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
+## 配置页视觉与双主题（2026-11-09，本地已实现）
+
+- 已按批准设计优化独立桌面摘要与手机输入层级，并加入深浅主题、系统首次跟随和浏览器持久化；storage 不可用时降级为当前页选择，设备配置与 schema14 保持。
+- 双主题四宽布局、文字对比度、键盘、主题刷新、草稿隔离及保存/桥接/跑步浏览器回归通过；派生离线演示同步，手机同视口截图为 0 像素差异。
+- CSS 内联压缩器保留状态类名与后代伪类语义；内联总量 96,925 字节，比原版增加 2,397 字节，仍在原预算内。详见 [设计与验证](docs/dev/53-device-configuration-design.md)。
+- 页面功能已提交并推送至 `feat/portal-theme-20261109`，提交 `ddd71b8`。用户追加授权部署正式 GitHub Pages，按 PR/CI/主分支部署流程执行；真机验收 NOT_RUN，未烧录或发布新固件。
+
 ## v4.4.0 已发布（仅 generic-c3，2026-11-09）
 
 本轮有效建议实施：测试契约、开发/发行工具、网页故障路径和 BLE 控制

@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--screenshot-dir", default="")
+    parser.add_argument("--color-scheme", choices=("light", "dark"), default="light")
     args = parser.parse_args()
     screenshots = Path(args.screenshot_dir) if args.screenshot_dir else None
     if screenshots:
@@ -39,7 +40,7 @@ def main():
                         break
                     except OSError:
                         time.sleep(0.05)
-                page = browser.new_page(viewport={"width": width, "height": 844})
+                page = browser.new_page(viewport={"width": width, "height": 844}, color_scheme=args.color_scheme)
                 errors = []
                 page.on("pageerror", lambda e: errors.append(str(e)))
                 page.goto(url)

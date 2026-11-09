@@ -41,7 +41,9 @@ def main():
         "retryBridgeBtn", "sharedCalibrationHint", "fallbackSimulationSummary",
         "replaceBridgeConfirm")), "核心渐进界面")
     check("data-runtime" not in html and "restoreDemoBtn" not in html, "禁止原型模拟操作进入设备页")
-    check("prefers-color-scheme" not in css and "localStorage" not in js, "仅明亮主题")
+    check("html[data-theme=dark]" in css and "themeToggle" in parser.ids
+          and "bikepower.portal.theme.v1" in js and "prefers-color-scheme" in js,
+          "双主题与浏览器持久化")
     check("prefers-reduced-motion" in css and "text-align: center" in css, "动画与居中按钮")
     check("data-sim-mode=\"custom\"" not in html, "骑行自定义收敛于机器人档")
     for api in ("state", "runtime", "config", "close-wifi", "bridge/scan", "bridge/control", "renew", "time"):

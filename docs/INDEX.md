@@ -47,6 +47,8 @@
 | [三链路实现与验证](dev/50-ble-multi-client.md) | 两下游+单上游、逐连接隔离、虚拟与实物验收边界 |
 | [v4.4.0优化与发行收尾](dev/52-release-440-closeout.md) | 提交级候选、CI、COM205回退、NVS保持与正式P0阻断 |
 | [发版前项目复核](dev/51-pre-release-project-review.md) | 新失败注入、发布ZIP内容门禁、完整专项结果与待修/可延后项 |
+| [设备配置页优化设计](dev/53-device-configuration-design.md) | 工作台布局、手机可读性、双主题、浏览器持久化与本地验收结果 |
+| [设备配置页实施计划](dev/54-device-configuration-implementation.md) | 已完成的前端实施步骤、测试接线与离线产物生成 |
 
 ## Code Wiki
 

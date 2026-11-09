@@ -50,11 +50,13 @@ def c_string_literal(content, width=160):
 def minify_css(css):
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     css = re.sub(r"\s+", " ", css)
-    css = re.sub(r"\s*([{}:;,>])\s*", r"\1", css)
+    css = re.sub(r"\s*([{};,>])\s*", r"\1", css)
+    css = re.sub(r":\s*", ":", css)
     css = css.replace(";}", "}")
-    variables = sorted(set(re.findall(r"--[a-z][a-z0-9-]*", css)), key=lambda name: (-len(name), name))
-    for index, name in enumerate(variables):
-        css = re.sub(re.escape(name) + r"(?![a-z0-9-])", "--v" + format(index, "x"), css)
+    variables = sorted(set(re.findall(r"(--[a-z][a-z0-9-]*)\s*:", css)), key=lambda name: (-len(name), name))
+    names = {name: "--" + (chr(97 + index) if index < 26 else "v" + format(index, "x"))
+             for index, name in enumerate(variables)}
+    css = re.sub(r"--[a-z][a-z0-9-]*", lambda match: names.get(match.group(), match.group()), css)
     return css.strip()
 
 
