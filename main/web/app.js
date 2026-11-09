@@ -1,6 +1,25 @@
 (function () {
   "use strict";
   var $ = function(id) { return document.getElementById(id); };
+  var themeKey = "bikepower.portal.theme.v1", themeChoice = "";
+  var themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+  try { themeChoice = localStorage.getItem(themeKey); } catch (_) {}
+  if (themeChoice !== "light" && themeChoice !== "dark") themeChoice = "";
+  function applyTheme() {
+    var theme = themeChoice || (themeMedia.matches ? "dark":"light");
+    document.documentElement.dataset.theme = theme;
+    $("themeToggle").textContent = theme === "dark" ? "浅色":"深色";
+    $("themeToggle").setAttribute("aria-label",theme === "dark" ? "切换为浅色主题":"切换为深色主题");
+    document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#14161a":"#f3f4f6";
+  }
+  $("themeToggle").addEventListener("click",function() {
+    themeChoice = document.documentElement.dataset.theme === "dark" ? "light":"dark";
+    try { localStorage.setItem(themeKey,themeChoice); } catch (_) {}
+    applyTheme();
+  });
+  if (themeMedia.addEventListener) themeMedia.addEventListener("change",applyTheme);
+  else if (themeMedia.addListener) themeMedia.addListener(applyTheme);
+  applyTheme();
   var clone = function(value) { return JSON.parse(JSON.stringify(value)); };
   var devices = {};
   var state = {loaded:false, busy:false, message:"正在读取设备…", applied:null, draft:null,
@@ -204,7 +223,7 @@
   }
   function userActivity(event) {
     if (!event.isTrusted || document.hidden || !state.loaded || state.closed || state.closeRequested) return;
-    if (event.target.closest && event.target.closest("#renewBtn,#warningRenewBtn,#confirmCloseBtn,#wifiClosed")) return;
+    if (event.target.closest && event.target.closest("#themeToggle,#renewBtn,#warningRenewBtn,#confirmCloseBtn,#wifiClosed")) return;
     if (event.type === "pointermove" && (!state.pointerActive || !event.buttons)) return;
     state.activityPending = true;
     if (state.renewing || state.activityTimer) return;

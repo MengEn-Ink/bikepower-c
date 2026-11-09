@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f1f2f5">
+  <meta name="theme-color" content="#f3f4f6">
+  <meta name="color-scheme" content="light dark">
+  <script>
+    (function(){var theme;try{theme=localStorage.getItem("bikepower.portal.theme.v1");}catch(_){}
+    document.documentElement.dataset.theme=theme==="light"||theme==="dark"?theme:
+      (matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");})();
+  </script>
   <title>BikePower · 设备配置</title>
   <!-- INLINE_CSS -->
 </head>
@@ -24,6 +30,7 @@
         <span id="headerFirmware">正在读取固件…</span>
       </div>
       <div class="session-clock">
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="切换为深色主题">深色</button>
         <span>闲置关闭</span>
         <b id="wifiTimer" aria-label="无操作后关闭倒计时">05:00</b>
         <button class="icon-btn" id="renewBtn" type="button" title="续期配网" aria-label="续期配网">

@@ -13,7 +13,7 @@ const embedded = sandbox.window.BikePowerPhoneSource;
 const production = name => fs.readFileSync(path.join(root, 'main/web', name), 'utf8').replace(/\r\n/g, '\n');
 assert.ok(embedded.includes(production('app.css')), '屏幕必须使用当前生产 CSS');
 assert.ok(embedded.includes(production('app.js')), '屏幕必须使用当前生产 JS');
-const adapter = embedded.match(/<script>([\s\S]*?)<\/script>/)[1];
+const adapter = embedded.match(/<script>(window\.PHONE_FIXTURE=[\s\S]*?)<\/script>/)[1];
 const reference = production('index.html').replace('<!-- INLINE_CSS -->', '<style>' + production('app.css') + '</style>')
   .replace('<!-- INLINE_JS -->', '<script>' + adapter + '</script><script>' + production('app.js') + '</script>');
 (async () => {
