@@ -586,7 +586,20 @@ python3 tests/ble_selftest.py
 
 ---
 
-## 七、已移除的脚本（历史记录）
+## 七、Service Changed 重启恢复回归
+
+`python3 tests/test_ble_bond_cache.py` 执行生产缓存同步代码，并覆盖布局已落盘、
+未确认指示跨重启、已确认不重发、多 peer、满容量及晚读取失败。
+安装 IDF 时直接提取其系统范围更新与编码函数；无 IDF 的 CI 使用明确标注的
+host 范围替身。设置 `BIKEPOWER_TEST_REQUIRE_IDF=1` 可强制实际源码路径，
+`IDF_PATH` 指向当前工具链；host 编译需 OpenSSL 开发头文件与库。
+
+`ble_selftest.py` 检查两套 profile 的 Service Changed indication 特征存在；
+`virtual_board_e2e.py --security` 若取得指示，严格验证四字节完整范围。
+未取得指示仍记 NOT_OBTAINED；这些检查不代替真实绑定客户端跨重启的发送/确认。
+见[设计与结果](../docs/dev/65-service-changed-reboot-recovery.md)。
+
+## 八、已移除的脚本（历史记录）
 
 | 脚本 | 移除版本 | 原因 | 替代 |
 |------|----------|------|------|
