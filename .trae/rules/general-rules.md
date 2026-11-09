@@ -115,6 +115,8 @@ bikepower-c/
 │   ├── check_portal_js.py    — TC-3a：对 main/web/app.js 跑 node --check
 │   ├── check_portal_structure.py — TC-3d：校验 index.html 结构 + 路由表一致性 + 前端 API 调用
 │   ├── test_portal_theme_browser.cjs — 双主题、浏览器持久化、对比度与布局回归
+│   ├── test_portal_intensity_browser.cjs — 档位/功率/FTP 草稿反馈、无效输入与保存事务浏览器回归
+│   ├── test_portal_inputs_browser.cjs — 渐进配置、已有配置恢复、组合数值与浮动滑杆浏览器回归
 │   ├── check_config_consistency.py — TC-3c：常量一致性校验
 │   ├── check_nvs_schema.py   — TC-3e：NVS key/schema 静态一致性
 │   ├── check_board_desc.py   — TC-3f：板型描述表静态一致性

@@ -49,6 +49,14 @@
 | [发版前项目复核](dev/51-pre-release-project-review.md) | 新失败注入、发布ZIP内容门禁、完整专项结果与待修/可延后项 |
 | [设备配置页优化设计](dev/53-device-configuration-design.md) | 工作台布局、手机可读性、双主题、浏览器持久化与本地验收结果 |
 | [设备配置页实施计划](dev/54-device-configuration-implementation.md) | 已完成的前端实施步骤、测试接线与离线产物生成 |
+| [强度反馈与交互细节](dev/55-portal-intensity-feedback-design.md) | 档位、体重、功率与 FTP 关系、范围条及资源边界 |
+| [强度反馈实施与验证](dev/56-portal-intensity-feedback-implementation.md) | 浏览器专项、双主题、事务反馈与演示同步 |
+| [顶部参数与骑行滑杆设计](dev/57-portal-profile-slider-design.md) | 固定个人参数、分档滑动、键盘/触屏与会话边界 |
+| [顶部参数与骑行滑杆实施](dev/58-portal-profile-slider-implementation.md) | 资源预算、业务回归与离线演示交付 |
+| [组合输入与整页交互设计](dev/59-portal-composite-input-design.md) | 主题图标、同栏目标与浮动、成熟输入方案与整页审查 |
+| [组合输入实施与验证](dev/60-portal-composite-input-implementation.md) | 字段校验、滑杆同步、焦点修复、双主题与离线门禁 |
+| [模式对齐与浮动滑杆统一](dev/61-portal-alignment-float-sliders.md) | 模式等宽居中、五项同栏输入、隐藏保值、几何门禁与资源预算 |
+| [首次核心配置与渐进展开](dev/62-portal-progressive-configuration.md) | 默认固定模拟、随动心率、按需展开、已保存配置恢复与验证结果 |
 
 ## Code Wiki
 

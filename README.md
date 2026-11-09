@@ -87,6 +87,6 @@ python3 scripts/tools/serve_ble_monitor.py
 
 分别访问 `http://127.0.0.1:8080/` 和 `http://127.0.0.1:8766/`。Pages 预览不拉取发行固件，刷写入口显示不可用。
 
-新版配置页支持深浅主题与浏览器持久化，可打开 [离线交互模拟](design-demos/bikepower-ui/configuration-preview/configuration.html)。重新生成使用 `python3 scripts/tools/export_configuration_demo.py`，专项验证使用 `node tests/test_portal_theme_browser.cjs`；离线保存只修改演示数据，设备需安装包含新版页面的固件。
+新版配置页先展示核心数值：新设备默认固定模拟功率、踏频与随动心率，其他模式、来源及广播兼容按需展开；已有配置正常恢复，展开不提交、收起保留草稿。月亮/太阳图标切换主题并记住选择，体重、FTP 和阈值心率固定在顶部。五项参数统一为目标与右侧 `±浮动` 同栏，下方滑杆调浮动；配速保留分钟与秒输入，非法值就近提示。机器人强度用分档滑杆，联动 W/kg、功率和 FTP 范围。可打开 [离线交互模拟](design-demos/bikepower-ui/configuration-preview/configuration.html)和[渐进配置与验证说明](docs/dev/62-portal-progressive-configuration.md)。重新生成使用 `python3 scripts/tools/export_configuration_demo.py`；专项入口为 `test_portal_theme_browser.cjs`、`test_portal_intensity_browser.cjs`、`test_portal_inputs_browser.cjs`（均在 `tests/` 下）。离线保存只修改演示数据，设备需安装包含新版页面的固件。
 
 文档改动运行 `python3 scripts/tools/quality_gate.py --level docs`；源码事实由 `doc_facts.py --write` 更新，手机离线手册由 `sync_user_docs.py` 同步。协作规则见 [AGENTS](AGENTS.md)，当前实现见 [技术参考](docs/dev/01-technical-reference.md)，历史变化见 [CHANGELOG](CHANGELOG.md)。

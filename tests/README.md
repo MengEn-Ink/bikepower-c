@@ -174,6 +174,9 @@ source $IDF_PATH/export.sh
 |------|------|---------|--------|
 | `check_portal_js.py` | 门户 JS 语法静态检查（`main/web/app.js` 跑 `node --check`） | TC-3a | **最高，每次改动必跑** |
 | `check_portal_structure.py` | 门户结构静态检查（路由表 / HTML / 占位符 / API 一致性） | TC-3d | 高 |
+| `test_portal_theme_browser.cjs` | 双主题持久化、四宽布局、对比度与草稿隔离 | 浏览器 | 高 |
+| `test_portal_intensity_browser.cjs` | 固定顶部三参数、滑杆拖动/键盘/触屏、整数功率、FTP 图示、无效输入、摘要展开、保存忙态/失败草稿、会话关闭与恢复；可用 `--screenshots <目录>` 保存双主题四宽截图 | 浏览器 | 高 |
+| `test_portal_inputs_browser.cjs` | 首次核心数值与折叠、展开不保存与保留草稿，已有机器人/跑步/功率计/固定心率恢复；模式等宽居中、五项组合栏与全宽滑杆、配速保存换算、44px 触控、同步、非法输入、忙态/失败/结束禁用、主题与扫描焦点；`--screenshots <目录>` 输出初始页及双主题四宽截图 | 浏览器 | 高 |
 | `check_config_consistency.py` | 常量一致性静态检查（config 头文件 ↔ 引用方） | TC-3c | 高 |
 | `check_nvs_schema.py` | NVS schema 静态一致性检查（nvs_store ↔ config） | TC-3e | 高 |
 | `check_board_desc.py` | 板型描述表静态一致性检查（board_detect ↔ config ↔ Kconfig） | TC-3f | 高 |
