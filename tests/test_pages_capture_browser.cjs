@@ -4,6 +4,8 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {chromium}=require('./web-flash/node_modules/playwright');
 const root=path.join(__dirname,'../tools/web');
+const screenshots=path.join(__dirname,'reports/pages-capture');
+fs.mkdirSync(screenshots,{recursive:true});
 (async()=>{
  const browser=await chromium.launch({headless:true,executablePath:process.env.BIKEPOWER_CHROMIUM_PATH||undefined});
  try{
@@ -60,7 +62,7 @@ const root=path.join(__dirname,'../tools/web');
    await page.evaluate(()=>queue.push(makeCaptureDevice('reference')));await page.locator('#compat-collect-board').click();await page.waitForFunction(()=>document.querySelector('#compat-status').textContent.includes('同一台'));assert.deepEqual(await page.evaluate(()=>BikePowerCompatibilityUI.report().snapshots.board),before,'同设备拒绝不覆盖快照');
    await page.locator('#compat-release-capture').click();assert.equal(await page.evaluate(()=>devices.filter(d=>d.gatt.connected).length),0);assert.deepEqual(await page.evaluate(()=>BikePowerCompatibilityUI.report().snapshots.board),before);
    await page.evaluate(()=>queue.push('cancel'));await page.locator('#compat-collect-board').click();await page.waitForFunction(()=>document.querySelector('#compat-collection-progress').textContent.includes('取消'));assert.deepEqual(await page.evaluate(()=>BikePowerCompatibilityUI.report().snapshots.board),before);
-   await page.locator('#compat-analyze').click();await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(__dirname,`../design-demos/bikepower-ui/screenshots/pages-capture-${theme}.png`),animations:'disabled'});
+   await page.locator('#compat-analyze').click();await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(screenshots,`pages-capture-${theme}.png`),animations:'disabled'});
    assert.equal(await page.evaluate(()=>writes),0);
    const invalid=structuredClone(partial);invalid.snapshots.reference.name='<img src=x onerror="window.captureInjected=true">';
    await page.locator('#compat-import').setInputFiles({name:'unsafe.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(invalid))});

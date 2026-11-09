@@ -21,6 +21,11 @@ NimBLE启用最多4个绑定记录，标准独立`nimble_bond` namespace存储�
 
 当前本地候选将CONNECT状态0或已观察到的远端特征错误26经`ble_gap_conn_find`确认，只有Host仍存在真实外设连接才发布应用句柄；开启SUBSCRIBE早于CONNECT确认时走相同验证。同句柄重复确认不重置订阅/控制，异句柄断开不清空当前连接，通知仍要求正确应用句柄和逐特征订阅。候选实物结果与未执行项见 [BINAVI连接修复](44-binavi-connection-fix.md)，不以构建通过代替码表验收。
 
+已接纳下游首次建链时，以 peer identity 查询已有安全记录；安全存储正常、
+LTK 存在且密钥长度合法、连接未加密时，主动请求恢复加密。EALREADY 表示
+已有安全过程，不当作失败。未知客户端仍通过加密特征触发原配对流程，
+不自动删除绑定，也不放宽 FTMS 的 WRITE_ENC。
+
 ## Pages 骑行端适配排查
 
 Pages设备比对默认逐台只读采集第三方正常设备和开发板，两份GATT信息分别保存到本浏览器，支持单侧报告导入导出与刷新恢复；可尝试双连接，但不保证主机和设备能力。差异覆盖双向服务/特征、属性、能力位、读取值、通知帧结构与频率，未授权和采集失败不判缺失。旧身份模板功能保留为折叠工具，不等于补齐协议。实现、限额、验证和实物边界见 [骑行适配采集](42-cycling-compatibility-capture.md)。移动端删除重复二级教程，以项目介绍、主设备/手机操作演示和使用场景为主；主配网演示说明长按松开后二次确认开启设备WiFi热点，手机连接后进入配置页。
@@ -372,6 +377,11 @@ DIS 读取内容来自编译期常量：
 - 其他：返回 not supported
 
 Fitness Machine Status 和 Control Point 使用独立编号；Reset/Started 为 1 字节，Stopped/Paused 为 2 字节。FTMS 写入先保留响应位置，再把命令及票据交给单槽 mailbox；未接受返回 Operation Failed，满槽不覆盖旧命令。主循环实际应用后才返回 Success。过期票据、断连和退订不完成旧命令；退订释放未发送的 indication 预留，已发出的 ATT 保留至确认或失败，不允许同特征新过程越过在途确认；同一特征等待 indication 确认期间拒绝新过程。Reset 成功后目标指令必须重新 Request Control。
+
+控制者退订、断连、响应失败、Reset 或 Host 复位统一递增释放代次。
+主任务每轮先观察代次并清理旧 ERG，再按 mailbox 的票据和代次应用命令；
+新目标应用后记录其代次。先退订后断连只释放一次，观察者退出不改变
+控制者代次；GAP/GATT 回调只改状态，ERG 引擎仍由主任务操作。
 
 RSC `SC Control Point=0x2A55` 使用 Write + Indicate，支持 Set Cumulative Value（opcode 1、uint32 dm）及 Response Code 0x10；已知请求截断、未知操作码、未订阅、进行中和 mailbox 忙均有独立错误路径。累计设置仅作用于本次运行会话，不写 NVS；长度、订阅和全 uint32 范围回归不替代实物 GATT 验收。
 
@@ -937,6 +947,7 @@ v13→v14 把原单设备绑定迁移到固定三设备表的槽位 0，其他�
 - 阈值心率 `PROFILE_THR_HR_MIN` 到 `PROFILE_THR_HR_MAX`
 - `ride_type` 合法性
 - 设备名空串回退为 `DEVICE_NAME_DEFAULT`
+- 广播掩码没有任何运动字段时回退 `BROADCAST_MASK_DEFAULT`；仅设置踏频随功率兼容位也需要回退
 
 ### 9.4 配置 JSON 序列化
 
@@ -1100,6 +1111,18 @@ idf.py build
 ```
 
 根据项目规则，C 代码改动后 `idf.py build` 必须通过。
+
+日常工具 `scripts/tools/dev_workflow.py` 的同模式锁覆盖配置桶、源码快照、
+状态及实际构建，clean 使用相同锁并保留锁文件。切板会移除快照的旧
+sdkconfig，Unix 构建子进程使用独立进程组和连续日志 deadline。
+POSIX 虚拟环境保留入口路径；显式 repo/config 贯穿发行调用，CMake 接收
+源仓库 Git 身份。缓存 PASS 记录源指纹、配置桶、sdkconfig 和三个实际
+bin 的哈希，任一变化均不能复用旧镜像。
+
+`release_build.py` 在构建前复用权威实物证据检查器。候选写入 candidates，
+状态文件位于包外；即使 skip-build 也在锁内核对成功状态、板型、Git、
+源快照、配置及镜像哈希，生成的 manifest/ZIP 由同一权威产物契约检查。
+候选构建和打包通过不代表实体、人工或正式发行通过。
 
 发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行先跑 host、桥接会话、压缩页面交互、mock、3 分钟核心流程耐久和静态门禁，再生成双板型合并固件、SHA256、manifest、报告、手册和总包。合并固件文件名为 `bikepower-c-板型-v版本.bin`，总包为 `bikepower-c-v版本.zip`，Git ID 单独保存在 manifest。脚本不创建 tag 或 GitHub Release。
 

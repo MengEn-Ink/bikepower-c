@@ -1,8 +1,11 @@
 /* 通过真实页面操作验收手机教学、时间信息、主题和工具导航。 */
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('./web-flash/node_modules/playwright');
 const root = path.join(__dirname, '../tools/web');
+const screenshots = path.join(__dirname, 'reports/pages-experience');
+fs.mkdirSync(screenshots, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ headless: true });
   try {
@@ -80,7 +83,7 @@ const root = path.join(__dirname, '../tools/web');
           await page.locator('#mg-theme-btn').click();
           if (width === 390) {
             await page.getByRole('link', { name: '按钮演示', exact: true }).click();
-            await page.screenshot({ path: '/tmp/bikepower-pages-mobile-' + theme + '.png', animations: 'disabled' });
+            await page.screenshot({ path: path.join(screenshots, 'mobile-' + theme + '.png'), animations: 'disabled' });
           }
         } else {
           const gate = page.locator('#connect-gate');
@@ -93,7 +96,7 @@ const root = path.join(__dirname, '../tools/web');
           await page.locator('.mode-btn[data-mode="health"]').click();
           assert.equal(await page.locator('#mode-health').isVisible(), true);
           assert.equal(await page.locator('.tool-cluster').count(), 3);
-          if (width === 1280) await page.screenshot({ path: '/tmp/bikepower-pages-desktop-' + theme + '.png', animations: 'disabled' });
+          if (width === 1280) await page.screenshot({ path: path.join(screenshots, 'desktop-' + theme + '.png'), animations: 'disabled' });
         }
         assert.deepEqual(errors, []);
         console.log('PASS: ' + theme + ' ' + width + 'px, 更新时间、布局、操作、主题');

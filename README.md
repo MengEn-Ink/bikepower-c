@@ -15,7 +15,7 @@ Pages 手册分为设备按键与手机操作：手机机身内复用实际配�
 - 设备配网：参数保存到 NVS，普通配网保持 BLE 在线，默认 300 秒，可信页面操作续期；后台轮询不续期。
 - 电脑工具台：网页刷写、实时监控、设备比对、配置读写、健康检查与[设备状态](https://mengen-ink.github.io/bikepower-c/#/device-status)。含遥测的候选固件支持内存/CPU 百分比、RSSI 与独立详情窗口；手机可打开状态页面，蓝牙连接需浏览器支持 Web Bluetooth。
 
-**网页刷写只提供正式 GitHub Release。** v4.4.0 本次发行目标仅通用 ESP32-C3；尚未创建正式 Release，M5Stamp C3 保留历史版本。用户已确认当前实测正常；完整设备矩阵、三链路/WiFi峰值、SC直接指示与其他系统兼容性未取得具体证据，不宣称Bluetooth完整认证。精确构建、验收和发行状态见 [PROGRESS](PROGRESS.md)。
+**网页刷写只提供正式 GitHub Release。** v4.4.0 已仅为通用 ESP32-C3 发布，M5Stamp C3 保留历史版本。完整设备矩阵、三链路/WiFi峰值、SC直接指示与其他系统兼容性未取得具体证据，不宣称Bluetooth完整认证。精确构建、验收和发行状态见 [PROGRESS](PROGRESS.md)。
 
 ## 硬件
 
@@ -73,6 +73,10 @@ python3 scripts/tools/quality_gate.py --no-build
 ```
 
 需要烧录时使用 `./scripts/flash_latest.sh`；双板构建使用 `./scripts/build_all.sh`。构建、真机证据和发布流程统一见 [构建与测试](docs/wiki/09-build-and-test.md)，分发固件必须是校验后的 merged bin。
+
+日常增量构建可用 `python3 scripts/tools/dev_workflow.py build --mode production --board generic`；
+切换 `--board m5stamp` 会使板型配置失效并重新构建。开发缓存记录源码、配置、
+Git 和三个镜像的哈希；候选打包仍需校验这些身份，正式发行额外要求当前实物证据。
 
 本地门户预览：
 

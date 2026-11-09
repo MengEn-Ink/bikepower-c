@@ -39,6 +39,21 @@
 
 ## 快速开始
 
+### 日常增量构建
+
+```bash
+python3 scripts/tools/dev_workflow.py doctor --json
+python3 scripts/tools/dev_workflow.py build --mode production --board generic
+python3 scripts/tools/dev_workflow.py build --mode production --board m5stamp
+```
+
+缓存按模式隔离，构建与清理共享锁；切板会废弃旧 sdkconfig。缓存复用需
+成功状态、源码/配置/Git 身份及三个实际镜像哈希一致。候选打包也执行
+这些检查；正式发行仍由当前板型的权威实物证据门禁约束。
+
+文档门禁已经包含 Markdown 链接检查，CI 和 pre-push 不再重复执行独立
+扫描。浏览器截图写入忽略目录 `tests/reports/`，不能替代实体测试。
+
 ### 1. 首次编译烧录
 
 ```bash
