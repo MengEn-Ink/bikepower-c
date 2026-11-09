@@ -1533,6 +1533,12 @@ static void test_config_store(void)
     CHECK(b.led.scenes[LED_SCENE_WAIT_CONN].mode == LED_MODE_SLOW, "非法 LED 模式回默认慢闪");
     CHECK(b.led.scenes[LED_SCENE_CONNECTED].color == LED_COLOR_BLUE, "非法 LED 颜色回默认蓝色");
     CHECK(b.led.silent == 1, "LED 静默规范化为1");
+    config_data_t compatibility_only;
+    config_store_defaults(&compatibility_only);
+    compatibility_only.broadcast_mask = BROADCAST_FIELD_CADENCE_WITH_POWER;
+    CHECK(config_store_validate(&compatibility_only), "仅兼容位掩码需要修正");
+    CHECK(compatibility_only.broadcast_mask == BROADCAST_MASK_DEFAULT, "仅兼容位恢复默认运动字段");
+    CHECK(!config_store_validate(&compatibility_only), "掩码修正幂等");
 
     // ERG 仅为会话态，旧 NVS 或导入配置中的 ERG 必须修正为 steady 并触发回写。
     config_data_t erg;

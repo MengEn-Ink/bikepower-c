@@ -48,7 +48,19 @@ static void ble_config_service_disconnect(uint16_t c){(void)c;}
 #define BLE_GAP_EVENT_NOTIFY_TX 5
 #define BLE_GAP_EVENT_ENC_CHANGE 6
 #define BLE_ERR_UNSUPP_REM_FEATURE 26
-struct ble_gap_conn_desc {uint8_t role;};
+typedef struct {uint8_t type,val[6];} ble_addr_t;
+struct ble_gap_conn_desc {uint8_t role;ble_addr_t peer_id_addr;struct {bool encrypted;} sec_state;};
+struct ble_store_key_sec {ble_addr_t peer_addr;uint8_t idx;};
+struct ble_store_value_sec {bool ltk_present;uint8_t key_size;};
+#define BLE_HS_EALREADY 2
+#define BLE_SM_PAIR_KEY_SZ_MIN 7
+#define BLE_SM_PAIR_KEY_SZ_MAX 16
+static unsigned security_requests;
+static bool encrypted;
+static int bond_error,security_error;
+static struct ble_store_value_sec bond={.ltk_present=true,.key_size=16};
+static int __attribute__((unused)) ble_store_read_peer_sec(const struct ble_store_key_sec *key,struct ble_store_value_sec *value){assert(key->peer_addr.type==1&&key->idx==0);*value=bond;return bond_error;}
+static int __attribute__((unused)) ble_gap_security_initiate(uint16_t c){assert(c>=1&&c<=3);security_requests++;return security_error;}
 struct ble_gap_event {
  int type;
  struct {int status;uint16_t conn_handle;} connect;
@@ -60,12 +72,13 @@ static bool host_exists=true;static uint8_t host_role=BLE_GAP_ROLE_SLAVE;
 static unsigned ads;
 static int start_advertising(void){ads++;return 0;}
 static void ble_power_bridge_host_reset(void){}
-static int ble_gap_conn_find(uint16_t c,struct ble_gap_conn_desc *d){if(!host_exists||c<1||c>3)return 1;d->role=host_role;return 0;}
+static int ble_gap_conn_find(uint16_t c,struct ble_gap_conn_desc *d){if(!host_exists||c<1||c>3)return 1;*d=(struct ble_gap_conn_desc){.role=host_role,.peer_id_addr={.type=1},.sec_state={.encrypted=encrypted}};return 0;}
 int ble_bikepower_conn_count(void);
 static bool indication_submit(uint32_t,const uint8_t*,size_t);
 static void indication_reset(void);
 '''
-funcs=t.functions(source,[('client_find','static ble_client_t *'),('client_indicates','static bool'),
+funcs=t.functions(source,[('ftms_release_owner','static void'),('ble_bikepower_control_generation','uint32_t'),
+ ('restore_bond_encryption','static void'),('client_find','static ble_client_t *'),('client_indicates','static bool'),
  ('subscriptions_reset','static void'),('subscription_update','static void'),('notification_subscribed','static bool'),
  ('indication_reset','static void'),('indication_reserve','static uint32_t'),('indication_subscription_revoked','static void'),
  ('indication_complete','static void'),('indication_pump_nolock','static void'),('indication_submit','static bool'),
@@ -74,6 +87,23 @@ checks=r'''
 int main(void){
  (void)chr_read_buf;(void)g_profile;(void)g_broadcast_mask;(void)s_output;(void)s_data_lock;(void)client_indicates;
  g_ready=true;
+ assert(connection_accept(1)&&security_requests==1);connection_remove(1);
+ encrypted=true;assert(connection_accept(1)&&security_requests==1);connection_remove(1);encrypted=false;
+ bond.ltk_present=false;assert(connection_accept(1)&&security_requests==1);connection_remove(1);bond.ltk_present=true;
+ bond.key_size=6;assert(connection_accept(1)&&security_requests==1);connection_remove(1);bond.key_size=16;
+ bond_error=1;assert(connection_accept(1)&&security_requests==1);connection_remove(1);bond_error=0;
+ s_security_store_failed=true;assert(connection_accept(1)&&security_requests==1);connection_remove(1);s_security_store_failed=false;
+ security_error=BLE_HS_EALREADY;assert(connection_accept(1)&&security_requests==2);assert(connection_accept(1)&&security_requests==2);connection_remove(1);security_error=0;
+ assert(connection_accept(1)&&connection_accept(2));
+ g_ftms_owner=g_ftms_connection=1;g_ftms_control=true;
+ uint32_t generation=ble_bikepower_control_generation();
+ indication_subscription_revoked(2,9);assert(ble_bikepower_control_generation()==generation&&g_ftms_control);
+ indication_subscription_revoked(1,9);assert(ble_bikepower_control_generation()==generation+1&&!g_ftms_control);
+ connection_remove(1);assert(ble_bikepower_control_generation()==generation+1);
+ assert(connection_accept(1));g_ftms_owner=g_ftms_connection=2;g_ftms_control=true;
+ connection_remove(1);assert(ble_bikepower_control_generation()==generation+1&&g_ftms_control);
+ indication_reset();assert(ble_bikepower_control_generation()==generation+2&&!g_ftms_control);
+ connection_remove(2);
  assert(connection_accept(1));assert(connection_accept(2));assert(ble_bikepower_conn_count()==2);
  assert(!connection_accept(3));
  subscription_update(1,28,true);subscription_update(2,28,true);

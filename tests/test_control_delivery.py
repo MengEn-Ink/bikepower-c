@@ -8,7 +8,7 @@ import test_ble_standard_contract as t
 
 def main():
     source=(ROOT/'main/ble_bikepower.c').read_text()
-    funcs=t.functions(source,[("ftms_send_response","static void"),("ftms_send_status","static void"),
+    funcs=t.functions(source,[("ftms_release_owner","static void"),("ftms_send_response","static void"),("ftms_send_status","static void"),
         ("ftms_operation_accepted","static void"),("rsc_cp_cb","static int"),("ftms_cp_cb","static int"),
         ("ble_bikepower_control_ticket","uint32_t"),("ble_bikepower_control_current","bool"),
         ("ble_bikepower_control_complete","void")])
@@ -121,6 +121,8 @@ int main(void){
 #define portENABLE_INTERRUPTS() ((void)0)
 static bool s_real_power_source,current=true;
 static uint32_t ticket=1;
+static uint32_t generation;
+uint32_t ble_bikepower_control_generation(void){return generation;}
 static power_engine_t s_engine;
 static unsigned applied,completed;
 static app_evt_t last;
@@ -142,6 +144,14 @@ int main(void){
  assert(on_erg_target(250));ticket=2;process_control_mailbox();assert(applied==2&&completed==4);
  assert(on_run_control(BLE_RUN_CTRL_RESET,0));process_control_mailbox();assert(last.type==APP_EVT_RUN_RESET);
  assert(!on_run_control(BLE_RUN_CTRL_SPEED,299));assert(!on_erg_target(2001));
+ unsigned previous=applied,confirmed=completed;
+ generation=10;process_control_mailbox();
+ assert(applied==previous+1&&last.type==APP_EVT_ERG_CLEAR&&completed==confirmed);
+ assert(on_erg_target(300));generation++;process_control_mailbox();
+ assert(last.type==APP_EVT_ERG_CLEAR&&completed==confirmed);
+ assert(on_erg_target(350));process_control_mailbox();
+ assert(last.type==APP_EVT_ERG_TARGET&&last.data==350&&completed==confirmed+1);
+ previous=applied;process_control_mailbox();assert(applied==previous);
  puts("生产mailbox：满槽拒绝、按序应用后确认、旧票据丢弃、RSC精度与uint64转换通过");
 }
 '''

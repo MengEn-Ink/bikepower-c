@@ -112,6 +112,8 @@ static ble_erg_clear_cb_t g_erg_clear_cb;
 static ble_run_control_cb_t g_run_control_cb;
 static unsigned calls, responses, statuses;
 static uint32_t g_ftms_response_token;
+static atomic_uint_least32_t s_control_generation;
+static portMUX_TYPE s_indication_lock;
 static uint16_t g_ftms_owner=BLE_HS_CONN_HANDLE_NONE,g_ftms_connection=BLE_HS_CONN_HANDLE_NONE;
 static void *client_find(uint16_t c){return c==g_conn_handle?(void*)1:NULL;}
 static bool client_indicates(uint16_t c,uint16_t h){(void)h;return c==g_conn_handle&&g_ftms_subscribed;}
@@ -136,7 +138,7 @@ static bool run_control(ble_run_control_type_t t,int v)
 static void reset(void)
 {
     g_ftms_subscribed=true; g_ftms_control=true; g_ftms_pending=false;
-    g_ftms_owner=BLE_HS_CONN_HANDLE_NONE;g_ftms_connection=1;
+    g_ftms_owner=1;g_ftms_connection=1;
     g_profile=SPORT_PROFILE_CYCLING; g_conn_handle=1; g_ready=true; g_stopping=false;
     accepted=true; send_ok=true; capacity=true; calls=responses=statuses=0;
     g_erg_cb=erg; g_erg_clear_cb=clear; g_run_control_cb=run_control;
@@ -569,7 +571,7 @@ def main():
                                       ("ftms_feat_cb", "ftms_power_range_cb", "ftms_speed_range_cb")])
         run(PREAMBLE + "\n".join(buffers) + callbacks + FEATURE_CHECKS)
     if mode in ("all", "control"):
-        callbacks = functions(source, [("ftms_send_response", "static void"),
+        callbacks = functions(source, [("ftms_release_owner", "static void"), ("ftms_send_response", "static void"),
                                        ("ftms_send_status", "static void"), ("ftms_operation_accepted", "static void"), ("ftms_cp_cb", "static int")])
         run(PREAMBLE + CP_STUBS.replace("static int write_bytes", "static int ftms_cp_cb(uint16_t, uint16_t, struct ble_gatt_access_ctxt *, void *);\nstatic int write_bytes")
             + callbacks + CP_CHECKS)

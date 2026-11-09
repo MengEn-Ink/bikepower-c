@@ -119,10 +119,11 @@ static void process_pending_identity(void)
 /** 控制点有界 mailbox：host 只接收，主循环按票据应用后确认；满槽拒绝不覆盖。 */
 typedef struct {
     bool pending, rsc;
-    uint32_t ticket, distance_dm;
+    uint32_t ticket, distance_dm, generation;
     app_evt_t event;
 } control_mailbox_t;
 static control_mailbox_t s_control_mailbox;
+static uint32_t s_applied_control_generation;
 
 static bool queue_control(app_evt_t event, bool rsc, uint32_t distance_dm)
 {
@@ -131,6 +132,7 @@ static bool queue_control(app_evt_t event, bool rsc, uint32_t distance_dm)
     if (accepted) s_control_mailbox = (control_mailbox_t){
         .pending = true, .rsc = rsc, .distance_dm = distance_dm,
         .ticket = ble_bikepower_control_ticket(rsc), .event = event,
+        .generation = ble_bikepower_control_generation(),
     };
     portENABLE_INTERRUPTS();
     return accepted;
@@ -169,11 +171,17 @@ static bool on_rsc_distance(uint32_t distance_dm)
 
 static void process_control_mailbox(void)
 {
+    uint32_t generation = ble_bikepower_control_generation();
+    if (generation != s_applied_control_generation) {
+        app_state_handle_event(&(app_evt_t){ .type = APP_EVT_ERG_CLEAR });
+        s_applied_control_generation = generation;
+    }
     portDISABLE_INTERRUPTS();
     control_mailbox_t command = s_control_mailbox;
     s_control_mailbox.pending = false;
     portENABLE_INTERRUPTS();
-    if (!command.pending || !ble_bikepower_control_current(command.ticket, command.rsc)) return;
+    if (!command.pending || (!command.rsc && command.generation != ble_bikepower_control_generation())
+            || !ble_bikepower_control_current(command.ticket, command.rsc)) return;
     if (command.rsc) {
         s_engine.running.distance_x1000_m = (uint64_t)command.distance_dm * 100u;
         s_engine.running.snapshot.total_distance_m = command.distance_dm / 10u;
@@ -181,6 +189,7 @@ static void process_control_mailbox(void)
     } else {
         app_state_handle_event(&command.event);
         if (command.event.type == APP_EVT_RUN_RESET) power_engine_set_run_speed(&s_engine, RUN_SPEED_X100_DEFAULT);
+        s_applied_control_generation = command.generation;
     }
     ble_bikepower_control_complete(command.ticket, command.rsc, true);
 }

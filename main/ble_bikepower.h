@@ -26,6 +26,12 @@ typedef bool (*ble_erg_cb_t)(int target_power);
 typedef bool (*ble_rsc_distance_cb_t)(uint32_t distance_dm);
 void ble_bikepower_enable_async_control(ble_rsc_distance_cb_t cb);
 uint32_t ble_bikepower_control_ticket(bool rsc);
+/**
+ * 读取控制者释放代次；退订、断连、响应失败、Reset 或协议栈复位时递增。
+ * 主任务先按代次清理 ERG，再验证同代次 mailbox，避免旧清理覆盖新目标。
+ * 不访问协议栈或存储，可在 mailbox 接收时读取。
+ */
+uint32_t ble_bikepower_control_generation(void);
 bool ble_bikepower_control_current(uint32_t ticket, bool rsc);
 void ble_bikepower_control_complete(uint32_t ticket, bool rsc, bool success);
 
