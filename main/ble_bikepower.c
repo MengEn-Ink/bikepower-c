@@ -2004,6 +2004,7 @@ static void on_sync(void)
 #endif
     bool layout_changed = false;
     esp_err_t cache_err = ble_bond_cache_sync(&layout_changed);
+    if (cache_err == ESP_OK && s_security_store_failed) cache_err = ESP_FAIL;
     if (cache_err != ESP_OK) {
         s_security_store_failed = true;
         mark_start_failed("订阅缓存布局同步失败", cache_err);
@@ -2012,12 +2013,6 @@ static void on_sync(void)
 #if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
     ESP_LOGW(TAG, "DIAG: bond_cache_sync err=%d layout_changed=%d", cache_err, layout_changed);
 #endif
-    if (layout_changed) {
-#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
-        ESP_LOGW(TAG, "DIAG: 触发 ble_svc_gatt_changed SC indication");
-#endif
-        ble_svc_gatt_changed(BLE_GATT_CHANGED_START_HANDLE, BLE_GATT_CHANGED_END_HANDLE);
-    }
     rc = start_advertising();
     if (rc != 0) {
         mark_start_failed("启动广播失败", rc);
