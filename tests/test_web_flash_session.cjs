@@ -247,6 +247,72 @@ test('closed outcome is reported only after successful resource release', async 
   h.dispose();
 });
 
+test('selected port emits preparation stages and cancellation aborts download without opening', async () => {
+  const h = harness();
+  h.w.fetch = (url, options) => new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(new Error('aborted'))));
+  const pending = h.session.start(item, '4.2.1');
+  await tick();
+  assert.match(h.messages.at(-1), /串口已选择.*清单/);
+  assert.equal(h.session.canCancel(), true);
+  await h.session.cancel();
+  await pending;
+  assert.equal(h.counts().opens, 0);
+  assert.equal(h.session.isBusy(), false);
+  assert.match(h.messages.at(-1), /已取消准备.*未开始写入/);
+  h.dispose();
+});
+
+test('late port open after deadline cannot create installer or allow early retry', async () => {
+  const h = harness();
+  let finish;
+  h.port.open = () => new Promise(resolve => { finish = () => { h.port.readable = {}; h.port.writable = {}; resolve(); }; });
+  const pending = h.session.start(item, '4.2.1');
+  await tick();
+  [...h.timers.values()].find(t => t.ms === 15000).fn();
+  assert.match(h.messages.at(-1), /打开串口超时.*禁止重试/);
+  assert.equal(h.session.isBusy(), true);
+  await h.session.start(item, '4.2.1');
+  assert.equal(h.counts().picks, 1);
+  finish();
+  await pending;
+  assert.equal(h.w.document.querySelector('ewt-install-dialog'), null);
+  assert.equal(h.counts().closes, 1);
+  assert.equal(h.session.isBusy(), false);
+  h.dispose();
+});
+
+test('opening timeout followed by failed close keeps all retries fenced', async () => {
+  const h = harness();
+  let finish;
+  h.port.open = () => new Promise(resolve => { finish = () => { h.port.readable={};h.port.writable={};resolve(); }; });
+  h.port.locked = true;
+  const pending = h.session.start(item, '4.2.1');
+  await tick();
+  [...h.timers.values()].find(t => t.ms === 15000).fn();
+  finish();
+  await pending;
+  assert.equal(h.session.isBusy(),true);
+  assert.equal(h.blobs.size,2);
+  assert.match(h.messages.at(-1),/尚未释放/);
+  await h.session.start(item,'4.2.1');
+  assert.equal(h.counts().picks,1);
+  h.dispose();
+});
+
+test('preparation cancellation cannot close active installer and recovery is never success', async () => {
+  const h = harness();
+  await h.session.start(item, '4.2.1');
+  assert.equal(h.session.canCancel(), false);
+  await h.session.cancel();
+  assert.equal(h.counts().closes, 0);
+  assert.equal(h.session.isBusy(), true);
+  const next = h.w.BikePowerFlash.createSession(h.options);
+  assert.match(next.recoveryNotice(), /上次.*中断.*不能确认/);
+  await h.close();
+  assert.equal(next.recoveryNotice(), '');
+  h.dispose();
+});
+
 test('cross-tab Web Lock excludes other sessions and releases only after closed', async () => {
   const h = harness();
   let held = false;

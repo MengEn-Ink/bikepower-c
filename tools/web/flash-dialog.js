@@ -14,7 +14,7 @@
     ['Keep this page visible to prevent slow down', '请保持页面可见，不要拔线、刷新或关闭窗口'],
     ['All data on the device will be erased.', '开发板上的全部数据将被清除，包括配置和蓝牙绑定。'],
     ['All data on the device will be lost.', '开发板上的全部数据将丢失。'],
-    ['Do you want to erase the device before installing', '安装前是否清除全部数据？固件更新通常不要勾选。即将安装'],
+    ['Do you want to erase the device before installing', '安装前是否整片清除？不勾选也无法保留本全量固件覆盖范围内的配置和绑定。即将安装'],
     ['Do you want to install', '即将刷写'], ['Do you want to update to', '即将更新到'],
     ['Failed to initialize. Try resetting your device or holding the BOOT button while clicking INSTALL.', '无法连接芯片。请检查数据线和串口占用；按住 BOOT，再按一下 EN / RST，松开后返回重新刷写。'],
     ['Serial port is not readable/writable. Close any other application using it and try again.', '串口不可读写。请关闭串口监视器和其他占用程序，再关闭弹窗重试。'],

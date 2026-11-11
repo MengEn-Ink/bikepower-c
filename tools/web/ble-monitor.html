@@ -1357,7 +1357,11 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
    ===================================================================== */
 .mobile-guide{display:none}
 @media(max-width:899px){
-  body>:not(.mobile-guide):not(script),.ob-modal,.ob-hole,.ob-pop,.ob-blocker{display:none!important}
+  body:not(.flash-session-active):not(.flash-workspace):not(.device-status-mobile)>:not(.mobile-guide):not(script),body:not(.flash-session-active) .ob-modal,body:not(.flash-session-active) .ob-hole,body:not(.flash-session-active) .ob-pop,body:not(.flash-session-active) .ob-blocker{display:none!important}
+  body.flash-session-active .mobile-guide,body.flash-workspace .mobile-guide{display:none!important}
+  body.flash-session-active #mode-flash,body.flash-workspace #mode-flash{display:block!important}
+  body.flash-session-active #mode-flash .flash-grid,body.flash-workspace #mode-flash .fw-ide{grid-template-columns:1fr}
+  body.flash-workspace .masthead{display:none}
   body.gate-lock{overflow:auto}
   .mobile-guide{display:block;min-height:100vh;padding:0 0 calc(28px + env(safe-area-inset-bottom));background:var(--bg)}
 }
@@ -1438,7 +1442,6 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 .mg-bar .theme-btn{width:36px;height:36px}
 .help-item[data-theme-follow] span em{font-style:normal;color:var(--strong);font-weight:700}
 </style>
-<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
 <script src="./flash-session.js"></script>
 <script src="./flash-dialog.js"></script>
 <script src="./ble-connection-help.js"></script>
@@ -1496,6 +1499,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
     <code class="mg-url" id="mg-url">https://mengen-ink.github.io/bikepower-c/</code>
     <div class="mg-actions">
       <button class="btn primary big" id="mg-copy" type="button" onclick="mgCopyLink()">复制桌面端链接</button>
+      <button class="btn big hidden" id="mg-flash" type="button" onclick="openCompactFlash()">在此窗口打开串口刷写</button>
       <button class="btn big hidden" id="mg-share" type="button" onclick="mgShareLink()">发送到电脑</button>
     </div>
     <p class="mg-copied" id="mg-copied" role="status" aria-live="polite"></p>
@@ -1676,7 +1680,9 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           <button class="btn" id="install-unavailable" disabled>暂无可刷写固件</button>
           <a class="btn alt hidden" id="firmware-download" href="#" download>下载固件</a>
         </div>
-        <div class="hint" id="flash-message">正在读取 Release 固件信息。</div>
+        <button class="btn hidden" id="flash-compact-back" type="button" onclick="closeCompactFlash()">返回使用首页</button>
+        <div class="hint" id="flash-message" role="status" aria-live="polite">正在读取 Release 固件信息。</div>
+        <button class="btn hidden" id="flash-cancel" type="button" onclick="flashSession&&flashSession.cancel()">取消准备（尚未写入）</button>
 
         <figure class="flash-anim" data-tour="flash-diagram" aria-label="刷写过程示意：电脑经 USB 数据线把固件写入开发板">
           <svg viewBox="0 0 640 150" role="img" aria-hidden="true">
@@ -4089,7 +4095,8 @@ function renderSelectedFirmware(){
   }else{
     installer.classList.remove("hidden");$("install-unavailable").classList.add("hidden");
     setFirmwareStatus(isLatest?"可刷写 · 最新":"可回滚","ok");
-    setText("flash-message","已选择 "+rel.tag+" · "+(item.label||board)+"。部署流程已校验固件 SHA256；点击按钮后请选择开发板串口。");
+    const recovery=flashSession&&flashSession.recoveryNotice();
+    setText("flash-message",recovery||"已选择 "+rel.tag+" · "+(item.label||board)+"。部署流程已校验固件 SHA256；点击按钮后请选择开发板串口。");
   }
   if(typeof rel.release_url==="string"&&rel.release_url.startsWith("https://")){
     const link=$("firmware-release");link.href=rel.release_url;link.classList.remove("hidden");
@@ -4099,7 +4106,7 @@ function renderSelectedFirmware(){
 }
 async function loadFirmwareCatalog(){
   resetFirmwareDetails();
-  webInstallerReady=!!customElements.get("esp-web-install-button")&&!!window.BikePowerFlash&&window.isSecureContext&&!!navigator.serial;
+  webInstallerReady=!!window.BikePowerFlash&&window.isSecureContext&&!!navigator.serial;
   if(location.protocol==="file:"){
     setText("mg-fw","请到在线工具台查看");
     setFirmwareStatus("需要本地服务","warn");
@@ -6849,7 +6856,9 @@ function fgBodyHtml(){
   }
   if(fgStep===4){
     const idx=FG_PHASES.findIndex(p=>p.id===fgPhase);
-    return '<p>当前是串口会话，不代表已开始写入。确认、进度、失败和完成以 ESP 安装弹窗为准，以下仅为状态说明：</p>'
+    return '<p role="status">'+escapeHtml($("flash-message").textContent)+'</p>'
+      +(flashSession&&flashSession.canCancel()?'<button type="button" class="btn" onclick="flashSession.cancel()">取消准备（尚未写入）</button>':"")
+      +'<p>当前是串口会话，不代表已开始写入。确认、进度、失败和完成以 ESP 安装弹窗为准，以下仅为状态说明：</p>'
       +'<ol class="fg-phases">'+FG_PHASES.map((p,k)=>{
         const st=fgFlashed||k<idx?"done":k===idx?"run":"wait";
         return '<li class="'+st+'"><span class="idx">'+(st==="done"?"✓":st==="run"?"▸":k+1)+'</span><div><span class="fg-phase-zh">'+p.zh+'</span><span class="fg-phase-en">'+p.en+'</span><div class="fg-phase-desc">'+p.desc+'</div></div></li>';
@@ -7015,8 +7024,13 @@ function initOnboarding(){
   }
   if(window.BikePowerFlash){
     flashSession=window.BikePowerFlash.createSession({
-      message:text=>setText("flash-message",text),
+      message:text=>{setText("flash-message",text);if(fgOpen&&fgStep===4)renderFlashGuide();},
+      stage:state=>{
+        const el=$("flash-message");if(el)el.dataset.stage=state.name;
+        const cancel=$("flash-cancel");if(cancel)cancel.classList.toggle("hidden",!state.canCancel);
+      },
       busy:value=>{
+        document.body.classList.toggle("flash-session-active",value);
         for(const id of ["flash-activate","firmware-board","fw-rollback-ack"]){const el=$(id);if(el)el.disabled=value;}
         if(fgOpen){fgPhase=null;fgGo(value?4:3);}
       },
@@ -7030,10 +7044,8 @@ function initOnboarding(){
       },
     });
   }
-  customElements.whenDefined("esp-web-install-button").then(()=>{
-    webInstallerReady=!!window.BikePowerFlash&&window.isSecureContext&&!!navigator.serial;
-    if(firmwareCatalog)renderSelectedFirmware();
-  });
+  webInstallerReady=!!flashSession&&window.isSecureContext&&!!navigator.serial;
+  if(firmwareCatalog)renderSelectedFirmware();
   window.addEventListener("beforeunload",event=>{
     if(flashSession&&flashSession.isBusy()){event.preventDefault();event.returnValue="";}
   });
@@ -7057,13 +7069,17 @@ async function mgCopyLink(){
 async function mgShareLink(){
   try{await navigator.share({title:"BikePower 工具台",text:"在电脑上用 Chrome / Edge 打开：",url:mgDesktopUrl()});}catch(e){}
 }
+function compactFlashAllowed(){return window.isSecureContext&&!!navigator.serial&&/Win|MacIntel|Linux x86|CrOS/.test(navigator.platform||"")&&!/Android|iPhone|iPad/i.test(navigator.userAgent||"")&&!(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);}
+function openCompactFlash(){if(!compactFlashAllowed())return;document.body.classList.add("flash-workspace");$("flash-compact-back").classList.remove("hidden");switchMode("flash");}
+function closeCompactFlash(){if(flashSession&&flashSession.isBusy()){setText("flash-message","串口会话仍在工作，请先安全取消准备或关闭安装弹窗。");return;}document.body.classList.remove("flash-workspace");$("flash-compact-back").classList.add("hidden");switchMode("manual");}
 function initMobileGuide(){
   setText("mg-url",mgDesktopUrl());
+  const compact=$("mg-flash");if(compact)compact.classList.toggle("hidden",!compactFlashAllowed());
   if(navigator.share){const b=$("mg-share");if(b)b.classList.remove("hidden");}
 }
 
 /* ==================== 启动 ==================== */
-window.addEventListener("load",()=>{
+window.addEventListener("DOMContentLoaded",()=>{
   checkSupport();
   initMobileGuide();
   installEspWebToolsTheme();

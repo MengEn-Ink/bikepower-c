@@ -1,5 +1,11 @@
 # 测试脚本使用说明
 
+## Pages 刷写稳定性
+
+- `node --test tests/test_web_flash_session.cjs tests/test_web_flash_vendor.cjs`：准备取消、下载超时、串口迟到返回与清理失败保护、刷新记录、锁定同源快照逐字节及依赖闭包。
+- `node tests/test_web_flash_browser.cjs`：真实10.4.0组件，下载中刷新、窄窗实际ew-dialog可见、显式安装、失败清理与无自动续写；串口为替身，不证明实体刷写成功。
+- 同源模块由站点copytree一并分发，固件版本/写入范围不变；结果与未验项见[刷写稳定性](../docs/dev/67-pages-flash-stability.md)。
+
 ## Pages 连接异常恢复指引
 
 - `node --test tests/test_ble_connection_help.cjs`：15类分类、选择阶段隔离、已知绑定/通用建链区分、Mac/Windows定向步骤、原始错误保留。

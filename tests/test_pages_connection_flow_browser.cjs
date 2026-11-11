@@ -17,7 +17,7 @@ const manifest = { name: 'BikePower', version: '4.3.3', new_install_prompt_erase
       page.on('pageerror', error => errors.push(error.message));
       await page.route('**/*', route => {
         const u = new URL(route.request().url());
-        if (u.hostname === 'unpkg.com') return route.fulfill({ path: path.join(__dirname, 'web-flash/node_modules/esp-web-tools/dist/web', path.basename(u.pathname)), contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' } });
+        if (u.pathname.includes('/vendor/esp-web-tools-10.4.0/')) return route.fulfill({ path: path.join(root, 'tools/web/vendor/esp-web-tools-10.4.0', path.basename(u.pathname)), contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' } });
         if (u.hostname !== 'example.test') return route.abort();
         if (u.pathname.endsWith('manifest.json')) return route.fulfill({ json: manifest });
         if (u.pathname.endsWith('bike.bin')) return route.fulfill({ body: bytes });
@@ -97,7 +97,7 @@ const manifest = { name: 'BikePower', version: '4.3.3', new_install_prompt_erase
       await page.reload();
       assert.equal(await page.locator('#ble-pause-notice').isVisible(), false, 'explicit resume survives reload');
       await page.evaluate(async item => {
-        await customElements.whenDefined('esp-web-install-button');
+        await BikePowerFlash.loadDialog();
         firmwareCatalog = { available: true };
         firmwareReleases = [{ tag: 'v4.3.3', version: '4.3.3', latest: true, boards: { 'generic-c3': item } }];
         webInstallerReady = true; selectFirmwareRelease(null); switchMode('flash');

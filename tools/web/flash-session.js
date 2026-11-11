@@ -2,11 +2,13 @@
 (function (global) {
   'use strict';
   const DOWNLOAD_TIMEOUT_MS = 30000;
+  const PORT_TIMEOUT_MS = 15000;
   const SESSION_NOTICE_MS = 180000;
   const MAX_FIRMWARE_BYTES = 4 * 1024 * 1024;
-  const DIALOG_MODULE = 'https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-dialog-im156JnI.js';
+  const DIALOG_MODULE = new URL('./vendor/esp-web-tools-10.4.0/install-dialog-im156JnI.js', document.currentScript?.src || location.href).href;
+  const JOURNAL_KEY = 'bikepower.flash.pending.v1';
 
-  async function fetchBytes(url, limit, signal) {
+  async function fetchBytes(url, limit, signal, progress) {
     const controller = new AbortController();
     const abort = () => controller.abort();
     signal.addEventListener('abort', abort, { once: true });
@@ -25,6 +27,7 @@
         size += value.length;
         if (size > limit) throw new Error('下载内容超过大小限制');
         chunks.push(value);
+        if (progress) progress(size);
       }
       const bytes = new Uint8Array(size);
       let offset = 0;
@@ -41,28 +44,25 @@
   }
 
   function siteURL(path) {
-    if (typeof path !== 'string' || !/^firmware\/[A-Za-z0-9._+/-]+$/.test(path) || path.includes('..')) {
-      throw new Error('固件索引路径无效');
-    }
+    if (typeof path !== 'string' || !/^firmware\/[A-Za-z0-9._+/-]+$/.test(path) || path.includes('..')) throw new Error('固件索引路径无效');
     const url = new URL(path, location.href);
     if (url.origin !== location.origin) throw new Error('固件必须同源');
     return url.href;
   }
 
-  async function prepare(item, version, signal) {
+  async function prepare(item, version, signal, report = () => {}) {
     const manifestURL = siteURL(item.manifest);
     const binaryURL = siteURL(item.download);
-    if (!Number.isInteger(item.size) || item.size <= 0 || item.size > MAX_FIRMWARE_BYTES || !/^[a-f0-9]{64}$/i.test(item.sha256)) {
-      throw new Error('固件大小或 SHA256 索引无效');
-    }
+    if (!Number.isInteger(item.size) || item.size <= 0 || item.size > MAX_FIRMWARE_BYTES || !/^[a-f0-9]{64}$/i.test(item.sha256)) throw new Error('固件大小或 SHA256 索引无效');
+    report('manifest', '串口已选择；正在下载安装清单，尚未打开串口或写入。');
     const manifest = JSON.parse(new TextDecoder().decode(await fetchBytes(manifestURL, 65536, signal)));
-    const build = manifest.builds && manifest.builds[0];
-    const part = build && build.parts && build.parts[0];
-    if (manifest.version !== version || manifest.builds.length !== 1 || build.chipFamily !== 'ESP32-C3' ||
-        build.parts.length !== 1 || part.offset !== 0 || typeof part.path !== 'string' || new URL(part.path, manifestURL).href !== binaryURL) {
-      throw new Error('manifest 与所选版本、ESP32-C3 或 0x0 merged bin 不一致');
-    }
-    const bytes = await fetchBytes(binaryURL, MAX_FIRMWARE_BYTES, signal);
+    const build = Array.isArray(manifest.builds) && manifest.builds[0];
+    const part = build && Array.isArray(build.parts) && build.parts[0];
+    if (!build || !part || manifest.version !== version || manifest.builds.length !== 1 || build.chipFamily !== 'ESP32-C3' ||
+        build.parts.length !== 1 || part.offset !== 0 || typeof part.path !== 'string' || new URL(part.path, manifestURL).href !== binaryURL) throw new Error('manifest 与所选版本、ESP32-C3 或 0x0 merged bin 不一致');
+    report('download', '正在下载固件：0 / ' + item.size + ' 字节；尚未写入。');
+    const bytes = await fetchBytes(binaryURL, MAX_FIRMWARE_BYTES, signal, count => report('download', '正在下载固件：' + count + ' / ' + item.size + ' 字节；尚未写入。'));
+    report('verify', '正在校验固件大小和 SHA256；尚未写入。');
     const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
     if (bytes.length !== item.size || digest !== item.sha256.toLowerCase()) throw new Error('固件大小或 SHA256 校验失败；已阻止写入');
     return { manifest, bytes };
@@ -71,6 +71,30 @@
   function createSession(options) {
     let active = null;
     const notify = text => options.message(text);
+    const journal = session => {
+      try {
+        session.record = JSON.stringify({ version: session.version, stage: session.stage, startedAt: session.startedAt });
+        global.sessionStorage.setItem(JOURNAL_KEY, session.record);
+      } catch (_) {}
+    };
+    function clearJournal(session) {
+      try { if (global.sessionStorage.getItem(JOURNAL_KEY) === session.record) global.sessionStorage.removeItem(JOURNAL_KEY); } catch (_) {}
+    }
+    function stage(session, name, text) {
+      if (active !== session) return;
+      session.stage = name;
+      journal(session);
+      options.stage?.({ name, canCancel: ['manifest', 'download', 'verify', 'component'].includes(name) });
+      notify(text);
+    }
+    async function settledOperation(session, operation, message) {
+      const timer = setTimeout(() => {
+        if (active !== session) return;
+        session.controller.abort();
+        notify(message + '；底层操作仍在收尾，已禁止重试。请等待返回，不要再开一个刷写页面。');
+      }, PORT_TIMEOUT_MS);
+      try { return await operation(); } finally { clearTimeout(timer); }
+    }
     async function cleanup(session) {
       if (active !== session || session.cleaning) return;
       session.cleaning = true;
@@ -79,29 +103,35 @@
       if (session.adapter) session.adapter.stop();
       if (session.disconnect) navigator.serial.removeEventListener('disconnect', session.disconnect);
       try {
-        if (session.opened && (session.port.readable || session.port.writable)) await session.port.close();
+        if (session.opened && (session.port.readable || session.port.writable)) {
+          stage(session, 'cleanup', '正在释放串口；释放完成前不允许再次刷写。');
+          await settledOperation(session, () => session.port.close(), '释放串口超时');
+        }
         for (const url of session.urls) URL.revokeObjectURL(url);
         if (session.release) session.release();
+        clearJournal(session);
         active = null;
+        options.stage?.({ name: 'idle', canCancel: false });
         options.busy(false);
         notify(session.result === 'success' ? '刷写完成，串口已释放。请等待设备启动，再点击连接蓝牙。' : session.result === 'failed' ? '刷写失败，串口已释放。请检查数据线、BOOT 和串口占用后主动重试。' : '安装弹窗已关闭，串口已释放；未确认刷写成功。需要时重新点击刷写。');
         if (session.dialog && options.onDialogClose) options.onDialogClose({ outcome: session.result || 'unknown', version: session.version });
         return true;
       } catch (error) {
         session.cleaning = false;
-        notify('串口资源尚未释放，已禁止重复刷写。请关闭占用终端/其他标签页，关闭本页后重新打开；不要继续点击安装。');
+        stage(session, 'blocked', '串口资源尚未释放，已禁止重复刷写。请关闭占用终端/其他标签页，关闭本页后重新打开；不要继续点击安装。');
       }
     }
     async function start(item, version) {
       if (active) { notify('已有串口/安装/日志会话，请先返回并关闭安装弹窗。'); return; }
       if (!global.isSecureContext || !navigator.serial) { notify('刷写需要安全上下文和 Web Serial，请使用支持该 API 的桌面浏览器访问 HTTPS 页面。'); return; }
       if (!item) { notify('没有可刷写固件'); return; }
-      const session = { controller: new AbortController(), urls: [], opened: false, cleaning: false, version };
+      const session = { controller: new AbortController(), urls: [], opened: false, cleaning: false, version, startedAt: Date.now() };
       active = session;
       options.busy(true);
-      notify('请选择开发板串口；授权后先下载并校验固件，尚未写入。');
+      stage(session, 'picker', '请选择开发板串口；授权后先下载并校验固件，尚未写入。');
       try {
         session.port = await navigator.serial.requestPort();
+        stage(session, 'lock', '串口已选择；正在检查本站其他刷写页面，尚未写入。');
         if (navigator.locks) {
           await new Promise((resolve, reject) => {
             navigator.locks.request('bikepower-web-serial', { ifAvailable: true }, async lock => {
@@ -118,18 +148,21 @@
           notify('开发板串口已断开；不要重试写入。等待安装弹窗返回/关闭后检查线材、供电和 BOOT。');
         };
         navigator.serial.addEventListener('disconnect', session.disconnect);
-        const prepared = await prepare(item, version, session.controller.signal);
-        notify('固件下载与 SHA256 校验通过；正在加载安装组件，尚未写入。');
+        const prepared = await prepare(item, version, session.controller.signal, (name, text) => stage(session, name, text));
+        stage(session, 'component', '固件下载与 SHA256 校验通过；正在加载本站安装组件，尚未写入。');
         await options.loadDialog();
-        if (session.controller.signal.aborted) throw new Error('设备已断开，未开始写入');
+        if (session.controller.signal.aborted) throw new Error('会话已取消或设备已断开，未开始写入');
         const binary = URL.createObjectURL(new Blob([prepared.bytes]));
         session.urls.push(binary);
         prepared.manifest.builds[0].parts[0].path = binary;
         prepared.manifest.new_install_improv_wait_time = 0;
         const manifest = URL.createObjectURL(new Blob([JSON.stringify(prepared.manifest)], { type: 'application/json' }));
         session.urls.push(manifest);
-        await session.port.open({ baudRate: 115200, bufferSize: 8192 });
+        stage(session, 'opening', '正在打开已选择的串口（最多等待 15 秒后提示）；尚未写入。');
+        await settledOperation(session, () => session.port.open({ baudRate: 115200, bufferSize: 8192 }), '打开串口超时');
         session.opened = true;
+        if (session.controller.signal.aborted) throw new Error('串口操作超时或设备已断开，已阻止迟到安装');
+        if (!session.port.readable || !session.port.writable) throw new Error('串口不可读写，未开始安装');
         const dialog = document.createElement('ewt-install-dialog');
         dialog.port = session.port;
         dialog.manifestPath = manifest;
@@ -141,29 +174,48 @@
         session.dialog = dialog;
         options.beforeInstall();
         document.body.appendChild(dialog);
-        notify('请在安装弹窗确认安装/清除数据。进度、失败和完成以该弹窗为准；本页不自动重刷。');
+        stage(session, 'dialog', '串口已打开，安装弹窗正在初始化。请在弹窗确认刷写；尚未确认时不会写入。本页不自动重刷。');
         session.timer = setTimeout(() => {
           if (active === session) notify('串口会话超过 3 分钟（可能正在查看日志/等待确认）。若进度卡住，请保持页面可见并检查安装弹窗；不强制中断、不自动重试。无法返回时关闭本页再排障。');
         }, SESSION_NOTICE_MS);
       } catch (error) {
-        const cancelled = error.name === 'NotFoundError';
+        const cancelled = error.name === 'NotFoundError' && session.stage === 'picker';
         await cleanup(session);
-        if (active === session) return; // 清理失败必须保留禁止重试的提示。
-        notify(cancelled ? '已取消串口选择，未开始写入。需要时再次点击即可。' : '未开始写入：' + error.message + '。关闭占用串口的软件，检查网络/线材后主动重试。');
+        if (active === session) return;
+        notify(session.cancelled ? '已取消准备，未开始写入。需要时重新选择串口。' : cancelled ? '已取消串口选择，未开始写入。需要时再次点击即可。' : '未开始写入：' + error.message + '。关闭占用串口的软件，检查网络/线材后主动重试。');
       }
     }
-    return { start, isBusy: () => active !== null };
+    function canCancel() { return !!active && ['manifest', 'download', 'verify', 'component'].includes(active.stage) && !active.cleaning; }
+    async function cancel() {
+      if (!canCancel()) { if (active) notify('当前串口或安装组件仍在工作，请在安装弹窗安全返回/关闭；不强制中断、不自动重试。'); return; }
+      active.cancelled = true;
+      active.controller.abort();
+      notify('正在取消准备；等待下载/组件操作收尾后释放会话，尚未写入。');
+    }
+    function recoveryNotice() {
+      try {
+        const value = JSON.parse(global.sessionStorage.getItem(JOURNAL_KEY));
+        if (value && typeof value.stage === 'string') return '上次串口会话被刷新或关闭中断，不能确认刷写成功。本站不会自动续写；先确认开发板状态，再主动重新选择串口。全量安装会覆盖配置和绑定。';
+      } catch (_) {}
+      return '';
+    }
+    return { start, cancel, canCancel, recoveryNotice, isBusy: () => active !== null };
   }
 
+  let dialogReady;
   function loadDialog() {
+    if (customElements.get('ewt-install-dialog')) return Promise.resolve();
+    if (dialogReady) return dialogReady;
     let timer;
-    return new Promise((resolve, reject) => {
-      timer = setTimeout(() => reject(new Error('安装组件加载超时')), DOWNLOAD_TIMEOUT_MS);
+    dialogReady = new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error('本站安装组件加载超时；未开始写入')), DOWNLOAD_TIMEOUT_MS);
       import(DIALOG_MODULE).then(() => {
         if (!customElements.get('ewt-install-dialog')) throw new Error('安装组件未注册');
         resolve();
       }).catch(reject);
     }).finally(() => clearTimeout(timer));
+    dialogReady.catch(() => { dialogReady = null; });
+    return dialogReady;
   }
   global.BikePowerFlash = { createSession, prepare, fetchBytes, loadDialog };
 })(window);

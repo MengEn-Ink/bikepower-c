@@ -16,9 +16,9 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
     page.on('pageerror', error => errors.push(error.message));
     await page.route('**/*', async route => {
       const url = new URL(route.request().url());
-      if (url.hostname === 'unpkg.com') {
+      if (url.pathname.includes('/vendor/esp-web-tools-10.4.0/')) {
         const name = path.basename(url.pathname);
-        const file = path.join(__dirname, 'web-flash/node_modules/esp-web-tools/dist/web', name);
+        const file = path.join(root, 'tools/web/vendor/esp-web-tools-10.4.0', name);
         return route.fulfill({ path: file, contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' } });
       }
       if (url.hostname !== 'example.test') return route.abort();
@@ -29,6 +29,8 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
       if (url.pathname.endsWith('/ble-connection-help.js')) return route.fulfill({ path: path.join(root, 'tools/web/ble-connection-help.js'), contentType: 'text/javascript' });
       if (url.pathname.endsWith('/flash-dialog.js')) return route.fulfill({ path: path.join(root, 'tools/web/flash-dialog.js'), contentType: 'text/javascript' });
       if (url.pathname.endsWith('/flash-session.js')) return route.fulfill({ path: path.join(root, 'tools/web/flash-session.js'), contentType: 'text/javascript' });
+      if (url.pathname.endsWith('/firmware/latest.json')) return route.fulfill({json:{schema_version:1,available:true,tag:'v4.2.1',version:'4.2.1',boards:{'generic-c3':item}}});
+      if (url.pathname.endsWith('/firmware/releases.json')) return route.fulfill({json:{schema_version:1,releases:[{tag:'v4.2.1',version:'4.2.1',latest:true,boards:{'generic-c3':item}}]}});
       if (url.pathname.endsWith('/manifest.json')) return route.fulfill({ json: manifest });
       if (url.pathname.endsWith('/bike.bin')) return route.fulfill({ body: bytes });
       if (url.pathname.endsWith('.json')) return route.fulfill({ json: { schema_version: 1, available: false } });
@@ -58,28 +60,56 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
       Object.defineProperty(navigator, 'serial', { value: serial });
     });
     await page.goto('https://example.test/bikepower-c/');
-    await page.waitForFunction(() => document.getElementById('flash-message').textContent.includes('暂无完整板型固件'));
+    await page.waitForFunction(() => document.getElementById('firmware-status').textContent.includes('可刷写'));
+    await page.evaluate(async () => { await loadFirmwareCatalog(); });
+    assert.equal(await page.locator('#install-unavailable').isVisible(),false,'catalog reload must keep safe launcher available without upstream button');
     await page.evaluate(async ({ item }) => {
-      await customElements.whenDefined('esp-web-install-button');
+      await BikePowerFlash.loadDialog();
       firmwareCatalog = { schema_version: 1, available: true };
       firmwareReleases = [{ tag: 'v4.2.1', version: '4.2.1', latest: true, boards: { 'generic-c3': item } }];
       webInstallerReady = true;
       selectFirmwareRelease(null);
       location.hash = '#flash';
     }, { item });
+    await page.setViewportSize({width:704,height:874});
+    await page.locator('#mg-flash').click();
+    assert.equal(await page.locator('#flash-activate').isVisible(),true);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'compact flasher must not overflow');
     // Actual page capture handler: chooser cancellation must release busy without touching BLE/device.
     await page.evaluate(() => { window.cancelChooser = true; document.getElementById('flash-activate').click(); });
     await page.waitForFunction(() => !flashSession.isBusy());
     assert.match(await page.locator('#flash-message').textContent(), /已取消/);
     assert.equal(await page.evaluate(() => serialCounts.opens), 0);
+    let releaseDownload;
+    await page.route('**/firmware/bike.bin', route => new Promise(resolve => { releaseDownload = async () => { await route.fulfill({body:bytes}); resolve(); }; }));
+    await page.evaluate(() => { window.cancelChooser = false; });
+    await page.locator('#flash-activate').click();
+    await page.waitForFunction(() => document.getElementById('flash-message').dataset.stage === 'download');
+    assert.match(await page.locator('#flash-message').textContent(), /正在下载固件/);
+    assert.equal(await page.locator('#flash-cancel').isVisible(), true);
+    assert.equal(await page.evaluate(() => serialCounts.opens), 0);
+    await page.reload();
+    await page.waitForFunction(() => flashSession !== null);
+    assert.match(await page.evaluate(() => flashSession.recoveryNotice()), /上次.*中断.*不能确认/);
+    assert.equal(await page.evaluate(() => serialCounts.picks), 0);
+    await page.evaluate(item => { firmwareCatalog={available:true};firmwareReleases=[{tag:'v4.2.1',version:'4.2.1',latest:true,boards:{'generic-c3':item}}];webInstallerReady=true;selectFirmwareRelease(null);switchMode('flash'); }, item);
+    assert.match(await page.locator('#flash-message').textContent(), /上次.*中断/);
+    await page.unroute('**/firmware/bike.bin');
+    if (releaseDownload) await releaseDownload().catch(() => {});
     // Actual page + real upstream dashboard/erase/confirmation; no device writes before confirmation.
     await page.evaluate(() => { window.cancelChooser = false; window.failInitialize = true; document.getElementById('flash-activate').click(); });
     const dialog = page.locator('ewt-install-dialog');
+    await dialog.getByText('安装 BikePower 固件', { exact: true }).waitFor();
+    await page.setViewportSize({width:704,height:874});
+    assert.equal(await dialog.locator('ew-dialog').isVisible(), true, 'active serial dialog cannot be hidden by sidebar resize');
+    assert.equal(await page.locator('#mode-flash').isVisible(), true);
+    assert.equal(await page.locator('.mobile-guide').isVisible(), false);
+    await page.setViewportSize({width:1280,height:900});
     await dialog.getByText('安装 BikePower 固件', { exact: true }).click();
     await dialog.getByText('下一步', { exact: true }).click();
     await dialog.locator('div[slot="headline"]').filter({ hasText: /^确认刷写$/ }).waitFor();
     assert.equal(await page.evaluate(() => serialCounts.writes), 0);
-    assert.equal(await page.evaluate(() => serialCounts.picks), 2); // no upstream duplicate chooser
+    assert.equal(await page.evaluate(() => serialCounts.picks), 1); // after reload: no upstream duplicate chooser
     await dialog.locator('ew-text-button').filter({ hasText: /^\s*确认刷写\s*$/ }).click();
     await dialog.getByText('刷写失败', { exact: true }).waitFor();
     assert.match(await dialog.locator('ewt-page-message').evaluate(el => String(el.label)), /无法连接芯片/);
