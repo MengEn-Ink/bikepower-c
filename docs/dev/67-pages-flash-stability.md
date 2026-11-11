@@ -51,7 +51,9 @@ Espressif esptool-js：https://espressif.github.io/esptool-js/docs/ 。更底层
 
 - 实现提交`63a61c38cf11c2a5775be15cbf8393268cddca9e`的[CI](https://github.com/MengEn-Ink/bikepower-c/actions/runs/43016754402)全部success，包含docs、quick及Ubuntu/macOS虚拟板；[Pages部署](https://github.com/MengEn-Ink/bikepower-c/actions/runs/43017588995)success。
 - Mac内置浏览器实际打开新版Pages，看到可刷写按钮，取消串口选择后明确显示“未开始写入”，无console错误；未取得选中实体串口后的实测。
-- 线上检查发现取消上游按钮注册后备用unsupported/not-allowed槽位文字同时显示，已隐藏并补真实DOM断言；错误环境仍由安全会话消息负责说明，最终补丁部署待核对。
+- 线上检查发现取消上游按钮注册后备用unsupported/not-allowed槽位文字同时显示，已隐藏并补真实DOM断言；错误环境仍由安全会话消息负责说明。最终补丁`6ec28c637da140b02fe5a25a2e5f723d656d5e0f`的[完整CI](https://github.com/MengEn-Ink/bikepower-c/actions/runs/43018482956)与[Pages部署](https://github.com/MengEn-Ink/bikepower-c/actions/runs/43019301816)均success。
+- 线上3个核心文件及26个同源JS模块共29份逐一返回成功，统一行尾后与已提交内容完全一致。
+- Mac内置浏览器最终实际刷新至`6ec28c6`，可刷写按钮可用，备用错误槽位不再显示，console无错误。未选中真实串口，未点击安装/擦除；实物握手、写入、校验和耐久仍未验证。
 
 ## 本地回归
 
@@ -61,4 +63,4 @@ Espressif esptool-js：https://espressif.github.io/esptool-js/docs/ 。更底层
 - 首轮窄窗测试选了无尺寸宿主而非实际ew-dialog，已改成真实内容可见判据；新CSS特异性曾覆盖设备状态移动例外，恢复明确例外后原八组合通过。改同源依赖时取消无用install-button预加载，不再强制依赖上游按钮注册。
 - Windows独立已装无头Chrome，门户mock显式使用现有Python；私有preload不提交、不改断言。实体Mac串口握手/刷写/拔线/耐久未执行。
 - 锁定同源模块按需加载，不再等待无用的上游按钮注册；真实索引再次加载回归覆盖该路径，避免刷新索引后误禁用启动按钮。
-- 静态页面契约、15项站点打包与正常pre-push5/5通过；同源vendor按copytree进入正式站点。远端CI/Pages部署结果待完成后追加。
+- 静态页面契约、15项站点打包与正常pre-push5/5通过；同源vendor按copytree进入正式站点。最终CI和部署均通过，详见上方远端记录。
