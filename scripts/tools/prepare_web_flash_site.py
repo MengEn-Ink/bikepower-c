@@ -254,8 +254,19 @@ def manifest(board, version, firmware_name):
     }
 
 
+def release_changes(release):
+    catalog = json.loads((ROOT / "tools/web/firmware-release-notes.json").read_text(encoding="utf-8"))
+    if catalog.get("schema_version") != 1:
+        raise ReleaseValidationError("版本升级说明格式不受支持")
+    return catalog.get("releases", {}).get(str(release.get("tag_name") or ""), {})
+
+
+def full_release_notes(release):
+    return str(release.get("body") or "").replace("\r\n", "\n").strip()
+
+
 def notes_excerpt(release):
-    body = str(release.get("body") or "").replace("\r\n", "\n").strip()
+    body = full_release_notes(release)
     if len(body) > NOTES_EXCERPT_MAX:
         body = body[:NOTES_EXCERPT_MAX].rstrip() + "…"
     return body
@@ -325,6 +336,9 @@ def materialize_release(site_dir, release, token="", allow_file=False, dest_rel=
         "schema_version": 1,
         "tag": tag,
         "version": version,
+        "notes": notes_excerpt(release),
+        "notes_full": full_release_notes(release),
+        "changes": release_changes(release),
     }
     if dest_rel == "firmware":
         write_json(firmware_dir / "latest.json", latest)
@@ -336,6 +350,8 @@ def release_entry(info, is_latest, release):
         "boards": info["boards"],
         "latest": bool(is_latest),
         "notes": notes_excerpt(release),
+        "notes_full": full_release_notes(release),
+        "changes": release_changes({**release, "tag_name": info["tag"]}),
         "published_at": info.get("published_at", ""),
         "release_url": info.get("release_url", ""),
         "tag": info["tag"],

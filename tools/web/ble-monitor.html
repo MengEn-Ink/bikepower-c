@@ -386,6 +386,22 @@ body.gate-lock{overflow:hidden}
 .fw-rollback b{color:var(--amber)}
 .fw-rollback p{margin:6px 0 12px;color:var(--ink);font-size:13px;line-height:1.6}
 .fw-rollback .check-line{background:transparent;border-color:color-mix(in srgb,var(--amber) 50%,transparent)}
+.fw-changes{margin:18px 0;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.fw-changes h3{margin:0;font-size:18px}
+.fw-change-summary{margin:8px 0 12px;color:var(--ink);font-size:14px;line-height:1.7;max-width:76ch}
+.fw-change-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px}
+.fw-change-group{min-width:0}
+.fw-change-group h4{margin:0 0 7px;font-size:14px;color:var(--ink)}
+.fw-change-group ul{margin:0;padding-left:20px;color:var(--muted);font-size:13px;line-height:1.75}
+.fw-change-group li+li{margin-top:5px}
+.fw-change-group p{margin:0;color:var(--muted);font-size:13px;line-height:1.7}
+.fw-change-group[data-group="notes"]{grid-column:1/-1;border-left:3px solid var(--amber);padding-left:12px}
+.fw-change-web{margin-top:14px;font-size:13px;color:var(--muted)}
+.fw-change-web summary{cursor:pointer;color:var(--ink)}
+.fw-change-web ul{padding-left:20px;line-height:1.7}
+.fw-change-sources{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-size:12px}
+.fw-change-sources a{color:var(--accent);text-underline-offset:3px}
+@media(max-width:760px){.fw-change-grid{grid-template-columns:minmax(0,1fr)}}
 .fw-notes{margin:8px 0 0;max-height:260px;overflow:auto;padding:12px 14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:12px/1.7 var(--mono);white-space:pre-wrap;word-break:break-word}
 .flash-anim{margin:22px 0 0;border:1px solid var(--line);background:linear-gradient(var(--line-soft) 1px,transparent 1px) 0 0/100% 30px,var(--bg)}
 .flash-anim svg{display:block;width:100%;height:auto;max-height:190px}
@@ -1665,6 +1681,11 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           </div>
         </div>
 
+        <section class="fw-changes hidden" id="fw-changes" aria-labelledby="fw-changes-title">
+          <h3 id="fw-changes-title">版本升级内容</h3>
+          <div id="fw-changes-body"></div>
+        </section>
+
         <div class="fw-rollback hidden" id="fw-rollback" role="alert">
           <b>你选的是历史版本，这会把设备降级。</b>
           <p id="fw-rollback-text">旧固件可能读不懂新版本保存的配置。建议刷写时在弹窗里选择 Erase（清除数据），刷完后重新设置参数。</p>
@@ -1715,7 +1736,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <div class="flash-warning"><b>重要：</b>当前全量合并固件从 0x0 写入，会覆盖 NVS 配置与蓝牙绑定；不勾 Erase 也不能保留。更新前先导出配置。刷后曾系统配对但连不上，请仅忽略/删除 BikePower 的旧配对，再回本站重新选择。刷写期间不要拔线、刷新或关闭页面。</div>
 
         <details class="flash-details" id="fw-notes-wrap">
-          <summary>本版本发布说明</summary>
+          <summary>完整 Release 原文</summary>
           <pre class="fw-notes" id="fw-notes">--</pre>
         </details>
         <details class="flash-details">
@@ -3978,6 +3999,8 @@ function setFirmwareStatus(text,kind="warn"){
   badge.className="badge"+(kind?" "+kind:"");
 }
 function resetFirmwareDetails(){
+  const changes=$("fw-changes");if(changes)changes.classList.add("hidden");
+  const notes=$("fw-notes");if(notes)notes.textContent="版本信息尚未加载。";
   setText("firmware-version","--");
   setText("firmware-published","--");
   setText("firmware-filename","--");
@@ -4007,7 +4030,7 @@ function normalizeFirmwareReleases(index,latest){
   const list=[];
   const ok=r=>r&&typeof r.tag==="string"&&r.boards&&typeof r.boards==="object"&&Object.keys(r.boards).length;
   if(index&&index.schema_version===1&&Array.isArray(index.releases))for(const r of index.releases)if(ok(r))list.push(r);
-  if(!list.length&&latest&&latest.available&&ok(latest))list.push({tag:latest.tag,version:latest.version,published_at:latest.published_at,release_url:latest.release_url,boards:latest.boards,latest:true,notes:""});
+  if(!list.length&&latest&&latest.available&&ok(latest))list.push({tag:latest.tag,version:latest.version,published_at:latest.published_at,release_url:latest.release_url,boards:latest.boards,latest:true,notes:latest.notes||"",notes_full:latest.notes_full||"",changes:latest.changes||{}});
   if(list.length&&!list.some(r=>r.latest))list[0].latest=true;
   return list;
 }
@@ -4042,6 +4065,29 @@ function moveFirmwareHead(){
   const top=row.offsetTop+box.offsetTop-box.scrollTop;
   head.style.transform="translateY("+top+"px)";head.style.height=row.offsetHeight+"px";
 }
+function firmwareNotesSource(value){
+  try{const url=new URL(value);return url.protocol==="https:"&&url.hostname==="github.com"&&url.pathname.startsWith("/MengEn-Ink/bikepower-c/")?url.href:null;}catch(_){return null;}
+}
+function renderFirmwareChanges(rel){
+  const box=$("fw-changes"),body=$("fw-changes-body");if(!box||!body)return;
+  box.classList.remove("hidden");setText("fw-changes-title",rel.tag+" 升级内容");
+  const changes=rel.changes&&typeof rel.changes==="object"?rel.changes:{};
+  const items=key=>Array.isArray(changes[key])?changes[key].filter(v=>typeof v==="string"&&v.trim()):[];
+  const list=values=>'<ul>'+values.map(v=>'<li>'+escapeHtml(v)+'</li>').join("")+'</ul>';
+  const groups=[["added","新增功能"],["fixed","修复问题"],["improved","其他改进"],["notes","升级注意与已知限制"]];
+  let html='<p class="fw-change-summary">'+escapeHtml(typeof changes.summary==="string"?changes.summary:"该版本尚未整理分类摘要，请查看下方 Release 原文；不会套用其他版本的说明。")+'</p>';
+  html+='<div class="fw-change-grid">'+groups.map(([key,label])=>{
+    const values=items(key);
+    if(key==="improved"&&!values.length)return "";
+    const fallback=key==="notes"?"本页从 0x0 全量写入，会覆盖 NVS 配置与绑定；刷前导出配置，降级后重新核对服务和参数。":"发布说明未单列此类内容，不表示不存在变更。";
+    return '<div class="fw-change-group" data-group="'+key+'"><h4>'+label+'</h4>'+(values.length?list(values):'<p>'+escapeHtml(fallback)+'</p>')+'</div>';
+  }).join("")+'</div>';
+  const web=items("web");if(web.length)html+='<details class="fw-change-web"><summary>同期网页工具变更（不随固件回滚）</summary>'+list(web)+'</details>';
+  const sources=items("sources").map(firmwareNotesSource).filter(Boolean);
+  if(!sources.length){const source=firmwareNotesSource(rel.release_url);if(source)sources.push(source);}
+  if(sources.length)html+='<div class="fw-change-sources">'+sources.map((url,i)=>'<a href="'+escapeHtml(url)+'" target="_blank" rel="noopener noreferrer">'+(i===0?"查看正式 Release":"核对标签变更记录")+'</a>').join("")+'</div>';
+  body.innerHTML=html;
+}
 function renderSelectedFirmware(){
   if(flashSession&&flashSession.isBusy())return;
   resetFirmwareDetails();
@@ -4069,7 +4115,8 @@ function renderSelectedFirmware(){
   const board=select.value;
   const item=rel.boards[board];
   setText("fw-pick-meta",formatPublishedDate(rel.published_at)+" 发布 · "+(item&&item.label||board)+" · "+formatBytes(item&&item.size)+" · SHA256 已校验");
-  const notes=$("fw-notes");if(notes)notes.textContent=rel.notes||"该版本没有附带发布说明，可点击“固件详情”中的 Release 链接查看。";
+  renderFirmwareChanges(rel);
+  const notes=$("fw-notes");if(notes)notes.textContent=rel.notes_full||rel.notes||"该版本没有附带发布说明，可点击“固件详情”中的 Release 链接查看。";
   if(!item){setFirmwareStatus("板型固件缺失","err");setText("flash-message",rel.tag+" 未包含当前板型的完整固件与校验文件。");return;}
   const manifestPath=safeSitePath(item.manifest);
   const downloadPath=safeSitePath(item.download);

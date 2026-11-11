@@ -193,6 +193,28 @@ class WebFlashSiteTest(unittest.TestCase):
             json.loads((site / "firmware" / "latest.json").read_text())["tag"], "v4.2.0"
         )
 
+    def test_release_notes_complete_and_version_bound(self):
+        release = self.make_versioned_release("4.4.1", body="x" * 2000 + "末尾升级注意")
+        info = {"boards": {"generic-c3": {}}, "tag": "v4.4.1", "version": "4.4.1"}
+        entry = web_flash.release_entry(info, True, release)
+        self.assertTrue(entry["notes_full"].endswith("末尾升级注意"))
+        self.assertIn("手机配置页", entry["changes"]["summary"])
+        self.assertTrue(entry["changes"]["fixed"])
+        self.assertTrue(entry["changes"]["notes"])
+        unknown = web_flash.release_entry({**info, "tag": "v99.0.0"}, False, release)
+        self.assertEqual(unknown["changes"], {})
+        self.assertNotEqual(unknown.get("changes"), entry["changes"])
+
+    def test_all_current_versions_have_sourced_categories(self):
+        notes = json.loads((ROOT / "tools/web/firmware-release-notes.json").read_text(encoding="utf-8"))
+        self.assertEqual(set(notes["releases"]), {"v4.4.1", "v4.4.0", "v4.3.3", "v4.3.0", "v4.2.1", "v4.2.0", "v4.1.3"})
+        for tag, item in notes["releases"].items():
+            self.assertTrue(item["summary"])
+            for key in ("added", "fixed", "improved", "web", "notes"):
+                self.assertIsInstance(item[key], list)
+            self.assertTrue(item["notes"])
+            self.assertTrue(all(tag in url and url.startswith("https://github.com/MengEn-Ink/bikepower-c/") for url in item["sources"]))
+
     def test_history_rejects_unsafe_destination(self):
         site = web_flash.initialize_site(self.source, self.base / "site")
         with self.assertRaises(web_flash.ReleaseValidationError):
