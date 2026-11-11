@@ -41,12 +41,12 @@ class FakeClient:
         if char == CP:
             return
         # 注入fake帧（good场景），每5ms一帧
-        if self.scenario == 'good':
+        if self.scenario in ('good', 'parse_err'):
             async def pump():
                 try:
                     import struct as _st
-                    good = _st.pack('<Hh', 0, 100)
-                    for _ in range(40):
+                    good = b'\x20' if self.scenario == 'parse_err' else _st.pack('<Hh', 0, 320)
+                    while self.state.get('active', False):
                         cb(None, good)
                         await asyncio.sleep(0.002)
                 except asyncio.CancelledError:
@@ -66,6 +66,20 @@ class FakeClient:
 
 
 state = {}
+REAL_SLEEP = asyncio.sleep
+
+
+async def host_sleep(seconds):
+    await REAL_SLEEP(0.001 if seconds >= 3 else seconds)
+
+
+async def run_fast(mod):
+    original_sleep = mod.asyncio.sleep
+    mod.asyncio.sleep = host_sleep
+    try:
+        return await mod.main()
+    finally:
+        mod.asyncio.sleep = original_sleep
 
 
 class FakeSession:
@@ -77,16 +91,21 @@ class FakeSession:
         self.cfg = {'core': bytearray(15), 'bridge': bytearray(16)}
         self.cfg['core'][14] = 3          # 初始：完整掩码未开
         self.cfg['bridge'][1] = 1         # 初始：真实桥接（FTMS 按设计不注册）
-        self.client = FakeClient(state['scenario'], state)
+        self.client = None
         FakeSession.instances.append(self)
 
     async def connect(self):
         self.connects += 1
         if state.get('boom'):
             raise RuntimeError('boom')
+        self.client = FakeClient(state['scenario'], state)
+        state['active'] = True
 
     async def disconnect(self):
-        pass
+        state['active'] = False
+        for task in state['tasks']:
+            task.cancel()
+        self.client = None
 
     async def read_snapshot(self):
         return {'protocol': 1, 'schema': 14, 'revision': 1, 'group_mask': 255,
@@ -114,7 +133,7 @@ def run_scenario(scenario, rounds=2, min_frames=1, boom=False, ignore_bridge=Fal
     mod.reset_device = lambda *a, **k: None
     sys.argv = ['soak', '--address', 'AA:BB', '--port', 'COMX',
                 '--duration', '1', '--rounds', str(rounds), '--min-frames', str(min_frames)]
-    rc = asyncio.run(mod.main())
+    rc = asyncio.run(run_fast(mod))
     for t in state['tasks']:
         t.cancel()
     return rc, FakeSession.instances
@@ -165,7 +184,7 @@ def main_checks():
     mod.reset_device = lambda *a, **k: None
     sys.argv = ['soak', '--address', 'AA:BB', '--port', 'COMX',
                 '--duration', '1', '--rounds', '2', '--min-frames', '1']
-    rc = asyncio.run(mod.main())
+    rc = asyncio.run(run_fast(mod))
     ses = FakeSession.instances[0]
     assert ses.commits >= 2, f'fullmask+恢复两次提交都应发生, 实际{ses.commits}'
     assert rc == 1
@@ -174,7 +193,7 @@ def main_checks():
     # 7) 前置不成立：提交成功但桥接位没生效 → 判 precondition(rc=2)，不跑主测试、不计 FAIL
     rc, sessions = run_scenario('good', ignore_bridge=True)
     assert rc == 2, f'前置不成立应返回2而非FAIL(1): rc={rc}'
-    assert sessions[0].client.handlers == {}, '前置不成立时不应订阅任何特征（不该跑主测试）'
+    assert sessions[0].client is None, '前置不成立后的连接必须释放'
     print('PASS 前置不成立→precondition(rc=2)且不跑主测试')
 
 

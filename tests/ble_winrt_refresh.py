@@ -2,7 +2,7 @@
 
 策略：
 1. 默认(允许cached)连接；读 Config Meta 强校验长度=12。读到 stale（长度!=12/
-   DIS 非 'generic-c3-v4.3.3' 可读字节）→ 判定缓存过期。
+   DIS 不是当前配置头文件版本对应的板型固件名）→ 判定缓存过期。
 2. 过期则关闭当前引用，创建新 client(use_cached_services=False) 强制完整重枚举；
    重试限定事件/瞬态窗口，不做 sleep 盲重试。
 3. per-service DEBUG：逐 UUID GetCharacteristicsAsync 定位 E_UNEXPECTED 抛出点。
@@ -10,13 +10,33 @@
 """
 import asyncio
 import logging
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
 
 log = logging.getLogger(__name__)
 
 CONFIG_META_UUID = '7a5a0001-4c7a-4f2a-9b3e-6d1f4a8c0b21'
 DIS_FW_UUID = '00002a26-0000-1000-8000-00805f9b34fb'
+def _config_value(name):
+    match = re.search(rf'#define\s+{name}\s+"([^"]+)"',
+                      (ROOT / "main" / "bikepower_config.h").read_text(encoding="utf-8"))
+    if not match:
+        raise RuntimeError(f"无法读取 {name}")
+    return match.group(1)
+
+
+def expected_firmware_prefixes():
+    version = _config_value("FIRMWARE_VERSION")
+    return {
+        f"{_config_value('BOARD_NAME_GENERIC')}-v{version}",
+        f"{_config_value('BOARD_NAME_M5STAMP')}-v{version}",
+    }
+
+
 EXPECTED_META_LEN = 12
-EXPECTED_FW_PREFIX = 'generic-c3-v4.3.3'
+EXPECTED_FW_PREFIXES = expected_firmware_prefixes()
 
 
 class StaleCacheError(RuntimeError):
@@ -50,7 +70,7 @@ def _looks_stale(meta_raw, fw_bytes):
         fw = bytes(fw_bytes).split(b'\x00')[0].decode('ascii', 'replace')
     except Exception:
         fw = ''
-    if EXPECTED_FW_PREFIX not in fw:
+    if not any(fw.startswith(prefix) for prefix in EXPECTED_FW_PREFIXES):
         reasons.append(f'DIS固件异常: {fw!r}')
     return reasons
 

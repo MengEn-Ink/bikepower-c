@@ -18,6 +18,8 @@ void power_bridge_config_defaults(bridge_config_t *c)
 {
     if (!c) return;
     memset(c, 0, sizeof(*c));
+    /* 出厂默认：模拟来源（不桥接外部功率计），无绑定设备。 */
+    c->source = BRIDGE_SOURCE_SIMULATED;
     c->percent_x10 = BRIDGE_PERCENT_DEFAULT;
 }
 

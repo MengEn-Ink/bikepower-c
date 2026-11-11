@@ -8,9 +8,10 @@
   color-scheme:light;
 }
 * { box-sizing:border-box; }
-html { min-width:320px; background:var(--page); }
-body { margin:0; padding-bottom:92px; color:var(--ink); background:var(--page); font:15px/1.5 var(--sans); }
-button,input,select { font:inherit; letter-spacing:0; }
+html { min-width:0; background:var(--page); -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+body { margin:0; padding-bottom:calc(92px + env(safe-area-inset-bottom,0px)); color:var(--ink); background:var(--page); font:15px/1.5 var(--sans); }
+button,input,select { font:inherit; letter-spacing:0; touch-action:manipulation; }
+input,select,textarea { font-size:16px; }
 button { cursor:pointer; color:inherit; text-align: center; transition:background-color .16s,color .16s,border-color .16s,transform .12s; }
 button:active:not(:disabled) { transform:scale(.98); }
 button:disabled { cursor:default; }
@@ -153,8 +154,8 @@ dd { overflow:hidden; margin:3px 0 0; font-size:12px; font-weight:800; text-over
 input[type=range] { width:100%; min-height:44px; margin:5px 0 0; accent-color:var(--gold-hover); }
 .formula-line { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:5px; color:var(--muted); font-size:12px; }
 .formula-line b { flex:0 0 auto; color:var(--ink); }
-.field-pair,.inline-fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px; }
-.field-pair label,.inline-fields label,.wide-field { position:relative; display:block; color:var(--muted); font-size:12px; font-weight:800; }
+.field-pair,.inline-fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; margin-top:8px; }
+.field-pair label,.inline-fields label,.wide-field { position:relative; display:block; min-width:0; color:var(--muted); font-size:12px; font-weight:800; }
 .field-pair input,.inline-fields input,.wide-field input,.wide-field select {
   width:100%; min-height:44px; margin-top:3px; padding:0 42px 0 12px; border:1px solid var(--line-strong);
   border-radius:6px; background:var(--surface); color:var(--ink); font-size:16px; font-weight:750;
@@ -226,7 +227,7 @@ input[type=range] { width:100%; min-height:44px; margin:5px 0 0; accent-color:va
 .wifi-closed span { color:var(--cyan); font-size:12px; font-weight:850; }
 .wifi-closed h2 { margin:10px 0 6px; font-size:29px; }
 .wifi-closed p { margin:0 0 22px; color:var(--muted); }
-.toast { position:fixed; z-index:120; left:50%; bottom:96px; max-width:calc(100% - 32px); padding:10px 14px; transform:translate(-50%,16px); transition:opacity .18s,transform .18s; border-radius:7px; background:var(--ink); color:var(--surface); font-size:12px; font-weight:800; opacity:0; pointer-events:none; }
+.toast { position:fixed; z-index:120; left:50%; bottom:calc(110px + env(safe-area-inset-bottom,0px)); width:max-content; max-width:calc(100% - 32px); padding:10px 14px; overflow-wrap:anywhere; transform:translate(-50%,16px); transition:opacity .18s,transform .18s; border-radius:7px; background:var(--ink); color:var(--surface); font-size:12px; font-weight:800; opacity:0; pointer-events:none; }
 .toast.is-visible { transform:translate(-50%,0); opacity:1; }
 .identity-heading { display:flex; justify-content:space-between; gap:8px; margin:12px 0 5px; font-size:12px; }
 .identity-grid { display:grid; grid-template-columns:1fr 1fr; margin:0; border:1px solid var(--line); border-radius:6px; background:var(--surface-2); }
@@ -282,6 +283,11 @@ input[type=range] { width:100%; min-height:44px; margin:5px 0 0; accent-color:va
   .action-bar>div:last-child { display:grid; grid-template-columns:.8fr 1.2fr; width:100%; }
 }
 @media(max-width:540px) {
+  body { padding-bottom:calc(112px + env(safe-area-inset-bottom,0px)); }
+  .action-bar>div:first-child { min-width:0; overflow-wrap:anywhere; }
+  .action-bar>div:last-child { grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); }
+  .device-settings-body { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .replace-bridge-confirm select { font-size:16px; }
   .session-warning { align-items:stretch; flex-direction:column; }
   .session-warning .secondary-btn { width:100%; }
   .brand { font-size:15px; }

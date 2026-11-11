@@ -1,5 +1,16 @@
 # 测试脚本使用说明
 
+## 核心重复测试 harness
+
+- `python3 tests/core_suite.py --layer host --repeat 2 --report-dir tests/reports/core-host`：固定用例登记、依赖前置、argv 直传、每轮独立日志、失败不被后续 PASS 覆盖；报告目录不可复用，避免覆盖原失败；`--case transport` 可单跑，`--layer browser|all` 加入生产门户浏览器回归。浏览器需匹配的 Playwright 和 Chromium，Windows 可用 `SYSTEM_CHROME` 显式指向独立无头 Chrome。
+- `python3 tests/core_device_e2e.py --address <BLE地址> --port <串口> --board generic-c3 --name <设备名> --out tests/reports/core-device.json`：默认五轮 × 60 秒，模拟骑行掩码 15/7 交替，逐轮重新发现和连接、八组读回、CPS/HRS 数值/踏频/停更及 FTMS 控制/ERG 校验；`finally` 恢复原八组并 ROM 重启回读。原配置、绑定不清除，不自动配对；FTMS 控制要求事先完成正常系统配对。
+- 设备 E2E 启动前检查 `bleak/pyserial/esptool`（Windows 另需 WinRT）；默认控制模式只读检查系统配对，未配对在连接/写配置/复位前 FAIL。已配对仅是前置条件，不等价加密控制 PASS；不自动接受配对、不清绑定。
+- 设备报告与 `<报告名>-original-private.json` 均拒绝覆盖；每次换新报告名。快照包含 DIS 串号，可供 `--original` 身份校验使用；私有文件不上传。
+- `--data-only` 仅验证非零功率、CPS 曲柄踏频、HRS 与重连。报告保留 `control_status=NOT_RUN`、`full_acceptance=false`，不能替代控制或目标 App 验收；同一 Windows 中心端的多路订阅不等于两个独立下游。
+- `--original <本轮原快照.json>` 支持异常收尾时恢复独立完整八组，必须带匹配的 DIS 序列号；私有快照不上传。`--firmware <app.bin>` 仅记录期望 SHA256，不冒称已读回镜像；`--expected-git <短提交>` 可拒绝不匹配的板端遥测身份，烧录校验仍须独立执行。
+- `core_harness.DeviceLease` 仅协调遵守此锁的本机 harness；不控制第三方 App、旧脚本或其他电脑。串口/BLE 写入仍须统一执行者。核心数据面、离线断言、真实 NimBLE 虚拟板、系统缓存和目标 App 分层报告，不互相代替。
+- `test_core_harness.py`、`test_core_device_e2e.py` 及五宽度输入聚焦回归已接 quick/full 与质量门禁。旧 `ble_release_control_soak.py` 补齐真实 ERG 最后五帧、精确 3 字节控制响应、取消/恢复/释放错误；旧假帧夹具仍仅证明编排分支，不证明无线协议。
+
 ## 本地虚拟开发板
 
 - Windows：`./scripts/virtual_board.ps1 setup`、`doctor`、`build`、`test -Security -Running`、`debug`；构建在 Windows，仿真在同机 WSL2，不访问真实串口/蓝牙。

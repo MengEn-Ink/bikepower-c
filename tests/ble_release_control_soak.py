@@ -94,20 +94,22 @@ async def subscribe_all(s, run):
         return found, False
     counts = {u: 0 for u in [CPS_UUID, HR_UUID, CSC_UUID, FTMS_BIKE_UUID] + TELE_UUIDS}
     parse_errors = []
+    power_values = []
 
     def make_cb(uuid):
         def cb(_, data):
             counts[uuid] += 1
             if uuid == CPS_UUID:
                 try:
-                    parse_cps(bytes(data))
+                    power_values.append(parse_cps(bytes(data))['power_w'])
                 except ValueError as exc:
                     parse_errors.append(str(exc))
         return cb
     for uuid in counts:
         if uuid in found:
             await s.client.start_notify(uuid, make_cb(uuid))
-    return {'found': found, 'counts': counts, 'parse_errors': parse_errors}, True
+    return {'found': found, 'counts': counts, 'parse_errors': parse_errors,
+            'power_values': power_values}, True
 
 
 async def run_round(s, round_ctx, run, round_index):
@@ -121,7 +123,7 @@ async def run_round(s, round_ctx, run, round_index):
         for _ in range(60):
             await asyncio.sleep(0.05)
             hit = [bytes.fromhex(h) for h in cp_resp[before:]
-                   if len(h) >= 6 and bytes.fromhex(h)[0] == 0x80 and bytes.fromhex(h)[1] == op]
+                   if len(bytes.fromhex(h)) == 3 and bytes.fromhex(h)[0] == 0x80 and bytes.fromhex(h)[1] == op]
             if hit:
                 code = hit[-1][2]
                 if code != expected:
@@ -134,7 +136,11 @@ async def run_round(s, round_ctx, run, round_index):
     await cp_expect(0x05, struct.pack('<h', -1), 0x03, 'SetTargetPower(-1)')
     await cp_expect(0x05, struct.pack('<h', ERG_TARGET), 0x01, f'SetTargetPower({ERG_TARGET})')
     snap = dict(counts)
+    power_start = len(round_ctx['power_values'])
     await asyncio.sleep(run.args.duration)
+    stable = round_ctx['power_values'][power_start:][-5:]
+    if len(stable) < 5 or any(not ERG_RANGE[0] <= value <= ERG_RANGE[1] for value in stable):
+        run.fail_main(f'R{round_index} ERG未收敛: {stable}')
     delta = {u: counts[u] - snap[u] for u in counts}
     for uuid, n in delta.items():
         if n < run.args.min_frames:
@@ -169,14 +175,16 @@ async def main():
             if args.expect_bridge is not None and cfg['bridge'][1] != args.expect_bridge:
                 info['precondition_failures'].append(
                     f"bridge_source={cfg['bridge'][1]} != {args.expect_bridge}")
-        except Exception as exc:  # noqa: BLE001
+        except (Exception, asyncio.CancelledError) as exc:  # noqa: BLE001
             info['precondition_failures'].append(f'{type(exc).__name__}: {exc}')
         finally:
             try:
                 await s.disconnect()
-            except Exception:  # noqa: BLE001
-                pass
-            info['released'] = True
+            except (Exception, asyncio.CancelledError) as exc:
+                info['precondition_failures'].append('释放失败: ' + str(exc))
+            info['released'] = s.client is None
+            if not info['released']:
+                info['precondition_failures'].append('连接释放未证实')
         info['status'] = 'preflight-failed' if info['precondition_failures'] else 'preflight-ok'
         out = Path(args.out) if args.out else Path(__file__).with_name('soak-preflight.json')
         out.write_text(json.dumps(info, ensure_ascii=False, indent=2), encoding='utf-8', newline='\n')
@@ -234,19 +242,19 @@ async def main():
                 if not ok:
                     break
                 run.result['rounds'].append(await run_round(s, round_ctx, run, r + 1))
-            except Exception as exc:
+            except (Exception, asyncio.CancelledError) as exc:
                 run.fail_main(f'R{r + 1}独立连接失败: {type(exc).__name__}: {exc}')
                 break
     except PreconditionAbort:
         pass
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         run.fail_main(f'{type(exc).__name__}: {exc}')
     finally:
         # 真正 finally：仅在成功读到原快照时才恢复，主/恢复错误分离
         try:
             await s.disconnect()
-        except Exception:
-            pass
+        except (Exception, asyncio.CancelledError) as exc:
+            run.fail_restore('释放连接失败: ' + str(exc))
         if run.backup is not None:
             try:
                 # 服务表可能已被重建，先 ROM 重启让中心设备重新枚举再恢复
@@ -265,13 +273,13 @@ async def main():
                 _, final = await s.read_snapshot()
                 if final != run.backup:
                     run.fail_restore('重启后回读与原快照不一致')
-            except Exception as exc:
+            except (Exception, asyncio.CancelledError) as exc:
                 run.fail_restore(f'恢复路径异常: {type(exc).__name__}: {exc}')
             finally:
                 try:
                     await s.disconnect()
-                except Exception:
-                    pass
+                except (Exception, asyncio.CancelledError) as exc:
+                    run.fail_restore('最终释放连接失败: ' + str(exc))
         run.result['mask_after_restore'] = run.backup['core'][14] if run.backup else None
         if run.result['precondition_failures']:
             run.result['status'] = 'precondition'
@@ -279,7 +287,10 @@ async def main():
             run.result['status'] = 'failed'
         else:
             run.result['status'] = 'success'
-        run.result['released'] = True
+        run.result['released'] = s.client is None
+        if not run.result['released']:
+            run.fail_restore('连接释放未证实')
+            run.result['status'] = 'failed'
         out = Path(args.out) if args.out else Path(__file__).with_suffix('.json')
         out.write_text(json.dumps(run.result, ensure_ascii=False, indent=2),
                        encoding='utf-8', newline='\n')

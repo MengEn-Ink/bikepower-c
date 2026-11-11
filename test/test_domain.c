@@ -1465,6 +1465,7 @@ static void test_config_store(void)
     CHECK(c.run_pace_float_sec == RUN_PACE_FLOAT_SEC_DEFAULT, "默认跑步配速浮动秒数");
     CHECK(c.run_cadence_float == RUN_CADENCE_FLOAT_DEFAULT, "默认跑步步频浮动");
     CHECK(c.broadcast_mask == (BROADCAST_FIELD_ALL | BROADCAST_FIELD_CADENCE_WITH_POWER), "默认数据项全开且踏频随功率");
+    CHECK(c.bridge.source == BRIDGE_SOURCE_SIMULATED && c.bridge.device_count == 0, "出厂默认为模拟来源且无绑定桥接设备");
 
     config_data_t saved = c;
     saved.broadcast_mask = BROADCAST_FIELD_ALL;

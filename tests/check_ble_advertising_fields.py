@@ -38,7 +38,7 @@ ble_src = read(BLE_BIKEPOWER_C)
 config_src = read(CONFIG_H)
 
 # 提取广播 UUID 动态拼装块（adv_uuids 构建到 fields.uuids16 赋值之间）
-adv_block_m = re.search(r"ble_uuid16_t adv_uuids\[3\];.*?fields\.uuids16", ble_src, re.S)
+adv_block_m = re.search(r"ble_uuid16_t adv_uuids\[\d+\];.*?fields\.uuids16", ble_src, re.S)
 adv_block = adv_block_m.group(0) if adv_block_m else ""
 
 # 拆分跑步分支与骑行分支

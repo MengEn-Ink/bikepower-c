@@ -302,7 +302,7 @@ static void process_pending_ble_config(void)
     if (rebuild) {
         uint16_t owner = s_processing_config_wifi ? BLE_HS_CONN_HANDLE_NONE
             : ble_config_service_owner(transaction_id);
-        if (!ble_bikepower_begin_rebuild(owner)) {
+        if (!ble_bikepower_begin_rebuild(owner, s_processing_config_wifi)) {
             config_commit_result(transaction_id, BLE_CONFIG_RESULT_BUSY, 0, NULL);
             return;
         }

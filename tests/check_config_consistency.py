@@ -691,7 +691,7 @@ check("FTMS_TREADMILL_UUID" in ble_selftest_src and "parse_treadmill" in ble_sel
       "ble_selftest.py 覆盖 FTMS Treadmill Data 发现和解析")
 check("g_ftms_cycling_feature_buf" in ble_bikepower_src and "g_ftms_running_feature_buf" in ble_bikepower_src,
       "FTMS Feature 必须按 cycling/running profile 分开声明")
-adv_block = re.search(r"ble_uuid16_t adv_uuids\[3\];.*?fields\.uuids16", ble_bikepower_src, re.S)
+adv_block = re.search(r"ble_uuid16_t adv_uuids\[\d+\];.*?fields\.uuids16", ble_bikepower_src, re.S)
 adv_block_src = adv_block.group(0) if adv_block else ""
 check(adv_block_src.count("BLE_UUID16_INIT(FTMS_SERVICE_UUID)") >= 2,
       "cycling 与 running 广播 UUID 都必须包含 FTMS，便于可控训练器入口发现")

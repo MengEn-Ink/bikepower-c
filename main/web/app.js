@@ -384,6 +384,11 @@
       $("saveBtn").textContent = "保存并切换到" + (state.draft.sport === "running" ? "跑步":"骑行");
       $("saveHint").textContent = state.busy ? "正在切换运动模式…":"保存后 BLE 服务将短暂重建";
     }
+    if (dirty && (state.draft.sport !== state.applied.sport
+        || state.draft.source !== state.applied.source
+        || JSON.stringify(state.draft.broadcast) !== JSON.stringify(state.applied.broadcast))) {
+      $("saveHint").textContent = "保存后蓝牙将短暂断开，请在 App 或码表重新连接";
+    }
     if (!validSimulation()) $("saveHint").textContent = "请检查体重和强度范围";
   }
 
@@ -847,7 +852,9 @@
         if (runtime.transaction === transaction && !runtime.pending) {
           if (runtime.result !== 0) {
             confirmedFailure = true;
-            throw new Error("配置未保存（错误 " + runtime.result + "），草稿已保留");
+            throw new Error(runtime.result === 3
+              ? "设备忙碌，另一项配置或模式切换尚未结束，请稍后重试；草稿已保留"
+              : "配置未保存（错误 " + runtime.result + "），草稿已保留");
           }
           if (close) { endSession(true,runtime.remaining_sec); }
           else { await load(false); if (!state.closed) showToast("配置已保存并应用"); }

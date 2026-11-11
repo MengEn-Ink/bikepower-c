@@ -204,6 +204,6 @@ void ble_bikepower_refresh_device_name(void);
  * 特殊行为：不包含上游功率计连接。
  */
 int ble_bikepower_conn_count(void);
-bool ble_bikepower_begin_rebuild(uint16_t owner);
+bool ble_bikepower_begin_rebuild(uint16_t owner, bool allow_disconnect);
 void ble_bikepower_cancel_rebuild(void);
 uint16_t ble_bikepower_response_connection(uint32_t token);

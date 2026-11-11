@@ -5,6 +5,17 @@
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
+## 当前本地候选：门户切换、移动适配与核心 harness（2026-11-11）
+
+- WiFi来源/服务表变更允许冻结并沿原1.5秒宽限主动断开重建；BLE配置多下游所有者保护保持。移动输入字号、安全区、网格收缩及重试提示更新。
+- 五轮×60秒实体模拟数据通过（掩码15/7交替，CPS/HRS每轮各60帧，曲柄踏频正常）；原桥接八组恢复与ROM重启读回通过。只证明当前候选数据，不等价实体真实踩踏、完整控制或目标App验收。
+- 骑鬥v2.6.6功率/踏频已显示更新，HRS独立通知正常；定向清本机旧绑定后骑鬥心率仍停在连接60秒，无数值。原配置mask3未注册心率，本轮当前基线已变为模拟source0/mask15，独立收尾八组与身份一致、连接释放。标准WinRT Encryption仍Failed19，系统配对接管被跳过，控制/发布保持阻塞，不降低认证。
+- 续测已核验两条历史peer中一条对应当前电脑，仅按本轮授权令该peer的5条旧记录失效（6字节NVS位图，未写app）；新鲜NVS双备份/CRC与写后双读逐字节核验通过，其他peer/本机IRK/配置保持。ROM启动及最终严格回读通过；不能把旧绑定认定为心率或Failed19的唯一根因。
+- 设备harness补依赖/配对前置、唯一报告与快照名/防覆盖、DIS身份恢复源；8项编排Host与2项WinRT通过，续测完整7用例两轮14次PASS。实机未配对前置拒绝零写入，控制NOT_RUN，不冒充ERG通过。
+- 核心harness新增固定用例登记、每次执行日志、独占锁及完整快照身份检查、数值/停更/ERG断言、取消/恢复失败分离；`--data-only`保留控制NOT_RUN且完整验收false。Host6246/0、核心最终12项负例、移动两轮五宽、601秒45轮mock通过。
+- 最终统一核心suite新目录两轮七用例共14次全PASS；历史缺依赖suite保留FAIL，补齐依赖不修改旧结果。完整[验证报告](docs/dev/53-qidou-core-harness-validation.md)包含镜像身份、心率分层与发布阻塞。
+- 当前源码IDF构建/实际NimBLE虚拟安全跑步通过，SC仍NOT_OBTAINED。实体已测旧构建身份与当前重新构建镜像分别记录，不沿用旧PASS。未提交push/tag/Release；严格发布门禁与目标客户端完整验收仍开放。测试入口见 [tests/README.md](tests/README.md)。
+
 ## v4.4.0 已发布（仅 generic-c3，2026-11-09）
 
 - tag `v4.4.0` 与 GitHub Release 已创建；v4.3.3 保留不覆盖，M5Stamp C3 未发布。

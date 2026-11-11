@@ -57,7 +57,8 @@ struct ble_gap_event {
  struct {uint16_t conn_handle,attr_handle;bool indication;int status;} notify_tx;
 };
 static bool host_exists=true;static uint8_t host_role=BLE_GAP_ROLE_SLAVE;
-static unsigned ads;
+static unsigned ads,adv_stops;
+static int ble_gap_adv_stop(void){adv_stops++;return 0;}
 static int start_advertising(void){ads++;return 0;}
 static void ble_power_bridge_host_reset(void){}
 static int ble_gap_conn_find(uint16_t c,struct ble_gap_conn_desc *d){if(!host_exists||c<1||c>3)return 1;d->role=host_role;return 0;}
@@ -69,13 +70,19 @@ funcs=t.functions(source,[('client_find','static ble_client_t *'),('client_indic
  ('subscriptions_reset','static void'),('subscription_update','static void'),('notification_subscribed','static bool'),
  ('indication_reset','static void'),('indication_reserve','static uint32_t'),('indication_subscription_revoked','static void'),
  ('indication_complete','static void'),('indication_pump_nolock','static void'),('indication_submit','static bool'),
- ('notify_one_nolock','static void'),('connection_accept','static bool'),('connection_remove','static void'),('ble_bikepower_conn_count','int'),('gap_event_cb','static int'),('on_reset','static void')])
+ ('notify_one_nolock','static void'),('connection_accept','static bool'),('connection_remove','static void'),('ble_bikepower_conn_count','int'),('gap_event_cb','static int'),('on_reset','static void'),('ble_bikepower_begin_rebuild','bool'),('ble_bikepower_cancel_rebuild','void')])
 checks=r'''
 int main(void){
  (void)chr_read_buf;(void)g_profile;(void)g_broadcast_mask;(void)s_output;(void)s_data_lock;(void)client_indicates;
  g_ready=true;
  assert(connection_accept(1));assert(connection_accept(2));assert(ble_bikepower_conn_count()==2);
  assert(!connection_accept(3));
+ assert(!ble_bikepower_begin_rebuild(1,false));assert(!s_rebuild_pending);
+ assert(!ble_bikepower_begin_rebuild(BLE_HS_CONN_HANDLE_NONE,false));
+ assert(ble_bikepower_begin_rebuild(BLE_HS_CONN_HANDLE_NONE,true));
+ assert(s_rebuild_pending&&adv_stops==1&&ble_bikepower_conn_count()==2);
+ assert(!ble_bikepower_begin_rebuild(BLE_HS_CONN_HANDLE_NONE,true));
+ ble_bikepower_cancel_rebuild();assert(!s_rebuild_pending&&ble_bikepower_conn_count()==2);
  subscription_update(1,28,true);subscription_update(2,28,true);
  uint8_t b[5]={2,1,0,1,0};notify_one_nolock(28,b,5);assert(notes[1]==1&&notes[2]==1);
  subscription_update(1,28,false);notify_one_nolock(28,b,5);assert(notes[1]==1&&notes[2]==2);

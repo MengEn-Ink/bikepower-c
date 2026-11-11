@@ -1773,6 +1773,9 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
     case BLE_GAP_EVENT_CONNECT: {
         uint16_t connection = event->connect.conn_handle;
         int status = event->connect.status;
+#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
+        ESP_LOGW(TAG, "DIAG: connect handle=%u status=%d", connection, status);
+#endif
         bool recoverable = status == 0 || status == BLE_ERR_UNSUPP_REM_FEATURE;
         if (recoverable && connection_accept(connection)) {
             if (status != 0) ESP_LOGW(TAG, "远端特征状态=%d，Host连接仍有效 handle=%u", status, connection);
@@ -1786,6 +1789,10 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         return 0;
     }
     case BLE_GAP_EVENT_DISCONNECT:
+#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
+        ESP_LOGW(TAG, "DIAG: disconnect handle=%u reason=%d",
+                 event->disconnect.conn.conn_handle, event->disconnect.reason);
+#endif
         connection_remove(event->disconnect.conn.conn_handle);
         rc = start_advertising();
         if (rc != 0 && !g_stopping) ESP_LOGW(TAG, "断开后广播暂未恢复 rc=%d", rc);
@@ -1796,9 +1803,22 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         return 0;
     case BLE_GAP_EVENT_SUBSCRIBE:
 #if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
-        ESP_LOGW(TAG, "DIAG: subscribe handle=%u cur_notify=%u cur_indicate=%u reason=%u",
-                 event->subscribe.attr_handle, event->subscribe.cur_notify,
-                 event->subscribe.cur_indicate, event->subscribe.reason);
+        {
+            uint16_t sub_handle = event->subscribe.attr_handle;
+            const char *sub_svc = "?";
+            if (sub_handle == g_cps_val_handle) sub_svc = "CPS";
+            else if (sub_handle == g_hr_val_handle) sub_svc = "HRS";
+            else if (sub_handle == g_csc_val_handle) sub_svc = "CSC";
+            else if (sub_handle == g_rsc_val_handle) sub_svc = "RSC";
+            else if (sub_handle == g_ftms_bike_handle) sub_svc = "FTMS-Bike";
+            else if (sub_handle == g_ftms_treadmill_handle) sub_svc = "FTMS-TM";
+            else if (sub_handle == g_ftms_cp_handle) sub_svc = "FTMS-CP";
+            else if (sub_handle == g_ftms_status_handle) sub_svc = "FTMS-Status";
+            else if (sub_handle == g_rsc_cp_handle) sub_svc = "RSC-CP";
+            ESP_LOGW(TAG, "DIAG: subscribe handle=%u svc=%s cur_notify=%u cur_indicate=%u reason=%u",
+                     sub_handle, sub_svc, event->subscribe.cur_notify,
+                     event->subscribe.cur_indicate, event->subscribe.reason);
+        }
 #endif
         if (!client_find(event->subscribe.conn_handle)
                 && (event->subscribe.cur_notify || event->subscribe.cur_indicate)) {
@@ -2264,13 +2284,14 @@ int ble_bikepower_conn_count(void)
  * 返回值：`ESP_OK` 表示启动成功，否则为对应错误码。
  * 特殊行为：任一步失败都会回滚已分配资源，保持模块可再次尝试启动。
  */
-bool ble_bikepower_begin_rebuild(uint16_t owner)
+bool ble_bikepower_begin_rebuild(uint16_t owner, bool allow_disconnect)
 {
     portENTER_CRITICAL(&s_indication_lock);
     bool allowed = !s_rebuild_pending;
     for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
         uint16_t connection = s_clients[i].connection;
-        if (connection != BLE_HS_CONN_HANDLE_NONE && connection != owner) allowed = false;
+        if (!allow_disconnect && connection != BLE_HS_CONN_HANDLE_NONE
+                && connection != owner) allowed = false;
     }
     if (allowed) s_rebuild_pending = true;
     portEXIT_CRITICAL(&s_indication_lock);
