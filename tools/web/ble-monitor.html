@@ -4910,24 +4910,32 @@ async function inspectorConnect(){
   const device=await requestDevice();
   if(!device) return;
   inspectorBadge("连接中…","warn");
+  const epoch=bleConnectionEpoch;
+  const rec={device, server:null, services:[], info:{}, latest:{}, subscriptions:{}, notifyTimes:{}, history:[], inspectorOwned:true};
   try{
-    const epoch=bleConnectionEpoch;
-    if(inspectorState.rec && inspectorState.rec.server){ try{inspectorState.rec.server.disconnect();}catch(e){} }
-    const rec={device, server:null, services:[], info:{}, latest:{}, subscriptions:{}, notifyTimes:{}, history:[]};
+    inspectorDisconnect();
     rec.server=await connectPageGatt(device,epoch);
-    rec.info=await readDeviceInfo(rec.server);
+    const guard=()=>{assertBleConnection(device,epoch);assertGattConnected(rec.server,"枚举设备");};
+    rec.info=await readDeviceInfo(rec.server,guard);
     assertBleConnection(device,epoch);
-    rec.services=await enumerateServices(rec.server);
+    rec.services=await enumerateServices(rec.server,guard);
     assertBleConnection(device,epoch);
-    device.addEventListener("gattserverdisconnected", ()=>{
-      inspectorBadge("已断开","err"); inspectorState.subscriptions.clear(); renderInspectorTree();
+    rec.onDisconnect=()=>{
+      releaseConnectionListeners(rec);
+      if(inspectorState.rec!==rec)return;
+      releaseInspectorSubscriptions();
+      inspectorBadge("已断开","err"); renderInspectorTree();
       log("[inspector] 设备已断开","warn");
-    });
+    };
+    device.addEventListener("gattserverdisconnected",rec.onDisconnect);
     inspectorState.rec=rec; inspectorState.services=rec.services; inspectorState.subscriptions.clear();
     inspectorBadge("已连接","ok");
     log("[inspector] 已连接 "+(device.name||"(无名)")+"，枚举 "+rec.services.length+" 个服务","data");
     renderInspectorTree();
   }catch(err){
+    releaseConnectionListeners(rec);
+    disconnectPageGatt(device,epoch);
+    if(epoch!==bleConnectionEpoch)return;
     inspectorBadge("连接失败","err");
     log("[inspector] 连接失败: "+err.message,"error");
   }
@@ -4945,7 +4953,15 @@ async function inspectorReuseConnected(){
     log("[inspector] 没有可沿用的已连接设备，请先在实时监控里连接","warn");
   }
 }
+function releaseInspectorSubscriptions(){
+  for(const entry of inspectorState.subscriptions.values()){
+    entry.char.removeEventListener("characteristicvaluechanged",entry.handler);
+  }
+  inspectorState.subscriptions.clear();
+}
 function inspectorDisconnect(){
+  releaseInspectorSubscriptions();
+  if(inspectorState.rec && inspectorState.rec.inspectorOwned)releaseConnectionListeners(inspectorState.rec);
   if(inspectorState.rec && inspectorState.rec.server){ try{inspectorState.rec.server.disconnect();}catch(e){} }
   inspectorState.rec=null; inspectorState.services=[]; inspectorState.subscriptions.clear();
   inspectorBadge("未连接","muted");
@@ -5108,6 +5124,7 @@ const HEALTH_STEPS = [
 ];
 const healthState = {
   running:false, results:{}, samples:[], report:null, device:null, server:null, services:[], info:{}, subs:[],
+  epoch:null, onDisconnect:null,
 };
 
 function healthResetSummary(){
@@ -5144,6 +5161,7 @@ function resetHealthCheck(){
   if(healthState.running){ log("[health] 正在运行，无法重置","warn"); return; }
   healthState.results={}; healthState.samples=[]; healthState.report=null;
   healthState.device=null; healthState.server=null; healthState.services=[]; healthState.info={}; healthState.subs=[];
+  healthState.epoch=null; healthState.onDisconnect=null;
   healthResetSummary();
   renderHealthSteps();
 }
@@ -5168,12 +5186,12 @@ async function runHealthCheck(){
     setHealthStep("env","running","正在收集浏览器环境信息…");
     const ua=navigator.userAgent; const secure=window.isSecureContext;
     const envDetail="UA = <code>"+escapeHtml(ua.slice(0,160))+"</code>；安全上下文 = "+(secure?"是":"否")+"；协议 = "+location.protocol;
-    if(!secure){ setHealthStep("env","fail",envDetail+"。Web Bluetooth 要求 HTTPS 或 localhost。"); healthFinalize(false); return; }
+    if(!secure){ setHealthStep("env","fail",envDetail+"。Web Bluetooth 要求 HTTPS 或 localhost。"); await healthFinalize(false); return; }
     setHealthStep("env","pass",envDetail);
 
     // Step 2: support
     setHealthStep("support","running","检查 navigator.bluetooth…");
-    if(!navigator.bluetooth){ setHealthStep("support","fail","当前浏览器不支持 Web Bluetooth（navigator.bluetooth = undefined）。请使用桌面 Chrome / Edge。"); healthFinalize(false); return; }
+    if(!navigator.bluetooth){ setHealthStep("support","fail","当前浏览器不支持 Web Bluetooth（navigator.bluetooth = undefined）。请使用桌面 Chrome / Edge。"); await healthFinalize(false); return; }
     let avail=true;
     try{ if(navigator.bluetooth.getAvailability) avail=await navigator.bluetooth.getAvailability(); }catch(e){ avail=true; }
     if(!avail){ setHealthStep("support","warn","navigator.bluetooth 存在，但 getAvailability() 返回 false（蓝牙适配器可能被禁用）。"); }
@@ -5182,11 +5200,13 @@ async function runHealthCheck(){
     // Step 3: device + connect
     setHealthStep("device","running","请在弹窗中选择 BikePower 或其他骑行设备…");
     const device=await requestDevice();
-    if(!device){ setHealthStep("device","fail","未选择设备或权限被拒绝。"); healthFinalize(false); return; }
+    if(!device){ setHealthStep("device","fail","未选择设备或权限被拒绝。"); await healthFinalize(false); return; }
     const t0=performance.now();
     const epoch=bleConnectionEpoch;
     healthState.device=device;
-    device.addEventListener("gattserverdisconnected", ()=>{ log("[health] 设备在检查期间断开","warn"); });
+    healthState.epoch=epoch;
+    healthState.onDisconnect=()=>{ log("[health] 设备在检查期间断开","warn"); };
+    device.addEventListener("gattserverdisconnected",healthState.onDisconnect);
     const server=await connectPageGatt(device,epoch);
     healthState.server=server;
     const connectMs=Math.round(performance.now()-t0);
@@ -5197,7 +5217,7 @@ async function runHealthCheck(){
     const info=await readDeviceInfo(server);
     assertBleConnection(device,epoch);
     healthState.info=info;
-    const filled=Object.values(info).filter(v=>v).length;
+    const filled=DIS_CHARS.filter(([key])=>!!info[key]).length;
     if(filled===0){ setHealthStep("dis","warn","设备未提供可读的 DIS 特征。"); }
     else{ setHealthStep("dis","pass",["厂商="+(info.manufacturer||"—"),"型号="+(info.model||"—"),"固件="+(info.firmware||"—")].map(escapeHtml).join(" · "),filled+" / 6 字段已读取"); }
 
@@ -5236,7 +5256,7 @@ async function runHealthCheck(){
       }catch(e){ /* ignore missing */ }
     }
     healthState.subs=subs;
-    if(!subs.length){ setHealthStep("sub","fail","未能订阅任何关键通知；该设备可能不是支持的骑行设备。"); healthFinalize(false); return; }
+    if(!subs.length){ setHealthStep("sub","fail","未能订阅任何关键通知；该设备可能不是支持的骑行设备。"); await healthFinalize(false); return; }
     setHealthStep("sub","pass","已订阅 "+subs.map(s=>s.key.toUpperCase()).join(" · "),subs.length+" / "+subMap.length+" 关键通知可用");
 
     // Step 7: 10s window
@@ -5246,11 +5266,11 @@ async function runHealthCheck(){
     const WINDOW_MS=10000;
     await new Promise(r=>setTimeout(r,WINDOW_MS));
     const endN=healthState.samples.length;
-    const window=healthState.samples.slice(startN,endN);
+    const sampleWindow=healthState.samples.slice(startN,endN);
     const stats={};
     subs.forEach(s=>{ stats[s.key]={count:0,gaps:[]}; });
     let prev={};
-    for(const sample of window){
+    for(const sample of sampleWindow){
       if(!stats[sample.key]) continue;
       stats[sample.key].count++;
       if(prev[sample.key]!=null){ stats[sample.key].gaps.push(sample.t-prev[sample.key]); }
@@ -5292,6 +5312,10 @@ async function healthFinalize(success){
     try{ s.ch.removeEventListener("characteristicvaluechanged",s.handler); await s.ch.stopNotifications(); }catch(e){}
   }
   healthState.subs=[];
+  if(healthState.device && healthState.onDisconnect){
+    healthState.device.removeEventListener("gattserverdisconnected",healthState.onDisconnect);
+    healthState.onDisconnect=null;
+  }
 
   // Build desensitized report
   const salt=Math.random().toString(36).slice(2,14)+"-"+Date.now().toString(16);
@@ -5351,8 +5375,8 @@ async function healthFinalize(success){
   healthState.running=false;
 
   // disconnect if we opened the connection (don't disconnect reused devices)
-  if(healthState.device && healthState.server){
-    try{ healthState.server.disconnect(); }catch(e){}
+  if(healthState.device){
+    disconnectPageGatt(healthState.device,healthState.epoch);
   }
 }
 

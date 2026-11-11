@@ -390,6 +390,11 @@ ok(f"检查了 {len(config_vars)} 个宏定义，无冲突")
 print("\n=== 6. 静态门禁聚合 ===")
 # (脚本相对路径, 人类可读名称)
 STATIC_CHECKS = [
+    ("tests/test_dev_workflow.py", "开发工具锁/超时/环境/源码快照回归"),
+    ("tests/test_release_build.py", "发行入口证据/缓存/标准打包回归"),
+    ("tests/test_ble_winrt_refresh.py", "双板 BLE 缓存身份与失败释放回归"),
+    ("tests/test_telemetry_e2e_ready.py", "遥测 E2E 链路缓存就绪与超时回归"),
+    ("tests/test_soak_harness_fake.py", "控制耐久帧数/收敛/最低堆判据回归"),
     ("tests/test_maintenance_tools.py", "维护工具功能回归"),
     ("tests/test_persistent_store.py", "生产 NVS 双槽原子提交与故障恢复 ASan/UBSan"),
     ("tests/test_mock_server_shutdown.py", "mock 服务终止信号与清理回归"),
@@ -410,6 +415,7 @@ STATIC_CHECKS = [
     ("tests/test_portal_faults.py", "生产门户 HTTP 事务故障 ASan/UBSan"),
     ("tests/test_device_gate_commands.py", "设备门禁板型命令契约"),
     ("tests/portal_exception_browser.py", "门户 HTTP 异常与恢复 E2E"),
+    ("tests/test_portal_recovery_browser.cjs", "门户隐藏错误定位与草稿恢复"),
     ("tests/test_pages_exceptions.py", "Pages BLE 事务异常与重试 E2E"),
     ("tests/test_bridge_session.py", "上游桥接会话与扫描 ASan/UBSan"),
     ("tests/check_bridge_failover_contract.py", "桥接主备恢复静态契约"),
@@ -470,7 +476,7 @@ for rel_path, name in STATIC_CHECKS:
     if not os.path.exists(full):
         fail(f"{name}: 脚本缺失 {rel_path}")
         continue
-    run_args = [python_exe, full]
+    run_args = ["node" if rel_path.endswith(".cjs") else python_exe, full]
     if rel_path == "scripts/tools/sync_user_docs.py":
         run_args.append("--check")
     out, rc = run_cmd(run_args, cwd=PROJECT, timeout=180)

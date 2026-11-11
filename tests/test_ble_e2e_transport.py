@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """BLE真机测试传输层离线回归；不连接设备、不修改配置。"""
 import asyncio
+import os
 import struct
 import sys
 import types
@@ -13,12 +14,57 @@ from test_ble_config_e2e import fixture_groups
 
 
 class TransportTests(unittest.TestCase):
+    def test_profile_child_uses_identified_address_and_restores(self):
+        import device_profile_ble_harness as profile
+        original = fixture_groups()
+        current = dict(original)
+        session = types.SimpleNamespace(
+            address="target", connect=AsyncMock(), disconnect=AsyncMock(),
+            client=types.SimpleNamespace(read_gatt_char=AsyncMock(
+                return_value=config.expected_firmware_name("generic-c3").encode())),
+        )
+
+        async def read_snapshot():
+            return {"revision": 1}, dict(current)
+
+        async def commit(groups, revision):
+            self.assertEqual(revision, 1)
+            current.update(groups)
+            return {"result": 0, "restart_flags": 1}
+
+        session.read_snapshot = read_snapshot
+        session.commit_all = commit
+        args = types.SimpleNamespace(device_name="BikePower", scan_timeout=1, board="generic-c3",
+                                     profile="running", settle_seconds=0, duration=3, target_power=250)
+        with patch.object(profile, "DeviceSession", return_value=session) as factory, \
+                patch.object(profile.subprocess, "run", return_value=types.SimpleNamespace(returncode=0)) as run, \
+                patch.object(asyncio, "sleep", AsyncMock()), \
+                patch.dict(os.environ, {"BIKEPOWER_BLE_ADDRESS": "target"}):
+            asyncio.run(profile.run_harness(args))
+        self.assertEqual(factory.call_args.kwargs["address"], "target")
+        self.assertEqual(run.call_args.kwargs["env"]["BIKEPOWER_BLE_ADDRESS"], "target")
+        self.assertEqual(current, original)
+
+    def test_selftest_explicit_miss_never_uses_name(self):
+        import ble_selftest as selftest
+        scanner = types.SimpleNamespace(find_device_by_filter=AsyncMock(return_value=None),
+                                        find_device_by_name=AsyncMock(), discover=AsyncMock())
+        with patch.object(selftest, "BleakScanner", scanner), \
+                patch.dict(os.environ, {"BIKEPOWER_BLE_ADDRESS": "target"}):
+            self.assertEqual(asyncio.run(selftest.main()), 1)
+        scanner.find_device_by_name.assert_not_awaited()
+        scanner.discover.assert_not_awaited()
+
     def test_explicit_address_never_falls_back(self):
         scanner = types.SimpleNamespace(find_device_by_filter=AsyncMock(return_value=None))
-        with patch.dict(sys.modules, {"bleak": types.SimpleNamespace(BleakScanner=scanner)}):
+
+        async def exercise():
             session = config.DeviceSession("BikePower", 1, "target")
+            await session._find_device()
+
+        with patch.dict(sys.modules, {"bleak": types.SimpleNamespace(BleakScanner=scanner)}):
             with self.assertRaises(config.ConfigE2EError):
-                asyncio.run(session._find_device())
+                asyncio.run(exercise())
         self.assertEqual(scanner.find_device_by_filter.await_count, 1)
         predicate = scanner.find_device_by_filter.call_args.args[0]
         self.assertTrue(predicate(types.SimpleNamespace(address="target"), None))
@@ -47,17 +93,19 @@ class TransportTests(unittest.TestCase):
         meta = struct.pack("<BBBBIHH", 1, 14, 0xFF, 0x0F, 1, 48, 0)
         changed = struct.pack("<BBBBIHH", 1, 14, 0xFF, 0x0F, 2, 48, 0)
         for final_meta, valid in [(meta, True), (changed, False)]:
-            session = config.DeviceSession("BikePower", 1)
-            session.client = types.SimpleNamespace(read_gatt_char=AsyncMock(
-                side_effect=[meta, *groups.values(), final_meta]))
-            if valid:
-                actual_meta, actual_groups = asyncio.run(session.read_snapshot())
-                self.assertEqual(actual_meta["revision"], 1)
-                self.assertEqual(actual_groups, groups)
-            else:
-                with self.assertRaisesRegex(config.ConfigE2EError, "Meta改变"):
-                    asyncio.run(session.read_snapshot())
-            self.assertEqual(session.client.read_gatt_char.await_count, 10)
+            async def exercise():
+                session = config.DeviceSession("BikePower", 1)
+                session.client = types.SimpleNamespace(read_gatt_char=AsyncMock(
+                    side_effect=[meta, *groups.values(), final_meta]))
+                if valid:
+                    actual_meta, actual_groups = await session.read_snapshot()
+                    self.assertEqual(actual_meta["revision"], 1)
+                    self.assertEqual(actual_groups, groups)
+                else:
+                    with self.assertRaisesRegex(config.ConfigE2EError, "Meta改变"):
+                        await session.read_snapshot()
+                self.assertEqual(session.client.read_gatt_char.await_count, 10)
+            asyncio.run(exercise())
 
     def test_cancelled_gatt_runs_original_restore_and_disconnect(self):
         args = types.SimpleNamespace(device_name="BikePower", scan_timeout=1, board="",

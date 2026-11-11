@@ -185,6 +185,10 @@ source $IDF_PATH/export.sh
 |------|------|---------|--------|
 | `check_portal_js.py` | 门户 JS 语法静态检查（`main/web/app.js` 跑 `node --check`） | TC-3a | **最高，每次改动必跑** |
 | `check_portal_structure.py` | 门户结构静态检查（路由表 / HTML / 占位符 / API 一致性） | TC-3d | 高 |
+| `test_portal_theme_browser.cjs` | 双主题持久化、四宽布局、对比度与草稿隔离 | 浏览器 | 高 |
+| `test_portal_intensity_browser.cjs` | 固定顶部三参数、滑杆拖动/键盘/触屏、整数功率、FTP 图示、无效输入、摘要展开、保存忙态/失败草稿、会话关闭与恢复；可用 `--screenshots <目录>` 保存双主题四宽截图 | 浏览器 | 高 |
+| `test_portal_inputs_browser.cjs` | 首次核心数值与折叠、展开不保存与保留草稿，已有机器人/跑步/功率计/固定心率恢复；模式等宽居中、五项组合栏与全宽滑杆、配速保存换算、44px 触控、同步、非法输入、忙态/失败/结束禁用、主题与扫描焦点；`--screenshots <目录>` 输出初始页及双主题四宽截图 | 浏览器 | 高 |
+| `test_portal_recovery_browser.cjs` | 隐藏错误聚焦、模式保留、最新已应用配置恢复、保存失败草稿、临时功率计取消及 503 保留、忙态/结束禁用、双主题四宽；接入 quality、operation 与 Pages 浏览器门禁 | 浏览器/mock | 高 |
 | `check_config_consistency.py` | 常量一致性静态检查（config 头文件 ↔ 引用方） | TC-3c | 高 |
 | `check_nvs_schema.py` | NVS schema 静态一致性检查（nvs_store ↔ config） | TC-3e | 高 |
 | `check_board_desc.py` | 板型描述表静态一致性检查（board_detect ↔ config ↔ Kconfig） | TC-3f | 高 |
@@ -593,7 +597,20 @@ python3 tests/ble_selftest.py
 
 ---
 
-## 七、已移除的脚本（历史记录）
+## 七、Service Changed 重启恢复回归
+
+`python3 tests/test_ble_bond_cache.py` 执行生产缓存同步代码，并覆盖布局已落盘、
+未确认指示跨重启、已确认不重发、多 peer、满容量及晚读取失败。
+安装 IDF 时直接提取其系统范围更新与编码函数；无 IDF 的 CI 使用明确标注的
+host 范围替身。设置 `BIKEPOWER_TEST_REQUIRE_IDF=1` 可强制实际源码路径，
+`IDF_PATH` 指向当前工具链；host 编译需 OpenSSL 开发头文件与库。
+
+`ble_selftest.py` 检查两套 profile 的 Service Changed indication 特征存在；
+`virtual_board_e2e.py --security` 若取得指示，严格验证四字节完整范围。
+未取得指示仍记 NOT_OBTAINED；这些检查不代替真实绑定客户端跨重启的发送/确认。
+见[设计与结果](../docs/dev/65-service-changed-reboot-recovery.md)。
+
+## 八、已移除的脚本（历史记录）
 
 | 脚本 | 移除版本 | 原因 | 替代 |
 |------|----------|------|------|

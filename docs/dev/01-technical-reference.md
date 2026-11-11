@@ -13,13 +13,18 @@
 
 NimBLE启用最多4个绑定记录，标准独立`nimble_bond` namespace存储安全密钥/CCCD/客户端能力；用户配置namespace与schema不变。使用SC Just Works、ENC/ID分发和public本机广播，保持FTMS骑行/跑步WRITE_ENC。容量满拒绝新增，不使用轮转删除；已有绑定重复配对不自动替换。启动逐记录核验实际NVS格式及RAM恢复，写入后补同身份更新落盘和回读，失败阻止密钥恢复及FTMS控制，不擦除记录。服务表可因配置变化重建，重新同步时通过Service Changed告知已绑定客户端。该早期候选五轮加密控制/四路300秒通知、已绑定时八组配置/GATT重建/重启与原配置恢复通过，但最终4ecf069镜像实物第二轮重连失败，正式发行阻断；持久CCCD存在跨服务表句柄失配线索，尚未修复。当前容量和存储故障仅host专项，未做多客户端满容量或真机写失败注入。若系统单侧忘记绑定，板端会拒绝覆盖；当前没有用户清绑定入口，需定向维护。最终发行门禁以PROGRESS.md为准；旧[会话修复报告](46-qidou-session-security-fix.md)仅记录先前无绑定手机验收，不代表当前候选通过。
 
-## 未提交的订阅布局缓存候选（仍阻断发行）
+## 订阅布局缓存与未确认指示恢复
 
-新增 `ble_bond_cache` 按GATT注册布局SHA256区分旧订阅，独立namespace `ble_gatt_cache`、key `layout_sha`。布局变化先清旧CCCD，保留已有Service Changed订阅并置value_changed，核验NVS后才提交/回读布局；相同布局及同Host重复sync不重复清理。密钥和用户配置不清，失败阻止广播。当前caf973be候选真实普通复连与重启配置保持通过，但服务表重建后WinRT发现仍失败，不能作为已修复规格或正式固件。采集时CCCD为0，不证明重建前状态或唯一根因；原八组/DIS已独立恢复。完整结果见 [绑定发行核验](47-bonding-release-verification.md)。标准Database Hash/Robust Caching尚未启用。
+`ble_bond_cache` 按GATT注册布局SHA256区分旧订阅，独立namespace `ble_gatt_cache`、key `layout_sha`。布局变化先清旧CCCD，保留已有Service Changed订阅并置value_changed，核验NVS后才提交/回读布局；相同布局及同Host重复sync不重复清理。每次成功同步均检查未确认的indication订阅；若存在，恢复系统服务的 `1–65535` 句柄范围，以免再次启动后范围归零。`changed` 仅报告布局变化。没有待确认记录则不触发系统更新；系统入口面向所有已订阅peer，因此部分peer已确认、另一个peer仍待确认时，前者也可能收到完整范围指示。密钥和用户配置不清，读取或持久化失败阻止广播。详见 [重启恢复验证](65-service-changed-reboot-recovery.md)；无线发送/确认与Windows链路占用仍待实物验证。早期caf973be候选WinRT发现失败记录见 [绑定发行核验](47-bonding-release-verification.md)，不作为当前镜像验收。标准Database Hash/Robust Caching尚未启用。
 
 ## BLE外设连接状态确认
 
 当前本地候选将CONNECT状态0或已观察到的远端特征错误26经`ble_gap_conn_find`确认，只有Host仍存在真实外设连接才发布应用句柄；开启SUBSCRIBE早于CONNECT确认时走相同验证。同句柄重复确认不重置订阅/控制，异句柄断开不清空当前连接，通知仍要求正确应用句柄和逐特征订阅。候选实物结果与未执行项见 [BINAVI连接修复](44-binavi-connection-fix.md)，不以构建通过代替码表验收。
+
+已接纳下游首次建链时，以 peer identity 查询已有安全记录；安全存储正常、
+LTK 存在且密钥长度合法、连接未加密时，主动请求恢复加密。EALREADY 表示
+已有安全过程，不当作失败。未知客户端仍通过加密特征触发原配对流程，
+不自动删除绑定，也不放宽 FTMS 的 WRITE_ENC。
 
 ## Pages 骑行端适配排查
 
@@ -372,6 +377,11 @@ DIS 读取内容来自编译期常量：
 - 其他：返回 not supported
 
 Fitness Machine Status 和 Control Point 使用独立编号；Reset/Started 为 1 字节，Stopped/Paused 为 2 字节。FTMS 写入先保留响应位置，再把命令及票据交给单槽 mailbox；未接受返回 Operation Failed，满槽不覆盖旧命令。主循环实际应用后才返回 Success。过期票据、断连和退订不完成旧命令；退订释放未发送的 indication 预留，已发出的 ATT 保留至确认或失败，不允许同特征新过程越过在途确认；同一特征等待 indication 确认期间拒绝新过程。Reset 成功后目标指令必须重新 Request Control。
+
+控制者退订、断连、响应失败、Reset 或 Host 复位统一递增释放代次。
+主任务每轮先观察代次并清理旧 ERG，再按 mailbox 的票据和代次应用命令；
+新目标应用后记录其代次。先退订后断连只释放一次，观察者退出不改变
+控制者代次；GAP/GATT 回调只改状态，ERG 引擎仍由主任务操作。
 
 RSC `SC Control Point=0x2A55` 使用 Write + Indicate，支持 Set Cumulative Value（opcode 1、uint32 dm）及 Response Code 0x10；已知请求截断、未知操作码、未订阅、进行中和 mailbox 忙均有独立错误路径。累计设置仅作用于本次运行会话，不写 NVS；长度、订阅和全 uint32 范围回归不替代实物 GATT 验收。
 
@@ -937,6 +947,7 @@ v13→v14 把原单设备绑定迁移到固定三设备表的槽位 0，其他�
 - 阈值心率 `PROFILE_THR_HR_MIN` 到 `PROFILE_THR_HR_MAX`
 - `ride_type` 合法性
 - 设备名空串回退为 `DEVICE_NAME_DEFAULT`
+- 广播掩码没有任何运动字段时回退 `BROADCAST_MASK_DEFAULT`；仅设置踏频随功率兼容位也需要回退
 
 ### 9.4 配置 JSON 序列化
 
@@ -1100,6 +1111,18 @@ idf.py build
 ```
 
 根据项目规则，C 代码改动后 `idf.py build` 必须通过。
+
+日常工具 `scripts/tools/dev_workflow.py` 的同模式锁覆盖配置桶、源码快照、
+状态及实际构建，clean 使用相同锁并保留锁文件。切板会移除快照的旧
+sdkconfig，Unix 构建子进程使用独立进程组和连续日志 deadline。
+POSIX 虚拟环境保留入口路径；显式 repo/config 贯穿发行调用，CMake 接收
+源仓库 Git 身份。缓存 PASS 记录源指纹、配置桶、sdkconfig 和三个实际
+bin 的哈希，任一变化均不能复用旧镜像。
+
+`release_build.py` 在构建前复用权威实物证据检查器。候选写入 candidates，
+状态文件位于包外；即使 skip-build 也在锁内核对成功状态、板型、Git、
+源快照、配置及镜像哈希，生成的 manifest/ZIP 由同一权威产物契约检查。
+候选构建和打包通过不代表实体、人工或正式发行通过。
 
 发版构建使用 `scripts/build_all.sh`。该脚本支持 `--help`、`--dry-run` 和按板型选择构建；正式运行先跑 host、桥接会话、压缩页面交互、mock、3 分钟核心流程耐久和静态门禁，再生成双板型合并固件、SHA256、manifest、报告、手册和总包。合并固件文件名为 `bikepower-c-板型-v版本.bin`，总包为 `bikepower-c-v版本.zip`，Git ID 单独保存在 manifest。脚本不创建 tag 或 GitHub Release。
 

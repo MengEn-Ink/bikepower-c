@@ -41,20 +41,34 @@ def request_json(base_url, path, payload=None, timeout=5):
         return json.loads(response.read().decode("utf-8"))
 
 
-def set_profile(base_url, profile, broadcast_mask, request_fn=request_json):
+def submit_config(base_url, payload, request_fn=request_json):
+    revision = request_fn(base_url, "/api/state")["revision"]
     result = request_fn(
-        base_url,
-        "/api/config",
-        {"sport_profile": profile, "broadcast_mask": broadcast_mask},
+        base_url, "/api/config", dict(payload, revision=revision),
     )
     if result.get("ok") is not True:
-        raise RuntimeError(f"切换 profile={profile} 失败: {result}")
+        raise RuntimeError(f"配置请求未被接收: {result}")
+    transaction = result.get("transaction")
+    if not isinstance(transaction, int) or transaction <= 0:
+        raise RuntimeError(f"配置请求缺少有效 transaction: {result}")
+    for _ in range(40):
+        runtime = request_fn(base_url, "/api/runtime")
+        if runtime.get("transaction") == transaction and runtime.get("pending") is False:
+            if runtime.get("result") != 0:
+                raise RuntimeError(f"配置保存失败: {runtime}")
+            return runtime
+        time.sleep(0.1)
+    raise RuntimeError(f"配置事务 {transaction} 未确认完成")
+
+
+def set_profile(base_url, profile, broadcast_mask, request_fn=request_json):
+    return submit_config(
+        base_url, {"sport_profile": profile, "broadcast_mask": broadcast_mask}, request_fn,
+    )
 
 
 def restore_config(base_url, payload, request_fn=request_json):
-    result = request_fn(base_url, "/api/config", payload)
-    if result.get("ok") is not True:
-        raise RuntimeError(f"恢复原始配置失败: {result}")
+    return submit_config(base_url, payload, request_fn)
 
 
 def selftest_command(profile, duration, target_power):
@@ -78,7 +92,7 @@ def run_profile_harness(
     run_fn=subprocess.run,
     sleep_fn=time.sleep,
 ):
-    original = request_fn(base_url, "/api/state")
+    original = request_fn(base_url, "/api/state")["config"]
     original_profile = original.get("sport_profile")
     original_mask = original.get("broadcast_mask", ALL_BROADCAST_FIELDS) or ALL_BROADCAST_FIELDS
     if original_profile not in ("cycling", "running"):

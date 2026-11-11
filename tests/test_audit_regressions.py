@@ -84,7 +84,7 @@ def main():
                         "-lm","-o",str(folder/"domain")],check=True)
         subprocess.run([str(folder/"domain")],check=True)
     source=(ROOT/"main/ble_bikepower.c").read_text(encoding="utf-8")
-    callbacks=standard.functions(source,[("ftms_send_response","static void"),
+    callbacks=standard.functions(source,[("ftms_release_owner","static void"),("ftms_send_response","static void"),
         ("ftms_send_status","static void"),("ftms_operation_accepted","static void"),("ftms_cp_cb","static int")])
     stubs=standard.CP_STUBS.replace("static int write_bytes",
         "static int ftms_cp_cb(uint16_t,uint16_t,struct ble_gatt_access_ctxt *,void *);\nstatic int write_bytes")

@@ -2,6 +2,7 @@
 #include "mbedtls/sha256.h"
 #include "nvs.h"
 #include "host/ble_hs.h"
+#include "ble_gatt_priv.h"
 #include "store/config/ble_store_config.h"
 #include "services/gatt/ble_svc_gatt.h"
 #include "bikepower_config.h"
@@ -148,6 +149,36 @@ static esp_err_t verify_subscriptions(uint16_t changed_handle)
     return err == ESP_ERR_NVS_NOT_FOUND ? ESP_OK : err;
 }
 
+static esp_err_t restore_service_changed(void)
+{
+    uint16_t changed_handle;
+    if (ble_gatts_find_chr(BLE_UUID16_DECLARE(BLE_GATT_SVC_UUID16),
+                          BLE_UUID16_DECLARE(BLE_SVC_GATT_CHR_SERVICE_CHANGED_UUID16),
+                          NULL, &changed_handle) != 0) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    bool pending = false;
+    for (unsigned index = 0; index < CONFIG_BT_NIMBLE_MAX_CCCDS; ++index) {
+        union ble_store_key key = {0};
+        union ble_store_value value = {0};
+        key.cccd.peer_addr = *BLE_ADDR_ANY;
+        key.cccd.idx = index;
+        int rc = ble_store_config_read(BLE_STORE_OBJ_TYPE_CCCD, &key, &value);
+        if (rc == BLE_HS_ENOENT) break;
+        if (rc != 0) return ESP_FAIL;
+        if (value.cccd.chr_val_handle == changed_handle
+                && (value.cccd.flags & BLE_GATTS_CLT_CFG_F_INDICATE)
+                && value.cccd.value_changed) {
+            pending = true;
+        }
+    }
+    if (pending) {
+        /* 范围仅在 RAM 中，摘要相同的重启也须恢复未确认指示。 */
+        ble_svc_gatt_changed(BLE_GATT_CHANGED_START_HANDLE, BLE_GATT_CHANGED_END_HANDLE);
+    }
+    return ESP_OK;
+}
+
 esp_err_t ble_bond_cache_sync(bool *changed)
 {
     if (!changed || (!s_layout_started && !s_layout_valid)) return ESP_ERR_INVALID_STATE;
@@ -202,5 +233,6 @@ esp_err_t ble_bond_cache_sync(bool *changed)
     }
 done:
     nvs_close(handle);
+    if (err == ESP_OK) err = restore_service_changed();
     return err;
 }

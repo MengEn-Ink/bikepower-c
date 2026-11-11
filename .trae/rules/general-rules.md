@@ -19,6 +19,7 @@
 5. **代码改动同步文档**：改代码必须同步 PROGRESS.md / 规则 / CHANGELOG。
 6. **按功能分批提交**：不相关变更不混进同一 commit。
 7. **commit 后立即 push**（最高优先级）。
+8. **PR 合并后自动清理分支**：按下文流程删除已合并的工作分支及关联 worktree，保持本地和远程分支整洁，清理结果必须纳入交付说明。
 
 ## 文档命名规范（强制）
 
@@ -92,7 +93,7 @@ bikepower-c/
 │   ├── flash_latest.sh       — 自动探测 ESP-IDF 路径与串口，编译并烧录最新正式固件
 │   ├── build_all.sh          — 双板型 release 产物构建（merged bin + manifest）
 │   ├── log_daemon.sh         — 串口日志守护包装脚本
-│   ├── tools/                — 质量门禁 / 设备监控工具
+│   ├── tools/                — 质量门禁 / 设备监控 / 离线演示生成（含 export_configuration_demo.py）
 │   └── platform/             — 平台相关构建入口
 ├── tools/web/
 │   ├── ble-monitor.html      — Pages 工具台与移动使用手册
@@ -113,6 +114,10 @@ bikepower-c/
 │   ├── stage5_portal_test.py — 配网门户 /api/xxx JSON 路由自测
 │   ├── check_portal_js.py    — TC-3a：对 main/web/app.js 跑 node --check
 │   ├── check_portal_structure.py — TC-3d：校验 index.html 结构 + 路由表一致性 + 前端 API 调用
+│   ├── test_portal_theme_browser.cjs — 双主题、浏览器持久化、对比度与布局回归
+│   ├── test_portal_intensity_browser.cjs — 档位/功率/FTP 草稿反馈、无效输入与保存事务浏览器回归
+│   ├── test_portal_inputs_browser.cjs — 渐进配置、已有配置恢复、组合数值与浮动滑杆浏览器回归
+│   ├── test_portal_recovery_browser.cjs — 隐藏错误定位、撤销草稿与临时功率计取消回归
 │   ├── check_config_consistency.py — TC-3c：常量一致性校验
 │   ├── check_nvs_schema.py   — TC-3e：NVS key/schema 静态一致性
 │   ├── check_board_desc.py   — TC-3f：板型描述表静态一致性
@@ -207,3 +212,18 @@ bridge_failover → bridge_runtime → ble_power_bridge 定向会话
 - 发版前：编译通过 + 真机测试 + CHANGELOG 测试报告 + 用户手动验证并明确批准 + 打 tag + DIS 固件版本同步。
 - **固件发行产物必须合并为单文件（强制）**：创建发行版时，必须用 `esptool.py merge_bin` 把 bootloader + partition-table + app 合并为单一 `.bin`，用户一次烧录即可，禁止分发分散的多个 bin 文件。
 - Commit message：`<type>(<scope>): <简体中文概述>` + 逐文件正文 + `Co-authored-by: AI <ai@trae>` + `Model:`。
+
+## PR 合并后分支清理（强制）
+
+本规则适用于本仓库 PR 合并后的交付收尾。用户已授权自动清理满足以下条件的已合并工作分支，无需再次询问删除确认。
+
+1. **先确认合并**：从 GitHub 核对 PR 状态为 `MERGED`，记录来源分支、来源提交、目标分支和合并提交。仅提交 PR、CI 通过或 PR 被关闭均不代表已合并。
+2. **远程自动删除**：仓库必须保持 `delete_branch_on_merge=true`，由 GitHub 在 PR 合并后自动删除来源分支。若来源分支仍存在，确认其 head 与 PR 合并时的来源提交一致，再用 `git push origin --delete <branch>` 清理；合并后新增提交的同名分支必须保留。
+3. **同步主分支**：执行 `git fetch --prune origin`，确认目标主分支包含合并提交。工作区干净时切回目标主分支并使用 `git merge --ff-only origin/<base>` 更新；已有未提交改动时不得覆盖、强制切换或自动丢弃。
+4. **清理本地与工作区**：先保存必要的测试报告、日志和交付产物；关联 worktree 必须无 tracked/untracked 改动，再用 `git worktree remove <path>` 删除临时工作区，最后用 `git branch -d <branch>` 删除本地来源分支。未提交的待验证修复不能随工作区删除。
+5. **收敛历史分支**：每次收尾同时检查本地和 origin 上遗留的已合并工作分支；核对其 PR、最新 head、有效差异与关联 worktree 后按同样流程清理，不为已交付任务长期保留临时备份分支。
+6. **保留有效分支**：`main`、默认分支、受保护分支、仍有 OPEN PR 的分支、存在未合并有效提交或未提交改动的分支不自动删除。其他人的活动分支和无法确认归属的共享分支不得清理。
+7. **删除失败必须如实记录**：权限或保护规则阻止删除，或 squash/rebase 合并后普通 `git branch -d` 拒绝删除时，保留分支并说明原因；不得擅自使用 `-D`、force push、reset/clean 等方式绕过检查。
+8. **最终核验**：再次检查本地分支、远程 heads、worktree 和主分支状态；交付说明列出已删除分支、仍保留分支及理由。只有清理或明确记录阻断后才完成收尾，不得把未完成的清理写成已删除。
+
+PR 合并不授权固件发版、打 tag 或删除 tag；仍遵循原有发布门禁。

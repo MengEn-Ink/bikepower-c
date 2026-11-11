@@ -4,7 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('./web-flash/node_modules/playwright');
 const web = path.join(__dirname, '../tools/web');
-const screenshots = path.join(__dirname, '../design-demos/bikepower-ui/screenshots');
+const screenshots = path.join(__dirname, 'reports/pages-layout');
+fs.mkdirSync(screenshots, { recursive: true });
 const routes = [['manual', 'guide'], ['flash', 'device'], ['connect', 'device'],
   ['compare', 'device'], ['device-status', 'diagnostics'], ['inspector', 'diagnostics'], ['health', 'diagnostics']];
 (async () => {

@@ -2,6 +2,7 @@
 # 用法: make && ./test_domain
 DOMAIN := ../components/bikepower_domain
 CC ?= clang
+CPPFLAGS += -D_POSIX_C_SOURCE=200809L
 CFLAGS := -std=c11 -Wall -Wextra -I$(DOMAIN)/include
 DOMAIN_SRCS := $(DOMAIN)/profile.c \
         $(DOMAIN)/domain_rng.c \
@@ -26,20 +27,20 @@ HEADERS := $(wildcard $(DOMAIN)/include/*.h)
 all: test_domain ble_codec_cli test_power_bridge test_bridge_failover test_device_telemetry
 
 test_domain: $(TEST_SRCS) $(HEADERS)
-	$(CC) $(CFLAGS) -o $@ $(TEST_SRCS) -lm
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(TEST_SRCS) -lm
 
 ble_codec_cli: ble_codec_cli.c $(CODEC_SRC) $(HEADERS)
-	$(CC) $(CFLAGS) -o $@ ble_codec_cli.c $(CODEC_SRC)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ ble_codec_cli.c $(CODEC_SRC)
 
 test_power_bridge: test_power_bridge.c $(DOMAIN_SRCS) $(CONFIG_CODEC_SRC) $(CODEC_SRC) $(HEADERS)
-	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) -lm
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(filter %.c,$^) -lm
 
 test_bridge_failover: test_bridge_failover.c $(DOMAIN)/bridge_failover.c \
 		$(DOMAIN)/power_bridge.c $(DOMAIN)/device_identity.c $(HEADERS)
-	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(filter %.c,$^)
 
 test_device_telemetry: test_device_telemetry.c $(DOMAIN)/device_telemetry.c $(HEADERS)
-	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(filter %.c,$^)
 
 run: all
 	./test_domain

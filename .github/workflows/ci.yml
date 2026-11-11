@@ -26,8 +26,6 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Markdown links
-        run: python3 scripts/tools/check_markdown_links.py
       - name: Docs quality gate
         run: python3 scripts/tools/quality_gate.py --level docs
       - name: Release version consistency

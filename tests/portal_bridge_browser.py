@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--screenshot-dir", default="")
+    parser.add_argument("--color-scheme", choices=("light", "dark"), default="light")
     args = parser.parse_args()
     screenshots = Path(args.screenshot_dir) if args.screenshot_dir else None
     if screenshots:
@@ -39,7 +40,7 @@ def main():
                         break
                     except OSError:
                         time.sleep(0.05)
-                page = browser.new_page(viewport={"width": width, "height": 844})
+                page = browser.new_page(viewport={"width": width, "height": 844}, color_scheme=args.color_scheme)
                 errors = []
                 page.on("pageerror", lambda e: errors.append(str(e)))
                 page.goto(url)
@@ -66,6 +67,7 @@ def main():
                 expect(page.locator("#heroMetricValue")).to_have_text("310")
                 page.locator("#saveBtn").click()
                 expect(page.locator("#heroMetricValue")).to_have_text("315")
+                page.locator("#sourceOptions summary").click()
                 page.locator("[data-source=bridge]").click()
                 expect(page.locator("#bridgeEditor")).to_be_hidden()
                 expect(page.locator("#saveBtn")).to_be_disabled()

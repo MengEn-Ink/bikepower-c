@@ -18,6 +18,7 @@
 | 文档 | 用途 |
 |---|---|
 | [技术参考](dev/01-technical-reference.md) | 运行时、协议、配置和门户行为 |
+| [Service Changed重启恢复](dev/65-service-changed-reboot-recovery.md) | 持久待确认订阅、范围恢复、主机回归与实物验收边界 |
 | [固件安全](dev/02-firmware-security.md) | 编译加固及硬件安全方案 |
 | [测试覆盖分析](dev/03-test-coverage-analysis.md) | 模块覆盖与证据边界 |
 | [跑步兼容性](dev/04-running-mode-compatibility.md) | 跑步 App、RSC/FTMS 适配口径 |
@@ -48,6 +49,17 @@
 | [v4.4.0优化与发行收尾](dev/52-release-440-closeout.md) | 提交级候选、CI、COM205回退、NVS保持与正式P0阻断 |
 | [骑鬥与核心harness验证](dev/53-qidou-core-harness-validation.md) | 重复数据/配置E2E、心率分层、恢复与发布阻塞 |
 | [发版前项目复核](dev/51-pre-release-project-review.md) | 新失败注入、发布ZIP内容门禁、完整专项结果与待修/可延后项 |
+| [设备配置页优化设计](dev/53-device-configuration-design.md) | 工作台布局、手机可读性、双主题、浏览器持久化与本地验收结果 |
+| [设备配置页实施计划](dev/54-device-configuration-implementation.md) | 已完成的前端实施步骤、测试接线与离线产物生成 |
+| [强度反馈与交互细节](dev/55-portal-intensity-feedback-design.md) | 档位、体重、功率与 FTP 关系、范围条及资源边界 |
+| [强度反馈实施与验证](dev/56-portal-intensity-feedback-implementation.md) | 浏览器专项、双主题、事务反馈与演示同步 |
+| [顶部参数与骑行滑杆设计](dev/57-portal-profile-slider-design.md) | 固定个人参数、分档滑动、键盘/触屏与会话边界 |
+| [顶部参数与骑行滑杆实施](dev/58-portal-profile-slider-implementation.md) | 资源预算、业务回归与离线演示交付 |
+| [组合输入与整页交互设计](dev/59-portal-composite-input-design.md) | 主题图标、同栏目标与浮动、成熟输入方案与整页审查 |
+| [组合输入实施与验证](dev/60-portal-composite-input-implementation.md) | 字段校验、滑杆同步、焦点修复、双主题与离线门禁 |
+| [模式对齐与浮动滑杆统一](dev/61-portal-alignment-float-sliders.md) | 模式等宽居中、五项同栏输入、隐藏保值、几何门禁与资源预算 |
+| [首次核心配置与渐进展开](dev/62-portal-progressive-configuration.md) | 默认固定模拟、随动心率、按需展开、已保存配置恢复与验证结果 |
+| [草稿恢复计划](dev/63-portal-draft-recovery-plan.md)、[验证报告](dev/64-portal-draft-recovery-validation.md) | 隐藏错误定位、撤销草稿、资源与门禁验证 |
 
 ## Code Wiki
 

@@ -5,6 +5,8 @@ const path = require('node:path');
 const { chromium } = require('./web-flash/node_modules/playwright');
 const root = path.join(__dirname, '..');
 const web = path.join(root, 'tools/web');
+const screenshots = path.join(__dirname, 'reports/pages-operation');
+fs.mkdirSync(screenshots, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ headless: true });
   try {
@@ -55,7 +57,7 @@ const web = path.join(root, 'tools/web');
         assert.match(await demo.locator('[data-demo-wifi-guide]').innerText(), /12345678.*配置页/s);
         assert.match(await demo.locator('[data-demo-text]').textContent(), /192\.168\.4\.1/);
         if (width === 390 || width === 1280) {
-          await suite.screenshot({ path: '/tmp/bikepower-operation-' + width + '-' + theme + '.png' });
+          await suite.screenshot({ path: path.join(screenshots, 'operation-' + width + '-' + theme + '.png') });
         }
         await demo.getByRole('button', { name: '重置', exact: true }).click();
         await demo.getByRole('button', { name: '播放演示', exact: true }).click();
@@ -115,7 +117,7 @@ const web = path.join(root, 'tools/web');
         assert.equal(glow.opacity, '1');
         assert.ok(await demo.locator('.demo-light-field').evaluate(node => node.getBoundingClientRect().width >= 300));
         if (width === 390 || width === 1280) {
-          await suite.screenshot({ path: '/tmp/bikepower-operation-final-' + width + '-' + theme + '.png' });
+          await suite.screenshot({ path: path.join(screenshots, 'operation-final-' + width + '-' + theme + '.png') });
         }
         console.log(`PASS 操作演示：${theme} ${width}px，确认/保存/0W/交接/减少动画/无设备请求`);
         if (width === 1280 && theme === 'light') {

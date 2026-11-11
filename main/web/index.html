@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f1f2f5">
+  <meta name="theme-color" content="#f3f4f6">
+  <meta name="color-scheme" content="light dark">
+  <script>
+    (function(){var theme;try{theme=localStorage.getItem("bikepower.portal.theme.v1");}catch(_){}
+    document.documentElement.dataset.theme=theme==="light"||theme==="dark"?theme:
+      (matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");})();
+  </script>
   <title>BikePower · 设备配置</title>
   <!-- INLINE_CSS -->
 </head>
@@ -24,6 +30,10 @@
         <span id="headerFirmware">正在读取固件…</span>
       </div>
       <div class="session-clock">
+        <button class="icon-btn theme-toggle" id="themeToggle" type="button" aria-label="切换为深色主题">
+          <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.7 13.1A9 9 0 0 1 10.9 3.3a9 9 0 1 0 9.8 9.8Z"/></svg>
+          <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></svg>
+        </button>
         <span>闲置关闭</span>
         <b id="wifiTimer" aria-label="无操作后关闭倒计时">05:00</b>
         <button class="icon-btn" id="renewBtn" type="button" title="续期配网" aria-label="续期配网">
@@ -31,6 +41,12 @@
         </button>
       </div>
     </div>
+    <div class="field-pair profile-bar" id="profileBar" role="group" aria-label="个人参数">
+      <label title="40–150 kg，填写整数">体重<input id="profileWeight" type="number" min="40" max="150" step="1" inputmode="numeric" aria-describedby="profileHelp" disabled><span>kg</span></label>
+      <label title="50–500 W，填写整数">FTP<input id="ftpValue" type="number" min="50" max="500" step="1" inputmode="numeric" aria-describedby="profileHelp" disabled><span>W</span></label>
+      <label title="100–220 bpm，填写整数">阈值心率<input id="thresholdHeart" type="number" min="100" max="220" step="1" inputmode="numeric" aria-describedby="profileHelp" disabled><span>bpm</span></label>
+    </div>
+    <p id="profileHelp" hidden>体重 40–150 kg，FTP 50–500 W，阈值心率 100–220 bpm，均填写整数。修改为草稿，保存确认后应用。</p>
   </header>
 
   <main class="page">
@@ -56,7 +72,6 @@
             <h1 id="liveTitle">模拟骑行输出</h1>
             <p id="liveSubtitle">正在读取设备…</p>
           </div>
-          <span class="applied-tag">已应用</span>
         </div>
 
         <div class="signal-chain" aria-label="信号链路">
@@ -260,38 +275,52 @@
 
           <div id="simulationEditor">
             <section class="editor-section">
-              <div class="section-title">
-                <div><span>02</span><h3>模拟目标</h3></div>
-                <p>当前 <b id="simulationModeSummary">固定功率</b></p>
-              </div>
               <div class="segmented two-options" role="group" aria-label="模拟模式">
                 <button class="is-active" type="button" data-sim-mode="fixed">固定功率</button>
                 <button type="button" data-sim-mode="pacer">配速机器人</button>
               </div>
-              <div class="field-pair">
-                <label id="fixedPowerField">目标功率<input id="simPower" type="number" min="0" max="2000" value="220" inputmode="numeric"><span>W</span></label>
-                <label id="robotWeightField" hidden>体重<input id="profileWeight" type="number" min="30" max="200" value="70" inputmode="decimal"><span>kg</span></label>
-                <label>模拟踏频<input id="simCadence" type="number" value="88" inputmode="numeric"><span>rpm</span></label>
-              </div>
-              <div class="field-pair">
-                <label>功率浮动<input id="powerFloat" type="number" min="0" max="100"><span>±W</span></label>
-                <label>踏频浮动<input id="cadenceFloat" type="number" min="0" max="20"><span>±rpm</span></label>
+              <div class="field-pair simulation-fields">
+                <div id="fixedPowerField">
+                  <label for="simPower">目标功率</label>
+                  <div class="paired-input">
+                    <div><input id="simPower" type="number" min="0" max="2000" step="1" inputmode="numeric" aria-describedby="powerInputHelp" disabled><span>W</span></div>
+                    <div><span>±</span><input id="powerFloat" type="number" min="0" max="100" step="1" inputmode="numeric" aria-label="功率浮动 W" aria-describedby="powerInputHelp" disabled><span>W</span></div>
+                  </div>
+                  <input id="powerFloatRange" type="range" min="0" max="100" step="1" aria-label="调整功率浮动" aria-describedby="powerInputHelp" disabled>
+                  <p class="identity-note" id="powerInputHelp" role="status"></p>
+                </div>
+                <div>
+                  <label for="simCadence">模拟踏频</label>
+                  <div class="paired-input">
+                    <div><input id="simCadence" type="number" min="20" max="120" step="1" inputmode="numeric" aria-describedby="cadenceInputHelp" disabled><span>rpm</span></div>
+                    <div data-fixed-float><span>±</span><input id="cadenceFloat" type="number" min="0" max="20" step="1" inputmode="numeric" aria-label="踏频浮动 rpm" aria-describedby="cadenceInputHelp" disabled><span>rpm</span></div>
+                  </div>
+                  <input id="cadenceFloatRange" type="range" min="0" max="20" step="1" aria-label="调整踏频浮动" aria-describedby="cadenceInputHelp" data-fixed-float disabled>
+                  <p class="identity-note" id="cadenceInputHelp" role="status"></p>
+                </div>
               </div>
               <div id="robotFields" hidden>
-                <label class="wide-field intensity-field">骑行强度
-                  <select id="robotPreset">
-                    <option value="recovery">恢复骑行 · 1.5–2.0 W/kg</option>
-                    <option value="endurance" selected>耐力骑行 · 2.5–3.0 W/kg</option>
-                    <option value="tempo">节奏骑行 · 3.0–3.5 W/kg</option>
-                    <option value="custom">自定义强度</option>
-                  </select>
-                </label>
+                <div class="formula-line"><label for="robotPreset">骑行强度</label><b id="robotPresetLabel">正在读取档位…</b></div>
+                <input id="robotPreset" type="range" min="0" max="5" step="1" aria-describedby="rideHelp">
+                <div class="ride-stops" id="robotStops" role="group" aria-label="直接选择骑行强度"></div>
+                <p class="identity-note" id="rideHelp">滑动或点选强度；自定义可填写范围。</p>
                 <div class="field-pair" id="customRobotFields" hidden>
-                  <label>强度下限<input id="wkgMin" type="number" min="0.5" max="10" step="0.1" value="2.5" inputmode="decimal"><span>W/kg</span></label>
-                  <label>强度上限<input id="wkgMax" type="number" min="0.5" max="10" step="0.1" value="3" inputmode="decimal"><span>W/kg</span></label>
+                  <label>强度下限<input id="wkgMin" type="number" min="1" max="7" step="0.1" value="2.5" inputmode="decimal" aria-describedby="robotRangeError"><span>W/kg</span></label>
+                  <label>强度上限<input id="wkgMax" type="number" min="1" max="7" step="0.1" value="3" inputmode="decimal" aria-describedby="robotRangeError"><span>W/kg</span></label>
                 </div>
                 <label class="wide-field">自定义档名称<input id="customPacerName" maxlength="31"></label>
-                <div class="robot-preview"><span>功率范围 <b id="robotPowerRange">175–210 W</b></span><small>按体重与强度平滑变化</small></div>
+                <div class="robot-preview">
+                  <div class="formula-line"><span>预计功率</span><b id="robotPowerRange">—</b></div>
+                  <div class="formula-line"><span id="robotFtpReference">参考 FTP</span><b id="robotFtpRange">—</b></div>
+                  <svg class="robot-track" id="robotFtpTrack" viewBox="0 0 150 10" preserveAspectRatio="none" aria-hidden="true" hidden>
+                    <rect y="3" width="150" height="4" rx="2"/>
+                    <rect id="robotRangeBand" y="3" width="150" height="4"/>
+                    <line x1="100" x2="100" y1="0" y2="10"/>
+                  </svg>
+                  <div class="formula-line" id="robotFtpScale" hidden><span>0%</span><span>100% FTP</span><span>150%</span></div>
+                  <small id="robotFtpRelation" role="status"></small>
+                </div>
+                <p class="identity-note">预计功率 = 体重 × 强度。不调节骑行台阻力；机器人自动控制浮动。</p>
                 <p class="field-error" id="robotRangeError" role="status" hidden>强度下限不能大于上限</p>
               </div>
             </section>
@@ -317,18 +346,15 @@
             </div>
             <p class="identity-note" id="bridgeHeartHint" hidden>接入真实功率计后默认关闭；可手动开启模拟心率。</p>
             <div id="heartFields">
-              <div class="segmented" role="group" aria-label="模拟心率模式">
+              <div class="segmented two-options" role="group" aria-label="模拟心率模式">
                 <button class="is-active" type="button" data-heart-mode="linked">功率联动</button>
                 <button type="button" data-heart-mode="fixed">固定心率</button>
               </div>
-              <div class="field-pair" id="linkedHeartFields">
-                <label>FTP<input id="ftpValue" type="number" value="245"><span>W</span></label>
-                <label>阈值心率<input id="thresholdHeart" type="number" value="178"><span>bpm</span></label>
-              </div>
+              <p class="identity-note" id="linkedHeartFields">功率联动使用顶部的 FTP 与阈值心率。</p>
               <div class="field-pair" id="fixedHeartFields" hidden>
                 <label>目标心率<input id="fixedHeart" type="number" value="145"><span>bpm</span></label>
+                <label>固定心率浮动<input id="hrFloat" type="number" min="0" max="20"><span>±bpm</span></label>
               </div>
-              <label class="wide-field">固定心率浮动<input id="hrFloat" type="number" min="0" max="20"><span>±bpm</span></label>
             </div>
           </section>
         </div>
@@ -339,7 +365,7 @@
               <div><span>01</span><h3>跑步模式</h3></div>
               <p id="runModeSummary">固定配速</p>
             </div>
-            <div class="segmented" role="group" aria-label="跑步模式">
+            <div class="segmented two-options" role="group" aria-label="跑步模式">
               <button class="is-active" type="button" data-run-mode="fixed">固定配速</button>
               <button type="button" data-run-mode="pacer">配速档</button>
 
@@ -391,7 +417,8 @@
   <div class="action-bar">
     <div>
       <span id="saveState" role="status">正在读取设备…</span>
-      <small id="saveHint">关闭网页不会停止已运行的桥接</small>
+      <small id="saveHint">关闭网页不影响当前输出</small>
+      <button class="text-btn" id="locateErrorBtn" type="button" hidden>定位错误</button>
     </div>
     <div>
       <button class="secondary-btn" id="closeWifiBtn" type="button">关闭 WiFi</button>

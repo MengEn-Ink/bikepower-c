@@ -38,6 +38,7 @@ SENSOR_LOCATION_UUID = "00002a5d-0000-1000-8000-00805f9b34fb"
 DIS_MANUF_UUID = "00002a29-0000-1000-8000-00805f9b34fb"
 DIS_MODEL_UUID = "00002a24-0000-1000-8000-00805f9b34fb"
 DIS_FW_UUID = "00002a26-0000-1000-8000-00805f9b34fb"
+SERVICE_CHANGED_UUID = "00002a05-0000-1000-8000-00805f9b34fb"
 
 def get_expected_board_name(repo_root):
     env_board = os.environ.get("BIKEPOWER_EXPECT_BOARD", "")
@@ -381,6 +382,13 @@ async def run_running_profile(client, found):
                 samples, treadmill_samples, 2.2, settle_seconds=1.1
             )
 
+            print("Reset 后重新申请控制")
+            request_result = await write_ftms_cp_and_wait(
+                client, cp_responses, OP_REQUEST_CONTROL
+            )
+            control_results["RequestControlAfterReset"] = request_result
+            if request_result != CP_RESULT_SUCCESS:
+                control_errors.append(f"Reset 后 RequestControl=0x{request_result:02x}")
             print("下发 running StartResume(0x07)，累计应重新推进")
             resume_result = await write_ftms_cp_and_wait(
                 client, cp_responses, OP_START_RESUME
@@ -405,7 +413,7 @@ async def run_running_profile(client, found):
 
     ok_notify = len(moving_rsc) >= 2
     ok_speed = ok_notify and abs(moving_rsc[-1]["speed_kmh"] - expected_speed) <= 0.25
-    ok_cadence = ok_notify and 120 <= moving_rsc[-1]["cadence_spm"] <= 220
+    ok_cadence = ok_notify and 60 <= moving_rsc[-1]["cadence_single_leg_spm"] <= 110
     ok_distance = values_strictly_grow(moving_rsc, "total_distance_m")
     ok_flags = ok_notify and all(item["flags"] == 0x07 and item["running"] for item in moving_rsc)
     ok_treadmill_notify = len(moving_treadmill) >= 2
@@ -462,9 +470,9 @@ async def run_running_profile(client, found):
             len(resumed_rsc) >= 2
             and len(resumed_treadmill) >= 2
             and all(item["running"] and item["flags"] == 0x07 for item in resumed_rsc)
-            and abs(resumed_rsc[-1]["speed_kmh"] - expected_speed) <= 0.25
+            and abs(resumed_rsc[-1]["speed_kmh"] - 10.0) <= 0.25
             and values_strictly_grow(resumed_rsc, "total_distance_dm")
-            and resumed_treadmill[-1]["speed_x100_kmh"] > 0
+            and abs(resumed_treadmill[-1]["speed_x100_kmh"] / 100.0 - 10.0) <= 0.25
             and values_strictly_grow(resumed_treadmill, "total_distance_m")
             and values_strictly_grow(resumed_treadmill, "elapsed_time_s")
         )
@@ -535,8 +543,14 @@ async def check_dis(client, found):
 
 async def main():
     print(f"扫描 {DEVICE_NAME} ...")
-    dev = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
-    if not dev:
+    address = os.environ.get("BIKEPOWER_BLE_ADDRESS", "")
+    if address:
+        dev = await BleakScanner.find_device_by_filter(
+            lambda candidate, _adv: candidate.address == address, timeout=10
+        )
+    else:
+        dev = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
+    if not dev and not address:
         # 模糊匹配：设备名可能带后缀（如 BikePower23）
         devices = await BleakScanner.discover(timeout=5)
         for d in devices:
@@ -550,6 +564,9 @@ async def main():
     async with BleakClient(dev) as client:
         print("已连接")
         found = {c.uuid for s in client.services for c in s.characteristics}
+        changed = client.services.get_characteristic(SERVICE_CHANGED_UUID)
+        assert changed and "indicate" in changed.properties, "缺少 Service Changed 指示特征"
+        print("Service Changed 特征存在；发送及确认仍需绑定后跨重启验收")
         if telemetry_uuid(1) in found:
             meta = telemetry_meta(bytes(await client.read_gatt_char(telemetry_uuid(1))))
             for group in range(4):

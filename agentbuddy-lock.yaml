@@ -1,0 +1,11 @@
+lockfileVersion: "1.0"
+extensions:
+  - identifier: skills:github.com/anthropics/skills/frontend-design
+    agents:
+      - trae
+    link: copy
+    source:
+      kind: git
+      url: https://github.com/anthropics/skills.git
+      path: skills/frontend-design/SKILL.md
+      archive_digest: sha1:d79e2a5bb4df4a386c2adcdd9ab8709bba28c3f6

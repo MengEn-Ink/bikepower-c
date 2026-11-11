@@ -22,6 +22,7 @@
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
+#include "host/ble_sm.h"
 #include "ble_hs_priv.h"
 #include "host/util/util.h"
 #include "store/config/ble_store_config.h"
@@ -449,6 +450,7 @@ static ble_client_t s_clients[BLE_DOWNSTREAM_MAX] = {
     { .connection = BLE_HS_CONN_HANDLE_NONE },
 };
 static uint32_t s_indication_sequence;
+static atomic_uint_least32_t s_control_generation;
 static atomic_uint_least32_t g_ftms_response_token;
 // END_INDICATION_STATE
 
@@ -734,6 +736,17 @@ static int ftms_status_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt 
  * 返回值：无。
  * 特殊行为：无连接时直接丢弃，不缓存待发送响应。
  */
+static void ftms_release_owner(uint16_t connection)
+{
+    portENTER_CRITICAL(&s_indication_lock);
+    if (connection != BLE_HS_CONN_HANDLE_NONE && g_ftms_owner == connection) {
+        g_ftms_owner = BLE_HS_CONN_HANDLE_NONE;
+        g_ftms_control = false;
+        ++s_control_generation;
+    }
+    portEXIT_CRITICAL(&s_indication_lock);
+}
+
 static void ftms_send_response(uint8_t request_op, uint8_t result)
 {
     g_ftms_resp_buf[0] = FTMS_OP_RESPONSE_CODE;
@@ -741,8 +754,7 @@ static void ftms_send_response(uint8_t request_op, uint8_t result)
     g_ftms_resp_buf[2] = result;
     if (!indicate_try(g_ftms_cp_handle, g_ftms_resp_buf, sizeof(g_ftms_resp_buf))) {
         g_ftms_pending = false;
-        g_ftms_control = false;
-        if (g_ftms_owner == g_ftms_connection) g_ftms_owner = BLE_HS_CONN_HANDLE_NONE;
+        ftms_release_owner(g_ftms_connection);
         ESP_LOGW(TAG, "FTMS 响应发送失败，控制权已释放");
     }
 }
@@ -777,7 +789,7 @@ static void ftms_send_status(uint8_t status, uint8_t parameter)
 static void ftms_operation_accepted(uint8_t op, uint8_t parameter)
 {
     if (g_control_async) return;
-    if (op == FTMS_OP_RESET) { g_ftms_control = false; g_ftms_owner = BLE_HS_CONN_HANDLE_NONE; ftms_send_status(FTMS_STATUS_RESET, 0); }
+    if (op == FTMS_OP_RESET) { ftms_release_owner(g_ftms_connection); ftms_send_status(FTMS_STATUS_RESET, 0); }
     else if (op == FTMS_OP_START_RESUME) ftms_send_status(FTMS_STATUS_STARTED_RESUMED_BY_USER, 0);
     else if (op == FTMS_OP_STOP_PAUSE) ftms_send_status(FTMS_STATUS_STOPPED_PAUSED_BY_USER, parameter);
     ftms_send_response(op, FTMS_RESULT_SUCCESS);
@@ -866,8 +878,10 @@ static int ftms_cp_cb(uint16_t ch, uint16_t ah, struct ble_gatt_access_ctxt *ctx
     ESP_LOGD(TAG, "FTMS控制点写入 op=0x%02x len=%d", op, len);
     switch (op) {
     case FTMS_OP_REQUEST_CONTROL:
+        portENTER_CRITICAL(&s_indication_lock);
         g_ftms_owner = ch;
         g_ftms_control = true;
+        portEXIT_CRITICAL(&s_indication_lock);
         ftms_send_response(FTMS_OP_REQUEST_CONTROL, FTMS_RESULT_SUCCESS);
         break;
     case FTMS_OP_SET_TARGET_POWER:
@@ -1442,6 +1456,7 @@ static void notify_one(uint16_t handle, const uint8_t *buf, size_t len)
 static void indication_reset(void)
 {
     portENTER_CRITICAL(&s_indication_lock);
+    ftms_release_owner(g_ftms_owner);
     for (size_t i = 0; i < BLE_DOWNSTREAM_MAX; ++i) {
         s_clients[i].head = s_clients[i].count = 0;
         s_clients[i].active = s_clients[i].failed = false;
@@ -1481,7 +1496,7 @@ static void indication_subscription_revoked(uint16_t connection, uint16_t handle
     bool in_flight = client->active && client->count
         && client->indications[client->head].handle == handle;
     if (handle == g_ftms_cp_handle) {
-        if (g_ftms_owner == connection) g_ftms_owner = BLE_HS_CONN_HANDLE_NONE;
+        ftms_release_owner(connection);
         if (g_ftms_connection == connection) {
             g_ftms_response_token = 0;
             g_ftms_pending = in_flight;
@@ -1518,8 +1533,7 @@ static void indication_complete(uint16_t connection, uint16_t handle, int status
                 && (token == g_ftms_response_token || !g_ftms_response_token)) {
             g_ftms_pending = false;
             if (status != BLE_HS_EDONE) {
-                g_ftms_control = false;
-                if (g_ftms_owner == connection) g_ftms_owner = BLE_HS_CONN_HANDLE_NONE;
+                ftms_release_owner(connection);
             }
         }
         if (handle == g_rsc_cp_handle && g_rsc_connection == connection
@@ -1578,8 +1592,8 @@ static void indication_pump_nolock(void)
                 else {
                     client->failed = true;
                     if (g_ftms_connection == entry.connection && entry.handle == g_ftms_cp_handle) {
-                        g_ftms_pending = g_ftms_control = false;
-                        if (g_ftms_owner == entry.connection) g_ftms_owner = BLE_HS_CONN_HANDLE_NONE;
+                        g_ftms_pending = false;
+                        ftms_release_owner(entry.connection);
                     }
                 }
             }
@@ -1707,6 +1721,19 @@ static void mark_start_failed(const char *reason, int rc)
  * 在 Host 确认真实外设连接后发布应用连接状态。
  * 重复确认不清空已登记的订阅和控制事务。
  */
+static void restore_bond_encryption(uint16_t connection, const struct ble_gap_conn_desc *desc)
+{
+    if (s_security_store_failed || desc->sec_state.encrypted) return;
+    struct ble_store_key_sec key = { .peer_addr = desc->peer_id_addr };
+    struct ble_store_value_sec bond = {0};
+    if (ble_store_read_peer_sec(&key, &bond) != 0 || !bond.ltk_present
+            || bond.key_size < BLE_SM_PAIR_KEY_SZ_MIN || bond.key_size > BLE_SM_PAIR_KEY_SZ_MAX) return;
+    int rc = ble_gap_security_initiate(connection);
+    if (rc != 0 && rc != BLE_HS_EALREADY) {
+        ESP_LOGW(TAG, "已绑定下游恢复加密请求失败 handle=%u rc=%d", connection, rc);
+    }
+}
+
 static bool connection_accept(uint16_t connection)
 {
     if (g_stopping || !g_ready || connection == BLE_HS_CONN_HANDLE_NONE) return false;
@@ -1731,6 +1758,7 @@ static bool connection_accept(uint16_t connection)
     if (!client) return false;
     ble_config_service_connect(connection);
     ble_telemetry_service_connect(connection);
+    restore_bond_encryption(connection, &desc);
     ESP_LOGI(TAG, "下游已连接 handle=%u count=%d", connection, ble_bikepower_conn_count());
     return true;
 }
@@ -1746,7 +1774,7 @@ static void connection_remove(uint16_t connection)
         client->active = client->failed = false;
         client->ftms_subscribed = client->rsc_subscribed = false;
         for (size_t i = 0; i < BLE_NOTIFY_SUBSCRIPTION_MAX; ++i) client->subscriptions[i] = 0;
-        if (g_ftms_owner == connection) { g_ftms_owner = BLE_HS_CONN_HANDLE_NONE; g_ftms_control = false; }
+        ftms_release_owner(connection);
         if (g_ftms_connection == connection) { g_ftms_response_token = 0; g_ftms_pending = false; }
         if (g_rsc_connection == connection) { g_rsc_response_token = 0; g_rsc_pending = false; }
     }
@@ -1996,6 +2024,7 @@ static void on_sync(void)
 #endif
     bool layout_changed = false;
     esp_err_t cache_err = ble_bond_cache_sync(&layout_changed);
+    if (cache_err == ESP_OK && s_security_store_failed) cache_err = ESP_FAIL;
     if (cache_err != ESP_OK) {
         s_security_store_failed = true;
         mark_start_failed("订阅缓存布局同步失败", cache_err);
@@ -2004,12 +2033,6 @@ static void on_sync(void)
 #if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
     ESP_LOGW(TAG, "DIAG: bond_cache_sync err=%d layout_changed=%d", cache_err, layout_changed);
 #endif
-    if (layout_changed) {
-#if CONFIG_BIKEPOWER_DIAGNOSTIC_LOGS
-        ESP_LOGW(TAG, "DIAG: 触发 ble_svc_gatt_changed SC indication");
-#endif
-        ble_svc_gatt_changed(BLE_GATT_CHANGED_START_HANDLE, BLE_GATT_CHANGED_END_HANDLE);
-    }
     rc = start_advertising();
     if (rc != 0) {
         mark_start_failed("启动广播失败", rc);
@@ -2134,6 +2157,11 @@ uint32_t ble_bikepower_control_ticket(bool rsc)
     return rsc ? g_rsc_response_token : g_ftms_response_token;
 }
 
+uint32_t ble_bikepower_control_generation(void)
+{
+    return s_control_generation;
+}
+
 bool ble_bikepower_control_current(uint32_t ticket, bool rsc)
 {
     uint16_t connection = rsc ? g_rsc_connection : g_ftms_connection;
@@ -2151,7 +2179,7 @@ void ble_bikepower_control_complete(uint32_t ticket, bool rsc, bool success)
         (void)indication_submit(ticket, response, sizeof(response));
     } else {
         if (success) {
-            if (g_control_op == FTMS_OP_RESET) { g_ftms_control = false; g_ftms_owner = BLE_HS_CONN_HANDLE_NONE; ftms_send_status(FTMS_STATUS_RESET, 0); }
+            if (g_control_op == FTMS_OP_RESET) { ftms_release_owner(g_ftms_connection); ftms_send_status(FTMS_STATUS_RESET, 0); }
             else if (g_control_op == FTMS_OP_START_RESUME) ftms_send_status(FTMS_STATUS_STARTED_RESUMED_BY_USER, 0);
             else if (g_control_op == FTMS_OP_STOP_PAUSE) ftms_send_status(FTMS_STATUS_STOPPED_PAUSED_BY_USER, g_control_parameter);
             ftms_send_response(g_control_op, FTMS_RESULT_SUCCESS);

@@ -66,12 +66,23 @@ if(PORTAL_TEST_AUTO_CONFIG)
     message(STATUS "PORTAL_TEST_AUTO_CONFIG=ON（测试固件，启动自动配网）")
 endif()
 
-execute_process(
-    COMMAND git -C ${CMAKE_SOURCE_DIR} rev-parse --short HEAD
-    OUTPUT_VARIABLE BIKEPOWER_GIT_SHA
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET
-)
+if(DEFINED BIKEPOWER_SOURCE_GIT_SHA)
+    if(NOT BIKEPOWER_SOURCE_GIT_SHA STREQUAL "nogit")
+        string(LENGTH "${BIKEPOWER_SOURCE_GIT_SHA}" BIKEPOWER_SHA_LENGTH)
+        if(NOT BIKEPOWER_SHA_LENGTH EQUAL 40 OR
+           NOT BIKEPOWER_SOURCE_GIT_SHA MATCHES "^[0-9a-f]+$")
+            message(FATAL_ERROR "BIKEPOWER_SOURCE_GIT_SHA 必须是完整的源提交 SHA")
+        endif()
+    endif()
+    string(SUBSTRING "${BIKEPOWER_SOURCE_GIT_SHA}" 0 7 BIKEPOWER_GIT_SHA)
+else()
+    execute_process(
+        COMMAND git -C ${CMAKE_SOURCE_DIR} rev-parse --short=7 HEAD
+        OUTPUT_VARIABLE BIKEPOWER_GIT_SHA
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+endif()
 if(NOT BIKEPOWER_GIT_SHA)
     set(BIKEPOWER_GIT_SHA "nogit")
 endif()

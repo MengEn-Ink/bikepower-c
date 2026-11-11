@@ -232,7 +232,8 @@ def main():
     assert source.count("BLE_GATT_CHR_F_WRITE_ENC") >= 2
     assert 's_security_store_failed' in extract_function(source, 'ftms_cp_cb')
     assert 'ble_hs_id_infer_auto(0,' in extract_function(source, 'on_sync'), '不切换本机RPA广播'
-    assert 'ble_svc_gatt_changed(' in extract_function(source, 'on_sync'), '绑定客户端必须获知服务表变化'
+    cache = (ROOT / 'main/ble_bond_cache.c').read_text(encoding='utf-8')
+    assert 'ble_svc_gatt_changed(' in extract_function(cache, 'restore_service_changed'), '未确认指示必须在缓存同步后恢复范围'
     sync = extract_function(source, 'on_sync')
     assert sync.index('security_store_activate()') < sync.index('ble_bond_cache_sync(')
     assert sync.index('security_store_activate()') < sync.index('start_advertising()')
@@ -297,6 +298,7 @@ puts("实际IDF容量与重复配对前置分支通过；不自动删除旧绑�
 static int ble_store_config_num_our_secs,ble_store_config_num_peer_secs,ble_store_config_num_cccds,ble_store_config_num_csfcs,ble_store_config_num_rpa_recs,ble_store_config_num_local_irks;
 static void ble_store_config_conf_init(void) {init_calls++;}
 static unsigned cache_calls,advertise_calls,failure_calls,telemetry_calls;
+static bool cache_store_fail;
 static int security_store_read(int,const union ble_store_key*,union ble_store_value*);
 static int security_store_write(int,const union ble_store_value*);
 static int security_store_delete(int,const union ble_store_key*);
@@ -304,11 +306,11 @@ static bool g_ready,g_start_failed;
 static unsigned char g_own_addr_type;
 #define BLE_GATT_CHANGED_START_HANDLE 1
 #define BLE_GATT_CHANGED_END_HANDLE 65535
+#define ESP_FAIL -1
 static int ble_hs_util_ensure_addr(int n) {(void)n;return 0;}
 static int ble_hs_id_infer_auto(int n,unsigned char *t) {(void)n;*t=0;return 0;}
 static void mark_start_failed(const char *m,int n) {(void)m;(void)n;failure_calls++;g_start_failed=true;g_ready=false;}
-static int ble_bond_cache_sync(bool *changed) {cache_calls++;*changed=false;assert(ble_hs_cfg.store_read_cb==security_store_read);assert(ble_hs_cfg.store_write_cb==security_store_write);assert(ble_hs_cfg.store_delete_cb==security_store_delete);return 0;}
-static void ble_svc_gatt_changed(unsigned a,unsigned b) {(void)a;(void)b;}
+static int ble_bond_cache_sync(bool *changed) {cache_calls++;*changed=false;assert(ble_hs_cfg.store_read_cb==security_store_read);assert(ble_hs_cfg.store_write_cb==security_store_write);assert(ble_hs_cfg.store_delete_cb==security_store_delete);if(cache_store_fail)s_security_store_failed=true;return 0;}
 static int start_advertising(void) {advertise_calls++;assert(ble_hs_cfg.store_read_cb==security_store_read);return 0;}
 static void ble_telemetry_service_sync(void) {telemetry_calls++;}
 #define ESP_LOGI(...) ((void)0)
@@ -321,6 +323,8 @@ assert(ble_hs_cfg.store_read_cb==ble_store_config_read && ble_hs_cfg.store_write
 on_sync();assert(init_calls==2 && cache_calls==1 && advertise_calls==1 && telemetry_calls==1 && g_ready && !failure_calls);
 ble_store_config_init();s_security_store_failed=true;on_sync();assert(init_calls==3 && failure_calls==1 && cache_calls==1 && advertise_calls==1 && s_security_store_failed && !g_ready);
 s_security_store_failed=false;open_rc=42;on_sync();assert(failure_calls==2 && cache_calls==1 && advertise_calls==1 && s_security_store_failed && !g_ready);
+s_security_store_failed=false;open_rc=0;cache_store_fail=true;on_sync();
+assert(failure_calls==3 && cache_calls==2 && advertise_calls==1 && telemetry_calls==1 && s_security_store_failed && !g_ready);
 puts("真实IDF存储初始化覆盖→生产on_sync重新安装→缓存/广播次序及失败锁存阻断通过（host替身）");return 0;
 }
 '''
