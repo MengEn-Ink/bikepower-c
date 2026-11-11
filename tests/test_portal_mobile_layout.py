@@ -33,12 +33,13 @@ def main():
                 page.goto(url);expect(page.locator('#simPower')).to_be_visible();check(page)
                 for selector in ('#simPower','#simCadence','#powerFloat','#cadenceFloat'):
                     page.locator(selector).tap();check(page)
-                page.locator('.device-settings').evaluate('(el)=>el.open=true')
+                page.locator('#deviceNameInput').locator('xpath=ancestor::details[1]').evaluate('(el)=>el.open=true')
                 page.locator('#deviceNameInput').tap();check(page)
                 page.set_viewport_size({'width':width,'height':420});check(page)
                 page.set_viewport_size({'width':width,'height':844})
                 page.locator('[data-sport=running]').tap();check(page)
                 page.locator('[data-sport=cycling]').tap();check(page)
+                page.locator('#sourceOptions').evaluate('(el)=>el.open=true')
                 page.locator('[data-source=bridge]').tap();check(page)
                 page.locator('[data-source=simulation]').tap();check(page)
                 assert page.locator('[name=viewport]').get_attribute('content').find('user-scalable=no')<0
