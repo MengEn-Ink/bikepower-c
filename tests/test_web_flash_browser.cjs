@@ -63,6 +63,8 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
     await page.waitForFunction(() => document.getElementById('firmware-status').textContent.includes('可刷写'));
     await page.evaluate(async () => { await loadFirmwareCatalog(); });
     assert.equal(await page.locator('#install-unavailable').isVisible(),false,'catalog reload must keep safe launcher available without upstream button');
+    assert.equal(await page.locator('#install-button [slot="unsupported"]').isVisible(),false);
+    assert.equal(await page.locator('#install-button [slot="not-allowed"]').isVisible(),false);
     await page.evaluate(async ({ item }) => {
       await BikePowerFlash.loadDialog();
       firmwareCatalog = { schema_version: 1, available: true };

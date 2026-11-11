@@ -1674,8 +1674,8 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <div class="flash-cta" data-tour="flash-start">
           <esp-web-install-button id="install-button" class="hidden">
             <button class="btn primary big" id="flash-activate" slot="activate" type="button">开始刷写（选择串口）</button>
-            <span slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
-            <span slot="not-allowed">网页刷写只能在 HTTPS 或 localhost 页面使用。</span>
+            <span class="hidden" slot="unsupported">当前浏览器不支持 Web Serial，请改用桌面版 Chrome / Edge。</span>
+            <span class="hidden" slot="not-allowed">网页刷写只能在 HTTPS 或 localhost 页面使用。</span>
           </esp-web-install-button>
           <button class="btn" id="install-unavailable" disabled>暂无可刷写固件</button>
           <a class="btn alt hidden" id="firmware-download" href="#" download>下载固件</a>

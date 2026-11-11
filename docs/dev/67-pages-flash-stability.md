@@ -47,6 +47,12 @@ Espressif esptool-js：https://espressif.github.io/esptool-js/docs/ 。更底层
 - 未新增稀疏保留式升级、断点续写、设备自动重配对或跨版本回滚迁移。全量BIN覆盖NVS的风险仍存在。
 - 内置浏览器本轮JS诊断接口不可用，采用可见DOM/请求/取消反馈；未读取用户浏览器资料或隐私配置。
 
+## 远端与内置浏览器核对
+
+- 实现提交`63a61c38cf11c2a5775be15cbf8393268cddca9e`的[CI](https://github.com/MengEn-Ink/bikepower-c/actions/runs/43016754402)全部success，包含docs、quick及Ubuntu/macOS虚拟板；[Pages部署](https://github.com/MengEn-Ink/bikepower-c/actions/runs/43017588995)success。
+- Mac内置浏览器实际打开新版Pages，看到可刷写按钮，取消串口选择后明确显示“未开始写入”，无console错误；未取得选中实体串口后的实测。
+- 线上检查发现取消上游按钮注册后备用unsupported/not-allowed槽位文字同时显示，已隐藏并补真实DOM断言；错误环境仍由安全会话消息负责说明，最终补丁部署待核对。
+
 ## 本地回归
 
 - 原基线36会话测试中的新增前三项RED，修复后36/36 PASS；新增同源组件字节/依赖闭包1/1 PASS。
