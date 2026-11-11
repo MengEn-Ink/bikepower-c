@@ -110,7 +110,9 @@ jobs:
           node-version: "24"
 
       - name: Install Python harness dependencies
-        run: python3 -m pip install --disable-pip-version-check -r requirements-test.txt
+        run: |
+          python3 -m pip install --disable-pip-version-check -r requirements-test.txt
+          python3 -m playwright install --with-deps chromium
 
       - name: Web flash lifecycle and DOM regression
         run: |

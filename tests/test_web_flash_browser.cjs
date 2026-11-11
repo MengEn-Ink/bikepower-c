@@ -26,6 +26,7 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
         return route.fulfill({ path: path.join(root, 'tools/web', path.basename(url.pathname)),
           contentType: url.pathname.endsWith('.css') ? 'text/css' : 'text/javascript' });
       }
+      if (url.pathname.endsWith('/ble-connection-help.js')) return route.fulfill({ path: path.join(root, 'tools/web/ble-connection-help.js'), contentType: 'text/javascript' });
       if (url.pathname.endsWith('/flash-dialog.js')) return route.fulfill({ path: path.join(root, 'tools/web/flash-dialog.js'), contentType: 'text/javascript' });
       if (url.pathname.endsWith('/flash-session.js')) return route.fulfill({ path: path.join(root, 'tools/web/flash-session.js'), contentType: 'text/javascript' });
       if (url.pathname.endsWith('/manifest.json')) return route.fulfill({ json: manifest });

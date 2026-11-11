@@ -246,6 +246,10 @@ body.gate-lock{overflow:hidden}
 .gate-body h2{margin:14px 0 0;color:var(--strong);font:600 34px/1.08 var(--display);letter-spacing:-.01em}
 .gate-body h2 em{font-style:italic;color:var(--accent)}
 .gate-desc{margin:10px 0 0;color:var(--muted);font-size:14px;line-height:1.7}
+.ble-recovery{margin:12px 0;color:var(--ink);font-size:14px;line-height:1.7;min-width:0;overflow-wrap:anywhere}
+.ble-recovery ol{margin:8px 0;padding-left:22px}.ble-recovery li+li{margin-top:8px}
+.ble-recovery details{margin-top:10px}.ble-recovery summary{min-height:44px;display:list-item;cursor:pointer;color:var(--muted)}
+.ble-recovery pre{margin:0;white-space:pre-wrap;font-size:12px}.ble-recovery .btn{margin-top:10px}
 .gate-known{margin-top:16px;border:1px solid var(--line)}
 .gate-known-head{padding:9px 12px;border-bottom:1px solid var(--line);color:var(--faint);font:700 10px/1 var(--mono);letter-spacing:.1em}
 .gate-dev{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border:0;border-bottom:1px solid var(--line-soft);background:transparent;color:var(--ink);text-align:left;cursor:pointer}
@@ -1437,6 +1441,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
 <script src="./flash-session.js"></script>
 <script src="./flash-dialog.js"></script>
+<script src="./ble-connection-help.js"></script>
 <link rel="stylesheet" href="./operation-demos.css">
 <link rel="stylesheet" href="./phone-operation-demos.css">
 <script defer src="./phone-portal-source.js"></script>
@@ -1586,6 +1591,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <div class="gate-eyebrow"><span id="gate-step">STEP 0 / 连接</span><b id="gate-tag">BLE · 主连接</b></div>
         <h2 id="gate-title">先连上你的<em>骑行设备</em>。</h2>
         <p class="gate-desc" id="gate-desc">蓝牙是本工具台的主连接：实时监控、设备比对与模板写入、通知检查、健康检查都共用这条 BLE 链路。连接后会打开使用手册，带你一步步操作。</p>
+        <div id="gate-recovery" class="ble-recovery hidden" aria-live="polite"></div>
         <div class="gate-known hidden" id="gate-known"></div>
         <div class="gate-env" id="gate-env" aria-label="环境检测">
           <span class="gate-env-item" id="gate-env-browser"><i>…</i>桌面 Chrome / Edge</span>
@@ -1700,7 +1706,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           <strong>英文状态对照</strong>
           <div class="flash-terms"><div class="flash-term"><b>INSTALL / ERASE</b>确认安装；Erase 表示先清除旧数据再安装</div><div class="flash-term"><b>INSTALLING</b>正在写入，保持页面打开</div><div class="flash-term"><b>WRAPPING UP / COMPLETE</b>正在收尾 / 已经完成</div></div>
         </div>
-        <div class="flash-warning"><b>重要：</b>如果弹窗提示 Erase device，继续后设备内保存的参数可能需要重新设置。刷写期间不要拔线、刷新或关闭页面。</div>
+        <div class="flash-warning"><b>重要：</b>当前全量合并固件从 0x0 写入，会覆盖 NVS 配置与蓝牙绑定；不勾 Erase 也不能保留。更新前先导出配置。刷后曾系统配对但连不上，请仅忽略/删除 BikePower 的旧配对，再回本站重新选择。刷写期间不要拔线、刷新或关闭页面。</div>
 
         <details class="flash-details" id="fw-notes-wrap">
           <summary>本版本发布说明</summary>
@@ -1756,6 +1762,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <div id="connect-empty" class="monitor-note">首次连接会打开浏览器设备选择器，只显示广播了骑行功率、心率、骑行速度/踏频或智能骑行台服务的设备。网页不能静默获取附近设备。</div>
         <div id="ble-pause-notice" class="monitor-note hidden" role="status"><p>网页蓝牙已暂停，让其他 App 使用设备。完成 App 实测后，可在这里恢复；不会自动抢占设备。</p><button class="btn alt" type="button" onclick="resumePageBluetooth()">结束实测，恢复网页连接</button></div>
         <p id="ble-connect-feedback" class="monitor-note" role="status" aria-live="polite"></p>
+        <div id="ble-connect-recovery" class="ble-recovery hidden" aria-live="polite"></div>
         <div class="rail-identity" id="single-device-card" aria-live="polite"></div>
         <div class="autolink" aria-label="自动连接与跨标签页关联">
           <label class="autolink-toggle" for="autolink-enabled"><input type="checkbox" id="autolink-enabled" checked onchange="setAutoLinkEnabled(this.checked)">自动连接 · 断线重连 · 多标签页同步</label>
@@ -2423,6 +2430,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             </div>
           </header>
           <div class="ch-body">
+            <details id="ble-troubleshooting" class="ble-recovery"><summary>蓝牙连接异常分类与解决步骤</summary><p>先按实际错误和发生阶段分类；通用连接失败不能直接判定缓存或占用。只处理目标设备，不清空全部配对、不改 MAC。</p><div id="ble-troubleshooting-categories"></div></details>
             <div class="m-faq">
               <details open>
                 <summary><span class="q">Q01</span><span style="flex:1">搜不到 BLE 设备</span><span class="plus"></span></summary>
@@ -2450,7 +2458,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
               </details>
               <details>
                 <summary><span class="q">Q07</span><span style="flex:1">如何更新固件</span><span class="plus"></span></summary>
-                <div class="a">打开项目 GitHub Pages，按第 1 节的网页烧录流程重新烧录；Pages 临时不可用时使用备用烧录入口。</div>
+                <div class="a">全量合并固件会覆盖 NVS 配置及绑定，不勾整片擦除也不能保留。更新前先导出配置；刷后曾系统配对但连不上，按上方“蓝牙连接异常分类”仅忽略/删除 BikePower 的旧配对，再在本站重新选择。</div>
               </details>
               <details>
                 <summary><span class="q">Q08</span><span style="flex:1">重建服务表后为什么收不到 Service Changed</span><span class="plus"></span></summary>
@@ -3113,10 +3121,9 @@ function recordAnomaly(kind, detail){
 function checkAnomalies(){
   const rec=currentMode==="connect"?singleDevice:null;
   if(!rec||!rec.server||!rec.server.connected){updateMonitorEvidence(rec);return;}
-  if(!rec.lastNotifyAt){updateMonitorEvidence(rec);return;}
-  const gap=Date.now()-rec.lastNotifyAt;
+  const gap=Date.now()-(rec.lastNotifyAt||Date.parse(rec.connectedAt));
   if(gap>ANOMALY_LIMITS.staleMs){
-    if(!rec.staleOpen){rec.staleOpen=true;recordAnomaly("stale","超过 "+Math.round(gap)+"ms 未收到通知");}
+    if(!rec.staleOpen){rec.staleOpen=true;recordAnomaly("stale","超过 "+Math.round(gap)+"ms 未收到通知");const help=BikePowerConnectionHelp.classify("通知中断",{category:"notifications"});setText("ble-connect-feedback",help.title+"。"+help.summary);renderBleRecovery("ble-connect-recovery",help);}
   }
   updateMonitorEvidence(rec);
 }
@@ -3124,6 +3131,7 @@ function markNotify(rec,serviceKey){
   const now=Date.now();
   rec.lastNotifyAt=now;
   rec.notifyTimes[serviceKey]=now;
+  if(rec.staleOpen){renderBleRecovery("ble-connect-recovery",null);setText("ble-connect-feedback","设备通知已恢复，实时数据由设备推送更新。");}
   rec.staleOpen=false;
 }
 function parseCyclingPower(view){
@@ -4139,8 +4147,37 @@ function resumePageBluetooth(){
   if(gateOpen)setGate("choose");
   setText("ble-connect-feedback","网页蓝牙已恢复。请先断开其他 App，再点击扫描并连接设备。");
 }
+function renderBleRecovery(id,help){
+  const box=$(id);if(!box)return;
+  box.classList.toggle("hidden",!help);
+  box.innerHTML=help?'<ol>'+help.steps.map(step=>'<li>'+escapeHtml(step)+'</li>').join("")+'</ol>'
+    +'<button class="btn alt" type="button" onclick="openBleTroubleshooting()">查看异常分类与解决步骤</button>'
+    +(help.technical?'<details><summary>原始错误（反馈时保留）</summary><pre>'+escapeHtml(help.technical)+'</pre></details>':""):"";
+  if(help)box.dataset.category=help.category;else delete box.dataset.category;
+}
+function openBleTroubleshooting(){
+  closeGate("help");if(typeof closeObModal==="function")closeObModal("ob-error");
+  switchMode("manual");const section=$("ble-troubleshooting");if(section){section.open=true;const chapter=section.closest(".manual-chapter");if(chapter)chapter.open=true;section.scrollIntoView({block:"start"});}
+}
+function renderBleTroubleshooting(){
+  const box=$("ble-troubleshooting-categories");if(!box)return;
+  box.innerHTML=Object.keys(BikePowerConnectionHelp.catalog).map(category=>{
+    const help=BikePowerConnectionHelp.classify("",{category});
+    return '<details><summary>'+escapeHtml(help.title)+'</summary><p>'+escapeHtml(help.summary)+'</p><ol>'+help.steps.map(step=>'<li>'+escapeHtml(step)+'</li>').join("")+'</ol></details>';
+  }).join("");
+}
+function showBleFailure(error,context={}){
+  const help=BikePowerConnectionHelp.classify(error,context);
+  renderBlePauseNotice();
+  const feedback=$("ble-connect-feedback");if(feedback){feedback.textContent=help.title+"。"+help.summary;feedback.dataset.kind=help.severity;}
+  renderBleRecovery("ble-connect-recovery",help);
+  if(gateOpen)setGate("error",{help});
+  log(help.title+"："+help.technical,help.severity==="error"?"error":"warn");
+  return help;
+}
 function showBleConnectFeedback(message,kind="warn"){
   renderBlePauseNotice();
+  renderBleRecovery("ble-connect-recovery",null);
   const feedback=$("ble-connect-feedback");if(feedback){feedback.textContent=message;feedback.dataset.kind=kind;}
   if(gateOpen&&kind!=="pending")setGate("error",{message});
   log(message,kind==="error"?"error":kind==="pending"?"info":"warn");
@@ -4167,10 +4204,7 @@ async function requestDevice(){
     setText("ble-connect-feedback","已选择设备，正在连接并读取蓝牙服务…");
     return device;
   }catch(err){
-    const message=err.name==="NotFoundError"?"已取消蓝牙设备选择，尚未连接。需要时再次点击；若列表为空，请确认设备在广播且未被其他 App 占用。":
-      err.name==="SecurityError"||err.name==="NotAllowedError"?"浏览器未允许蓝牙访问。请检查地址栏的网站蓝牙权限，并在电脑 Chrome / Edge 中重新点击连接。":
-      "蓝牙设备选择失败："+err.message+"。请检查电脑蓝牙是否开启，然后主动重试。";
-    showBleConnectFeedback(message,err.name==="NotFoundError"?"warn":"error");
+    showBleFailure(err,{phase:"picker"});
     return null;
   }finally{blePickerBusy=false;}
 }
@@ -4281,6 +4315,10 @@ async function connectAndCollect(device,attempt=null){
       const state=$("single-device-state");if(state){state.textContent="已断开";state.className="badge err";}
       setText("power-summary","连接已断开，当前显示最后收到的真实数值。");
       setText("power-detail","本次会话的曲线与统计仍保留，可继续检查具体时间点或导出 CSV / JSON 报告。");
+      if(!rec.configState||!rec.configState.expectedDisconnectMessage){
+        const help=BikePowerConnectionHelp.classify("连接已断开",{category:"disconnected"});
+        setText("ble-connect-feedback",help.title+"。"+help.summary);renderBleRecovery("ble-connect-recovery",help);
+      }
       markConfigDisconnected(rec);renderSignalTrace(rec);updateMonitorEvidence(rec);
       onSingleDeviceDisconnected(rec);
     }
@@ -4353,7 +4391,7 @@ async function connectAuthorized(){
   if(compatibilityHandoffActive()){showBleConnectFeedback("网页蓝牙已暂停，请先结束实测并恢复网页连接。");return;}
   if(flashSession&&flashSession.isBusy()){showBleConnectFeedback("请先关闭串口安装弹窗，再连接蓝牙。");return;}
   if(!checkSupport())return;
-  if(!navigator.bluetooth.getDevices){showBleConnectFeedback("当前浏览器不支持已授权设备列表，请点击扫描并连接设备重新授权。");return;}
+  if(!navigator.bluetooth.getDevices){showBleFailure("当前浏览器不支持已授权设备列表",{category:"authorized"});return;}
   if(currentMode==="compare"){
     const devices=await orderedAuthorizedDevices();
     const candidate=devices[0];
@@ -4425,13 +4463,14 @@ async function runSingleConnection(attempt,source,timeoutMs){
     assertGattConnected(rec.server,"完成连接");
     singleDevice=rec;
     renderSingleDevice(rec);
+    renderBleRecovery("ble-connect-recovery",null);
     setText("ble-connect-feedback","蓝牙已连接，已读取服务；实时数据由设备通知更新。");
     onSingleDeviceConnected(rec,source);
     if(window.BikePowerStatus)window.BikePowerStatus.attach(rec);
     return rec;
   }catch(err){
     $("single-device-card").innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+escapeHtml(err.message)+'</div>';
-    showBleConnectFeedback("蓝牙连接失败："+err.message+" 请保留当前错误与事件日志，确认所选开发板和使用浏览器；仅在确有其他连接时先释放它。","error");
+    showBleFailure(err,{phase:"connect"});
     setLinkState("idle");
     resetMonitorSignals();
     throw err;
@@ -4590,7 +4629,8 @@ async function addCompareDeviceFromExisting(device){
     renderCompareDeviceCard(card,rec);
     renderCompareTable();
   }catch(err){
-    card.innerHTML='<div class="dc-head"><span class="badge err">连接失败</span></div><div class="hint">'+escapeHtml(err.message)+'</div>';
+    const help=BikePowerConnectionHelp.classify(err,{phase:"connect"});
+    card.innerHTML='<div class="dc-head"><span class="badge err">'+escapeHtml(help.title)+'</span></div><div class="hint">'+escapeHtml(help.summary)+'</div><ol>'+help.steps.map(step=>'<li>'+escapeHtml(step)+'</li>').join("")+'</ol>';
   }
 }
 
@@ -4937,6 +4977,7 @@ async function inspectorConnect(){
     disconnectPageGatt(device,epoch);
     if(epoch!==bleConnectionEpoch)return;
     inspectorBadge("连接失败","err");
+    showBleFailure(err,{phase:"connect"});
     log("[inspector] 连接失败: "+err.message,"error");
   }
 }
@@ -5779,7 +5820,7 @@ function onSingleDeviceDisconnected(rec){
 function scheduleReconnect(delay){
   clearTimeout(reconnectTimer);
   if(compatibilityHandoffActive())return;
-  if(reconnectAttempt>=RECONNECT_DELAYS.length){setAutoLinkStatus("已连续重连 "+RECONNECT_DELAYS.length+" 次未成功，停止自动重连。请检查设备后手动连接。","err");return;}
+  if(reconnectAttempt>=RECONNECT_DELAYS.length){setAutoLinkStatus("已连续重连 "+RECONNECT_DELAYS.length+" 次未成功，停止自动重连。请点击“扫描并连接设备”；若刚全量刷机且以前配对过，先仅忽略/删除 BikePower 的旧配对。","err");return;}
   const wait=delay||RECONNECT_DELAYS[reconnectAttempt];reconnectAttempt++;
   setAutoLinkStatus("连接已断开，"+Math.round(wait/1000)+" 秒后进行第 "+reconnectAttempt+" 次自动重连…","busy");
   reconnectTimer=setTimeout(async()=>{
@@ -5984,7 +6025,7 @@ function closeCapPanel(){const panel=$("cap-panel");if(panel)panel.classList.add
 async function reconnectFromCapsule(){
   if(!singleDevice)return openGate({force:true});
   allowManualPageConnection();
-  try{await connectSingleWith(singleDevice.device,"reconnect");}catch(err){log("重新连接失败："+err.message,"warn");openGate({force:true,state:"error",message:err.message});}
+  try{await connectSingleWith(singleDevice.device,"reconnect");}catch(err){log("重新连接失败："+err.message,"warn");openGate({force:true,state:"error",error:err});}
 }
 function capsuleArrive(){
   const cap=$("link-capsule");if(!cap)return;
@@ -6007,10 +6048,12 @@ function setGate(state,opts){
   const g=$("connect-gate");if(!g)return;
   g.dataset.gate=state;
   const c=GATE_COPY[state]||GATE_COPY.choose;
-  const fill=t=>t.replace("{name}",escapeHtml(opts.name||"设备")).replace("{role}",opts.role?escapeHtml(opts.role)+"。":"").replace("{next}",gateReturnMode&&MODE_TITLE[gateReturnMode]?"正在返回「"+MODE_TITLE[gateReturnMode]+"」…":"正在打开使用手册…").replace("{message}",escapeHtml(opts.message||"设备没有响应。")+" 请核对所选开发板并保留事件日志；若设备确有其他连接，先释放后再重试。断连不代表缺少运动服务。");
-  setText("gate-step",c.step);setText("gate-tag",c.tag);
-  $("gate-title").innerHTML=fill(c.title);
-  setText("gate-desc",opts.note||fill(c.desc));
+  const help=state==="error"?(opts.help||BikePowerConnectionHelp.classify(opts.error||opts.message||"设备没有响应。",{phase:"connect"})):null;
+  const fill=t=>t.replace("{name}",escapeHtml(opts.name||"设备")).replace("{role}",opts.role?escapeHtml(opts.role)+"。":"").replace("{next}",gateReturnMode&&MODE_TITLE[gateReturnMode]?"正在返回「"+MODE_TITLE[gateReturnMode]+"」…":"正在打开使用手册…").replace("{message}",help?escapeHtml(help.summary):escapeHtml(opts.message||"设备没有响应。"));
+  renderBleRecovery("gate-recovery",help);
+  setText("gate-step",c.step);setText("gate-tag",help?help.title:c.tag);
+  $("gate-title").innerHTML=help?escapeHtml(help.title):fill(c.title);
+  setText("gate-desc",help?help.summary:opts.note||fill(c.desc));
   const cta=$("gate-connect");
   cta.textContent=opts.cta||c.cta;
   const ctaEnabled=state==="choose"||state==="error"||(state==="locked"&&!!opts.cta);
@@ -6071,7 +6114,7 @@ async function gateRun(device,source){
   gateBusy=true;allowManualPageConnection();
   setGate("connecting",{name:device.name||"未命名设备"});
   try{const rec=await connectSingleWith(device,source);gateBusy=false;await gateSuccess(rec);}
-  catch(err){setGate("error",{message:err.message});}
+  catch(err){setGate("error",{error:err});}
   finally{gateBusy=false;}
 }
 /* 成功：表盘锁定 → 信号点沿弧线飞入右上角胶囊 → 倒计时后自动关门并进入目标页 */
@@ -6518,7 +6561,7 @@ const FG_STEPS=[
 ];
 const FG_PHASES=[
   {id:"connect",match:["connecting","连接芯片"],zh:"连接芯片",en:"CONNECTING",desc:"浏览器通过串口和 ESP32-C3 握手，读取芯片型号。"},
-  {id:"erase",match:["erasing","ask_erase","擦除"],zh:"擦除",en:"ERASING",desc:"清空将要写入的区域。勾选了 Erase 时会一并清除已保存的设置。"},
+  {id:"erase",match:["erasing","ask_erase","擦除"],zh:"擦除",en:"ERASING",desc:"清空将要写入的区域；当前全量合并文件即使不勾 Erase，也会覆盖 NVS 配置和绑定。"},
   {id:"write",match:["writing","installing","install","写入"],zh:"写入",en:"INSTALLING",desc:"把 merged.bin 从 0x0 地址写入闪存，约 1 分钟。不要拔线、刷新或切走页面。"},
   {id:"verify",match:["wrapping","wrapping_up","verify","校验"],zh:"校验",en:"WRAPPING UP",desc:"逐段比对写入内容的哈希，确保与 Release 文件一致。"},
   {id:"reset",match:["complete","finished","reset","重启"],zh:"重启",en:"COMPLETE",desc:"自动复位开发板，新固件开始运行。串口会被释放。"},
@@ -6550,12 +6593,8 @@ const FG_ERRORS={
   flashFail:{title:"写入中断，固件没有写完",lead:"别担心，ESP32-C3 的下载模式固化在芯片里，重新刷写即可恢复，不会变砖。",
     steps:["确认数据线没有松动，刷写期间保持页面在前台。","让开发板进入下载模式：按住 BOOT，按一下 RST，再松开 BOOT。","点“开始刷写”，会从头完整写入一次。","连续失败：换一根线、换一个 USB 口，或在 ESP 弹窗里勾选 Erase 后再试。"],
     code:"Timed out waiting for packet header",primary:"知道了"},
-  bleBusy:{title:"这台设备正被别的 App 连着",lead:"多数骑行设备同一时间只接受一个连接。你选中的设备可能正连着 Zwift、MyWhoosh 或手机 App。",
-    steps:["在骑行 App 里断开这台设备，或暂时关闭手机蓝牙。","确认设备 LED 回到慢闪（广播中）。","回到这里重新连接。如果你要连的是开发板，请选择 BikePower。"],
-    code:"NetworkError · GATT 连接失败",primary:"知道了"},
-  bleCancel:{title:"没有选择设备",lead:"蓝牙选择窗口被关闭了，没有建立连接。",
-    steps:["列表里看不到 BikePower？确认开发板已上电、LED 慢闪；刚刷完固件需要等约 3 秒启动。","设备若正连着手机 App，会停止广播，先断开它。"],
-    code:"NotFoundError · User cancelled",primary:"知道了"},
+  bleBusy:Object.assign({},BikePowerConnectionHelp.classify("",{category:"generic"}),{primary:"知道了",code:"通用 GATT 错误，原因未确定"}),
+  bleCancel:Object.assign({},BikePowerConnectionHelp.classify("",{category:"cancelled"}),{primary:"知道了",code:"设备选择未完成"}),
 };
 let obStore=null;
 function obReadStore(){
@@ -6901,6 +6940,7 @@ function obStartHandoff(){
       +'<span class="tour-kicker">下一步 · 蓝牙连接</span><button type="button" class="tour-skip" onclick="obEndHandoff()">稍后</button></div>'
       +'<h3 class="tour-title" id="ho-title">固件已就绪，用蓝牙连接开发板</h3>'
       +'<p class="tour-body">USB 串口已释放，之后所有工具都走蓝牙。点“连接蓝牙设备”后在浏览器弹窗里选择 <b style="color:var(--strong)">BikePower</b>（改过名就选你的名字）。</p>'
+      +'\u003cp class="tour-body"\u003e当前全量合并固件会覆盖设备 NVS（配置和绑定），不勾整片擦除也不能保留。若以前在系统里配对过且连不上：Mac 在蓝牙设置中仅“忽略 BikePower”；Windows 仅“删除 BikePower”，然后回本站重新点选。不要清空全部设备或改 MAC。\u003c/p\u003e'
       +'<div class="fg-state '+(boot>0?"warn":"ok")+'" style="margin:11px 16px 0"><span class="'+(boot>0?"ob-led":"")+'" style="'+(boot>0?"":'background:var(--green);animation:none;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px')+'"></span>'
       +(boot>0?"设备启动中，约 "+boot+" 秒…":"已等待启动；请观察 LED 是否慢闪，无广播时按 EN / RST 或重新上电")+'</div>'
       +'<div class="tour-foot"><span class="fg-hint" style="margin-left:0">刷写 6/6 · 衔接</span>'
@@ -6920,14 +6960,14 @@ function obEndHandoff(){clearInterval(fgHandoffTimer);obClearSpotlight();}
 
 /* ---- 错误恢复卡：针对性建议，不给裸错误码 ---- */
 function showObError(kind,lead){
-  const e=FG_ERRORS[kind];if(!e)return;
+  const e=(kind==="bleBusy"||kind==="bleCancel")?Object.assign({},BikePowerConnectionHelp.classify(lead||"",{category:kind==="bleCancel"?"cancelled":undefined}),{lead:"浏览器错误需要分步排查，不直接判定其他 App 占用。",code:lead||"BLE",primary:"知道了"}):FG_ERRORS[kind];if(!e)return;
   const steps=e.steps.map((s,i)=>'<li><i>'+(i+1)+'</i><span>'+escapeHtml(s)+'</span></li>').join("");
   const html='<div class="ob-card2 err" role="alertdialog" aria-modal="true" aria-labelledby="ob-err-title">'
     +'<div class="ob-m-body"><div style="display:flex;justify-content:space-between;align-items:center">'
     +'<span class="ob-m-kicker err">需要处理 · 不是你的错</span>'
     +'<button type="button" aria-label="关闭" class="fg-x" onclick="closeObModal(\'ob-error\')">×</button></div>'
     +'<h3 class="ob-m-title" id="ob-err-title">'+escapeHtml(e.title)+'</h3>'
-    +'<p class="ob-m-lead">'+escapeHtml(lead||e.lead||"")+'</p>'
+    +'<p class="ob-m-lead">'+escapeHtml(e.summary||lead||e.lead||"")+'</p>'
     +'<ol class="ob-steps">'+steps+'</ol>'
     +'<div class="ob-code">技术信息（反馈时附上）：'+escapeHtml(e.code)+'</div></div>'
     +'<div class="ob-m-actions"><button type="button" class="btn ghost" onclick="closeObModal(\'ob-error\');switchMode(\'manual\');closeFlashGuide(true)">查看手册 · 常见问题</button>'
@@ -6956,6 +6996,7 @@ function onboardingKeydown(e){
 
 /* ---- 启动 ---- */
 function initOnboarding(){
+  renderBleTroubleshooting();
   obStore=obReadStore();
   renderOnboardingStatus();
   document.addEventListener("click",e=>{const w=$("help-wrap");if(w&&!w.contains(e.target))closeHelpMenu();});

@@ -18,6 +18,7 @@
 | 文档 | 用途 |
 |---|---|
 | [技术参考](dev/01-technical-reference.md) | 运行时、协议、配置和门户行为 |
+| [Pages 蓝牙异常恢复](dev/66-pages-connection-recovery.md) | 15类错误、Mac/Windows定向配对恢复、证据边界与页面回归 |
 | [Service Changed重启恢复](dev/65-service-changed-reboot-recovery.md) | 持久待确认订阅、范围恢复、主机回归与实物验收边界 |
 | [固件安全](dev/02-firmware-security.md) | 编译加固及硬件安全方案 |
 | [测试覆盖分析](dev/03-test-coverage-analysis.md) | 模块覆盖与证据边界 |

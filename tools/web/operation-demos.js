@@ -233,10 +233,10 @@
       ["确认关闭，回到 App。", 1, ["260 W · 已保存", "已关闭"], "返回 App", "success"]
     ], note: "关闭热点不会保存草稿。默认 5 分钟；需要更多时间请点续期。" },
     troubleshoot: { title: "搜不到 / 连不上", labels: ["网页连接", "App 连接"], frames: [
-      ["连不上？先看看是不是网页在占用。", 0, ["已连接", "连接失败"], "检查连接", "error"],
-      ["释放网页连接，并关闭其他占用。", 0, ["已释放", "等待连接"], "重新搜索", "working"],
-      ["按正确的设备类型重新配对。", 1, ["保持断开", "BikePower · 已连接"], "已连接", "success"]
-    ], note: "仍无数据：检查供电、运动类型和 App 支持；热点问题看“手机连接热点”。" },
+      ["连不上？先核对供电、广播和错误阶段。", 0, ["待核对", "连接失败"], "检查连接", "error"],
+      ["仅在确有其他连接时，释放该设备。", 0, ["已核对", "等待连接"], "重新搜索", "working"],
+      ["按正确设备类型连接，并核对新通知。", 1, ["已核对", "BikePower · 已连接"], "已连接", "success"]
+    ], note: "刚全量刷机且曾配对但连不上：Mac仅忽略BikePower，Windows仅删除BikePower，再回Pages重新选择；其他错误按下方分类排查，不默认归因占用。" },
     overview: { title: "记住使用顺序", labels: ["配置", "App"], frames: [
       ["连接热点，打开配置页。", 0, ["已打开", "保持当前状态"], "修改设置", "ready"],
       ["保存成功，再关闭热点。", 0, ["已保存 · 已关闭热点", "等待配对"], "返回 App", "working"],
@@ -482,6 +482,10 @@
       node.innerHTML = `<summary><h2>${name === "button" ? "按钮日常操作" : guides[name].title}</h2></summary>` +
         (name === "button" ? `<div class="operation-demos">${buttonMarkup()}</div><p class="operation-caution"><b>注意</b>配网时先松开，再确认。</p>` :
           `<div data-operation-guide="${name}"></div>`);
+      if(name === "troubleshoot"){
+        const recovery=old.querySelector("#ble-troubleshooting");
+        if(recovery)node.append(recovery);
+      }
       old.replaceWith(node);
     });
     const hero = content.querySelector(".manual-hero");

@@ -5,6 +5,7 @@
 骑行/跑步数据解析、异常检测和导出能力。
 """
 from pathlib import Path
+import json
 import re
 import shutil
 import subprocess
@@ -260,7 +261,7 @@ def main():
         ("你选的口不是开发板", "错误恢复：选错串口的针对性建议"),
         ("串口被别的程序占用", "错误恢复：串口占用建议"),
         ("写入中断，固件没有写完", "错误恢复：刷写失败且说明不会变砖"),
-        ("这台设备正被别的 App 连着", "错误恢复：蓝牙被占用建议"),
+        ("showBleFailure", "错误恢复：按证据分类而非统一归因占用"),
         ("还没有 GATT 数据", "空状态即教程：GATT 面板说明连接后会出现什么"),
         ("还没有读取开发板配置", "空状态即教程：NVS 面板说明连接后会出现什么"),
         ("不会用演示值", "实时监控空状态承诺不用演示值冒充设备数据"),
@@ -467,6 +468,7 @@ if (safeSitePath("firmware/v4.1.1/manifest-generic-c3.json") !== "./firmware/v4.
 if (safeSitePath("firmware/../x") !== null) throw new Error("路径穿越必须被拒绝");
 """
         with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as tmp:
+            tmp.write("const BikePowerConnectionHelp = require(" + json.dumps(str(ROOT / "tools/web/ble-connection-help.js")) + ");\n")
             tmp.write(runtime_prelude)
             tmp.write(scripts[0])
             tmp.write(runtime_assertions)

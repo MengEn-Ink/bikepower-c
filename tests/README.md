@@ -1,5 +1,12 @@
 # 测试脚本使用说明
 
+## Pages 连接异常恢复指引
+
+- `node --test tests/test_ble_connection_help.cjs`：15类分类、选择阶段隔离、已知绑定/通用建链区分、Mac/Windows定向步骤、原始错误保留。
+- `node tests/test_ble_connection_help_browser.cjs`：双主题900/1440宽、连接门/侧栏步骤、原始错误转义、手册父章节保留与导航、横向溢出。接入 `tests/web-flash` 的 test/browser 脚本。
+- `BP_BROWSER_CHANNEL=chrome` 可运行现有独立Chrome；测试用BLE替身，不访问真实设备，不清系统配对。Python与Node Playwright各安装匹配的Chromium，不能仅装Node浏览器覆盖Python回归。
+- 分类与实际Mac恢复证据边界见[Pages恢复说明](../docs/dev/66-pages-connection-recovery.md)。
+
 ## 核心重复测试 harness
 
 - `python3 tests/core_suite.py --layer host --repeat 2 --report-dir tests/reports/core-host`：固定用例登记、依赖前置、argv 直传、每轮独立日志、失败不被后续 PASS 覆盖；报告目录不可复用，避免覆盖原失败；`--case transport` 可单跑，`--layer browser|all` 加入生产门户浏览器回归。浏览器需匹配的 Playwright 和 Chromium，Windows 可用 `SYSTEM_CHROME` 显式指向独立无头 Chrome。
