@@ -89,4 +89,14 @@
 - 首轮失败保留：本地锁定Chromium未安装；新测试未等待异步门初始化；手册重建移除了分类入口；固定路由未加载新模块；门户子进程python3不可执行。分别明确环境/修复真实重建与测试依赖，不放宽判据。
 - Pages静态契约、打包15项、版本5文件一致性、docs门禁79 PASS / 2已有工作区WARN / 0 FAIL通过。编译/烧录/本次新网页真实BLE未执行，因本次没有固件变更，不冒称新增设备验收。
 - CI前置已补Python Playwright自身的Chromium安装；之前workflow只安装Node版本，Python三个浏览器入口无法启动。没有移除或跳过测试。
-- 页面提交`33b9f87`已推送。首轮远端docs、16浏览器入口及Ubuntu/macOS虚拟板通过；quick唯一失败为旧移动测试用`.device-settings`单选匹配4个details。已改为设备名称的实际父details，并显式展开来源；原16px/scale=1/无裁切断言不变，本地320/360/390/430/844五宽PASS。最终CI与Pages待下一提交验证。
+- 页面提交`33b9f87`已推送。首轮远端docs、16浏览器入口及Ubuntu/macOS虚拟板通过；quick唯一失败为旧移动测试用`.device-settings`单选匹配4个details。已改为设备名称的实际父details，并显式展开来源；原16px/scale=1/无裁切断言不变，本地320/360/390/430/844五宽PASS。最终网页提交为`400d425`；完整CI与Pages正式部署已通过，详情见下方终态记录。
+
+### 最终远端与线上验证（2026-11-11）
+
+- 网页实现与测试修复提交：`400d425165459eaacc58943013a9569bae43d5c1`。
+- [CI](https://github.com/MengEn-Ink/bikepower-c/actions/runs/43003563819)已完成且为success：docs、quick-harness、Ubuntu与macOS虚拟板全部通过；原“触屏输入聚焦及移动视口固定”也通过。虚拟板构建证据不替代实体BLE或手机验收。
+- [Pages部署](https://github.com/MengEn-Ink/bikepower-c/actions/runs/43004375648)已完成且为success，prepare与deploy都通过，消费上述已验证提交；不再是“仅推送、尚未上线”。
+- 线上`ble-monitor.html`、`ble-connection-help.js`、`operation-demos.js`返回HTTP200；统一CRLF/LF后分别与本地已提交源码完全一致。
+- 对[线上页面](https://mengen-ink.github.io/bikepower-c/)使用独立无头Chrome检查深浅主题：通用错误显示“原因未确定”及Mac/Windows定向步骤，明确密钥错误归为旧配对，手册导航打开15类入口；无页面脚本错误。
+- 线上检查仅在隔离浏览器上下文注入故障，不调用真实蓝牙/串口，不访问用户浏览器资料，不把模拟故障测试记为无线验收。
+- 固件版本仍为v4.4.1，无新固件tag/Release；本次未修改全量刷写动作或升级保留策略，因此没有消除全量BIN覆盖NVS后单边绑定的复发条件。新增的是准确可操作的恢复指引及异常分流。
