@@ -31,7 +31,8 @@
 3. 首轮浏览器失败为第二主题继续使用已打开的紧凑工作区，此时首页入口按设计隐藏；测试显式返回首页再执行真实入口点击后通过，未改生产断言或强制点击。
 4. 既有静态门禁、73/73单元及17个完整浏览器入口均通过；手机生产页与演示原始和排除抗锯齿后均0像素差异。站点生成器17/17、手册漂移与空白检查通过。
 5. 浏览器脚本使用真实渲染与替身WebSerial，无物理烧录。Windows私有helper仅指定系统Chrome及已确认Python路径，不提交或修改测试断言。
-6. 远端完整CI、Pages部署和内置浏览器上线核对待取得后记录。
+6. 提交 `2407b9a6e8cec72118a9468454e63a72b3c70298` 的[完整 CI](https://github.com/MengEn-Ink/bikepower-c/actions/runs/43029884455)（docs、quick、macOS与Ubuntu虚拟板）与[Pages部署](https://github.com/MengEn-Ink/bikepower-c/actions/runs/43030835667)全部success。线上页面统一行尾后与提交内容一致，七版分类字段与catalog逐字段一致，latest回退一致，完整Release均存在。
+7. 线上比较初轮因JSON键排序不同报mismatch，逐字段比较确认内容一致；未修改生产索引以迎合字符串顺序。Mac内置浏览器实际刷新并点击全部七版，分类及回滚确认提示核对通过；已回到v4.4.1，原文末尾与视觉排版核对，console无错误。未选串口或烧录。
 
 ## 维护
 
