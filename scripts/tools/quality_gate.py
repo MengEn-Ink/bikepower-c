@@ -395,6 +395,7 @@ STATIC_CHECKS = [
     ("tests/test_ble_winrt_refresh.py", "双板 BLE 缓存身份与失败释放回归"),
     ("tests/test_telemetry_e2e_ready.py", "遥测 E2E 链路缓存就绪与超时回归"),
     ("tests/test_soak_harness_fake.py", "控制耐久帧数/收敛/最低堆判据回归"),
+    ("tests/test_workspace_audit.py", "工作区分类与 Git 重命名解析回归"),
     ("tests/test_maintenance_tools.py", "维护工具功能回归"),
     ("tests/test_persistent_store.py", "生产 NVS 双槽原子提交与故障恢复 ASan/UBSan"),
     ("tests/test_mock_server_shutdown.py", "mock 服务终止信号与清理回归"),

@@ -2,8 +2,11 @@
 """维护工具功能回归，不启动 ESP-IDF 或真实设备。"""
 import ast
 import importlib.util
+import os
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,6 +78,39 @@ class MaintenanceToolsTest(unittest.TestCase):
             doc.write_text("[错标题](target.md#fake)\n[错路径](missing.md)\n[代码ID](target.md#fakeid)\n")
             errors = tool.check_document(doc, root)
             self.assertEqual(len(errors), 3)
+
+    def test_inline_generator_rejects_source_aliases_before_writing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            web = root / 'web'
+            web.mkdir()
+            originals = {'index.html': '<!-- INLINE_CSS --><!-- INLINE_JS -->',
+                         'app.css': 'body { color: black; }',
+                         'app.js': 'const x = 1;'}
+            for name, content in originals.items():
+                (web / name).write_text(content, encoding='utf-8')
+            alias = root / 'alias.h'
+            alias.symlink_to(web / 'index.html')
+            hardlink = root / 'hardlink.h'
+            os.link(web / 'app.css', hardlink)
+            outputs = [web / name for name in originals] + [alias, hardlink, root / 'wrong.html']
+            for output in outputs:
+                with self.subTest(output=output.name):
+                    for name, content in originals.items():
+                        (web / name).write_text(content, encoding='utf-8')
+                    result = subprocess.run([sys.executable, str(ROOT / 'scripts/inline_static.py'),
+                                             '--web-dir', str(web), '--output', str(output)],
+                                            capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('FAIL:', result.stderr)
+                    for name, content in originals.items():
+                        self.assertEqual((web / name).read_text(encoding='utf-8'), content)
+            output = root / 'generated' / 'web_index_html.h'
+            result = subprocess.run([sys.executable, str(ROOT / 'scripts/inline_static.py'),
+                                     '--web-dir', str(web), '--output', str(output)],
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('static const char index_html[]', output.read_text(encoding='utf-8'))
 
     def test_facts_use_current_source_and_detect_drift(self):
         tool = load("doc_facts")

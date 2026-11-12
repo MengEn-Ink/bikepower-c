@@ -25,10 +25,13 @@ def git_status(root=ROOT):
         capture_output=True, text=True, check=True,
     )
     entries = []
-    for chunk in result.stdout.split('\0'):
+    chunks = iter(result.stdout.split('\0'))
+    for chunk in chunks:
         if not chunk:
             continue
         code, path = chunk[:2], chunk[3:]
+        if 'R' in code or 'C' in code:
+            next(chunks, None)
         entries.append((code, path.replace('\\', '/')))
     return entries
 

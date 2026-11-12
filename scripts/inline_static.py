@@ -130,6 +130,16 @@ def main():
     css_path = os.path.join(args.web_dir, "app.css")
     js_path = os.path.join(args.web_dir, "app.js")
 
+    output = os.path.realpath(args.output)
+    for source in (html_path, css_path, js_path):
+        same_file = os.path.exists(output) and os.path.exists(source) and os.path.samefile(output, source)
+        if output == os.path.realpath(source) or same_file:
+            print("FAIL: 输出不得覆盖 web 源文件 " + source, file=sys.stderr)
+            return 1
+    if not args.output.lower().endswith(".h"):
+        print("FAIL: 输出必须是 .h C 头文件", file=sys.stderr)
+        return 1
+
     for p in [html_path, css_path, js_path]:
         if not os.path.isfile(p):
             print("FAIL: 缺少文件 " + p, file=sys.stderr)
