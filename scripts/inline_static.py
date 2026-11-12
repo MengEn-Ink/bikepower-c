@@ -16,7 +16,9 @@
 iOS Captive Portal WebView 不能加载外部 .css/.js，必须内联。
 """
 import argparse
+import importlib.util
 import os
+from pathlib import Path
 import re
 import sys
 
@@ -60,44 +62,15 @@ def minify_css(css):
     return css.strip()
 
 
-def _strip_js_line_comment(line):
-    out = []
-    quote = ""
-    escaped = False
-    i = 0
-    while i < len(line):
-        ch = line[i]
-        nxt = line[i + 1] if i + 1 < len(line) else ""
-        if quote:
-            out.append(ch)
-            if escaped:
-                escaped = False
-            elif ch == "\\":
-                escaped = True
-            elif ch == quote:
-                quote = ""
-            i += 1
-            continue
-        if ch in ("'", '"', "`"):
-            quote = ch
-            out.append(ch)
-            i += 1
-            continue
-        if ch == "/" and nxt == "/":
-            break
-        out.append(ch)
-        i += 1
-    return "".join(out)
+_vendor_spec = importlib.util.spec_from_file_location(
+    'bikepower_rjsmin', Path(__file__).with_name('vendor') / 'rjsmin.py')
+_vendor = importlib.util.module_from_spec(_vendor_spec)
+_vendor_spec.loader.exec_module(_vendor)
+_jsmin = _vendor._make_jsmin(python_only=True)
 
 
 def minify_js(js):
-    js = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
-    lines = []
-    for line in js.splitlines():
-        stripped = _strip_js_line_comment(line).strip()
-        if stripped:
-            lines.append(stripped)
-    return " ".join(lines)
+    return _jsmin(js, keep_bang_comments=True)
 
 
 def minify_html(html):

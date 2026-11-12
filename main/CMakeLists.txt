@@ -50,6 +50,7 @@ add_custom_command(
             ${CMAKE_CURRENT_LIST_DIR}/web/app.css
             ${CMAKE_CURRENT_LIST_DIR}/web/app.js
             ${CMAKE_SOURCE_DIR}/scripts/inline_static.py
+            ${CMAKE_SOURCE_DIR}/scripts/vendor/rjsmin.py
     COMMENT "Inlining web static resources -> web_index_html.h"
     VERBATIM
 )

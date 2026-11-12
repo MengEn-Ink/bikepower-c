@@ -112,6 +112,25 @@ class MaintenanceToolsTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('static const char index_html[]', output.read_text(encoding='utf-8'))
 
+    def test_minifier_preserves_asi_regex_strings_and_operators(self):
+        spec = importlib.util.spec_from_file_location('inline_static_test', ROOT / 'scripts/inline_static.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        cases = [
+            'function f(){return\n42;} console.log(JSON.stringify(f()));',
+            'let x=1,y=2; console.log(x + +y, x - -y);',
+            'const url="https://example.invalid/a/*keep*/"; console.log(url);',
+            'function f(x){return /[/*]+/.test(x);} console.log(f("//"));',
+            'const x=`line one\\nline two`; console.log(x);',
+            'let x=1\nx++\nconsole.log(x);',
+        ]
+        for source in cases:
+            with self.subTest(source=source):
+                before = subprocess.run(['node', '-e', source], capture_output=True, text=True, check=True)
+                after = subprocess.run(['node', '-e', module.minify_js(source)], capture_output=True, text=True, check=True)
+                self.assertEqual(after.stdout, before.stdout)
+        self.assertIn('/*! license */', module.minify_js('/*! license */ const x = 1;'))
+
     def test_facts_use_current_source_and_detect_drift(self):
         tool = load("doc_facts")
         text = tool.render(ROOT)

@@ -66,6 +66,8 @@ SOURCE_TOP_FILES = (
     "partitions.csv",
     # 构建期由 main/CMakeLists 调用的生成脚本（CMAKE_SOURCE_DIR 相对路径）
     "scripts/inline_static.py",
+    "scripts/vendor/rjsmin.py",
+    "scripts/vendor/rjsmin.LICENSE",
     # managed 组件只 hash 清单/锁（不 hash 整个 managed_components tree）
     "main/idf_component.yml",
     "components/bikepower_domain/idf_component.yml",
