@@ -46,10 +46,10 @@
 
 ### 3.3 文档事实矫正：已完成
 
-- [安全说明](02-firmware-security.md)：区分 Flash 存储保密与 Secure Boot 真实性；纠正 C3 为 XTS-AES-128、256 位总密钥；加密 coredump 需要改变取证通道，不是必然失效。编译裁剪不是安全保证，也不应把 MIT 开源项目写成靠隐藏代码防抄袭。<RichMediaReference>["https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c3/security/flash-encryption.html","https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c3/api-guides/core_dump.html"]</RichMediaReference>
+- [安全说明](02-firmware-security.md)：区分 Flash 存储保密与 Secure Boot 真实性；纠正 C3 为 XTS-AES-128、256 位总密钥；加密 coredump 需要改变取证通道，不是必然失效。编译裁剪不是安全保证，也不应把 MIT 开源项目写成靠隐藏代码防抄袭。（[来源1](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c3/security/flash-encryption.html)；[来源2](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c3/api-guides/core_dump.html)）
 - [架构 Wiki](../wiki/01-architecture.md)：移除已不存在的模板实现节点，修正为 config snapshot；factory 是 `0x3E0000`（3.875 MiB）的应用分区，不是 3.25 MB，也不等于 merged-bin 的全部内容。
 - [虚拟开发板说明](48-local-virtual-board.md)：删除“当前没有 macOS 机器”这种失效环境描述；把旧 v4.3.3 发行阻断明确限定为历史阶段，不冒充当前发行状态。
-- [PROGRESS](../../PROGRESS.md) 与 [CHANGELOG](../../CHANGELOG.md)：补齐 v4.4.1 已正式发布的身份边界。正式 Release 发布于 2026-11-11；后续 Pages 更新不是新的固件发行，也不能把 main 自动等同于 Release tag 的镜像。<RichMediaReference>["https://github.com/MengEn-Ink/bikepower-c/releases/tag/v4.4.1"]</RichMediaReference>
+- [PROGRESS](../../PROGRESS.md) 与 [CHANGELOG](../../CHANGELOG.md)：补齐 v4.4.1 已正式发布的身份边界。正式 Release 发布于 2026-11-11；后续 Pages 更新不是新的固件发行，也不能把 main 自动等同于 Release tag 的镜像。（[来源1](https://github.com/MengEn-Ink/bikepower-c/releases/tag/v4.4.1)）
 - [文档索引](../INDEX.md)：补充遗漏的本地开发工作流及开发效率入口；旧治理报告添加历史用途与本报告指向。已有重复 48/53 编号暂不重命名，以免无必要破坏历史链接；后续新文档只用递增的唯一编号。
 
 ## 四、实际验证与证据边界
@@ -74,7 +74,7 @@
 
 ### 5.1 崩溃取证栈余量：P1，配置风险而非已复现故障
 
-当前 defaults 与本轮 sdkconfig 均为 `CONFIG_ESP_COREDUMP_STACK_SIZE=1024`；官方 v5.5.4 指南推荐独立 coredump 栈大于 1300 字节。建议在隔离镜像比较 1536/2048，并真实触发 panic、校验 dump 完整性与符号化；不能仅改数字就宣称可靠。<RichMediaReference>["https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c3/api-guides/core_dump.html"]</RichMediaReference>
+当前 defaults 与本轮 sdkconfig 均为 `CONFIG_ESP_COREDUMP_STACK_SIZE=1024`；官方 v5.5.4 指南推荐独立 coredump 栈大于 1300 字节。建议在隔离镜像比较 1536/2048，并真实触发 panic、校验 dump 完整性与符号化；不能仅改数字就宣称可靠。（[来源1](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c3/api-guides/core_dump.html)）
 
 ### 5.2 门户预算几乎耗尽：P1
 
@@ -102,49 +102,49 @@
 
 ### 6.1 SmartSpin2k：学传感器时序与控制验收，不搬电机系统
 
-SmartSpin2k 是真实阻力执行器方案，有上下游 BLE、FTMS、功率/心率输入与电机调阻；它的 native 与 Python 回归强调生产协议字节、样本新鲜度、固定 workout 回放、失败不跳过及模拟结果和硬件结果分开。<RichMediaReference>["https://github.com/doudar/SmartSpin2k","https://github.com/doudar/SmartSpin2k/blob/develop/AGENTS.md"]</RichMediaReference>
+SmartSpin2k 是真实阻力执行器方案，有上下游 BLE、FTMS、功率/心率输入与电机调阻；它的 native 与 Python 回归强调生产协议字节、样本新鲜度、固定 workout 回放、失败不跳过及模拟结果和硬件结果分开。（[来源1](https://github.com/doudar/SmartSpin2k)；[来源2](https://github.com/doudar/SmartSpin2k/blob/develop/AGENTS.md)）
 
 适用 BikePower：把值、采样时间、来源、session generation 作为同一快照；增加延迟/重复样本、停止踏频、模式切换、长时回绕与恢复时序回归。真实 ERG 电机调参、homing、扭矩/齿隙模型不适合直接搬给模拟器/功率桥。
 
-软件为 GPL-2.0，BikePower 为 MIT；借鉴方法并独立实现，不能直接复制其实现到 MIT 固件。<RichMediaReference>["https://github.com/doudar/SmartSpin2k"]</RichMediaReference>
+软件为 GPL-2.0，BikePower 为 MIT；借鉴方法并独立实现，不能直接复制其实现到 MIT 固件。（[来源1](https://github.com/doudar/SmartSpin2k)）
 
 ### 6.2 qdomyos-zwift：学兼容 profile 与功能分层，不做万能固件
 
-QZ 公开提供设备/用户 profiles、心率输入、ZWO/XML workout、GPX、统计及 DirCon；虚拟 bike 实现把 CPS、CSC、FTMS、HRS-only、特定客户端兼容分支及 notifier/write processor 分开。<RichMediaReference>["https://github.com/cagnulein/qdomyos-zwift","https://github.com/cagnulein/qdomyos-zwift/blob/master/src/virtualdevices/virtualbike.cpp"]</RichMediaReference>
+QZ 公开提供设备/用户 profiles、心率输入、ZWO/XML workout、GPX、统计及 DirCon；虚拟 bike 实现把 CPS、CSC、FTMS、HRS-only、特定客户端兼容分支及 notifier/write processor 分开。（[来源1](https://github.com/cagnulein/qdomyos-zwift)；[来源2](https://github.com/cagnulein/qdomyos-zwift/blob/master/src/virtualdevices/virtualbike.cpp)）
 
 适用 BikePower：兼容预设必须来源于真实目标端日志与 Feature/特征集契约，而非靠反复改 MAC；把训练计划与导出放在 Pages/桌面层，避免把 UI、网络和大文件解析压进 C3。
 
-QZ 为 GPL-3.0，不直接搬代码。DirCon 依赖长期网络，与本项目“默认 BLE、临时用户触发 WiFi、不恢复 OTA”的现有边界冲突，宜外部网关方案、低优先级单独立项。<RichMediaReference>["https://github.com/cagnulein/qdomyos-zwift"]</RichMediaReference>
+QZ 为 GPL-3.0，不直接搬代码。DirCon 依赖长期网络，与本项目“默认 BLE、临时用户触发 WiFi、不恢复 OTA”的现有边界冲突，宜外部网关方案、低优先级单独立项。（[来源1](https://github.com/cagnulein/qdomyos-zwift)）
 
 ### 6.3 Espressif ESP Emulator + Bumble：强化真实协议路径，不自欺式 mock
 
-ESP Emulator 当前文档提供真实 C3 镜像、NimBLE HCI、虚拟 UART、GDB 和任务 trace；Bumble 支持 Python ATT/GATT/SMP 与虚拟/真实 HCI，但其项目仍明确提示实验性与生产使用限制。<RichMediaReference>["https://github.com/espressif/esp-emulator","https://github.com/google/bumble"]</RichMediaReference>
+ESP Emulator 当前文档提供真实 C3 镜像、NimBLE HCI、虚拟 UART、GDB 和任务 trace；Bumble 支持 Python ATT/GATT/SMP 与虚拟/真实 HCI，但其项目仍明确提示实验性与生产使用限制。（[来源1](https://github.com/espressif/esp-emulator)；[来源2](https://github.com/google/bumble)）
 
 本项目已固定 emulator 0.51.0、Bumble 0.0.219，已有 checked LTK 与拒绝未知命令的测试策略。优化方向是扩展故障注入、复用生产路径、固定种子与输入镜像哈希，**不是重新创建另一套业务 mock**。main 文档的新能力不自动适用于固定旧二进制。
 
 ### 6.4 Zephyr Twister：借鉴能力声明和多层测试编排，不迁移 RTOS
 
-Twister 用测试 scenario、平台/能力/fixture 与 harness 声明进行矩阵编排，区分仅构建与实际执行，支持 emulation、coverage 及多 DUT 场景。<RichMediaReference>["https://docs.zephyrproject.org/latest/develop/test/twister.html"]</RichMediaReference>
+Twister 用测试 scenario、平台/能力/fixture 与 harness 声明进行矩阵编排，区分仅构建与实际执行，支持 emulation、coverage 及多 DUT 场景。（[来源1](https://docs.zephyrproject.org/latest/develop/test/twister.html)）
 
 适用 BikePower：把 quality、operation、release、npm 和设备工具里重复的测试登记收敛为一个可审计 registry；声明依赖、是否修改配置、设备数量、证据等级与恢复责任，生成各入口。先消除名单漂移，不必迁移到 Zephyr、west 或改写 FreeRTOS。
 
 ### 6.5 ESP Web Tools：维持锁定快照与生命周期，谨慎升级
 
-ESP Web Tools 提供基于 manifest 的浏览器刷写及按芯片/串口类型选择镜像能力；本项目已固定同源 10.4.0 快照与独立生命周期回归。<RichMediaReference>["https://github.com/esphome/esp-web-tools"]</RichMediaReference>
+ESP Web Tools 提供基于 manifest 的浏览器刷写及按芯片/串口类型选择镜像能力；本项目已固定同源 10.4.0 快照与独立生命周期回归。（[来源1](https://github.com/esphome/esp-web-tools)）
 
 增量优化重点：配置保持式升级和完整恢复式刷写明确分开、错误终态资源释放、原始 checksum/来源；未完成设备验收前不自动追最新上游，不因“100%”或弹窗关闭标成功。
 
 ### 6.6 CBMC 与来源证明：针对关键小边界建立保证
 
-CBMC 能对 C/C++ 数组边界、指针及用户断言做有界验证；适合选择小 codec、双槽提交或 failover 状态机，而不是对整个 BLE/RTOS 一次性形式化。<RichMediaReference>["https://github.com/diffblue/cbmc"]</RichMediaReference>
+CBMC 能对 C/C++ 数组边界、指针及用户断言做有界验证；适合选择小 codec、双槽提交或 failover 状态机，而不是对整个 BLE/RTOS 一次性形式化。（[来源1](https://github.com/diffblue/cbmc)）
 
-GitHub artifact attestations 可绑定产物、构建 workflow、提交身份与 SBOM，并可验证；它证明来源，不保证代码安全或设备兼容。适合给正式 bin/ZIP 增补来源链，而不是给每份文档签名。<RichMediaReference>["https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds"]</RichMediaReference>
+GitHub artifact attestations 可绑定产物、构建 workflow、提交身份与 SBOM，并可验证；它证明来源，不保证代码安全或设备兼容。适合给正式 bin/ZIP 增补来源链，而不是给每份文档签名。（[来源1](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds)）
 
 ## 七、升级选择
 
 ### 推荐先评估 ESP-IDF 同系列补丁升级
 
-官方已发布 v5.5.6，属于 v5.5 bugfix，并列出 WiFi supplicant 等修复。不能把 Bluedroid/其他芯片修复直接当作 C3 NimBLE 项目收益；先筛选实际使用组件。<RichMediaReference>["https://github.com/espressif/esp-idf/releases/tag/v5.5.6"]</RichMediaReference>
+官方已发布 v5.5.6，属于 v5.5 bugfix，并列出 WiFi supplicant 等修复。不能把 Bluedroid/其他芯片修复直接当作 C3 NimBLE 项目收益；先筛选实际使用组件。（[来源1](https://github.com/espressif/esp-idf/releases/tag/v5.5.6)）
 
 路线：固定旧 5.5.4 基线 → 隔离安装 5.5.6 → 私有 adapter 编译/ABI 审查 → 双板构建与 codec/存储/系统 indication 回归 → 原固件虚拟路径 → 配置/绑定保持实物升级。旧共享 SDK 不原地修改，不直接跳 major，不把编译成功当作升级完成。
 
