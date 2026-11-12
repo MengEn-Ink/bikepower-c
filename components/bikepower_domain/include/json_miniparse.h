@@ -1,44 +1,31 @@
 /**
- * JSON 最小解析（纯 C，不依赖 ESP-IDF，可 host 编译）
- *
- * 轻量 JSON 字段提取（纯 C，不依赖 ESP-IDF，可 host 编译），
- * 供 config_store 与 wifi_portal 解析配置 JSON 请求体。
- * 简单字段面向工具生成格式，对象数组支持跳过转义及嵌套对象。
+ * 受限 JSON 对象解析（纯 C，无动态分配）。
+ * 配置导入先规范化并校验，member/checked helper 只消费规范化对象。
  */
 #pragma once
 #include <stddef.h>
 #include <stdbool.h>
 
-/**
- * 从 JSON 字符串中提取指定键的字符串值。
- * 查找 "key":"value" 模式，返回 value 部分（不解析转义）。
- * json：完整 JSON 字符串。
- * key：待提取的键名（不带引号）。
- * out：输出缓冲区。
- * out_sz：输出缓冲区大小。
- * 返回值：true 表示找到并写入，false 表示未找到。
- * 特殊行为：遇到第一个闭合引号即结束，不处理转义；仅用于简单字符串。
- */
+/* 删除字符串外合法空白并验证完整对象；不支持转义键名，重复键拒绝。
+ * 长度和深度有界。失败输出可能不完整，调用方不能使用。 */
+bool json_normalize_object(const char *json, char *out, size_t capacity);
+
+/* 查当前对象直接成员，不搜索嵌套对象；不存在返回 NULL。 */
+const char *json_member_value(const char *json, const char *key);
+
+/* 仅接受完整十进制整数 token，int 溢出/错误类型拒绝，失败保持输出。 */
+bool json_get_int_checked(const char *json, const char *key, int *value);
+
+/* 简单未转义字符串兼容入口；不足/转义/错误时拒绝且保持输出。
+ * 不是配置 Unicode 导入接口。 */
 bool json_get_str(const char *json, const char *key, char *out, size_t out_sz);
 
-/**
- * 从 JSON 字符串中提取指定键的整数值。
- * 查找 "key":数字 模式，解析为 int。
- * json：完整 JSON 字符串。
- * key：待提取的键名。
- * 返回值：解析后的整数值，未找到返回 0。
- */
+/* 兼容入口，缺失或非法返回 0；需要区分错误时使用 checked 接口。 */
 int json_get_int(const char *json, const char *key);
 
-/*
- * 返回对象数组项数；键缺失返回 -1，数组语法错误返回 -2。
- * 仅接受由 JSON 对象组成的数组，并正确跳过字符串转义和嵌套对象。
- */
+/* 对象数组项数；缺失 -1，错误 -2。 */
 int json_get_object_array_count(const char *json, const char *key);
 
-/*
- * 提取对象数组中的指定项，结果包含外层花括号。
- * 索引越界、语法错误或输出容量不足时返回 false。
- */
+/* 提取带花括号的对象数组项；容量/索引/语法错误返回 false。 */
 bool json_get_object_array_item(const char *json, const char *key, int index,
                                 char *out, size_t out_size);

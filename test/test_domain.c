@@ -1785,10 +1785,10 @@ static void test_json_miniparse(void)
                                       tiny_item, sizeof(tiny_item)),
           "对象数组输出容量不足返回 false");
 
-    // 缓冲区不足截断
-    char small[5];
-    CHECK(json_get_str(json, "version", small, sizeof(small)), "小缓冲提取");
-    CHECK(strcmp(small, "3.1.") == 0, "小缓冲截断为 3.1.");
+    // 缓冲区不足拒绝，失败不修改输出
+    char small[5] = "keep";
+    CHECK(!json_get_str(json, "version", small, sizeof(small)), "小缓冲拒绝截断");
+    CHECK(strcmp(small, "keep") == 0, "小缓冲失败保持输出");
 
     // 嵌套 JSON（key 出现在 value 中）
     const char *nested = "{\"a\":\"1\",\"key\":\"val\"}";

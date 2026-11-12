@@ -558,11 +558,8 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
 
 static const char *json_string_value(const char *json, const char *key)
 {
-    char pattern[48];
-    int written = snprintf(pattern, sizeof(pattern), "\"%s\":\"", key);
-    if (written < 0 || (size_t)written >= sizeof(pattern)) return NULL;
-    const char *value = strstr(json, pattern);
-    return value ? value + strlen(pattern) : NULL;
+    const char *value = json_member_value(json, key);
+    return value && *value == '"' ? value + 1 : NULL;
 }
 
 static bool parse_bridge_address(const char *value, uint8_t address[6])
@@ -590,13 +587,15 @@ static bool bridge_device_valid(const bridge_device_t *device)
 
 static bool parse_bridge_device(const char *json, bridge_device_t *device)
 {
-    if (!json || !device || !strstr(json, "\"addr_type\":")
-        || !strstr(json, "\"address\":\"") || !strstr(json, "\"name\":\"")) {
+    int type;
+    if (!json || !device || !json_get_int_checked(json, "addr_type", &type)
+        || type < 0 || type > 1
+        || !json_string_value(json, "address") || !json_string_value(json, "name")) {
         return false;
     }
     bridge_device_t parsed = {
         .bound = 1,
-        .addr_type = json_get_int(json, "addr_type"),
+        .addr_type = type,
     };
     if (!parse_bridge_address(json_string_value(json, "address"), parsed.addr)
         || !json_unescape(json_string_value(json, "name"),
@@ -630,16 +629,18 @@ static bool parse_bridge_devices(const char *json, bridge_config_t *bridge)
 
 static bool parse_legacy_bridge(const char *json, bridge_config_t *bridge)
 {
-    if (!strstr(json, "\"bridge_bound\":")) return true;
-    int bound = json_get_int(json, "bridge_bound");
+    if (!json_member_value(json, "bridge_bound")) return true;
+    int bound, type;
+    if (!json_get_int_checked(json, "bridge_bound", &bound)) return false;
     if (bound == 0) return true;
-    if (bound != 1 || !strstr(json, "\"bridge_addr_type\":")
-        || !strstr(json, "\"bridge_address\":\"")) {
+    if (bound != 1 || !json_get_int_checked(json, "bridge_addr_type", &type)
+        || type < 0 || type > 1
+        || !json_string_value(json, "bridge_address")) {
         return false;
     }
     bridge_device_t device = {
         .bound = 1,
-        .addr_type = json_get_int(json, "bridge_addr_type"),
+        .addr_type = type,
     };
     if (!parse_bridge_address(json_string_value(json, "bridge_address"), device.addr)) {
         return false;
@@ -655,8 +656,11 @@ static bool parse_legacy_bridge(const char *json, bridge_config_t *bridge)
 bool config_store_deserialize(const char *json, config_data_t *c)
 {
     if (json == NULL || c == NULL) return false;
-    /* 必备结构校验：缺 schema_ver 键视为非法 JSON，避免静默落默认配置 */
-    if (strstr(json, "\"schema_ver\":") == NULL) return false;
+    char normalized[CONFIG_JSON_MAX_LEN];
+    if (!json_normalize_object(json, normalized, sizeof(normalized))) return false;
+    json = normalized;
+    int schema;
+    if (!json_get_int_checked(json, "schema_ver", &schema)) return false;
 
     /* 解析到临时对象，成功才写出，失败不污染调用方的 c */
     config_data_t tmp;
@@ -689,11 +693,8 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         {"bridge_percent_x10", &tmp.bridge.percent_x10},
     };
     for (size_t i = 0; i < sizeof(int_keys) / sizeof(int_keys[0]); i++) {
-        char pat[40];
-        snprintf(pat, sizeof(pat), "\"%s\":", int_keys[i].key);
-        if (strstr(json, pat)) {
-            *int_keys[i].field = json_get_int(json, int_keys[i].key);
-        }
+        if (json_member_value(json, int_keys[i].key)
+            && !json_get_int_checked(json, int_keys[i].key, int_keys[i].field)) return false;
     }
 
     struct { const char *key; uint8_t *field; } led_keys[] = {
@@ -710,30 +711,20 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         {"led_error_color", &tmp.led.scenes[LED_SCENE_ERROR].color},
     };
     for (size_t i = 0; i < sizeof(led_keys) / sizeof(led_keys[0]); i++) {
-        char pat[48];
-        snprintf(pat, sizeof(pat), "\"%s\":", led_keys[i].key);
-        if (strstr(json, pat)) {
-            *led_keys[i].field = (uint8_t)json_get_int(json, led_keys[i].key);
+        if (json_member_value(json, led_keys[i].key)) {
+            int value;
+            if (!json_get_int_checked(json, led_keys[i].key, &value)
+                || value < 0 || value > UINT8_MAX) return false;
+            *led_keys[i].field = (uint8_t)value;
         }
     }
 
-    const char *cp = strstr(json, "\"custom_pacer_name\":\"");
-    if (cp) {
-        cp += strlen("\"custom_pacer_name\":\"");
-        if (!json_unescape(cp, tmp.custom_pacer_name, CUSTOM_PACER_NAME_MAX)) return false;
-    }
-    const char *rp = strstr(json, "\"run_custom_name\":\"");
-    if (rp) {
-        rp += strlen("\"run_custom_name\":\"");
-        if (!json_unescape(rp, tmp.run_custom_name, RUN_CUSTOM_NAME_MAX)) return false;
-    }
-
-    /* device_name：定位值起点后做反转义（json_get_str 不处理转义） */
-    const char *dp = strstr(json, "\"device_name\":\"");
-    if (dp) {
-        dp += strlen("\"device_name\":\"");
-        if (!json_unescape(dp, tmp.device_name, DEVICE_NAME_MAX)) return false;
-    }
+    const char *cp = json_member_value(json, "custom_pacer_name");
+    if (cp && (*cp != '"' || !json_unescape(cp + 1, tmp.custom_pacer_name, CUSTOM_PACER_NAME_MAX))) return false;
+    const char *rp = json_member_value(json, "run_custom_name");
+    if (rp && (*rp != '"' || !json_unescape(rp + 1, tmp.run_custom_name, RUN_CUSTOM_NAME_MAX))) return false;
+    const char *dp = json_member_value(json, "device_name");
+    if (dp && (*dp != '"' || !json_unescape(dp + 1, tmp.device_name, DEVICE_NAME_MAX))) return false;
 
     if (tmp.schema_ver == CONFIG_VERSION) {
         if (!parse_bridge_devices(json, &tmp.bridge)) return false;

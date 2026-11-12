@@ -47,6 +47,7 @@
 /* v14 新增三设备桥接列表，保留 v13 单设备配置迁移。 */
 #define CONFIG_VERSION        14
 #define CONFIG_JSON_MAX_LEN    2048
+#define JSON_IMPORT_MAX_DEPTH   8
 
 /* 真实功率桥接的校正、有效性和显式配置编码边界。 */
 #define BRIDGE_NAME_MAX                32
