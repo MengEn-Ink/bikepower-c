@@ -9,6 +9,12 @@
 
 当前源码另提供独立只读遥测服务 `7a5a1000`：每秒统一发布内存、CPU 窗口、连接参数和发送计数，四组记录均不超过 20 字节。主任务采样，RSSI 由 NimBLE host 缓存；GATT 不同步查询 HCI。CPU 使用 FreeRTOS esp_timer 运行统计，Pages 状态页与常驻指标/窗口共用既有连接。详细布局、百分比口径和实物边界见 [设备遥测协议](36-device-telemetry-verification.md)。此功能尚未发布正式固件。
 
+## 工程加固与受限 JSON 导入
+
+`config_store_deserialize()` 先在 2048 字节缓冲内校验完整对象，深度最多8，拒绝重复键、转义键名、非法数值 token、整数溢出、尾部垃圾与缩窄溢出；查找仅作用于直接成员。名称值仍支持既有 Unicode/代理对解码，未知字段必须语法有效。已知整数业务越界仍按原迁移/夹紧规则处理，失败保持调用者配置，schema14、NVS与BLE布局不变。这不是任意通用 JSON 或 Unicode 键解析器。
+
+NimBLE私有头与在途指示字段集中在 `nimble_adapter`，仅adapter拥有私有include；调用需在host上下文，保持应用锁→host锁次序，不返回私有指针。生产仍为IDF5.5.4；5.5.6仅隔离候选。构建JS压缩采用固定rJSmin1.2.5纯Python函数并保留Apache2许可证，内联门户106831字节，110KiB预算未扩大；语法/浏览器检查仍独立。自动改进和未验边界见[实施记录](70-automated-engineering-followups.md)。
+
 ## BLE持久绑定安全策略（4.3.3）
 
 NimBLE启用最多4个绑定记录，标准独立`nimble_bond` namespace存储安全密钥/CCCD/客户端能力；用户配置namespace与schema不变。使用SC Just Works、ENC/ID分发和public本机广播，保持FTMS骑行/跑步WRITE_ENC。容量满拒绝新增，不使用轮转删除；已有绑定重复配对不自动替换。启动逐记录核验实际NVS格式及RAM恢复，写入后补同身份更新落盘和回读，失败阻止密钥恢复及FTMS控制，不擦除记录。服务表可因配置变化重建，重新同步时通过Service Changed告知已绑定客户端。该早期候选五轮加密控制/四路300秒通知、已绑定时八组配置/GATT重建/重启与原配置恢复通过，但最终4ecf069镜像实物第二轮重连失败，正式发行阻断；持久CCCD存在跨服务表句柄失配线索，尚未修复。当前容量和存储故障仅host专项，未做多客户端满容量或真机写失败注入。若系统单侧忘记绑定，板端会拒绝覆盖；当前没有用户清绑定入口，需定向维护。最终发行门禁以PROGRESS.md为准；旧[会话修复报告](46-qidou-session-security-fix.md)仅记录先前无绑定手机验收，不代表当前候选通过。

@@ -9,7 +9,7 @@
 
 本节汇总当前未完成事项；下方阶段记录中的 OPEN、未修复、未提交及 NOT_RUN 保留为当时证据，不用于判断当前状态。
 
-完整工程优先级、依赖、工作量与验收标准见 [main 卫生与升级评审](docs/dev/69-main-hygiene-and-upgrade-review.md)。下方硬件事项不因软件门禁通过而关闭；SDK、coredump栈、资源预算和新特性尚未实施。
+完整工程优先级、依赖、工作量与验收标准见 [main 卫生与升级评审](docs/dev/69-main-hygiene-and-upgrade-review.md)；本轮自动推进状态见[自动工程改进](docs/dev/70-automated-engineering-followups.md)。JSON与NimBLE适配边界、测试信号/依赖诊断已实现；门户余量改善但10%目标未闭合。SDK5.5.6与coredump栈仅隔离验证，生产仍5.5.4/1024；下方硬件事项不因软件通过而关闭。
 
 - [ ] **P0 当前镜像真实踩踏与 5 分钟实体耐久**：非零功率/踏频、断开重连、广播恢复与堆余量。
 - [ ] **P1 新页面真实热点验收**：iOS/Android 操作、BLE 连续通知及配网最低堆；本轮无 ESP32 USB 串口，设备验收 NOT_RUN。
@@ -17,6 +17,14 @@
 - [ ] **P1 Service Changed 实物验收**：未确认指示跨重启范围归零的软件缺陷已修复；绑定重连后的无线发送与确认仍未取得，不能记 PASS。见[恢复设计与验证](docs/dev/65-service-changed-reboot-recovery.md)。
 - [ ] **P2 Windows 断开后链路占用边界、M5 实物 LED/按键、保留 NVS 与绑定升级演练**。
 - [ ] **P2 双槽 NVS 实物故障验证**：断电与满分区。跨键原子提交的软件修复已完成，不再列为待实现缺陷。
+
+## 自动工程改进（2026-11-12）
+
+- 受限JSON校验、失败输出保持、整数/LED/地址缩窄与深度边界已加固；固定seed、截断及ASan/UBSan回归通过，原6250领域断言保持。
+- 固定JS压缩器与许可证/构建依赖已登记，内联111911→106831字节；17浏览器入口保持，剩余5809字节（5.16%），未达到建议10%。
+- NimBLE私有ABI集中adapter，系统/应用指示竞争策略保持；通用/M5当前SDK构建通过。新增只读依赖doctor、测试进程信号前置/有界回收、真实镜像SDK身份及私有panic取证入口。
+- 5.5.6独立构建与虚拟协议通过，SC仍NOT_OBTAINED；新SDK默认连接事件延后及私有GATT实现有变化，不凭PASS升级生产。1024/1536/2048均取得本机虚拟panic dump CRC/ELF/符号化；实物和其他panic情境未验。
+- 未刷实体板、未切生产SDK/栈、未发Release/tag。统一test registry、遥测扩展/供应链和产品增强仍待后续切片；最终提交身份、完整回归与剩余项见[实施记录](docs/dev/70-automated-engineering-followups.md)。
 
 ## main 卫生与工程评审（2026-11-12）
 
