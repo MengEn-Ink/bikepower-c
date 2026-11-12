@@ -23,7 +23,7 @@
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
 #include "host/ble_sm.h"
-#include "ble_hs_priv.h"
+#include "nimble_adapter.h"
 #include "host/util/util.h"
 #include "store/config/ble_store_config.h"
 #include "services/gap/ble_svc_gap.h"
@@ -1570,11 +1570,7 @@ static void indication_pump_nolock(void)
             continue;
         }
         if (!entry.token) continue;
-        ble_hs_lock();
-        struct ble_hs_conn *host_connection = ble_hs_conn_find(entry.connection);
-        bool busy = host_connection && host_connection->bhc_gatt_svr.indicate_val_handle != 0;
-        ble_hs_unlock();
-        if (!host_connection || busy) continue;
+        if (!nimble_adapter_indication_idle(entry.connection)) continue;
         portENTER_CRITICAL(&s_indication_lock);
         bool valid = client->connection == entry.connection && client->generation == entry.generation
             && client->count && !client->active && !client->failed

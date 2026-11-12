@@ -5,6 +5,9 @@ import sys
 import test_ble_standard_contract as t
 ROOT = Path(__file__).resolve().parents[1]
 source = (ROOT/'main/ble_bikepower.c').read_text(encoding='utf-8')
+adapter = (ROOT/'main/nimble_adapter.c').read_text(encoding='utf-8')
+adapter_function = t.functions(adapter, [('nimble_adapter_indication_idle', 'bool')])
+assert 'ble_hs_priv.h' not in source
 state = source.split('// BEGIN_INDICATION_STATE')[1].split('// END_INDICATION_STATE')[0]
 pre = t.PREAMBLE.replace('static uint16_t g_conn_handle;', '') + r'''
 #include "ble_config_codec.h"
@@ -32,6 +35,7 @@ static struct ble_hs_conn host_connections[4];
 static void ble_hs_lock(void){}
 static void ble_hs_unlock(void){}
 static struct ble_hs_conn *ble_hs_conn_find(uint16_t c){return c<4?&host_connections[c]:NULL;}
+''' + adapter_function + r'''
 static int ble_gatts_indicate_custom(uint16_t c,uint16_t h,struct os_mbuf *om){assert(c<4&&!s_lock_depth);sends[c]++;memcpy(payloads[c],om->data,om->length);if(send_rc)indication_complete(c,h,send_rc);else if(synchronous_ack)indication_complete(c,h,14);return send_rc;}
 static int ble_gatts_notify_custom(uint16_t c,uint16_t h,struct os_mbuf *om){assert(c<4&&h==28&&om->length==5);notes[c]++;return 0;}
 static int ble_gap_terminate(uint16_t c,int r){assert(c<4&&r==19);terminated[c]++;return 0;}

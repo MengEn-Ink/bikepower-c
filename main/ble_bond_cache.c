@@ -2,7 +2,7 @@
 #include "mbedtls/sha256.h"
 #include "nvs.h"
 #include "host/ble_hs.h"
-#include "ble_gatt_priv.h"
+#include "nimble_adapter.h"
 #include "store/config/ble_store_config.h"
 #include "services/gatt/ble_svc_gatt.h"
 #include "bikepower_config.h"
@@ -167,7 +167,7 @@ static esp_err_t restore_service_changed(void)
         if (rc == BLE_HS_ENOENT) break;
         if (rc != 0) return ESP_FAIL;
         if (value.cccd.chr_val_handle == changed_handle
-                && (value.cccd.flags & BLE_GATTS_CLT_CFG_F_INDICATE)
+                && (value.cccd.flags & NIMBLE_ADAPTER_CCCD_INDICATE_FLAG)
                 && value.cccd.value_changed) {
             pending = true;
         }

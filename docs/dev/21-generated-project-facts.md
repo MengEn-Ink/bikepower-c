@@ -7,7 +7,7 @@
 - 配网超时：300 秒，仅显式续期
 - BLE 通知周期：1000 毫秒
 - 已注册 HTTP 路由：23 个（按 method + URI 计数）
-- 板级生产模块：19 个
+- 板级生产模块：20 个
 - 领域生产模块：19 个
 
 ## HTTP 路由
@@ -40,6 +40,7 @@
 
 - `main/app_main.c`
 - `main/ble_bikepower.c`
+- `main/nimble_adapter.c`
 - `main/ble_bond_cache.c`
 - `main/ble_config_service.c`
 - `main/ble_telemetry_service.c`

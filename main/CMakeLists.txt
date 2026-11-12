@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS "app_main.c"
          "ble_bikepower.c"
+         "nimble_adapter.c"
          "ble_bond_cache.c"
          "ble_config_service.c"
          "ble_telemetry_service.c"
@@ -24,9 +25,9 @@ idf_component_register(
              esp_driver_rmt json mbedtls
 )
 
-# 固定 IDF 5.5.4：读取真实每连接 indication 在途状态，避免与系统 Service Changed 冲突。
+# 私有 NimBLE ABI 只暴露给 adapter，其他应用文件不得访问。
 idf_component_get_property(BT_COMPONENT_DIR bt COMPONENT_DIR)
-target_include_directories(${COMPONENT_LIB} PRIVATE
+set_source_files_properties("nimble_adapter.c" PROPERTIES INCLUDE_DIRECTORIES
     "${BT_COMPONENT_DIR}/host/nimble/nimble/nimble/host/src")
 
 # ===== web 静态资源内联（v3.2.0 前后端分离） =====
