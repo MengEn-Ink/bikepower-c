@@ -17,6 +17,7 @@
 
 | 文档 | 用途 |
 |---|---|
+| [main 卫生与升级评审](dev/69-main-hygiene-and-upgrade-review.md) | 最新分支清理、卫生修复、开源对比、系统工程与排序待办 |
 | [技术参考](dev/01-technical-reference.md) | 运行时、协议、配置和门户行为 |
 | [Pages 逐版本升级说明](dev/68-pages-firmware-release-notes.md) | 已发布版本分类摘要、原文保留、来源边界与页面验证 |
 | [Pages 刷写稳定性](dev/67-pages-flash-stability.md) | 串口选择反馈、同源组件、取消/超时/刷新恢复与风险边界 |
@@ -47,6 +48,8 @@
 | [鬥骑序列号修复](dev/43-qidou-serial-fix.md) | USB证据、非空默认序列号、配置保留刷写与待App复测 |
 | [鬥骑会话加密修复](dev/46-qidou-session-security-fix.md) | 无绑定安全存储、手机配对/控制成功与未闭合边界 |
 | [持久绑定与发行核验](dev/47-bonding-release-verification.md) | v4.3.3加密恢复、已绑定GATT重建、真实耐久与发行边界 |
+| [本地开发工作流](dev/48-local-dev-workflow.md) | 开发缓存、独立构建与候选/发行身份区分 |
+| [开发效率优化](dev/49-dev-efficiency-optimizations.md) | 统一入口、便宜门禁与证据目录维护 |
 | [本地虚拟开发板](dev/48-local-virtual-board.md) | Windows/WSL本机入口、Apple Silicon待验、虚拟刷写/BLE/GDB/CI与真机边界 |
 | [三链路实现与验证](dev/50-ble-multi-client.md) | 两下游+单上游、逐连接隔离、虚拟与实物验收边界 |
 | [v4.4.0优化与发行收尾](dev/52-release-440-closeout.md) | 提交级候选、CI、COM205回退、NVS保持与正式P0阻断 |

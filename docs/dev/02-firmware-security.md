@@ -14,9 +14,9 @@
 | 刷入篡改 / 恶意固件 | 串口重刷未授权固件 | Secure Boot v2 |
 | 绕过保护 dump RAM / 重进下载 | JTAG 调试、ROM 下载模式 | 关闭 JTAG / 下载模式 |
 | 降低逆向可读性 | 静态反汇编 `.bin` | 编译层加固（本项目当前方案） |
-| 抓 BLE 空中协议 | 嗅探 BLE 通知包 | 固件保护**无效**（协议在空气中明文） |
+| 抓 BLE 空中协议 | 分析无线链路数据 | Flash 加密不保护无线链路；是否明文取决于连接加密状态 |
 
-> 关键认知：固件加密只防固件被**复制 / 反编译 / 篡改**，不防 BLE 空中协议被嗅探。后者属于协议层，与固件保护无关。
+> 关键认知：Flash 加密主要提供存储保密性，Secure Boot 校验启动镜像真实性；两者不能替代 BLE 链路加密。CPS/HRS 等具体连接是否加密，应按该连接的安全状态判断，不能一概写成空中明文。编译裁剪不是安全边界，本项目源码已按 MIT 开源。
 
 ---
 
@@ -47,13 +47,14 @@
 
 - 编译层加固**只抬高门槛，挡不住有 esptool 的人**：任意人接串口都能 `read_flash` 把固件 dump 出来并反汇编。
 - 字符串常量（如配网页 HTML、日志文本）在 `.bin` 中仍可见。
+- 当前 `CONFIG_ESP_COREDUMP_STACK_SIZE=1024`；官方 v5.5.4 指南建议独立栈大于 1300 字节。它是待验证的崩溃取证可靠性风险，不代表已复现崩溃；调整到 1536/2048 前须量化常驻内存并在隔离镜像中触发 panic、验证完整 dump 与符号化，不能直接改生产配置冒称已验收。
 - 要真正做到"读出来是密文"，必须上硬件层 Flash 加密（方案 A/B）。
 
 ---
 
 ## 四、方案 A：Flash 加密（⬜ 未实现，⚠️ 不可逆）
 
-防提取的核心。ESP32-C3 用 AES-256(XTS) 加密 flash，密钥存 eFuse，CPU 之外无法读取。
+防提取的核心。ESP32-C3 使用 XTS-AES-128，采用 256 位总密钥并保存在受保护 eFuse 中；不能误称 AES-256-XTS。见 [IDF v5.5.4 Flash 加密说明](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c3/security/flash-encryption.html)。
 
 ```
 CONFIG_SECURE_FLASH_ENC_ENABLED=y
@@ -67,10 +68,10 @@ CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE=y
 
 ### 对本项目的冲突点（需改造）
 
-1. **不可逆**：Release 烧死 eFuse 后，该芯片永远无法读 flash、无法刷未签名固件，烧错即废。
-2. **coredump 失效**：当前 `CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y` 写 flash，加密后取不到明文栈，破坏现有串口排障流程。
-3. **OTA / 配网重刷**：后续固件需用同一密钥重新打包，`scripts/build_all.sh` 双板型合并流程要加加密步骤。
-4. **量产烧录复杂化**：不能再用普通 `idf.py flash`，需走 `espefuse` + 预加密镜像流程。
+1. **不可逆配置**：eFuse 与下载通道限制需要单独设计。Flash 加密限制明文更新；拒绝未签名固件由 Secure Boot 实现，不能混为同一功能。
+2. **coredump 路径需改造**：加密分区不能用原串口原始 Flash 读取流程直接分析，但不是必然失效。官方支持设备侧解密读取后交给分析工具；需验证授权、分区和完整排障链路，见 [Core Dump 指南](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c3/api-guides/core_dump.html)。
+3. **网页刷写冲突**：本项目设备内 OTA 已移除；当前通用 merged-bin 网页刷写不能直接套用加密量产流程。密钥与镜像分发需另行设计。
+4. **量产流程需验证**：按设备密钥生成方式、下载模式与是否启用 Secure Boot 选择流程；本项目不自动烧 eFuse、关闭调试口或改变现有升级通道。
 
 ---
 
@@ -106,7 +107,7 @@ CONFIG_SECURE_DISABLE_ROM_DL_MODE=y   # 永久禁用 ROM 下载模式（⚠️ �
 | 真要量产、怕固件被复制反编译 | 方案 C + 方案 A（Flash 加密 Release） |
 | 量产 + 怕被刷恶意固件 | 方案 C + A + B（全开） |
 
-> 当前结论：BikePower C 为 BLE 功率计模拟器，核心资产是功率 / 心率算法。已落地方案 C 足以抬高抄袭门槛；如转商业量产防盗版，再单独评估方案 A/B 的不可逆改造。
+> 当前结论：BikePower C 源码已按 MIT 开源；编译层裁剪用于体积与诊断策略，不作为防抄袭或完整安全保证。优先建设发布来源可验证、依赖与许可证清单、配置写权限和排障隐私边界；量产 Flash 加密/Secure Boot 需独立评审，本轮不实施。
 
 ---
 

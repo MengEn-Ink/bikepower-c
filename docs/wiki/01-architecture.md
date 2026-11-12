@@ -46,8 +46,8 @@
 │  │  │engine    │ │logic   │ │pattern│ │miniparse   │      │  │
 │  │  └──────────┘ └────────┘ └───────┘ └────────────┘      │  │
 │  │  ┌──────────┐ ┌────────┐ ┌───────┐                      │  │
-│  │  │device_   │ │device_ │ │domain_│                      │  │
-│  │  │template  │ │analysis│ │rng    │                      │  │
+│  │  │config_   │ │device_ │ │domain_│                      │  │
+│  │  │snapshot  │ │analysis│ │rng    │                      │  │
 │  │  └──────────┘ └────────┘ └───────┘                      │  │
 │  └─────────────────────────────────────────────────────────┘  │
 │                        领域层（纯 C）                           │
@@ -245,6 +245,8 @@ main/web/app.js      ─┘                                               ↓
 
 **为什么内联**：iOS Captive Portal WebView（CNA）不会加载外部 CSS/JS 资源，必须全部内联到单个 HTML 中才能正常显示配网页面。
 
+生成器 `--output` 必须指向 `.h`；源模板、CSS/JS 及其符号链接/硬链接别名均拒绝作为输出。`main/web/index.html` 始终保留占位符，不能把预览或 C 头文件写回源模板。
+
 ---
 
 ## 构建注入变量
@@ -267,7 +269,7 @@ main/web/app.js      ─┘                                               ↓
 |------|------|------|
 | `nvs` | 24KB | NVS 配置存储 |
 | `phy_init` | 4KB | PHY 初始化数据 |
-| `factory` | 3.25MB | 固件（bootloader + partition-table + app 合并为单 bin） |
+| `factory` | `0x3E0000`（3.875 MiB） | 应用分区；分发 merged bin 还包含 bootloader 与分区表，不属于 factory 本身 |
 | `coredump` | 64KB | coredump 分区（写 flash） |
 
 参考：[sdkconfig.defaults](../../sdkconfig.defaults) 中 `CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y`、`CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y`。

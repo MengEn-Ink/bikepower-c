@@ -5,7 +5,7 @@
 BikePower 主线采用 ESP Emulator 0.51.0 + Bumble 0.0.219，运行实际 ESP32-C3 ROM、bootloader、应用和固件里的 NimBLE Host，不把业务逻辑重写成 mock。日常先在 Windows/macOS 本地验证，CI 运行同源回归；真实开发板只承担模拟器不能证明的验收。
 
 - Windows 已实测：原生 ESP-IDF 5.5.4 构建，同机 WSL2 Ubuntu 运行模拟器、虚拟 UART/HCI 和纯软件客户端。无需 Docker、真实串口或蓝牙适配器。
-- macOS Apple Silicon：固定版原生包及 shell 入口已提供，当前没有 macOS 机器，未实机验证。
+- macOS Apple Silicon：固定版原生包及 shell 入口已提供；历史 Windows 阶段未做本机验证。当前支持状态需绑定具体构建与本机运行报告，不由 shell 入口存在或 CI 配置推断。
 - Intel Mac：固定版没有原生包；WASM/容器只是未验证备选，不保证兼容。
 - Wokwi/QEMU 不承担项目 BLE 主线；公开能力调研见文末一手来源。
 
@@ -38,7 +38,9 @@ sh scripts/virtual_board.sh test build/virtual-board-build --security --running
 sh scripts/virtual_board.sh debug build/virtual-board-build --gdb riscv32-esp-elf-gdb
 ```
 
-shell 入口接受相对或绝对 build 路径，GDB 可指定 `--gdb`。Linux/WSL 上已验证运行路径；macOS 包安装、构建、BLE 与 GDB 均须补本机实测，不能据 shell 语法通过宣布 macOS 全部通过。
+shell 入口接受相对或绝对 build 路径，GDB 可指定 `--gdb`。Linux/WSL 上已验证运行路径；macOS 不能据 shell 语法通过宣布全部通过。
+
+2026-11-12 本机 Apple Silicon 补测：固定模拟器0.51.0/依赖、IDF5.5.4 generic构建与实际ROM/NimBLE虚拟回归已执行，虚拟刷写/八组/骑行/checked LTK/绑定复连/NVS与跑步恢复通过；SC indication仍为NOT_OBTAINED（OPEN1），本轮GDB未执行。首次因继承SIGTERM屏蔽/忽略造成退出超时，恢复本轮测试进程信号后复跑，失败原记录保留。它不是shell统一入口全流程或真实射频验收，详见[本轮审查](69-main-hygiene-and-upgrade-review.md)。
 
 ## 锁定与隔离
 
@@ -67,7 +69,7 @@ Bumble 默认 LocalLink 的 encryption 路径不请求 peripheral LTK。本项�
 
 未实现的 Privacy Mode/RSSI 命令保留 Unknown Command 并写入报告，不能通过假 success 掩盖模拟器不足。固定公共虚拟客户端身份只解决 LocalLink 路由与 Host 身份一致，不证明 RPA/隐私地址解析。
 
-以下仍需真机：Windows/手机 GATT 缓存、跨表已绑定客户端的 Service Changed 订阅落盘/发送/确认、真实射频加密、WiFi/BLE 共存、真实功率桥接、实体断电/电气/按钮/灯效、目标骑跑 App、长时控制耐久。原 v4.3.3 发行阻断保持；不创建 tag/Release，不因本地仿真通过放行。
+以下仍需真机：Windows/手机 GATT 缓存、跨表已绑定客户端的 Service Changed 订阅落盘/发送/确认、真实射频加密、WiFi/BLE 共存、真实功率桥接、实体断电/电气/按钮/灯效、目标骑跑 App、长时控制耐久。历史 v4.3.3 阶段的发行阻断仅对应当时镜像；当前发行及未验项统一以 [PROGRESS 顶部](../../PROGRESS.md) 为准。本地仿真通过不授权创建 tag/Release，也不替代精确镜像的实物证据。
 
 ## 统一入口与本地门禁
 

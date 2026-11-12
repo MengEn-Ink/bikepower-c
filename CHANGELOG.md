@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+### main 卫生与工程评审（2026-11-12）
+- 内联生成器拒绝 `.h` 以外输出及源文件/符号链接/硬链接别名覆盖；Git 工作区审计正确消费重命名源路径，仍只读。两项先有失败负例，再修复与接入完整软件门禁。
+- 矫正安全文档的加密/真实性/coredump边界、架构图和factory分区大小、历史虚拟板环境/发行状态；补齐索引和v4.4.1正式发行说明，未改运行态、schema、BLE或eFuse。
+- 严格软件136 PASS/2工作区WARN/0FAIL、领域6250断言；Pages73单元/17浏览器入口及独立IDF5.5.4 generic构建通过。新特性、SDK升级和实物验收仅列待办，见[评审报告](docs/dev/69-main-hygiene-and-upgrade-review.md)。
+
 ### Pages 逐版本升级说明
 - 7个当前可刷写正式版本分别展示新增、修复、改进、升级注意与已知限制；版本切换即时替换摘要，按钮前直接可读。无单列修复不编造，无新版本摘要不套用旧版。
 - Release完整原文不再受900字符摘要限制；版本化来源catalog进入同源latest及历史索引，旧版单索引回退保持。同期Pages变更独立折叠，明确不随固件回滚。
@@ -19,7 +24,8 @@
 - 全量刷写后明确NVS配置和绑定会覆盖；仅在刚刷机且曾配对或明确密钥错误时，提供Mac“忽略此设备”和Windows“删除设备”步骤。保持MAC/固件/用户配置及原握手互斥与取消保护。
 - 新增分类单元与双主题桌面边界浏览器回归，接入既有npm门禁；补Python Playwright自己的Chromium安装，修复CI仅安装Node版本浏览器导致Python E2E无法启动的问题。结果见[异常恢复说明](docs/dev/66-pages-connection-recovery.md)。
 
-### v4.4.1 出厂默认加固与心率根因定位
+### v4.4.1 已发布内容摘要（2026-11-11，仅 generic-c3）
+> 本节位于历史合并记录下，但所列出厂默认与移动缩放内容已随 [正式 Release v4.4.1](https://github.com/MengEn-Ink/bikepower-c/releases/tag/v4.4.1) 发布。Pages 后续更新独立于固件版本；当前未验事项见 PROGRESS 顶部。
 - 出厂默认加固：`power_bridge_config_defaults()` 显式设 `BRIDGE_SOURCE_SIMULATED`（不再依赖 memset 零值枚举），无用户心率配置时心率按功率经 FTP 区间平滑推导；host 单测补"出厂默认模拟来源且 device_count=0"断言。Host 6247/0。
 - 心率连不上根因钉死（板端排除）：独立 bleak 探针未配对直连，CPS 22 帧、HRS 21 帧（176–178bpm 随功率变化）订阅成功；板端 ATT 订阅日志实证骑鬥在同一 BLE 连接上只订阅 FTMS-Bike/Status/CP，HRS 2A37 订阅 0 次、无第二连接、无加密变更。换全新 MAC（D0:20:BA:CC:3A:EF）后骑鬥仍不订阅 HRS，排除缓存假设。判定为骑鬥单 MAC 单角色绑定——同一地址被 FTMS 骑行台占用后不再发起心率角色订阅，UI 却标"已连接"致 0 bpm。板端 HRS 对多服务码表/APP 正常。
 - 回退诊断广播实验（主广播加 180D、去短名）为生产行为：HRS 只放 scan response，主广播恢复短名；静态门禁 `adv_uuids[3]` 硬编码放宽为 `[\d+]`，广播字段 11 项 PASS、配置一致性 299/0。
