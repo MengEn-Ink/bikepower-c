@@ -398,6 +398,7 @@ STATIC_CHECKS = [
     ("tests/test_process_runtime.py", "测试进程信号前置与有界回收"),
     ("tests/test_test_doctor.py", "测试依赖诊断缺失/超时回归"),
     ("tests/test_virtual_build_identity.py", "实际镜像 SDK 身份与安装锁分离"),
+    ("tests/test_virtual_observation.py", "虚拟设备时钟窗口与宿主deadline负例"),
     ("tests/test_workspace_audit.py", "工作区分类与 Git 重命名解析回归"),
     ("tests/test_maintenance_tools.py", "维护工具功能回归"),
     ("tests/test_json_import.py", "纯 C JSON 严格token/作用域/截断 sanitizer"),

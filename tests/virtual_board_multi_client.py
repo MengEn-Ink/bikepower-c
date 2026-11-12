@@ -15,8 +15,16 @@ from bumble.keys import JsonKeyStore
 from bumble.gatt import Characteristic, Service
 from bumble.core import UUID
 from virtual_ble_controller import CheckedController
+from virtual_observation import observe_device_time, require_frame_counts
+from virtual_board import digest, firmware_sdk_version
+from test_process_runtime import prepare_test_signals, stop_process
+from ble_telemetry import decode, decode_meta, uuid as telemetry_uuid
 
 async def run(args):
+    if not 1 <= args.seconds <= 120:
+        raise ValueError('设备观察窗需在1..120秒')
+    source_hash, elf_hash = digest(args.firmware), digest(args.elf)
+    started = time.monotonic()
     folder=args.report_dir/('session-'+str(time.time_ns()));folder.mkdir(parents=True)
     link=LocalLink(); port,ctl=free_port(),free_port()
     transport=await open_transport(f'tcp-server:127.0.0.1:{port}')
@@ -40,7 +48,7 @@ async def run(args):
     a.target_address=b.target_address=fw.public_address
     image=folder/'runtime-private.bin';shutil.copyfile(args.firmware,image)
     log=(folder/'firmware.log').open('w',encoding='utf-8')
-    proc=subprocess.Popen([str(args.emulator),'--chip','esp32c3','--firmware',str(image),'--elf',str(args.elf),'--ble-hci',f'tcp:127.0.0.1:{port}','--control-tcp',f'127.0.0.1:{ctl}','--timeout','300s','--save-state','--net','user,restrict=yes'],stdout=log,stderr=log)
+    proc=subprocess.Popen([str(args.emulator),'--chip','esp32c3','--firmware',str(image),'--elf',str(args.elf),'--ble-hci',f'tcp:127.0.0.1:{port}','--control-tcp',f'127.0.0.1:{ctl}','--timeout','600s','--save-state','--net','user,restrict=yes'],stdout=log,stderr=log)
     results=[];original=None;error=None
     stage='startup'
     def passed(name,details=None):
@@ -49,6 +57,14 @@ async def run(args):
         await session.characteristic('2A63').subscribe(lambda v:samples.append(bytes(v)))
     try:
         await a.connect();_,original=await a.read_snapshot();await b.connect()
+        identity = decode_meta(bytes(await a.read_gatt_char(telemetry_uuid(1))))
+        require(identity['git'] == args.expected_git, '固件Git身份不匹配')
+        async def read_clock():
+            before = decode_meta(bytes(await a.read_gatt_char(telemetry_uuid(1))))
+            cpu = decode(1, bytes(await a.read_gatt_char(telemetry_uuid(3))))
+            after = decode_meta(bytes(await a.read_gatt_char(telemetry_uuid(1))))
+            require(before['boot'] == after['boot'], '时钟采样跨重启')
+            return after['boot'], cpu['uptime_s']
         passed('two_downstream_discovery')
         left,right=[],[];await notifications(a,left);await notifications(b,right);await asyncio.sleep(5)
         require(len(left)>=3 and len(right)>=3,'双下游通知不足');require(set(left)&set(right),'两下游未共享CPS快照')
@@ -76,20 +92,23 @@ async def run(args):
         answer=await a.commit_all(current,meta['revision']);require(answer['result']==0,'启用上游提交失败');await a.reconnect();await b.connect()
         left,right=[],[];await notifications(a,left);await notifications(b,right)
         stage='three-link'
-        for i in range(args.seconds):
-            await upstream.notify_subscribers(measurement,struct.pack('<HhHH',32,250,i+1,(i*1024)&65535));await asyncio.sleep(1)
-        require(len(upstream.connections)==1,'上游连接未建立');require(len(left)>=args.seconds*0.8 and len(right)>=args.seconds*0.8,'三链路双下游通知不足')
+        async def publish(index):
+            await upstream.notify_subscribers(measurement, struct.pack('<HhHH',32,250,index+1,(index*1024)&65535))
+        window = await observe_device_time(read_clock, publish, args.seconds, args.seconds*3+15)
+        require(len(upstream.connections)==1,'上游连接未建立')
+        minimum = require_frame_counts(len(left), len(right), window)
         require(any(struct.unpack_from('<h',v,2)[0]==250 for v in left) and any(struct.unpack_from('<h',v,2)[0]==250 for v in right),'上游功率未分别转发到两下游')
         require(not a.has_service('1826') and not b.has_service('1826'),'真实桥接误提供FTMS')
-        passed('three_link_cps_bridge',{'a':len(left),'b':len(right),'upstream_connections':len(upstream.connections)})
+        passed('three_link_cps_bridge',{'a':len(left),'b':len(right),'upstream_connections':len(upstream.connections), 'minimum':minimum, 'window':window})
         await next(iter(upstream.connections.values())).disconnect()
         checkpoint=(len(left),len(right))
-        for i in range(75):
-            await upstream.notify_subscribers(measurement,struct.pack('<HhHH',32,251,i+100,(i*1024)&65535));await asyncio.sleep(1)
+        async def publish_recovery(index):
+            await upstream.notify_subscribers(measurement,struct.pack('<HhHH',32,251,index+100,(index*1024)&65535))
+        recovery_window = await observe_device_time(read_clock, publish_recovery, 75, 240)
         require(len(upstream.connections)==1 and a.connection is not None and b.connection is not None,'两下游在线时上游恢复失败')
         require(len(left)>checkpoint[0] and len(right)>checkpoint[1],'上游掉线时下游停止输出')
         require(any(struct.unpack_from('<h',v,2)[0]==251 for v in left[checkpoint[0]:]) and any(struct.unpack_from('<h',v,2)[0]==251 for v in right[checkpoint[1]:]),'上游恢复数据未转发')
-        passed('upstream_recovery_two_slots_occupied')
+        passed('upstream_recovery_two_slots_occupied', {'window':recovery_window})
     except (Exception,asyncio.CancelledError) as e:
         error=f'{stage}: {type(e).__name__}: {e}';print('FAIL',error,flush=True)
     finally:
@@ -111,9 +130,7 @@ async def run(args):
             except (Exception,asyncio.CancelledError) as e:
                 error=(error+'; ' if error else '')+label+' disconnect: '+str(e)
         try:
-            if proc.poll() is None:proc.terminate()
-            try:await asyncio.to_thread(proc.wait,10)
-            except subprocess.TimeoutExpired:proc.kill();await asyncio.to_thread(proc.wait,10)
+            await asyncio.to_thread(stop_process, proc, 10)
         except (Exception,asyncio.CancelledError) as e:
             error=(error+'; ' if error else '')+'process cleanup: '+str(e)
         finally:
@@ -121,12 +138,20 @@ async def run(args):
             try:await transport.close()
             except (Exception,asyncio.CancelledError) as e:
                 error=(error+'; ' if error else '')+'transport cleanup: '+str(e)
-        report={'status':'FAIL' if error else 'PASS','error':error,'results':results,'scope':'actual firmware NimBLE + virtual HCI; no RF/WiFi proof'}
+        if digest(args.firmware) != source_hash:
+            error = (error+'; ' if error else '')+'输入镜像被修改'
+        report={'status':'FAIL' if error else 'PASS','error':error,'results':results,
+                'firmware_sha256':source_hash,'elf_sha256':elf_hash,'expected_git':args.expected_git,
+                'esp_idf':firmware_sdk_version(args.firmware), 'duration_seconds':round(time.monotonic()-started,3),
+                'clock':'device_uptime with bounded host deadline',
+                'scope':'actual firmware NimBLE + virtual HCI; no RF/WiFi proof'}
         (folder/'report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
         print('REPORT',folder/'report.json',flush=True)
     return 1 if error else 0
 
 if __name__=='__main__':
+    prepare_test_signals()
     p=argparse.ArgumentParser();p.add_argument('--emulator',type=Path,required=True);p.add_argument('--firmware',type=Path,required=True);p.add_argument('--elf',type=Path,required=True);p.add_argument('--report-dir',type=Path,required=True);p.add_argument('--seconds',type=int,default=60)
+    p.add_argument('--expected-git', required=True)
     logging.basicConfig(level=logging.ERROR)
     raise SystemExit(asyncio.run(run(p.parse_args())))

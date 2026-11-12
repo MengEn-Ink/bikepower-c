@@ -35,6 +35,7 @@
 
 - Windows：`./scripts/virtual_board.ps1 setup`、`doctor`、`build`、`test -Security -Running`、`debug`；构建在 Windows，仿真在同机 WSL2，不访问真实串口/蓝牙。
 - macOS Apple Silicon/Linux：`sh scripts/virtual_board.sh setup|doctor|build`，`test build/virtual-board-build --security --running`，`debug build/virtual-board-build --gdb riscv32-esp-elf-gdb`。macOS Apple Silicon 已有实际 C3/NimBLE 与 GDB 软件证据，Intel 无固定版原生包；不替代实物验收。
+- `tests/test_virtual_observation.py`：设备uptime观察窗/宿主deadline分离，停钟、回退、重启、挂起、取消与帧数不足12项负例。`virtual_board_multi_client.py --expected-git <镜像短SHA>` 默认观察60秒设备时间，要求至少80%逐路帧数，另观察75秒设备时间验证上游掉线恢复；宿主deadline有界。报告绑定bin/ELF与时钟口径，不改实际固件通知频率，不把虚拟结果当射频/WiFi证明。
 - `tests/test_virtual_board.py` 验证 LTK/未知命令拒绝；`virtual_board_e2e.py` 跑实际 NimBLE/配置/通知/重启/恢复；`virtual_board_gdb.py` 验证符号断点、栈与单步。
 - `--inject-failure after-config|cancel-after-config` 仅针对私有虚拟镜像，预期整体 FAIL/非零且原配置恢复与 reset 回读通过，不是正常 E2E PASS。
 - CI 运行独立 `virtual-board` job，只上传公开报告/GDB日志，不上传 keys/Flash 私有副本。虚拟刷写目前精确覆盖4 KiB，真实缓存/射频/发行门禁保持，详见[运行与边界](../docs/dev/48-local-virtual-board.md)。

@@ -30,7 +30,7 @@ case "$ACTION" in
       idf.py -B "$BUILD" -D "SDKCONFIG=$BUILD/sdkconfig" -D "SDKCONFIG_DEFAULTS=$BUILD/sdkconfig.defaults" -D PORTAL_TEST_AUTO_CONFIG=OFF reconfigure build
     fi
     ;;
-  test|debug)
+  test|debug|multi)
     BUILD=${1:-build/virtual-board-build}
     if [ "$#" -gt 0 ]; then shift; fi
     case "$BUILD" in /*) ;; *) BUILD="$ROOT/$BUILD" ;; esac
@@ -39,13 +39,16 @@ case "$ACTION" in
     "$PY" "$ROOT/scripts/tools/virtual_board.py" merge --build-dir "$BUILD" --output "$IMAGE"
     if [ "$ACTION" = debug ]; then
       "$PY" "$ROOT/tests/virtual_board_gdb.py" --emulator "$TOOLS/esp-emu" --firmware "$IMAGE" --elf "$BUILD/bikepower-c.elf" "$@"
+    elif [ "$ACTION" = multi ]; then
+      GIT=$(git -C "$ROOT" rev-parse --short HEAD)
+      "$PY" "$ROOT/tests/virtual_board_multi_client.py" --emulator "$TOOLS/esp-emu" --firmware "$IMAGE" --elf "$BUILD/bikepower-c.elf" --expected-git "$GIT" --report-dir "$ROOT/tests/reports/virtual-board/multi" "$@"
     else
       GIT=$(git -C "$ROOT" rev-parse --short HEAD)
       "$PY" "$ROOT/tests/virtual_board_e2e.py" --emulator "$TOOLS/esp-emu" --firmware "$IMAGE" --elf "$BUILD/bikepower-c.elf" --expected-git "$GIT" "$@"
     fi
     ;;
   *)
-    printf '%s\n' '用法：scripts/virtual_board.sh setup|doctor|build|test|debug [build-dir] [--security --running | --gdb PATH]' >&2
+    printf '%s\n' '用法：scripts/virtual_board.sh setup|doctor|build|test|debug|multi [build-dir] [--security --running | --gdb PATH | --seconds 60]' >&2
     exit 2
     ;;
 esac

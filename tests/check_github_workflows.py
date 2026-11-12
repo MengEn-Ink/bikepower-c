@@ -44,6 +44,8 @@ def main():
     check("pull_request:" in ci and "push:" in ci, "CI 覆盖 PR 与 main push", failures)
     check("tests/operation_gate.py" in ci and "--level quick" in ci,
           "CI 通过 operation harness 执行 quick 门禁", failures)
+    check("sh scripts/virtual_board.sh multi build/virtual-board-build" in ci,
+          "双平台CI执行实际NimBLE三链路与设备时钟回归", failures)
     check("pip install" in ci and "requirements-test.txt" in ci,
           "CI 安装 BLE 与串口 Harness 依赖", failures)
     check("fetch-depth: 2" in ci and "git diff --check HEAD^ HEAD" in ci,

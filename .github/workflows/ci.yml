@@ -78,6 +78,7 @@ jobs:
           sh scripts/virtual_board.sh build
           sh scripts/virtual_board.sh test build/virtual-board-build --security --running
           sh scripts/virtual_board.sh debug build/virtual-board-build --gdb "$GDB"
+          sh scripts/virtual_board.sh multi build/virtual-board-build
       - name: Upload public evidence only
         if: always()
         uses: actions/upload-artifact@v7
