@@ -21,6 +21,19 @@ def digest(path):
         return hashlib.file_digest(source, 'sha256').hexdigest() if hasattr(hashlib, 'file_digest') else _digest(source)
 
 
+def firmware_sdk_version(path, app_offset=0x10000):
+    """从 ESP-IDF 应用描述读取版本，不以工具安装锁替代实际镜像身份。"""
+    with Path(path).open('rb') as source:
+        source.seek(app_offset + 32)
+        descriptor = source.read(256)
+    if len(descriptor) != 256 or descriptor[:4] != b'\x32\x54\xcd\xab':
+        raise RuntimeError('镜像缺少有效 ESP-IDF 应用描述')
+    version = descriptor[112:144].split(b'\0', 1)[0].decode('ascii')
+    if not version:
+        raise RuntimeError('镜像缺少 SDK 版本')
+    return version
+
+
 def _digest(source):
     result = hashlib.sha256()
     for block in iter(lambda: source.read(1024 * 1024), b''):

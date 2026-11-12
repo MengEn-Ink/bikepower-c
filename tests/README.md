@@ -1,5 +1,12 @@
 # 测试脚本使用说明
 
+## 自动工程前置与配置边界
+
+- `python3 scripts/tools/test_doctor.py --json`：只读检查 Python/Node 依赖、各自 Chromium、编译器与 OpenSSL 编译链接；缺失/超时非零，不自动安装。macOS 可对该命令设置 `CPATH`/`LIBRARY_PATH` 指向已安装的 OpenSSL。
+- `tests/test_process_runtime.py` 验证本进程 SIGTERM 前置及有界回收；强制 kill 保留失败，不能证明状态落盘。实际虚拟 E2E/GDB 入口共用此规则。
+- `tests/test_json_import.py` 编译实际纯 C 源码并用 ASan/UBSan 检查 token、溢出、重复键、嵌套作用域、深度、缩窄、截断和固定种子输入；受限契约见[技术参考](../docs/dev/01-technical-reference.md)。
+- `virtual_board_coredump.py --help` 是隔离候选故障注入入口，重定向虚拟 PC 到 abort；runtime Flash/dump 保持私有，FAIL 不代表实体缺陷或保证取证。生产 defaults 未随实验改变。
+
 ## Pages 刷写稳定性
 
 - `node --test tests/test_web_flash_session.cjs tests/test_web_flash_vendor.cjs`：准备取消、下载超时、串口迟到返回与清理失败保护、刷新记录、锁定同源快照逐字节及依赖闭包。
@@ -27,7 +34,7 @@
 ## 本地虚拟开发板
 
 - Windows：`./scripts/virtual_board.ps1 setup`、`doctor`、`build`、`test -Security -Running`、`debug`；构建在 Windows，仿真在同机 WSL2，不访问真实串口/蓝牙。
-- macOS Apple Silicon/Linux：`sh scripts/virtual_board.sh setup|doctor|build`，`test build/virtual-board-build --security --running`，`debug build/virtual-board-build --gdb riscv32-esp-elf-gdb`。macOS 未实机验证，Intel 无固定版原生包。
+- macOS Apple Silicon/Linux：`sh scripts/virtual_board.sh setup|doctor|build`，`test build/virtual-board-build --security --running`，`debug build/virtual-board-build --gdb riscv32-esp-elf-gdb`。macOS Apple Silicon 已有实际 C3/NimBLE 与 GDB 软件证据，Intel 无固定版原生包；不替代实物验收。
 - `tests/test_virtual_board.py` 验证 LTK/未知命令拒绝；`virtual_board_e2e.py` 跑实际 NimBLE/配置/通知/重启/恢复；`virtual_board_gdb.py` 验证符号断点、栈与单步。
 - `--inject-failure after-config|cancel-after-config` 仅针对私有虚拟镜像，预期整体 FAIL/非零且原配置恢复与 reset 回读通过，不是正常 E2E PASS。
 - CI 运行独立 `virtual-board` job，只上传公开报告/GDB日志，不上传 keys/Flash 私有副本。虚拟刷写目前精确覆盖4 KiB，真实缓存/射频/发行门禁保持，详见[运行与边界](../docs/dev/48-local-virtual-board.md)。

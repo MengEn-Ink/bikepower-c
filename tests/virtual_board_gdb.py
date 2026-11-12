@@ -14,9 +14,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'scripts/tools'))
 from virtual_board import digest, verify_version
+from test_process_runtime import prepare_test_signals, stop_process
 
 
 def main():
+    prepare_test_signals()
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('emulator', 'firmware', 'elf'):
         parser.add_argument('--' + name, type=Path, required=True)
@@ -64,13 +66,10 @@ def main():
             error = f'{type(exc).__name__}: {exc}'
         finally:
             if process is not None:
-                if process.poll() is None:
-                    process.terminate()
                 try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=10)
+                    stop_process(process, 10)
+                except RuntimeError as exc:
+                    error = (error + '; ' if error else '') + str(exc)
     if source_hash is not None and digest(args.firmware) != source_hash:
         error = '输入镜像被改变'
     report = {'status': 'FAIL' if error else 'PASS', 'error': error,

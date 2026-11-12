@@ -18,7 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT/'scripts/tools'))
-from virtual_board import LOCK, digest, verify_version, check_dependencies
+from virtual_board import LOCK, digest, verify_version, check_dependencies, firmware_sdk_version
+from test_process_runtime import prepare_test_signals, stop_process
 from ble_config_e2e import (DeviceSession, CONFIG_SERVICE_UUID, CONFIG_GROUP_UUIDS, CONFIG_CONTROL_UUID,
     RESULT_SUCCESS, RESULT_STALE_REVISION, RESULT_INCOMPLETE, RESULT_INVALID_VALUE,
     OP_BEGIN, OP_COMMIT, OP_CANCEL, make_begin, make_commit, make_cancel,
@@ -346,15 +347,11 @@ async def run_protocol(args, folder, record, record_not_obtained):
         except (Exception,asyncio.CancelledError) as error:
             cleanup.append(f'断连: {type(error).__name__}: {error}')
         finally:
-            if process.poll() is None:
-                process.terminate()
             try:
-                await asyncio.to_thread(process.wait,10)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                await asyncio.to_thread(process.wait,10)
-            log.close()
-            await transport.close()
+                await asyncio.to_thread(stop_process, process, 10)
+            finally:
+                log.close()
+                await transport.close()
         record('controller_scope',{'unsupported_commands':sorted(firmware_controller.unsupported),'ltk_checks':firmware_controller.encryption_checks})
         if cleanup:
             message = '; '.join(cleanup)
@@ -394,11 +391,11 @@ def run_flash(args, folder, record):
             require(readback.read_bytes()==payload.read_bytes(),'虚拟刷写回读不同')
             record('flash_exact_readback',{})
         finally:
-            if process.poll() is None: process.terminate()
-            process.wait(timeout=10)
+            stop_process(process, 10)
 
 
 def main():
+    prepare_test_signals()
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--emulator',type=Path,required=True)
     parser.add_argument('--firmware',type=Path,required=True)
@@ -414,7 +411,7 @@ def main():
     for key in ('emulator','firmware','elf','report_dir'): setattr(args,key,getattr(args,key).resolve())
     args.report_dir.mkdir(parents=True,exist_ok=True)
     folder=Path(tempfile.mkdtemp(prefix='session-',dir=args.report_dir))
-    results=[]; started=time.monotonic(); original_hash=None; elf_hash=None
+    results=[]; started=time.monotonic(); original_hash=None; elf_hash=None; sdk_version=None
     def record(name,detail):
         results.append({'name':name,'status':'PASS','detail':detail})
         print(f'[virtual-board] PASS {name} {detail}',flush=True)
@@ -424,6 +421,7 @@ def main():
     error=None
     try:
         original_hash=digest(args.firmware)
+        sdk_version=firmware_sdk_version(args.firmware)
         elf_hash=digest(args.elf)
         require(2 <= args.seconds <= 30, '通知观察窗需在2至30秒内')
         verify_version(args.emulator)
@@ -442,7 +440,8 @@ def main():
         'source_identity_note':'内嵌Git身份不含dirty状态；源码是否干净须结合构建证据，不能仅凭此字段认定',
         'flash_scope':{'offset':65536,'bytes':4096,'full_flash_rewrite':False},
         'injected_failure':args.inject_failure,
-        'versions':{k:LOCK[k] for k in ('esp_idf','esp_emulator','bumble','esptool')},'checks':results,
+        'versions':{'esp_idf':sdk_version, **{k:LOCK[k] for k in ('esp_emulator','bumble','esptool')}},
+        'sdk_install_lock':LOCK['esp_idf'],'checks':results,
         'security_requested':args.security,'running_requested':args.running,
         'not_run':['真实射频','实际AES-CCM链路加密','Windows/手机缓存','实体掉电','电气灯效','已绑定跨GATT表的系统缓存','目标骑跑App'] + ([] if sys.platform=='darwin' else ['macOS本机运行']),
         'security_model':'测试控制器请求并核对双方LTK；不模拟射频AES-CCM、不证明隐私地址解析'}
