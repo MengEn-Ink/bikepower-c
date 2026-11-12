@@ -11,6 +11,7 @@
 
 完整工程优先级、依赖、工作量与验收标准见 [main 卫生与升级评审](docs/dev/69-main-hygiene-and-upgrade-review.md)；本轮自动推进状态见[自动工程改进](docs/dev/70-automated-engineering-followups.md)。JSON与NimBLE适配边界、测试信号/依赖诊断已实现；门户余量改善但10%目标未闭合。SDK5.5.6与coredump栈仅隔离验证，生产仍5.5.4/1024；下方硬件事项不因软件通过而关闭。
 
+- [ ] **P1 虚拟三链路 harness 时钟口径**：原宿主15/60秒窗口帧数FAIL；固件uptime窗口诊断15秒两路15/14帧、上游恢复与配置重启回读通过。原脚本未修、不认定FAIL关闭；需独立设备观察窗/宿主deadline及停钟负例。
 - [ ] **P0 当前镜像真实踩踏与 5 分钟实体耐久**：非零功率/踏频、断开重连、广播恢复与堆余量。
 - [ ] **P1 新页面真实热点验收**：iOS/Android 操作、BLE 连续通知及配网最低堆；本轮无 ESP32 USB 串口，设备验收 NOT_RUN。
 - [ ] **P1 双下游 + 真实 CPS 上游 + WiFi 共存峰值**及手机/BINAVI 兼容矩阵。
