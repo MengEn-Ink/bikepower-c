@@ -18,6 +18,8 @@ def render():
     )[1].split('<div class="wrap">', 1)[0]
     guide = guide.replace("移动端 · 只读", "离线使用手册")
     guide = guide.replace("正在读取 Release", "请到在线工具台查看")
+    for name in re.findall(r'\./platform-logos/([A-Za-z0-9_.-]+)', guide):
+        guide = guide.replace(f"./platform-logos/{name}", f"../../tools/web/platform-logos/{name}")
     guide = guide.replace(
         "./manual-images/luatos-core-esp32c3-official-reference.png",
         "https://wiki.luatos.com/chips/esp32c3/board.html",

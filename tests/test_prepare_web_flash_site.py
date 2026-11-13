@@ -38,6 +38,13 @@ class WebFlashSiteTest(unittest.TestCase):
             site = web_flash.initialize_site(ROOT / "tools/web", self.base / "site")
         self.assertEqual((site / "flash-dialog.js").read_bytes(), (ROOT / "tools/web/flash-dialog.js").read_bytes())
         self.assertIn('<script src="./flash-dialog.js"></script>', (site / "index.html").read_text(encoding="utf-8"))
+        for name in ("zwift.svg", "mywhoosh.png", "onelap.png", "qidou.png"):
+            self.assertEqual(
+                (site / "platform-logos" / name).read_bytes(),
+                (ROOT / "tools/web/platform-logos" / name).read_bytes(),
+                "官方 Logo 必须随 Pages 同源打包",
+            )
+            self.assertIn(f'./platform-logos/{name}', (site / "index.html").read_text(encoding="utf-8"))
 
     def test_site_materializes_referenced_canonical_manual_image(self):
         (self.source / "ble-monitor.html").write_text(

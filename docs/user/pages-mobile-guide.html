@@ -1878,6 +1878,19 @@ body{font-family:var(--sans);line-height:1.65}
 .mg-hero{border:0;padding:32px 20px 24px!important;text-align:center}
 .mg-hero h1{margin:0;font-size:36px!important;line-height:1.2;letter-spacing:-.04em;text-wrap:balance}
 .mg-hero p{margin:14px auto 0;font-size:15px;max-width:30em}
+.platform-support{max-width:580px;margin:24px auto 0;text-align:center;min-width:0}
+.platform-support h2{margin:0 0 12px;color:var(--strong);font-size:14px;line-height:1.5;font-weight:600;letter-spacing:0}
+.platform-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;list-style:none;margin:0;padding:0}
+.platform-list li{min-width:0}
+.platform-list a{display:flex;align-items:center;justify-content:center;gap:10px;min-height:60px;padding:10px 8px;color:var(--strong);background:var(--panel-2);border:1px solid var(--line-soft);border-radius:10px;text-decoration:none;font-size:14px;line-height:1.5;font-weight:600}
+.platform-list a:hover{border-color:var(--muted)}
+.platform-list a:active{background:var(--panel-3)}
+.platform-list a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.platform-mark{display:flex;align-items:center;justify-content:center;flex:0 0 46px;width:46px;height:34px;padding:4px;background:#0b0b0b;border-radius:5px}
+.platform-mark img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+.platform-mark img[src$="zwift.svg"]{height:23px}
+.mg-hero .platform-note,#mode-manual .platform-note{max-width:none;margin:12px 0 0;color:var(--muted);font-size:14px;line-height:1.65;font-weight:400}
+@media(min-width:600px){.platform-list{grid-template-columns:repeat(4,minmax(0,1fr))}.platform-list a{flex-direction:column;gap:8px;padding:12px 8px}.platform-mark{flex-basis:auto;width:88px;height:34px}}
 .guide-index{padding:0 20px 14px;gap:8px;border-bottom:1px solid var(--line-soft);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
 .guide-index a{font-size:13px;min-height:44px;display:flex;align-items:center;padding:8px 12px;border-radius:8px;background:transparent}
 .mg-sec{padding:32px 20px 24px;border:0}
@@ -1993,6 +2006,16 @@ body{font-family:var(--sans);line-height:1.65}
   <section class="mg-hero" aria-labelledby="mg-project-title">
     <h1 id="mg-project-title">让运动数据，<br>连上你的应用。</h1>
     <p>BikePower 是开源的蓝牙骑行与跑步工具：模拟运动数据、桥接真实功率计，也帮助排查骑行 App 与码表的适配差异。</p>
+    <div class="platform-support" role="group" aria-labelledby="mg-platform-title">
+      <h2 id="mg-platform-title">支持骑行平台</h2>
+      <ul class="platform-list">
+        <li><a href="https://www.zwift.com/" target="_blank" rel="noopener noreferrer" aria-label="Zwift 官方网站（新窗口）"><span class="platform-mark"><img src="../../tools/web/platform-logos/zwift.svg" width="26" height="25" alt="" decoding="async"></span><span>Zwift</span></a></li>
+        <li><a href="https://www.mywhoosh.com/" target="_blank" rel="noopener noreferrer" aria-label="MyWhoosh 官方网站（新窗口）"><span class="platform-mark"><img src="../../tools/web/platform-logos/mywhoosh.png" width="3506" height="1470" alt="" decoding="async"></span><span>MyWhoosh</span></a></li>
+        <li><a href="https://www.onelap.cn/index.html" target="_blank" rel="noopener noreferrer" aria-label="顽鹿 官方网站（新窗口）"><span class="platform-mark"><img src="../../tools/web/platform-logos/onelap.png" width="264" height="80" alt="" decoding="async"></span><span>顽鹿</span></a></li>
+        <li><a href="https://www.weqidou.com/" target="_blank" rel="noopener noreferrer" aria-label="骑鬥 官方网站（新窗口）"><span class="platform-mark"><img src="../../tools/web/platform-logos/qidou.png" width="228" height="86" alt="" decoding="async"></span><span>骑鬥</span></a></li>
+      </ul>
+      <p class="platform-note">通过蓝牙连接，具体功能以平台与设备模式为准。<br>骑鬥同屏心率需独立心率带；非官方认证或合作。</p>
+    </div>
   </section>
 
   <nav class="guide-index" aria-label="移动首页导航">
