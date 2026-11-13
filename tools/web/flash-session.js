@@ -19,53 +19,57 @@
   }
   function createPreparationCache(options = {}) {
     let entry = null;
-    const emit = value => options.change?.({ key: value.key, name: value.name, text: value.text });
+    const state = value => ({ key: value.key, name: value.name, text: value.text, loaded: value.loaded || 0, total: value.total, progress: value.progress });
+    const emit = value => options.change?.(state(value));
     function status(item, version) {
       try {
         const key = preparationKey(item, version);
         return entry && entry.key === key && (entry.name !== 'ready' || Date.now() - entry.at < CACHE_TTL_MS)
-          ? { key, name: entry.name, text: entry.text } : { key, name: 'idle', text: '固件尚未预下载' };
+          ? state(entry) : { key, name: 'idle', text: '请点击“下载并准备固件”，下载校验完成后再连接串口。', loaded: 0, total: item.size, progress: 0 };
       } catch (error) { return { name: 'failed', text: error.message }; }
     }
     function select(item, version, retry = false) {
       const key = preparationKey(item, version);
-      if (entry && entry.key === key && !(entry.name === 'ready' && Date.now() - entry.at >= CACHE_TTL_MS) && !(retry && entry.name === 'failed')) return entry;
+      if (entry && entry.key === key && !(entry.name === 'ready' && Date.now() - entry.at >= CACHE_TTL_MS) && !(retry && ['failed', 'cancelled'].includes(entry.name))) return entry;
       if (entry) entry.controller.abort();
-      const value = { key, controller: new AbortController(), listeners: new Set(), name: 'manifest', text: '后台准备安装清单；不会连接串口或写入设备。' };
+      const value = { key, controller: new AbortController(), listeners: new Set(), name: 'manifest', text: '正在准备安装清单；不会连接串口或写入设备。', loaded: 0, total: item.size, progress: null };
       entry = value;
-      const report = (name, text) => {
+      const report = (name, text, detail = {}) => {
         if (entry !== value) return;
         value.name = name; value.text = text;
+        if (Number.isFinite(detail.loaded)) value.loaded = detail.loaded;
+        value.progress = ['download', 'failed', 'cancelled'].includes(name) ? Math.min(100, Math.floor(value.loaded * 100 / value.total)) : name === 'ready' ? 100 : null;
         emit(value);
         for (const listener of value.listeners) listener(name, text);
       };
       value.promise = prepare({ ...item }, version, value.controller.signal, report).then(prepared => {
-        if (value.controller.signal.aborted) throw new Error('预下载已取消');
+        if (value.controller.signal.aborted) throw new Error('下载已取消');
         value.prepared = prepared; value.at = Date.now();
-        report('ready', '固件已预下载并通过 SHA256 校验；连接串口后可直接进入安装确认。');
+        report('ready', '固件下载完成并通过 SHA256 校验，可以连接串口继续刷写。');
         return prepared;
       }).catch(error => {
         value.prepared = null;
-        report('failed', '预下载未完成：' + error.message + '。点击刷写时可重试下载。');
+        report(value.controller.signal.aborted ? 'cancelled' : 'failed', value.controller.signal.aborted ? '下载已取消，未连接串口。可点击重新下载。' : '下载未完成：' + error.message + '。请点击“重新下载”重试。');
         throw error;
       });
       value.promise.catch(() => {});
       return value;
     }
-    function prefetch(item, version) {
+    function prefetch(item, version, retry = false) {
       let promise;
-      try { promise = select(item, version).promise.then(() => {}); }
+      try { promise = select(item, version, retry).promise.then(() => {}); }
       catch (error) { promise = Promise.reject(error); }
       promise.catch(() => {});
       return promise;
     }
-    async function get(item, version, signal, report = () => {}) {
+    async function get(item, version, signal, report = () => {}, readyOnly = false) {
       if (signal.aborted) throw new Error('会话已取消');
-      const value = select(item, version, true);
+      if (readyOnly && status(item, version).name !== 'ready') throw new Error('下载缓存已失效，请手动重新下载固件');
+      const value = readyOnly ? entry : select(item, version, true);
       const abort = () => value.controller.abort();
       signal.addEventListener('abort', abort, { once: true });
       value.listeners.add(report);
-      report(value.name === 'ready' ? 'verify' : value.name, value.name === 'ready' ? '复用已预下载固件；刷写前再次校验 SHA256，尚未写入。' : value.text);
+      report(value.name === 'ready' ? 'verify' : value.name, value.name === 'ready' ? '复用已下载固件；刷写前再次校验 SHA256，尚未写入。' : value.text);
       try {
         const prepared = await value.promise;
         if (signal.aborted) throw new Error('会话已取消');
@@ -78,8 +82,16 @@
         signal.removeEventListener('abort', abort);
       }
     }
+    function invalidate(item, version) {
+      let key;
+      try { key = preparationKey(item, version); } catch (_) {}
+      if (entry && entry.key !== key) clear();
+    }
+    function cancel() {
+      if (entry && ['manifest', 'download', 'verify'].includes(entry.name)) entry.controller.abort();
+    }
     function clear() { if (entry) entry.controller.abort(); entry = null; }
-    return { prefetch, get, status, clear };
+    return { prefetch, get, status, clear, cancel, invalidate };
   }
 
   async function fetchBytes(url, limit, signal, progress) {
@@ -134,8 +146,8 @@
     const part = build && Array.isArray(build.parts) && build.parts[0];
     if (!build || !part || manifest.version !== version || manifest.builds.length !== 1 || build.chipFamily !== 'ESP32-C3' ||
         build.parts.length !== 1 || part.offset !== 0 || typeof part.path !== 'string' || new URL(part.path, manifestURL).href !== binaryURL) throw new Error('manifest 与所选版本、ESP32-C3 或 0x0 merged bin 不一致');
-    report('download', '正在下载固件：0 / ' + item.size + ' 字节；尚未写入。');
-    const bytes = await fetchBytes(binaryURL, MAX_FIRMWARE_BYTES, signal, count => report('download', '正在下载固件：' + count + ' / ' + item.size + ' 字节；尚未写入。'));
+    report('download', '正在下载固件：0 / ' + item.size + ' 字节；尚未写入。', { loaded: 0, total: item.size });
+    const bytes = await fetchBytes(binaryURL, MAX_FIRMWARE_BYTES, signal, count => report('download', '正在下载固件：' + count + ' / ' + item.size + ' 字节；尚未写入。', { loaded: count, total: item.size }));
     report('verify', '正在校验固件大小和 SHA256；尚未写入。');
     await verifyBytes(bytes, item);
     if (signal.aborted) throw new Error('会话已取消');
@@ -204,10 +216,11 @@
       if (active) { notify('已有串口/安装/日志会话，请先返回并关闭安装弹窗。'); return; }
       if (!global.isSecureContext || !navigator.serial) { notify('刷写需要安全上下文和 Web Serial，请使用支持该 API 的桌面浏览器访问 HTTPS 页面。'); return; }
       if (!item) { notify('没有可刷写固件'); return; }
+      if (options.requirePrepared && options.preparation?.status(item, version).name !== 'ready') { notify('请先点击“下载并准备固件”，等待校验通过后再连接串口；不会自动下载。'); return; }
       const session = { controller: new AbortController(), urls: [], opened: false, cleaning: false, version, startedAt: Date.now() };
       active = session;
       options.busy(true);
-      stage(session, 'picker', '请选择开发板串口；授权后先下载并校验固件，尚未写入。');
+      stage(session, 'picker', options.requirePrepared ? '固件已下载并校验；请选择开发板串口，尚未写入。' : '请选择开发板串口；授权后先下载并校验固件，尚未写入。');
       try {
         session.port = await navigator.serial.requestPort();
         stage(session, 'lock', '串口已选择；正在检查本站其他刷写页面，尚未写入。');
@@ -228,7 +241,7 @@
         };
         navigator.serial.addEventListener('disconnect', session.disconnect);
         const report = (name, text) => stage(session, name === 'ready' ? 'verify' : name, '串口已选择；' + text);
-        const prepared = options.preparation ? await options.preparation.get(item, version, session.controller.signal, report) : await prepare(item, version, session.controller.signal, report);
+        const prepared = options.preparation ? await options.preparation.get(item, version, session.controller.signal, report, !!options.requirePrepared) : await prepare(item, version, session.controller.signal, report);
         stage(session, 'component', '固件下载与 SHA256 校验通过；正在加载本站安装组件，尚未写入。');
         await options.loadDialog();
         if (session.controller.signal.aborted) throw new Error('会话已取消或设备已断开，未开始写入');

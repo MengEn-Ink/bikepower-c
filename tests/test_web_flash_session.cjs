@@ -346,7 +346,7 @@ test('background prefetch deduplicates and reuses verified bytes without serial 
   assert.equal(requests, 2);
   assert.equal(h.counts().picks, 1);
   assert.equal(h.session.getState().name, 'dialog');
-  assert.match(h.messages.join('\n'), /复用已预下载/);
+  assert.match(h.messages.join('\n'), /复用已下载/);
   await h.close();
   assert.equal(h.session.getState().name, 'closed');
   assert.match(h.session.getState().text, /未确认刷写成功/);
@@ -421,5 +421,57 @@ test('cache identity includes SHA and version; expiry causes fresh verification'
   prepared.bytes[0] ^= 0xff; prepared.manifest.version = 'bad';
   const again = await cache.get(item, '4.2.1', new AbortController().signal);
   assert.deepEqual(Buffer.from(again.bytes), bytes); assert.equal(again.manifest.version, '4.2.1');
+  h.dispose();
+});
+
+test('manual-only gate blocks all device access and downloads until explicit preparation', async () => {
+  const h = harness(); let requests = 0;
+  h.w.fetch = async url => { requests++; return new Response(url.endsWith('.json') ? JSON.stringify(manifest) : bytes); };
+  const cache=h.w.BikePowerFlash.createPreparationCache();
+  h.options.preparation=cache; h.options.requirePrepared=true;
+  await h.session.start(item,'4.2.1');
+  assert.equal(requests,0); assert.equal(h.counts().picks,0);
+  assert.equal(h.session.isBusy(),false); assert.match(h.messages.at(-1),/先点击/);
+  await cache.prefetch(item,'4.2.1',true);
+  await h.session.start(item,'4.2.1'); assert.equal(requests,2);assert.equal(h.counts().picks,1);
+  await h.close();
+  cache.clear(); await h.session.start(item,'4.2.1');assert.equal(requests,2);assert.equal(h.counts().picks,1);
+  h.dispose();
+});
+
+test('manual progress is based on streamed bytes and verification is indeterminate', async () => {
+  const h=harness(), changes=[];let finish;
+  h.w.fetch=async url=>url.endsWith('.json')?new Response(JSON.stringify(manifest)):new Response(new ReadableStream({start(c){
+    c.enqueue(bytes.subarray(0,5));finish=()=>{c.enqueue(bytes.subarray(5));c.close();};
+  }}));
+  const cache=h.w.BikePowerFlash.createPreparationCache({change:s=>changes.push(s)});
+  const pending=cache.prefetch(item,'4.2.1',true);await tick();
+  const state=cache.status(item,'4.2.1');assert.equal(state.loaded,5);assert.equal(state.progress,Math.floor(500/bytes.length));
+  finish();await pending;
+  assert.equal(cache.status(item,'4.2.1').progress,100);
+  assert.equal(changes.find(s=>s.name==='verify').progress,null);
+  assert.equal(h.counts().picks,0);h.dispose();
+});
+
+test('version invalidation aborts manual download without starting a new request', async () => {
+  const h=harness();let requests=0,aborted=false;
+  h.w.fetch=(url,options)=>new Promise((resolve,reject)=>{requests++;options.signal.addEventListener('abort',()=>{aborted=true;reject(Error('cancelled'));});});
+  const cache=h.w.BikePowerFlash.createPreparationCache();
+  const pending=cache.prefetch(item,'4.2.1',true);
+  cache.invalidate({...item,download:'firmware/new.bin'},'4.3.0');
+  await assert.rejects(pending);assert.equal(aborted,true);assert.equal(requests,1);
+  assert.equal(cache.status(item,'4.2.1').name,'idle');h.dispose();
+});
+
+test('manual-only checksum failure never enables serial and expired cache never redownloads automatically', async () => {
+  const h=harness();let requests=0;
+  h.w.fetch=async url=>{requests++;return new Response(url.endsWith('.json')?JSON.stringify(manifest):bytes);};
+  const cache=h.w.BikePowerFlash.createPreparationCache();h.options.preparation=cache;h.options.requirePrepared=true;
+  const bad={...item,sha256:'0'.repeat(64)};
+  await assert.rejects(cache.prefetch(bad,'4.2.1',true),/校验失败/);
+  await h.session.start(bad,'4.2.1');assert.equal(h.counts().picks,0);assert.equal(requests,2);
+  await cache.prefetch(item,'4.2.1',true);
+  const now=h.w.Date.now();h.w.Date.now=()=>now+600001;
+  await h.session.start(item,'4.2.1');assert.equal(h.counts().picks,0);assert.equal(requests,4);
   h.dispose();
 });

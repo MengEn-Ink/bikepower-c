@@ -1154,6 +1154,14 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
 .tour-nav .btn{height:32px;padding:0 12px;font-size:12.5px;border-radius:0}
 .tour-nav .btn.primary{font-weight:800}
 
+/* 手动下载：原生进度条只使用实际收到的字节；校验阶段保持不确定状态。 */
+.firmware-prep{margin:14px 0;padding:14px;border:1px solid var(--line);background:var(--panel-2);min-width:0}
+.firmware-prep progress{display:block;width:100%;height:12px;margin:12px 0 8px;accent-color:var(--accent);border:0}
+.firmware-prep .hint{margin:0;font-size:14px;overflow-wrap:anywhere}
+.prep-meta{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.prep-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.prep-actions .btn{min-height:44px;max-width:100%;white-space:normal}
+.firmware-prep[data-stage="ready"] progress{accent-color:var(--green)}
 /* 刷写向导（右侧停靠 / 移动底部卡） */
 #fg-root{position:fixed;top:64px;right:0;bottom:0;z-index:70;width:min(400px,30vw);min-width:330px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;box-shadow:-20px 0 50px rgba(0,0,0,calc(.45*var(--shadow-k)));animation:fgIn .24s cubic-bezier(.2,.7,.2,.1) both}
 @keyframes fgIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
@@ -1702,6 +1710,12 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           <label class="check-line"><input type="checkbox" id="fw-rollback-ack" onchange="renderSelectedFirmware()">我了解风险，确认回滚到这个版本</label>
         </div>
 
+        <div class="firmware-prep" id="firmware-preparation" data-stage="idle">
+          <p class="hint" data-prep-status role="status" aria-live="polite">请手动下载固件，校验通过后再连接串口；页面不会自动下载。</p>
+          <progress data-prep-progress max="100" value="0" aria-label="固件下载进度"></progress>
+          <div class="prep-meta" data-prep-meta>尚未下载</div>
+          <div class="prep-actions"><button type="button" class="btn primary" data-prep-download onclick="downloadSelectedFirmware()">下载并准备固件</button><button type="button" class="btn hidden" data-prep-cancel onclick="firmwarePreparation.cancel()">取消下载</button></div>
+        </div>
         <div class="flash-cta" data-tour="flash-start">
           <esp-web-install-button id="install-button" class="hidden">
             <button class="btn primary big" id="flash-activate" slot="activate" type="button">开始刷写（选择串口）</button>
@@ -1709,10 +1723,9 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <span class="hidden" slot="not-allowed">网页刷写只能在 HTTPS 或 localhost 页面使用。</span>
           </esp-web-install-button>
           <button class="btn" id="install-unavailable" disabled>暂无可刷写固件</button>
-          <a class="btn alt hidden" id="firmware-download" href="#" download>下载固件</a>
+          <a class="btn alt hidden" id="firmware-download" href="#" download>另存固件到电脑</a>
         </div>
         <button class="btn hidden" id="flash-compact-back" type="button" onclick="closeCompactFlash()">返回使用首页</button>
-        <div class="hint" id="firmware-preparation" role="status" aria-live="polite" style="margin-top:8px" data-stage="idle">读取版本后将后台预下载固件；不会连接串口或自动刷写。</div>
         <div class="hint" id="flash-message" role="status" aria-live="polite">正在读取 Release 固件信息。</div>
         <button class="btn hidden" id="flash-cancel" type="button" onclick="flashSession&&flashSession.cancel()">取消准备（尚未写入）</button>
 
@@ -3007,17 +3020,30 @@ let flashSession = null;
 let firmwarePreparation = null;
 function selectedPreparationStatus(){
   const rel=selectedFirmwareRelease(),board=$("firmware-board");
-  return firmwarePreparation&&rel&&board?firmwarePreparation.status(rel.boards[board.value],rel.version):{name:"idle",text:"固件尚未预下载"};
+  return firmwarePreparation&&rel&&board?firmwarePreparation.status(rel.boards[board.value],rel.version):{name:"idle",text:"请先手动下载固件",loaded:0,progress:0};
+}
+function firmwarePreparationHtml(prefix){
+  return '<div class="firmware-prep" id="'+prefix+'" data-stage="idle"><p class="hint" data-prep-status role="status" aria-live="polite">请点击下载，校验完成后再连接串口。</p><progress data-prep-progress max="100" value="0" aria-label="固件下载进度"></progress><div class="prep-meta" data-prep-meta>尚未下载</div><div class="prep-actions"><button type="button" class="btn primary" data-prep-download onclick="downloadSelectedFirmware()">下载并准备固件</button><button type="button" class="btn hidden" data-prep-cancel onclick="firmwarePreparation.cancel()">取消下载</button></div></div>';
 }
 function renderFirmwarePreparation(){
-  const el=$("firmware-preparation");if(!el)return;
-  const state=selectedPreparationStatus();el.dataset.stage=state.name;el.textContent=state.text;
-  if(fgOpen&&!flashSession?.isBusy()&&fgStep===3)renderFlashGuide();
+  const state=selectedPreparationStatus(),busy=['manifest','download','verify'].includes(state.name),serialBusy=!!flashSession?.isBusy();
+  document.querySelectorAll('.firmware-prep').forEach(el=>{
+    el.dataset.stage=state.name;
+    el.querySelector('[data-prep-status]').textContent=state.text;
+    const bar=el.querySelector('[data-prep-progress]');
+    if(state.progress===null)bar.removeAttribute('value');else bar.value=state.progress||0;
+    el.querySelector('[data-prep-meta]').textContent=state.name==='ready'?'已下载并校验通过':state.name==='verify'?'下载完成，正在校验 SHA256…':state.name==='download'?(state.progress||0)+'% · '+(state.loaded>0?formatBytes(state.loaded):'0.00 MB')+' / '+formatBytes(state.total):state.name==='manifest'?'准备安装清单…':state.name==='cancelled'?'已取消':state.name==='failed'?'下载失败':'尚未下载';
+    const btn=el.querySelector('[data-prep-download]');btn.disabled=busy||serialBusy||state.name==='ready'||!webInstallerReady;
+    btn.textContent=state.name==='ready'?'固件已就绪':busy?'下载与校验中…':['failed','cancelled'].includes(state.name)?'重新下载':'下载并准备固件';
+    const cancel=el.querySelector('[data-prep-cancel]');cancel.classList.toggle('hidden',!busy);cancel.disabled=serialBusy;
+  });
+  const start=$("flash-activate");if(start)start.disabled=serialBusy||state.name!=="ready";
+  document.querySelectorAll('[data-fg-start]').forEach(btn=>{btn.disabled=serialBusy||state.name!=="ready"||isRollbackSelected()&&!rollbackAcked();});
 }
-function prefetchSelectedFirmware(){
-  if(!firmwarePreparation||!webInstallerReady||/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))return;
+function downloadSelectedFirmware(){
+  if(!firmwarePreparation||!webInstallerReady||flashSession?.isBusy())return;
   const rel=selectedFirmwareRelease(),board=$("firmware-board");if(!rel||!board||!rel.boards[board.value])return;
-  void firmwarePreparation.prefetch(rel.boards[board.value],rel.version).catch(()=>{});
+  void firmwarePreparation.prefetch(rel.boards[board.value],rel.version,true).catch(()=>{});
   renderFirmwarePreparation();
 }
 let singleDevice = null;
@@ -4180,7 +4206,7 @@ function renderSelectedFirmware(){
     installer.classList.remove("hidden");$("install-unavailable").classList.add("hidden");
     setFirmwareStatus(isLatest?"可刷写 · 最新":"可回滚","ok");
     const recovery=flashSession&&flashSession.recoveryNotice();
-    setText("flash-message",recovery||"已选择 "+rel.tag+" · "+(item.label||board)+"。部署流程已校验固件 SHA256；点击按钮后请选择开发板串口。");
+    setText("flash-message",recovery||"已选择 "+rel.tag+" · "+(item.label||board)+"。请先点击下载并准备固件，校验通过后再连接串口。");
   }
   if(typeof rel.release_url==="string"&&rel.release_url.startsWith("https://")){
     const link=$("firmware-release");link.href=rel.release_url;link.classList.remove("hidden");
@@ -4191,7 +4217,8 @@ function renderSelectedFirmware(){
   if(recovery)setText("flash-message",recovery);
   else if(previous&&!previous.busy&&previous.name!=="idle")setText("flash-message",previous.text);
   renderIdeStatus();
-  prefetchSelectedFirmware();
+  firmwarePreparation?.invalidate(item,rel.version);
+  renderFirmwarePreparation();
 }
 async function loadFirmwareCatalog(){
   if(flashSession&&flashSession.isBusy())return;
@@ -6950,8 +6977,8 @@ function fgBodyHtml(){
     const no=fgOs==="mac"?"cu.Bluetooth-Incoming-Port / cu.debug-console":"通信端口 (COM1) / 蓝牙链接上的标准串行";
     return '<p>点下方按钮后浏览器会弹出串口选择窗口。网页不能替你自动选择，这是浏览器的安全限制。</p>'
       +'<div class="fg-target"><div class="k">在弹窗里选择</div><div class="v">'+escapeHtml(target)+'</div><div class="x">不要选 '+escapeHtml(no)+'</div></div>'
-      +'<div class="fg-state" role="status">'+escapeHtml(selectedPreparationStatus().text)+'</div>'
-      +'<button type="button" class="btn primary" style="width:100%;height:44px;margin-top:11px;font-weight:800"'+(canStart?"":" disabled")+' onclick="fgActivate()">连接串口并继续'+(ver?" v"+escapeHtml(ver):"")+'</button>'
+      +firmwarePreparationHtml('fg-preparation')
+      +'<button data-fg-start type="button" class="btn primary" style="width:100%;height:44px;margin-top:11px;font-weight:800"'+(canStart&&selectedPreparationStatus().name==='ready'?"":" disabled")+' onclick="fgActivate()">连接串口并继续'+(ver?" v"+escapeHtml(ver):"")+'</button>'
       +(canStart?"":'<div style="margin-top:6px;font-size:11.5px;color:var(--amber)">回滚需先在页面上勾选“我了解风险”。</div>')
       +'<div style="margin-top:8px;font-size:11.5px;color:var(--muted)">弹窗由浏览器提供，两种系统都请使用支持数据传输的 USB 线。</div>';
   }
@@ -6960,7 +6987,7 @@ function fgBodyHtml(){
     const terminal=!state.busy;
     return '<p role="status">'+escapeHtml(state.text||$("flash-message").textContent)+'</p>'
       +(flashSession&&flashSession.canCancel()?'<button type="button" class="btn" onclick="flashSession.cancel()">取消准备（尚未写入）</button>':"")
-      +(terminal?'<div class="fg-state">'+escapeHtml(selectedPreparationStatus().text)+'</div><button type="button" class="btn primary" style="width:100%;height:44px;margin-top:12px" onclick="fgActivate()">重新连接串口并继续</button>':'<p class="fg-sub">'+(['dialog','confirm'].includes(state.name)?'无需再选串口，请在安装弹窗确认。':state.name==="picker"?'请在浏览器窗口选择开发板。':'状态来自实际会话与安装弹窗；没有进度时不显示虚构百分比。')+'</p>')
+      +(terminal?firmwarePreparationHtml('fg-preparation')+'<button data-fg-start type="button" class="btn primary" style="width:100%;height:44px;margin-top:12px" onclick="fgActivate()">重新连接串口并继续</button>':'<p class="fg-sub">'+(['dialog','confirm'].includes(state.name)?'无需再选串口，请在安装弹窗确认。':state.name==="picker"?'请在浏览器窗口选择开发板。':'状态来自实际会话与安装弹窗；没有进度时不显示虚构百分比。')+'</p>')
       +'<div style="margin-top:8px;color:var(--amber)">写入期间不要拔线、刷新或关闭页面。</div>';
   }
   return '<p>'+(fgFlashed?(ver?"v"+escapeHtml(ver)+" 已写入并校验通过，开发板已重启。":"固件已写入并校验通过，开发板已重启。"):"刷写完成后，这里会带你用蓝牙连接开发板。")+'</p>'
@@ -6986,6 +7013,7 @@ function renderFlashGuide(){
     +[["noPort","弹窗里看不到开发板"],["wrongPort","选错了串口"],["busy","提示串口被占用"],["flashFail","刷写中途失败"],["bleBusy","蓝牙连不上 / 被占用"]].map(([k,l])=>'<button type="button" class="fg-err-btn" onclick="showObError(\''+k+'\')">'+escapeHtml(l)+'<span>→</span></button>').join("")
     +'</details></div>'
     +'<div class="fg-foot">'+fgFooterHtml()+'</div>';
+  renderFirmwarePreparation();
   const target=FG_STEPS[fgStep].target;
   if(target&&currentMode==="flash")setTimeout(()=>obSpotlight(target,{html:null,ring:true,label:false,tag:""}),40);
   else obClearSpotlight();
@@ -7125,7 +7153,8 @@ function initOnboarding(){
     firmwarePreparation=window.BikePowerFlash.createPreparationCache({change:renderFirmwarePreparation});
     flashSession=window.BikePowerFlash.createSession({
       preparation:firmwarePreparation,
-      message:text=>{setText("flash-message",text);if(fgOpen)renderFlashGuide();},
+      requirePrepared:true,
+      message:text=>{setText("flash-message",text);if(fgOpen)renderFlashGuide();renderFirmwarePreparation();},
       stage:state=>{
         const el=$("flash-message");if(el)el.dataset.stage=state.name;
         const cancel=$("flash-cancel");if(cancel)cancel.classList.toggle("hidden",!state.canCancel);
@@ -7136,6 +7165,7 @@ function initOnboarding(){
         document.body.classList.toggle("flash-session-active",value);
         for(const id of ["flash-activate","firmware-board","fw-rollback-ack"]){const el=$(id);if(el)el.disabled=value;}
         if(fgOpen)renderFlashGuide();
+        renderFirmwarePreparation();
       },
       beforeInstall:prepareForFlash,
       loadDialog:window.BikePowerFlash.loadDialog,

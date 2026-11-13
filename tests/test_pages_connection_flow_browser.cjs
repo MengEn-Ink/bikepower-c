@@ -102,6 +102,8 @@ const manifest = { name: 'BikePower', version: '4.3.3', new_install_prompt_erase
         firmwareReleases = [{ tag: 'v4.3.3', version: '4.3.3', latest: true, boards: { 'generic-c3': item } }];
         webInstallerReady = true; selectFirmwareRelease(null); switchMode('flash');
       }, item);
+      await page.locator('#firmware-preparation [data-prep-download]').click();
+      await page.waitForFunction(() => selectedPreparationStatus().name === 'ready');
       await page.locator('#flash-activate').click();
       let dialog = page.locator('ewt-install-dialog');
       await dialog.getByText('安装 BikePower 固件', { exact: true }).waitFor();

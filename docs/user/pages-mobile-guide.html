@@ -1138,6 +1138,14 @@ button.st-item:hover{color:var(--strong);background:var(--panel)}
 .tour-nav .btn{height:32px;padding:0 12px;font-size:12.5px;border-radius:0}
 .tour-nav .btn.primary{font-weight:800}
 
+/* 手动下载：原生进度条只使用实际收到的字节；校验阶段保持不确定状态。 */
+.firmware-prep{margin:14px 0;padding:14px;border:1px solid var(--line);background:var(--panel-2);min-width:0}
+.firmware-prep progress{display:block;width:100%;height:12px;margin:12px 0 8px;accent-color:var(--accent);border:0}
+.firmware-prep .hint{margin:0;font-size:14px;overflow-wrap:anywhere}
+.prep-meta{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.prep-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.prep-actions .btn{min-height:44px;max-width:100%;white-space:normal}
+.firmware-prep[data-stage="ready"] progress{accent-color:var(--green)}
 /* 刷写向导（右侧停靠 / 移动底部卡） */
 #fg-root{position:fixed;top:64px;right:0;bottom:0;z-index:70;width:min(400px,30vw);min-width:330px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;box-shadow:-20px 0 50px rgba(0,0,0,calc(.45*var(--shadow-k)));animation:fgIn .24s cubic-bezier(.2,.7,.2,.1) both}
 @keyframes fgIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
