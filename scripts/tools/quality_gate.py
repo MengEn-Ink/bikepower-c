@@ -417,6 +417,8 @@ STATIC_CHECKS = [
     ("tests/test_ble_bond_cache.py", "GATT布局变化与绑定订阅失效 ASan/UBSan"),
     ("tests/test_ble_serial_identity.py", "默认序列号与身份覆盖生产回归 ASan/UBSan"),
     ("tests/test_device_telemetry.py", "设备遥测人工协议真值与 CPU 窗口"),
+    ("tests/test_captive_redirect.py", "真实 Captive 处理函数固定IP重定向 sanitizer"),
+    ("tests/test_portal_transport_browser.cjs", "门户固定入口与有限只读连接恢复"),
     ("tests/test_portal_runtime.py", "生产门户容量与超时 ASan/UBSan"),
     ("tests/test_portal_faults.py", "生产门户 HTTP 事务故障 ASan/UBSan"),
     ("tests/test_device_gate_commands.py", "设备门禁板型命令契约"),

@@ -1,6 +1,6 @@
 # WiFi 核心门户与真实功率桥接
 
-当前工作区采用 schema v14。静态资源来自 `main/web/index.html`、`app.css`、`app.js`，经 `scripts/inline_static.py` 压缩内联，设备不加载外部字体、图片或脚本。仅保留明亮主题；内联总量上限 110 KiB。模板管理和 LED 配置留在电脑端工具。
+当前工作区采用 schema v14。静态资源来自 `main/web/index.html`、`app.css`、`app.js`，经 `scripts/inline_static.py` 压缩内联，设备不加载外部字体、图片或脚本。静态资源支持深浅主题；内联总量上限 110 KiB。模板管理和 LED 配置留在电脑端工具。
 
 ## 生命周期
 
@@ -31,7 +31,9 @@ WiFi 启停统一经过 `radio_ctrl`，普通配网保持 BLE peripheral 在线�
 | POST | `/api/bridge/scan` | 启动或停止扫描 |
 | POST | `/api/bridge/control` | test、stop、resume、retry |
 
-Captive 探测返回 `303 See Other`、`Location: /` 和短文本 body。DHCP Option 114 指向 `/.well-known/captive-portal`。
+Captive 探测返回 `303 See Other`、固定 `Location: http://192.168.4.1/` 和短文本 body。DHCP Option 114 指向 `/.well-known/captive-portal`。页面在已知系统检测域名下先跳转固定设备地址，再初始化接口，避免请求依赖检测域名的DNS路由。
+
+断线/超时/错误响应显示中文恢复提示，隐藏旧实时数值，当前运行状态仅标待确认；保留本页草稿。只读恢复按2/4/8秒退避，三次自动重试后暂停，手动重新连接可重启探测；内存轮询及操作续期在断线期间暂停。恢复回读config/runtime，不自动提交或续期。保存响应丢失保留待核实提示，重连不冒称成功；只有用户明确操作才可再次提交。
 
 ## 配置事务
 

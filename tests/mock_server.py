@@ -354,7 +354,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send({"scanning": STATE["scanning_until"] > time.monotonic(), "devices": DEVICES})
             if path.startswith("/api/"):
                 return self.send({"ok": False, "error": "路由不存在"}, status=404)
-            return self.send(b"Redirect to the captive portal", "text/plain", 303, {"Location": "/"})
+            return self.send(b"Redirect to the captive portal", "text/plain", 303, {"Location": "http://192.168.4.1/"})
 
     def do_POST(self):
         try:

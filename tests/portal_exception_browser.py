@@ -87,7 +87,8 @@ window.testCloseRace = async function () {
                     for fault in ("503", "json"):
                         faults["state"] = fault
                         page.goto(url)
-                        expect(page.locator("#saveState")).to_contain_text("请刷新")
+                        expect(page.locator("#connectionRecovery")).to_be_visible()
+                        expect(page.locator("#saveState")).to_contain_text("连接中断")
                         expect(page.locator("#saveBtn")).to_be_disabled()
                     faults.clear()
                     page.reload()

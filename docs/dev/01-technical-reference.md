@@ -801,7 +801,7 @@ v3.2.0 起配网门户前后端分离：
 - `POST /api/bridge/scan`（用户启动或停止有界扫描，候选编号包含代次）
 - `POST /api/bridge/control`（test 临时测试、stop 暂停、resume 恢复、retry 立即重试）
 
-Captive Portal 探测路由与未知路径统一返回 `303 See Other`、`Location: /` 和短文本 body `Redirect to the captive portal`。这与 ESP-IDF captive_portal 示例保持一致：iOS Captive Network Assistant 对“只有空 302”的响应兼容性较差，带 body 的 303 更稳；404 兜底则用于覆盖 Chrome/Chromium `browsernetworktime/*` 等新增或变化的系统探测路径。DHCP Option 114 走 `/.well-known/captive-portal` JSON API，避免新系统把 HTML 首页当作 Captive Portal API 解析失败而不弹窗。
+Captive Portal 探测路由与未知路径统一返回 `303 See Other`、固定 `Location: http://192.168.4.1/` 和短文本 body `Redirect to the captive portal`。已知系统检测域名下页面先跳转固定设备地址再初始化API，不继续依赖检测域名DNS路由；404兜底覆盖新探测路径。DHCP Option 114 走 `/.well-known/captive-portal` JSON API，避免新系统把HTML首页当JSON API。配网页请求失败时保留草稿、隐藏旧实时值并提供恢复入口；只读探测按2/4/8秒三次退避后暂停，用户可手动重启。断线不续期、不自动重发写请求，丢失保存确认保持待核实；网络恢复后只读回读不冒称保存成功。
 
 其中：
 

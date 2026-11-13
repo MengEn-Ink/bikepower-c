@@ -993,6 +993,11 @@ input[aria-invalid=true] { border-color:var(--danger); }
 })();
 </script><script>(function () {
   "use strict";
+  var captiveHosts = ["connectivitycheck.vivo.com.cn","connectivitycheck.gstatic.com","connectivitycheck.android.com","captive.apple.com","www.msftconnecttest.com"];
+  if (captiveHosts.includes(location.hostname.toLowerCase())) {
+    location.replace("http://192.168.4.1/");
+    return;
+  }
   var $ = function(id) { return document.getElementById(id); };
   function text(id, value) { $(id).textContent = value; }
   var themeKey = "bikepower.portal.theme.v1", themeChoice = "";
@@ -1025,7 +1030,8 @@ input[aria-invalid=true] { border-color:var(--danger); }
     pendingReplacementKey:null, replaceSlot:null, polling:false, closed:false,
     closeRequested:false, closeConfirmed:false, leaseVersion:0, idleSeconds:300,
     renewing:false, activityTimer:0, activityPending:false, lastRenewAt:0,
-    pointerActive:false};
+    pointerActive:false, transportDown:false, retryFailures:0, retryAt:0, saveUncertain:false};
+  var READ_RETRY_MS = [2000,4000,8000];
   var ACTIVITY_MERGE_MS = 1000, CLOSE_WARNING_SEC = 30;
   var pollTimer = 0, memoryTimer = 0;
   var emptyIdentity = {manufacturer:"",model:"",serial:"",hardware:"",firmware:"",software:""};
@@ -1121,7 +1127,43 @@ input[aria-invalid=true] { border-color:var(--danger); }
   function validFields() {
     return !!state.draft && !validationErrors().length;
   }
+  var recovery = document.createElement("section");
+  recovery.id = "connectionRecovery"; recovery.className = "runtime-alert is-warn connection-recovery";
+  recovery.hidden = true; recovery.style.cssText = "display:block;margin:0 0 20px";
+  recovery.setAttribute("aria-labelledby","connectionRecoveryTitle");
+  [["b","connectionRecoveryTitle","设备连接中断"],["p","connectionRecoveryText",""],
+    ["button","connectionRetryBtn","重新连接"],["a","devicePortalLink","打开设备地址"],
+    ["p","","自动登录窗口异常时，请在普通浏览器输入 http://192.168.4.1/；离开本页前记录未保存修改。"]].forEach(function(item) {
+    var node = document.createElement(item[0]); node.id = item[1]; node.textContent = item[2];
+    if (item[1] === "connectionRecoveryText") node.setAttribute("role","status");
+    if (item[0] === "button") { node.type = "button"; node.className = "secondary-btn"; }
+    if (item[0] === "p") node.style.cssText = "font-size:14px;overflow-wrap:anywhere";
+    if (item[0] === "a") { node.href = "http://192.168.4.1/"; node.target = "_blank"; node.rel = "noopener noreferrer"; node.style.cssText = "display:inline-flex;align-items:center;min-height:44px;padding:8px;color:var(--ink)"; }
+    recovery.appendChild(node);
+  });
+  $("sessionRenewError").after(recovery);
+  function connectionFailure(error) {
+    state.transportDown = true;
+    state.retryFailures++;
+    state.retryAt = state.retryFailures <= READ_RETRY_MS.length
+      ? performance.now() + READ_RETRY_MS[state.retryFailures - 1]:Infinity;
+    clearTimeout(state.activityTimer); state.activityTimer = 0; state.activityPending = false;
+    $("connectionRecovery").hidden = false;
+    $("connectionRetryBtn").disabled = false;
+    text("connectionRecoveryTitle","设备连接中断");
+    text("connectionRecoveryText",error.message + "；本页草稿保留，不会自动提交。" +
+      (state.retryAt === Infinity ? "自动重试已暂停，请检查热点后重新连接。":"正在有限次重试连接。"));
+    text("saveState",state.saveUncertain ? "保存结果待核实，请恢复连接后核对":"设备连接中断，请检查热点连接");
+    if (state.loaded) { renderLive(); updateDirty(); }
+  }
+  function connectionRestored() {
+    state.transportDown = false; state.retryFailures = 0; state.retryAt = 0;
+    $("connectionRecovery").hidden = true;
+    $("sessionRenewError").hidden = true;
+    $("connectionRetryBtn").disabled = false;
+  }
   async function api(path, body) {
+    if (body !== undefined && state.transportDown) throw new Error("设备连接中断，请先重新连接");
     var controller = new AbortController(), timeout = setTimeout(function() { controller.abort(); },7000);
     try {
       var response = await fetch("/api/" + path,{method:body === undefined ? "GET":"POST",
@@ -1134,11 +1176,22 @@ input[aria-invalid=true] { border-color:var(--danger); }
         data = text.trim().charAt(0) === "{" ? JSON.parse(text):{remaining_sec:Number(text)};
         if (data.closing) endSession(true,data.remaining_sec || 0);
         if (data.ok !== false && (!Number.isFinite(data.remaining_sec) || data.remaining_sec <= 0)) throw new Error("续期响应无效");
-      } else data = await response.json();
+      } else {
+        if (!(response.headers.get("Content-Type") || "").includes("json")) throw new Error("设备响应格式异常，请确认已连接设备热点");
+        data = await response.json();
+      }
       if (data.ok === false) throw new Error(data.error || "设备拒绝操作");
       return data;
     } catch (e) {
       if (body !== undefined && (!response || (response.ok && (!data || data.ok !== false)))) e.resultUnknown = true;
+      e.transportError = !response || e instanceof SyntaxError || (response.ok && !data);
+      var message = e.name === "AbortError" ? "设备请求超时，请检查热点连接"
+        : e instanceof TypeError ? "设备连接中断，请检查热点连接"
+        : e instanceof SyntaxError ? "设备响应格式异常，请重新连接后核对":e.message;
+      if (message !== e.message) {
+        var original = e; e = new Error(message);
+        e.resultUnknown = original.resultUnknown; e.transportError = original.transportError;
+      }
       throw e;
     } finally { clearTimeout(timeout); }
   }
@@ -1183,7 +1236,7 @@ input[aria-invalid=true] { border-color:var(--danger); }
     $("wifiClosed").focus();
   }
   async function renewSession(manual) {
-    if (!state.loaded || state.closed || state.closeRequested || state.renewing) return;
+    if (!state.loaded || state.closed || state.closeRequested || state.renewing || state.transportDown) return;
     state.renewing = true; state.activityPending = false;
     state.lastRenewAt = performance.now();
     $("renewBtn").disabled = true;
@@ -1198,6 +1251,7 @@ input[aria-invalid=true] { border-color:var(--danger); }
       if (!state.closed) {
         $("sessionRenewError").hidden = false;
         text("sessionRenewError","续期未确认，请检查热点连接；倒计时未延长。");
+        if (e.resultUnknown) connectionFailure(e);
         if (manual) showToast(e.message);
       }
     } finally {
@@ -1210,8 +1264,8 @@ input[aria-invalid=true] { border-color:var(--danger); }
     }
   }
   function userActivity(event) {
-    if (!event.isTrusted || document.hidden || !state.loaded || state.closed || state.closeRequested) return;
-    if (event.target.closest && event.target.closest("#themeToggle,#renewBtn,#warningRenewBtn,#confirmCloseBtn,#wifiClosed")) return;
+    if (!event.isTrusted || document.hidden || !state.loaded || state.closed || state.closeRequested || state.transportDown) return;
+    if (event.target.closest && event.target.closest("#themeToggle,#renewBtn,#warningRenewBtn,#confirmCloseBtn,#wifiClosed,#connectionRecovery")) return;
     if (event.type === "pointermove" && (!state.pointerActive || !event.buttons)) return;
     state.activityPending = true;
     if (state.renewing || state.activityTimer) return;
@@ -1268,7 +1322,7 @@ input[aria-invalid=true] { border-color:var(--danger); }
       ["gitSha",data.git_sha],["buildTime",data.build_time]].forEach(function(x) { $(x[0]).textContent = x[1]; });
     text("schemaVersion","schema v" + data.config.schema_ver);
     text("headerFirmware","固件 v" + data.firmware_version);
-    if (!preserve) renderAll(); else updateDirty();
+    if (!preserve || firstLoad) renderAll(); else updateDirty();
     if (firstLoad) {
       $("sourceOptions").open = state.draft.source === "bridge" || state.draft.simulation.mode === "pacer";
       $("heartOptions").open = state.draft.heart.mode === "fixed";
@@ -1277,6 +1331,14 @@ input[aria-invalid=true] { border-color:var(--danger); }
     return data;
   }
   function renderLive() {
+    if (state.transportDown) {
+      text("liveSubtitle","网页与设备连接中断，当前输出状态未确认");
+      ["heroMetricValue","metricTwoValue","heartLiveValue"].forEach(function(id) { text(id,"—"); });
+      $("liveStatus").className = "status-chip status-chip--danger"; text("liveStatus","连接中断");
+      $("runtimeAlert").className = "runtime-alert is-warn";
+      text("runtimeAlertTitle","当前设备状态未确认"); text("runtimeAlertText","请重新连接热点；不将网络中断视为设备停止或保存成功。");
+      return;
+    }
     if (!state.output) return;
     var o = state.output, c = state.applied, b = o.bridge;
     var runtime = o.bridge_runtime || {state:"disabled",actual_source:c.source === "bridge" ? "real":"simulation",active_slot:0,next_attempt_ms:0};
@@ -1386,12 +1448,12 @@ input[aria-invalid=true] { border-color:var(--danger); }
       && state.draft.source === "bridge"
       && !bridgeReady();
     $("draftChip").hidden = !dirty;
-    $("restoreConfigBtn").hidden = !dirty;
-    saveBtn.disabled = !state.loaded || state.busy || !dirty || bridgePending || errors.length > 0;
-    $("restoreConfigBtn").disabled = !dirty || state.busy || state.closed;
+    $("restoreConfigBtn").hidden = !dirty && !state.saveUncertain;
+    saveBtn.disabled = !state.loaded || state.busy || state.closed || state.transportDown || !dirty || bridgePending || errors.length > 0;
+    $("restoreConfigBtn").disabled = (!dirty && !state.saveUncertain) || state.busy || state.closed || state.transportDown;
     $("locateErrorBtn").hidden = !errors.length;
     $("locateErrorBtn").disabled = state.busy || state.closed;
-    text("saveState",state.busy ? "正在确认设备保存结果…" : errors.length ? errors[0][1] : state.message || (dirty ? "有未保存修改" : "当前配置已应用"));
+    text("saveState",state.busy ? "正在确认设备保存结果…" : state.saveUncertain ? "保存结果待核实，请核对已应用配置；确认后可恢复已应用配置" : state.transportDown ? "设备连接中断，请检查热点连接" : errors.length ? errors[0][1] : state.message || (dirty ? "有未保存修改" : "当前配置已应用"));
     hint.textContent = bridgePending
       ? "先选择并测试一台功率计"
       : (dirty ? "实际输出继续使用已应用配置" : "关闭网页不影响当前输出");
@@ -1963,15 +2025,18 @@ input[aria-invalid=true] { border-color:var(--danger); }
     node.focus({preventScroll:true}); node.scrollIntoView({block:"center"});
   });
   $("restoreConfigBtn").addEventListener("click",async function() {
-    if (!state.loaded || state.busy || state.closed || !isDirty()) return;
+    if (!state.loaded || state.busy || state.closed || state.transportDown || (!isDirty() && !state.saveUncertain)) return;
     setBusy(true);
     try {
+      if (state.saveUncertain) { await load(true); if (state.closed) return; }
       var cancel = state.testCandidate || (state.bridge && state.bridge.temporary) || !$("scanModal").hidden;
       state.testCandidate = null;
       if (cancel && !await cancelTest()) return;
       if (state.closed) return;
+      state.saveUncertain = false;
       resetDraft(); state.message = "已恢复设备已应用配置"; renderAll();
-    } finally { setBusy(false); }
+    } catch(e) { if (e.transportError) connectionFailure(e); showToast(e.message); }
+    finally { setBusy(false); }
   });
   Object.keys(fields).forEach(function(id) {
     $(id).addEventListener("input",function() {
@@ -2072,13 +2137,13 @@ input[aria-invalid=true] { border-color:var(--danger); }
     });
   }
   async function save(close) {
-    if (!state.loaded || state.busy || state.closed || state.closeRequested) return;
+    if (!state.loaded || state.busy || state.closed || state.closeRequested || state.transportDown) return;
     if (close) {
       state.closeRequested = true;
       clearTimeout(state.activityTimer); state.activityTimer = 0; state.activityPending = false;
     }
     if (!close && (!validFields() || (state.draft.source === "bridge" && !bridgeReady()))) return;
-    setBusy(true); state.message = "";
+    setBusy(true); state.message = ""; state.saveUncertain = false;
     var transaction = 0, confirmedFailure = false;
     try {
       var body = close ? {revision:state.revision}:Object.assign(
@@ -2101,8 +2166,10 @@ input[aria-invalid=true] { border-color:var(--danger); }
       }
       throw new Error("设备尚未确认保存，请稍后核实结果");
     } catch (e) {
+      if (!confirmedFailure && (transaction || e.resultUnknown)) state.saveUncertain = true;
       var message = !confirmedFailure && (transaction || e.resultUnknown)
         ? "保存结果待核实，请核对设备配置：" + e.message:e.message;
+      if (e.transportError) connectionFailure(e);
       showToast(message);
       try { await load(true); } catch (_) {}
       state.message = message; updateDirty();
@@ -2165,6 +2232,7 @@ input[aria-invalid=true] { border-color:var(--danger); }
         $("profileBar").inert = false;
         await load(true,data);
         if (state.closed) return;
+        connectionRestored(); setBusy(false);
         $("renewBtn").disabled = false;
         clearInterval(pollTimer); clearInterval(memoryTimer);
         pollTimer = setInterval(poll,1000); memoryTimer = setInterval(refreshMemory,10000);
@@ -2193,7 +2261,7 @@ input[aria-invalid=true] { border-color:var(--danger); }
     }
   }
   async function refreshMemory() {
-    if (state.closed) return;
+    if (state.closed || state.transportDown) return;
     try {
       var memory = await api("mem_stats");
       $("heapValue").textContent = "当前 " + (memory.free / 1024).toFixed(1)
@@ -2203,13 +2271,19 @@ input[aria-invalid=true] { border-color:var(--danger); }
     }
   }
   async function poll() {
-    if (state.polling || state.closed || !state.loaded) return;
+    if (state.polling || state.closed || state.busy || (state.transportDown && performance.now() < state.retryAt)) return;
     state.polling = true;
+    var recovering = state.transportDown || !state.loaded;
     var version = state.leaseVersion, startedAt = performance.now();
     try {
+      if (recovering) {
+        await load(true);
+        if (state.closed) return;
+      }
       var o = await api("runtime");
       if (o.closing) { endSession(true,o.remaining_sec); return; }
       if (state.closed) return;
+      if (recovering) { connectionRestored(); setBusy(false); }
       state.output = o; state.bridge = o.bridge; state.bridgeRuntime = o.bridge_runtime;
       state.rawPower = o.bridge.raw_power;
       text("meterConnection",o.bridge.valid ? "数据有效":o.bridge.connected ? "等待数据":"未连接");
@@ -2261,15 +2335,19 @@ input[aria-invalid=true] { border-color:var(--danger); }
       if (o.closing) endSession(true,o.remaining_sec);
     } catch(e) {
       if (state.closed) return;
-      text("liveSubtitle","设备暂时不可达，最后数据已停止更新");
-      $("heroMetricValue").textContent = "—"; $("metricTwoValue").textContent = "—"; $("heartLiveValue").textContent = "—";
-      state.message = e.message; updateDirty();
+      connectionFailure(e);
     } finally { state.polling = false; }
   }
-  document.querySelector(".editor-pane").classList.add("is-busy");
-  load(false).then(function() { setBusy(false); refreshMemory(); poll(); }).catch(function(e) {
-    text("saveState",e.message + "；请刷新页面重试");
+  $("connectionRetryBtn").addEventListener("click",function() {
+    if (state.busy || state.polling || state.closeRequested || state.closeConfirmed) return;
+    state.retryAt = 0; state.retryFailures = 0; $("connectionRetryBtn").disabled = true;
+    if (state.closed) checkSession(); else poll();
   });
+  document.querySelector(".editor-pane").classList.add("is-busy");
+  state.polling = true;
+  load(false).then(function() { setBusy(false); refreshMemory(); }).catch(function(e) {
+    connectionFailure(e);
+  }).finally(function() { state.polling = false; poll(); });
   pollTimer = setInterval(poll,1000);
   setInterval(renderTimer,1000);
   memoryTimer = setInterval(refreshMemory,10000);

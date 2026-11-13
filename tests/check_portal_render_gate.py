@@ -20,6 +20,8 @@ def main():
                 ("test_portal_theme_browser.cjs" in web_checks, "双主题持久化浏览器门禁"),
                 ("test_portal_intensity_browser.cjs" in web_checks, "骑行强度浏览器门禁"),
                 ("test_portal_inputs_browser.cjs" in web_checks, "组合输入浏览器门禁"),
+                ("test_portal_transport_browser.cjs" in web_checks and "test_captive_redirect.py" in quality,
+                 "固定热点地址和网络恢复门禁"),
                 ("test_portal_recovery_browser.cjs" in web_checks, "草稿恢复与隐藏错误浏览器门禁"),
                 ("group.room-group.used" in inputs and "group.widths" in inputs
                  and "切换整体居中" in inputs, "按钮组占满、等宽与居中几何断言"),
