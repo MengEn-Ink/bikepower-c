@@ -7,6 +7,80 @@
   const MAX_FIRMWARE_BYTES = 4 * 1024 * 1024;
   const DIALOG_MODULE = new URL('./vendor/esp-web-tools-10.4.0/install-dialog-im156JnI.js', document.currentScript?.src || location.href).href;
   const JOURNAL_KEY = 'bikepower.flash.pending.v1';
+  const CACHE_TTL_MS = 10 * 60 * 1000;
+
+  async function verifyBytes(bytes, item) {
+    const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
+    if (bytes.length !== item.size || digest !== item.sha256.toLowerCase()) throw new Error('固件大小或 SHA256 校验失败；已阻止写入');
+  }
+  function preparationKey(item, version) {
+    if (!item || !Number.isInteger(item.size) || item.size <= 0 || item.size > MAX_FIRMWARE_BYTES || !/^[a-f0-9]{64}$/i.test(item.sha256)) throw new Error('固件大小或 SHA256 索引无效');
+    return JSON.stringify([siteURL(item.manifest), siteURL(item.download), version, item.size, item.sha256.toLowerCase()]);
+  }
+  function createPreparationCache(options = {}) {
+    let entry = null;
+    const emit = value => options.change?.({ key: value.key, name: value.name, text: value.text });
+    function status(item, version) {
+      try {
+        const key = preparationKey(item, version);
+        return entry && entry.key === key && (entry.name !== 'ready' || Date.now() - entry.at < CACHE_TTL_MS)
+          ? { key, name: entry.name, text: entry.text } : { key, name: 'idle', text: '固件尚未预下载' };
+      } catch (error) { return { name: 'failed', text: error.message }; }
+    }
+    function select(item, version, retry = false) {
+      const key = preparationKey(item, version);
+      if (entry && entry.key === key && !(entry.name === 'ready' && Date.now() - entry.at >= CACHE_TTL_MS) && !(retry && entry.name === 'failed')) return entry;
+      if (entry) entry.controller.abort();
+      const value = { key, controller: new AbortController(), listeners: new Set(), name: 'manifest', text: '后台准备安装清单；不会连接串口或写入设备。' };
+      entry = value;
+      const report = (name, text) => {
+        if (entry !== value) return;
+        value.name = name; value.text = text;
+        emit(value);
+        for (const listener of value.listeners) listener(name, text);
+      };
+      value.promise = prepare({ ...item }, version, value.controller.signal, report).then(prepared => {
+        if (value.controller.signal.aborted) throw new Error('预下载已取消');
+        value.prepared = prepared; value.at = Date.now();
+        report('ready', '固件已预下载并通过 SHA256 校验；连接串口后可直接进入安装确认。');
+        return prepared;
+      }).catch(error => {
+        value.prepared = null;
+        report('failed', '预下载未完成：' + error.message + '。点击刷写时可重试下载。');
+        throw error;
+      });
+      value.promise.catch(() => {});
+      return value;
+    }
+    function prefetch(item, version) {
+      let promise;
+      try { promise = select(item, version).promise.then(() => {}); }
+      catch (error) { promise = Promise.reject(error); }
+      promise.catch(() => {});
+      return promise;
+    }
+    async function get(item, version, signal, report = () => {}) {
+      if (signal.aborted) throw new Error('会话已取消');
+      const value = select(item, version, true);
+      const abort = () => value.controller.abort();
+      signal.addEventListener('abort', abort, { once: true });
+      value.listeners.add(report);
+      report(value.name === 'ready' ? 'verify' : value.name, value.name === 'ready' ? '复用已预下载固件；刷写前再次校验 SHA256，尚未写入。' : value.text);
+      try {
+        const prepared = await value.promise;
+        if (signal.aborted) throw new Error('会话已取消');
+        const bytes = prepared.bytes.slice();
+        await verifyBytes(bytes, item);
+        if (signal.aborted) throw new Error('会话已取消');
+        return { bytes, manifest: JSON.parse(JSON.stringify(prepared.manifest)) };
+      } finally {
+        value.listeners.delete(report);
+        signal.removeEventListener('abort', abort);
+      }
+    }
+    function clear() { if (entry) entry.controller.abort(); entry = null; }
+    return { prefetch, get, status, clear };
+  }
 
   async function fetchBytes(url, limit, signal, progress) {
     const controller = new AbortController();
@@ -54,7 +128,7 @@
     const manifestURL = siteURL(item.manifest);
     const binaryURL = siteURL(item.download);
     if (!Number.isInteger(item.size) || item.size <= 0 || item.size > MAX_FIRMWARE_BYTES || !/^[a-f0-9]{64}$/i.test(item.sha256)) throw new Error('固件大小或 SHA256 索引无效');
-    report('manifest', '串口已选择；正在下载安装清单，尚未打开串口或写入。');
+    report('manifest', '正在下载安装清单；尚未打开串口或写入。');
     const manifest = JSON.parse(new TextDecoder().decode(await fetchBytes(manifestURL, 65536, signal)));
     const build = Array.isArray(manifest.builds) && manifest.builds[0];
     const part = build && Array.isArray(build.parts) && build.parts[0];
@@ -63,14 +137,15 @@
     report('download', '正在下载固件：0 / ' + item.size + ' 字节；尚未写入。');
     const bytes = await fetchBytes(binaryURL, MAX_FIRMWARE_BYTES, signal, count => report('download', '正在下载固件：' + count + ' / ' + item.size + ' 字节；尚未写入。'));
     report('verify', '正在校验固件大小和 SHA256；尚未写入。');
-    const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
-    if (bytes.length !== item.size || digest !== item.sha256.toLowerCase()) throw new Error('固件大小或 SHA256 校验失败；已阻止写入');
+    await verifyBytes(bytes, item);
+    if (signal.aborted) throw new Error('会话已取消');
     return { manifest, bytes };
   }
 
   function createSession(options) {
     let active = null;
-    const notify = text => options.message(text);
+    let snapshot = { name: 'idle', text: '', busy: false, canCancel: false };
+    const notify = text => { snapshot = { ...snapshot, text }; options.message(text); };
     const journal = session => {
       try {
         session.record = JSON.stringify({ version: session.version, stage: session.stage, startedAt: session.startedAt });
@@ -84,7 +159,8 @@
       if (active !== session) return;
       session.stage = name;
       journal(session);
-      options.stage?.({ name, canCancel: ['manifest', 'download', 'verify', 'component'].includes(name) });
+      snapshot = { name, text, busy: true, version: session.version, canCancel: ['manifest', 'download', 'verify', 'component', 'ready'].includes(name) && !session.cleaning };
+      options.stage?.({ ...snapshot });
       notify(text);
     }
     async function settledOperation(session, operation, message) {
@@ -111,9 +187,12 @@
         if (session.release) session.release();
         clearJournal(session);
         active = null;
-        options.stage?.({ name: 'idle', canCancel: false });
+        const outcome = session.result || 'unknown';
+        const text = session.errorText || (outcome === 'success' ? '刷写完成，串口已释放。请等待设备启动，再点击连接蓝牙。' : outcome === 'failed' ? '刷写失败，串口已释放。请检查数据线、BOOT 和串口占用后主动重试。' : '安装弹窗已关闭，串口已释放；未确认刷写成功。需要时重新点击刷写。');
+        snapshot = { name: session.cancelled ? 'cancelled' : session.errorText ? 'failed' : outcome === 'success' ? 'complete' : outcome === 'failed' ? 'failed' : 'closed', text, busy: false, canCancel: false, version: session.version, outcome };
+        options.stage?.({ ...snapshot });
         options.busy(false);
-        notify(session.result === 'success' ? '刷写完成，串口已释放。请等待设备启动，再点击连接蓝牙。' : session.result === 'failed' ? '刷写失败，串口已释放。请检查数据线、BOOT 和串口占用后主动重试。' : '安装弹窗已关闭，串口已释放；未确认刷写成功。需要时重新点击刷写。');
+        notify(text);
         if (session.dialog && options.onDialogClose) options.onDialogClose({ outcome: session.result || 'unknown', version: session.version });
         return true;
       } catch (error) {
@@ -145,10 +224,11 @@
         session.disconnect = event => {
           if (event.target !== session.port && event.port !== session.port) return;
           session.controller.abort();
-          notify('开发板串口已断开；不要重试写入。等待安装弹窗返回/关闭后检查线材、供电和 BOOT。');
+          stage(session, 'disconnected', '开发板串口已断开；不要重试写入。等待安装弹窗返回/关闭后检查线材、供电和 BOOT。');
         };
         navigator.serial.addEventListener('disconnect', session.disconnect);
-        const prepared = await prepare(item, version, session.controller.signal, (name, text) => stage(session, name, text));
+        const report = (name, text) => stage(session, name === 'ready' ? 'verify' : name, '串口已选择；' + text);
+        const prepared = options.preparation ? await options.preparation.get(item, version, session.controller.signal, report) : await prepare(item, version, session.controller.signal, report);
         stage(session, 'component', '固件下载与 SHA256 校验通过；正在加载本站安装组件，尚未写入。');
         await options.loadDialog();
         if (session.controller.signal.aborted) throw new Error('会话已取消或设备已断开，未开始写入');
@@ -169,7 +249,8 @@
         dialog.addEventListener('closed', () => { void cleanup(session); }, { once: true });
         if (global.BikePowerFlashDialog) session.adapter = global.BikePowerFlashDialog.attach(dialog, {
           message: notify,
-          result: outcome => { session.result = outcome; },
+          result: outcome => { if (active === session) session.result = outcome; },
+          stage: state => { if (!session.cleaning && !session.controller.signal.aborted) stage(session, state.name, state.text); },
         });
         session.dialog = dialog;
         options.beforeInstall();
@@ -180,9 +261,9 @@
         }, SESSION_NOTICE_MS);
       } catch (error) {
         const cancelled = error.name === 'NotFoundError' && session.stage === 'picker';
+        session.errorText = session.cancelled ? '已取消准备，未开始写入。需要时重新选择串口。' : cancelled ? '已取消串口选择，未开始写入。需要时再次点击即可。' : '未开始写入：' + error.message + '。关闭占用串口的软件，检查网络/线材后主动重试。';
+        if (cancelled) session.cancelled = true;
         await cleanup(session);
-        if (active === session) return;
-        notify(session.cancelled ? '已取消准备，未开始写入。需要时重新选择串口。' : cancelled ? '已取消串口选择，未开始写入。需要时再次点击即可。' : '未开始写入：' + error.message + '。关闭占用串口的软件，检查网络/线材后主动重试。');
       }
     }
     function canCancel() { return !!active && ['manifest', 'download', 'verify', 'component'].includes(active.stage) && !active.cleaning; }
@@ -199,7 +280,7 @@
       } catch (_) {}
       return '';
     }
-    return { start, cancel, canCancel, recoveryNotice, isBusy: () => active !== null };
+    return { start, cancel, canCancel, recoveryNotice, isBusy: () => active !== null, getState: () => ({ ...snapshot, busy: active !== null }) };
   }
 
   let dialogReady;
@@ -217,5 +298,5 @@
     dialogReady.catch(() => { dialogReady = null; });
     return dialogReady;
   }
-  global.BikePowerFlash = { createSession, prepare, fetchBytes, loadDialog };
+  global.BikePowerFlash = { createSession, createPreparationCache, prepare, fetchBytes, loadDialog };
 })(window);

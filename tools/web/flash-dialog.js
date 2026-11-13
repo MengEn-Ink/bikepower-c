@@ -29,7 +29,13 @@
     return text;
   }
   function attach(host, options = {}) {
-    let stopped = false, timer = null, outcome = 'unknown', closing = false;
+    let stopped = false, timer = null, outcome = 'unknown', closing = false, lastStage = '';
+    function report(name, text, progress) {
+      const key = name + ':' + text;
+      if (key === lastStage) return;
+      lastStage = key;
+      options.stage?.({ name, text, progress });
+    }
     const observers = new Map();
     function stop() {
       stopped = true;
@@ -78,6 +84,20 @@
       const message = root.querySelector('ewt-page-message');
       const success = host.getAttribute('state') === 'INSTALL' && ['Installation complete!', '刷写完成'].includes(message?.label);
       const failed = host.getAttribute('state') === 'ERROR' || ['Installation failed', '刷写失败'].includes(heading);
+      const progress = root.querySelector('ewt-page-progress');
+      const label = typeof progress?.label === 'string' ? progress.label : progress?.shadowRoot?.textContent || '';
+      const percent = Number.isFinite(progress?.progress) ? Math.max(0, Math.min(100, Math.round(progress.progress))) : null;
+      if (failed) report('install-failed', '刷写失败；请关闭安装弹窗并等待串口释放后排障，不能重复点击刷写。');
+      else if (success) report('installed', '安装组件报告刷写完成；正在关闭弹窗并释放串口。');
+      else if (['Confirm Installation', '确认刷写', 'Erase User Data', '清除用户配置'].includes(heading)) report('confirm', '串口已连接、固件已校验。请在安装弹窗点击“确认刷写”；尚未写入。');
+      else if (host.getAttribute('state') === 'LOGS') report('logs', '串口日志会话进行中；关闭安装弹窗并释放串口后才能再次刷写。');
+      else if (progress) {
+        if (/Wrapping up|完成校验和重启/.test(label)) report('wrapping', '正在完成安装校验和重启，请勿拔线或关闭页面。');
+        else if (/Erasing|清除数据/.test(label)) report('erasing', '正在清除数据，请勿拔线或关闭页面。');
+        else if (/Preparing installation|连接芯片|Connecting|连接开发板/.test(label)) report('connecting', '正在连接芯片并准备刷写；请勿拔线。');
+        else if (percent !== null || /Installing|写入固件/.test(label)) report('writing', percent === null ? '正在写入固件，请勿拔线或关闭页面。' : '正在写入固件：' + percent + '%；请勿拔线或关闭页面。', percent);
+        else report('dialog', '安装组件正在处理；请查看安装弹窗，当前无法确认写入进度。');
+      } else report('dialog', '串口已连接、固件已校验。请在安装弹窗选择安装并确认刷写，不需再次选择串口。');
       if (failed) {
         outcome = 'failed'; clearTimeout(timer); timer = null;
         options.result?.(outcome);

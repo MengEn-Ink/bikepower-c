@@ -14,6 +14,7 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    let binaryRequests = 0;
     await page.route('**/*', async route => {
       const url = new URL(route.request().url());
       if (url.pathname.includes('/vendor/esp-web-tools-10.4.0/')) {
@@ -32,7 +33,7 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
       if (url.pathname.endsWith('/firmware/latest.json')) return route.fulfill({json:{schema_version:1,available:true,tag:'v4.2.1',version:'4.2.1',boards:{'generic-c3':item}}});
       if (url.pathname.endsWith('/firmware/releases.json')) return route.fulfill({json:{schema_version:1,releases:[{tag:'v4.2.1',version:'4.2.1',latest:true,boards:{'generic-c3':item}}]}});
       if (url.pathname.endsWith('/manifest.json')) return route.fulfill({ json: manifest });
-      if (url.pathname.endsWith('/bike.bin')) return route.fulfill({ body: bytes });
+      if (url.pathname.endsWith('/bike.bin')) { binaryRequests++; return route.fulfill({ body: bytes }); }
       if (url.pathname.endsWith('.json')) return route.fulfill({ json: { schema_version: 1, available: false } });
       if (url.pathname === '/bikepower-c/') return route.fulfill({ path: path.join(root, 'tools/web/ble-monitor.html'), contentType: 'text/html' });
       return route.fulfill({ status: 404, body: '' });
@@ -61,6 +62,9 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
     });
     await page.goto('https://example.test/bikepower-c/');
     await page.waitForFunction(() => document.getElementById('firmware-status').textContent.includes('可刷写'));
+    await page.waitForFunction(() => selectedPreparationStatus().name === 'ready');
+    assert.equal(binaryRequests, 1, 'page-open prefetch deduplicates catalog reloads');
+    assert.equal(await page.evaluate(() => serialCounts.picks), 0, 'prefetch never requests serial');
     await page.evaluate(async () => { await loadFirmwareCatalog(); });
     assert.equal(await page.locator('#install-unavailable').isVisible(),false,'catalog reload must keep safe launcher available without upstream button');
     assert.equal(await page.locator('#install-button [slot="unsupported"]').isVisible(),false);
@@ -84,10 +88,14 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
     assert.equal(await page.evaluate(() => serialCounts.opens), 0);
     let releaseDownload;
     await page.route('**/firmware/bike.bin', route => new Promise(resolve => { releaseDownload = async () => { await route.fulfill({body:bytes}); resolve(); }; }));
-    await page.evaluate(() => { window.cancelChooser = false; });
+    await page.evaluate(() => { window.cancelChooser = false; firmwarePreparation.clear(); openFlashGuide(); fgGo(3); });
     await page.locator('#flash-activate').click();
     await page.waitForFunction(() => document.getElementById('flash-message').dataset.stage === 'download');
     assert.match(await page.locator('#flash-message').textContent(), /正在下载固件/);
+    await page.evaluate(() => { fgGo(3); closeFlashGuide(true); openFlashGuide(); });
+    assert.equal(await page.evaluate(() => fgStep), 4, 'reopen and back navigation cannot regress active state');
+    assert.equal(await page.locator('#fg-root').getByText('连接串口并继续', { exact: false }).count(), 0);
+    await page.evaluate(() => closeFlashGuide(true));
     assert.equal(await page.locator('#flash-cancel').isVisible(), true);
     assert.equal(await page.evaluate(() => serialCounts.opens), 0);
     await page.reload();
@@ -99,9 +107,15 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
     await page.unroute('**/firmware/bike.bin');
     if (releaseDownload) await releaseDownload().catch(() => {});
     // Actual page + real upstream dashboard/erase/confirmation; no device writes before confirmation.
-    await page.evaluate(() => { window.cancelChooser = false; window.failInitialize = true; document.getElementById('flash-activate').click(); });
+    await page.waitForFunction(() => selectedPreparationStatus().name === 'ready');
+    const downloadsBeforeInstall = binaryRequests;
+    await page.evaluate(() => { openFlashGuide(); window.cancelChooser = false; window.failInitialize = true; document.getElementById('flash-activate').click(); });
     const dialog = page.locator('ewt-install-dialog');
     await dialog.getByText('安装 BikePower 固件', { exact: true }).waitFor();
+    assert.equal(binaryRequests, downloadsBeforeInstall, 'verified prefetch is reused at install');
+    await page.evaluate(() => { closeFlashGuide(true); openFlashGuide(); fgGo(3); });
+    assert.equal(await page.evaluate(() => fgStep), 4);
+    await page.evaluate(() => closeFlashGuide(true));
     await page.setViewportSize({width:704,height:874});
     assert.equal(await dialog.locator('ew-dialog').isVisible(), true, 'active serial dialog cannot be hidden by sidebar resize');
     assert.equal(await page.locator('#mode-flash').isVisible(), true);
@@ -110,6 +124,8 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
     await dialog.getByText('安装 BikePower 固件', { exact: true }).click();
     await dialog.getByText('下一步', { exact: true }).click();
     await dialog.locator('div[slot="headline"]').filter({ hasText: /^确认刷写$/ }).waitFor();
+    await page.waitForFunction(() => flashSession.getState().name === 'confirm');
+    assert.match(await page.locator('#flash-message').textContent(), /无需|尚未写入|确认刷写/);
     assert.equal(await page.evaluate(() => serialCounts.writes), 0);
     assert.equal(await page.evaluate(() => serialCounts.picks), 1); // after reload: no upstream duplicate chooser
     await dialog.locator('ew-text-button').filter({ hasText: /^\s*确认刷写\s*$/ }).click();
@@ -126,6 +142,10 @@ const manifest = { name: 'BikePower', version: '4.2.1', new_install_prompt_erase
     await page.waitForFunction(() => !flashSession.isBusy());
     assert.equal(await page.locator('#ob-success').count(), 0, 'failed session cannot report success on close');
     assert.match(await page.locator('#flash-message').textContent(), /刷写失败.*串口已释放/);
+    await page.evaluate(() => openFlashGuide());
+    assert.equal(await page.evaluate(() => fgStep), 4, 'failed outcome stays visible rather than resetting to chooser');
+    assert.match(await page.locator('#fg-body').textContent(), /刷写失败.*串口已释放/);
+    await page.evaluate(() => closeFlashGuide(true));
     assert.deepEqual(errors, []);
     // Recovery fallback: leaving this page destroys the owner; reload must not auto-select/reflash.
     await page.reload();

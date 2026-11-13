@@ -1712,6 +1712,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           <a class="btn alt hidden" id="firmware-download" href="#" download>下载固件</a>
         </div>
         <button class="btn hidden" id="flash-compact-back" type="button" onclick="closeCompactFlash()">返回使用首页</button>
+        <div class="hint" id="firmware-preparation" role="status" aria-live="polite" style="margin-top:8px" data-stage="idle">读取版本后将后台预下载固件；不会连接串口或自动刷写。</div>
         <div class="hint" id="flash-message" role="status" aria-live="polite">正在读取 Release 固件信息。</div>
         <button class="btn hidden" id="flash-cancel" type="button" onclick="flashSession&&flashSession.cancel()">取消准备（尚未写入）</button>
 
@@ -3003,6 +3004,22 @@ let firmwareReleases = [];
 let selectedFirmwareTag = null;
 let webInstallerReady = false;
 let flashSession = null;
+let firmwarePreparation = null;
+function selectedPreparationStatus(){
+  const rel=selectedFirmwareRelease(),board=$("firmware-board");
+  return firmwarePreparation&&rel&&board?firmwarePreparation.status(rel.boards[board.value],rel.version):{name:"idle",text:"固件尚未预下载"};
+}
+function renderFirmwarePreparation(){
+  const el=$("firmware-preparation");if(!el)return;
+  const state=selectedPreparationStatus();el.dataset.stage=state.name;el.textContent=state.text;
+  if(fgOpen&&!flashSession?.isBusy()&&fgStep===3)renderFlashGuide();
+}
+function prefetchSelectedFirmware(){
+  if(!firmwarePreparation||!webInstallerReady||/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))return;
+  const rel=selectedFirmwareRelease(),board=$("firmware-board");if(!rel||!board||!rel.boards[board.value])return;
+  void firmwarePreparation.prefetch(rel.boards[board.value],rel.version).catch(()=>{});
+  renderFirmwarePreparation();
+}
 let singleDevice = null;
 let compareDevices = [];
 let events = [];
@@ -4134,7 +4151,7 @@ function renderSelectedFirmware(){
   select.classList.toggle("hidden",boards.length<2);$("firmware-board-wrap").classList.toggle("hidden",boards.length<2);
   const board=select.value;
   const item=rel.boards[board];
-  setText("fw-pick-meta",formatPublishedDate(rel.published_at)+" 发布 · "+(item&&item.label||board)+" · "+formatBytes(item&&item.size)+" · SHA256 已校验");
+  setText("fw-pick-meta",formatPublishedDate(rel.published_at)+" 发布 · "+(item&&item.label||board)+" · "+formatBytes(item&&item.size)+" · 刷写前校验 SHA256");
   renderFirmwareChanges(rel);
   const notes=$("fw-notes");if(notes)notes.textContent=rel.notes_full||rel.notes||"该版本没有附带发布说明，可点击“固件详情”中的 Release 链接查看。";
   if(!item){setFirmwareStatus("板型固件缺失","err");setText("flash-message",rel.tag+" 未包含当前板型的完整固件与校验文件。");return;}
@@ -4158,7 +4175,7 @@ function renderSelectedFirmware(){
   }else if(!acked){
     $("install-unavailable").textContent="先勾选上方的回滚确认";
     setFirmwareStatus("待确认回滚","warn");
-    setText("flash-message","历史版本 "+rel.tag+" 已通过 SHA256 校验。勾选回滚确认后才能开始刷写。");
+    setText("flash-message","已选择历史版本 "+rel.tag+"。勾选回滚确认后才能开始刷写；下载文件将在刷写前校验。");
   }else{
     installer.classList.remove("hidden");$("install-unavailable").classList.add("hidden");
     setFirmwareStatus(isLatest?"可刷写 · 最新":"可回滚","ok");
@@ -4169,9 +4186,15 @@ function renderSelectedFirmware(){
     const link=$("firmware-release");link.href=rel.release_url;link.classList.remove("hidden");
     $("firmware-release-empty").classList.add("hidden");
   }
+  const recovery=flashSession&&flashSession.recoveryNotice();
+  const previous=flashSession?.getState();
+  if(recovery)setText("flash-message",recovery);
+  else if(previous&&!previous.busy&&previous.name!=="idle")setText("flash-message",previous.text);
   renderIdeStatus();
+  prefetchSelectedFirmware();
 }
 async function loadFirmwareCatalog(){
+  if(flashSession&&flashSession.isBusy())return;
   resetFirmwareDetails();
   webInstallerReady=!!window.BikePowerFlash&&window.isSecureContext&&!!navigator.serial;
   if(location.protocol==="file:"){
@@ -6848,7 +6871,10 @@ function isRollbackSelected(){const pick=$("fw-pick");return !!(pick&&pick.datas
 function rollbackAcked(){const a=$("fw-rollback-ack");return !!a&&a.checked;}
 function openFlashGuide(){
   if(typeof currentMode!=="undefined"&&currentMode!=="flash")switchMode("flash");
-  fgOpen=true;fgStep=0;fgPhase="connect";
+  fgOpen=true;
+  const state=flashSession?.getState();
+  fgStep=state&&(state.busy||state.name!=="idle")?(state.name==="complete"?5:4):0;
+  fgPhase=state?.name||"connect";
   renderFlashGuide();
   obPatch({flash:"in_progress"});
   if(obStore.status==="new")obPatch({status:"in_progress"});
@@ -6860,7 +6886,10 @@ function closeFlashGuide(silent){
 }
 function fgSetOs(os){fgOs=os;renderFlashGuide();}
 function fgSetPlugged(v){fgPlugged=v;renderFlashGuide();}
-function fgGo(step){fgStep=Math.max(0,Math.min(FG_STEPS.length-1,step));renderFlashGuide();}
+function fgGo(step){
+  const state=flashSession?.getState();
+  fgStep=state?.busy?4:Math.max(0,Math.min(FG_STEPS.length-1,step));renderFlashGuide();
+}
 function portExplainerHtml(){
   const c=FG_PORT_COPY[fgOs];
   const macRows=[
@@ -6893,8 +6922,12 @@ function portExplainerHtml(){
   h+='<div class="pe-nodata">看不到任何 USB 项？多半是“仅充电”数据线，换一根能传数据的线。</div>';
   return h;
 }
+function fgStateTitle(name){
+  const titles={picker:"选择开发板串口",lock:"串口已选择",manifest:"准备安装清单",download:"下载固件",verify:"校验固件",component:"准备安装组件",opening:"连接已选择的串口",dialog:"连接完成，待安装确认",confirm:"待确认刷写",connecting:"连接芯片",erasing:"正在清除数据",writing:"正在写入固件",wrapping:"完成校验与重启",installed:"刷写完成，正在释放串口",cleanup:"正在释放串口",blocked:"串口未释放",disconnected:"串口已断开",logs:"串口日志会话",'install-failed':"刷写失败，等待关闭弹窗",failed:"未完成刷写",cancelled:"已取消，未写入",closed:"会话已关闭"};
+  return titles[name]||"刷写状态";
+}
 function fgBodyHtml(){
-  const ver=selectedFirmwareLabel(),rollback=isRollbackSelected(),canStart=!rollback||rollbackAcked();
+  const ver=fgStep>=4&&flashSession?.getState().version||selectedFirmwareLabel(),rollback=isRollbackSelected(),canStart=!rollback||rollbackAcked();
   if(fgStep===0){
     return '<p>用 USB 线把开发板接到这台电脑。开发板上的指示灯亮起即表示已供电。</p>'
       +'<ul class="fg-list">'
@@ -6908,7 +6941,7 @@ function fgBodyHtml(){
       +'<dl class="fg-dl">'
       +'<div><dt>最新版</dt><dd>默认选项，修复最多，直接刷。</dd></div>'
       +'<div><dt>旧版本 = 回滚</dt><dd>会把设备降级；旧固件可能读不懂新配置，必须勾选页面上的“我了解风险”才能开始。</dd></div>'
-      +'<div><dt>清除设备数据 Erase</dt><dd>不勾：保留蓝牙名、功率等设置，升级推荐。勾选：清空后再写入，回滚或配置错乱时使用，刷完需重新设置。</dd></div></dl>'
+      +'<div><dt>清除设备数据 Erase</dt><dd>当前是从 0x0 写入的全量合并固件，不勾整片擦除也会覆盖配置与蓝牙绑定。刷前备份，刷完重新设置；不要把“不勾”当成保留配置升级。</dd></div></dl>'
       +'<div class="fg-state '+(rollback?(canStart?"warn":"bad"):"ok")+'">当前选择：'+(ver?"v"+escapeHtml(ver)+" · ":"")
       +(rollback?(canStart?"回滚，已确认风险":"回滚，尚未确认风险"):"最新版，可直接刷写")+'</div>';
   }
@@ -6917,20 +6950,18 @@ function fgBodyHtml(){
     const no=fgOs==="mac"?"cu.Bluetooth-Incoming-Port / cu.debug-console":"通信端口 (COM1) / 蓝牙链接上的标准串行";
     return '<p>点下方按钮后浏览器会弹出串口选择窗口。网页不能替你自动选择，这是浏览器的安全限制。</p>'
       +'<div class="fg-target"><div class="k">在弹窗里选择</div><div class="v">'+escapeHtml(target)+'</div><div class="x">不要选 '+escapeHtml(no)+'</div></div>'
-      +'<button type="button" class="btn primary" style="width:100%;height:44px;margin-top:11px;font-weight:800"'+(canStart?"":" disabled")+' onclick="fgActivate()">开始刷写'+(ver?" v"+escapeHtml(ver):"")+'（打开串口选择器）</button>'
+      +'<div class="fg-state" role="status">'+escapeHtml(selectedPreparationStatus().text)+'</div>'
+      +'<button type="button" class="btn primary" style="width:100%;height:44px;margin-top:11px;font-weight:800"'+(canStart?"":" disabled")+' onclick="fgActivate()">连接串口并继续'+(ver?" v"+escapeHtml(ver):"")+'</button>'
       +(canStart?"":'<div style="margin-top:6px;font-size:11.5px;color:var(--amber)">回滚需先在页面上勾选“我了解风险”。</div>')
       +'<div style="margin-top:8px;font-size:11.5px;color:var(--muted)">弹窗由浏览器提供，两种系统都请使用支持数据传输的 USB 线。</div>';
   }
   if(fgStep===4){
-    const idx=FG_PHASES.findIndex(p=>p.id===fgPhase);
-    return '<p role="status">'+escapeHtml($("flash-message").textContent)+'</p>'
+    const state=flashSession?.getState()||{name:"idle",text:$("flash-message").textContent};
+    const terminal=!state.busy;
+    return '<p role="status">'+escapeHtml(state.text||$("flash-message").textContent)+'</p>'
       +(flashSession&&flashSession.canCancel()?'<button type="button" class="btn" onclick="flashSession.cancel()">取消准备（尚未写入）</button>':"")
-      +'<p>当前是串口会话，不代表已开始写入。确认、进度、失败和完成以 ESP 安装弹窗为准，以下仅为状态说明：</p>'
-      +'<ol class="fg-phases">'+FG_PHASES.map((p,k)=>{
-        const st=fgFlashed||k<idx?"done":k===idx?"run":"wait";
-        return '<li class="'+st+'"><span class="idx">'+(st==="done"?"✓":st==="run"?"▸":k+1)+'</span><div><span class="fg-phase-zh">'+p.zh+'</span><span class="fg-phase-en">'+p.en+'</span><div class="fg-phase-desc">'+p.desc+'</div></div></li>';
-      }).join("")+'</ol>'
-      +'<div style="margin-top:8px;font-size:11.5px;color:var(--amber)">刷写期间不要拔线、刷新或切走页面。</div>';
+      +(terminal?'<div class="fg-state">'+escapeHtml(selectedPreparationStatus().text)+'</div><button type="button" class="btn primary" style="width:100%;height:44px;margin-top:12px" onclick="fgActivate()">重新连接串口并继续</button>':'<p class="fg-sub">'+(['dialog','confirm'].includes(state.name)?'无需再选串口，请在安装弹窗确认。':state.name==="picker"?'请在浏览器窗口选择开发板。':'状态来自实际会话与安装弹窗；没有进度时不显示虚构百分比。')+'</p>')
+      +'<div style="margin-top:8px;color:var(--amber)">写入期间不要拔线、刷新或关闭页面。</div>';
   }
   return '<p>'+(fgFlashed?(ver?"v"+escapeHtml(ver)+" 已写入并校验通过，开发板已重启。":"固件已写入并校验通过，开发板已重启。"):"刷写完成后，这里会带你用蓝牙连接开发板。")+'</p>'
     +'<ol class="fg-steps ob-steps">'
@@ -6945,10 +6976,11 @@ function renderFlashGuide(){
   if(!fgOpen)return;
   let root=document.getElementById("fg-root");
   if(!root){root=document.createElement("aside");root.id="fg-root";root.setAttribute("aria-label","刷写向导");document.body.appendChild(root);}
-  const seg=FG_STEPS.map((s,k)=>'<i class="'+(k===fgStep?"cur":k<fgStep?"done":"")+'" title="'+s.label+'"'+(k<=3?' onclick="fgGo('+k+')"':"")+'></i>').join("");
+  if(fgOpen&&flashSession?.isBusy())fgStep=4;
+  const seg=FG_STEPS.map((s,k)=>'<i class="'+(k===fgStep?"cur":k<fgStep?"done":"")+'" title="'+s.label+'"'+(k<=3&&!flashSession?.isBusy()?' onclick="fgGo('+k+')"':"")+'></i>').join("");
   root.innerHTML='<div class="fg-head"><div class="fg-head-row"><span class="fg-kicker">刷写向导 · '+(fgStep+1)+' / '+FG_STEPS.length+'</span>'
     +'<button type="button" class="fg-x" aria-label="关闭刷写向导" onclick="closeFlashGuide()">×</button></div>'
-    +'<h3 class="fg-title">'+FG_STEPS[fgStep].label+'</h3><div class="fg-segments">'+seg+'</div></div>'
+    +'<h3 class="fg-title">'+escapeHtml(fgStep===4?fgStateTitle(flashSession?.getState().name):FG_STEPS[fgStep].label)+'</h3><div class="fg-segments">'+seg+'</div></div>'
     +'<div class="fg-body" id="fg-body">'+fgBodyHtml()
     +'<details class="fg-errors"><summary>遇到问题？</summary>'
     +[["noPort","弹窗里看不到开发板"],["wrongPort","选错了串口"],["busy","提示串口被占用"],["flashFail","刷写中途失败"],["bleBusy","蓝牙连不上 / 被占用"]].map(([k,l])=>'<button type="button" class="fg-err-btn" onclick="showObError(\''+k+'\')">'+escapeHtml(l)+'<span>→</span></button>').join("")
@@ -6963,7 +6995,7 @@ function fgFooterHtml(){
   if(fgStep===1)return (fgStep>0?'<button type="button" class="btn ghost" onclick="fgGo(0)">上一步</button>':"")+'<button type="button" class="btn primary" style="margin-left:auto" onclick="fgGo(2)">认清了，下一步 →</button>';
   if(fgStep===2)return '<button type="button" class="btn ghost" onclick="fgGo(1)">上一步</button><button type="button" class="btn primary" style="margin-left:auto" onclick="fgGo(3)">版本确认，下一步 →</button>';
   if(fgStep===3)return '<span class="fg-hint">等待你选择串口</span>';
-  if(fgStep===4)return '<span class="fg-hint">以安装弹窗结果为准</span>';
+  if(fgStep===4)return '<span class="fg-hint">'+(flashSession?.isBusy()?"正在处理当前串口会话":"已保留本次会话结果")+'</span>';
   return '<span class="fg-hint">'+(fgFlashed?"完成":"")+'</span>';
 }
 function fgActivate(){
@@ -7090,21 +7122,25 @@ function initOnboarding(){
     },true);
   }
   if(window.BikePowerFlash){
+    firmwarePreparation=window.BikePowerFlash.createPreparationCache({change:renderFirmwarePreparation});
     flashSession=window.BikePowerFlash.createSession({
-      message:text=>{setText("flash-message",text);if(fgOpen&&fgStep===4)renderFlashGuide();},
+      preparation:firmwarePreparation,
+      message:text=>{setText("flash-message",text);if(fgOpen)renderFlashGuide();},
       stage:state=>{
         const el=$("flash-message");if(el)el.dataset.stage=state.name;
         const cancel=$("flash-cancel");if(cancel)cancel.classList.toggle("hidden",!state.canCancel);
+        fgPhase=state.name;
+        if(fgOpen){fgStep=state.name==="complete"?5:4;renderFlashGuide();}
       },
       busy:value=>{
         document.body.classList.toggle("flash-session-active",value);
         for(const id of ["flash-activate","firmware-board","fw-rollback-ack"]){const el=$(id);if(el)el.disabled=value;}
-        if(fgOpen){fgPhase=null;fgGo(value?4:3);}
+        if(fgOpen)renderFlashGuide();
       },
       beforeInstall:prepareForFlash,
       loadDialog:window.BikePowerFlash.loadDialog,
       onDialogClose:result=>{
-        if(result.outcome!=="success"){fgFlashed=false;if(fgOpen){fgPhase=null;fgGo(3);}return;}
+        if(result.outcome!=="success"){fgFlashed=false;if(fgOpen)renderFlashGuide();return;}
         fgFlashed=true;
         closeFlashGuide(true);
         showFlashSuccess();

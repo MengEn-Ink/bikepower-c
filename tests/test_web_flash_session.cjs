@@ -332,3 +332,94 @@ test('cross-tab Web Lock excludes other sessions and releases only after closed'
   assert.equal(held, false);
   h.dispose();
 });
+
+test('background prefetch deduplicates and reuses verified bytes without serial access', async () => {
+  const h = harness(); let requests = 0;
+  h.w.fetch = async url => { requests++; return new Response(url.endsWith('.json') ? JSON.stringify(manifest) : bytes); };
+  const cache = h.w.BikePowerFlash.createPreparationCache();
+  await Promise.all([cache.prefetch(item, '4.2.1'), cache.prefetch({ ...item }, '4.2.1')]);
+  assert.equal(requests, 2);
+  assert.equal(cache.status(item, '4.2.1').name, 'ready');
+  assert.equal(h.counts().picks, 0); assert.equal(h.counts().opens, 0);
+  h.options.preparation = cache;
+  await h.session.start(item, '4.2.1');
+  assert.equal(requests, 2);
+  assert.equal(h.counts().picks, 1);
+  assert.equal(h.session.getState().name, 'dialog');
+  assert.match(h.messages.join('\n'), /复用已预下载/);
+  await h.close();
+  assert.equal(h.session.getState().name, 'closed');
+  assert.match(h.session.getState().text, /未确认刷写成功/);
+  await h.session.start(item, '4.2.1');
+  const dialog = h.w.document.querySelector('ewt-install-dialog');
+  const m = JSON.parse(await h.blobs.get(dialog.manifestPath).text());
+  assert.ok(m.builds[0].parts[0].path.startsWith('blob:'));
+  assert.equal(requests, 2);
+  await h.close(); h.dispose();
+});
+
+test('failed prefetch is not an unhandled rejection or retry loop; manual start retries', async () => {
+  const h = harness(); let requests = 0;
+  h.w.fetch = async () => { requests++; throw new Error('offline'); };
+  const cache = h.w.BikePowerFlash.createPreparationCache();
+  await assert.rejects(cache.prefetch(item, '4.2.1'), /offline/);
+  await assert.rejects(cache.prefetch(item, '4.2.1'), /offline/);
+  assert.equal(requests, 1); assert.equal(h.counts().picks, 0);
+  assert.equal(cache.status(item, '4.2.1').name, 'failed');
+  h.w.fetch = async url => { requests++; return new Response(url.endsWith('.json') ? JSON.stringify(manifest) : bytes); };
+  h.options.preparation = cache;
+  await h.session.start(item, '4.2.1');
+  assert.equal(requests, 3); assert.equal(h.counts().opens, 1);
+  await h.close(); h.dispose();
+});
+
+test('manual start joins in-flight prefetch; cancel aborts the shared request without opening port', async () => {
+  const h = harness(); let requests = 0, aborted = false;
+  h.w.fetch = (url, options) => new Promise((resolve, reject) => {
+    requests++; options.signal.addEventListener('abort', () => { aborted = true; reject(new Error('aborted')); });
+  });
+  const cache = h.w.BikePowerFlash.createPreparationCache();
+  const preload = cache.prefetch(item, '4.2.1');
+  h.options.preparation = cache;
+  const start = h.session.start(item, '4.2.1');
+  await tick(); assert.equal(requests, 1);
+  await h.session.cancel(); await start; await assert.rejects(preload);
+  assert.equal(aborted, true); assert.equal(h.counts().opens, 0);
+  assert.equal(h.session.getState().name, 'cancelled');
+  h.dispose();
+});
+
+test('switching version cancels old prefetch and ignores stale feedback', async () => {
+  const h = harness(), changes = []; let aborted = false;
+  const newer = { ...item, manifest: 'firmware/new.json', download: 'firmware/new.bin' };
+  const m = structuredClone(manifest); m.version = '4.3.0'; m.builds[0].parts[0].path = 'new.bin';
+  h.w.fetch = (url, options) => {
+    if (url.endsWith('new.json')) return Promise.resolve(new Response(JSON.stringify(m)));
+    if (url.endsWith('new.bin')) return Promise.resolve(new Response(bytes));
+    return new Promise((resolve, reject) => options.signal.addEventListener('abort', () => { aborted = true; reject(new Error('aborted')); }));
+  };
+  const cache = h.w.BikePowerFlash.createPreparationCache({ change: value => changes.push(value) });
+  const old = cache.prefetch(item, '4.2.1');
+  await cache.prefetch(newer, '4.3.0'); await assert.rejects(old);
+  assert.equal(aborted, true); assert.equal(cache.status(newer, '4.3.0').name, 'ready');
+  assert.equal(cache.status(item, '4.2.1').name, 'idle');
+  assert.ok(!changes.slice(1).some(value => value.text.includes('aborted')));
+  h.dispose();
+});
+
+test('cache identity includes SHA and version; expiry causes fresh verification', async () => {
+  const h = harness(); let requests = 0;
+  h.w.fetch = async url => { requests++; return new Response(url.endsWith('.json') ? JSON.stringify(manifest) : bytes); };
+  const cache = h.w.BikePowerFlash.createPreparationCache();
+  await cache.prefetch(item, '4.2.1');
+  assert.equal(cache.status({ ...item, sha256: '0'.repeat(64) }, '4.2.1').name, 'idle');
+  assert.equal(cache.status(item, '4.3.0').name, 'idle');
+  const now = h.w.Date.now(); h.w.Date.now = () => now + 600001;
+  assert.equal(cache.status(item, '4.2.1').name, 'idle');
+  await cache.prefetch(item, '4.2.1'); assert.equal(requests, 4);
+  const prepared = await cache.get(item, '4.2.1', new AbortController().signal);
+  prepared.bytes[0] ^= 0xff; prepared.manifest.version = 'bad';
+  const again = await cache.get(item, '4.2.1', new AbortController().signal);
+  assert.deepEqual(Buffer.from(again.bytes), bytes); assert.equal(again.manifest.version, '4.2.1');
+  h.dispose();
+});
