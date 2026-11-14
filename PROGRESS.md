@@ -27,6 +27,8 @@
 - 台账 `tests/reports/device-acceptance-generic-c3.json`：P0 PASS=3（`serial_boot`、`soak_5min`、`ble_reconnect`）、FAIL=1（`ble_config_rw`）、NOT_RUN=1（`ble_cycling`）；P1 十项仍 NOT_RUN。
 - 耐久证据 `tests/logs/soak-8c09507-win.log`：10 轮 × 15 秒，扫描失败 0、连接失败 0、累计 CPS 通知 153，总判定通过。前置失败（`soak-21e2d83-mac.log` 等 10/10 扫描失败）根因为设备处于手机连接态停止广播，同时旧脚本用 `BikePower` 精确匹配；脚本已改为 `BP_` 前缀匹配。
 - 重连证据 `tests/logs/stage3-8c09507-win.log`：两轮独立扫描/连接/显式断开全通过，两轮同地址 `10:20:BA:CC:26:22`。
+- 复烧复核（HEAD `732350a`，`COM205`）：镜像 1,201,952B、SHA256 `75EF47B1…EB74C9`，内含 `BIKEPOWER_GIT_SHA=732350a`；Flash `0x10000` 回读与构建产物 SHA256 全等，烧写内容与源码一致。
+- 另一块板复测（`10:20:BA:CC:3A:EE`，广播名派生 `BP_3AEE`）：`soak_5min` 303 秒 9 轮、失败 0、CPS 通知 138 PASS；`ble_reconnect` 两轮独立扫描/连接/断开 PASS。`BP_2622` 板当前不在广播（未接入 USB），其本轮证据保留在此前小节。
 - 未闭合：`ble_cycling` 控制点写需加密链路，Windows 未配对（`Insufficient Authentication`）；`ble_config_rw` 末段"持久化后重新连接"仍 `Unreachable`，涉及设备重启的进一步排查未继续。
 - 中央侧现象备忘：清设备端 NVS 后 Windows 可枚举完整 8 服务，"缺服务/数值为 0"属中央缓存或连接类型选择问题，不是固件缺陷。
 

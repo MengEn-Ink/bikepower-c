@@ -9,6 +9,8 @@
 - `ble_reconnect` PASS：两轮独立扫描/连接/显式断开全部成功，两轮命中同一地址 `10:20:BA:CC:26:22`，日志 `tests/logs/stage3-8c09507-win.log`；串口状态机日志因 `CONFIG_LOG_DEFAULT_LEVEL_WARN=y` 未输出，未作为判据。
 - 前置失败归因：设备处于手机连接态时停止广播，扫描必然失败（`tests/logs/soak-21e2d83-mac.log` 10/10），叠加旧脚本 `BikePower` 精确匹配；脚本已统一为 `BP_` 前缀匹配。
 - 未闭合：`ble_cycling` 写 FTMS 控制点返回 `Insufficient Authentication`（Windows 未与该板配对）；`ble_config_rw` 末段持久化后重连仍 `Unreachable`。
+- 复核重烧（2026-11-14 晚）：以仓库 HEAD `732350a` 重新 reconfigure 构建并烧录 `COM205`，镜像 1,201,952B、SHA256 `75EF47B1F19657332292205DD819AFDC3ACE7D7ACBB40566E8CA6B0FAAEB74C9`（内含 `BIKEPOWER_GIT_SHA=732350a`）；Flash `0x10000` 回读与构建产物 SHA256 全等，确认烧写内容与源码一致。
+- 换成另一块板 `10:20:BA:CC:3A:EE` 复测：广播名按规则派生为 `BP_3AEE`（第二条板级证据），`soak_5min` 303 秒 9 轮、扫描/连接失败 0、累计 CPS 通知 138 通过；`ble_reconnect` 两轮独立扫描/连接/断开通过，两次均命中 `10:20:BA:CC:3A:EE`。
 
 ### NVS 清理后 GATT 恢复与配置 E2E 复测（2026-11-14）
 - 现象：Windows 侧对已配对过的设备出现 `Could not get GATT services: Unreachable`，此前一度只枚举到 1800/1801/180A 三个服务；mac 侧同地址也读不到服务，设备广播正常。
