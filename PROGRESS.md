@@ -1014,3 +1014,5 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 - `test/` 与 `tests/` 目录职责不同不合并（评估结论见 [tests/README.md](tests/README.md) 第六章）：`test/` 放 ESP-IDF 约定的 host 单测（纯 C），`tests/` 放所有 Python/Shell 设备测试与静态门禁
 - P0 协议与可靠性修复设计见 [归档规格](docs/archive/14-top5-protocol-stability-design.md)，历史优化清单见 [复审归档](docs/archive/19-project-review-and-optimization.md)。修复实现已完成，硬件和人工验收按当前镜像证据判定，不把自动化全绿等同于全部验收完成。
 - GitHub Release、Actions 和 Pages 已收敛为单一链路；v4.1.1 双板固件在线 SHA256 与 manifest 已自动复核，generic-c3 / m5stamp-c3 浏览器真机刷写仍待确认。
+- `tests/ble_config_e2e.py` 会在中途写入测试用覆盖名（如 `BP_E2E`）；一旦后续重连失败，恢复步骤跑不到，设备会停在测试名下，需 `esptool erase_flash` + 重烧出厂镜像恢复（2026-11-14 复现两次）。计划给该脚本加「失败兜底恢复」：异常分支用串口复位路径把原配置写回，未实现前不得把该脚本当无人值守用例。
+- Windows 中央独占链路：断开后设备停止广播且不自动恢复（需硬复位），本机 WinRT 无法闭合 `ble_config_rw` 的重连判据；LE-only 设备也不会出现在系统「添加设备」列表，配对需走应用内配对或代码侧 `pair()`（Just Works，无需输入）。
