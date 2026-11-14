@@ -14,6 +14,7 @@
 - 配对路径打通（`ble_cycling` 由 NOT_RUN 转 PASS）：固件为 `NO_INPUT_OUTPUT + SC + bonding + mitm=0`（Just Works），用 bleak `client.pair()` 可直接完成系统配对，无需人工输入；配对后 FTMS-CP `RequestControl/StartResume/SetTargetPower 200W` 全部返回成功，ERG 收敛 200W，Stop/Pause 正常。Windows「添加设备」列表不显示该设备属 LE-only + 系统缓存行为，不是广播缺陷（广播 flags=0x06、可连接、含 1818/1826/180d）。
 - 骑行自测判据修正：`tests/ble_selftest.py` 改为以**广播声明的服务集合**校核 GATT 一致性，并按当前掩码语义决定是否要求 CSC——掩码含「踏频随功率」时固件按兼容模式不注册 0x1816（踏频由 CPS 曲柄字段承载），此前脚本硬性要求五服务导致误判 FAIL；同时保留「广播声明但 GATT 缺失」即判失败的漂移检查。
 - `ble_config_rw` 在配对完成后仍 FAIL：断开后设备持续不广播（6 次有界重试全灭，直至硬复位才恢复），确认该边界为 Windows 中央独占链路，非固件缺陷；本机 WinRT 无法闭合，需换干净中央（macOS/Linux 主机或 Android 端）复验。
+- `ble_config_rw` 已在 macOS 干净中央复验 **PASS**：按发布资产重刷（SHA256 `2DEE4E28…6330C1F7`，esptool `Hash verified`）后跑 `tests/ble_config_e2e.py`，固件标识、八组全量读写、stale revision 拒绝、CANCEL 不落盘、不完整事务拒绝、非法值不污染、revision 改写、重连读取、重启后 NVS、GATT 重建、掩码触发断连重广播、恢复与恢复后持久化全部通过，**5 次重连均首次尝试成功**；自此 v4.4.2 真机 P0 达到 **5/5 PASS**（P1 十项仍 NOT_RUN，物理按钮/LED 未验证）。
 
 ### WiFi 热点名规则 BPW_XXXX（2026-11-14）
 - 配网热点从 `BikePower-XXXXXX`（AP MAC 后 3 字节）改为 `BPW_` + BT MAC 低 2 字节的 4 位大写 hex，与 BLE 名后缀同源：同一块板 `BP_3AEE` 对应热点 `BPW_3AEE`，用户可一眼对应设备。
