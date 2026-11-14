@@ -11,6 +11,9 @@
 - `ble_config_rw` 根因定位：八组读写与错误路径全 PASS，失败只在重连阶段。实测断开后 60 秒内未见广播、串口复位 2.1 秒即恢复；`test-report` 与台账据此记为 FAIL（Windows WinRT 断开后未释放链路 → 设备保持连接态停止广播），属既有 P2「Windows 断开后链路占用边界」，非固件缺陷。
 - 测试脚本增强：`tests/ble_config_e2e.py` 的重连与复位后连接改为 `connect_with_retry`（6 次 × 4 s 有界重试），不放宽任何通过判据；复位后重连实测仍失败，说明该边界未消失。
 - 烧录 merged bin 后 `stage3_conn_test.py` 复跑：第 1 轮连接/断开正常，第 2 轮 3 秒扫描窗口内未发现设备（等待约 15–20 秒后设备恢复广播），与上述根因一致。
+- 配对路径打通（`ble_cycling` 由 NOT_RUN 转 PASS）：固件为 `NO_INPUT_OUTPUT + SC + bonding + mitm=0`（Just Works），用 bleak `client.pair()` 可直接完成系统配对，无需人工输入；配对后 FTMS-CP `RequestControl/StartResume/SetTargetPower 200W` 全部返回成功，ERG 收敛 200W，Stop/Pause 正常。Windows「添加设备」列表不显示该设备属 LE-only + 系统缓存行为，不是广播缺陷（广播 flags=0x06、可连接、含 1818/1826/180d）。
+- 骑行自测判据修正：`tests/ble_selftest.py` 改为以**广播声明的服务集合**校核 GATT 一致性，并按当前掩码语义决定是否要求 CSC——掩码含「踏频随功率」时固件按兼容模式不注册 0x1816（踏频由 CPS 曲柄字段承载），此前脚本硬性要求五服务导致误判 FAIL；同时保留「广播声明但 GATT 缺失」即判失败的漂移检查。
+- `ble_config_rw` 在配对完成后仍 FAIL：断开后设备持续不广播（6 次有界重试全灭，直至硬复位才恢复），确认该边界为 Windows 中央独占链路，非固件缺陷；本机 WinRT 无法闭合，需换干净中央（macOS/Linux 主机或 Android 端）复验。
 
 ### WiFi 热点名规则 BPW_XXXX（2026-11-14）
 - 配网热点从 `BikePower-XXXXXX`（AP MAC 后 3 字节）改为 `BPW_` + BT MAC 低 2 字节的 4 位大写 hex，与 BLE 名后缀同源：同一块板 `BP_3AEE` 对应热点 `BPW_3AEE`，用户可一眼对应设备。

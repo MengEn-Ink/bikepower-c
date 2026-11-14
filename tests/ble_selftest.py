@@ -214,14 +214,20 @@ async def check_ftms_feature(client, found, expected_machine_mask, expected_targ
     return ok_machine and ok_target
 
 
-async def check_cycling_features(client, found):
-    """校验必需的只读能力值与 Measurement 的 Notify 属性。"""
+async def check_cycling_features(client, found, csc_expected=True):
+    """校验必需的只读能力值与 Measurement 的 Notify 属性。
+
+    CSC 是否注册由设备广播掩码决定（启用了「踏频随功率」时按兼容模式不注册 CSC，
+    踏频由 CPS 曲柄字段承载），因此仅在广播声明了 0x1816 时才要求 CSC 特征。
+    """
     ok = True
-    for uuid, expected in [
+    checks = [
         (CPS_FEATURE_UUID, bytes.fromhex("08001000")),
-        (CSC_FEATURE_UUID, bytes.fromhex("0200")),
         (SENSOR_LOCATION_UUID, bytes.fromhex("05")),
-    ]:
+    ]
+    if csc_expected:
+        checks.insert(1, (CSC_FEATURE_UUID, bytes.fromhex("0200")))
+    for uuid, expected in checks:
         try:
             characteristic = client.services.get_characteristic(uuid)
             properties = set(characteristic.properties) if characteristic else set()
@@ -234,7 +240,8 @@ async def check_cycling_features(client, found):
             valid = False
         print(f"  骑行 Feature {uuid}: {'通过' if valid else '失败'}")
         ok = valid and ok
-    for uuid in [CPS_UUID, CSC_UUID]:
+    notify_uuids = [CPS_UUID] + ([CSC_UUID] if csc_expected else [])
+    for uuid in notify_uuids:
         characteristic = client.services.get_characteristic(uuid)
         properties = set(characteristic.properties) if characteristic else set()
         ok = ("notify" in properties and "read" not in properties) and ok
@@ -541,26 +548,26 @@ async def check_dis(client, found):
     return dis_ok
 
 
+async def scan_device_and_adv(address):
+    """返回 (设备, 广播声明的 16bit 服务 UUID 集合)。广播集合是设备自身声明，用于校核 GATT。"""
+    ds = await BleakScanner.discover(timeout=10, return_adv=True)
+    for addr, (candidate, adv) in ds.items():
+        name = adv.local_name or candidate.name or ""
+        if (address and addr == address) or (not address and name.startswith(DEVICE_NAME)):
+            declared = {uuid[4:8].lower() for uuid in adv.service_uuids}
+            return candidate, declared
+    return None, set()
+
+
 async def main():
     print(f"扫描 {DEVICE_NAME} ...")
     address = os.environ.get("BIKEPOWER_BLE_ADDRESS", "")
-    if address:
-        dev = await BleakScanner.find_device_by_filter(
-            lambda candidate, _adv: candidate.address == address, timeout=10
-        )
-    else:
-        dev = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
-    if not dev and not address:
-        # 模糊匹配：设备名可能带后缀（如 BikePower23）
-        devices = await BleakScanner.discover(timeout=5)
-        for d in devices:
-            if d.name and d.name.startswith(DEVICE_NAME):
-                dev = d
-                break
+    dev, declared_services = await scan_device_and_adv(address)
     if not dev:
         print("未发现设备")
         return 1
     print(f"发现 {dev.name} {dev.address}，连接中...")
+    print(f"广播声明的服务: {sorted(declared_services) or '无'}")
     async with BleakClient(dev) as client:
         print("已连接")
         found = {c.uuid for s in client.services for c in s.characteristics}
@@ -576,25 +583,37 @@ async def main():
         if PROFILE == "running":
             return await run_running_profile(client, found)
 
+        # CSC 只在广播声明 0x1816 时要求；广播未带服务列表时按严格口径要求 CSC
+        csc_expected = ("1816" in declared_services) if declared_services else True
         services = [
             ("CPS", CPS_UUID),
             ("CPS-Feature", CPS_FEATURE_UUID),
             ("CPS-SensorLocation", SENSOR_LOCATION_UUID),
             ("HR", HR_UUID),
-            ("CSC", CSC_UUID),
-            ("CSC-Feature", CSC_FEATURE_UUID),
             ("FTMS-Bike", FTMS_BIKE_UUID),
             ("FTMS-CP", FTMS_CP_UUID),
         ]
+        if csc_expected:
+            services.insert(4, ("CSC", CSC_UUID))
+            services.insert(5, ("CSC-Feature", CSC_FEATURE_UUID))
         missing = []
         for label, uuid in services:
             present = uuid in found
             print(f"  特征 {label}: {'有' if present else '无'}")
             if not present:
                 missing.append(label)
+        # 广播声明与 GATT 必须一致，否则视为漂移
+        for short, uuid, label in [
+            ("1818", CPS_UUID, "CPS"),
+            ("180d", HR_UUID, "HR"),
+            ("1826", FTMS_BIKE_UUID, "FTMS"),
+            ("1816", CSC_UUID, "CSC"),
+        ]:
+            if short in declared_services and uuid not in found:
+                missing.append(f"{label}(广播声明但GATT缺失)")
 
         dis_ok = await check_dis(client, found)
-        cycling_features_ok = await check_cycling_features(client, found)
+        cycling_features_ok = await check_cycling_features(client, found, csc_expected)
         ftms_feature_ok = await check_ftms_feature(
             client,
             found,
