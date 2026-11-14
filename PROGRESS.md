@@ -13,6 +13,7 @@
 
 - [x] **BLE 设备名规则 `BP_XXXX`**：`BP_` + eFuse BT MAC 低 2 字节 4 位 hex 已实现并在实板验证（扫描 `BP_2622`，DIS `generic-c3-v4.4.2`，序列号 `BP-1020BACC2620`）；显式 `devname` 仍可覆盖。超过 100 块量产前需评估改 6 位或走生产写号。
 - [ ] **P0 当前镜像真实踩踏与 5 分钟实体耐久**：非零功率/踏频、断开重连、广播恢复与堆余量。
+- [ ] **P0 `ble_config_rw` 未闭合**：清除设备端 NVS 后 Windows 可稳定枚举 8 服务，八组读写、拒绝路径、revision 改写与恢复读取全 PASS；脚本末段"持久化后重新连接"仍报 `Could not get GATT services: Unreachable`，台账保持 FAIL（证据 `tests/logs/cfg-e2e-21e2d83-nvs-clear.log`）。
 - [ ] **P1 新页面真实热点验收**：iOS/Android 操作、BLE 连续通知及配网最低堆；本轮已发现通用板串口并完成原配置/Flash私有备份，当前候选手机热点验收仍待执行。
 - [ ] **P1 双下游 + 真实 CPS 上游 + WiFi 共存峰值**及手机/BINAVI 兼容矩阵。
 - [ ] **P1 Service Changed 实物验收**：未确认指示跨重启范围归零的软件缺陷已修复；绑定重连后的无线发送与确认仍未取得，不能记 PASS。见[恢复设计与验证](docs/dev/65-service-changed-reboot-recovery.md)。

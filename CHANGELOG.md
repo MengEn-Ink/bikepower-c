@@ -4,6 +4,13 @@
 
 ## [未发布]
 
+### NVS 清理后 GATT 恢复与配置 E2E 复测（2026-11-14）
+- 现象：Windows 侧对已配对过的设备出现 `Could not get GATT services: Unreachable`，此前一度只枚举到 1800/1801/180A 三个服务；mac 侧同地址也读不到服务，设备广播正常。
+- 处置：仅擦除 NVS 分区（`esptool erase_region 0x9000 0x6000`，保留 app 与镜像身份），清除设备端配对与 GATT 缓存记录后重新枚举。
+- 结果：同一镜像重连稳定返回 8 个服务（1800/1801/1818/180d/1826/180a/7a5a0000 配置/7a5a1000 遥测），证明固件 GATT 数据库完整，"缺服务"是两端中央缓存而非固件缺陷（`tests/logs/cfg-e2e-21e2d83-nvs-clear.log`）。
+- 配置 E2E 复测：八组全量读取 schema=14、stale revision 拒绝、CANCEL 不落盘、不完整事务拒绝、非法值不污染、八组改写后 revision 2、重连读回、恢复后读取全部 PASS。
+- 未闭合：脚本末段"持久化后重新连接"仍复现 `Unreachable`（两次独立会话一致），ble_config_rw 仍记 FAIL；设备重启相关实现未进一步改动，避免在未确认根因前变更固件行为。
+
 ### BLE 设备名规则 BP_XXXX（2026-11-14）
 - 出厂默认 BLE 名改为 `BP_` + eFuse BT MAC 低 2 字节的 4 位大写 hex：本机板 BT 地址 `10:20:BA:CC:26:22` → `BP_2622`（另一块 `…3A:EE` → `BP_3AEE`）。7 字符可完整进入主广播包，不再受 `BLE_ADV_NAME_MAX_LEN=11` 截断。
 - 优先级：显式 `devname`（配置服务/门户写入）> MAC 派生 > 常量兜底；派生只在名称为出厂默认或空名时发生，且只改内存不写 NVS，避免旧默认名残留在已烧录板。
