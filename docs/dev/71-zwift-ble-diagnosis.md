@@ -56,7 +56,13 @@
 
 也就是说 Windows 的 BLE 中央栈完全可用；Zwift 侧是在"用不用得上"这一层就断了，问题在客户端 DLL 与进程套间模型，不在平台。
 
-## 4. 可落地的处置路径（按成本排序）
+## 4. 两次会话一致 + 注入模块已排除
+
+- 17:46 那次会话（日志 `logfile_-1_2026-11-14_175721.txt.gz`，5388 行）在 `[17:46:47]` 出现与 15:48 完全相同的三条：两个 DLL 均 `errorCode=1114`，随后 `Native BLE unavailable, deferring scan`。说明不是偶发。
+- `ZwiftApp` 内确实被注入了 `aiep_sbox.dll` / `aiep_ipc.dll`（`D:\app\DoubaoWork\app\sbox\x64`），但**注入不是本案原因**：独立进程里先 `LoadLibrary(aiep_sbox.dll)` 成功、再 `LoadLibrary(BleWin10Lib.dll)` 仍然成功（脚本 `tests\logs\_probe_inject_then_ble.py`）。另外用 explorer 外壳与计划任务拉起 Zwift，注入依旧存在、1114 依旧出现，与是否经代理进程启动无关。
+- 结论收敛：MTA 套间由 **Zwift 自身**在加载 BLE 库的线程上建立，不是本机第三方注入造成，也不是 Windows 蓝牙栈故障。
+
+## 5. 可落地的处置路径（按成本排序）
 
 1. **先排除外部注入**：关闭 Discord/RTSS/手柄与键鼠厂商套件/杀软的游戏内注入，或干净启动（仅 Microsoft 服务）后重试 Zwift。任何先把进程 COM 设成 MTA 的注入模块都会放大这个问题。
 2. **重装 VC++ 运行库（x86 + x64）**：Zwift 官方论坛对 `BleWin10Lib.dll` 加载类故障（error 126）给出的标准修复；成本低，可先做。
@@ -64,7 +70,7 @@
 4. **绕过 Win32 BLE 库**：手机装 Zwift Companion，与 PC 同网，用 Companion 把手机的 BLE 传感器桥给 PC。这条路不依赖 Zwift 的 Win32 BLE 库，是目前最稳的可用方案；注意手机端另有一个"连上但数值 0"的问题待解。
 5. **ANT+ 路径**：Zwift PC 原生支持 ANT+，但本固件只做 BLE，需要额外 BLE→ANT+ 桥接硬件，优先级最低。
 
-## 5. 边界
+## 6. 边界
 
 - 未修改 `D:\app\Zwift` 下任何文件；上述第 3 条需用户确认来源后再动。
 - 未做干净启动验证（需要改系统服务与重启），属人工步骤。
