@@ -4,6 +4,25 @@
 
 ## [未发布]
 
+### Pages 连接失败引导补 Windows 实测解法（2026-11-14）
+- 背景：用旧板刷 v4.4.2 后 Windows 连接蓝牙失败，在“设置 → 蓝牙和设备 → 设备”删除该设备后重连即恢复（本机实测）。
+- `tools/web/ble-connection-help.js`：新增 `staleBond`（“系统或 App 里残留了旧设备”）分类，覆盖“能连上但读不到数据 / 立刻断开 / Unreachable”；`disconnected` 与 `generic` 补上“删除这台 `BP_xxxx` 后回 Pages 重新连接”的步骤；`pairingSteps` 设备名统一为 4 位命名。
+- `tools/web/ble-monitor.html`：手册「蓝牙连接异常分类与解决步骤」顶部新增“刷机后连不上的已知解法”，FAQ Q07 与 8 处设备名文案由 `BikePower` 改为 `BP_xxxx`。
+- `docs/user/02-user-manual.md`：新增“Windows 刷机后连不上的已知解法”与故障表行；`docs/dev/66-pages-connection-recovery.md` 增补第 16 类与判定边界（管理员清缓存、重启蓝牙服务不写进用户指引）。
+- 验证：`tests/check_ble_monitor.py` 全 PASS。
+
+### 测试脚本与工具链修整（2026-11-14）
+- `tests/ble_selftest.py`：`scan_device_and_adv` 改用 `BleakScanner.find_device_by_filter`，显式地址只做精确地址匹配、不名称回退、不触发全量 discover，广播声明服务集合同回调取得；`tests/test_ble_e2e_transport.py` 由报错恢复为 10/10 PASS。
+- `tests/ble_config_e2e.py`：恢复阶段失败时增加一次硬复位 + 有界重连后重试（最多两轮），降低“设备停在测试覆盖名 `BP_E2E`”的残留概率；仍失败时错误信息提示改用 `--address` 或 `erase_flash` 重烧。离线回归 `tests/test_ble_config_e2e.py` PASS。
+- `scripts/flash_latest.ps1`：修正第 70 行 `if (Test-Path $p -and -not $x)` 的参数解析错误（`-and` 被当作 `Test-Path` 参数），改为括号分组；`Parser::ParseFile` 语法解析通过。
+
+### Pages 手机售卖文案分享（本地）
+- 新增右上角分享入口与可编辑实体设备文案面板：真实商品资料、已装固件、实际功能、本件实测平台，详细/精简模板即时生成，手动编辑不被资料变化覆盖。
+- Clipboard写入/传统复制/长按选择降级与系统分享增强；导出前核对，取消不自动外发、不自动发布，不读取设备配置。保留模拟与真实测量、适配参考与实测、非官方认证、平台内交易及售后责任边界；不保证类目准入。
+- 离线手机手册同步，打包包含新增资源；模板5项、当前89Node、29浏览器专项、17打包、300常量检查通过。20浏览器入口分批均取得PASS，初轮蓝牙15/16分类FAIL及并行修复复验留痕；实体手机/真实分享/闲鱼发布未执行，见 `docs/dev/72-pages-listing-share.md`。
+- 本执行未提交/推送/部署，未改固件/BLE/WiFi/NVS/SDK；共享工作区其他操作的136f7c0已夹带部分分享入口，但JS/CSS/生成器仍未完整提交，不宣称线上完整可用。被并行生成覆盖的离线逻辑已恢复并复验。
+
+
 ### v4.4.2 正式发布（2026-11-14）
 - 发布形态：GitHub **正式 Release** `v4.4.2`（非 draft、非 pre-release），tag `v4.4.2` 指向 `9ada47c`，资产 4 个：`generic-c3-v4.4.2.bin` 1,267,456 B（SHA256 `6858F6F8874B93DCD2967336B9BA42C5979C52B70211B5EFB2FFCF51631D7996`）、`.bin.sha256`、`bikepower-c-v4.4.2.zip` 1,489,104 B、`.zip.sha256`。
 - 构建门禁：`release_build.py` 正式入口（带 `--evidence` / `--endurance`）全 PASS——merge、evidence-validate、endurance、docs、manifest、zip，总耗时 104.5s。

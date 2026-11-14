@@ -5,6 +5,13 @@
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
+## Pages 移动端售卖文案分享（本地实现）
+
+- 手机首页右上角新增分享图标，打开可编辑实体设备说明面板；成色/瑕疵/配件/已装版本、实际功能、本件实测平台、详细/精简即时生成，手动编辑保护与核对确认保持。
+- 同源本地模板、复制优先/系统分享增强；失败手动降级，取消不自动复制/发布。不读取设备配置，不带站外链接/配置隐私，非官方认证和模拟/真实来源边界明确；闲鱼类目及硬件认证准入仍须卖家核验。
+- 分享专项29组、模板5项、当前89Node、17打包、300常量检查和离线同步通过；20浏览器入口均分批取得PASS，初轮蓝牙分类15/16不一致FAIL保留，后由并行工作修复并复验。手机演示与生产配网页0像素差异；iOS/Android实物软键盘、真实分享目标和闲鱼发布NOT_RUN。
+- 本执行未提交/推送/部署；执行中共享工作区另有136f7c0提交，夹带部分分享入口/手册，但新增JS/CSS与生成器尚未完整提交，不能声称线上分享已完整上线。并行离线生成覆盖的分享逻辑已重新同步并通过29组最终复验。固件、BLE、NVS、SDK和版本不变。详见[方案与验证](docs/dev/72-pages-listing-share.md)。
+
 ## v4.4.2 正式版发布（2026-11-14）
 
 - 发布：GitHub Release `v4.4.2`（正式，非 pre-release），tag 指向 `9ada47c`；资产 `generic-c3-v4.4.2.bin` 1,267,456 B / SHA256 `6858F6F8874B93DCD2967336B9BA42C5979C52B70211B5EFB2FFCF51631D7996`、整包 ZIP 1,489,104 B 及两个 `.sha256`。预发布 `v4.4.2-rc1` 保留以便追溯。
@@ -1022,5 +1029,6 @@ Android/Chrome、iOS/macOS、Windows、Firefox、Kindle 共 10 个端点，统�
 - `test/` 与 `tests/` 目录职责不同不合并（评估结论见 [tests/README.md](tests/README.md) 第六章）：`test/` 放 ESP-IDF 约定的 host 单测（纯 C），`tests/` 放所有 Python/Shell 设备测试与静态门禁
 - P0 协议与可靠性修复设计见 [归档规格](docs/archive/14-top5-protocol-stability-design.md)，历史优化清单见 [复审归档](docs/archive/19-project-review-and-optimization.md)。修复实现已完成，硬件和人工验收按当前镜像证据判定，不把自动化全绿等同于全部验收完成。
 - GitHub Release、Actions 和 Pages 已收敛为单一链路；v4.1.1 双板固件在线 SHA256 与 manifest 已自动复核，generic-c3 / m5stamp-c3 浏览器真机刷写仍待确认。
-- `tests/ble_config_e2e.py` 会在中途写入测试用覆盖名（如 `BP_E2E`）；一旦后续重连失败，恢复步骤跑不到，设备会停在测试名下，需 `esptool erase_flash` + 重烧出厂镜像恢复（2026-11-14 复现两次）。计划给该脚本加「失败兜底恢复」：异常分支用串口复位路径把原配置写回，未实现前不得把该脚本当无人值守用例。
+- `tests/ble_config_e2e.py` 会在中途写入测试用覆盖名（如 `BP_E2E`）；一旦后续重连失败，可能停在测试名下（2026-11-14 复现两次）。已加部分兜底（2026-11-14）：恢复失败时做一次硬复位 + 有界重连后重试（最多两轮），仍失败则错误信息提示改用 `--address` 指定设备或 `erase_flash` 重烧；无人值守前仍建议带 `--address`。
 - Windows 中央独占链路：断开后设备停止广播且不自动恢复（需硬复位），本机 WinRT 无法闭合 `ble_config_rw` 的重连判据；LE-only 设备也不会出现在系统「添加设备」列表，配对需走应用内配对或代码侧 `pair()`（Just Works，无需输入）。
+- **Windows 刷机后连不上的用户解法（已实测并写进 Pages/手册）**：连接能建立但首个 GATT 读即 `Unreachable` 时，在“设置 → 蓝牙和设备 → 设备”删除这台 `BP_xxxx` 后回 Pages 重新扫描连接即恢复；只删目标设备，不清空全部配对、不整片擦除。页面落点 `tools/web/ble-connection-help.js`（`staleBond` 分类）、手册第 14 章顶部说明与 `docs/user/02-user-manual.md`。
