@@ -9,6 +9,7 @@
 - 实现：`main/bikepower_config.h` 新增 `WIFI_SSID_PREFIX "BPW_"` 与 `WIFI_SSID_FORMAT`；`main/radio_ctrl.c` 的 `build_softap_ssid()` 改用 `esp_read_mac(mac, ESP_MAC_BT)` 取样并套用 `WIFI_SSID_FORMAT`。
 - 同步更新用户文档、README、Pages 演示文案、`tests/README.md` 与 `tests/check_config_consistency.py` 断言（原断言固定要求 `BikePower` 前缀与 `"%s-%02X%02X%02X"` 格式）。
 - 边界：SSID 只在长按 + 二次确认进入配网模式后出现，需人工按键触发，本轮未取得热点实物证据。
+- 最终镜像复核：1,201,936B，SHA256 `65B6CD5039D2E4DB7CDCA76DE7513B86A1231816807FBCA77E8ABAF61481F225`，内含 `BIKEPOWER_GIT_SHA=8067dae`；Flash `0x10000` 回读与构建产物全等，镜像内可见 `BPW_` 前缀字符串。同一镜像上 `soak_5min` 321 秒 10 轮、CPS 通知 155、失败 0 PASS，`ble_reconnect` 两轮独立扫描/连接/断开 PASS。
 
 ### 当前镜像 5 分钟耐久与断开重连取证（2026-11-14）
 - `soak_5min` PASS：Windows 端 10 轮各 15 秒连接，扫描失败 0、连接失败 0、累计 CPS 通知 153，日志 `tests/logs/soak-8c09507-win.log`。
