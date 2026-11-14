@@ -294,7 +294,10 @@ typedef enum {
 #define LED_TICK_MS            20     // LED 任务节拍，累加判断闪烁相位
 
 // ===== WiFi AP 热点 =====
-#define WIFI_SSID_PREFIX       "BikePower"
+// 热点名规则：WIFI_SSID_PREFIX + BT MAC 低 2 字节的 4 位大写 hex，与 BLE 名后缀同源，
+// 例如 BLE 名 BP_3AEE 的板对应热点 BPW_3AEE，便于用户一眼对应同一台设备。
+#define WIFI_SSID_PREFIX       "BPW_"
+#define WIFI_SSID_FORMAT       WIFI_SSID_PREFIX "%02X%02X"
 #define WIFI_PASSWORD          "12345678"
 #define WIFI_AP_CHANNEL        1
 #define WIFI_PORT              80

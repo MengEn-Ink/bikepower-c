@@ -298,13 +298,13 @@ radio_ctrl_enter_wifi(engine)
 | `radio_ctrl_enter_wifi(engine)` | 进入 WiFi 配网（共存优先，BLE 不停） |
 | `radio_ctrl_exit_wifi()` | 退出配网：停 HTTP/DNS/SoftAP，回到 BLE |
 | `radio_ctrl_ble_suspended()` | BLE 是否被主动暂停（兜底停 BLE 时为 true） |
-| `radio_ctrl_start_wifi_ap()` | 启动 SoftAP（SSID = BikePower-XXXXXX，密码 12345678） |
+| `radio_ctrl_start_wifi_ap()` | 启动 SoftAP（SSID = BPW_XXXX，密码 12345678） |
 
 ### WiFi AP 配置
 
 | 宏 | 值 | 含义 |
 |----|-----|------|
-| `WIFI_SSID_PREFIX` | "BikePower" | SSID 前缀，实际追加 MAC 后 3 字节 |
+| `WIFI_SSID_PREFIX` | "BPW_" | SSID 前缀，实际追加 BT MAC 低 2 字节（与 BLE 名后缀同源） |
 | `WIFI_PASSWORD` | "12345678" | WPA2 密码 |
 | `WIFI_AP_CHANNEL` | 1 | 信道 |
 | `WIFI_PORT` | 80 | HTTP 端口 |

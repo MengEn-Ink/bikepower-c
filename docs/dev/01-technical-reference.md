@@ -759,7 +759,7 @@ SoftAP 启动时还会通过 DHCP 下发 `Domain-Name-Server = 192.168.4.1` 和 
 SoftAP 由 `radio_ctrl_start_wifi_ap()` 启动，HTTP 门户由 `wifi_portal_start()` 绑定到已经启动的 AP。
 关键配置来自 `bikepower_config.h`：
 
-- `WIFI_SSID_PREFIX = "BikePower"`，实际 SoftAP 名称由 `radio_ctrl` 追加 AP MAC 后 3 字节生成，例如 `BikePower-A1B2C3`
+- `WIFI_SSID_PREFIX = "BPW_"` + `WIFI_SSID_FORMAT`，SoftAP 名称由 `radio_ctrl` 用 BT MAC 低 2 字节生成，与 BLE 名后缀同源，例如 BLE `BP_3AEE` 对应热点 `BPW_3AEE`
 - `WIFI_PASSWORD = "12345678"`
 - `WIFI_AP_CHANNEL = 1`
 - `WIFI_PORT = 80`
@@ -1234,7 +1234,7 @@ LED 物理变化仍需人工肉眼确认。
 ### 12.5 WiFi 门户测试
 
 脚本为 `tests/stage5_portal_test.py`。
-前提是设备已进入配网模式并连接到 `BikePower-XXXXXX` 热点。
+前提是设备已进入配网模式并连接到 `BPW_XXXX` 热点。
 
 默认会检查：
 

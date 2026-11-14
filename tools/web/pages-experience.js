@@ -29,7 +29,7 @@
       }
       if (scene === "wifi" && t >= 3300) {
         state = "wifi";
-        text = "WiFi 热点已开启。手机连接 BikePower-XXXXXX，密码 12345678；保持无互联网连接，自动弹出或手动打开 http://192.168.4.1 进入配置页。";
+        text = "WiFi 热点已开启。手机连接 BPW_XXXX，密码 12345678；保持无互联网连接，自动弹出或手动打开 http://192.168.4.1 进入配置页。";
       }
       if (scene === "cancel" && t >= 5300) {
         state = "ble";

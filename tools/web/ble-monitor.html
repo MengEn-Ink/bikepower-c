@@ -2040,7 +2040,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <div class="toc-foot">
           <b>基础信息</b>
           蓝牙名称：BikePower<br>
-          WiFi 热点：BikePower-XXXXXX<br>
+          WiFi 热点：BPW_XXXX<br>
           密码：12345678<br>
           配网地址：192.168.4.1
         </div>
@@ -2269,7 +2269,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
               <li><p><b>长按</b>按钮至少 <code>2s</code> 后松开。</p></li>
               <li><p>看到 LED 进入<b>快闪</b>确认状态。</p></li>
               <li><p>在确认窗口内<b>再按一次</b>按钮。</p></li>
-              <li><p>手机连接热点 <code>BikePower-XXXXXX</code>，密码 <code>12345678</code>。</p></li>
+              <li><p>手机连接热点 <code>BPW_XXXX</code>，密码 <code>12345678</code>。</p></li>
               <li><p>连接热点后，使用手机<b>自动弹出的配置窗口</b>；未弹出时，再打开浏览器访问 <code>http://192.168.4.1</code>。</p></li>
               <li><p>修改配置后点击「<b>保存并应用</b>」；切换运动类型时显示「<b>保存并切换到跑步 / 骑行</b>」。等待保存成功提示。</p></li>
               <li><p>不再修改时点击「<b>关闭 WiFi</b>」并确认；先保存草稿，关闭操作不会提交未保存的修改。</p></li>
@@ -2474,7 +2474,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
               <li><p>在同一个设备配网页完成<b>所有修改</b>。</p></li>
               <li><p>点击保存，等待设备确认落盘。失败时保留草稿，修正输入或重新读取后重试。</p></li>
               <li><p>保存成功后点击「<b>关闭 WiFi</b>」并确认，或等待倒计时结束；需要更多时间时主动续期。</p></li>
-              <li><p>手机会断开 <code>BikePower-XXXXXX</code> 热点，设备回到日常 BLE 使用状态。</p></li>
+              <li><p>手机会断开 <code>BPW_XXXX</code> 热点，设备回到日常 BLE 使用状态。</p></li>
             </ol>
             <div class="m-callout warn"><b>如果只关闭浏览器或直接断电</b>，最后一次未保存的修改<b>可能不会保留</b>。</div>
           </div>
@@ -2499,7 +2499,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
               </details>
               <details>
                 <summary><span class="q">Q02</span><span style="flex:1">进不了 WiFi 配网页</span><span class="plus"></span></summary>
-                <div class="a">确认已经完成两步按钮操作：长按超过 <code>2s</code>，松开后再按一次确认。然后连接 <code>BikePower-XXXXXX</code> 热点，手动访问 <code>192.168.4.1</code>。</div>
+                <div class="a">确认已经完成两步按钮操作：长按超过 <code>2s</code>，松开后再按一次确认。然后连接 <code>BPW_XXXX</code> 热点，手动访问 <code>192.168.4.1</code>。</div>
               </details>
               <details>
                 <summary><span class="q">Q03</span><span style="flex:1">手机提示无互联网</span><span class="plus"></span></summary>
@@ -2542,7 +2542,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           <div class="ch-body">
             <div class="m-tldr">
               <div><div class="n">01</div><div class="k">上电连接</div><div class="b">给设备通电，等待 LED 慢闪，在骑行 App 内搜索并连接 BikePower。</div></div>
-              <div><div class="n">02</div><div class="k">长按进配网</div><div class="b">长按按钮超过 2 秒松开，看到快闪后再按一次，手机连接 BikePower-XXXXXX 热点并访问 192.168.4.1。</div></div>
+              <div><div class="n">02</div><div class="k">长按进配网</div><div class="b">长按按钮超过 2 秒松开，看到快闪后再按一次，手机连接 BPW_XXXX 热点并访问 192.168.4.1。</div></div>
               <div><div class="n">03</div><div class="k">修改保存</div><div class="b">在设备配网页修改参数，点击「保存并应用」，等待成功回显。</div></div>
               <div><div class="n">04</div><div class="k">关闭热点</div><div class="b">先保存成功，再点击「关闭 WiFi」并确认，回到日常 BLE 使用。</div></div>
             </div>
@@ -4918,7 +4918,7 @@ const MANUAL_META = {
   "ch01":{num:1,title:"烧录或更新固件",kicker:"FIRMWARE",points:["只支持桌面 Chrome / Edge + HTTPS","USB 线必须支持数据传输，不能是纯充电线","设备内 OTA 已永久放弃，统一走网页烧录"]},
   "ch02":{num:2,title:"上电后连接骑行 App",kicker:"CONNECT",points:["默认蓝牙名称 BikePower","App 支持多种设备类型时按功率计 / 心率计搜索","LED 慢闪 = 广播中 · 常亮 = 已连接"]},
   "ch03":{num:3,title:"按钮日常操作",kicker:"BUTTON",points:["短按 = 功率 −1 步进（默认 20 W）","按住 0.5 s 后持续加功率","长按 ≥2 s 松开 → 二次按键 → 进入 WiFi 配网"]},
-  "ch04":{num:4,title:"进入 WiFi 配网页",kicker:"WIFI",points:["长按 2s → 松开 → 窗口内再按一次 → 开热点","热点 SSID = BikePower-XXXXXX · 密码 = 12345678","手机提示「无互联网」是正常现象"]},
+  "ch04":{num:4,title:"进入 WiFi 配网页",kicker:"WIFI",points:["长按 2s → 松开 → 窗口内再按一次 → 开热点","热点 SSID = BPW_XXXX · 密码 = 12345678","手机提示「无互联网」是正常现象"]},
   "ch05":{num:5,title:"设备配网 · 骑行模式",kicker:"CYCLING",points:["固定模式与配速机器人互斥","配速机器人按体重 + W/kg 换算","保存成功后核对实时输出"]},
   "ch06":{num:6,title:"设备配网 · 跑步模式",kicker:"RUNNING",points:["固定速度或配速机器人","未保存的运动切换隐藏旧实时值","支持开始 / 暂停 / 重置，不支持远程设速度"]},
   "ch07":{num:7,title:"设备配网 · 用户资料",kicker:"PROFILE",points:["体重影响配速机器人功率换算","FTP 用于功率区间与心率模型","阈值心率用于心率强度"]},

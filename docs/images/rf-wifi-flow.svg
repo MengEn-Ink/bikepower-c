@@ -8,7 +8,7 @@
     <text x="400" y="145" text-anchor="middle">↓ radio_ctrl_enter_wifi</text>
     <rect x="30" y="164" width="740" height="100" rx="8" fill="#e8f5e9" stroke="#388e3c"/>
     <text x="50" y="196">BLE 保持在线；启动 SoftAP、HTTP 与 Captive Portal</text>
-    <text x="50" y="225">BikePower-XXXXXX · 密码 12345678 · http://192.168.4.1</text>
+    <text x="50" y="225">BPW_XXXX · 密码 12345678 · http://192.168.4.1</text>
     <text x="50" y="250">配置保存经主任务事务与 NVS；默认 300 秒，仅主动续期延长</text>
     <text x="400" y="290" text-anchor="middle">↓ 关闭事务成功 / 超时 → done 回调 → APP_EVT_WIFI_DONE</text>
     <rect x="30" y="311" width="740" height="60" rx="8" fill="#e3f2fd" stroke="#1976d2"/>

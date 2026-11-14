@@ -44,7 +44,7 @@
 1. `DT-9`：让设备进入配网模式
 - 长按至少 2 秒
 - 确认窗口内再次按下
-2. `DT-10`：连上热点 `BikePower-XXXXXX`
+2. `DT-10`：连上热点 `BPW_XXXX`
 - 密码 `12345678`
 3. `DT-11`：运行门户自测
 - `python3 tests/stage5_portal_test.py`

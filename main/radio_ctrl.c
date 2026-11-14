@@ -15,6 +15,7 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_system.h"
+#include "esp_mac.h"
 #include "esp_task_wdt.h"
 #include "lwip/ip4_addr.h"
 #include "freertos/FreeRTOS.h"
@@ -41,17 +42,16 @@ static void radio_ctrl_stop_wifi_ap(void);
 static esp_err_t build_softap_ssid(char *ap_ssid, size_t ap_ssid_size)
 {
     uint8_t mac[6] = { 0 };
-    esp_err_t ret = esp_wifi_get_mac(WIFI_IF_AP, mac);
+    // 与 BLE 名同源：取 BT MAC 低 2 字节，保证 BP_XXXX 与 BPW_XXXX 后缀一致。
+    esp_err_t ret = esp_read_mac(mac, ESP_MAC_BT);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "读取 SoftAP MAC 失败 ret=%d", ret);
+        ESP_LOGE(TAG, "读取 BT MAC 失败 ret=%d", ret);
         return ret;
     }
 
     int written = snprintf(ap_ssid,
                            ap_ssid_size,
-                           "%s-%02X%02X%02X",
-                           WIFI_SSID_PREFIX,
-                           mac[3],
+                           WIFI_SSID_FORMAT,
                            mac[4],
                            mac[5]);
     if (written < 0 || (size_t)written >= ap_ssid_size) {

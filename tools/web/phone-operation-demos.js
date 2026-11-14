@@ -191,7 +191,7 @@
     host.querySelector(".operation-tabs").innerHTML = `<button type="button" data-operation-tab="button" aria-pressed="true">设备操作</button><button type="button" data-operation-tab="phone" aria-pressed="false">手机操作</button>`;
     const panel = document.createElement("section");
     panel.dataset.operationPanel = "phone"; panel.className = "hidden";
-    panel.innerHTML = `<p class="phone-entry-note">实际使用前，先长按 + 二次确认开启设备热点，手机连接 BikePower-XXXXXX（密码 12345678），再打开 http://192.168.4.1。下方是配置页模拟演示，不会连接或修改你的设备。</p><div class="phone-scenes" role="group" aria-label="选择手机操作">${["save", "bridge", "running", "cycling", "device"].map((name, i) =>
+    panel.innerHTML = `<p class="phone-entry-note">实际使用前，先长按 + 二次确认开启设备热点，手机连接 BPW_XXXX（密码 12345678），再打开 http://192.168.4.1。下方是配置页模拟演示，不会连接或修改你的设备。</p><div class="phone-scenes" role="group" aria-label="选择手机操作">${["save", "bridge", "running", "cycling", "device"].map((name, i) =>
       `<button type="button" class="btn" data-phone-select="${name}" aria-pressed="${!i}">${scenes[name].title}</button>`).join("")}</div><div data-phone-suite></div>`;
     host.append(panel);
     mountGuide(panel.querySelector("[data-phone-suite]"), "save");

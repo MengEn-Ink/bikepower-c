@@ -248,18 +248,18 @@ check('#include "esp_random.h"' in app_main_src
       and "domain_rng_seed(esp_random())" in app_main_src,
       "app_main.c 必须用 ESP32 硬件随机数播种领域 RNG，避免每次启动重复同一骑行轨迹")
 
-# WIFI_SSID_PREFIX 与 DEVICE_NAME 关系（AP 名沿用设备名前缀，运行时追加 MAC 后缀）
+# WIFI_SSID_PREFIX 与 BLE 名同源（热点名后缀 = BLE 名后缀，运行时按 BT MAC 派生）
 wifi_ssid_prefix = extract_define(config_src, "WIFI_SSID_PREFIX")
-check(wifi_ssid_prefix == "BikePower",
-      f"WIFI_SSID_PREFIX = BikePower (实际={wifi_ssid_prefix})")
+check(wifi_ssid_prefix == "BPW_",
+      f"WIFI_SSID_PREFIX = BPW_ (实际={wifi_ssid_prefix})")
 check(extract_define(config_src, "WIFI_SSID") is None,
       "不再定义固定 WIFI_SSID，避免手机 Captive Portal 缓存同名热点")
-check("esp_wifi_get_mac(WIFI_IF_AP" in radio_ctrl_src,
-      "radio_ctrl.c 使用 SoftAP MAC 生成热点后缀")
-check('"%s-%02X%02X%02X"' in radio_ctrl_src,
-      "radio_ctrl.c 按 BikePower-XXXXXX 规则格式化热点名")
-check("WIFI_SSID_PREFIX" in radio_ctrl_src and "ap_ssid" in radio_ctrl_src,
-      "radio_ctrl.c 使用 WIFI_SSID_PREFIX 生成实际 SSID")
+check("esp_read_mac(mac, ESP_MAC_BT)" in radio_ctrl_src,
+      "radio_ctrl.c 用 BT MAC 派生热点后缀，与 BLE 名后缀同源")
+check('WIFI_SSID_FORMAT' in radio_ctrl_src,
+      "radio_ctrl.c 按 WIFI_SSID_FORMAT（BPW_XXXX）格式化热点名")
+check(("WIFI_SSID_FORMAT" in radio_ctrl_src or "WIFI_SSID_PREFIX" in radio_ctrl_src) and "ap_ssid" in radio_ctrl_src,
+      "radio_ctrl.c 使用 WIFI_SSID_FORMAT/PREFIX 生成实际 SSID")
 check("ap_cfg.ap.ssid_len = strlen(ap_ssid)" in radio_ctrl_src,
       "radio_ctrl.c 的 ssid_len 使用实际 SSID 长度")
 check("ssid=%s" in radio_ctrl_src and "ap_ssid" in radio_ctrl_src,

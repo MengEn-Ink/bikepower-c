@@ -4,6 +4,12 @@
 
 ## [未发布]
 
+### WiFi 热点名规则 BPW_XXXX（2026-11-14）
+- 配网热点从 `BikePower-XXXXXX`（AP MAC 后 3 字节）改为 `BPW_` + BT MAC 低 2 字节的 4 位大写 hex，与 BLE 名后缀同源：同一块板 `BP_3AEE` 对应热点 `BPW_3AEE`，用户可一眼对应设备。
+- 实现：`main/bikepower_config.h` 新增 `WIFI_SSID_PREFIX "BPW_"` 与 `WIFI_SSID_FORMAT`；`main/radio_ctrl.c` 的 `build_softap_ssid()` 改用 `esp_read_mac(mac, ESP_MAC_BT)` 取样并套用 `WIFI_SSID_FORMAT`。
+- 同步更新用户文档、README、Pages 演示文案、`tests/README.md` 与 `tests/check_config_consistency.py` 断言（原断言固定要求 `BikePower` 前缀与 `"%s-%02X%02X%02X"` 格式）。
+- 边界：SSID 只在长按 + 二次确认进入配网模式后出现，需人工按键触发，本轮未取得热点实物证据。
+
 ### 当前镜像 5 分钟耐久与断开重连取证（2026-11-14）
 - `soak_5min` PASS：Windows 端 10 轮各 15 秒连接，扫描失败 0、连接失败 0、累计 CPS 通知 153，日志 `tests/logs/soak-8c09507-win.log`。
 - `ble_reconnect` PASS：两轮独立扫描/连接/显式断开全部成功，两轮命中同一地址 `10:20:BA:CC:26:22`，日志 `tests/logs/stage3-8c09507-win.log`；串口状态机日志因 `CONFIG_LOG_DEFAULT_LEVEL_WARN=y` 未输出，未作为判据。

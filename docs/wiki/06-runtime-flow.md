@@ -253,7 +253,7 @@
        │    ├─ radio_ctrl_start_wifi_ap()             │
        │    │    ├─ esp_netif（AP 模式，192.168.4.1）│
        │    │    ├─ DHCP Option 114（Captive Portal）│
-       │    │    ├─ SoftAP: BikePower-XXXXXX          │
+       │    │    ├─ SoftAP: BPW_XXXX          │
        │    │    │  密码 12345678，信道 1，WPA2      │
        │    │    └─ coex 共存（BLE 不停）              │
        │    ├─ captive_portal_start_dns()（UDP 53）  │

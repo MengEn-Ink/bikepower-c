@@ -11,7 +11,7 @@
 
 完整工程优先级、依赖、工作量与验收标准见 [main 卫生与升级评审](docs/dev/69-main-hygiene-and-upgrade-review.md)；本轮自动推进状态见[自动工程改进](docs/dev/70-automated-engineering-followups.md)。JSON与NimBLE适配边界、测试信号/依赖诊断已实现；门户余量改善但10%目标未闭合。SDK5.5.6与coredump栈仅隔离验证，生产仍5.5.4/1024；下方硬件事项不因软件通过而关闭。
 
-- [x] **BLE 设备名规则 `BP_XXXX`**：`BP_` + eFuse BT MAC 低 2 字节 4 位 hex 已实现并在实板验证（扫描 `BP_2622`，DIS `generic-c3-v4.4.2`，序列号 `BP-1020BACC2620`）；显式 `devname` 仍可覆盖。超过 100 块量产前需评估改 6 位或走生产写号。
+- [x] **设备命名规则 `BP_XXXX` / 热点 `BPW_XXXX`**：BLE 名 `BP_` + BT MAC 低 2 字节 4 位 hex（实板 `BP_2622`、`BP_3AEE`）；配网热点同源改为 `BPW_` + 同一 4 位（`BPW_3AEE`），两者后缀一致便于对应同一设备。显式 `devname` 仍可覆盖 BLE 名。热点仅在长按 + 二次确认后出现，SSID 实物证据需人工按键触发。超过 100 块量产前需评估改 6 位或走生产写号。
 - [x] **P0 当前镜像 5 分钟实体耐久与断开重连**（2026-11-14，Windows 侧）：`soak_5min` PASS，10 轮各 15 秒连接，扫描/连接失败 0，累计 CPS 通知 153，总判定通过；`ble_reconnect` PASS，两次独立扫描/连接/显式断开全部成功且两轮命中同一地址。串口状态机日志因 `CONFIG_LOG_DEFAULT_LEVEL_WARN=y` 未输出，未作为判据。
 - [ ] **P0 `ble_cycling` 未取得**：CPS/HR/FTMS 服务与数据正常（模拟模式 240W 量级），但 FTMS 控制点写 `RequestControl` 被拒 `Insufficient Authentication`——设备端绑定在清 NVS 时已清空，Windows 侧尚未与该板配对。需先在 Windows 蓝牙设置里配对 `BP_2622`，再复跑 `tests/ble_selftest.py --profile cycling`。
 - [ ] **P0 `ble_config_rw` 未闭合**：清除设备端 NVS 后 Windows 可稳定枚举 8 服务，八组读写、拒绝路径、revision 改写与恢复读取全 PASS；脚本末段"持久化后重新连接"仍报 `Could not get GATT services: Unreachable`，台账保持 FAIL（证据 `tests/logs/cfg-e2e-21e2d83-nvs-clear.log`）。

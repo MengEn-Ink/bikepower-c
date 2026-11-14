@@ -337,7 +337,7 @@ python3 tests/ble_selftest.py
 
 [stage5_portal_test.py](../../tests/stage5_portal_test.py) 在设备进入配网模式后验证：
 
-1. 连接 BikePower 热点
+1. 连接 BPW_XXXX 热点（与 BLE 名 BP_XXXX 后缀一致）
 2. 访问首页、验证内联 HTML
 3. 测试 `/api/state`、`/api/time`、`/api/renew`、`/api/mem_stats`
 4. POST 配置并验证保存和实时生效

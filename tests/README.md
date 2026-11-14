@@ -532,19 +532,19 @@ idf.py build -DPORTAL_TEST_AUTO_CONFIG=ON
 
 ## 五、常见问题
 
-### Q1：nmcli 连接 BikePower-XXXXXX 报"缺少属性"
+### Q1：nmcli 连接 BPW_XXXX 报"缺少属性"
 
 使用 `nmcli connection add` 显式创建连接而非 `nmcli device wifi connect`：
 
 ```bash
 nmcli connection add type wifi ifname wlp1s0 con-name BikePowerTest \
-  802-11-wireless.ssid "BikePower-A1B2C3" \
+  802-11-wireless.ssid "BPW_A1B2" \
   802-11-wireless-security.key-mgmt wpa-psk \
   802-11-wireless-security.psk "12345678"
 nmcli connection up BikePowerTest ifname wlp1s0
 ```
 
-上面的 `BikePower-A1B2C3` 只是示例，实际 SSID 以后缀不同为准。
+上面的 `BPW_A1B2` 只是示例，实际 SSID 后缀与 BLE 名后缀一致（同一块板为 BP_XXXX / BPW_XXXX）。
 
 ### Q2：串口权限拒绝
 
