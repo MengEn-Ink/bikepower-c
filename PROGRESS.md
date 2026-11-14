@@ -1,9 +1,17 @@
 # BikePower C — 项目进度
 
 > 当前行为：[技术参考](docs/dev/01-technical-reference.md)；早期重写背景见 [归档](docs/archive/01-cidf-nimble-rewrite.md)
-> 当前固件版本：v4.4.2（已发 **pre-release** `v4.4.2-rc1`，正式版待 P0 剩余两项闭合；C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v4.4.2（已发 **正式版** `v4.4.2`（tag `9ada47c`，P0 5/5 PASS、P1 十项 NOT_RUN）；C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
+
+## v4.4.2 正式版发布（2026-11-14）
+
+- 发布：GitHub Release `v4.4.2`（正式，非 pre-release），tag 指向 `9ada47c`；资产 `generic-c3-v4.4.2.bin` 1,267,456 B / SHA256 `6858F6F8874B93DCD2967336B9BA42C5979C52B70211B5EFB2FFCF51631D7996`、整包 ZIP 1,489,104 B 及两个 `.sha256`。预发布 `v4.4.2-rc1` 保留以便追溯。
+- 门禁：正式入口全 PASS（merge / evidence-validate / endurance / docs / manifest / zip，104.5s）；另有 `sdkconfig.diag.defaults`（未 tracked、被 `dev_workflow.py` 引用的本地诊断预设）以 `.git/info/exclude` 规避 dirty 误伤，文件本身未改动、未提交。
+- 真机 P0 5/5 PASS；证据采集于同源码线预发布镜像（`2DEE4E28…`），正式镜像重编译后复跑配置 E2E（`cfg-e2e-mac-formal.log`，含 GATT 重建与 5 次重连）、命名 `BP_xxxx` 与烧写校验，全部通过。
+- 未闭合（如实记录）：Windows 本机对 `BP_3AEE` 的中央链路——清缓存设备（提权 `pnputil`，8 节点归零）并重启蓝牙服务后，仍表现为连接成功、首个 GATT 读 `Unreachable`；同板刷回预发布镜像结果一致（A/B 对照），属本机栈状态而非构建回归。ERG 复跑需在干净的已绑定中央重做。
+- 待办不变：P1 十项 NOT_RUN；物理按钮/LED、`BPW_xxxx` 热点实物需人工按键；`ble_config_e2e.py` 失败兜底恢复未实现。
 
 ## 当前待办（唯一状态入口）
 

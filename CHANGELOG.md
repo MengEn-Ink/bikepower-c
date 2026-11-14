@@ -4,6 +4,15 @@
 
 ## [未发布]
 
+### v4.4.2 正式发布（2026-11-14）
+- 发布形态：GitHub **正式 Release** `v4.4.2`（非 draft、非 pre-release），tag `v4.4.2` 指向 `9ada47c`，资产 4 个：`generic-c3-v4.4.2.bin` 1,267,456 B（SHA256 `6858F6F8874B93DCD2967336B9BA42C5979C52B70211B5EFB2FFCF51631D7996`）、`.bin.sha256`、`bikepower-c-v4.4.2.zip` 1,489,104 B、`.zip.sha256`。
+- 构建门禁：`release_build.py` 正式入口（带 `--evidence` / `--endurance`）全 PASS——merge、evidence-validate、endurance、docs、manifest、zip，总耗时 104.5s。
+- 真机 P0 5/5 PASS：`serial_boot`、`ble_config_rw`、`ble_cycling`、`ble_reconnect`、`soak_5min`；P1 十项与物理按钮/LED、配网热点实物仍 NOT_RUN，未计入通过。
+- 证据口径（如实记录）：P0 五项在 v4.4.2 源码线的预发布镜像（SHA256 `2DEE4E28…6330C1F7`）上采集；正式镜像为同一源码线重新编译（非 bit-exact 复现，差异来自构建期元数据），已对正式镜像重跑配置 E2E / GATT 重建 / 重连 / 广播命名（`BP_4D5A`、`BP_3AEE`）并全部通过，日志 `tests/logs/cfg-e2e-mac-formal.log`。
+- 正式镜像烧写复核：mac `/dev/cu.usbmodem2101` 与 Windows `COM205` 均 `erase_flash` + 写 0x0 + `Hash of data verified`，复位后广播名 `BP_xxxx` 生效（`10:20:BA:CC:3A:EE` 广播 `BP_3AEE`，rssi −38 ~ −50）。
+- Windows 中央复验受阻（未完成项，如实记录）：清除缓存设备（提权 `pnputil /remove-device`，8 个 `BTHLEDEVICE` 节点归零）并重启 `BTAGService`/`bthserv` 后，连接仍成功但首个 GATT 读即 `Could not read characteristic handle 45: Unreachable`。**A/B 对照**：同一块板刷回预发布镜像（`2DEE4E28…`）表现完全相同，证明与正式构建无关，属本机蓝牙栈对该设备的链路状态问题；因此 `ble_cycling` 的 ERG 复跑未在正式镜像上重新取得，HW 侧改用 mac 侧正式镜像的配置 E2E 与 GATT 重建作为回归证据。
+- 发布副作用：tag push 触发 Pages「Deploy BLE Monitor and Web Flasher」由 release 触发（run 43605432415）。
+
 ### v4.4.2 预发布（2026-11-14）
 - 发布形态：GitHub **pre-release** `v4.4.2-rc1`，tag 指向 `2eeddf8`，资产含 merged bin、`.sha256`、整包 ZIP、`manifest.txt`、`test-report.md`、`user-manual.md`。
 - 镜像：`generic-c3-v4.4.2.bin` 1,267,472 B，SHA256 `2DEE4E282093EB7971688218940E46B850EAF9B29109393E3F0DBD5F6330C1F7`；已用 esptool 写入 `COM205` 0x0，烧写校验通过，复位后广播 `BP_3AEE`（rssi −41）。
