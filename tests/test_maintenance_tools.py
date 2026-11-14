@@ -19,6 +19,18 @@ def load(name):
     return module
 
 
+def symlink_supported():
+    """Windows 非开发者模式无符号链接权限，探测一次供子用例跳过。"""
+    with tempfile.TemporaryDirectory() as temp:
+        target = Path(temp) / "target.txt"
+        target.write_text("x", encoding="utf-8")
+        try:
+            (Path(temp) / "alias.txt").symlink_to(target)
+        except (OSError, NotImplementedError):
+            return False
+    return True
+
+
 class MaintenanceToolsTest(unittest.TestCase):
     def test_quality_options_preserve_default_full_gate(self):
         # 旧入口在导入时执行构建；仅载入声明以验证新 CLI 参数的纯解析契约。
@@ -90,12 +102,15 @@ class MaintenanceToolsTest(unittest.TestCase):
             for name, content in originals.items():
                 (web / name).write_text(content, encoding='utf-8')
             alias = root / 'alias.h'
-            alias.symlink_to(web / 'index.html')
+            if symlink_supported():
+                alias.symlink_to(web / 'index.html')
             hardlink = root / 'hardlink.h'
             os.link(web / 'app.css', hardlink)
             outputs = [web / name for name in originals] + [alias, hardlink, root / 'wrong.html']
             for output in outputs:
                 with self.subTest(output=output.name):
+                    if output == alias and not alias.is_symlink():
+                        self.skipTest("当前系统不允许创建符号链接（Windows 需开发者模式或管理员）")
                     for name, content in originals.items():
                         (web / name).write_text(content, encoding='utf-8')
                     result = subprocess.run([sys.executable, str(ROOT / 'scripts/inline_static.py'),
