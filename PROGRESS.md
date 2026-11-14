@@ -1,7 +1,7 @@
 # BikePower C — 项目进度
 
 > 当前行为：[技术参考](docs/dev/01-technical-reference.md)；早期重写背景见 [归档](docs/archive/01-cidf-nimble-rewrite.md)
-> 当前固件版本：v4.4.2（源码候选，未正式发布；C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
+> 当前固件版本：v4.4.2（已发 **pre-release** `v4.4.2-rc1`，正式版待 P0 剩余两项闭合；C + ESP-IDF v5.5.4 + NimBLE，ESP32-C3）
 > 主仓库：[github.com/MengEn-Ink/bikepower-c](https://github.com/MengEn-Ink/bikepower-c)
 > 发布与部署：GitHub Release + GitHub Actions + GitHub Pages（唯一链路）
 
@@ -18,7 +18,7 @@
 - [ ] **P1 新页面真实热点验收**：iOS/Android 操作、BLE 连续通知及配网最低堆；本轮已发现通用板串口并完成原配置/Flash私有备份，当前候选手机热点验收仍待执行。
 - [ ] **P1 双下游 + 真实 CPS 上游 + WiFi 共存峰值**及手机/BINAVI 兼容矩阵。
 - [ ] **P1 Service Changed 实物验收**：未确认指示跨重启范围归零的软件缺陷已修复；绑定重连后的无线发送与确认仍未取得，不能记 PASS。见[恢复设计与验证](docs/dev/65-service-changed-reboot-recovery.md)。
-- [ ] **P2 Windows 断开后链路占用边界、M5 实物 LED/按键、保留 NVS 与绑定升级演练**。
+- [ ] **P2 Windows 断开后链路占用边界、M5 实物 LED/按键、保留 NVS 与绑定升级演练**。已定位：Windows WinRT 断开后不立即释放链路，设备保持连接态停止广播（实测 60 秒内无广播、串口复位 2.1 秒恢复；烧录 merged bin 后 `stage3_conn_test.py` 第 2 轮 3 秒窗口未发现设备，约 15–20 秒后恢复）。这是 `ble_config_rw` 记 FAIL 的唯一原因。
 - [ ] **P2 双槽 NVS 实物故障验证**：断电与满分区。跨键原子提交的软件修复已完成，不再列为待实现缺陷。
 
 ## v4.4.2 当前镜像 BLE 实体验收（2026-11-14 晚）

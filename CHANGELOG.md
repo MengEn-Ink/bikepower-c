@@ -4,6 +4,14 @@
 
 ## [未发布]
 
+### v4.4.2 预发布（2026-11-14）
+- 发布形态：GitHub **pre-release** `v4.4.2-rc1`，tag 指向 `2eeddf8`，资产含 merged bin、`.sha256`、整包 ZIP、`manifest.txt`、`test-report.md`、`user-manual.md`。
+- 镜像：`generic-c3-v4.4.2.bin` 1,267,472 B，SHA256 `2DEE4E282093EB7971688218940E46B850EAF9B29109393E3F0DBD5F6330C1F7`；已用 esptool 写入 `COM205` 0x0，烧写校验通过，复位后广播 `BP_3AEE`（rssi −41）。
+- 门禁状态如实记录：P0 PASS 3（`serial_boot`/`soak_5min`/`ble_reconnect`）、FAIL 1（`ble_config_rw`）、NOT_RUN 1（`ble_cycling`）；P1 十项 NOT_RUN。正式版仍需等这两项闭合。
+- `ble_config_rw` 根因定位：八组读写与错误路径全 PASS，失败只在重连阶段。实测断开后 60 秒内未见广播、串口复位 2.1 秒即恢复；`test-report` 与台账据此记为 FAIL（Windows WinRT 断开后未释放链路 → 设备保持连接态停止广播），属既有 P2「Windows 断开后链路占用边界」，非固件缺陷。
+- 测试脚本增强：`tests/ble_config_e2e.py` 的重连与复位后连接改为 `connect_with_retry`（6 次 × 4 s 有界重试），不放宽任何通过判据；复位后重连实测仍失败，说明该边界未消失。
+- 烧录 merged bin 后 `stage3_conn_test.py` 复跑：第 1 轮连接/断开正常，第 2 轮 3 秒扫描窗口内未发现设备（等待约 15–20 秒后设备恢复广播），与上述根因一致。
+
 ### WiFi 热点名规则 BPW_XXXX（2026-11-14）
 - 配网热点从 `BikePower-XXXXXX`（AP MAC 后 3 字节）改为 `BPW_` + BT MAC 低 2 字节的 4 位大写 hex，与 BLE 名后缀同源：同一块板 `BP_3AEE` 对应热点 `BPW_3AEE`，用户可一眼对应设备。
 - 实现：`main/bikepower_config.h` 新增 `WIFI_SSID_PREFIX "BPW_"` 与 `WIFI_SSID_FORMAT`；`main/radio_ctrl.c` 的 `build_softap_ssid()` 改用 `esp_read_mac(mac, ESP_MAC_BT)` 取样并套用 `WIFI_SSID_FORMAT`。
