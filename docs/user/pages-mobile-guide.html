@@ -2000,6 +2000,43 @@ body{font-family:var(--sans);line-height:1.65}
   .operation-demos .demo-metric{width:125px}.operation-demos .demo-stage{gap:4px}
   .demo-sequence li{font-size:11px}.demo-countdown{font-size:11px}
 }
+/* 与现有 Pages 色板一致的移动端售卖文案面板。 */
+.mg-bar .listing-share-trigger{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;flex:0 0 44px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--strong);cursor:pointer}
+.listing-share-trigger svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.listing-share-trigger:hover{background:var(--panel-2)}
+.listing-share-trigger:focus-visible,.listing-dialog button:focus-visible,.listing-dialog input:focus-visible,.listing-dialog select:focus-visible,.listing-dialog textarea:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.mg-bar-right{min-width:0;flex-shrink:0}.mg-brand{min-width:0}.mg-bar .theme-btn{width:44px;height:44px}
+@media(max-width:440px){.mg-bar .mg-chip{display:none}}
+.listing-dialog{box-sizing:border-box;position:fixed;inset:auto 0 0;margin:0 auto;width:100%;max-width:640px;max-height:92vh;max-height:92dvh;border:1px solid var(--line);border-bottom:0;border-radius:16px 16px 0 0;padding:0;background:var(--bg);color:var(--ink);overflow:auto;overscroll-behavior:contain;font:14px/1.75 var(--sans);box-shadow:0 -8px 40px #00000020}
+.listing-dialog:not([open]){display:none}
+.listing-dialog::backdrop{background:#0008}
+.listing-dialog *{box-sizing:border-box;min-width:0}
+.listing-head{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);background:var(--bg)}
+.listing-head h2{margin:0;font-size:20px;line-height:1.3;color:var(--strong)}
+.listing-dialog button{min-height:44px;font:600 14px/1.5 var(--sans);padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);color:var(--strong);cursor:pointer}
+.listing-dialog button:disabled{cursor:not-allowed;opacity:.55}
+.listing-content{padding:16px 20px 20px;overflow-wrap:anywhere}
+.listing-content p{margin:0 0 16px;font-size:14px}
+.listing-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.listing-field{display:flex;flex-direction:column;gap:6px;color:var(--strong);font-size:14px}
+.listing-dialog input:not([type=checkbox]),.listing-dialog select,.listing-dialog textarea{display:block;width:100%;padding:11px 12px;font:16px/1.6 var(--sans);border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--strong)}
+.listing-dialog textarea{resize:vertical;white-space:pre-wrap;overflow-wrap:anywhere}
+.listing-dialog fieldset{padding:0;border:0;margin:18px 0}
+.listing-dialog legend{padding:0;margin-bottom:8px;color:var(--strong);font-weight:600;font-size:14px}
+.listing-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px}
+.listing-choices label,.listing-check{display:flex;gap:8px;align-items:center;min-height:44px;font-size:14px;cursor:pointer}
+.listing-dialog input[type=checkbox]{width:18px;height:18px;flex:0 0 18px;accent-color:var(--accent);margin:0}
+.listing-note{color:var(--muted);font-size:14px!important;line-height:1.75}
+.listing-output{margin-top:20px;padding-top:20px;border-top:1px solid var(--line)}
+.listing-output h3{margin:0 0 12px;font-size:18px;color:var(--strong)}
+.listing-output .listing-field{margin:14px 0}
+#listing-body{min-height:280px}
+.listing-check{align-items:flex-start;margin:16px 0}.listing-check input{margin-top:4px!important}
+.listing-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.listing-actions .primary{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.listing-status{min-height:48px;margin:14px 0 0!important;color:var(--strong);font-size:14px}
+.listing-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(min-width:600px){.listing-dialog{inset:5vh 0 auto;max-height:90vh;max-height:90dvh;border-bottom:1px solid var(--line);border-radius:16px}.listing-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.listing-wide{grid-column:1/-1}}
 
 .mobile-guide{display:block!important;max-width:560px;margin:auto}.mg-hero h1{font-size:40px}.mg-hero p{font-size:15px}.mobile-guide [id]{scroll-margin-top:75px}
 </style></head><body><div class="mobile-guide" id="mobile-guide" aria-label="移动端使用引导">
@@ -2008,8 +2045,41 @@ body{font-family:var(--sans);line-height:1.65}
       <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><path class="logo-accent" d="M37 4 22 28h11l-8 14 19-22H33z"/><path class="logo-line" d="M13 19a24 24 0 1 0 34 27M7 12a36 36 0 0 1 13-7"/><circle class="logo-hub" cx="22" cy="35" r="5"/></svg>
       <b>Bike<span>Power</span><i class="brand-c">/c</i></b>
     </span>
-    <span class="mg-bar-right"><span class="mg-chip">离线使用手册</span><button class="theme-btn" id="mg-theme-btn" type="button" data-theme-toggle data-source="system" aria-label="切换亮 / 暗主题" title="切换亮 / 暗主题" onclick="toggleTheme()"><svg class="ti-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="ti-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></span>
+    <span class="mg-bar-right"><span class="mg-chip">离线使用手册</span><button class="theme-btn" id="mg-theme-btn" type="button" data-theme-toggle data-source="system" aria-label="切换亮 / 暗主题" title="切换亮 / 暗主题" onclick="toggleTheme()"><svg class="ti-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="ti-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button><button class="listing-share-trigger" id="mg-listing-share" type="button" aria-label="生成闲鱼售卖文案" title="生成闲鱼售卖文案" aria-haspopup="dialog" aria-controls="listing-dialog" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></button></span>
   </header>
+
+  <dialog class="listing-dialog" id="listing-dialog" aria-labelledby="listing-heading" aria-describedby="listing-intro">
+    <div class="listing-head"><h2 id="listing-heading">闲鱼售卖文案</h2><button id="listing-close" type="button" aria-label="关闭售卖文案">关闭</button></div>
+    <div class="listing-content listing-bottom">
+      <p id="listing-intro">为已刷固件的实体设备生成说明。仅在本页处理，不连接设备、不自动发布。</p>
+      <form id="listing-form">
+        <div class="listing-fields">
+          <label class="listing-field">实物型号<input id="listing-model" value="ESP32-C3" maxlength="60" autocomplete="off"></label>
+          <label class="listing-field">已装固件版本（非网页最新版本）<input id="listing-version" placeholder="如 v4.4.2；未核对可留空" maxlength="40" autocomplete="off"></label>
+          <label class="listing-field listing-wide">成色与瑕疵<input id="listing-condition" placeholder="按实物填写，包括划痕、维修或改装情况" maxlength="200" autocomplete="off"></label>
+          <label class="listing-field listing-wide">随附物品<input id="listing-accessories" placeholder="列明设备、外壳、线材；没有配件写仅设备" maxlength="200" autocomplete="off"></label>
+          <label class="listing-field listing-wide">补充说明<textarea id="listing-notes" rows="2" maxlength="500" placeholder="实测 App 版本、设备条件、交付说明等"></textarea></label>
+          <label class="listing-field">文案长度<select id="listing-format"><option value="detail">详细说明</option><option value="brief">精简说明</option></select></label>
+        </div>
+        <fieldset><legend>本件实际具备的功能</legend><div id="listing-features" class="listing-choices"></div></fieldset>
+        <p class="listing-note">请按已装固件和实物核对。默认只勾选骑行模拟与手机配置，其他功能确认后再加入。</p>
+        <fieldset><legend>本件已实测的平台（没有测试不要勾选）</legend><div id="listing-platforms" class="listing-choices"></div></fieldset>
+        <p class="listing-note">项目适配参考：<span id="listing-platform-reference"></span>。参考名单不等于本件实测或官方认证；骑鬥同屏心率需独立心率带。</p>
+      </form>
+      <section class="listing-output" aria-labelledby="listing-output-heading">
+        <h3 id="listing-output-heading">标题与正文</h3>
+        <button id="listing-regenerate" type="button">重新生成文案</button>
+        <label class="listing-field" for="listing-title">标题<input id="listing-title" maxlength="400" autocomplete="off"></label>
+        <button id="listing-copy-title" type="button">选择标题单独复制</button>
+        <label class="listing-field" for="listing-body">正文（可直接编辑）<textarea id="listing-body" rows="14" maxlength="12000" spellcheck="false"></textarea></label>
+      </section>
+      <p class="listing-note">请使用实物照片，真实填写价格、配送与售后。不要加入夸大承诺、站外引导或违规用途；开源许可不等于商品认证，转售须保留相应版权与许可。此模板与文字检查不构成平台审核通过保证，请以闲鱼最新类目及发布规则为准。</p>
+      <label class="listing-check"><input id="listing-reviewed" type="checkbox"><span>已核对本件实物、成色配件、已装版本与实测平台，确认文案真实且符合发布规则。</span></label>
+      <div class="listing-actions"><button id="listing-copy" class="primary" type="button">复制文案</button><button id="listing-native" type="button">系统分享</button></div>
+      <p id="listing-native-note" class="listing-note">分享目标由系统决定；没有闲鱼入口时，复制后在闲鱼粘贴。</p>
+      <p id="listing-status" class="listing-status" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
 
   <section class="mg-hero" aria-labelledby="mg-project-title">
     <h1 id="mg-project-title">让运动数据，<br>连上你的应用。</h1>
@@ -2063,7 +2133,7 @@ body{font-family:var(--sans);line-height:1.65}
     <h2 class="mg-h" id="mg-facts-title">基本信息</h2>
     <dl class="mg-facts">
       <div><dt>最新正式固件</dt><dd id="mg-fw">请到在线工具台查看</dd></div>
-      <div><dt>默认蓝牙名</dt><dd>BikePower</dd></div>
+      <div><dt>默认蓝牙名</dt><dd>BP_xxxx</dd></div>
       <div><dt>配网地址</dt><dd>192.168.4.1</dd></div>
     </dl>
   </section>
@@ -3059,6 +3129,142 @@ window.BikePowerPhoneSource="\u003c!doctype html>\n\u003chtml lang=\"zh-CN\">\n\
         el.textContent = location.protocol === "file:" ? "本地预览 · 未发布" : "更新信息暂不可用";
       });
     }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+/* 实体商品说明模板与分享；不读取设备、配置或浏览器已有草稿。 */
+(function () {
+  "use strict";
+  const FEATURES = Object.freeze({
+    cycling: { label: "骑行模拟", text: "骑行模拟：可设置模拟功率、踏频和心率，用于连接体验与数据链路调试。" },
+    wifi: { label: "手机配置", text: "手机配置：手动开启设备 WiFi 热点，在浏览器修改参数并保存，无需安装配置 App。" },
+    bridge: { label: "真实功率桥接", text: "真实功率桥接：接收外部蓝牙 CPS 功率计的功率和同源踏频，支持固定瓦数或比例校正；功率计需另备，输出以实际来源为准。" },
+    pacer: { label: "模拟配速档", text: "模拟配速档：按体重和所选 W/kg 范围生成模拟功率，不会控制实体骑行台的阻力。" },
+    running: { label: "跑步模拟", text: "跑步模拟：可设置模拟配速、步频和心率；接收端需支持跑步传感器协议。" }
+  });
+  const clean = (value, max = 500) => String(value ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u206f]/g, "").trim().slice(0, max);
+  function normalize(input = {}) {
+    const platformNames = [...new Set((Array.isArray(input.platforms) ? input.platforms : []).map(x => clean(x, 32)).filter(Boolean))].slice(0, 8);
+    return {
+      model: clean(input.model, 60) || "ESP32-C3", condition: clean(input.condition, 200), accessories: clean(input.accessories, 200),
+      version: /^v?\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(clean(input.version, 40)) ? clean(input.version, 40) : "",
+      notes: clean(input.notes, 500), platforms: platformNames,
+      tested: platformNames.filter(x => Array.isArray(input.tested) && input.tested.includes(x)),
+      features: Object.keys(FEATURES).filter(x => Array.isArray(input.features) && input.features.includes(x)),
+      format: input.format === "brief" ? "brief" : "detail"
+    };
+  }
+  function generate(input) {
+    const v = normalize(input);
+    const title = "BikePower 蓝牙运动数据工具｜" + v.model + " 已刷固件实体设备";
+    const paragraphs = [
+      "出售一台已刷 BikePower 开源固件的实体设备（" + v.model + "），用于蓝牙运动数据连接体验、开发与测试。不是实体功率测量仪或心率测量仪。",
+      "【实物与交付】\n成色与瑕疵：" + (v.condition || "【待填写实物成色及瑕疵】") + "\n随附物品：" + (v.accessories || "【待填写配件；没有配件请写仅设备】") + "\n已装固件：" + (v.version || "未填写，请在发货前核对实际版本") + (v.notes ? "\n补充说明：" + v.notes : "")
+    ];
+    if (v.features.length) paragraphs.push("【功能说明】\n" + v.features.map(x => v.format === "brief" ? FEATURES[x].label : FEATURES[x].text).join(v.format === "brief" ? " / " : "\n") + "\n以上功能仅描述所勾选项目，需以该实物已安装固件和实测结果为准；网页更新不等于设备升级。");
+    if (v.platforms.length) paragraphs.push("【平台与连接】\n项目适配参考：" + v.platforms.join("、") + "；不是官方认证或合作，功能受 App 版本、手机/电脑及设备模式影响。" + (v.tested.length ? "\n卖家勾选的本件实测平台：" + v.tested.join("、") + "（具体版本、连接角色和测试条件请在补充说明中列明）。" : "\n本件实测平台尚未填写，不承诺全平台兼容。") + (v.platforms.includes("骑鬥") ? "\n骑鬥同屏心率需另备独立心率带，不能将设备模拟心率当作同屏保证。" : ""));
+    const steps = ["接通设备供电，在接收 App 内搜索设备；默认名依固件可能为 BP_XXXX 或 BikePower，自定义名称以实物为准。"];
+    if (v.features.includes("cycling")) steps.push("骑行优先按功率传感器连接；支持“踏频随功率”的固件与配置可在同一功率连接获取踏频。");
+    if (v.features.includes("wifi")) steps.push("配置：操作键按住至少 2 秒后松开，3 秒内再按一次；连接设备热点（新版 BPW_XXXX，旧版名称以实物为准），自动弹出或在浏览器打开 192.168.4.1，保存成功后关闭热点。热点密码按随附说明确认。");
+    if (v.features.includes("bridge")) steps.push("桥接：唤醒功率计，在配置页扫描、测试、校正并保存；断线可能切回模拟，使用前核对实际来源。");
+    if (v.features.includes("running")) steps.push("跑步：切换模式并保存后，释放旧连接，按跑步传感器类型重新搜索。");
+    paragraphs.push("【上手操作】\n" + (v.format === "brief" ? steps.slice(0, v.features.includes("wifi") ? 3 : 2).join("\n") : steps.map((x, i) => (i + 1) + ". " + x).join("\n")));
+    paragraphs.push("【使用与交易边界】\n模拟数据不代表真实运动表现，仅用于合法体验、开发与测试；不得用于赛事排名、成绩认证或奖励获取。真实桥接依赖外部功率计，校正输出不等于计量认证。设备不含运动平台会员、账号或第三方服务。\n请按实物照片、已装版本和实测条件核对后购买；价格、配送与售后以闲鱼商品页约定及适用规则为准，沟通和交易在平台内完成。");
+    return { title, body: paragraphs.join("\n\n"), text: title + "\n\n" + paragraphs.join("\n\n") };
+  }
+  function review(title, body) {
+    const text = clean(title, 400) + "\n" + clean(body, 12000);
+    const issues = [];
+    if (!clean(title) || !clean(body)) issues.push("标题和正文不能为空。");
+    if (/【待填写/.test(text)) issues.push("请先填写实物成色、瑕疵和随附物品。");
+    if (/(https?:\/\/|www\.|微信|加微|加v\b|\bQQ\b|二维码|私下转账|站外付款)/i.test(text)) issues.push("请移除站外联系方式、链接或付款引导。");
+    if (/(百分之百兼容|100\s*%\s*兼容|全平台通用|绝对准确|零误差|最强|全网最低|官方认证|官方合作|永久质保|终身质保|概不退换|不退不换)/.test(text.replace(/不是官方认证或合作/g, ""))) issues.push("请核对并删除无依据的绝对化、认证或售后承诺。");
+    if (/(代刷成绩|刷里程|自动刷分|解锁会员|绕过检测|防封号|代挂|作弊神器)/.test(text)) issues.push("不能加入违规用途或绕过平台规则的宣传。");
+    return issues;
+  }
+  const api = { FEATURES, normalize, generate, review };
+  if (typeof module !== "undefined") module.exports = api;
+  if (typeof window !== "undefined") window.BikePowerListing = api;
+  if (typeof document === "undefined") return;
+  function init() {
+    const trigger = document.getElementById("mg-listing-share");
+    const dialog = document.getElementById("listing-dialog");
+    if (!trigger || !dialog) return;
+    const el = id => document.getElementById("listing-" + id);
+    const form = el("form"), title = el("title"), body = el("body"), checked = el("reviewed"), status = el("status");
+    let manual = false, busy = false, opened = false, revision = 0;
+    const platforms = [...new Set([...document.querySelectorAll(".mg-hero .platform-list a")].map(a => a.lastElementChild?.textContent.trim()).filter(Boolean))];
+    const makeChoice = (host, value, label, name, selected) => {
+      const item = document.createElement("label"), box = document.createElement("input"), text = document.createElement("span");
+      box.type = "checkbox"; box.value = value; box.name = name; box.checked = selected;
+      text.textContent = label; item.append(box, text); host.append(item);
+    };
+    Object.entries(FEATURES).forEach(([key, feature]) => makeChoice(el("features"), key, feature.label, "features", ["cycling", "wifi"].includes(key)));
+    platforms.forEach(name => makeChoice(el("platforms"), name, name, "tested", false));
+    el("platform-reference").textContent = platforms.join("、") || "平台名单未提供";
+    const selected = name => [...form.querySelectorAll('input[name="' + name + '"]:checked')].map(x => x.value);
+    function input() { return { model: el("model").value, condition: el("condition").value, accessories: el("accessories").value, version: el("version").value, notes: el("notes").value, format: el("format").value, features: selected("features"), tested: selected("tested"), platforms }; }
+    function invalidate() { revision++; checked.checked = false; }
+    function render() {
+      const data = generate(input()); title.value = data.title; body.value = data.body; manual = false;
+      el("regenerate").textContent = "重新生成文案";
+      invalidate(); status.textContent = "文案已生成。请补全实物资料，再核对标题和正文。";
+    }
+    function manualEdit() { manual = true; invalidate(); el("regenerate").textContent = "按资料重生成（覆盖手动编辑）"; status.textContent = "手动编辑已保留；资料变化不会覆盖它，导出前请重新核对。"; }
+    title.addEventListener("input", manualEdit); body.addEventListener("input", manualEdit);
+    form.addEventListener("input", () => { if (manual) { invalidate(); status.textContent = "资料已变化，手动文案未被覆盖；可点击重生成或自行同步后核对。"; } else render(); });
+    form.addEventListener("submit", event => event.preventDefault());
+    el("regenerate").addEventListener("click", render);
+    trigger.addEventListener("click", () => {
+      if (dialog.open) return;
+      if (!opened) { render(); opened = true; }
+      if (typeof dialog.showModal !== "function") { trigger.title = "浏览器不支持此面板，请使用新版浏览器。"; trigger.setAttribute("aria-label", trigger.title); return; }
+      dialog.showModal(); trigger.setAttribute("aria-expanded", "true");
+      el("close").focus({ preventScroll: true });
+    });
+    el("close").addEventListener("click", () => dialog.close());
+    dialog.addEventListener("close", () => { trigger.setAttribute("aria-expanded", "false"); trigger.focus({ preventScroll: true }); });
+    function ready() {
+      const issues = review(title.value, body.value);
+      if (issues.length) { status.textContent = issues.join(" "); return false; }
+      if (!checked.checked) { status.textContent = "请先核对实物、功能及平台说明，并勾选下方确认。"; checked.focus(); return false; }
+      return true;
+    }
+    function payload() { return { title: clean(title.value, 400), text: clean(title.value, 400) + "\n\n" + clean(body.value, 12000) }; }
+    function setBusy(value) { busy = value; el("copy").disabled = value; el("native").disabled = value || typeof navigator.share !== "function" || !window.isSecureContext; }
+    function selectBody(message) { body.focus(); body.select(); body.setSelectionRange(0, body.value.length); status.textContent = message; }
+    function legacyCopy(text) {
+      const helper = document.createElement("textarea"); helper.value = text; helper.setAttribute("aria-label", "临时复制文本"); helper.style.cssText = "position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;font-size:16px";
+      dialog.append(helper); helper.focus(); helper.select(); helper.setSelectionRange(0, text.length);
+      let success = false;
+      try { success = typeof document.execCommand === "function" && document.execCommand("copy"); } catch (_) {} finally { helper.remove(); }
+      return success;
+    }
+    el("copy").addEventListener("click", async () => {
+      if (busy || !ready()) return;
+      const data = payload(), initial = revision; setBusy(true);
+      try {
+        if (window.isSecureContext && typeof navigator.clipboard?.writeText === "function") {
+          try { await navigator.clipboard.writeText(data.text); } catch (_) { if (!legacyCopy(data.text)) throw Error("复制被拒绝"); }
+        } else if (!legacyCopy(data.text)) throw Error("复制不可用");
+        status.textContent = initial === revision ? "已复制标题与正文。到闲鱼粘贴，补充实物照片、价格和配送后再发布。" : "已复制点击时的文案；之后的修改尚未复制，请重新核对。";
+        el("copy").focus({ preventScroll: true });
+      } catch (_) { selectBody("自动复制不可用，已选中正文，请长按复制；标题可在上方单独选择复制。"); }
+      finally { setBusy(false); }
+    });
+    el("copy-title").addEventListener("click", () => { title.focus(); title.select(); status.textContent = "已选中标题，请长按或使用复制快捷键。"; });
+    el("native").addEventListener("click", async () => {
+      if (busy || !ready()) return;
+      const data = payload();
+      try { if (typeof navigator.canShare === "function" && !navigator.canShare(data)) { status.textContent = "此浏览器无法分享该文本，请点击复制文案。"; return; } } catch (_) { status.textContent = "无法检查系统分享，请点击复制文案。"; return; }
+      setBusy(true);
+      try { await navigator.share(data); status.textContent = "已交给系统分享；是否发送及闲鱼是否发布，请在目标应用确认。"; }
+      catch (error) { status.textContent = error?.name === "AbortError" ? "分享已取消或没有可用目标，文案仍保留；没有自动复制或发布。" : "系统分享不可用，请点击复制文案；没有自动发送或发布。"; }
+      finally { setBusy(false); }
+    });
+    setBusy(false);
+    if (el("native").disabled) el("native-note").textContent = "当前浏览器不支持系统分享，可复制后到闲鱼粘贴。";
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

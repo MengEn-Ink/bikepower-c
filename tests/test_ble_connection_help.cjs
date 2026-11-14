@@ -14,6 +14,8 @@ const cases = [
   ['busy', new Error('上一连接仍在建立或收尾'), {}],
   ['timeout', new Error('连接超时（20 秒）'), {}],
   ['disconnected', new Error('GATT Server is disconnected.'), {}],
+  ['staleBond', new Error('Could not read characteristic handle 45: Unreachable'), {}],
+  ['staleBond', new Error('无法读取特征：远端不可达'), {}],
   ['discovery', new Error('蓝牙服务发现失败：Service discovery failed'), {}],
   ['unsupported', new Error('该设备未提供运动服务，已过滤'), {}],
   ['paused', new Error('网页蓝牙已暂停'), {}],

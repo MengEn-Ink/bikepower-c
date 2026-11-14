@@ -1479,6 +1479,8 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
 <script defer src="./device-telemetry.js"></script>
 <script defer src="./device-status.js"></script>
 <link rel="stylesheet" href="./pages-experience.css">
+<link rel="stylesheet" href="./listing-share.css">
+<script defer src="./listing-share.js"></script>
 </head>
 <body>
 <!-- ============ 移动端引导页：手机只读，引导到桌面端操作（< 900px 显示） ============ -->
@@ -1488,8 +1490,41 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
       <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><path class="logo-accent" d="M37 4 22 28h11l-8 14 19-22H33z"/><path class="logo-line" d="M13 19a24 24 0 1 0 34 27M7 12a36 36 0 0 1 13-7"/><circle class="logo-hub" cx="22" cy="35" r="5"/></svg>
       <b>Bike<span>Power</span><i class="brand-c">/c</i></b>
     </span>
-    <span class="mg-bar-right"><span class="mg-chip">移动端 · 只读</span><button class="theme-btn" id="mg-theme-btn" type="button" data-theme-toggle data-source="system" aria-label="切换亮 / 暗主题" title="切换亮 / 暗主题" onclick="toggleTheme()"><svg class="ti-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="ti-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></span>
+    <span class="mg-bar-right"><span class="mg-chip">移动端 · 只读</span><button class="theme-btn" id="mg-theme-btn" type="button" data-theme-toggle data-source="system" aria-label="切换亮 / 暗主题" title="切换亮 / 暗主题" onclick="toggleTheme()"><svg class="ti-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="ti-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button><button class="listing-share-trigger" id="mg-listing-share" type="button" aria-label="生成闲鱼售卖文案" title="生成闲鱼售卖文案" aria-haspopup="dialog" aria-controls="listing-dialog" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></button></span>
   </header>
+
+  <dialog class="listing-dialog" id="listing-dialog" aria-labelledby="listing-heading" aria-describedby="listing-intro">
+    <div class="listing-head"><h2 id="listing-heading">闲鱼售卖文案</h2><button id="listing-close" type="button" aria-label="关闭售卖文案">关闭</button></div>
+    <div class="listing-content listing-bottom">
+      <p id="listing-intro">为已刷固件的实体设备生成说明。仅在本页处理，不连接设备、不自动发布。</p>
+      <form id="listing-form">
+        <div class="listing-fields">
+          <label class="listing-field">实物型号<input id="listing-model" value="ESP32-C3" maxlength="60" autocomplete="off"></label>
+          <label class="listing-field">已装固件版本（非网页最新版本）<input id="listing-version" placeholder="如 v4.4.2；未核对可留空" maxlength="40" autocomplete="off"></label>
+          <label class="listing-field listing-wide">成色与瑕疵<input id="listing-condition" placeholder="按实物填写，包括划痕、维修或改装情况" maxlength="200" autocomplete="off"></label>
+          <label class="listing-field listing-wide">随附物品<input id="listing-accessories" placeholder="列明设备、外壳、线材；没有配件写仅设备" maxlength="200" autocomplete="off"></label>
+          <label class="listing-field listing-wide">补充说明<textarea id="listing-notes" rows="2" maxlength="500" placeholder="实测 App 版本、设备条件、交付说明等"></textarea></label>
+          <label class="listing-field">文案长度<select id="listing-format"><option value="detail">详细说明</option><option value="brief">精简说明</option></select></label>
+        </div>
+        <fieldset><legend>本件实际具备的功能</legend><div id="listing-features" class="listing-choices"></div></fieldset>
+        <p class="listing-note">请按已装固件和实物核对。默认只勾选骑行模拟与手机配置，其他功能确认后再加入。</p>
+        <fieldset><legend>本件已实测的平台（没有测试不要勾选）</legend><div id="listing-platforms" class="listing-choices"></div></fieldset>
+        <p class="listing-note">项目适配参考：<span id="listing-platform-reference"></span>。参考名单不等于本件实测或官方认证；骑鬥同屏心率需独立心率带。</p>
+      </form>
+      <section class="listing-output" aria-labelledby="listing-output-heading">
+        <h3 id="listing-output-heading">标题与正文</h3>
+        <button id="listing-regenerate" type="button">重新生成文案</button>
+        <label class="listing-field" for="listing-title">标题<input id="listing-title" maxlength="400" autocomplete="off"></label>
+        <button id="listing-copy-title" type="button">选择标题单独复制</button>
+        <label class="listing-field" for="listing-body">正文（可直接编辑）<textarea id="listing-body" rows="14" maxlength="12000" spellcheck="false"></textarea></label>
+      </section>
+      <p class="listing-note">请使用实物照片，真实填写价格、配送与售后。不要加入夸大承诺、站外引导或违规用途；开源许可不等于商品认证，转售须保留相应版权与许可。此模板与文字检查不构成平台审核通过保证，请以闲鱼最新类目及发布规则为准。</p>
+      <label class="listing-check"><input id="listing-reviewed" type="checkbox"><span>已核对本件实物、成色配件、已装版本与实测平台，确认文案真实且符合发布规则。</span></label>
+      <div class="listing-actions"><button id="listing-copy" class="primary" type="button">复制文案</button><button id="listing-native" type="button">系统分享</button></div>
+      <p id="listing-native-note" class="listing-note">分享目标由系统决定；没有闲鱼入口时，复制后在闲鱼粘贴。</p>
+      <p id="listing-status" class="listing-status" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
 
   <section class="mg-hero" aria-labelledby="mg-project-title">
     <h1 id="mg-project-title">让运动数据，<br>连上你的应用。</h1>
@@ -1543,7 +1578,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
     <h2 class="mg-h" id="mg-facts-title">基本信息</h2>
     <dl class="mg-facts">
       <div><dt>最新正式固件</dt><dd id="mg-fw">正在读取 Release</dd></div>
-      <div><dt>默认蓝牙名</dt><dd>BikePower</dd></div>
+      <div><dt>默认蓝牙名</dt><dd>BP_xxxx</dd></div>
       <div><dt>配网地址</dt><dd>192.168.4.1</dd></div>
     </dl>
   </section>
@@ -1757,7 +1792,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           <strong>英文状态对照</strong>
           <div class="flash-terms"><div class="flash-term"><b>INSTALL / ERASE</b>确认安装；Erase 表示先清除旧数据再安装</div><div class="flash-term"><b>INSTALLING</b>正在写入，保持页面打开</div><div class="flash-term"><b>WRAPPING UP / COMPLETE</b>正在收尾 / 已经完成</div></div>
         </div>
-        <div class="flash-warning"><b>重要：</b>当前全量合并固件从 0x0 写入，会覆盖 NVS 配置与蓝牙绑定；不勾 Erase 也不能保留。更新前先导出配置。刷后曾系统配对但连不上，请仅忽略/删除 BikePower 的旧配对，再回本站重新选择。刷写期间不要拔线、刷新或关闭页面。</div>
+        <div class="flash-warning"><b>重要：</b>当前全量合并固件从 0x0 写入，会覆盖 NVS 配置与蓝牙绑定；不勾 Erase 也不能保留。更新前先导出配置。刷后曾系统配对但连不上，请仅忽略/删除 BP_xxxx 的旧配对，再回本站重新选择。刷写期间不要拔线、刷新或关闭页面。</div>
 
         <details class="flash-details" id="fw-notes-wrap">
           <summary>完整 Release 原文</summary>
@@ -2039,7 +2074,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
         <ol class="toc-list" id="toc-list"></ol>
         <div class="toc-foot">
           <b>基础信息</b>
-          蓝牙名称：BikePower<br>
+          蓝牙名称：BP_xxxx<br>
           WiFi 热点：BPW_XXXX<br>
           密码：12345678<br>
           配网地址：192.168.4.1
@@ -2077,7 +2112,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           </details>
           <div class="manual-meta">
             <div><span>手册源码版本</span><b>v4.4.2 候选</b></div>
-            <div><span>蓝牙名称</span><b>BikePower</b></div>
+            <div><span>蓝牙名称</span><b>BP_xxxx</b></div>
             <div><span>配网地址</span><b>http://192.168.4.1</b></div>
           </div>
           <p class="operation-caution"><b>版本</b>页面更新不会升级设备，功能以已安装版本为准。</p>
@@ -2199,7 +2234,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             <div class="ch-meta">
               <div class="ch-kicker">CONNECT</div>
               <h2 class="ch-title">上电后连接骑行 App</h2>
-              <p class="ch-desc">默认蓝牙名称为 BikePower。上电后 LED 慢闪即进入广播状态，骑行 App 可以立刻搜到。</p>
+              <p class="ch-desc">默认蓝牙名称为 BP_xxxx（由 MAC 末 4 位派生，如 BP_3AEE）。上电后 LED 慢闪即进入广播状态，骑行 App 可以立刻搜到。</p>
             </div>
           </header>
           <div class="ch-body">
@@ -2491,11 +2526,11 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
             </div>
           </header>
           <div class="ch-body">
-            <details id="ble-troubleshooting" class="ble-recovery"><summary>蓝牙连接异常分类与解决步骤</summary><p>先按实际错误和发生阶段分类；通用连接失败不能直接判定缓存或占用。只处理目标设备，不清空全部配对、不改 MAC。</p><div id="ble-troubleshooting-categories"></div></details>
+            <details id="ble-troubleshooting" class="ble-recovery"><summary>蓝牙连接异常分类与解决步骤</summary><p>先按实际错误和发生阶段分类；通用连接失败不能直接判定缓存或占用。只处理目标设备，不清空全部配对、不改 MAC。</p><p><b>刷机后连不上的已知解法：</b>连接能建立但读不到数据、立刻断开或报 Unreachable 时，Windows 打开「设置 → 蓝牙和设备 → 设备」，删除这台 <code>BP_xxxx</code>（如 <code>BP_3AEE</code>）后刷新本站页面重新扫描连接；只删这一台，不要清空全部蓝牙设备。</p><div id="ble-troubleshooting-categories"></div></details>
             <div class="m-faq">
               <details open>
                 <summary><span class="q">Q01</span><span style="flex:1">搜不到 BLE 设备</span><span class="plus"></span></summary>
-                <div class="a">先确认设备已上电且 LED 有状态变化。然后在骑行 App 里重新扫描 <code>BikePower</code>。如果仍搜不到，重启 App 或重新给设备上电。</div>
+                <div class="a">先确认设备已上电且 LED 有状态变化。然后在骑行 App 里重新扫描 <code>BP_xxxx</code>。如果仍搜不到，重启 App 或重新给设备上电。</div>
               </details>
               <details>
                 <summary><span class="q">Q02</span><span style="flex:1">进不了 WiFi 配网页</span><span class="plus"></span></summary>
@@ -2519,7 +2554,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
               </details>
               <details>
                 <summary><span class="q">Q07</span><span style="flex:1">如何更新固件</span><span class="plus"></span></summary>
-                <div class="a">全量合并固件会覆盖 NVS 配置及绑定，不勾整片擦除也不能保留。更新前先导出配置；刷后曾系统配对但连不上，按上方“蓝牙连接异常分类”仅忽略/删除 BikePower 的旧配对，再在本站重新选择。</div>
+                <div class="a">全量合并固件会覆盖 NVS 配置及绑定，不勾整片擦除也不能保留。更新前先导出配置；刷后曾系统配对但连不上，按上方“蓝牙连接异常分类”仅忽略/删除 BP_xxxx 的旧配对，再在本站重新选择。</div>
               </details>
               <details>
                 <summary><span class="q">Q08</span><span style="flex:1">重建服务表后为什么收不到 Service Changed</span><span class="plus"></span></summary>
@@ -2541,7 +2576,7 @@ body.ide-wide .hero-value{font-size:clamp(56px,min(8vw,11vh),150px)}
           </header>
           <div class="ch-body">
             <div class="m-tldr">
-              <div><div class="n">01</div><div class="k">上电连接</div><div class="b">给设备通电，等待 LED 慢闪，在骑行 App 内搜索并连接 BikePower。</div></div>
+              <div><div class="n">01</div><div class="k">上电连接</div><div class="b">给设备通电，等待 LED 慢闪，在骑行 App 内搜索并连接 BP_xxxx。</div></div>
               <div><div class="n">02</div><div class="k">长按进配网</div><div class="b">长按按钮超过 2 秒松开，看到快闪后再按一次，手机连接 BPW_XXXX 热点并访问 192.168.4.1。</div></div>
               <div><div class="n">03</div><div class="k">修改保存</div><div class="b">在设备配网页修改参数，点击「保存并应用」，等待成功回显。</div></div>
               <div><div class="n">04</div><div class="k">关闭热点</div><div class="b">先保存成功，再点击「关闭 WiFi」并确认，回到日常 BLE 使用。</div></div>
@@ -4916,7 +4951,7 @@ function renderCompareTable(){
 /* ==================== 用户手册 ==================== */
 const MANUAL_META = {
   "ch01":{num:1,title:"烧录或更新固件",kicker:"FIRMWARE",points:["只支持桌面 Chrome / Edge + HTTPS","USB 线必须支持数据传输，不能是纯充电线","设备内 OTA 已永久放弃，统一走网页烧录"]},
-  "ch02":{num:2,title:"上电后连接骑行 App",kicker:"CONNECT",points:["默认蓝牙名称 BikePower","App 支持多种设备类型时按功率计 / 心率计搜索","LED 慢闪 = 广播中 · 常亮 = 已连接"]},
+  "ch02":{num:2,title:"上电后连接骑行 App",kicker:"CONNECT",points:["默认蓝牙名称 BP_xxxx（如 BP_3AEE）","App 支持多种设备类型时按功率计 / 心率计搜索","LED 慢闪 = 广播中 · 常亮 = 已连接"]},
   "ch03":{num:3,title:"按钮日常操作",kicker:"BUTTON",points:["短按 = 功率 −1 步进（默认 20 W）","按住 0.5 s 后持续加功率","长按 ≥2 s 松开 → 二次按键 → 进入 WiFi 配网"]},
   "ch04":{num:4,title:"进入 WiFi 配网页",kicker:"WIFI",points:["长按 2s → 松开 → 窗口内再按一次 → 开热点","热点 SSID = BPW_XXXX · 密码 = 12345678","手机提示「无互联网」是正常现象"]},
   "ch05":{num:5,title:"设备配网 · 骑行模式",kicker:"CYCLING",points:["固定模式与配速机器人互斥","配速机器人按体重 + W/kg 换算","保存成功后核对实时输出"]},
@@ -5944,7 +5979,7 @@ function onSingleDeviceDisconnected(rec){
 function scheduleReconnect(delay){
   clearTimeout(reconnectTimer);
   if(compatibilityHandoffActive())return;
-  if(reconnectAttempt>=RECONNECT_DELAYS.length){setAutoLinkStatus("已连续重连 "+RECONNECT_DELAYS.length+" 次未成功，停止自动重连。请点击“扫描并连接设备”；若刚全量刷机且以前配对过，先仅忽略/删除 BikePower 的旧配对。","err");return;}
+  if(reconnectAttempt>=RECONNECT_DELAYS.length){setAutoLinkStatus("已连续重连 "+RECONNECT_DELAYS.length+" 次未成功，停止自动重连。请点击“扫描并连接设备”；若刚全量刷机且以前配对过，先仅忽略/删除 BP_xxxx 的旧配对。","err");return;}
   const wait=delay||RECONNECT_DELAYS[reconnectAttempt];reconnectAttempt++;
   setAutoLinkStatus("连接已断开，"+Math.round(wait/1000)+" 秒后进行第 "+reconnectAttempt+" 次自动重连…","busy");
   reconnectTimer=setTimeout(async()=>{
