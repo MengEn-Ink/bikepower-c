@@ -20,10 +20,13 @@
 
 ## v4.4.2 本机实板验证进展（2026-11-14）
 
-- 本轮在 Windows 本机完成：ESP-IDF v5.5.4 工具链重建、干净 defaults 构建（`CONFIG_BT_NIMBLE_GATT_CACHING=y` 对齐 v4.4.1）、`COM198` 烧录、串口启动检查 PASS；镜像回读与 `build/bikepower-c.bin` SHA256 全等，内含 `BIKEPOWER_GIT_SHA=3fecd5e`。
+- 本轮在 Windows 本机完成：ESP-IDF v5.5.4 工具链重建、干净 defaults 构建（`CONFIG_BT_NIMBLE_GATT_CACHING=y` 对齐 v4.4.1）、`COM198` 烧录、串口启动检查 PASS；镜像回读与 `build/bikepower-c.bin` SHA256 全等，内含 `BIKEPOWER_GIT_SHA=e937e71`。
 - 固件侧诊断确认 ATT 库含 0x1800 handle=1 / 0x1801 handle=6 / 2A05 def=7 val=8；**但两极中央均为系统级 GATT 缓存视图**：macOS CoreBluetooth 对同一外设持续返回旧服务表与旧特征值（重刷后仍报旧 GitSha），Windows `bthserv` 缓存亦需管理员重启。清理缓存属人工操作，未取得前的 BLE 枚举结论不得作为固件判据。
-- 因此 P0 五项仍无当前镜像证据：`serial_boot` PASS；`ble_config_rw`/`ble_cycling`/`ble_reconnect`/`soak_5min` 待缓存清理后执行。release 产物、tag、GitHub Release 均未创建。
-- 人工待办（清理缓存后才可继续）：管理员重启 `bthserv`（Windows）或关闭再开启蓝牙（macOS，或重启主机）。
+- P0 当前状态：`serial_boot` PASS（`tests/logs/boot-v442-final.log`）；`soak_5min` PASS（macOS 作中央，`tests/logs/soak-v442-mac.log`：5 分 10 秒 17 轮连接，258 条 CPS 通知，扫描/连接失败 0）；`ble_cycling`/`ble_reconnect`/`ble_config_rw` 仍未取得 PASS 证据。
+- `ble_cycling` 在 mac 上二次实测（`tests/logs/cycling-v442-mac.log`）：CPS/CPS-Feature/SensorLocation/HR/FTMS-Bike/FTMS-CP 齐全，CSC 按当前 mask 不注册（踏频由 CPS 曲柄字段承载，非缺陷），DIS 三项通过，FTMS Feature `machine=0x00004402 target=0x00000008` 通过；但写 FTMS Control Point 被拒 `GATT Protocol Error: Insufficient Encryption`。原因是 `main/ble_bikepower.c` 对控制点与配置写入使用 `BLE_GATT_CHR_F_WRITE_ENC`，macOS 侧旧配对已失效、链路未加密，属固件的正当安全约束，需重新配对而非改固件。
+- `ble_config_rw`/`ble_reconnect` 依赖串口驱动的 `tests/ble_config_e2e.py` 与 `tests/stage3_conn_test.py`，需在持有 COM 口的 Windows 侧执行；同样受未加密链路限制。
+- release 产物、`v4.4.2` tag、GitHub Release 均未创建（`build_all.ps1` 的 `require_device_evidence` 要求 P0 五项全 PASS）。
+- 人工待办：在 macOS「系统设置 → 蓝牙」移除 BikePower 配对并关闭再开启蓝牙；Windows 以管理员重启 `bthserv`。之后即可复跑剩余三项 P0。
 
 ## v4.4.2 候选发版验证（2026-11-13）
 
