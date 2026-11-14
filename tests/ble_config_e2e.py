@@ -181,7 +181,7 @@ def make_modified_groups(original):
     modified["led"][1] = 0 if modified["led"][1] else 1
 
     current_name = decode_counted_string(bytes(modified["identity"]), 1, 23)
-    e2e_name = "BikePower-E2E" if current_name != "BikePower-E2E" else "BikePower-E2F"
+    e2e_name = "BP_E2E" if current_name != "BP_E2E" else "BP_E2F"
     modified["identity"] = bytearray(encode_identity(e2e_name))
     _toggle_u16(modified["bridge"], 13, 500, 3000)
     primary = modified["bridge"]
@@ -292,7 +292,7 @@ class DeviceSession:
             require(device is not None, "指定BLE地址未广播，不回退到其他同名设备")
             return device
         device = await BleakScanner.find_device_by_filter(
-            lambda candidate, adv: (adv.local_name or candidate.name or "") == self.device_name,
+            lambda candidate, adv: (adv.local_name or candidate.name or "").startswith(self.device_name),
             timeout=self.scan_timeout,
         )
         require(device is not None, f"未发现 BLE 设备 {self.device_name}")
@@ -540,7 +540,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="BikePower Config Service 真机端到端测试")
     parser.add_argument("--port", required=True, help="用于重启并验证 NVS 的开发板串口")
     parser.add_argument("--board", choices=("generic-c3", "m5stamp-c3"), default="")
-    parser.add_argument("--device-name", default="BikePower")
+    parser.add_argument("--device-name", default="BP_")
     parser.add_argument("--address", default="", help="精确BLE目标，首次及后续连接不回退同名设备")
     parser.add_argument("--reset-method", choices=("serial", "rom"), default="serial",
                         help="复位方式；USB Serial/JTAG可选esptool ROM run，不烧录")

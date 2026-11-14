@@ -338,6 +338,11 @@ typedef enum {
 #include "domain_config.h"
 
 // ===== 设备信息 =====
+// 出厂 BLE 名规则：DEVICE_NAME_PREFIX + eFuse BT MAC 低 2 字节的 4 位大写 hex，
+// 例如 BLE 地址 10:20:BA:CC:3A:EE → "BP_3AEE"。7 字符可完整放进主广播包（31 字节），
+// 不再依赖 BLE_ADV_NAME_MAX_LEN 截断；显式 devname（配置服务/门户写入）优先级更高。
+#define DEVICE_NAME_PREFIX   "BP_"
+#define DEVICE_NAME_FORMAT   DEVICE_NAME_PREFIX "%02X%02X"
 #define DEVICE_NAME          "BikePower"
 #define DEVICE_MANUFACTURER  "BikePower"
 #define DEVICE_MODEL         "ESP32-C3"

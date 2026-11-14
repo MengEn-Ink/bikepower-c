@@ -9,11 +9,14 @@
  *   app_main_task 本函数主循环：50ms 节拍生成快照 + 消费事件队列 + 喂看门狗
  */
 #include <stdatomic.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_random.h"
 #include "esp_task_wdt.h"
 #include "nvs_flash.h"
@@ -405,6 +408,24 @@ static bool on_wifi_done(void)
     return true;
 }
 
+/**
+ * 出厂设备名派生：仍是出厂默认名（或空名）时，用 eFuse BT MAC 低 2 字节生成 BP_XXXX。
+ * 目的：同批次多块板子同时在场时可区分，且不依赖生产工装写入；显式 devname 优先。
+ * 特殊行为：只改内存配置，不写 NVS —— 下次启动重新派生，避免旧默认名残留。
+ */
+static void apply_derived_device_name(void)
+{
+    if (s_engine.device_name[0] != '\0'
+            && strncmp(s_engine.device_name, DEVICE_NAME, DEVICE_NAME_MAX) != 0) {
+        return;
+    }
+    uint8_t mac[6];
+    if (esp_read_mac(mac, ESP_MAC_BT) != ESP_OK) return;
+    snprintf(s_engine.device_name, sizeof(s_engine.device_name),
+             DEVICE_NAME_FORMAT, mac[4], mac[5]);
+    ESP_LOGI(TAG, "出厂设备名派生: %s", s_engine.device_name);
+}
+
 void app_main(void)
 {
     ESP_LOGI(TAG, "BikePower C 启动 v%s (target=esp32c3, idf=v5.5.4)", FIRMWARE_VERSION);
@@ -420,6 +441,7 @@ void app_main(void)
 
     power_engine_init(&s_engine);
     if (storage_ready) nvs_store_load(&s_engine);
+    apply_derived_device_name();
     static bridge_device_t bridge_recent;
     bool have_bridge_recent = storage_ready && nvs_store_load_bridge_recent(&bridge_recent);
     power_engine_clear_dirty(&s_engine);

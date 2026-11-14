@@ -8,7 +8,7 @@ import time
 
 from bleak import BleakScanner
 
-TARGET_NAME = "BikePower"
+TARGET_NAME_PREFIX = "BP_"  # 出厂默认名 BP_<MAC低2字节4位hex>
 
 
 def main():
