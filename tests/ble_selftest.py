@@ -549,14 +549,29 @@ async def check_dis(client, found):
 
 
 async def scan_device_and_adv(address):
-    """返回 (设备, 广播声明的 16bit 服务 UUID 集合)。广播集合是设备自身声明，用于校核 GATT。"""
-    ds = await BleakScanner.discover(timeout=10, return_adv=True)
-    for addr, (candidate, adv) in ds.items():
-        name = adv.local_name or candidate.name or ""
-        if (address and addr == address) or (not address and name.startswith(DEVICE_NAME)):
-            declared = {uuid[4:8].lower() for uuid in adv.service_uuids}
-            return candidate, declared
-    return None, set()
+    """返回 (设备, 广播声明的 16bit 服务 UUID 集合)。广播集合是设备自身声明，用于校核 GATT。
+
+    显式地址时只按地址精确匹配，不做名称回退，也不触发全量 discover；
+    广播数据在同一回调里取到，避免二次扫描。
+    """
+    hit = {}
+
+    def _predicate(device, adv):
+        name = (getattr(adv, "local_name", None) or device.name or "")
+        if address:
+            matched = (device.address or "").upper() == address.upper()
+        else:
+            matched = name.startswith(DEVICE_NAME)
+        if matched and "adv" not in hit:
+            hit["adv"] = adv
+        return matched
+
+    dev = await BleakScanner.find_device_by_filter(_predicate, timeout=10)
+    if not dev:
+        return None, set()
+    adv = hit.get("adv")
+    declared = {uuid[4:8].lower() for uuid in (getattr(adv, "service_uuids", None) or [])}
+    return dev, declared
 
 
 async def main():
