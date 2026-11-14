@@ -18,6 +18,13 @@
 - [ ] **P2 Windows 断开后链路占用边界、M5 实物 LED/按键、保留 NVS 与绑定升级演练**。
 - [ ] **P2 双槽 NVS 实物故障验证**：断电与满分区。跨键原子提交的软件修复已完成，不再列为待实现缺陷。
 
+## v4.4.2 本机实板验证进展（2026-11-14）
+
+- 本轮在 Windows 本机完成：ESP-IDF v5.5.4 工具链重建、干净 defaults 构建（`CONFIG_BT_NIMBLE_GATT_CACHING=y` 对齐 v4.4.1）、`COM198` 烧录、串口启动检查 PASS；镜像回读与 `build/bikepower-c.bin` SHA256 全等，内含 `BIKEPOWER_GIT_SHA=3fecd5e`。
+- 固件侧诊断确认 ATT 库含 0x1800 handle=1 / 0x1801 handle=6 / 2A05 def=7 val=8；**但两极中央均为系统级 GATT 缓存视图**：macOS CoreBluetooth 对同一外设持续返回旧服务表与旧特征值（重刷后仍报旧 GitSha），Windows `bthserv` 缓存亦需管理员重启。清理缓存属人工操作，未取得前的 BLE 枚举结论不得作为固件判据。
+- 因此 P0 五项仍无当前镜像证据：`serial_boot` PASS；`ble_config_rw`/`ble_cycling`/`ble_reconnect`/`soak_5min` 待缓存清理后执行。release 产物、tag、GitHub Release 均未创建。
+- 人工待办（清理缓存后才可继续）：管理员重启 `bthserv`（Windows）或关闭再开启蓝牙（macOS，或重启主机）。
+
 ## v4.4.2 候选发版验证（2026-11-13）
 
 - 仅generic-c3候选，版本/修复版本4.4.2；生产IDF5.5.4/schema14/原资源限制保持，不覆盖v4.4.1、不创建正式tag/Release。

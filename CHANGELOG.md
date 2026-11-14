@@ -4,6 +4,13 @@
 
 ## [未发布]
 
+### GATT 缓存配置对齐与中央缓存排查（2026-11-14）
+- `sdkconfig.defaults` 显式开启 `CONFIG_BT_NIMBLE_GATT_CACHING=y`。干净 defaults 生成配置时 IDF 5.5.4 该项默认关闭，与 v4.4.1 已发布镜像不一致；开启后镜像增加约 16KB，GAP/GATT(0x1800/0x1801) 与 2A05/2B29/2B3A 随数据库注册。新配置已构建、烧录并通过串口启动检查。
+- 固件侧权威证据：串口诊断确认本地 ATT 库存在 0x1800 handle=1、0x1801 handle=6、2A05 def=7/val=8（`tests/logs/diag-gatt.log`）。
+- 复核边界：macOS CoreBluetooth 对该外设返回的是缓存视图，服务列表与特征值均不随重刷更新（同一镜像回读 `build/readback.bin` 与 `build/bikepower-c.bin` SHA256 全等，设备仍报旧 GitSha），因此"缺 1800/1801"不能直接当作固件缺陷；清理系统缓存需管理员/重启，列为人工待办。
+- `tests/test_maintenance_tools.py` 增加符号链接权限探测，Windows 非开发者模式仅跳过 alias 子用例，避免 WinError 1314 令文档门禁整体失败。
+- 构建身份：GitSha 在 CMake 配置期注入，改动提交后必须 reconfigure 再 build，否则镜像仍带旧 SHA；本轮已以 `BIKEPOWER_GIT_SHA=3fecd5e` 重建并烧录。
+
 ### v4.4.2 通用 ESP32-C3 候选准备（2026-11-13）
 - 本轮版本与修复版本升级到4.4.2，稳定基线仍4.0.0、schema14、ESP-IDF5.5.4；正式Release/tag尚未创建，不覆盖v4.4.1。
 - 纳入下方已整合的设备配网页固定IP入口、中文断线恢复、有限GET重试、首载恢复、草稿保留与写结果待核实；同期Pages手动下载/真实进度属于网页独立变更。
