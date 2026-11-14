@@ -18,7 +18,7 @@
     broadcast: { power: true, cadence: true, heart: true },
     heart: { enabled: true, mode: "linked", ftp: 245, threshold: 178, fixed: 145 },
     running: { mode: "fixed", paceMinutes: 5, paceSeconds: 0, cadence: 170, cadenceFloat: 4 },
-    deviceName: "BikePower-C3",
+    deviceName: "BP_XXXX",
     identity: { manufacturer: "BikePower", model: "m5stamp-c3", serial: "C3-DEMO-001", hardware: "ESP32-C3", firmware: "4.2.1", software: "4.2.1" },
     powerStep: 20
   };

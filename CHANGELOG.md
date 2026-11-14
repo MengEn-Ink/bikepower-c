@@ -8,6 +8,7 @@
 - 配网热点从 `BikePower-XXXXXX`（AP MAC 后 3 字节）改为 `BPW_` + BT MAC 低 2 字节的 4 位大写 hex，与 BLE 名后缀同源：同一块板 `BP_3AEE` 对应热点 `BPW_3AEE`，用户可一眼对应设备。
 - 实现：`main/bikepower_config.h` 新增 `WIFI_SSID_PREFIX "BPW_"` 与 `WIFI_SSID_FORMAT`；`main/radio_ctrl.c` 的 `build_softap_ssid()` 改用 `esp_read_mac(mac, ESP_MAC_BT)` 取样并套用 `WIFI_SSID_FORMAT`。
 - 同步更新用户文档、README、Pages 演示文案、`tests/README.md` 与 `tests/check_config_consistency.py` 断言（原断言固定要求 `BikePower` 前缀与 `"%s-%02X%02X%02X"` 格式）。
+- 配网页占位同步：`main/web/index.html` 的设备名占位从 `BikePower-C3` 改为 `BP_XXXX`（改为 placeholder，避免静态值被误当实际设备名保存）；`tools/web/phone-portal-source.js` 与 `docs/user/pages-mobile-guide.html` 由 `build_phone_demo.py` / `sync_user_docs.py` 重新生成，设计演示页同步更新。
 - 边界：SSID 只在长按 + 二次确认进入配网模式后出现，需人工按键触发，本轮未取得热点实物证据。
 - 最终镜像复核：1,201,936B，SHA256 `65B6CD5039D2E4DB7CDCA76DE7513B86A1231816807FBCA77E8ABAF61481F225`，内含 `BIKEPOWER_GIT_SHA=8067dae`；Flash `0x10000` 回读与构建产物全等，镜像内可见 `BPW_` 前缀字符串。同一镜像上 `soak_5min` 321 秒 10 轮、CPS 通知 155、失败 0 PASS，`ble_reconnect` 两轮独立扫描/连接/断开 PASS。
 

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方向 C · IDE 分屏工作台</title>
+<style>
+:root{
+  --bg:#fafbfc;
+  --bg-2:#f3f4f6;
+  --sidebar:#f7f8fa;
+  --panel:#ffffff;
+  --line:#e2e5ea;
+  --line-soft:#ebedf1;
+  --ink:#1f2329;
+  --ink-soft:#3c4250;
+  --muted:#6b7280;
+  --faint:#9ca3af;
+  --accent:#2563eb;
+  --accent-2:#3b82f6;
+  --accent-soft:#eff6ff;
+  --accent-deep:#1d4ed8;
+  --green:#16a34a;
+  --green-soft:#f0fdf4;
+  --red:#dc2626;
+  --red-soft:#fef2f2;
+  --amber:#d97706;
+  --amber-soft:#fffbeb;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue","PingFang SC","Microsoft YaHei",Arial,sans-serif;
+  --radius:8px;
+  --radius-sm:6px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:13px;
+  line-height:1.5;
+  display:flex;flex-direction:column;
+  height:100vh;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ===== 顶栏 ===== */
+.titlebar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;height:44px;
+  background:var(--panel);
+  border-bottom:1px solid var(--line);
+  flex-shrink:0;
+}
+.tb-left{display:flex;align-items:center;gap:10px}
+.tb-brand{display:flex;align-items:center;gap:8px}
+.tb-mark{
+  width:24px;height:24px;border-radius:5px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  color:#fff;display:grid;place-items:center;
+  font-weight:900;font-size:11px;
+}
+.tb-title{font-size:12.5px;font-weight:700;color:var(--ink)}
+.tb-sub{font-size:11px;color:var(--muted);margin-left:6px}
+.tb-tabs{display:flex;margin-left:16px;gap:0}
+.tb-tab{
+  padding:0 14px;height:44px;display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .12s;
+}
+.tb-tab:hover{color:var(--ink-soft)}
+.tb-tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--bg)}
+.tb-right{display:flex;align-items:center;gap:8px}
+
+/* ===== 工作区 ===== */
+.workspace{flex:1;display:flex;min-height:0}
+
+/* 左侧活动栏 */
+.activity-bar{
+  width:48px;background:var(--sidebar);
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;
+  padding:8px 0;gap:4px;flex-shrink:0;
+}
+.ab-item{
+  width:36px;height:36px;border-radius:6px;
+  display:grid;place-items:center;
+  color:var(--muted);cursor:pointer;font-size:17px;
+  transition:all .12s;position:relative;
+}
+.ab-item:hover{background:var(--bg-2);color:var(--ink-soft)}
+.ab-item.active{color:var(--accent)}
+.ab-item.active::before{
+  content:"";position:absolute;left:-8px;top:8px;bottom:8px;width:2px;
+  background:var(--accent);border-radius:0 2px 2px 0;
+}
+.ab-spacer{flex:1}
+
+/* 侧边面板 */
+.side-panel{
+  width:260px;background:var(--sidebar);
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;flex-shrink:0;
+}
+.sp-head{
+  padding:10px 14px;font-size:11px;font-weight:700;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.06em;
+  border-bottom:1px solid var(--line);
+}
+.sp-list{flex:1;overflow:auto;padding:6px}
+.sp-item{
+  display:flex;align-items:center;gap:9px;
+  padding:8px 10px;border-radius:5px;
+  cursor:pointer;font-size:12.5px;color:var(--ink-soft);
+  transition:background .12s;
+}
+.sp-item:hover{background:var(--bg-2)}
+.sp-item.active{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.sp-item .ico{width:16px;text-align:center;font-size:13px}
+.sp-item .badge-mini{
+  margin-left:auto;font-size:10px;background:var(--line-soft);
+  color:var(--muted);padding:1px 6px;border-radius:8px;font-weight:600;
+}
+
+/* 主编辑区 */
+.editor{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.editor-tabs{
+  display:flex;height:36px;border-bottom:1px solid var(--line);
+  background:var(--sidebar);flex-shrink:0;
+}
+.etab{
+  padding:0 14px;display:flex;align-items:center;gap:7px;
+  font-size:12px;color:var(--muted);cursor:pointer;
+  border-right:1px solid var(--line);
+}
+.etab.active{background:var(--panel);color:var(--ink);font-weight:600}
+.etab .close{opacity:.4;font-size:14px}
+.etab.active .close{opacity:.7}
+
+.editor-body{
+  flex:1;overflow:auto;padding:20px 24px;
+  display:flex;flex-direction:column;gap:16px;
+}
+
+/* ===== 面包屑/状态行 ===== */
+.breadcrumb{
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  display:flex;align-items:center;gap:6px;
+}
+.breadcrumb b{color:var(--ink-soft)}
+
+/* ===== 按钮 ===== */
+.btn{
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:var(--sans);color:var(--ink-soft);
+  background:var(--panel);transition:all .12s;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn:hover{border-color:var(--accent-2);color:var(--accent)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{background:var(--accent-deep);color:#fff;border-color:var(--accent-deep)}
+.btn.danger{background:var(--red);color:#fff;border-color:var(--red)}
+.btn.ghost{background:transparent}
+.btn.sm{padding:4px 10px;font-size:11.5px}
+
+/* ===== 区块 ===== */
+.block{
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);overflow:hidden;
+}
+.block-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-bottom:1px solid var(--line);
+  background:var(--sidebar);
+}
+.block-head h3{margin:0;font-size:12.5px;font-weight:700;color:var(--ink)}
+.block-body{padding:14px}
+
+/* ===== 步骤 ===== */
+.steps{display:flex;flex-direction:column;gap:2px}
+.step{
+  display:grid;grid-template-columns:20px 1fr;gap:10px;
+  padding:9px 12px;border-radius:5px;font-size:12px;
+}
+.step:hover{background:var(--bg-2)}
+.step .num{
+  width:18px;height:18px;border-radius:4px;
+  background:var(--accent-soft);color:var(--accent-deep);
+  display:grid;place-items:center;font-weight:700;font-size:10.5px;
+  font-family:var(--mono);
+}
+.step b{font-size:12px;color:var(--ink)}
+.step p{margin:2px 0 0;color:var(--muted);font-size:11.5px;line-height:1.5}
+
+/* ===== 徽章 ===== */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;
+  border-radius:4px;padding:2px 8px;font-size:10.5px;font-weight:700;
+  background:var(--accent-soft);color:var(--accent-deep);
+  font-family:var(--mono);
+}
+.badge.ok{background:var(--green-soft);color:var(--green)}
+.badge.warn{background:var(--amber-soft);color:var(--amber)}
+.badge.err{background:var(--red-soft);color:var(--red)}
+.badge.muted{background:var(--bg-2);color:var(--muted)}
+
+/* ===== 指标 ===== */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.metric{background:var(--panel);padding:14px}
+.metric .label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px}
+.metric b{font-size:24px;font-weight:800;color:var(--ink);font-family:var(--mono);letter-spacing:-.02em}
+.metric .unit{font-size:11px;color:var(--muted);margin-left:3px;font-weight:500}
+
+/* ===== 信息行 ===== */
+.spec{display:flex;flex-direction:column}
+.spec .row{
+  display:flex;justify-content:space-between;gap:12px;
+  padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12px;
+}
+.spec .row:last-child{border-bottom:0}
+.spec .row span:first-child{color:var(--muted);min-width:80px}
+.spec .row span:last-child{text-align:right;word-break:break-all;font-weight:600;color:var(--ink-soft);font-family:var(--mono);font-size:11.5px}
+
+/* ===== 服务列表 ===== */
+.svc-list{display:flex;flex-direction:column;gap:4px}
+.svc-item{
+  border:1px solid var(--line);border-radius:5px;padding:9px 11px;background:var(--bg-2);
+}
+.svc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.svc-name{font-weight:600;font-size:11.5px;color:var(--ink-soft);font-family:var(--mono)}
+.svc-uuid{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.chars{margin-top:7px;padding-top:7px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:3px}
+.char{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.char b{color:var(--ink-soft);font-weight:500}
+.props{font-size:9.5px;color:var(--faint);font-family:var(--mono)}
+
+/* ===== 比对表 ===== */
+.compare-table{width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px}
+.compare-table th,.compare-table td{
+  padding:7px 10px;text-align:left;border-bottom:1px solid var(--line-soft);vertical-align:top;
+}
+.compare-table th{font-weight:700;color:var(--muted);font-size:11px;background:var(--sidebar);font-family:var(--mono)}
+.compare-table td.field-name{font-weight:600;color:var(--ink-soft);background:var(--bg-2);width:110px;white-space:nowrap}
+.compare-table td.diff{background:var(--amber-soft)}
+.compare-table td.same{background:var(--green-soft)}
+.cell-val{font-family:var(--mono);font-size:11px;word-break:break-all;color:var(--ink-soft)}
+.cell-missing{color:var(--faint);font-style:italic}
+
+/* ===== 底部日志面板 ===== */
+.bottom-panel{
+  height:220px;background:var(--panel);
+  border-top:1px solid var(--line);
+  display:flex;flex-direction:column;flex-shrink:0;
+}
+.bp-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;height:32px;border-bottom:1px solid var(--line);
+  background:var(--sidebar);
+}
+.bp-tabs{display:flex;gap:0}
+.bp-tab{
+  padding:0 12px;height:32px;display:flex;align-items:center;
+  font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;
+}
+.bp-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.bp-actions{display:flex;gap:6px}
+.log{
+  flex:1;overflow:auto;padding:10px 14px;
+  font-family:var(--mono);font-size:11px;line-height:1.7;
+  background:#fafbfc;
+}
+.log::-webkit-scrollbar{width:8px;height:8px}
+.log::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.info{color:#0369a1}
+.data-log{color:#15803d}
+.warn-log{color:#b45309}
+.err-log{color:#b91c1c}
+
+/* ===== 状态栏 ===== */
+.statusbar{
+  height:24px;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 12px;font-size:11px;font-weight:600;flex-shrink:0;
+}
+.sb-left,.sb-right{display:flex;align-items:center;gap:14px}
+.sb-item{display:flex;align-items:center;gap:5px}
+
+.hidden{display:none !important}
+.hint{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:8px}
+.hint b{color:var(--ink);font-weight:600}
+
+@media(max-width:840px){
+  .side-panel{display:none}
+  .activity-bar{display:none}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<div class="titlebar">
+  <div class="tb-left">
+    <div class="tb-brand">
+      <div class="tb-mark">BP</div>
+      <span class="tb-title">BikePower BLE 工具台</span>
+      <span class="tb-sub">v4.1.3</span>
+    </div>
+    <div class="tb-tabs">
+      <div class="tb-tab active">⬇ 固件刷写</div>
+      <div class="tb-tab">📶 连接蓝牙</div>
+      <div class="tb-tab">⚖ 多设备比对</div>
+    </div>
+  </div>
+  <div class="tb-right">
+    <button class="btn sm">导出报告</button>
+    <button class="btn primary sm">连接串口并刷写</button>
+  </div>
+</div>
+
+<!-- 工作区 -->
+<div class="workspace">
+  <!-- 活动栏 -->
+  <div class="activity-bar">
+    <div class="ab-item active" title="固件刷写">⬇</div>
+    <div class="ab-item" title="蓝牙连接">📶</div>
+    <div class="ab-item" title="多设备比对">⚖</div>
+    <div class="ab-spacer"></div>
+    <div class="ab-item" title="设置">⚙</div>
+  </div>
+
+  <!-- 侧边面板 -->
+  <aside class="side-panel">
+    <div class="sp-head">设备列表</div>
+    <div class="sp-list">
+      <div class="sp-item active"><span class="ico">📱</span>BikePower-C3<span class="badge-mini ok">已连接</span></div>
+      <div class="sp-item"><span class="ico">❤️</span>HRM-Pro<span class="badge-mini">已授权</span></div>
+      <div class="sp-item"><span class="ico">⚡</span>Assioma Duo<span class="badge-mini">已授权</span></div>
+      <div class="sp-item" style="opacity:.5"><span class="ico">＋</span><span style="color:var(--muted)">添加设备...</span></div>
+    </div>
+    <div class="sp-head" style="border-top:1px solid var(--line)">已存模板</div>
+    <div class="sp-list">
+      <div class="sp-item"><span class="ico">📄</span>BikePower-C3<span class="badge-mini">3</span></div>
+      <div class="sp-item"><span class="ico">📄</span>HRM-Pro<span class="badge-mini">1</span></div>
+    </div>
+  </aside>
+
+  <!-- 编辑区 -->
+  <main class="editor">
+    <div class="editor-tabs">
+      <div class="etab active">固件刷写 <span class="close">×</span></div>
+      <div class="etab">实时数据 <span class="close">×</span></div>
+      <div class="etab">GATT 服务 <span class="close">×</span></div>
+    </div>
+    <div class="editor-body">
+      <div class="breadcrumb">workspace / <b>固件刷写</b> / esp32-c3</div>
+
+      <section class="block">
+        <div class="block-head"><h3>刷写步骤</h3><span class="badge ok">可刷写</span></div>
+        <div class="block-body">
+          <div class="steps">
+            <div class="step"><div class="num">1</div><div><b>用数据线连接开发板</b><p>将 ESP32-C3 通过支持数据传输的 USB 线连接到电脑。</p></div></div>
+            <div class="step"><div class="num">2</div><div><b>确认板型：通用 ESP32-C3</b><p>本固件仅支持通用 ESP32-C3 开发板。</p></div></div>
+            <div class="step"><div class="num">3</div><div><b>选择串口并刷写</b><p>点击右上角按钮，在弹窗中选择开发板对应的串口。</p></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="block-head"><h3>实时数据 — BikePower-C3</h3><span class="badge muted">已连接</span></div>
+        <div class="block-body" style="padding:0">
+          <div class="metrics">
+            <div class="metric"><div class="label">功率</div><b>186<span class="unit">W</span></b></div>
+            <div class="metric"><div class="label">心率</div><b>142<span class="unit">BPM</span></b></div>
+            <div class="metric"><div class="label">踏频</div><b>88<span class="unit">RPM</span></b></div>
+            <div class="metric"><div class="label">速度</div><b>32.4<span class="unit">km/h</span></b></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- 底部日志面板 -->
+<div class="bottom-panel">
+  <div class="bp-head">
+    <div class="bp-tabs">
+      <div class="bp-tab active">事件日志</div>
+      <div class="bp-tab">异常检测</div>
+    </div>
+    <div class="bp-actions">
+      <button class="btn sm ghost">清空</button>
+    </div>
+  </div>
+  <div class="log">
+    <div class="info">[12:04:21]  BLE 工具台已就绪。</div>
+    <div class="data-log">[12:04:35]  已订阅 CPS 通知</div>
+    <div class="data-log">[12:04:35]  已订阅 HRS 通知</div>
+    <div class="info">[12:04:36]  GATT 已连接: BikePower-C3</div>
+    <div class="info">[12:04:36]  DIS 信息读取完成</div>
+    <div class="info">[12:04:36]  已枚举 6 个 GATT 服务</div>
+    <div class="warn-log">[12:05:02]  超过 3500ms 未收到通知</div>
+  </div>
+</div>
+
+<!-- 状态栏 -->
+<div class="statusbar">
+  <div class="sb-left">
+    <span class="sb-item">● 已连接</span>
+    <span class="sb-item">generic-c3</span>
+  </div>
+  <div class="sb-right">
+    <span class="sb-item">Web Bluetooth ✓</span>
+    <span class="sb-item">UTF-8</span>
+  </div>
+</div>
+
+</body>
+</html>

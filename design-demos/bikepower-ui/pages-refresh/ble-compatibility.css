@@ -1,0 +1,42 @@
+/* 兼容性诊断复用工具台主题；表单与证据均保持可读。 */
+.compatibility{padding:24px}
+.compatibility .card-head{padding:0 0 16px;gap:16px}
+.compatibility h2{margin:6px 0 0}
+.compat-lead{max-width:880px;color:var(--muted);margin:0 0 24px}
+.compat-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:16px 0}
+.compat-fields label,.compat-notes,.compat-permissions>label{display:grid;gap:8px;color:var(--strong);font-size:13px;font-weight:600}
+.compatibility input:not([type="checkbox"]):not([type="file"]),.compatibility select,.compatibility textarea{
+  width:100%;min-height:44px;background:var(--bg);border:1px solid var(--line);color:var(--strong);
+  border-radius:0;padding:10px 12px;font:14px/1.5 var(--sans)
+}
+.compatibility textarea{resize:vertical}
+.compatibility input::placeholder,.compatibility textarea::placeholder{color:var(--muted);opacity:1}
+.compatibility textarea:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.compat-pair{grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--line);padding-top:20px}
+.compat-check{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--strong)}
+.compat-check input{width:18px;height:18px;accent-color:var(--accent);flex-shrink:0}
+.compat-actions{margin:20px 0 12px;flex-wrap:wrap}
+.compat-actions label{cursor:pointer;color:var(--muted)}
+.compat-file{width:1px;height:1px;position:absolute;clip-path:inset(50%)}
+.compat-actions:has(.compat-file:focus-visible) label[for="compat-import"]{outline:2px solid var(--accent)}
+.compat-permissions{margin:20px 0;color:var(--muted);font-size:13px}
+.compat-permissions summary{cursor:pointer;color:var(--strong);padding:10px 0}
+.compat-permissions p{margin:10px 0}
+.compat-results{border-top:1px solid var(--line);margin-top:24px}
+.compat-results:empty{display:none}
+.compat-results h3,.compat-handoff h3{font-size:18px;color:var(--strong);margin:24px 0 12px}
+.compat-finding{padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.compat-finding b{display:block;color:var(--strong);font-size:14px;margin:8px 0}
+.compat-finding p{margin:6px 0;font-size:13px;overflow-wrap:anywhere}
+.compat-evidence{font-family:var(--mono);color:var(--muted);font-size:12px!important}
+.compat-results table{width:100%;font-size:13px}
+.compat-results th,.compat-results td{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid var(--line);overflow-wrap:anywhere;white-space:normal}
+.compat-results th{color:var(--strong)}
+.compat-table{overflow-x:auto}
+.compat-results details summary{cursor:pointer;color:var(--strong);padding:16px 0}
+.compat-handoff{border-top:1px solid var(--line);margin-top:28px}
+.compat-handoff>p{color:var(--muted);font-size:13px}
+#compat-handoff-status{color:var(--accent);font-weight:600}
+.compat-notes{margin:16px 0}
+@media(min-width:1200px){.compat-outcomes{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:900px){.compatibility{padding:16px}.compat-fields{grid-template-columns:1fr}.compatibility .card-head{align-items:flex-start;flex-direction:column}}

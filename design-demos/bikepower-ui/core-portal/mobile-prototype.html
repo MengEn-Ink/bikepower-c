@@ -572,7 +572,7 @@ input[type="range"] { width: 100%; margin: 14px 0 0; accent-color: var(--gold-ho
         <span>Bike<strong>Power</strong></span>
       </a>
       <div class="device-heading">
-        <b id="headerDeviceName">BikePower-C3</b>
+        <b id="headerDeviceName">BP_XXXX</b>
         <span>固件 4.2.1 · 演示数据</span>
       </div>
       <div class="session-clock">
@@ -874,7 +874,7 @@ input[type="range"] { width: 100%; margin: 14px 0 0; accent-color: var(--gold-ho
             <span>展开</span>
           </summary>
           <div class="device-settings-body">
-            <label class="wide-field">设备名称<input id="deviceNameInput" type="text" value="BikePower-C3" maxlength="23"></label>
+            <label class="wide-field">设备名称<input id="deviceNameInput" type="text" placeholder="BP_XXXX" maxlength="23"></label>
             <label class="wide-field">按钮调功步进<input id="powerStepInput" type="number" value="20"><span>W</span></label>
             <dl class="identity-grid" id="boardIdentity"></dl>
             <dl class="firmware-list">
@@ -980,7 +980,7 @@ input[type="range"] { width: 100%; margin: 14px 0 0; accent-color: var(--gold-ho
     broadcast: { power: true, cadence: true, heart: true },
     heart: { enabled: true, mode: "linked", ftp: 245, threshold: 178, fixed: 145 },
     running: { mode: "fixed", paceMinutes: 5, paceSeconds: 0, cadence: 170, cadenceFloat: 4 },
-    deviceName: "BikePower-C3",
+    deviceName: "BP_XXXX",
     identity: { manufacturer: "BikePower", model: "m5stamp-c3", serial: "C3-DEMO-001", hardware: "ESP32-C3", firmware: "4.2.1", software: "4.2.1" },
     powerStep: 20
   };

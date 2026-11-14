@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方向 A · 暗色终端控制台</title>
+<style>
+:root{
+  --bg:#0a0e17;
+  --bg-2:#0f1520;
+  --panel:#131a28;
+  --panel-2:#182131;
+  --line:#1f2a3d;
+  --line-soft:#1a2333;
+  --ink:#e6edf6;
+  --ink-soft:#aebacc;
+  --muted:#6b7a93;
+  --faint:#4a5770;
+  --accent:#00d4ff;
+  --accent-2:#3da9fc;
+  --accent-deep:#0099cc;
+  --accent-soft:rgba(0,212,255,.12);
+  --green:#3ddc97;
+  --green-soft:rgba(61,220,151,.12);
+  --red:#ff5c7c;
+  --red-soft:rgba(255,92,124,.12);
+  --amber:#ffb454;
+  --amber-soft:rgba(255,180,84,.12);
+  --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --radius:10px;
+  --radius-sm:6px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:13.5px;
+  line-height:1.55;
+  display:grid;
+  grid-template-columns:240px 1fr;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(600px 400px at 100% 0%,rgba(0,212,255,.06),transparent 70%),
+    radial-gradient(500px 400px at 0% 100%,rgba(61,220,151,.04),transparent 70%);
+}
+
+/* ===== 侧栏 ===== */
+.sidebar{
+  background:var(--bg-2);
+  border-right:1px solid var(--line);
+  padding:22px 0;
+  position:sticky;top:0;height:100vh;
+  display:flex;flex-direction:column;
+  z-index:2;
+}
+.brand{
+  display:flex;align-items:center;gap:11px;
+  padding:0 20px 22px;
+  border-bottom:1px solid var(--line);
+}
+.brand-mark{
+  width:38px;height:38px;border-radius:9px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  color:#04141f;display:grid;place-items:center;
+  font-weight:900;font-size:14px;letter-spacing:-.03em;
+  box-shadow:0 0 18px rgba(0,212,255,.4);
+  font-family:var(--mono);
+}
+.brand h1{font-size:14px;margin:0;font-weight:800;letter-spacing:-.01em}
+.brand .sub{display:block;font-size:10.5px;color:var(--muted);margin-top:2px;font-family:var(--mono)}
+
+.nav{padding:14px 12px;display:flex;flex-direction:column;gap:4px}
+.nav-label{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.12em;padding:0 10px 8px;font-family:var(--mono)}
+.nav-item{
+  display:flex;align-items:center;gap:11px;
+  padding:10px 12px;border-radius:8px;
+  color:var(--ink-soft);cursor:pointer;font-size:13px;font-weight:600;
+  transition:all .15s;border:1px solid transparent;
+}
+.nav-item:hover{background:var(--panel);color:var(--ink)}
+.nav-item.active{
+  background:var(--accent-soft);
+  color:var(--accent);
+  border-color:rgba(0,212,255,.25);
+  box-shadow:inset 0 0 0 1px rgba(0,212,255,.1);
+}
+.nav-item .ico{width:18px;text-align:center;font-size:15px}
+.nav-item .kbd{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--faint)}
+
+.sidebar-foot{
+  margin-top:auto;padding:16px 20px;
+  border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+}
+.sidebar-foot .status{display:flex;align-items:center;gap:7px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+
+/* ===== 主区 ===== */
+.main{display:flex;flex-direction:column;min-width:0;z-index:1}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 28px;
+  border-bottom:1px solid var(--line);
+  background:rgba(15,21,32,.6);
+  backdrop-filter:blur(8px);
+  position:sticky;top:0;z-index:5;
+}
+.topbar .crumb{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.topbar .crumb b{color:var(--ink)}
+.topbar .actions{display:flex;gap:8px}
+
+.content{padding:24px 28px;flex:1;display:flex;flex-direction:column;gap:20px}
+
+/* ===== 按钮 ===== */
+.btn{
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;
+  font-family:var(--sans);color:var(--ink-soft);
+  background:var(--panel);transition:all .15s;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn:hover{border-color:var(--accent);color:var(--ink)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.primary{
+  background:var(--accent);color:#04141f;border-color:var(--accent);
+  box-shadow:0 0 14px rgba(0,212,255,.3);
+}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.danger{background:var(--red);color:#fff;border-color:var(--red)}
+.btn.ghost{background:transparent}
+.btn.sm{padding:6px 11px;font-size:11.5px}
+
+/* ===== 面板 ===== */
+.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.panel-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+  background:var(--panel-2);
+}
+.panel-head h2{
+  margin:0;font-size:13px;font-weight:800;color:var(--ink);
+  display:flex;align-items:center;gap:9px;letter-spacing:.01em;
+}
+.panel-head h2::before{
+  content:"";width:2px;height:13px;background:var(--accent);border-radius:1px;
+  box-shadow:0 0 6px var(--accent);
+}
+.panel-body{padding:18px}
+
+/* ===== 步骤指引 ===== */
+.steps{display:flex;flex-direction:column;gap:10px}
+.step{
+  display:grid;grid-template-columns:28px 1fr;gap:14px;align-items:flex-start;
+  padding:12px 14px;border-radius:8px;
+  background:var(--panel-2);border:1px solid var(--line);
+}
+.step .num{
+  width:26px;height:26px;border-radius:6px;
+  background:var(--accent-soft);color:var(--accent);
+  display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:12px;
+  border:1px solid rgba(0,212,255,.3);
+}
+.step b{font-size:13px;color:var(--ink);display:block;margin-bottom:3px}
+.step p{margin:0;font-size:12px;color:var(--muted);line-height:1.6}
+
+/* ===== 徽章 ===== */
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;
+  font-family:var(--mono);letter-spacing:.02em;
+  background:var(--accent-soft);color:var(--accent);
+  border:1px solid rgba(0,212,255,.25);
+}
+.badge.ok{background:var(--green-soft);color:var(--green);border-color:rgba(61,220,151,.3)}
+.badge.warn{background:var(--amber-soft);color:var(--amber);border-color:rgba(255,180,84,.3)}
+.badge.err{background:var(--red-soft);color:var(--red);border-color:rgba(255,92,124,.3)}
+.badge.muted{background:var(--panel-2);color:var(--muted);border-color:var(--line)}
+
+/* ===== 信息行 ===== */
+.spec{display:flex;flex-direction:column}
+.spec .row{
+  display:flex;justify-content:space-between;gap:14px;
+  padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px;
+}
+.spec .row:last-child{border-bottom:0}
+.spec .row span:first-child{color:var(--muted);min-width:90px;font-weight:500}
+.spec .row span:last-child{text-align:right;word-break:break-all;font-weight:700;color:var(--ink-soft);font-family:var(--mono)}
+.sha{font-size:10.5px;color:var(--faint)!important;font-weight:500!important}
+
+/* ===== 实时数据指标 ===== */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.metric{
+  background:var(--panel-2);border:1px solid var(--line);
+  border-radius:8px;padding:14px;position:relative;overflow:hidden;
+}
+.metric::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--accent);box-shadow:0 0 8px var(--accent);
+}
+.metric b{
+  display:block;font-size:28px;font-weight:800;color:var(--ink);
+  font-family:var(--mono);letter-spacing:-.03em;line-height:1.1;
+}
+.metric span{display:block;font-size:11px;color:var(--muted);margin-top:5px}
+
+/* ===== 设备卡片 ===== */
+.device-card{
+  border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--panel-2);padding:16px;
+}
+.dc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.dc-name{font-weight:800;font-size:14px;color:var(--ink)}
+.dc-meta{font-size:10.5px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.dc-foot{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+
+/* ===== 服务列表 ===== */
+.svc-list{display:flex;flex-direction:column;gap:6px}
+.svc-item{
+  border:1px solid var(--line);border-radius:7px;padding:11px 13px;background:var(--panel);
+}
+.svc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.svc-name{font-weight:700;font-size:12.5px;color:var(--ink-soft);font-family:var(--mono)}
+.svc-uuid{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.chars{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:3px}
+.char{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.char b{color:var(--ink-soft);font-weight:600}
+.props{font-size:10px;color:var(--faint);font-family:var(--mono)}
+
+/* ===== 比对表 ===== */
+.compare-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.compare-table th,.compare-table td{
+  padding:9px 12px;text-align:left;border-bottom:1px solid var(--line-soft);vertical-align:top;
+}
+.compare-table th{font-weight:700;color:var(--accent);font-size:11px;background:var(--panel-2);font-family:var(--mono);letter-spacing:.02em}
+.compare-table td.field-name{font-weight:600;color:var(--ink-soft);background:var(--panel-2);width:120px;white-space:nowrap;font-family:var(--mono)}
+.compare-table td.diff{background:var(--amber-soft)}
+.compare-table td.same{background:var(--green-soft)}
+.cell-val{font-family:var(--mono);font-size:11px;word-break:break-all;color:var(--ink-soft)}
+.cell-missing{color:var(--faint);font-style:italic}
+
+/* ===== 终端日志 ===== */
+.terminal{
+  background:#060910;
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.term-head{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 14px;background:#0c111c;
+  border-bottom:1px solid var(--line);
+}
+.term-dot{width:10px;height:10px;border-radius:50%}
+.term-dot.r{background:#ff5f56}
+.term-dot.y{background:#ffbd2e}
+.term-dot.g{background:#27c93f}
+.term-title{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:8px}
+.log{
+  height:200px;overflow:auto;padding:13px 16px;
+  font-family:var(--mono);font-size:11.5px;line-height:1.7;
+}
+.log::-webkit-scrollbar{width:8px}
+.log::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.info{color:#7dd3fc}
+.data-log{color:var(--green)}
+.warn-log{color:var(--amber)}
+.err-log{color:var(--red)}
+
+.hidden{display:none !important}
+.hint{font-size:12px;color:var(--muted);line-height:1.6;margin-top:10px}
+.hint b{color:var(--ink-soft);font-weight:700}
+
+@media(max-width:840px){
+  body{grid-template-columns:1fr}
+  .sidebar{position:relative;height:auto;flex-direction:row;flex-wrap:wrap;padding:14px}
+  .brand{border-bottom:0;padding:0 14px}
+  .nav{flex-direction:row;flex-wrap:wrap}
+  .nav-label{display:none}
+  .main{min-width:0}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-mark">BP</div>
+    <div>
+      <h1>BikePower</h1>
+      <span class="sub">BLE CONSOLE v4.1.3</span>
+    </div>
+  </div>
+  <nav class="nav">
+    <div class="nav-label">WORKSPACE</div>
+    <div class="nav-item active"><span class="ico">⬇</span>固件刷写<span class="kbd">1</span></div>
+    <div class="nav-item"><span class="ico">📶</span>连接蓝牙<span class="kbd">2</span></div>
+    <div class="nav-item"><span class="ico">⚖</span>多设备比对<span class="kbd">3</span></div>
+  </nav>
+  <div class="sidebar-foot">
+    <div class="status"><span class="dot"></span>Web Bluetooth 就绪</div>
+  </div>
+</aside>
+
+<main class="main">
+  <header class="topbar">
+    <div class="crumb">workspace / <b>固件刷写</b></div>
+    <div class="actions">
+      <button class="btn">导出报告</button>
+      <button class="btn primary">连接串口并刷写</button>
+    </div>
+  </header>
+
+  <div class="content">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>固件刷写</h2>
+        <span class="badge ok">可刷写 · v4.1.3</span>
+      </div>
+      <div class="panel-body">
+        <div class="steps">
+          <div class="step"><div class="num">1</div><div><b>用数据线连接开发板</b><p>将 ESP32-C3 开发板通过 USB 线插到电脑。注意：部分"充电线"只能充电不能传数据，请确认使用支持数据传输的线。</p></div></div>
+          <div class="step"><div class="num">2</div><div><b>确认板型</b><p>本固件仅支持通用 ESP32-C3 开发板。</p></div></div>
+          <div class="step"><div class="num">3</div><div><b>在弹窗中选择串口</b><p>点击刷写按钮后，浏览器会弹出串口选择框，请选择开发板对应的串口（Windows 通常是 COM3 / COM4）。</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>实时数据</h2><span class="badge muted">已连接设备</span></div>
+      <div class="panel-body">
+        <div class="metrics">
+          <div class="metric"><b>186</b><span>CPS 功率 (W)</span></div>
+          <div class="metric"><b>142</b><span>心率 (BPM)</span></div>
+          <div class="metric"><b>88</b><span>踏频 (RPM)</span></div>
+          <div class="metric"><b>32.4</b><span>速度 (km/h)</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="terminal">
+      <div class="term-head">
+        <span class="term-dot r"></span><span class="term-dot y"></span><span class="term-dot g"></span>
+        <span class="term-title">event-log — ble-console</span>
+      </div>
+      <div class="log">
+        <div class="info">[12:04:21]  BLE 工具台已就绪。</div>
+        <div class="data-log">[12:04:35]  已订阅 CPS 通知</div>
+        <div class="data-log">[12:04:35]  已订阅 HRS 通知</div>
+        <div class="info">[12:04:36]  GATT 已连接: BikePower-C3</div>
+        <div class="info">[12:04:36]  DIS 信息读取完成</div>
+        <div class="info">[12:04:36]  已枚举 6 个 GATT 服务</div>
+        <div class="warn-log">[12:05:02]  超过 3500ms 未收到通知</div>
+      </div>
+    </section>
+  </div>
+</main>
+</body>
+</html>
