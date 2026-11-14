@@ -67,7 +67,7 @@ function Prepare-BoardDefaults {
     }
 
     $sdkconfigPath = Join-Path $ProjectDir "sdkconfig"
-    if (Test-Path $sdkconfigPath -and -not $SdkconfigBackup) {
+    if ((Test-Path $sdkconfigPath) -and (-not $SdkconfigBackup)) {
         $script:SdkconfigBackup = Join-Path $ProjectDir "sdkconfig.flash.backup"
         Copy-Item $sdkconfigPath $script:SdkconfigBackup -Force
     }
