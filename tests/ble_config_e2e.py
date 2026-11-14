@@ -544,10 +544,23 @@ async def run_e2e(args):
         primary_error = exc
     finally:
         if original is not None:
-            try:
-                await restore_original(session, original, args.port, args.settle_seconds)
-            except (Exception, asyncio.CancelledError) as exc:
-                cleanup_error = exc
+            # 失败兜底：恢复可能因为设备仍挂着测试覆盖名（BP_E2E）或中央侧旧句柄而连不上，
+            # 这里再做一次硬复位 + 有界重连后重试，避免把开发板留在测试名上。
+            for attempt in range(1, 3):
+                try:
+                    await restore_original(session, original, args.port, args.settle_seconds)
+                    cleanup_error = None
+                    break
+                except (Exception, asyncio.CancelledError) as exc:
+                    cleanup_error = exc
+                    if attempt == 1:
+                        try:
+                            await asyncio.to_thread(
+                                reset_device, args.port, session.reset_method
+                            )
+                        except Exception:  # noqa: BLE001 - 复位失败按原错误继续上报
+                            pass
+                        await asyncio.sleep(max(3.0, args.settle_seconds))
         await session.disconnect()
 
     if primary_error is not None:
@@ -562,6 +575,7 @@ async def run_e2e(args):
     if cleanup_error is not None:
         raise ConfigE2EError(
             f"主测试通过但恢复失败: {type(cleanup_error).__name__}: {cleanup_error}"
+            + "；重试一次仍失败，设备名可能仍停在测试覆盖名，请用 --address 指定设备或 erase_flash 后重烧"
         )
     print("[ble-config-e2e] PASS 配置读写、错误路径、NVS 持久化与 GATT 重建全部通过")
 
