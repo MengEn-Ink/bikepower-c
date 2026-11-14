@@ -12,13 +12,23 @@
 完整工程优先级、依赖、工作量与验收标准见 [main 卫生与升级评审](docs/dev/69-main-hygiene-and-upgrade-review.md)；本轮自动推进状态见[自动工程改进](docs/dev/70-automated-engineering-followups.md)。JSON与NimBLE适配边界、测试信号/依赖诊断已实现；门户余量改善但10%目标未闭合。SDK5.5.6与coredump栈仅隔离验证，生产仍5.5.4/1024；下方硬件事项不因软件通过而关闭。
 
 - [x] **BLE 设备名规则 `BP_XXXX`**：`BP_` + eFuse BT MAC 低 2 字节 4 位 hex 已实现并在实板验证（扫描 `BP_2622`，DIS `generic-c3-v4.4.2`，序列号 `BP-1020BACC2620`）；显式 `devname` 仍可覆盖。超过 100 块量产前需评估改 6 位或走生产写号。
-- [ ] **P0 当前镜像真实踩踏与 5 分钟实体耐久**：非零功率/踏频、断开重连、广播恢复与堆余量。
+- [x] **P0 当前镜像 5 分钟实体耐久与断开重连**（2026-11-14，Windows 侧）：`soak_5min` PASS，10 轮各 15 秒连接，扫描/连接失败 0，累计 CPS 通知 153，总判定通过；`ble_reconnect` PASS，两次独立扫描/连接/显式断开全部成功且两轮命中同一地址。串口状态机日志因 `CONFIG_LOG_DEFAULT_LEVEL_WARN=y` 未输出，未作为判据。
+- [ ] **P0 `ble_cycling` 未取得**：CPS/HR/FTMS 服务与数据正常（模拟模式 240W 量级），但 FTMS 控制点写 `RequestControl` 被拒 `Insufficient Authentication`——设备端绑定在清 NVS 时已清空，Windows 侧尚未与该板配对。需先在 Windows 蓝牙设置里配对 `BP_2622`，再复跑 `tests/ble_selftest.py --profile cycling`。
 - [ ] **P0 `ble_config_rw` 未闭合**：清除设备端 NVS 后 Windows 可稳定枚举 8 服务，八组读写、拒绝路径、revision 改写与恢复读取全 PASS；脚本末段"持久化后重新连接"仍报 `Could not get GATT services: Unreachable`，台账保持 FAIL（证据 `tests/logs/cfg-e2e-21e2d83-nvs-clear.log`）。
 - [ ] **P1 新页面真实热点验收**：iOS/Android 操作、BLE 连续通知及配网最低堆；本轮已发现通用板串口并完成原配置/Flash私有备份，当前候选手机热点验收仍待执行。
 - [ ] **P1 双下游 + 真实 CPS 上游 + WiFi 共存峰值**及手机/BINAVI 兼容矩阵。
 - [ ] **P1 Service Changed 实物验收**：未确认指示跨重启范围归零的软件缺陷已修复；绑定重连后的无线发送与确认仍未取得，不能记 PASS。见[恢复设计与验证](docs/dev/65-service-changed-reboot-recovery.md)。
 - [ ] **P2 Windows 断开后链路占用边界、M5 实物 LED/按键、保留 NVS 与绑定升级演练**。
 - [ ] **P2 双槽 NVS 实物故障验证**：断电与满分区。跨键原子提交的软件修复已完成，不再列为待实现缺陷。
+
+## v4.4.2 当前镜像 BLE 实体验收（2026-11-14 晚）
+
+- 镜像：`build/bikepower-c.bin` 1,201,952B，SHA256 `D89799B17937C4A244A7597F555F4D854AA257CCF9C784885D31C0FBD0537170`；自该镜像构建提交以来 `main/`、`components/`、`CMakeLists.txt`、`sdkconfig.defaults` 零改动，后续提交仅涉及测试脚本与文档。
+- 台账 `tests/reports/device-acceptance-generic-c3.json`：P0 PASS=3（`serial_boot`、`soak_5min`、`ble_reconnect`）、FAIL=1（`ble_config_rw`）、NOT_RUN=1（`ble_cycling`）；P1 十项仍 NOT_RUN。
+- 耐久证据 `tests/logs/soak-8c09507-win.log`：10 轮 × 15 秒，扫描失败 0、连接失败 0、累计 CPS 通知 153，总判定通过。前置失败（`soak-21e2d83-mac.log` 等 10/10 扫描失败）根因为设备处于手机连接态停止广播，同时旧脚本用 `BikePower` 精确匹配；脚本已改为 `BP_` 前缀匹配。
+- 重连证据 `tests/logs/stage3-8c09507-win.log`：两轮独立扫描/连接/显式断开全通过，两轮同地址 `10:20:BA:CC:26:22`。
+- 未闭合：`ble_cycling` 控制点写需加密链路，Windows 未配对（`Insufficient Authentication`）；`ble_config_rw` 末段"持久化后重新连接"仍 `Unreachable`，涉及设备重启的进一步排查未继续。
+- 中央侧现象备忘：清设备端 NVS 后 Windows 可枚举完整 8 服务，"缺服务/数值为 0"属中央缓存或连接类型选择问题，不是固件缺陷。
 
 ## v4.4.2 本机实板验证进展（2026-11-14）
 

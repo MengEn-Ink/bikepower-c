@@ -4,6 +4,12 @@
 
 ## [未发布]
 
+### 当前镜像 5 分钟耐久与断开重连取证（2026-11-14）
+- `soak_5min` PASS：Windows 端 10 轮各 15 秒连接，扫描失败 0、连接失败 0、累计 CPS 通知 153，日志 `tests/logs/soak-8c09507-win.log`。
+- `ble_reconnect` PASS：两轮独立扫描/连接/显式断开全部成功，两轮命中同一地址 `10:20:BA:CC:26:22`，日志 `tests/logs/stage3-8c09507-win.log`；串口状态机日志因 `CONFIG_LOG_DEFAULT_LEVEL_WARN=y` 未输出，未作为判据。
+- 前置失败归因：设备处于手机连接态时停止广播，扫描必然失败（`tests/logs/soak-21e2d83-mac.log` 10/10），叠加旧脚本 `BikePower` 精确匹配；脚本已统一为 `BP_` 前缀匹配。
+- 未闭合：`ble_cycling` 写 FTMS 控制点返回 `Insufficient Authentication`（Windows 未与该板配对）；`ble_config_rw` 末段持久化后重连仍 `Unreachable`。
+
 ### NVS 清理后 GATT 恢复与配置 E2E 复测（2026-11-14）
 - 现象：Windows 侧对已配对过的设备出现 `Could not get GATT services: Unreachable`，此前一度只枚举到 1800/1801/180A 三个服务；mac 侧同地址也读不到服务，设备广播正常。
 - 处置：仅擦除 NVS 分区（`esptool erase_region 0x9000 0x6000`，保留 app 与镜像身份），清除设备端配对与 GATT 缓存记录后重新枚举。
