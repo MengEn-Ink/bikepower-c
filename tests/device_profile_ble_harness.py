@@ -122,7 +122,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="通过 BLE Config Service 临时切换 profile")
     parser.add_argument("--profile", choices=tuple(SPORT_PROFILES), required=True)
     parser.add_argument("--board", choices=("generic-c3", "m5stamp-c3"), default="")
-    parser.add_argument("--device-name", default="BikePower")
+    parser.add_argument("--device-name", default="BP_")
     parser.add_argument("--address", default="", help="首次及后续连接固定设备地址，不回退到同名设备")
     parser.add_argument("--scan-timeout", type=float, default=20.0)
     parser.add_argument("--settle-seconds", type=float, default=4.0)

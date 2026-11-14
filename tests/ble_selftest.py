@@ -20,7 +20,7 @@ from bleak import BleakScanner, BleakClient
 from ble_protocol import parse_cps, parse_rsc, parse_treadmill
 from ble_telemetry import uuid as telemetry_uuid, decode_meta as telemetry_meta
 
-DEVICE_NAME = "BikePower"
+DEVICE_NAME = "BP_"
 CPS_UUID = "00002a63-0000-1000-8000-00805f9b34fb"
 CPS_FEATURE_UUID = "00002a65-0000-1000-8000-00805f9b34fb"
 HR_UUID = "00002a37-0000-1000-8000-00805f9b34fb"

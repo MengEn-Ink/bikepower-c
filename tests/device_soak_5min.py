@@ -14,7 +14,7 @@ import time
 
 from bleak import BleakClient, BleakScanner
 
-DEVICE_NAME = "BikePower"
+DEVICE_NAME = "BP_"
 CPS_UUID = "00002a63-0000-1000-8000-00805f9b34fb"
 HR_UUID = "00002a37-0000-1000-8000-00805f9b34fb"
 CSC_UUID = "00002a5b-0000-1000-8000-00805f9b34fb"
@@ -30,8 +30,18 @@ def parse_args():
     return parser.parse_args()
 
 
+async def find_device_by_prefix(name, scan_timeout):
+    """出厂名为 BP_XXXX（MAC 低 2 字节派生），这里按前缀匹配取第一台。"""
+    discovered = await BleakScanner.discover(timeout=scan_timeout, return_adv=True)
+    for _addr, (device, adv) in discovered.items():
+        local = adv.local_name or device.name or ""
+        if local.startswith(name):
+            return device
+    return None
+
+
 async def run_cycle(name, scan_timeout, hold):
-    device = await BleakScanner.find_device_by_name(name, timeout=scan_timeout)
+    device = await find_device_by_prefix(name, scan_timeout)
     if not device:
         return {"scan_ok": False, "notify": 0, "error": "扫描未发现设备"}
     counts = {"cps": 0, "hr": 0, "csc": 0, "ftms": 0, "other": 0}

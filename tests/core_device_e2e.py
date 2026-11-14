@@ -235,7 +235,7 @@ def main():
     p.add_argument('--address', required=True)
     p.add_argument('--port', required=True)
     p.add_argument('--board', choices=('generic-c3','m5stamp-c3'), required=True)
-    p.add_argument('--name', default='BikePower')
+    p.add_argument('--name', default='BP_')
     p.add_argument('--rounds', type=int, default=5)
     p.add_argument('--seconds', type=int, default=60)
     p.add_argument('--timeout', type=int, default=30)

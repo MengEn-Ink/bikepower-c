@@ -16,6 +16,7 @@
 - 优先级：显式 `devname`（配置服务/门户写入）> MAC 派生 > 常量兜底；派生只在名称为出厂默认或空名时发生，且只改内存不写 NVS，避免旧默认名残留在已烧录板。
 - 唯一性取舍：4 hex 共 65536 空间，试产批次（≤100 块）重名概率 <8% 可接受；超过 100 块建议改 6 位 `BP_XXXXXX` 或由生产工装直接写 `devname`。
 - 测试脚本改为前缀匹配：`tests/ble_adv_scan_readonly.py`、`tests/ble_broadcast_monitor.py`、`tests/ble_config_e2e.py`（E2E 改名目标 `BP_E2E`/`BP_E2F`，默认 `--device-name BP_`）。
+- 其余设备脚本默认名同步为 `BP_` 前缀并按前缀匹配：`ble_selftest.py`、`stage3_conn_test.py`、`ble_telemetry_e2e.py`、`core_device_e2e.py`、`device_profile_ble_harness.py`、`device_soak_5min.py`（原默认 `BikePower` 精确匹配在新命名下必然扫描失败）。
 - 实物验证：镜像已烧录，空中扫描得到 `BP_2622`，DIS 读取型号 `ESP32-C3`、固件 `generic-c3-v4.4.2`、序列号 `BP-1020BACC2620`。
 - 取证边界：`sdkconfig.flash.tmp` 为 `CONFIG_LOG_DEFAULT_LEVEL_WARN=y`，INFO 级启动日志不输出，串口取证以 ROM banner 加 BLE 名称/DIS 为准。
 

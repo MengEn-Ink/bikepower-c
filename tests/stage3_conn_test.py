@@ -15,7 +15,7 @@ import serial
 from serial.tools import list_ports
 from bleak import BleakClient, BleakScanner
 
-DEVICE_NAME = "BikePower"
+DEVICE_NAME = "BP_"
 
 lines = []
 stop = threading.Event()

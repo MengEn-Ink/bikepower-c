@@ -22,7 +22,7 @@ async def wait_link_ready(client, timeout=5.0):
 
 async def run(args):
     device = await BleakScanner.find_device_by_filter(
-        lambda d, _: args.address == d.address if args.address else d.name == args.name,
+        lambda d, _: args.address == d.address if args.address else d.name and d.name.startswith(args.name),
         timeout=15)
     if not device:
         raise RuntimeError("未发现目标开发板；网页和骑行 App 必须先释放连接")
@@ -84,7 +84,7 @@ async def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--name", default="BikePower")
+    parser.add_argument("--name", default="BP_")
     parser.add_argument("--address")
     parser.add_argument("--seconds", type=int, default=30)
     parser.add_argument("--report", type=Path)

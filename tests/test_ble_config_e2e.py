@@ -77,7 +77,7 @@ def main():
     modified = make_modified_groups(original)
     validate_groups(modified)
     assert all(modified[key] != original[key] for key in original)
-    assert decode_counted_string(modified["identity"], 1, 23) == "BikePower-E2E"
+    assert decode_counted_string(modified["identity"], 1, 23) == "BP_E2E"
     assert modified["bridge"][2] == 1, "新增备选前必须先绑定主设备，避免固件压紧槽位"
     assert modified["bridge"][1] == original["bridge"][1]
     assert modified["bridge"][10:13] == original["bridge"][10:13]
