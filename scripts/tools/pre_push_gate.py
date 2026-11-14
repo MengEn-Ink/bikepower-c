@@ -32,6 +32,7 @@ def checks():
     return [
         ('commit 空白错误', ['git', 'diff', '--check']),
         ('暂存区空白错误', ['git', 'diff', '--cached', '--check']),
+        ('Badcase 约束', [sys.executable, 'scripts/tools/badcase_gate.py']),
         ('文档质量门禁', [sys.executable, 'scripts/tools/quality_gate.py', '--level', 'docs']),
         ('工作区审计单测', [sys.executable, 'tests/test_workspace_audit.py']),
         ('证据包维护单测', [sys.executable, 'tests/test_report_maintenance.py']),

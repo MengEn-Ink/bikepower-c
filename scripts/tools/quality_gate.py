@@ -457,6 +457,7 @@ STATIC_CHECKS = [
     ("tests/test_device_acceptance.py", "真机验收证据功能样例 (TC-3q)"),
     ("tests/test_operation_gate_evidence.py", "真机门禁证据采集样例 (TC-3r)"),
     ("tests/test_serial_boot_check.py", "串口启动日志判定样例 (TC-3s)"),
+    ("tests/test_badcase_gate.py", "Badcase 门禁功能样例 (BC-01..04)"),
 ]
 # 环境缺失标志：命中则降级为 warn（无设备/无依赖环境仍可跑），不算真实失败
 ENV_MISSING_MARKERS = [
@@ -475,6 +476,7 @@ if options.level == "docs":
         "tests/check_operation_coverage.py", "tests/check_github_workflows.py",
     }]
 STATIC_CHECKS += [
+    ("scripts/tools/badcase_gate.py", "Badcase 约束 (BC-01..04)"),
     ("scripts/tools/doc_facts.py", "源码事实摘要"),
     ("scripts/tools/check_markdown_links.py", "Markdown 相对链接与锚点"),
     ("scripts/tools/sync_user_docs.py", "手机离线手册来源一致性"),
