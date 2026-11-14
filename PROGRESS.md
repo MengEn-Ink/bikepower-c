@@ -14,11 +14,18 @@
 
 ## v4.4.2 正式版发布（2026-11-14）
 
-- 发布：GitHub Release `v4.4.2`（正式，非 pre-release），tag 指向 `9ada47c`；资产 `generic-c3-v4.4.2.bin` 1,267,456 B / SHA256 `6858F6F8874B93DCD2967336B9BA42C5979C52B70211B5EFB2FFCF51631D7996`、整包 ZIP 1,489,104 B 及两个 `.sha256`。预发布 `v4.4.2-rc1` 保留以便追溯。
+- 发布：GitHub Release `v4.4.2`（正式，非 pre-release），tag 指向 `9ada47c`；资产 `generic-c3-v4.4.2.bin` 1,267,456 B / SHA256 `6858F6F8874B93DCD2967336B9BA42C5979C52B70211B5EFB2FFCF51631D7996`、整包 ZIP 1,489,104 B 及两个 `.sha256`。预发布 `v4.4.2-rc1` 已于 2026-11-15 删除（GitHub Release 与远端、本地 tag 均已清理），其镜像 SHA256 仅保留在 CHANGELOG 记录中。
 - 门禁：正式入口全 PASS（merge / evidence-validate / endurance / docs / manifest / zip，104.5s）；另有 `sdkconfig.diag.defaults`（未 tracked、被 `dev_workflow.py` 引用的本地诊断预设）以 `.git/info/exclude` 规避 dirty 误伤，文件本身未改动、未提交。
 - 真机 P0 5/5 PASS；证据采集于同源码线预发布镜像（`2DEE4E28…`），正式镜像重编译后复跑配置 E2E（`cfg-e2e-mac-formal.log`，含 GATT 重建与 5 次重连）、命名 `BP_xxxx` 与烧写校验，全部通过。
 - 未闭合（如实记录）：Windows 本机对 `BP_3AEE` 的中央链路——清缓存设备（提权 `pnputil`，8 节点归零）并重启蓝牙服务后，仍表现为连接成功、首个 GATT 读 `Unreachable`；同板刷回预发布镜像结果一致（A/B 对照），属本机栈状态而非构建回归。ERG 复跑需在干净的已绑定中央重做。
-- 待办不变：P1 十项 NOT_RUN；物理按钮/LED、`BPW_xxxx` 热点实物需人工按键；`ble_config_e2e.py` 失败兜底恢复未实现。
+- 待办：P1 十项仍 NOT_RUN；物理按钮/LED、`BPW_xxxx` 热点实物需人工按键。`ble_config_e2e.py` 失败兜底恢复已实现（恢复失败时硬复位重连后重试一次，2026-11-14）。正式包仅 `generic-c3`，`m5stamp-c3` 按维护决定不出包（2026-11-15）。
+
+## 发布范围与 Badcase 门禁决定（2026-11-15）
+
+- 正式包只发 `generic-c3`：`m5stamp-c3` 无 P0 证据，按维护决定不出包；Release 正文与 `release-notes.md` 已写明范围。
+- `v4.4.2-rc1` 已删除：GitHub Release（7 个资产）与远端 tag `68d8883`、本地 tag 一并清理；其镜像 SHA256 仍留在 CHANGELOG 备查。
+- 新增 Badcase 门禁：`scripts/tools/badcase_gate.py` 固化 BC-01..04（HTML 引用未提交资源、文档链接指向未跟踪文件、`Test-Path … -and` 参数陷阱、`core.bare` 误置），单测 `tests/test_badcase_gate.py` 7 例；已接入 `quality_gate.py`（CI docs job）与 `pre_push_gate.py`；事故记录与流程纪律见 `docs/dev/73-badcase-gates.md`。
+- 连接引导与设备名收尾：Pages 连接异常新增 `staleBond` 分类并上线；`ble-connection-help.js` 剩余 `BikePower` 旧名统一为 `BP_xxxx`（`edba9e9`）。
 
 ## 当前待办（唯一状态入口）
 

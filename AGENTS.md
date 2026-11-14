@@ -37,6 +37,7 @@
 
 ## Validation
 
+- 提交/推送前先跑 `python scripts/tools/badcase_gate.py`（BC-01..04：引用资源、文档链接、PS1 `Test-Path`、`core.bare`），事故与流程纪律见 [docs/dev/73-badcase-gates.md](docs/dev/73-badcase-gates.md)。
 - C 代码改动：`idf.py build` 必须通过。
 - 领域层（components/bikepower_domain）改动：运行 host 单测（`test/test_domain`）。
 - 设备行为改动：编译 → 烧录 → 串口确认 → BLE 自测脚本（`tests/`）。

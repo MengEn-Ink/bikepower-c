@@ -4,6 +4,13 @@
 
 ## [未发布]
 
+### 发布范围收敛与 Badcase 门禁（2026-11-15）
+- 发布决定：`v4.4.2` 正式包只含 `generic-c3`，`m5stamp-c3` 不出包；GitHub Release 正文与 `build/release/4.4.2/release-notes.md` 已同步范围说明。
+- 删除 `v4.4.2-rc1`：Release（7 个资产）与远端 tag `68d8883`、本地 tag 均清理；其镜像 SHA256 `2DEE4E282093EB7971688218940E46B850EAF9B29109393E3F0DBD5F6330C1F7` 保留在本记录备查。
+- 新增 `scripts/tools/badcase_gate.py`：BC-01 HTML 引用未提交/不存在资源、BC-02 文档链接指向未跟踪文件、BC-03 `Test-Path … -and` 参数陷阱、BC-04 `core.bare` 误置；`tests/test_badcase_gate.py` 7 例正反样例；接入 `quality_gate.py`（docs job）与 `pre_push_gate.py`。
+- 新增 `docs/dev/73-badcase-gates.md`：逐条记录事故、代价与规则；BC-05..08 为无法自动判定的提交纪律（白名单 add、动共享工作区文件先备份、干净索引跑门禁、偶发失败只重跑不改代码）。
+- 连接引导收尾：`tools/web/ble-connection-help.js` 剩余 `BikePower` 旧名统一为 `BP_xxxx`，`tests/test_ble_connection_help.cjs` 23/23 PASS。
+
 ### Pages 连接失败引导补 Windows 实测解法（2026-11-14）
 - 背景：用旧板刷 v4.4.2 后 Windows 连接蓝牙失败，在“设置 → 蓝牙和设备 → 设备”删除该设备后重连即恢复（本机实测）。
 - `tools/web/ble-connection-help.js`：新增 `staleBond`（“系统或 App 里残留了旧设备”）分类，覆盖“能连上但读不到数据 / 立刻断开 / Unreachable”；`disconnected` 与 `generic` 补上“删除这台 `BP_xxxx` 后回 Pages 重新连接”的步骤；`pairingSteps` 设备名统一为 4 位命名。
