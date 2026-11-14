@@ -320,6 +320,27 @@ class DeviceSession:
         service_uuids = {service.uuid.lower() for service in self.client.services}
         require(CONFIG_SERVICE_UUID in service_uuids, "未发现 BikePower Config Service")
 
+    async def connect_with_retry(self, attempts=6, delay=4.0):
+        """设备复位后的重连有界重试。
+
+        设备硬复位后 2.1 秒即恢复广播（实测），但 Windows WinRT 中央侧在
+        旧连接被复位打断后会短暂保留失效句柄，首次 connect 直接报
+        `Could not get GATT services: Unreachable`。这里只重试"重新发现+连接"，
+        不改变任何通过判据：六次内连上则继续验证，连不上照样失败。
+        """
+        last_error = None
+        for index in range(1, attempts + 1):
+            try:
+                await self.disconnect()
+                await asyncio.sleep(delay)
+                await self.connect()
+                print(f"[ble-config-e2e] 重连成功（第 {index} 次尝试）", flush=True)
+                return
+            except Exception as exc:  # noqa: BLE001 - 保留原始异常用于最终判据
+                last_error = exc
+                print(f"[ble-config-e2e] 第 {index} 次重连失败: {exc}", flush=True)
+        raise ConfigE2EError(f"重连 {attempts} 次仍失败: {last_error}")
+
     async def disconnect(self):
         if self.client and self.client.is_connected:
             await self.client.disconnect()
@@ -389,7 +410,7 @@ class DeviceSession:
 async def reconnect(session, settle_seconds):
     await session.disconnect()
     await asyncio.sleep(settle_seconds)
-    await session.connect()
+    await session.connect_with_retry(delay=max(3.0, settle_seconds / 2))
 
 
 async def verify_firmware(session, expected):
@@ -420,7 +441,7 @@ async def restore_original(session, original, port, settle_seconds):
     await session.disconnect()
     await asyncio.to_thread(reset_device, port, session.reset_method)
     await asyncio.sleep(settle_seconds)
-    await session.connect()
+    await session.connect_with_retry()
     await verify_snapshot(session, original, "恢复后重启持久化")
     print("[ble-config-e2e] PASS 已恢复测试前全部配置并验证 NVS")
 
