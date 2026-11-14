@@ -410,7 +410,16 @@ class DeviceSession:
 async def reconnect(session, settle_seconds):
     await session.disconnect()
     await asyncio.sleep(settle_seconds)
-    await session.connect_with_retry(delay=max(3.0, settle_seconds / 2))
+    await _connect_with_retry(session, delay=max(3.0, settle_seconds / 2))
+
+
+async def _connect_with_retry(session, delay=4.0):
+    """对真实会话走有界重试；对测试桩（无该方法）退化为单次连接。"""
+    method = getattr(session, "connect_with_retry", None)
+    if method is None:
+        await session.connect()
+        return
+    await method(delay=delay)
 
 
 async def verify_firmware(session, expected):
@@ -441,7 +450,7 @@ async def restore_original(session, original, port, settle_seconds):
     await session.disconnect()
     await asyncio.to_thread(reset_device, port, session.reset_method)
     await asyncio.sleep(settle_seconds)
-    await session.connect_with_retry()
+    await _connect_with_retry(session)
     await verify_snapshot(session, original, "恢复后重启持久化")
     print("[ble-config-e2e] PASS 已恢复测试前全部配置并验证 NVS")
 
