@@ -33,7 +33,7 @@ test('generic is conditional and does not claim known pairing or occupancy',()=>
   const result=help.classify(new Error('Connection attempt failed'));
   assert.match(result.title,/原因未确定/);
   assert.match(result.steps.join(' '),/如果刚刷入/);
-  assert.match(result.steps.join(' '),/仅.*BikePower/);
+  assert.match(result.steps.join(' '),/仅.*BP_xxxx/);
   assert.match(result.steps.join(' '),/未刚刷机.*不要直接清绑定/);
   assert.doesNotMatch(result.title,/被别的 App|旧配对信息已失效/);
 });
