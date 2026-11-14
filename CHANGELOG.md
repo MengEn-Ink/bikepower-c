@@ -11,6 +11,7 @@
 - 配网页占位同步：`main/web/index.html` 的设备名占位从 `BikePower-C3` 改为 `BP_XXXX`（改为 placeholder，避免静态值被误当实际设备名保存）；`tools/web/phone-portal-source.js` 与 `docs/user/pages-mobile-guide.html` 由 `build_phone_demo.py` / `sync_user_docs.py` 重新生成，设计演示页同步更新。
 - 边界：SSID 只在长按 + 二次确认进入配网模式后出现，需人工按键触发，本轮未取得热点实物证据。
 - 最终镜像复核：1,201,936B，SHA256 `65B6CD5039D2E4DB7CDCA76DE7513B86A1231816807FBCA77E8ABAF61481F225`，内含 `BIKEPOWER_GIT_SHA=8067dae`；Flash `0x10000` 回读与构建产物全等，镜像内可见 `BPW_` 前缀字符串。同一镜像上 `soak_5min` 321 秒 10 轮、CPS 通知 155、失败 0 PASS，`ble_reconnect` 两轮独立扫描/连接/断开 PASS。
+- 含配网页占位的最终镜像：1,201,936B，SHA256 `46A1387F8ED5010965053CD07643A04A2A0A8E3EBD170714876B3E3354B94928`，`BIKEPOWER_GIT_SHA=a41e4e7`；Flash `0x10000` 回读全等。该镜像 `soak_5min` 310 秒 9 轮、CPS 通知 136、失败 0 PASS，`ble_reconnect` 两轮独立扫描/连接/断开 PASS；台账按此镜像与提交重录。
 
 ### 当前镜像 5 分钟耐久与断开重连取证（2026-11-14）
 - `soak_5min` PASS：Windows 端 10 轮各 15 秒连接，扫描失败 0、连接失败 0、累计 CPS 通知 153，日志 `tests/logs/soak-8c09507-win.log`。
