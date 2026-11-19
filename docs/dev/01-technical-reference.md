@@ -11,7 +11,7 @@
 
 ## 工程加固与受限 JSON 导入
 
-`config_store_deserialize()` 先在 2048 字节缓冲内校验完整对象，深度最多8，拒绝重复键、转义键名、非法数值 token、整数溢出、尾部垃圾与缩窄溢出；查找仅作用于直接成员。名称值仍支持既有 Unicode/代理对解码，未知字段必须语法有效。已知整数业务越界仍按原迁移/夹紧规则处理，失败保持调用者配置，schema14、NVS与BLE布局不变。这不是任意通用 JSON 或 Unicode 键解析器。
+`config_store_deserialize()` 先在 2048 字节缓冲内校验完整对象，深度最多8，拒绝重复键、转义键名、非法数值 token、整数溢出、尾部垃圾与缩窄溢出；查找仅作用于直接成员。名称值仍支持既有 Unicode/代理对解码，未知字段必须语法有效。已知整数业务越界仍按原迁移/夹紧规则处理，失败保持调用者配置，schema15、NVS与BLE布局不变。这不是任意通用 JSON 或 Unicode 键解析器。
 
 NimBLE私有头与在途指示字段集中在 `nimble_adapter`，仅adapter拥有私有include；调用需在host上下文，保持应用锁→host锁次序，不返回私有指针。生产仍为IDF5.5.4；5.5.6仅隔离候选。构建JS压缩采用固定rJSmin1.2.5纯Python函数并保留Apache2许可证，内联门户106831字节，110KiB预算未扩大；语法/浏览器检查仍独立。自动改进和未验边界见[实施记录](70-automated-engineering-followups.md)。
 
@@ -347,7 +347,7 @@ DIS 读取内容来自编译期常量：
 当前运动 payload 契约：
 
 - CPS：`flags=0x0020`，2 字节有符号功率、2 字节累计曲柄转数、2 字节曲柄事件时间，总长 8 字节。
-- CSC：`flags=0x02`，crank-only，总长 5 字节。
+- CSC：`flags=0x03`，wheel+crank，总长 11 字节；桥接模式仍用 crank-only 5 字节（flags=0x02），上游功率计无轮转数据。
 - FTMS Indoor Bike：全开 `0x0044/8B`、仅踏频 `0x0004/6B`、仅功率 `0x0040/6B`。
 - FTMS Treadmill：`flags=0x0504`，速度、uint24 米制距离、心率、用时，总长 10 字节。
 - RSC：运行/暂停 flags 分别为 `0x07/0x03`；Total Distance 使用 0.1m 单位，领域层从 uint64 毫米累计直接导出饱和 uint32 dm，保留 0.1m 精度；RSC Feature 为 2 字节 `0x0007`。协议步频为同一脚频率，业务总 steps/min 按 `(总步频+1)/2` 四舍五入；同脚步幅对应 10km/h、170 总步频为约 196cm。
@@ -811,7 +811,7 @@ Captive Portal 探测路由与未知路径统一返回 `303 See Other`、固定 
 - `/api/renew`：续期
 - `/api/mem_stats`：返回 `free` 和 `min_free`
 - `/api/bridge/*`：仅手动扫描 CPS；测试期间保持原输出，收到两份合法通知（包括 0W）后才允许保存新增设备。复制有效 DIS 字段到 `bp_ident`，缺失字段保留原值。
-- schema v14：桥接 blob 使用最多三台设备的 wire v2 显式小端编码，并兼容读取 wire v1；v13 单设备绑定迁移到设备表槽位 0。设备身份由“地址类型 + 地址”组成，满三台后新增设备必须显式提交 `replace_slot`。
+- schema v15：桥接 blob 使用最多三台设备的 wire v2 显式小端编码；新增独立速度计字段 `cycling_speed_x100`（1.00–60.00 km/h）、`cycling_wheel_diameter_mm`（500–2500 mm）、`cycling_speed_float`（0–100），CSC Feature 升级为 0x03 支持轮转数据，模拟模式下 CSC Measurement 扩展为 11 字节（轮+曲柄），FTMS Indoor Bike speed 不再由 cadence*30 推导，而直接使用独立配置速度；桥接模式保持 CSC crank-only 5 字节（上游功率计不提供轮转数据）。
 - `/api/runtime.bridge_runtime`：分别返回持久配置来源和运行时实际来源，以及主备状态、活动槽位、候选槽位和下次尝试倒计时；HTTP 任务只读主循环同步的快照并通过 mailbox 投递命令。
 - 配网默认连续无操作 300 秒；state/runtime 返回 `idle_timeout_sec=300`。读取、轮询、动画、临时测试的后台进展不续期；用户点击扫描/测试等操作由网页统一事件监听调用 renew。
 
@@ -919,22 +919,23 @@ namespace 固定为：
 
 领域层配置版本在 `domain_config.h` 中：
 
-`CONFIG_VERSION = 14`
+`CONFIG_VERSION = 15`
 
-v13→v14 把原单设备绑定迁移到固定三设备表的槽位 0，其他槽位保持为空；NVS `bridge` 升为最长 125 字节的 wire v2，并继续兼容读取最长 47 字节的 wire v1。`brrecent` 只保存最近成功设备的地址类型和地址，作为下次定向连接排序提示，不复制名称或校正参数。v12→v13 仍负责补充默认桥接配置，v11→v12 的历史 ±5W→±50W 迁移继续逐级执行。持久化禁止直接写入 C 结构体。
+v13→v14 把原单设备绑定迁移到固定三设备表的槽位 0，其他槽位保持为空；NVS `bridge` 升为最长 125 字节的 wire v2，并继续兼容读取最长 47 字节的 wire v1。`brrecent` 只保存最近成功设备的地址类型和地址，作为下次定向连接排序提示，不复制名称或校正参数。v12→v13 仍负责补充默认桥接配置，v11→v12 的历史 ±5W→±50W 迁移继续逐级执行。v14→v15 补 `cycling_speed_x100 = 4500`（45.00 km/h）、`cycling_wheel_diameter_mm = 670`（标准公路车 700c）、`cycling_speed_float = 5`（浮动 ±0.05 km/h），CSC Feature 从 0x02（仅曲柄）升级为 0x03（轮转 + 曲柄），CSC Measurement 从 5 字节扩展到 11 字节。持久化禁止直接写入 C 结构体。
 
 桥接领域模块 `cps_input_codec` 完整跳过 CPS 可选字段后读取功率及曲柄事件；`power_bridge` 要求两份有效样本，3 秒过期、断线立即失效。校正支持 ±200W 偏移或 50.0–300.0% 总倍率（页面显示相对 −50.0% 至 +200.0%，+200% 即原值 × 3；旧固件仍只接受最高 150.0% 总倍率），输出夹紧到 0–2000W，原始功率 ≤0 时保持 0W。曲柄计数和时间差采用 16 位回绕，非法差值或曲柄停更不会输出旧踏频。桥接无曲柄 CPS 为 4 字节，有曲柄为 8 字节；桥接 FTMS 使用 More Data 位省略速度，仅编码真实踏频、校正功率及可选模拟心率。
 
 `config_store_migrate()` 负责把旧 `schema_ver` 升级到当前版本。当前策略是：
 
-- v6 -> v14：保留已有配置，补 `run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT`，并继续逐级迁移
-- v7 -> v14：保留已有配置，补 `run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT`，并继续逐级迁移
-- v8 -> v14：补 `broadcast_mask = BROADCAST_FIELD_ALL`，并继续逐级迁移
-- v9 -> v14：保留既有跑步速度、配速浮动、步频、步频浮动，补 `run_mode`、`run_pacer_type`、`run_pace_low_sec`、`run_pace_high_sec`、`run_custom_name`
-- v10 -> v14：先进入 v11，保留其他当前字段，再执行 v11 的选择性功率浮动迁移
+- v6 -> v15：保留已有配置，补 `run_pace_float_sec = RUN_PACE_FLOAT_SEC_DEFAULT`，并继续逐级迁移
+- v7 -> v15：保留已有配置，补 `run_cadence_float = RUN_CADENCE_FLOAT_DEFAULT`，并继续逐级迁移
+- v8 -> v15：补 `broadcast_mask = BROADCAST_FIELD_ALL`，并继续逐级迁移
+- v9 -> v15：保留既有跑步速度、配速浮动、步频、步频浮动，补 `run_mode`、`run_pacer_type`、`run_pace_low_sec`、`run_pace_high_sec`、`run_custom_name`
+- v10 -> v15：先进入 v11，保留其他当前字段，再执行 v11 的选择性功率浮动迁移
 - v11 -> v12：仅当 `power_float == POWER_FLOAT_LEGACY_DEFAULT`（±5 W）时改为 `POWER_FLOAT_DEFAULT`（±50 W）；其他值视为用户自定义并保持不变
 - v12 -> v13：补充默认桥接配置，保持模拟来源且无绑定
 - v13 -> v14：保留原单设备身份与共享校正参数，把设备放入槽位 0
+- v14 -> v15：补 `cycling_speed_x100 = 4500`、`cycling_wheel_diameter_mm = 670`、`cycling_speed_float = 5`
 - 未知旧版本：回退默认配置
 
 这意味着 v6-v11 升级到当前版本时会保留主要用户配置，并修复历史默认浮动过小的问题；更早或无法识别的 schema 会安全回默认，避免异常配置导致新固件启动异常。

@@ -51,15 +51,19 @@
       }
     },
     {
-      "name": "csc_crank_only",
+      "name": "csc_full",
       "protocol": "csc",
       "input": {
+        "wheel_revolutions": 1000,
+        "wheel_event_time_1024": 5000,
         "crank_revolutions": 12,
         "crank_event_time_1024": 4660
       },
-      "expected_hex": "020c003412",
+      "expected_hex": "03e803000088130c003412",
       "expected_fields": {
-        "flags": 2,
+        "flags": 3,
+        "wheel_revolutions": 1000,
+        "wheel_event_time_1024": 5000,
         "crank_revolutions": 12,
         "crank_event_time_1024": 4660
       }

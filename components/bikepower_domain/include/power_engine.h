@@ -57,8 +57,12 @@ typedef struct {
     int cadence_float;        // 踏频浮动幅度（±RPM，仅固定模式生效）
     int hr_float;             // 固定心率浮动幅度（±BPM，仅固定模式+锁定心率生效）
     int power_step;           // 物理按钮调功步进（W），可配网修改并持久化
+    int cycling_speed_base_x100;   // 骑行模式基准速度 (km/h * 100)
+    int cycling_wheel_diameter_mm; // 骑行模式轮径 (mm)
+    int cycling_speed_float;       // 骑行模式速度浮动幅度 ±0.01 km/h
     ride_dynamics_t power_dynamics;
     ride_dynamics_t cadence_dynamics;
+    ride_dynamics_t speed_dynamics; // 骑行模式速度分层动态状态
     ride_mode_t mode;
     int erg_active_target;    // 有效仅当 has_erg_target
     bool has_erg_target;
@@ -84,6 +88,7 @@ typedef enum {
     CONTROL_TARGET_HEARTRATE,
     CONTROL_TARGET_RUN_SPEED,
     CONTROL_TARGET_RUN_CADENCE,
+    CONTROL_TARGET_CYCLING_SPEED,
 } control_target_t;
 
 /* 初始化功率引擎到领域层默认状态。 */
@@ -136,6 +141,17 @@ bool power_engine_set_run_mode(power_engine_t *e, run_mode_t mode);
 bool power_engine_set_run_pacer(power_engine_t *e, run_pacer_type_t pacer);
 bool power_engine_set_run_custom_pacer(power_engine_t *e, const char *name, int pace_low_sec, int pace_high_sec, int cadence_spm);
 bool power_engine_set_run_pace_range(power_engine_t *e, int pace_low_sec, int pace_high_sec);
+
+/* 设置骑行模式基准速度 (km/h * 100)，仅 CYCLING profile 生效。 */
+bool power_engine_set_cycling_speed(power_engine_t *e, int speed_x100_kmh);
+/* 调整骑行模式基准速度，仅 CYCLING profile 生效。 */
+int power_engine_adjust_cycling_speed(power_engine_t *e, int delta);
+/* 设置骑行模式速度浮动幅度，±0.01 km/h。 */
+bool power_engine_set_cycling_speed_float(power_engine_t *e, int amp);
+/* 设置骑行模式轮径 (mm)。 */
+bool power_engine_set_cycling_wheel_diameter(power_engine_t *e, int diameter_mm);
+/* 获取当前骑行模式有效输出速度，已叠加浮动效果 (km/h * 100)。 */
+int power_engine_cycling_speed_value(const power_engine_t *e);
 /* 设置跑步会话的运行/暂停状态；会话状态不持久化，也不设置 dirty。 */
 bool power_engine_set_run_running(power_engine_t *e, bool running);
 /* 重置跑步会话累计距离和用时；保持运行/暂停状态且不设置 dirty。 */

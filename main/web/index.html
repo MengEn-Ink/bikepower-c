@@ -298,6 +298,22 @@
                   <input id="cadenceFloatRange" type="range" min="0" max="20" step="1" aria-label="调整踏频浮动" aria-describedby="cadenceInputHelp" data-fixed-float disabled>
                   <p class="identity-note" id="cadenceInputHelp" role="status"></p>
                 </div>
+                <div id="cyclingSpeedFields">
+                  <label for="simSpeed">骑行速度</label>
+                  <div class="paired-input">
+                    <div><input id="simSpeed" type="number" min="100" max="6000" step="100" inputmode="numeric" aria-describedby="cyclingSpeedFloatHelp" disabled><span>km/h × 100</span></div>
+                    <div data-fixed-float><span>±</span><input id="cyclingSpeedFloat" type="number" min="0" max="100" step="1" inputmode="numeric" aria-label="速度浮动" aria-describedby="cyclingSpeedFloatHelp" disabled><span>±0.01 km/h</span></div>
+                  </div>
+                  <input id="cyclingSpeedFloatRange" type="range" min="0" max="100" step="1" aria-label="调整速度浮动" aria-describedby="cyclingSpeedFloatHelp" data-fixed-float disabled>
+                  <p class="identity-note" id="cyclingSpeedFloatHelp" role="status"></p>
+                </div>
+                <div id="wheelDiameterFields">
+                  <label for="wheelDiameter">轮径</label>
+                  <div class="paired-input">
+                    <div><input id="wheelDiameter" type="number" min="500" max="2500" step="10" inputmode="numeric" aria-describedby="wheelDiameterHelp" disabled><span>mm</span></div>
+                  </div>
+                  <p class="identity-note" id="wheelDiameterHelp">标准公路车 670mm (700c)，山地车约 660mm。轮径影响轮转数与码表显示速度。</p>
+                </div>
               </div>
               <div id="robotFields" hidden>
                 <div class="formula-line"><label for="robotPreset">骑行强度</label><b id="robotPresetLabel">正在读取档位…</b></div>

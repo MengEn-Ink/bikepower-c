@@ -258,12 +258,12 @@ static void config_cases(void)
     c.power = 333;
     c.power_float = 5;
     assert(config_store_migrate(&c));
-    assert(c.schema_ver == 14 && c.power == 333 && c.power_float == 50);
+    assert(c.schema_ver == CONFIG_VERSION && c.power == 333 && c.power_float == 50);
     assert(c.bridge.source == BRIDGE_SOURCE_SIMULATED && c.bridge.device_count == 0);
     c.schema_ver = 12;
     c.power_float = 17;
     assert(config_store_migrate(&c));
-    assert(c.schema_ver == 14 && c.power_float == 17);
+    assert(c.schema_ver == CONFIG_VERSION && c.power_float == 17);
 
     c.bridge.source = BRIDGE_SOURCE_REAL;
     c.bridge.device_count = 1;

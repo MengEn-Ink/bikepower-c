@@ -687,7 +687,8 @@ void app_main(void)
                                           (uint8_t)s.heartrate);
         } else {
             s = power_engine_snapshot(&s_engine);
-            ble_bikepower_set_data((uint16_t)s.power, (uint8_t)s.heartrate, (uint16_t)s.cadence);
+            ble_bikepower_set_data((uint16_t)s.power, (uint8_t)s.heartrate, (uint16_t)s.cadence,
+            (uint16_t)power_engine_cycling_speed_value(&s_engine), (uint16_t)s_engine.cycling_wheel_diameter_mm);
         }
 
         wifi_portal_sync(&s_engine);

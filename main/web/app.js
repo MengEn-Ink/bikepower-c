@@ -82,10 +82,12 @@
         low:c.run_pace_low_sec,high:c.run_pace_high_sec,customName:c.run_custom_name,
         paceMinutes:Math.floor(total / 60),paceSeconds:total % 60,cadence:c.run_cadence,
         cadenceFloat:c.run_cadence_float,paceFloat:c.run_pace_float_sec},
+      cycling:{speed:c.cycling_speed_x100 || 4500,wheel:c.cycling_wheel_diameter_mm || 670,
+        speedFloat:c.cycling_speed_float || 5},
       deviceName:c.device_name,identity:clone(emptyIdentity),powerStep:c.power_step};
   }
   function encode(config) {
-    var c = clone(state.wire), s = config.simulation, h = config.heart, r = config.running;
+    var c = clone(state.wire), s = config.simulation, h = config.heart, r = config.running, y = config.cycling;
     var saved = config.devices.map(function(key) {
       var item = devices[key];
       return {addr_type:item.addrType,address:item.address,name:item.named ? item.name:""};
@@ -107,6 +109,7 @@
       run_mode:r.mode === "fixed" ? 0:1,run_pacer_type:r.preset === "custom" ? 4:Number(r.preset),
       run_pace_low_sec:r.low,run_pace_high_sec:r.high,run_custom_name:r.customName,
       run_pace_float_sec:r.paceFloat,run_cadence:r.cadence,run_cadence_float:r.cadenceFloat,
+      cycling_speed_x100:y.speed,cycling_wheel_diameter_mm:y.wheel,cycling_speed_float:y.speedFloat,
       device_name:config.deviceName,power_step:config.powerStep});
     return c;
   }
@@ -659,6 +662,7 @@
   var floatGroups = [
     ["simPower","powerFloat","powerInputHelp","目标功率",0,2000,100,"W"],
     ["simCadence","cadenceFloat","cadenceInputHelp","踏频",20,120,20,"rpm"],
+    ["simSpeed","cyclingSpeedFloat","cyclingSpeedFloatHelp","速度",100,6000,100,"km/h × 100"],
     ["fixedHeart","hrFloat","hrFloatHelp","心率",60,200,20,"bpm"],
     [null,"runPaceFloat","runPaceFloatHelp","配速",0,0,60,"秒/km"],
     ["runCadence","runCadenceFloat","runCadenceFloatHelp","步频",120,220,20,"spm"]
@@ -696,14 +700,17 @@
   function renderSimulation() {
     var simulation = state.draft.simulation;
     var robot = simulation.mode === "pacer";
+    var isCyclingSimulation = state.draft.sport === "cycling" && state.draft.source === "simulation";
     setActive("[data-sim-mode]", simulation.mode, "simMode");
     $("robotFields").hidden = !robot;
     $("fixedPowerField").hidden = robot;
     document.querySelectorAll("[data-fixed-float]").forEach(function(node) { node.hidden = robot; });
+    document.querySelectorAll("#cyclingSpeedFields, #wheelDiameterFields").forEach(function(node) { node.hidden = !isCyclingSimulation; });
     $("customRobotFields").hidden = simulation.preset !== "custom";
     $("robotPreset").value = simulation.preset === "custom" ? "5":simulation.preset;
     setActive("[data-ride]",simulation.preset,"ride");
     fillValues("simulation");
+    fillValues("cycling");
     renderFloatInputs();
     $("customPacerName").parentElement.hidden = simulation.preset !== "custom";
     renderRobotPreview();
@@ -965,6 +972,7 @@
   var fields = {simPower:["simulation","power"],simCadence:["simulation","cadence"],
     profileWeight:["simulation","weight"],wkgMin:["simulation","wkgMin"],wkgMax:["simulation","wkgMax"],
     customPacerName:["simulation","customName"],powerFloat:["simulation","powerFloat"],cadenceFloat:["simulation","cadenceFloat"],
+    simSpeed:["cycling","speed"],cyclingSpeedFloat:["cycling","speedFloat"],wheelDiameter:["cycling","wheel"],
     ftpValue:["heart","ftp"],thresholdHeart:["heart","threshold"],fixedHeart:["heart","fixed"],hrFloat:["heart","float"],
     paceMinutes:["running","paceMinutes"],paceSeconds:["running","paceSeconds"],runCadence:["running","cadence"],
     runCadenceFloat:["running","cadenceFloat"],runPaceFloat:["running","paceFloat"],runPaceLow:["running","low"],
@@ -991,7 +999,10 @@
       ["runPaceHigh",144,1200,"最慢配速","秒/km"]];
     floatGroups.forEach(function(g) {
       if (g[0] && (g[0] !== "simPower" || (c.sport === "cycling" && c.source === "simulation" && s.mode === "fixed"))) {
-        rules.push([g[0],g[4],g[5],g[3],g[7]]);
+        var isCycling = g[0] === "simSpeed";
+        if (!isCycling || c.sport === "cycling" && c.source === "simulation") {
+          rules.push([g[0],g[4],g[5],g[3],g[7]]);
+        }
       }
       rules.push([g[1],0,g[6],g[3].replace("目标","") + "浮动",g[7]]);
     });

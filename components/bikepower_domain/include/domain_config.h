@@ -25,6 +25,17 @@
 #define DEFAULT_CADENCE       90
 #define DEFAULT_HEARTRATE     150
 
+// ===== 骑行模式独立速度计范围与默认值 =====
+#define CYCLING_SPEED_X100_MIN     100     // 1.00 km/h
+#define CYCLING_SPEED_X100_MAX     6000    // 60.00 km/h
+#define CYCLING_SPEED_X100_DEFAULT 4500    // 45.00 km/h
+#define CYCLING_WHEEL_DIAMETER_MM_MIN  500  // 最小轮径 (mm)
+#define CYCLING_WHEEL_DIAMETER_MM_MAX  2500 // 最大轮径 (mm)
+#define CYCLING_WHEEL_DIAMETER_MM_DEFAULT 670  // 标准公路车轮径 700c×23c (mm)
+#define CYCLING_SPEED_FLOAT_MIN   0        // 速度浮动下限 ±0.01 km/h
+#define CYCLING_SPEED_FLOAT_MAX   100      // 速度浮动上限 ±1.00 km/h
+#define CYCLING_SPEED_FLOAT_DEFAULT 5      // 默认浮动 ±0.05 km/h
+
 // ===== 跑步模式范围与默认值 =====
 #define RUN_SPEED_X100_MIN     300     // 3.00 km/h
 #define RUN_SPEED_X100_MAX     2500    // 25.00 km/h
@@ -45,7 +56,7 @@
 
 // ===== 配置格式版本 =====
 /* v14 新增三设备桥接列表，保留 v13 单设备配置迁移。 */
-#define CONFIG_VERSION        14
+#define CONFIG_VERSION        15
 #define CONFIG_JSON_MAX_LEN    2048
 #define JSON_IMPORT_MAX_DEPTH   8
 

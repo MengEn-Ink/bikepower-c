@@ -382,11 +382,11 @@ check(fit_reference.get("power", {}).get("ac1") == 0.9550639560242542
       "真实骑行参考基准保留功率自相关与38秒最佳心率滞后")
 
 config_version = extract_int(domain_src, "CONFIG_VERSION")
-check(config_version == 14, f"CONFIG_VERSION 必须升级到 14 (实际={config_version})")
+check(config_version >= 15, f"CONFIG_VERSION 必须至少为 15 (实际={config_version})")
 check(f"`CONFIG_VERSION = {config_version}`" in tech_ref_src,
       f"技术参考 schema 版本与 CONFIG_VERSION({config_version}) 一致")
-check("v13→v14" in tech_ref_src,
-      "技术参考必须记录 v13→v14 桥接设备表迁移")
+check("v14→v15" in tech_ref_src,
+      "技术参考必须记录 v14→v15 骑行速度字段迁移")
 for macro in [
     "RUN_MODE_FIXED",
     "RUN_MODE_PACER",

@@ -112,7 +112,8 @@ bool ble_bikepower_stop(void);
  * 返回值：无。
  * 特殊行为：锁内整体更新共享快照，不会立即主动发送通知。
  */
-void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm);
+void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm,
+                             uint16_t cycling_speed_x100, uint16_t cycling_wheel_diameter_mm);
 /* 原样转发真实曲柄事件；无效样本功率归零，不补模拟速度或踏频。 */
 void ble_bikepower_set_bridge_data(const bridge_snapshot_t *snapshot, uint8_t heartrate_bpm);
 /**

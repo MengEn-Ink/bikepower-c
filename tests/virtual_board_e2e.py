@@ -204,7 +204,7 @@ async def run_protocol(args, folder, record, record_not_obtained):
         data = await collect(session,specs,args.seconds)
         record('cycling_notifications',{k:len(v) for k,v in data.items()})
         require(bytes(await session.read_gatt_char('2A65')) == bytes.fromhex('08001000'),'CPS Feature错误')
-        require(bytes(await session.read_gatt_char('2A5C')) == bytes.fromhex('0200'),'CSC Feature错误')
+        require(bytes(await session.read_gatt_char('2A5C')) == bytes.fromhex('0300'),'CSC Feature错误')
         record('standard_features', {})
         for name, payload, opcode, result in (
             ('stale_revision', make_begin(11,meta['revision']+1),OP_BEGIN,RESULT_STALE_REVISION),

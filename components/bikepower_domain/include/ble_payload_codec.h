@@ -11,7 +11,8 @@
 
 enum {
     BLE_PAYLOAD_CPS_LEN = 8,
-    BLE_PAYLOAD_CSC_LEN = 5,
+    BLE_PAYLOAD_CSC_CRANK_LEN = 5,    // 仅曲柄（兼容桥接）
+    BLE_PAYLOAD_CSC_FULL_LEN = 11,    // 轮速+曲柄完整包
     BLE_PAYLOAD_HRS_LEN = 2,
     BLE_PAYLOAD_FTMS_BIKE_MAX_LEN = 8,
     BLE_PAYLOAD_FTMS_TREADMILL_LEN = 10,
@@ -27,8 +28,14 @@ size_t ble_payload_encode_cps_bridge(uint8_t *out, size_t capacity, bool has_cra
                                      int16_t power_w, uint16_t crank_revolutions,
                                      uint16_t crank_event_time_1024);
 size_t ble_payload_encode_csc(uint8_t *out, size_t capacity,
+                              uint32_t wheel_revolutions,
+                              uint16_t wheel_event_time_1024,
                               uint16_t crank_revolutions,
                               uint16_t crank_event_time_1024);
+/* 仅曲柄 CSC 编码（桥接场景兼容，5 字节） */
+size_t ble_payload_encode_csc_crank_only(uint8_t *out, size_t capacity,
+                                         uint16_t crank_revolutions,
+                                         uint16_t crank_event_time_1024);
 
 size_t ble_payload_encode_hrs(uint8_t *out, size_t capacity, uint8_t heart_rate_bpm);
 

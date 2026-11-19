@@ -1,6 +1,7 @@
 #include "ble_payload_codec.h"
 
 #define CPS_FLAG_CRANK_REVOLUTION_DATA 0x0020u
+#define CSC_FLAG_WHEEL_AND_CRANK_DATA 0x03u
 #define CSC_FLAG_CRANK_REVOLUTION_DATA 0x02u
 #define FTMS_BIKE_FLAG_CADENCE          0x0004u
 #define FTMS_BIKE_FLAG_POWER            0x0040u
@@ -45,14 +46,29 @@ size_t ble_payload_encode_cps(uint8_t *out, size_t capacity,
 }
 
 size_t ble_payload_encode_csc(uint8_t *out, size_t capacity,
+                              uint32_t wheel_revolutions,
+                              uint16_t wheel_event_time_1024,
                               uint16_t crank_revolutions,
                               uint16_t crank_event_time_1024)
 {
-    if (!out || capacity < BLE_PAYLOAD_CSC_LEN) return 0;
+    if (!out || capacity < BLE_PAYLOAD_CSC_FULL_LEN) return 0;
+    out[0] = CSC_FLAG_WHEEL_AND_CRANK_DATA;
+    put_u32_le(out + 1, wheel_revolutions);
+    put_u16_le(out + 5, wheel_event_time_1024);
+    put_u16_le(out + 7, crank_revolutions);
+    put_u16_le(out + 9, crank_event_time_1024);
+    return BLE_PAYLOAD_CSC_FULL_LEN;
+}
+
+size_t ble_payload_encode_csc_crank_only(uint8_t *out, size_t capacity,
+                                         uint16_t crank_revolutions,
+                                         uint16_t crank_event_time_1024)
+{
+    if (!out || capacity < BLE_PAYLOAD_CSC_CRANK_LEN) return 0;
     out[0] = CSC_FLAG_CRANK_REVOLUTION_DATA;
     put_u16_le(out + 1, crank_revolutions);
     put_u16_le(out + 3, crank_event_time_1024);
-    return BLE_PAYLOAD_CSC_LEN;
+    return BLE_PAYLOAD_CSC_CRANK_LEN;
 }
 
 size_t ble_payload_encode_cps_bridge(uint8_t *out, size_t capacity, bool has_crank,

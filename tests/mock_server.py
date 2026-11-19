@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 WEB_DIR = ROOT / "main/web"
 LOCK = threading.RLock()
 CONFIG = {
-    "schema_ver": 14, "power": 220, "cadence": 88, "mode": 0,
+    "schema_ver": 15, "power": 220, "cadence": 88, "mode": 0,
     "heartrate": 145, "has_user_hr": 0, "power_float": 50, "cadence_float": 8,
     "hr_float": 2, "power_step": 20, "weight": 70, "ftp": 300, "thr_hr": 190,
     "ride_type": 0, "custom_wkg_low": 25, "custom_wkg_high": 30,
@@ -26,6 +26,7 @@ CONFIG = {
     "bridge_addr_type": 0, "bridge_address": "000000000000",
     "bridge_calibration": 0, "bridge_watts": 0, "bridge_percent_x10": 1000, "bridge_name": "",
     "bridge_devices": [],
+    "cycling_speed_x100": 4500, "cycling_wheel_diameter_mm": 670, "cycling_speed_float": 5,
     "led_silent": 0,
 }
 for scene in ("wait", "conn", "wifi", "confirm", "error"):
@@ -46,7 +47,7 @@ IDENTITY = {"manufacturer": "Magene", "model": "P505", "serial": "MOCK-4A29",
 BOARD_IDENTITY = {"manufacturer": "BikePower", "model": "Generic-C3", "serial": "",
                   "hardware": "1.0", "firmware": "4.3.1", "software": ""}
 LIMITS = {
-    "schema_ver": (14, 14),
+    "schema_ver": (15, 15),
     "power": (0, 2000), "cadence": (20, 120), "heartrate": (60, 200),
     "power_float": (0, 100), "cadence_float": (0, 20), "hr_float": (0, 20),
     "power_step": (5, 50), "weight": (40, 150), "ftp": (50, 500), "thr_hr": (100, 220),
@@ -55,6 +56,8 @@ LIMITS = {
     "run_cadence": (120, 220), "run_cadence_float": (0, 20),
     "run_pace_low_sec": (144, 1200), "run_pace_high_sec": (144, 1200),
     "bridge_watts": (-200, 200), "bridge_percent_x10": (500, 3000),
+    "cycling_speed_x100": (100, 6000), "cycling_wheel_diameter_mm": (500, 2500),
+    "cycling_speed_float": (0, 100),
     "mode": (0, 1), "run_mode": (0, 1), "sport_profile": (0, 1), "ride_type": (0, 5),
     "run_pacer_type": (0, 4), "bridge_calibration": (0, 2), "cycling_source": (0, 1),
     "bridge_bound": (0, 1), "bridge_addr_type": (0, 1), "has_user_hr": (0, 1),
@@ -239,6 +242,7 @@ def runtime():
     return {k: STATE[k] for k in ("revision", "transaction", "pending", "result", "restart")} | {
         "source": c["cycling_source"], "power": power, "cadence": cadence,
         "heartrate": c["heartrate"] if c["broadcast_mask"] & 4 else 0,
+        "cycling_speed_x100": c["cycling_speed_x100"],
         "connections": 1, "remaining_sec": remaining(), "closing": STATE["closing"], "idle_timeout_sec": 300,
         "bridge": b, "bridge_runtime": bridge_state,
         "run_speed_x100": c["run_speed_x100"], "run_distance_m": 123, "run_elapsed_sec": 60}

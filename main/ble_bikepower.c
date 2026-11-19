@@ -348,6 +348,8 @@ typedef struct {
     uint16_t power;
     uint8_t heartrate;
     uint16_t cadence;
+    uint16_t cycling_speed_x100;
+    uint16_t cycling_wheel_diameter_mm;
     running_snapshot_t running;
     bridge_snapshot_t bridge;
     bool real;
@@ -356,6 +358,8 @@ typedef struct {
 static portMUX_TYPE s_data_lock = portMUX_INITIALIZER_UNLOCKED;
 static ble_output_snapshot_t s_output = {
     .power = DEFAULT_POWER, .heartrate = DEFAULT_HEARTRATE, .cadence = DEFAULT_CADENCE,
+    .cycling_speed_x100 = CYCLING_SPEED_X100_DEFAULT,
+    .cycling_wheel_diameter_mm = CYCLING_WHEEL_DIAMETER_MM_DEFAULT,
     .running = { .cadence_spm = RUN_CADENCE_DEFAULT, .running = true },
 };
 static atomic_uchar g_broadcast_mask = BROADCAST_MASK_DEFAULT;
@@ -365,15 +369,20 @@ static atomic_bool g_bridge_mode;
 static uint16_t g_crank_rev = 0;
 static uint32_t g_last_crank_ms = 0;
 
+// 轮速累计（CSC 独立）
+static uint32_t g_wheel_rev = 0;
+static uint32_t g_wheel_rev_sub = 0;
+static uint32_t g_last_wheel_ms = 0;
+
 // 预分配通知缓冲区（运行时零 malloc）
 static uint8_t g_cps_buf[BLE_PAYLOAD_CPS_LEN];
 static size_t g_cps_len = BLE_PAYLOAD_CPS_LEN;
 static bool s_bridge_csc_valid;
 static uint8_t g_hr_buf[BLE_PAYLOAD_HRS_LEN];
-static uint8_t g_csc_buf[BLE_PAYLOAD_CSC_LEN];
+static uint8_t g_csc_buf[BLE_PAYLOAD_CSC_FULL_LEN];
 // Feature 仅声明生产通知支持的曲柄转数，不声明轮速、扭矩或多位置能力。
 static const uint8_t g_cps_feature_buf[4] = { 0x08, 0x00, 0x10, 0x00 };
-static const uint8_t g_csc_feature_buf[2] = { 0x02, 0x00 };
+static const uint8_t g_csc_feature_buf[2] = { 0x03, 0x00 };
 static uint8_t g_rsc_buf[BLE_PAYLOAD_RSC_LEN];
 static uint8_t g_rsc_feature_buf[2] = { 0x07, 0x00 };
 static uint8_t g_sensor_location = 0x05;
@@ -1350,7 +1359,7 @@ static void pack_all(const ble_output_snapshot_t *data)
         g_cps_len = ble_payload_encode_cps_bridge(g_cps_buf, sizeof(g_cps_buf), crank,
             (int16_t)sample.power_w, sample.crank_revolutions, sample.crank_event_time_1024);
         ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), data->heartrate);
-        ble_payload_encode_csc(g_csc_buf, sizeof(g_csc_buf),
+        ble_payload_encode_csc_crank_only(g_csc_buf, sizeof(g_csc_buf),
             sample.crank_revolutions, sample.crank_event_time_1024);
         g_ftms_bike_len = 0;
         return;
@@ -1378,13 +1387,40 @@ static void pack_all(const ble_output_snapshot_t *data)
     (void)ble_payload_encode_cps(g_cps_buf, sizeof(g_cps_buf),
                                  (int16_t)power, rev, time_1024);
     (void)ble_payload_encode_hrs(g_hr_buf, sizeof(g_hr_buf), data->heartrate);
-    (void)ble_payload_encode_csc(g_csc_buf, sizeof(g_csc_buf), rev, time_1024);
 
+    // 轮速：基于独立速度计和轮径计算轮转累计
+    uint16_t speed_x100 = data->cycling_speed_x100;
+    uint16_t wheel_diameter = data->cycling_wheel_diameter_mm;
+    if (wheel_diameter < 500) wheel_diameter = 500;
+    // 轮周长 (mm)，π ≈ 31416/10000
+    uint32_t circumference_mm = (uint32_t)wheel_diameter * 31416u / 10000u;
+    // 每 tick (50ms) 行驶距离: speed_x100 * 5 / 36 mm
+    uint32_t dist_mm_per_tick = (uint32_t)speed_x100 * 5u / 36u;
+    if (dist_mm_per_tick < 1) dist_mm_per_tick = 1;
+    g_wheel_rev_sub += dist_mm_per_tick;
+    g_wheel_rev = g_wheel_rev_sub / circumference_mm;
+
+    // 轮速事件时间 (1/1024 秒单位，16 位回绕)
+    uint32_t wheel_adj_ms;
+    if (g_last_wheel_ms == 0) {
+        wheel_adj_ms = now_ms;
+    } else {
+        // 每轮时间 = 3600 * 1000 * circumference_mm / (speed_x100 * 10000) ms
+        // 简化：直接用 tick 间隔
+        wheel_adj_ms = g_last_wheel_ms + 50;
+    }
+    uint16_t wheel_time_1024 = (uint16_t)(((uint64_t)wheel_adj_ms * 1024u / 1000u) & 0xFFFF);
+    g_last_wheel_ms = wheel_adj_ms;
+
+    (void)ble_payload_encode_csc(g_csc_buf, sizeof(g_csc_buf),
+                                 g_wheel_rev, wheel_time_1024, rev, time_1024);
+
+    // FTMS indoor bike: speed 使用独立速度计值代替 cadence*30 推演
     bool cadence_enabled = (data->mask & BROADCAST_FIELD_CADENCE) != 0;
     bool power_enabled = (data->mask & BROADCAST_FIELD_POWER) != 0;
     g_ftms_bike_len = ble_payload_encode_ftms_bike(
         g_ftms_bike_buf, sizeof(g_ftms_bike_buf), cadence_enabled, power_enabled,
-        (uint16_t)(cadence * 30u), (uint16_t)(cadence * 2u), (int16_t)power);
+        speed_x100, (uint16_t)(cadence * 2u), (int16_t)power);
 }
 
 static void pack_running(const ble_output_snapshot_t *data)
@@ -2089,13 +2125,16 @@ static void ble_host_task(void *param)
  * 返回值：无。
  * 特殊行为：只更新共享变量，不立即触发打包或发送。
  */
-void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm)
+void ble_bikepower_set_data(uint16_t power_w, uint8_t heartrate_bpm, uint16_t cadence_rpm,
+                             uint16_t cycling_speed_x100, uint16_t cycling_wheel_diameter_mm)
 {
     portENTER_CRITICAL(&s_data_lock);
     s_output.real = false;
     s_output.power = power_w;
     s_output.heartrate = heartrate_bpm;
     s_output.cadence = cadence_rpm;
+    s_output.cycling_speed_x100 = cycling_speed_x100;
+    s_output.cycling_wheel_diameter_mm = cycling_wheel_diameter_mm;
     portEXIT_CRITICAL(&s_data_lock);
 }
 

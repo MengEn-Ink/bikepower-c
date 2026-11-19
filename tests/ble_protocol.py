@@ -37,15 +37,24 @@ def parse_cps(data):
 
 def parse_csc(data):
     payload = _bytes(data)
-    _require_length(payload, 5, "CSC Measurement")
+    if len(payload) not in (5, 11):
+        raise ValueError(f"CSC Measurement length must be 5 or 11, got {len(payload)}")
     flags = payload[0]
-    if flags != 0x02:
-        raise ValueError(f"unsupported CSC flags 0x{flags:02x}")
-    return {
-        "flags": flags,
-        "crank_revolutions": struct.unpack_from("<H", payload, 1)[0],
-        "crank_event_time_1024": struct.unpack_from("<H", payload, 3)[0],
-    }
+    if flags == 0x02:
+        return {
+            "flags": flags,
+            "crank_revolutions": struct.unpack_from("<H", payload, 1)[0],
+            "crank_event_time_1024": struct.unpack_from("<H", payload, 3)[0],
+        }
+    if flags == 0x03:
+        return {
+            "flags": flags,
+            "wheel_revolutions": struct.unpack_from("<I", payload, 1)[0],
+            "wheel_event_time_1024": struct.unpack_from("<H", payload, 5)[0],
+            "crank_revolutions": struct.unpack_from("<H", payload, 7)[0],
+            "crank_event_time_1024": struct.unpack_from("<H", payload, 9)[0],
+        }
+    raise ValueError(f"unsupported CSC flags 0x{flags:02x}")
 
 
 def parse_hr(data):

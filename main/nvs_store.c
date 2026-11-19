@@ -28,6 +28,9 @@ static const struct { const char *key; size_t offset; } s_legacy_fields[] = {
     FIELD(NVS_KEY_RUN_CAD_FLOAT, run_cadence_float), FIELD(NVS_KEY_RUN_MODE, run_mode),
     FIELD(NVS_KEY_RUN_PACER, run_pacer_type), FIELD(NVS_KEY_RUN_PACE_LO, run_pace_low_sec),
     FIELD(NVS_KEY_RUN_PACE_HI, run_pace_high_sec),
+    FIELD(NVS_KEY_CYCLING_SPEED, cycling_speed_x100),
+    FIELD(NVS_KEY_CYCLING_WHEEL, cycling_wheel_diameter_mm),
+    FIELD(NVS_KEY_CYCLING_SPEED_FLOAT, cycling_speed_float),
 };
 #undef FIELD
 

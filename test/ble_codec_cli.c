@@ -43,7 +43,7 @@ static int usage(const char *program)
     fprintf(stderr,
             "usage:\n"
             "  %s cps POWER REV TIME1024\n"
-            "  %s csc REV TIME1024\n"
+            "  %s csc WHEEL_REV WHEEL_TIME1024 CRANK_REV CRANK_TIME1024\n"
             "  %s hrs BPM\n"
             "  %s ftms_bike CADENCE_ON POWER_ON SPEED_X100 CADENCE_HALF_RPM POWER\n"
             "  %s ftms_treadmill SPEED_X100 DISTANCE_M BPM ELAPSED_S\n"
@@ -54,8 +54,8 @@ static int usage(const char *program)
 
 int main(int argc, char **argv)
 {
-    uint8_t payload[BLE_PAYLOAD_FTMS_BIKE_MAX_LEN > BLE_PAYLOAD_RSC_LEN
-                    ? BLE_PAYLOAD_FTMS_BIKE_MAX_LEN : BLE_PAYLOAD_RSC_LEN];
+    uint8_t payload[BLE_PAYLOAD_FTMS_TREADMILL_LEN > BLE_PAYLOAD_CSC_FULL_LEN
+                ? BLE_PAYLOAD_FTMS_TREADMILL_LEN : BLE_PAYLOAD_CSC_FULL_LEN];
     size_t length = 0;
     long values[6] = { 0 };
     uint32_t distance_dm = 0;
@@ -80,13 +80,17 @@ int main(int argc, char **argv)
                                                (int16_t)values[1], (uint16_t)values[2],
                                                (uint16_t)values[3]);
     } else if (strcmp(argv[1], "csc") == 0) {
-        if (argc != 4
-                || !parse_long(argv[2], 0, UINT16_MAX, &values[0])
-                || !parse_long(argv[3], 0, UINT16_MAX, &values[1])) {
+        uint32_t wheel_rev = 0;
+        if (argc != 6
+                || !parse_u32(argv[2], &wheel_rev)
+                || !parse_long(argv[3], 0, UINT16_MAX, &values[0])
+                || !parse_long(argv[4], 0, UINT16_MAX, &values[1])
+                || !parse_long(argv[5], 0, UINT16_MAX, &values[2])) {
             return usage(argv[0]);
         }
         length = ble_payload_encode_csc(payload, sizeof(payload),
-                                        (uint16_t)values[0], (uint16_t)values[1]);
+                                        wheel_rev, (uint16_t)values[0],
+                                        (uint16_t)values[1], (uint16_t)values[2]);
     } else if (strcmp(argv[1], "hrs") == 0) {
         if (argc != 3 || !parse_long(argv[2], 0, UINT8_MAX, &values[0])) return usage(argv[0]);
         length = ble_payload_encode_hrs(payload, sizeof(payload), (uint8_t)values[0]);

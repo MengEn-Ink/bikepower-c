@@ -46,7 +46,8 @@ def cli_args(vector):
         values = [int(fields["has_crank"]), fields["power_w"],
                   fields["crank_revolutions"], fields["crank_event_time_1024"]]
     elif protocol == "csc":
-        values = [fields["crank_revolutions"], fields["crank_event_time_1024"]]
+        values = [fields["wheel_revolutions"], fields["wheel_event_time_1024"],
+                  fields["crank_revolutions"], fields["crank_event_time_1024"]]
     elif protocol == "hrs":
         values = [fields["heart_rate_bpm"]]
     elif protocol == "ftms_bike":

@@ -135,8 +135,12 @@ void power_engine_init(power_engine_t *e)
     e->cadence_float = CADENCE_FLOAT_DEFAULT;
     e->hr_float = HR_FLOAT_DEFAULT;
     e->power_step = POWER_STEP_DEFAULT;
+    e->cycling_speed_base_x100 = CYCLING_SPEED_X100_DEFAULT;
+    e->cycling_wheel_diameter_mm = CYCLING_WHEEL_DIAMETER_MM_DEFAULT;
+    e->cycling_speed_float = CYCLING_SPEED_FLOAT_DEFAULT;
     ride_dynamics_reset(&e->power_dynamics);
     ride_dynamics_reset(&e->cadence_dynamics);
+    ride_dynamics_reset(&e->speed_dynamics);
     e->mode = DEFAULT_RIDE_MODE;
     e->erg_active_target = 0;
     e->has_erg_target = false;
@@ -668,6 +672,8 @@ int power_engine_control_value(const power_engine_t *e, control_target_t target)
         return e->running.speed_x100_kmh;
     case CONTROL_TARGET_RUN_CADENCE:
         return e->running.cadence_spm;
+    case CONTROL_TARGET_CYCLING_SPEED:
+        return e->cycling_speed_base_x100;
     default:
         return 0;
     }
@@ -687,6 +693,8 @@ bool power_engine_set_control_value(power_engine_t *e, control_target_t target, 
         return power_engine_set_run_speed(e, value);
     case CONTROL_TARGET_RUN_CADENCE:
         return power_engine_set_run_cadence(e, value);
+    case CONTROL_TARGET_CYCLING_SPEED:
+        return power_engine_set_cycling_speed(e, value);
     default:
         return false;
     }
@@ -724,9 +732,98 @@ int power_engine_adjust_control_target(power_engine_t *e, control_target_t targe
         power_engine_set_run_cadence(e, next);
         return e->running.cadence_spm;
     }
+    case CONTROL_TARGET_CYCLING_SPEED: {
+        int next = clampi(e->cycling_speed_base_x100 + sign * 100,
+                          CYCLING_SPEED_X100_MIN, CYCLING_SPEED_X100_MAX);
+        power_engine_set_cycling_speed(e, next);
+        return e->cycling_speed_base_x100;
+    }
     default:
         return 0;
     }
+}
+
+/*
+ * 设置骑行模式基准速度 (km/h * 100)。
+ * 参数：e 为功率引擎对象；speed_x100_kmh 为目标速度。
+ * 返回值：设置成功返回 true，否则返回 false。
+ * 特殊行为：仅 CYCLING profile 且非桥接模式允许设置。
+ */
+bool power_engine_set_cycling_speed(power_engine_t *e, int speed_x100_kmh)
+{
+    if (!e) return false;
+    if (e->sport_profile != SPORT_PROFILE_CYCLING) return false;
+    if (e->bridge.source == BRIDGE_SOURCE_REAL) return false;
+    int clamped = clampi(speed_x100_kmh, CYCLING_SPEED_X100_MIN, CYCLING_SPEED_X100_MAX);
+    if (e->cycling_speed_base_x100 == clamped) return false;
+    e->cycling_speed_base_x100 = clamped;
+    ride_dynamics_reset(&e->speed_dynamics);
+    e->dirty = true;
+    return true;
+}
+
+/*
+ * 调整骑行模式基准速度。
+ * 参数：e 为功率引擎对象；delta 为速度变化量 (km/h * 100)。
+ * 返回值：返回调整后的基准速度。
+ * 特殊行为：仅 CYCLING profile 且非桥接模式允许调整。
+ */
+int power_engine_adjust_cycling_speed(power_engine_t *e, int delta)
+{
+    if (!e) return e ? e->cycling_speed_base_x100 : 0;
+    if (e->sport_profile != SPORT_PROFILE_CYCLING) return e->cycling_speed_base_x100;
+    if (e->bridge.source == BRIDGE_SOURCE_REAL) return e->cycling_speed_base_x100;
+    power_engine_set_cycling_speed(e, e->cycling_speed_base_x100 + delta);
+    return e->cycling_speed_base_x100;
+}
+
+/*
+ * 设置骑行模式速度浮动幅度。
+ * 参数：e 为功率引擎对象；amp 为目标浮动幅度，取值范围 [0, CYCLING_SPEED_FLOAT_MAX]。
+ * 返回值：实际变化返回 true，否则返回 false。
+ * 特殊行为：越界值夹紧。
+ */
+bool power_engine_set_cycling_speed_float(power_engine_t *e, int amp)
+{
+    if (!e) return false;
+    amp = clampi(amp, CYCLING_SPEED_FLOAT_MIN, CYCLING_SPEED_FLOAT_MAX);
+    if (e->cycling_speed_float == amp) return false;
+    e->cycling_speed_float = amp;
+    ride_dynamics_reset(&e->speed_dynamics);
+    e->dirty = true;
+    return true;
+}
+
+/*
+ * 设置骑行模式轮径。
+ * 参数：e 为功率引擎对象；diameter_mm 为目标轮径。
+ * 返回值：实际变化返回 true，否则返回 false。
+ * 特殊行为：越界值夹紧。
+ */
+bool power_engine_set_cycling_wheel_diameter(power_engine_t *e, int diameter_mm)
+{
+    if (!e) return false;
+    int clamped = clampi(diameter_mm, CYCLING_WHEEL_DIAMETER_MM_MIN, CYCLING_WHEEL_DIAMETER_MM_MAX);
+    if (e->cycling_wheel_diameter_mm == clamped) return false;
+    e->cycling_wheel_diameter_mm = clamped;
+    e->dirty = true;
+    return true;
+}
+
+/*
+ * 获取当前骑行模式有效输出速度，已叠加浮动效果 (km/h * 100)。
+ * 参数：e 为功率引擎对象。
+ * 返回值：当前有效速度值。
+ * 特殊行为：浮动 amp=0 时返回基准速度。
+ */
+int power_engine_cycling_speed_value(const power_engine_t *e)
+{
+    if (!e) return CYCLING_SPEED_X100_DEFAULT;
+    int base = e->cycling_speed_base_x100;
+    int amp = e->cycling_speed_float;
+    if (amp <= 0) return base;
+    int offset = ride_dynamics_step((ride_dynamics_t *)&e->speed_dynamics, amp);
+    return clampi(base + offset, CYCLING_SPEED_X100_MIN, CYCLING_SPEED_X100_MAX);
 }
 
 /*

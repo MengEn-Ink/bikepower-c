@@ -54,6 +54,9 @@ void config_store_defaults(config_data_t *c)
     c->run_pace_high_sec = RUN_PACERS[RUN_PACER_DEFAULT].pace_high_sec;
     strncpy(c->run_custom_name, RUN_CUSTOM_NAME_DEFAULT, RUN_CUSTOM_NAME_MAX - 1);
     c->run_custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
+    c->cycling_speed_x100 = CYCLING_SPEED_X100_DEFAULT;
+    c->cycling_wheel_diameter_mm = CYCLING_WHEEL_DIAMETER_MM_DEFAULT;
+    c->cycling_speed_float = CYCLING_SPEED_FLOAT_DEFAULT;
     strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
     power_bridge_config_defaults(&c->bridge);
@@ -94,6 +97,9 @@ void config_store_from_engine(const power_engine_t *e, config_data_t *c)
     c->run_pace_high_sec = e->running.pace_high_sec;
     strncpy(c->run_custom_name, e->running.custom_name, RUN_CUSTOM_NAME_MAX - 1);
     c->run_custom_name[RUN_CUSTOM_NAME_MAX - 1] = '\0';
+    c->cycling_speed_x100 = e->cycling_speed_base_x100;
+    c->cycling_wheel_diameter_mm = e->cycling_wheel_diameter_mm;
+    c->cycling_speed_float = e->cycling_speed_float;
     strncpy(c->device_name, e->device_name, DEVICE_NAME_MAX - 1);
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
     c->bridge = e->bridge;
@@ -152,8 +158,11 @@ bool config_store_apply_to_engine(const config_data_t *c, power_engine_t *e)
     power_engine_set_run_mode(&next, (run_mode_t)checked.run_mode);
     power_engine_set_run_cadence(&next, checked.run_cadence);
     power_engine_set_device_name(&next, checked.device_name);
-    power_engine_set_mode(&next, (ride_mode_t)checked.mode);
     next.bridge = checked.bridge;
+    power_engine_set_cycling_speed(&next, checked.cycling_speed_x100);
+    power_engine_set_cycling_wheel_diameter(&next, checked.cycling_wheel_diameter_mm);
+    power_engine_set_cycling_speed_float(&next, checked.cycling_speed_float);
+    power_engine_set_mode(&next, (ride_mode_t)checked.mode);
     if (checked.bridge.source == BRIDGE_SOURCE_REAL) power_engine_clear_erg_target(&next);
     if (restore_erg) power_engine_set_erg_target(&next, erg_target);
     next.dirty = true;
@@ -215,6 +224,10 @@ bool config_store_validate(config_data_t *c)
         strncpy(c->run_custom_name, RUN_CUSTOM_NAME_DEFAULT, RUN_CUSTOM_NAME_MAX - 1);
     }
 
+    c->cycling_speed_x100 = clamp_int(c->cycling_speed_x100, CYCLING_SPEED_X100_MIN, CYCLING_SPEED_X100_MAX);
+    c->cycling_wheel_diameter_mm = clamp_int(c->cycling_wheel_diameter_mm, CYCLING_WHEEL_DIAMETER_MM_MIN, CYCLING_WHEEL_DIAMETER_MM_MAX);
+    c->cycling_speed_float = clamp_int(c->cycling_speed_float, CYCLING_SPEED_FLOAT_MIN, CYCLING_SPEED_FLOAT_MAX);
+
     c->device_name[DEVICE_NAME_MAX - 1] = '\0';
     if (c->device_name[0] == '\0') {
         strncpy(c->device_name, DEVICE_NAME_DEFAULT, DEVICE_NAME_MAX - 1);
@@ -248,6 +261,9 @@ bool config_store_validate(config_data_t *c)
         || in.run_pace_low_sec != c->run_pace_low_sec
         || in.run_pace_high_sec != c->run_pace_high_sec
         || strncmp(in.run_custom_name, c->run_custom_name, RUN_CUSTOM_NAME_MAX) != 0
+        || in.cycling_speed_x100 != c->cycling_speed_x100
+        || in.cycling_wheel_diameter_mm != c->cycling_wheel_diameter_mm
+        || in.cycling_speed_float != c->cycling_speed_float
         || strncmp(in.device_name, c->device_name, DEVICE_NAME_MAX) != 0;
 }
 
@@ -300,6 +316,13 @@ bool config_store_migrate(config_data_t *c)
     }
     if (c->schema_ver == 13) {
         c->schema_ver = 14;
+        config_store_validate(c);
+    }
+    if (c->schema_ver == 14) {
+        c->schema_ver = 15;
+        c->cycling_speed_x100 = CYCLING_SPEED_X100_DEFAULT;
+        c->cycling_wheel_diameter_mm = CYCLING_WHEEL_DIAMETER_MM_DEFAULT;
+        c->cycling_speed_float = CYCLING_SPEED_FLOAT_DEFAULT;
         config_store_validate(c);
         return true;
     }
@@ -525,7 +548,10 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         "\"bridge_watts\":%d,\"bridge_percent_x10\":%d,"
         "\"bridge_devices\":%s,"
         "\"bridge_bound\":%d,\"bridge_addr_type\":%d,"
-        "\"bridge_address\":\"%s\",\"bridge_name\":\"%s\"}",
+        "\"bridge_address\":\"%s\",\"bridge_name\":\"%s\","
+        "\"cycling_speed_x100\":%d,"
+        "\"cycling_wheel_diameter_mm\":%d,"
+        "\"cycling_speed_float\":%d}",
         c->schema_ver, c->power, c->cadence, c->mode,
         c->heartrate, c->has_user_hr,
         c->power_float, c->cadence_float, c->hr_float,
@@ -548,7 +574,10 @@ size_t config_store_serialize(const config_data_t *c, char *out, size_t out_sz)
         run_custom_esc,
         esc, c->bridge.source, c->bridge.calibration_mode,
         c->bridge.watts, c->bridge.percent_x10, bridge_devices,
-        primary->bound, primary->addr_type, address, bridge_esc);
+        primary->bound, primary->addr_type, address, bridge_esc,
+        c->cycling_speed_x100,
+        c->cycling_wheel_diameter_mm,
+        c->cycling_speed_float);
 
     if (n < 0 || (size_t)n >= sizeof(buf)) return 0;  /* 编码错误或内部缓冲不足 */
     if ((size_t)n >= out_sz) return 0;                /* 出参缓冲不足，不溢出 */
@@ -691,6 +720,9 @@ bool config_store_deserialize(const char *json, config_data_t *c)
         {"bridge_calibration", &tmp.bridge.calibration_mode},
         {"bridge_watts", &tmp.bridge.watts},
         {"bridge_percent_x10", &tmp.bridge.percent_x10},
+        {"cycling_speed_x100", &tmp.cycling_speed_x100},
+        {"cycling_wheel_diameter_mm", &tmp.cycling_wheel_diameter_mm},
+        {"cycling_speed_float", &tmp.cycling_speed_float},
     };
     for (size_t i = 0; i < sizeof(int_keys) / sizeof(int_keys[0]); i++) {
         if (json_member_value(json, int_keys[i].key)
@@ -726,9 +758,9 @@ bool config_store_deserialize(const char *json, config_data_t *c)
     const char *dp = json_member_value(json, "device_name");
     if (dp && (*dp != '"' || !json_unescape(dp + 1, tmp.device_name, DEVICE_NAME_MAX))) return false;
 
-    if (tmp.schema_ver == CONFIG_VERSION) {
+    if (tmp.schema_ver >= 14) {
         if (!parse_bridge_devices(json, &tmp.bridge)) return false;
-    } else if (tmp.schema_ver <= 13) {
+    } else {
         if (!parse_legacy_bridge(json, &tmp.bridge)) return false;
     }
 

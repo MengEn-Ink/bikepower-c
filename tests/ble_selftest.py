@@ -226,7 +226,7 @@ async def check_cycling_features(client, found, csc_expected=True):
         (SENSOR_LOCATION_UUID, bytes.fromhex("05")),
     ]
     if csc_expected:
-        checks.insert(1, (CSC_FEATURE_UUID, bytes.fromhex("0200")))
+        checks.insert(1, (CSC_FEATURE_UUID, bytes.fromhex("0300")))
     for uuid, expected in checks:
         try:
             characteristic = client.services.get_characteristic(uuid)

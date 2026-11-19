@@ -399,6 +399,7 @@ static esp_err_t h_api_runtime(httpd_req_t *req)
     cJSON_AddNumberToObject(object, "power", output.power);
     cJSON_AddNumberToObject(object, "cadence", output.cadence);
     cJSON_AddNumberToObject(object, "heartrate", output.heartrate);
+    cJSON_AddNumberToObject(object, "cycling_speed_x100", config.cycling_speed_x100);
     cJSON_AddNumberToObject(object, "run_speed_x100", running.speed_x100_kmh);
     cJSON_AddNumberToObject(object, "run_distance_m", running.total_distance_m);
     cJSON_AddNumberToObject(object, "run_elapsed_sec", running.elapsed_time_s);

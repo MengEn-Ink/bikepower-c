@@ -1374,8 +1374,8 @@ static void test_bridge_v14_json(void)
     v13.bridge.device_count = 1;
     memset(&v13.bridge.devices[1], 0,
            sizeof(v13.bridge.devices) - sizeof(v13.bridge.devices[0]));
-    CHECK(config_store_migrate(&v13), "v13 迁移到 v14");
-    CHECK(v13.schema_ver == 14 && v13.bridge.device_count == 1,
+    CHECK(config_store_migrate(&v13), "v13 迁移到当前版本");
+    CHECK(v13.schema_ver == CONFIG_VERSION && v13.bridge.device_count == 1,
           "v13 单设备绑定迁移后保留");
 
     const char *legacy_json =
@@ -1385,8 +1385,8 @@ static void test_bridge_v14_json(void)
         "\"bridge_percent_x10\":1000,\"bridge_name\":\"Legacy\"}";
     CHECK(config_store_deserialize(legacy_json, &restored),
           "v13 单设备 JSON 可迁移");
-    CHECK(restored.schema_ver == 14 && restored.bridge.device_count == 1,
-          "v13 JSON 迁移为 v14 单设备表");
+    CHECK(restored.schema_ver == CONFIG_VERSION && restored.bridge.device_count == 1,
+          "v13 JSON 迁移为当前版本单设备表");
     CHECK(restored.bridge.devices[0].addr_type == 1
               && restored.bridge.devices[0].addr[5] == 0x44
               && strcmp(restored.bridge.devices[0].name, "Legacy") == 0,
@@ -2031,7 +2031,7 @@ static void test_running_pacer_defaults(void)
     config_data_t c;
     config_store_defaults(&c);
 
-    CHECK(CONFIG_VERSION == 14, "配置 schema 版本升级到 14");
+    CHECK(CONFIG_VERSION == 15, "配置 schema 版本升级到 15");
     CHECK(c.run_mode == RUN_MODE_FIXED, "默认跑步模式为固定配速");
     CHECK(c.run_pacer_type == RUN_PACER_JOG, "默认跑步模板为慢跑");
     CHECK(c.run_pace_low_sec == 390, "默认跑步模板下限=6:30/km");

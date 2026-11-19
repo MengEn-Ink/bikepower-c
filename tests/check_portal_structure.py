@@ -58,11 +58,11 @@ def main():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     parts = [module.minify_html(html), module.minify_css(css), module.minify_js(js)]
-    for value, limit, name in zip(parts, (21, 24, 65), ("HTML", "CSS", "JS")):
+    for value, limit, name in zip(parts, (23, 24, 67), ("HTML", "CSS", "JS")):
         size = len(value.encode())
         check(size <= limit * 1024, f"{name} {size} bytes 超过 {limit} KiB")
     size = len(module.inline_html(*parts).encode())
-    check(size <= 110 * 1024, f"内联总量 {size} 超过 110 KiB")
+    check(size <= 115 * 1024, f"内联总量 {size} 超过 115 KiB")
     for error in errors:
         print("[TC-3d] FAIL", error)
     print(f"[TC-3d] {'FAIL' if errors else 'PASS'}: 内联 {size} bytes，{len(parser.ids)} 个唯一控件")
